@@ -1,0 +1,95 @@
+# The frequency to save trained models when training.
+save_step: 10000
+# The frequency to fetch and print output when training.
+print_step: 100
+# Path of the checkpoint, to resume the previous training
+init_from_checkpoint: ""
+# Path of the pretrain model, to better solve the current task
+init_from_pretrain_model: ""
+# Path of trained parameter, to make prediction
+init_from_params: "./trained_models/step_final/"
+# The directory for saving model
+save_model: "trained_models"
+# The directory for saving inference model 
+inference_model_dir: "infer_model"
+# Set seed for CE or debug
+random_seed: None
+# The file to output the translation results of predict_file to.
+output_file: "predict.txt"
+# The <bos>, <eos> and <unk> tokens in the dictionary.
+special_token: ["<s>", "<e>", "<unk>"]
+# The directory to store data.
+root: None
+
+# Whether to use cuda
+use_gpu: True
+
+# Args for reader, see reader.py for details
+pool_size: 200000
+sort_type: "global"
+batch_size: 4096
+infer_batch_size: 8
+shuffle_batch: True
+# Data shuffle only works when sort_type is pool or none
+shuffle: True
+# shuffle_seed must be set when shuffle is True and using multi-cards to train. 
+# Otherwise, the number of batches cannot be guaranteed. 
+shuffle_seed: 128
+
+# Hyparams for training:
+# The number of epoches for training
+epoch: 30
+
+# The hyper parameters for Adam optimizer.
+# This static learning_rate will be applied to the LearningRateScheduler
+# derived learning rate the to get the final learning rate.
+learning_rate: 2.0
+beta1: 0.9
+beta2: 0.997
+eps: 1e-9
+# The parameters for learning rate scheduling.
+warmup_steps: 8000
+# The weight used to mix up the ground-truth distribution and the fixed
+# uniform distribution in label smoothing when training.
+# Set this as zero if label smoothing is not wanted.
+label_smooth_eps: 0.1
+
+# Hyparams for generation:
+# The parameters for beam search.
+beam_size: 5
+max_out_len: 256
+# The number of decoded sentences to output.
+n_best: 1
+
+# Hyparams for model:
+# These following five vocabularies related configurations will be set
+# automatically according to the passed vocabulary path and special tokens.
+# Size of source word dictionary.
+src_vocab_size: 10000
+# Size of target word dictionay
+trg_vocab_size: 10000
+# Used to pad vocab size to be multiple of pad_factor.
+pad_factor: 8
+# Index for <bos> token
+bos_idx: 0
+# Index for <eos> token
+eos_idx: 1
+# Index for <unk> token
+unk_idx: 2
+# Max length of sequences deciding the size of position encoding table.
+max_length: 256
+# The dimension for word embeddings, which is also the last dimension of
+# the input and output of multi-head attention, position-wise feed-forward
+# networks, encoder and decoder.
+d_model: 512
+# Size of the hidden layer in position-wise feed-forward networks.
+d_inner_hid: 2048
+# Number of head used in multi-head attention.
+n_head: 8
+# Number of sub-layers to be stacked in the encoder and decoder.
+n_layer: 6
+# Dropout rates.
+dropout: 0.1
+# The flag indicating whether to share embedding and softmax weights.
+# Vocabularies in source and target should be same for weight sharing.
+weight_sharing: True
