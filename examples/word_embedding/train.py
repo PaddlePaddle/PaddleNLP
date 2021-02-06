@@ -37,7 +37,7 @@ parser.add_argument(
 parser.add_argument(
     "--save_dir",
     type=str,
-    default='chekpoints/',
+    default='./checkpoints/',
     help="Directory to save model checkpoint")
 parser.add_argument(
     "--batch_size",
