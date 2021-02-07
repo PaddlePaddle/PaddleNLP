@@ -35,26 +35,11 @@ DGU模型中的6个任务，分别采用不同的评估指标在test集上进行
 
 ## 快速开始
 
-### 安装说明
+### 环境配置
 
-* PaddlePaddle安装
-
-本项目依赖于PaddlePaddle 2.0.0及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* PaddleNLP安装
-
-```shell
-pip install paddlenlp>=2.0.0rc
-```
-
-* 环境依赖
-  - python>=3.6
-  - sentencepiece
-  - termcolor
-
-```shell
-pip install sentencepiece termcolor
-```
+- python >= 3.6
+- paddlepaddle >= 2.0.0, 安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
+- paddlenlp >= 2.0.0rc1, 安装方式：`pip install paddlenlp>=2.0.0rc1`
 
 ### 数据准备
 
