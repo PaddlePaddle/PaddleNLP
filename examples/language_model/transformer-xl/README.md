@@ -23,21 +23,23 @@
 
 ### 安装说明
 
-1. paddle安装
+ * PaddlePaddle安装
 
-    本项目依赖于 PaddlePaddle 2.0rc1及以上版本或适当的develop版本，请参考 [安装指南](https://www.paddlepaddle.org.cn/install/quick) 进行安装
+    本项目依赖于 PaddlePaddle 2.0 及以上版本或适当的develop版本，请参考 [安装指南](https://www.paddlepaddle.org.cn/install/quick) 进行安装
 
-2. 下载代码
+ * PaddleNLP安装
 
-    克隆代码库到本地
+```sh
+pip install paddlenlp==2.0.0rc
+```
 
-3. 环境依赖
+ * 环境依赖
+   - attrdict
+   - pyyaml
 
-    该模型使用PaddlePaddle，关于环境依赖部分，请先参考PaddlePaddle[安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/install/index_cn.html)关于环境依赖部分的内容。
-    此外，需要另外涉及：
-      * attrdict
-      * pyyaml
-
+``` sh
+pip install attrdict pyyaml
+```
 
 
 ### 数据准备
