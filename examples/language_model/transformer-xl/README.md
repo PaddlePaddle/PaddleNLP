@@ -25,7 +25,7 @@
 
  * PaddlePaddle安装
 
-    本项目依赖于 PaddlePaddle 2.0 及以上版本或适当的develop版本，请参考 [安装指南](https://www.paddlepaddle.org.cn/install/quick) 进行安装
+    本项目依赖于 PaddlePaddle 2.0.0 及以上版本或适当的develop版本，请参考 [安装指南](https://www.paddlepaddle.org.cn/install/quick) 进行安装
 
  * PaddleNLP安装
 
