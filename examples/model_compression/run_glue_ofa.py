@@ -269,11 +269,11 @@ def convert_example(example,
         if len(seqs) == 1:  # single sentence
             # Account for [CLS] and [SEP] with "- 2"
             seqs[0] = seqs[0][0:(max_seq_length - 2)]
-        else:  # sentence pair
+        else:  # Sentence pair
             # Account for [CLS], [SEP], [SEP] with "- 3"
             tokens_a, tokens_b = seqs
             max_seq_length -= 3
-            while True:  # truncate with longest_first strategy
+            while True:  # Truncate with longest_first strategy
                 total_length = len(tokens_a) + len(tokens_b)
                 if total_length <= max_seq_length:
                     break
@@ -300,10 +300,10 @@ def convert_example(example,
     if not is_test:
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
-        # get the label
+        # Get the label
         label = example[-1]
         example = example[:-1]
-        #create label maps if classification task
+        # Create label maps if classification task
         if label_list:
             label_map = {}
             for (i, l) in enumerate(label_list):
@@ -311,24 +311,33 @@ def convert_example(example,
             label = label_map[label]
         label = np.array([label], dtype=label_dtype)
 
-    # tokenize raw text
+    # Tokenize raw text
+    if len(example) == 1:
+        example = tokenizer(example[0], max_seq_len=max_seq_length)
+    else:
+        example = tokenizer(
+            example[0], text_pair=example[1], max_seq_len=max_seq_length)
+    '''
     tokens_raw = [tokenizer(l) for l in example]
-    # truncate to the truncate_length,
+    # Truncate to the truncate_length,
     tokens_trun = _truncate_seqs(tokens_raw, max_seq_length)
-    # concate the sequences with special tokens
+    # Concate the sequences with special tokens
     tokens_trun[0] = [tokenizer.cls_token] + tokens_trun[0]
     tokens, segment_ids, _ = _concat_seqs(tokens_trun, [[tokenizer.sep_token]] *
                                           len(tokens_trun))
-    # convert the token to ids
+    # Convert the token to ids
     input_ids = tokenizer.convert_tokens_to_ids(tokens)
     valid_length = len(input_ids)
     # The mask has 1 for real tokens and 0 for padding tokens. Only real
     # tokens are attended to.
     # input_mask = [1] * len(input_ids)
+    '''
     if not is_test:
-        return input_ids, segment_ids, valid_length, label
+        return example['input_ids'], example['segment_ids'], len(example[
+            'input_ids']), label
     else:
-        return input_ids, segment_ids, valid_length
+        return example['input_ids'], example['segment_ids'], len(example[
+            'input_ids'])
 
 
 def do_train(args):

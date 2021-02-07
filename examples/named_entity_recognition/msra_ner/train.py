@@ -149,6 +149,7 @@ def convert_example(example,
                     tokens_b.pop()
         return seqs
 
+    '''
     def _concat_seqs(seqs, separators, seq_mask=0, separator_mask=1):
         concat = sum((seq + sep for sep, seq in zip(separators, seqs)), [])
         segment_ids = sum(
@@ -162,6 +163,7 @@ def convert_example(example,
                       for sep, seq, s_mask, mask in zip(
                           separators, seqs, seq_mask, separator_mask)), [])
         return concat, segment_ids, p_mask
+    '''
 
     def _reseg_token_label(tokens, tokenizer, labels=None):
         if labels:
@@ -171,7 +173,7 @@ def convert_example(example,
             ret_tokens = []
             ret_labels = []
             for token, label in zip(tokens, labels):
-                sub_token = tokenizer(token)
+                sub_token = tokenizer._tokenize(token)
                 if len(sub_token) == 0:
                     continue
                 ret_tokens.extend(sub_token)
@@ -190,7 +192,7 @@ def convert_example(example,
         else:
             ret_tokens = []
             for token in tokens:
-                sub_token = tokenizer(token)
+                sub_token = tokenizer._tokenize(token)
                 if len(sub_token) == 0:
                     continue
                 ret_tokens.extend(sub_token)
@@ -212,6 +214,10 @@ def convert_example(example,
 
     tokens_raw, labels_raw = _reseg_token_label(
         tokens=example, labels=label, tokenizer=tokenizer)
+
+    encoded_input = tokenizer(
+        tokens_raw, is_split_into_words=True, max_seq_len=max_seq_length)
+    '''
     # truncate to the truncate_length,
     tokens_trun = _truncate_seqs([tokens_raw], max_seq_length)
     # concate the sequences with special tokens
@@ -220,15 +226,18 @@ def convert_example(example,
                                           len(tokens_trun))
     # convert the token to ids
     input_ids = tokenizer.convert_tokens_to_ids(tokens)
-    valid_length = len(input_ids)
+    '''
+    valid_length = len(encoded_input['input_ids'])
     if labels_raw:
         labels_trun = _truncate_seqs([labels_raw], max_seq_length)[0]
         labels_id = [no_entity_id] + [label_map[lbl]
                                       for lbl in labels_trun] + [no_entity_id]
     if not is_test:
-        return input_ids, segment_ids, valid_length, labels_id
+        return encoded_input['input_ids'], encoded_input[
+            'segment_ids'], valid_length, labels_id
     else:
-        return input_ids, segment_ids, valid_length
+        return encoded_input['input_ids'], encoded_input[
+            'segment_ids'], valid_length
 
 
 def do_train(args):
