@@ -123,28 +123,23 @@ def evaluate(model, loss_fct, metric, data_loader, label_num):
     model.train()
 
 
-def tokenize_and_align_labels(examples,
-                              tokenizer,
-                              no_entity_id,
+def tokenize_and_align_labels(example, tokenizer, no_entity_id,
                               max_seq_len=512):
-    labels = [examples[i]['labels'] for i in range(len(examples))]
-    examples = [examples[i]['tokens'] for i in range(len(examples))]
-    tokenized_inputs = tokenizer(
-        examples,
+    labels = example['labels']
+    example = example['tokens']
+    tokenized_input = tokenizer(
+        example,
         return_length=True,
         is_split_into_words=True,
         max_seq_len=max_seq_len)
 
-    for i in range(len(tokenized_inputs)):
-        if len(tokenized_inputs[i]['input_ids']) - 2 < len(labels[i]):
-            labels[i] = labels[i][:len(tokenized_inputs[i]['input_ids']) - 2]
-        tokenized_inputs[i]['labels'] = [no_entity_id] + labels[
-            i] + [no_entity_id]
-        tokenized_inputs[i]['labels'] += [no_entity_id] * (
-            len(tokenized_inputs[i]['input_ids']) -
-            len(tokenized_inputs[i]['labels']))
+    if len(tokenized_input['input_ids']) - 2 < len(labels):
+        labels = labels[:len(tokenized_input['input_ids']) - 2]
+    tokenized_input['labels'] = [no_entity_id] + labels + [no_entity_id]
+    tokenized_input['labels'] += [no_entity_id] * (
+        len(tokenized_input['input_ids']) - len(tokenized_input['labels']))
 
-    return tokenized_inputs
+    return tokenized_input
 
 
 def do_train(args):
@@ -167,12 +162,14 @@ def do_train(args):
         max_seq_len=args.max_seq_length)
 
     train_dataset = train_dataset.map(trans_func)
+    train_dataset = train_dataset.shard()
+    '''
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_dataset,
         batch_size=args.batch_size,
         shuffle=False,
         drop_last=True)
-
+    '''
     ignore_label = -100
 
     batchify_fn = lambda samples, fn=Dict({
@@ -184,19 +181,21 @@ def do_train(args):
 
     train_data_loader = DataLoader(
         dataset=train_dataset,
-        batch_sampler=train_batch_sampler,
         collate_fn=batchify_fn,
         num_workers=0,
+        batch_size=args.batch_size,
         return_list=True)
 
     test_dataset = test_dataset.map(trans_func)
+    '''
     dev_batch_sampler = paddle.io.BatchSampler(
         test_dataset, batch_size=args.batch_size, shuffle=False, drop_last=True)
+    '''
     test_data_loader = DataLoader(
         dataset=test_dataset,
-        batch_sampler=dev_batch_sampler,
         collate_fn=batchify_fn,
         num_workers=0,
+        batch_size=args.batch_size,
         return_list=True)
 
     model = BertForTokenClassification.from_pretrained(
@@ -204,8 +203,7 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    num_training_steps = args.max_steps if args.max_steps > 0 else len(
-        train_data_loader) * args.num_train_epochs
+    num_training_steps = args.max_steps if args.max_steps > 0 else 300
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_steps)

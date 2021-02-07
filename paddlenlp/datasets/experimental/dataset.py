@@ -144,21 +144,19 @@ class MapDataset(Dataset):
         if 'label_list' in kargs.keys():
             self.label_list = kargs['label_list']
 
-    def _transform(self, data, pipline):
-        for fn in reversed(pipline):
+    def _transform(self, data):
+        for fn in reversed(self._transform_pipline):
             data = fn(data)
         return data
 
     def __iter__(self):
         for example in self.new_data:
             yield self._transform(
-                example,
-                self._transform_pipline) if self._transform_pipline else example
+                example) if self._transform_pipline else example
 
     def __getitem__(self, idx):
-        return self._transform(
-            self.new_data[idx], self._transform_pipline
-        ) if self._transform_pipline else self.new_data[idx]
+        return self._transform(self.new_data[
+            idx]) if self._transform_pipline else self.new_data[idx]
 
     def __len__(self):
         return len(self.new_data)
@@ -241,28 +239,32 @@ class IterDataset(IterableDataset):
         self.data = data
         self._transform_pipline = []
         self._filter_pipline = []
-        self.new_data = self.data
         if 'label_list' in kargs.keys():
             self.label_list = kargs['label_list']
 
-    def _transform(self, data, pipline):
-        for fn in reversed(pipline):
+    def _transform(self, data):
+        for fn in reversed(self._transform_pipline):
             data = fn(data)
         return data
 
-    def _filter(self, data, pipline):
-        for fn in pipline:
+    def _filter(self, data):
+        for fn in self._filter_pipline:
             if not fn(data):
                 return False
         return True
 
+    def _shard_filter(self, num_samples):
+        return True
+
     def __iter__(self):
-        for example in self.new_data:
-            if not self._filter_pipline or self._filter(example,
-                                                        self._filter_pipline):
+        num_samples = 0
+        for example in self.data:
+            if (not self._filter_pipline or
+                    self._filter(self._filter_pipline)) and self._shard_filter(
+                        num_samples=num_samples):
                 yield self._transform(
-                    example, self.
-                    _transform_pipline) if self._transform_pipline else example
+                    example) if self._transform_pipline else example
+            num_samples += 1
 
     def filter(self, fn):
         """
@@ -293,16 +295,14 @@ class IterDataset(IterableDataset):
         if index is None:
             index = dist.get_rank()
 
-        def shard_filter(data, num_shards, index):
-            if dist.get_rank() != index or dist.get_rank() > num_shards:
-                return False
-            else:
+        def sharder(num_shards, index, num_samples):
+            if num_samples % num_shards == index:
                 return True
+            else:
+                return False
 
-        fn = partial(shard_filter, num_shards=num_shards, index=index)
-
-        self._filter_pipline.append(fn)
-
+        fn = partial(sharder, num_shards=num_shards, index=index)
+        self._shard_filter = fn
         return self
 
     def map(self, fn):
