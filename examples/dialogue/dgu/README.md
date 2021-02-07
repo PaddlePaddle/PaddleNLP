@@ -39,7 +39,7 @@ DGU模型中的6个任务，分别采用不同的评估指标在test集上进行
 
 - python >= 3.6
 - paddlepaddle >= 2.0.0, 安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-- paddlenlp >= 2.0.0rc1, 安装方式：`pip install paddlenlp>=2.0.0rc1`
+- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp==2.0.0rc`
 
 ### 数据准备
 

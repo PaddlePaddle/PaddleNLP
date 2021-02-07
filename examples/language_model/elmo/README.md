@@ -18,7 +18,7 @@ ELMo(Embeddings from Language Models)是重要的通用语义表示模型之一�
 
 - python >= 3.6
 - paddlepaddle >= 2.0.0, 安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-- paddlenlp >= 2.0.0rc1, 安装方式：`pip install paddlenlp>=2.0.0rc1`
+- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp==2.0.0rc`
 - sklearn gensim, 安装方式：`pip install sklearn gensim`
 
 ### 代码结构说明
