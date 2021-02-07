@@ -83,10 +83,10 @@ query title label
 
 ### 模型训练
 
-在模型训练之前，需要先下载词汇表文件term2id.dict，用于构造词-id映射关系。
+在模型训练之前，需要先下载词汇表文件simnet_vocab.txt，用于构造词-id映射关系。
 
 ```shell
-wget https://paddlenlp.bj.bcebos.com/data/simnet_word_dict.txt
+wget https://paddlenlp.bj.bcebos.com/data/simnet_vocab.txt
 ```
 
 我们以中文文本匹配数据集LCQMC为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
@@ -95,14 +95,14 @@ CPU启动：
 
 ```shell
 CPU启动
-python train.py --vocab_path='./simnet_word_dict.txt' --use_gpu=False --network=lstm --lr=5e-4 --batch_size=64 --epochs=5 --save_dir='./checkpoints'
+python train.py --vocab_path='./simnet_vocab.txt' --use_gpu=False --network=lstm --lr=5e-4 --batch_size=64 --epochs=5 --save_dir='./checkpoints'
 ```
 
 GPU启动：
 
 ```shell
 CUDA_VISIBLE_DEVICES=0
-python train.py --vocab_path='./simnet_word_dict.txt' --use_gpu=True --network=lstm --lr=5e-4 --batch_size=64 --epochs=5 --save_dir='./checkpoints'
+python train.py --vocab_path='./simnet_vocab.txt' --use_gpu=True --network=lstm --lr=5e-4 --batch_size=64 --epochs=5 --save_dir='./checkpoints'
 ```
 
 以上参数表示：
@@ -138,13 +138,13 @@ checkpoints/
 CPU启动：
 
 ```shell
-python predict.py --vocab_path='./simnet_word_dict.txt' --use_gpu=False --network=lstm --params_path=checkpoints/final.pdparams
+python predict.py --vocab_path='./simnet_vocab.txt' --use_gpu=False --network=lstm --params_path=checkpoints/final.pdparams
 ```
 
 GPU启动：
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python predict.py --vocab_path='./simnet_word_dict.txt' --use_gpu=True --network=lstm --params_path='./checkpoints/final.pdparams'
+CUDA_VISIBLE_DEVICES=0 python predict.py --vocab_path='./simnet_vocab.txt' --use_gpu=True --network=lstm --params_path='./checkpoints/final.pdparams'
 ```
 
 将待预测数据分词完毕后，如以下示例：
