@@ -73,7 +73,7 @@ class Demo:
 
 if __name__ == "__main__":
     demo = Demo("gpt2-base-cn")
-    demo.ask_question("百度的厂长是谁?")
+    demo.ask_question("苹果的CEO是谁?")
     demo.dictation_poetry("举杯邀明月，")
     del demo
     # demo = Demo("gpt2-medium-en")
