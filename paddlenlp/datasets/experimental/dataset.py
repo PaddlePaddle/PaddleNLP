@@ -18,8 +18,8 @@ import io
 import math
 import os
 import warnings
+import sys
 
-import abc
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset
 from paddle.dataset.common import md5file
@@ -27,36 +27,35 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 import importlib
-import inspect
+from functools import partial
 
-__all__ = ['MapDataset', 'DatasetReader', 'IterDataset', 'load_dataset']
+__all__ = ['MapDataset', 'DatasetBuilder', 'IterDataset', 'load_dataset']
 
-DATASETS_PATH = "paddlenlp.datasets.experimental."
+DATASETS_MODULE_PATH = "paddlenlp.datasets.experimental."
 
 
 def import_main_class(module_path):
-    """Import a module at module_path and return its main class:
-    - a DatasetBuilder if dataset is True
-    - a Metric if dataset is False
-    """
+    """Import a module at module_path and return its main class.
 
+    """
     module = importlib.import_module(module_path)
-    main_cls_type = DatasetReader
+    main_cls_type = DatasetBuilder
 
     # Find the main class in our imported module
     module_main_cls = None
     for name, obj in module.__dict__.items():
         if isinstance(obj, type) and issubclass(obj, main_cls_type):
-            if name == 'DatasetReader':
+            if name == 'DatasetBuilder':
                 continue
             module_main_cls = obj
             break
+
     return module_main_cls
 
 
 def load_dataset(name, data_files=None, splits=None, lazy=False):
 
-    module_path = DATASETS_PATH + name
+    module_path = DATASETS_MODULE_PATH + name
 
     reader_cls = import_main_class(module_path)
     reader_instance = reader_cls(lazy)
@@ -234,13 +233,14 @@ class IterDataset(IterableDataset):
     `map` and other utility methods. All non-magic methods of the raw object
     also accessible.
     Args:
-        data (list|Dataset): A dataset-like object. It can be a list or a
+        data (Iterable): A dataset-like object. It can be a Iterable or a
             subclass of Dataset.
     """
 
     def __init__(self, data, **kargs):
         self.data = data
         self._transform_pipline = []
+        self._filter_pipline = []
         self.new_data = self.data
         if 'label_list' in kargs.keys():
             self.label_list = kargs['label_list']
@@ -250,11 +250,60 @@ class IterDataset(IterableDataset):
             data = fn(data)
         return data
 
+    def _filter(self, data, pipline):
+        for fn in pipline:
+            if not fn(data):
+                return False
+        return True
+
     def __iter__(self):
         for example in self.new_data:
-            yield self._transform(
-                example,
-                self._transform_pipline) if self._transform_pipline else example
+            if not self._filter_pipline or self._filter(example,
+                                                        self._filter_pipline):
+                yield self._transform(
+                    example, self.
+                    _transform_pipline) if self._transform_pipline else example
+
+    def filter(self, fn):
+        """
+        Filters samples by the filter function and uses the filtered data to
+        update this dataset.
+        Args:
+            fn (callable): A filter function that takes a sample as input and
+                returns a boolean. Samples that return False are discarded.
+        """
+
+        self._filter_pipline.append(fn)
+
+        return self
+
+    def shard(self, num_shards=None, index=None):
+        """
+        Use samples whose indices mod `index` equals 0 to update this dataset.
+        Args:
+            num_shards (int, optional): A integer representing the number of
+                data shards. If None, `num_shards` would be number of trainers.
+                Default: None
+            index (int, optional): A integer representing the index of the
+                current shard. If None, index` would be the current trainer rank
+                id. Default: None.
+        """
+        if num_shards is None:
+            num_shards = dist.get_world_size()
+        if index is None:
+            index = dist.get_rank()
+
+        def shard_filter(data, num_shards, index):
+            if dist.get_rank() != index or dist.get_rank() > num_shards:
+                return False
+            else:
+                return True
+
+        fn = partial(shard_filter, num_shards=num_shards, index=index)
+
+        self._filter_pipline.append(fn)
+
+        return self
 
     def map(self, fn):
         """
@@ -276,9 +325,9 @@ class IterDataset(IterableDataset):
         return getattr(self.data, name)
 
 
-class DatasetReader:  #builder
+class DatasetBuilder:
     """
-    A base class for all DatasetReaders. It provides a `read()` function to turn 
+    A base class for all DatasetBuilder. It provides a `read()` function to turn 
     a data file into a MapDataset or IterDataset.
 
     `_get_data()` function and `_read()` function should be implemented to download

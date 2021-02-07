@@ -8,13 +8,13 @@ from paddle.utils.download import get_path_from_url
 from paddle.dataset.common import md5file
 from paddlenlp.utils.env import DATA_HOME
 import paddle.distributed as dist
-from . import DatasetReader
+from . import DatasetBuilder
 import numpy as np
 
 __all__ = ['PTB']
 
 
-class PTB(DatasetReader):
+class PTB(DatasetBuilder):
     URL = 'http://www.fit.vutbr.cz/~imikolov/rnnlm/simple-examples.tgz'
     MD5 = None
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
