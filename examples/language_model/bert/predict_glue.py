@@ -33,43 +33,36 @@ def parse_args():
         type=str,
         required=True,
         help="The name of the task to perform predict, selected in the list: " +
-        ", ".join(TASK_CLASSES.keys()),
-    )
+        ", ".join(TASK_CLASSES.keys()), )
     parser.add_argument(
         "--model_type",
         default=None,
         type=str,
         required=True,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()),
-    )
+        ", ".join(MODEL_CLASSES.keys()), )
     parser.add_argument(
         "--model_path",
         default=None,
         type=str,
         required=True,
-        help="The path prefix of inference model to be used.",
-    )
+        help="The path prefix of inference model to be used.", )
     parser.add_argument(
         "--select_device",
         default="gpu",
         choices=["gpu", "cpu", "xpu"],
-        help="Device selected for inference.",
-    )
+        help="Device selected for inference.", )
     parser.add_argument(
         "--batch_size",
         default=32,
         type=int,
-        help="Batch size for predict.",
-    )
+        help="Batch size for predict.", )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help=
-        "The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.",
-    )
+        help="The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.", )
     args = parser.parse_args()
     return args
 
@@ -108,8 +101,8 @@ class Predictor(object):
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
-            input_handle.copy_from_cpu(input_field.numpy(
-            ) if isinstance(input_field, paddle.Tensor) else input_field)
+            input_handle.copy_from_cpu(input_field.numpy() if isinstance(
+                input_field, paddle.Tensor) else input_field)
         self.predictor.run()
         output = [
             output_handle.copy_to_cpu() for output_handle in self.output_handles
@@ -117,14 +110,14 @@ class Predictor(object):
         return output
 
     def predict(self, dataset, collate_fn, batch_size=1):
-        batch_sampler = paddle.io.BatchSampler(dataset,
-                                               batch_size=batch_size,
-                                               shuffle=False)
-        data_loader = paddle.io.DataLoader(dataset=dataset,
-                                           batch_sampler=batch_sampler,
-                                           collate_fn=collate_fn,
-                                           num_workers=0,
-                                           return_list=True)
+        batch_sampler = paddle.io.BatchSampler(
+            dataset, batch_size=batch_size, shuffle=False)
+        data_loader = paddle.io.DataLoader(
+            dataset=dataset,
+            batch_sampler=batch_sampler,
+            collate_fn=collate_fn,
+            num_workers=0,
+            return_list=True)
         outputs = []
         for data in data_loader:
             output = self.predict_batch(data)
@@ -143,13 +136,14 @@ def main():
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     dataset = dataset_class.get_datasets("test")
-    tokenizer = tokenizer_class.from_pretrained(os.path.dirname(
-        args.model_path))
-    transform_fn = partial(convert_example,
-                           tokenizer=tokenizer,
-                           label_list=dataset.get_labels(),
-                           max_seq_length=args.max_seq_length,
-                           is_test=True)
+    tokenizer = tokenizer_class.from_pretrained(
+        os.path.dirname(args.model_path))
+    transform_fn = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        label_list=dataset.get_labels(),
+        max_seq_length=args.max_seq_length,
+        is_test=True)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
@@ -157,9 +151,8 @@ def main():
     ): [data for i, data in enumerate(fn(samples)) if i != 2]
     dataset = dataset.apply(transform_fn)
 
-    predictor.predict(dataset,
-                      batch_size=args.batch_size,
-                      collate_fn=batchify_fn)
+    predictor.predict(
+        dataset, batch_size=args.batch_size, collate_fn=batchify_fn)
 
 
 if __name__ == "__main__":
