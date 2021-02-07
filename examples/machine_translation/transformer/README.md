@@ -47,7 +47,7 @@ Decoder 具有和 Encoder 类似的结构，只是相比于组成 Encoder 的 la
 * PaddleNLP安装
 
 ```shell
-pip install paddlenlp>=2.0.0rc
+pip install paddlenlp==2.0.0rc
 ```
 
 * 环境依赖

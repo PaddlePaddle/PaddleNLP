@@ -268,7 +268,9 @@ class TransformerModel(nn.Layer):
                                                   transpose_y=True)
         else:
             self.linear = nn.Linear(
-                input_dim=d_model, output_dim=trg_vocab_size, bias_attr=False)
+                in_features=d_model,
+                out_features=trg_vocab_size,
+                bias_attr=False)
 
     def forward(self, src_word, trg_word):
         src_max_len = paddle.shape(src_word)[-1]
@@ -294,21 +296,21 @@ class TransformerModel(nn.Layer):
             enc_input = F.dropout(
                 src_emb, p=self.dropout,
                 training=self.training) if self.dropout else src_emb
-            
+
             trg_emb = self.trg_word_embedding(trg_word)
             trg_pos_emb = self.trg_pos_embedding(trg_pos)
             trg_emb = trg_emb + trg_pos_emb
             dec_input = F.dropout(
                 trg_emb, p=self.dropout,
                 training=self.training) if self.dropout else trg_emb
-            
+
             dec_output = self.transformer(
                 enc_input,
                 dec_input,
                 src_mask=src_slf_attn_bias,
                 tgt_mask=trg_slf_attn_bias,
                 memory_mask=trg_src_attn_bias)
-            
+
             predict = self.linear(dec_output)
 
         return predict
