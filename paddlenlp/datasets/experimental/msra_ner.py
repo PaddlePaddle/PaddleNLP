@@ -20,12 +20,12 @@ from paddle.io import Dataset
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
-from . import DatasetReader
+from . import DatasetBuilder
 
 __all__ = ['MSRA_NER']
 
 
-class MSRA_NER(DatasetReader):
+class MSRA_NER(DatasetBuilder):
     URL = "https://paddlenlp.bj.bcebos.com/datasets/msra_ner.tar.gz"
     MD5 = None
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))

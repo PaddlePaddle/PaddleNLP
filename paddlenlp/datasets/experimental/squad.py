@@ -9,12 +9,12 @@ from paddle.utils.download import get_path_from_url
 from paddle.io import Dataset
 from paddlenlp.utils.env import DATA_HOME
 from paddlenlp.transformers.tokenizer_utils import _is_whitespace, _is_control, convert_to_unicode
-from . import DatasetReader
+from . import DatasetBuilder
 
 __all__ = ['SQuAD']
 
 
-class SQuAD(DatasetReader):
+class SQuAD(DatasetBuilder):
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
 
     SPLITS = {

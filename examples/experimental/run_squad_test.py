@@ -3,8 +3,9 @@ from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from functools import partial
 from paddle.io import DataLoader
+from paddlenlp.datasets.experimental import load_dataset
 
-train_ds, dev_ds = SQuAD().read_datasets('train_v2', 'dev_v2')
+train_ds, dev_ds = load_dataset('squad', splits=('train_v2', 'dev_v2'))
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
 print(len(train_ds))
