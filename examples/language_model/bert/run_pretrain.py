@@ -41,8 +41,10 @@ logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger(__name__)
 
 MODEL_CLASSES = {
-    "bert": (BertForPretraining, BertTokenizer),
-    "ernie": (ErnieForPretraining, ErnieTokenizer)
+    "bert":
+    (BertModel, BertForPretraining, BertPretrainingCriterion, BertTokenizer),
+    "ernie":
+    (ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer)
 }
 
 
@@ -289,16 +291,16 @@ def do_train(args):
     worker_init = WorkerInitObj(args.seed + paddle.distributed.get_rank())
 
     args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[
+        args.model_type]
 
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    model = BertForPretraining(
-        BertModel(**model_class.pretrained_init_configuration[
+    model = model_class(
+        base_class(**model_class.pretrained_init_configuration[
             args.model_name_or_path]))
-    criterion = BertPretrainingCriterion(
-        getattr(model, BertForPretraining.base_model_prefix).config[
-            "vocab_size"])
+    criterion = criterion_class(
+        getattr(model, model_class.base_model_prefix).config["vocab_size"])
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -328,8 +330,8 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if os.path.isfile(os.path.join(args.input_dir, f)) and "training" in
-            f
+            if os.path.isfile(os.path.join(args.input_dir, f)) and
+            "training" in f
         ]
         files.sort()
         num_files = len(files)
