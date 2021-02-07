@@ -12,9 +12,9 @@ ERNIE-GEN 是面向生成任务的预训练-微调框架，首次在预训练阶
 
 - Python >= 3.6
 
-- paddlepaddle >= 2.0.0rc1，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
+- paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
 
-- paddlenlp >= 2.0.0b, 安装方式：`pip install paddlenlp\>=2.0.0b`
+- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp\>=2.0.0rc`
 
 - tqdm，安装方式：`pip install tqdm`
 
