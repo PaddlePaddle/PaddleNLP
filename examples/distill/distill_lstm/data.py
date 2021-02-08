@@ -14,20 +14,17 @@
 # limitations under the License.
 
 import io
-import os
 from functools import partial
 import gensim
 import numpy as np
 import jieba
 
 import paddle
-from paddle.metric import Metric, Accuracy, Precision, Recall
 from paddlenlp.data import Stack, Tuple, Pad, Vocab
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
+from paddlenlp.transformers import BertTokenizer
 from paddlenlp.datasets import GlueSST2, GlueQQP, ChnSentiCorp
-from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 
-from utils import convert_small_example, convert_two_example, convert_pair_example, convert_example
+from utils import convert_small_example, convert_two_example, convert_pair_example
 
 TASK_CLASSES = {
     "sst-2": GlueSST2,
@@ -68,6 +65,24 @@ def load_embedding(vocab_path,
     return emb_tensor
 
 
+def ngram_sampling(words, words_2=None, p_ng=0.25, ngram_range=(2, 6)):
+    if np.random.rand() < p_ng:
+        ngram_len = np.random.randint(ngram_range[0], ngram_range[1] + 1)
+        ngram_len = min(ngram_len, len(words))
+        start = np.random.randint(0, len(words) - ngram_len + 1)
+        words = words[start:start + ngram_len]
+        if words_2:
+            words_2 = words_2[start:start + ngram_len]
+    return words if not words_2 else (words, words_2)
+
+
+def flatten(list_of_list):
+    final_list = []
+    for each_list in list_of_list:
+        final_list += each_list
+    return final_list
+
+
 def apply_data_augmentation(task_name,
                             train_dataset,
                             tokenizer,
@@ -76,102 +91,94 @@ def apply_data_augmentation(task_name,
                             p_ng=0.25,
                             ngram_range=(2, 6)):
     """
-    Data Augmentation after texts are tokenized. 
-    For example:
-    train_ds[0] = [['hide', 'new', 'secret', '##ions', 'from', 
-        'the', 'parental', 'units'], '0']
+    Data Augmentation contains Masking and n-gram sampling. Tokenization and
+    Masking are performed at the same time, so that the masked token can be
+    directly replaced by `mask_token`, after what sampling is performed.
     """
-    used_texts = []
-    if task_name == 'qqp':
-        tokenized_text = [[tokenizer(data[0]), tokenizer(data[1]), data[2]]
-                          for data in train_dataset]
-        used_texts += [" ".join(token_list[0]) for token_list in tokenized_text]
-        used_texts += [" ".join(token_list[1]) for token_list in tokenized_text]
-    else:
-        tokenized_text = [[tokenizer(data[0]), data[1]]
-                          for data in train_dataset]
-        used_texts += [" ".join(token_list[0]) for token_list in tokenized_text]
+
+    def _data_augmentation(data):
+        # 1. Masking
+        words = []
+        for word in data.split():
+            words += [[tokenizer.mask_token]] if np.random.rand(
+            ) < p_mask else [tokenizer(word)]
+        # 2. n-gram sampling
+        words = ngram_sampling(words, p_ng=p_ng, ngram_range=ngram_range)
+        words = flatten(words)
+        new_text = " ".join(words)
+        return words, new_text
+
+    used_texts, new_data = [], []
+    for data in train_dataset:
+        data_list = tokenizer(data[0])
+        used_texts.append(" ".join(data_list))
+        if task_name == 'qqp':
+            data_list_2 = tokenizer(data[1])
+            used_texts.append(" ".join(data_list_2))
+            new_data.append([data_list, data_list_2, data[2]])
+        else:
+            new_data.append([data_list, data[1]])
 
     used_texts = set(used_texts)
-    new_data = []
 
-    for idx in range(len(tokenized_text)):
-        new_data.append(tokenized_text[idx])
+    for data in train_dataset:
         for _ in range(n_iter):
-            # 1. Masking
-            words = [
-                tokenizer.unk_token if np.random.rand() < p_mask and
-                not word.startswith('##') else word
-                for word in tokenized_text[idx][0]
-            ]
-            # 2. n-gram sampling
-            if np.random.rand() < p_ng:
-                ngram_len = np.random.randint(ngram_range[0],
-                                              ngram_range[1] + 1)
-                ngram_len = min(ngram_len, len(words))
-                start = np.random.randint(0, len(words) - ngram_len + 1)
-                words = words[start:start + ngram_len]
-            new_text = " ".join(words)
+            words, new_text = _data_augmentation(data[0])
             if task_name == 'qqp':
-                # 1. Masking
-                words_2 = [
-                    tokenizer.unk_token if np.random.rand() < p_mask and
-                    not word.startswith('##') else word
-                    for word in tokenized_text[idx][1]
-                ]
-                # 2. n-gram sampling
-                if np.random.rand() < p_ng:
-                    ngram_len = np.random.randint(ngram_range[0],
-                                                  ngram_range[1] + 1)
-                    ngram_len = min(ngram_len, len(words_2))
-                    start = np.random.randint(0, len(words_2) - ngram_len + 1)
-                    words_2 = words_2[start:start + ngram_len]
-                new_text_2 = " ".join(words)
+                words_2, new_text_2 = _data_augmentation(data[1])
                 if new_text not in used_texts or new_text_2 not in used_texts:
-                    new_data.append([words, words_2, tokenized_text[idx][2]])
+                    new_data.append([words, words_2, data[2]])
                     used_texts.add(new_text)
                     used_texts.add(new_text_2)
             else:
                 if new_text not in used_texts:
-                    new_data.append([words, tokenized_text[idx][1]])
+                    new_data.append([words, data[1]])
                     used_texts.add(new_text)
-
     train_dataset.data.data = new_data
 
     return train_dataset
 
 
 def apply_data_augmentation_for_cn(train_dataset,
+                                   tokenizer,
+                                   vocab,
                                    n_iter=20,
                                    p_mask=0.1,
                                    p_ng=0.25,
                                    ngram_range=(2, 6)):
-    """Only Chinese dataset could be applied data augmentation on raw data.
-    Because bert-base-chinese and jieba could both convert 'MASK' to '[UNK]',
-    and we could transform a same example in two ways(two Chinese tokenizer).
+    """
+    Because BERT and jieba have different `tokenize` function, so it returns
+     `[jieba_tokenizer(data[0], bert_tokenizer(data[0]), data[1])]` for each
+    data in dataset.
+    jieba tokenization and Masking are performed at the same time, so that the
+    masked token can be directly replaced by `mask_token`, and other tokens
+    could be stored or tokenized by BERT tokenization, from which tokenized
+    data for student model and teacher model would get at the same time.
     """
     used_texts = [data[0] for data in train_dataset]
     used_texts = set(used_texts)
     new_data = []
     for data in train_dataset:
-        new_data.append(data)
-
+        words = [word for word in jieba.cut(data[0])]
+        words_bert = tokenizer(data[0])
+        new_data.append([words, words_bert, data[1]])
         for _ in range(n_iter):
             # 1. Masking
-            words = [
-                "MASK" if np.random.rand() < p_mask else word
-                for word in jieba.cut(data[0])
-            ]
+            words, words_bert = [], []
+            for word in jieba.cut(data[0]):
+                if np.random.rand() < p_mask:
+                    words.append([tokenizer.mask_token])
+                    words_bert.append([vocab.mask_token])
+                else:
+                    words.append([word])
+                    words_bert.append(tokenizer(word))
             # 2. n-gram sampling
-            if np.random.rand() < p_ng:
-                ngram_len = np.random.randint(ngram_range[0],
-                                              ngram_range[1] + 1)
-                ngram_len = min(ngram_len, len(words))
-                start = np.random.randint(0, len(words) - ngram_len + 1)
-                words = words[start:start + ngram_len]
+            words, words_bert = ngram_sampling(words, words_bert, p_ng,
+                                               ngram_range)
+            words, words_bert = flatten(words), flatten(words_bert)
             new_text = "".join(words)
             if new_text not in used_texts:
-                new_data.append([new_text, data[1]])
+                new_data.append([words, words_bert, data[1]])
                 used_texts.add(new_text)
 
     train_dataset.data.data = new_data
@@ -237,24 +244,27 @@ def create_distill_loader(task_name,
     dataset_class = TASK_CLASSES[task_name]
     train_ds, dev_ds = dataset_class.get_datasets(['train', 'dev'])
     tokenizer = BertTokenizer.from_pretrained(model_name)
-    if task_name == 'senta':
-        train_ds = apply_data_augmentation_for_cn(train_ds, n_iter=n_iter)
-    else:
-        train_ds = apply_data_augmentation(
-            task_name, train_ds, tokenizer, n_iter=n_iter)
-    print("Data augmentation has been applied.")
 
     if task_name == 'senta':
         vocab = Vocab.load_vocabulary(
             vocab_path,
             unk_token='[UNK]',
             pad_token='[PAD]',
+            mask_token='[MASK]',
             bos_token=None,
             eos_token=None, )
         pad_val = vocab['[PAD]']
     else:
         vocab = tokenizer
         pad_val = tokenizer.pad_token_id
+
+    if task_name == 'senta':
+        train_ds = apply_data_augmentation_for_cn(
+            train_ds, tokenizer, vocab, n_iter=n_iter)
+    else:
+        train_ds = apply_data_augmentation(
+            task_name, train_ds, tokenizer, n_iter=n_iter)
+    print("Data augmentation has been applied.")
 
     trans_fn = partial(
         convert_two_example,
@@ -297,7 +307,6 @@ def create_distill_loader(task_name,
 
     train_data_loader, dev_data_loader = create_dataloader(
         train_ds, dev_ds, batch_size, batchify_fn, shuffle)
-
     return train_data_loader, dev_data_loader
 
 

@@ -25,11 +25,14 @@ def convert_small_example(example,
                           is_test=False):
     input_ids = []
     if task_name == 'senta':
-        for i, token in enumerate(jieba.cut(example[0])):
-            if i == max_seq_length:
-                break
-            token_id = vocab[token]
-            input_ids.append(token_id)
+        if is_tokenized:
+            input_ids = [vocab[token] for token in example[0]]
+        else:
+            for i, token in enumerate(jieba.cut(example[0])):
+                if i == max_seq_length:
+                    break
+                token_id = vocab[token]
+                input_ids.append(token_id)
     else:
         if is_tokenized:
             tokens = example[0][:max_seq_length]
@@ -42,8 +45,7 @@ def convert_small_example(example,
     if not is_test:
         label = np.array(example[-1], dtype="int64")
         return input_ids, valid_length, label
-    else:
-        return input_ids, valid_length
+    return input_ids, valid_length
 
 
 def convert_pair_example(example,
@@ -52,7 +54,6 @@ def convert_pair_example(example,
                          is_tokenized=True,
                          max_seq_length=128,
                          is_test=False):
-    is_tokenized &= (task_name != 'senta')
     seq1 = convert_small_example([example[0], example[2]], task_name, vocab,
                                  is_tokenized, max_seq_length, is_test)[:2]
 
@@ -71,14 +72,14 @@ def convert_two_example(example,
                         vocab,
                         is_tokenized=True,
                         is_test=False):
-    is_tokenized &= (task_name != 'senta')
     bert_features = convert_example(
-        example,
+        example[1:] if task_name == 'senta' and is_tokenized else example,
         tokenizer=tokenizer,
         label_list=label_list,
         is_tokenized=is_tokenized,
         max_seq_length=max_seq_length,
         is_test=is_test)
+
     if task_name == 'qqp':
         small_features = convert_pair_example(
             example, task_name, vocab, is_tokenized, max_seq_length, is_test)
@@ -163,7 +164,4 @@ def convert_example(example,
     # input_mask = [1] * len(input_ids)
     if not is_test:
         return input_ids, segment_ids, valid_length, label
-    else:
-        return input_ids, segment_ids, valid_length
-
-        return output_list
+    return input_ids, segment_ids, valid_length
