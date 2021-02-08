@@ -1,0 +1,14 @@
+{
+    "task_name": "emotion_detection",
+    "model_type": "textcnn_net",
+    "num_labels": 3,
+    "vocab_size": 240465,
+    "vocab_path": "./data/vocab.txt",
+    "data_dir": "./data",
+    "inference_model_dir": "./inference_model",
+    "save_checkpoint_dir": "",
+    "init_checkpoint": "",
+    "lr": 0.02,
+    "epoch": 10,
+    "batch_size": 64
+}

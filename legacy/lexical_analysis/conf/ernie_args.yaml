@@ -1,0 +1,77 @@
+model:
+  ernie_config_path:
+    val: "../LARK/ERNIE/config/ernie_config.json"
+    meaning: "Path to the json file for ernie model config."
+  init_checkpoint:
+    val: ""
+    meaning: "Path to init model"
+  mode:
+    val: "train"
+    meaning: "Setting to train or eval or infer"
+  init_pretraining_params:
+    val: "pretrained/params/"
+    meaning: "Init pre-training params which preforms fine-tuning from. If the arg 'init_checkpoint' has been set, this argument wouldn't be valid."
+
+train:
+  random_seed:
+    val: 0
+    meaning: "Random seed for training"
+  batch_size:
+    val: 10
+    meaning: "The number of sequences contained in a mini-batch"
+  epoch:
+    val: 10
+    meaning: "Corpus iteration num"
+  use_cuda:
+    val: True
+    meaning: "If set, use GPU for training."
+  base_learning_rate:
+    val: 0.0002
+    meaning: "The basic learning rate that affects the entire network."
+  init_bound:
+    val: 0.1
+    meaning: "init bound for initialization."
+  crf_learning_rate:
+    val: 0.2
+    meaning: "The real learning rate of the embedding layer will be (crf_learning_rate * base_learning_rate)."
+  cpu_num:
+    val: 10
+    meaning: "The number of cpu used to train model, it works when use_cuda=False"
+  print_steps:
+    val: 1
+    meaning: "Print the result per xxx batch of training"
+  save_steps:
+    val: 10
+    meaning: "Save the model once per xxxx batch of training"
+  validation_steps:
+    val: 5
+    meaning: "Do the validation once per xxxx batch of training"
+
+data:
+  vocab_path:
+    val: "../LARK/ERNIE/config/vocab.txt"
+    meaning: "The path of the vocabulary."
+  label_map_config:
+    val: "./conf/label_map.json"
+    meaning: "The path of the label dictionary."
+  num_labels:
+    val: 57
+    meaning: "label number"
+  max_seq_len:
+    val: 128
+    meaning: "Number of words of the longest seqence."
+  do_lower_case:
+    val: True
+    meaning: "Whether to lower case the input text. Should be True for uncased models and False for cased models."
+  train_data:
+    val: "./data/train.tsv"
+    meaning: "The folder where the training data is located."
+  test_data:
+    val: "./data/test.tsv"
+    meaning: "The folder where the test data is located."
+  infer_data:
+    val: "./data/test.tsv"
+    meaning: "The folder where the infer data is located."
+  model_save_dir:
+    val: "./ernie_models"
+    meaning: "The model will be saved in this path."
