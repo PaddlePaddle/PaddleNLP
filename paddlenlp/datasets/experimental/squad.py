@@ -47,8 +47,6 @@ class SQuAD(DatasetBuilder):
     def _read(self, filename):
         with open(filename, "r", encoding="utf8") as f:
             input_data = json.load(f)["data"]
-
-        examples = []
         for entry in input_data:
             title = entry.get("title", "").strip()
             for paragraph in entry["paragraphs"]:
