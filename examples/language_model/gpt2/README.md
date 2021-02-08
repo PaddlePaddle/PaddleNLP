@@ -9,7 +9,7 @@
 .
 ├── data.py                 # 数据处理
 ├── decompress.sh           # 数据集解压脚本
-├── generate_sample.py      # inference demo
+├── generate_sample.py      # 生成文本示例demo
 ├── lr.py                   # 学习率控制
 ├── process_data.py         # 数据预处理脚本
 ├── README.md               # 文档
@@ -21,18 +21,16 @@
 
 ### 安装说明
 
-1. paddle安装
+* PaddlePaddle 安装
 
     本项目依赖于 PaddlePaddle 2.0及以上版本或适当的develop版本，请参考 [安装指南](https://www.paddlepaddle.org.cn/install/quick) 进行安装
 
-2. 下载代码
+* PaddleNLP 以及其他依赖安装
 
-    克隆代码库到本地
-
-3. 环境依赖
-
-    该模型使用PaddlePaddle，关于环境依赖部分，请先参考PaddlePaddle[安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/install/index_cn.html)关于环境依赖部分的内容。
-
+    ```shell
+    pip install paddlenlp==2.0.0rc
+    pip install regex sentencepiece
+    ```
 
 ### 数据准备
 
@@ -49,7 +47,7 @@ mkdir raw_data
 bash decompress.sh  
 ```
 
-解压以后得到的raw_data目录大小约为54GB。
+解压以后得到的`raw_data`目录大小约为54GB。
 
 #### 数据预处理
 
@@ -79,13 +77,16 @@ mv train.data.json_ids.npz data
 #### 单卡训练
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python run_pretrain.py --model_name_or_path gpt2-small-en \
+CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
+    --model_type gpt2 \
+    --model_name_or_path gpt2-small-en \
     --input_dir "./data"\
     --output_dir "output"\
     --weight_decay 0.01\
     --grad_clip 1.0\
     --max_steps 500000\
     --save_steps 100000\
+    --decay_steps 320000\
     --warmup_rate 0.01\
     --batch_size 8\
     --device gpu
@@ -110,17 +111,19 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py --model_name_or_path gpt2-small-en
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py --model_name_or_path gpt2-small-en \
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
+    --model_type gpt2 \
+    --model_name_or_path gpt2-small-en \
     --input_dir "./data"\
     --output_dir "output"\
     --weight_decay 0.01\
     --grad_clip 1.0\
     --max_steps 500000\
     --save_steps 100000\
+    --decay_steps 320000\
     --warmup_rate 0.01\
     --batch_size 8\
     --device gpu
-
 ```
 
 用户也可以使用提供的shell脚本直接训练`sh scripts/run_multi.sh`.
@@ -136,6 +139,9 @@ python generate_sample.py
 生成效果展示:
 ```text
 问题：中国的首都是哪里？答案：北京。
+问题：苹果的CEO是谁? 答案：
+
+乔布斯。
 
 默写古诗: 大漠孤烟直，长河落日圆。
 举杯邀明月，
