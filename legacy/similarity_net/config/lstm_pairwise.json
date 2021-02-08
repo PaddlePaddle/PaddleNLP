@@ -1,0 +1,23 @@
+{
+    "net": {
+        "module_name": "lstm",
+        "class_name": "LSTM",
+        "emb_dim": 128, 
+        "lstm_dim": 128,
+        "hidden_dim": 128
+    },
+    "loss": {
+        "module_name": "hinge_loss",
+        "class_name": "HingeLoss",
+        "margin": 0.1
+    },
+    "optimizer": {
+        "class_name": "AdamOptimizer",
+        "learning_rate": 0.001,
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "epsilon": 1e-08
+    },
+    "task_mode": "pairwise",
+    "model_path": "lstm_pairwise"
+}

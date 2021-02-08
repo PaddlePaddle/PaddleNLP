@@ -1,0 +1,23 @@
+{
+    "net": {
+        "module_name": "cnn",
+        "class_name": "CNN",
+        "emb_dim": 128, 
+        "filter_size": 3,
+        "num_filters": 256,
+        "hidden_dim": 128
+    },
+    "loss": {
+        "module_name": "softmax_cross_entropy_loss",
+        "class_name": "SoftmaxCrossEntropyLoss"
+    },
+    "optimizer": {
+        "class_name": "AdamOptimizer",
+        "learning_rate": 0.001,
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "epsilon": 1e-08
+    },
+    "task_mode": "pointwise",
+    "model_path": "cnn_pointwise"
+}
