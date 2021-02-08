@@ -204,7 +204,7 @@ class MapDataset(Dataset):
 
         return self
 
-    def map(self, fn, lazy=False):
+    def map(self, fn, lazy=True):
         """
         Performs specific function on the dataset to transform and update every sample.
         Args:
@@ -247,18 +247,18 @@ class IterDataset(IterableDataset):
             data = fn(data)
         return data
 
+    def _shard_filter(self, num_samples):
+        return True
+
     def _filter(self, data):
         for fn in self._filter_pipline:
             if not fn(data):
                 return False
         return True
 
-    def _shard_filter(self, num_samples):
-        return True
-
     def __iter__(self):
         num_samples = 0
-        for example in self.data:
+        for example in self.data():
             if (not self._filter_pipline or
                     self._filter(self._filter_pipline)) and self._shard_filter(
                         num_samples=num_samples):
@@ -363,18 +363,15 @@ class DatasetBuilder:
             root = str(root)
 
         if self.lazy:
-            example_iter = self._read(root)
-
             label_list = self.get_labels()
 
             if label_list is not None:
-
                 label_dict = {}
                 for i, label in enumerate(label_list):
                     label_dict[label] = i
 
-                def generate_examples(example_iter):
-                    for example in example_iter:
+                def generate_examples():
+                    for example in self._read(root):
                         if 'labels' not in example.keys():
                             raise ValueError(
                                 "Keyword 'labels' should be in example if get_label() is specified."
@@ -386,10 +383,14 @@ class DatasetBuilder:
 
                             yield example
 
-                return IterDataset(
-                    generate_examples(example_iter), label_list=label_list)
+                return IterDataset(generate_examples, label_list=label_list)
             else:
-                return IterDataset(example_iter)
+
+                def generate_examples():
+                    for example in self._read(root):
+                        yield example
+
+                return IterDataset(generate_examples)
 
         else:
             examples = self._read(root)
@@ -408,7 +409,7 @@ class DatasetBuilder:
             if label_list is not None:
                 if 'labels' not in examples[0].keys():
                     raise ValueError(
-                        "Keyword 'labels' should be in example if get_label() is specified."
+                        "Key 'labels' should be in example if get_label() is specified."
                     )
 
                 label_dict = {}
