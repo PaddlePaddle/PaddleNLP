@@ -165,7 +165,7 @@ def do_train(args):
 
     train_dataset = train_dataset.map(trans_func)
 
-    #train_dataset = train_dataset.shard()
+    train_dataset = train_dataset.shard()
 
     ignore_label = -100
 
@@ -197,7 +197,7 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    num_training_steps = 11248
+    num_training_steps = 2812
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_steps)
