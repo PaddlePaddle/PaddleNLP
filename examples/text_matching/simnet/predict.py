@@ -26,7 +26,7 @@ from utils import preprocess_prediction_data
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--use_gpu", type=eval, default=False, help="Whether use GPU for training, input should be True or False")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
-parser.add_argument("--vocab_path", type=str, default="./simnet_word_dict.txt", help="The path to vocabulary.")
+parser.add_argument("--vocab_path", type=str, default="./simnet_vocab.txt", help="The path to vocabulary.")
 parser.add_argument('--network', type=str, default="lstm", help="Which network you would like to choose bow, cnn, lstm or gru ?")
 parser.add_argument("--params_path", type=str, default='./checkpoints/final.pdparams', help="The path of model parameter to be loaded.")
 args = parser.parse_args()

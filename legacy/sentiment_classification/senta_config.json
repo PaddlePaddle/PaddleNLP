@@ -1,0 +1,5 @@
+{
+    "model_type": "bilstm_net",
+    "vocab_size": 33256,
+    "max_seq_len": 256
+}
