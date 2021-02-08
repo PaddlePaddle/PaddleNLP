@@ -48,12 +48,19 @@
 
 ### 环境依赖
 
-- python >= 3.6
-- paddlepaddle >= 2.0.0-rc1
+* PaddlePaddle 安装
 
-```
-pip install paddlenlp>=2.0.0rc
-```
+   本项目依赖于 PaddlePaddle 2.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
+
+* PaddleNLP 安装
+
+   ```shell
+   pip install paddlenlp >= 2.0.0rc
+   ```
+
+* 环境依赖
+
+   Python的版本要求 3.6+，其它环境请参考 PaddlePaddle [安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/1.5/beginners_guide/install/index_cn.html) 部分的内容
 
 ### 代码结构说明
 
