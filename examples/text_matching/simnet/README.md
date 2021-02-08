@@ -38,10 +38,12 @@ SimNet框架在百度各产品上广泛应用，主要包括BOW、CNN、RNN、MM
 * PaddleNLP 安装
 
    ```shell
-   pip install paddlenlp>=2.0rc0
+   pip install paddlenlp >= 2.0.0rc
    ```
 
 * 环境依赖
+
+   Python的版本要求 3.6+，其它环境请参考 PaddlePaddle [安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/1.5/beginners_guide/install/index_cn.html) 部分的内容
 
    本项目依赖于jieba分词，请在运行本项目之前，安装jieba，如`pip install -U jieba`
 
