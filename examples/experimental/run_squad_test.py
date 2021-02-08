@@ -88,7 +88,7 @@ def prepare_train_features(examples):
     return tokenized_examples
 
 
-train_ds.map(prepare_train_features)
+train_ds.map(prepare_train_features, lazy=False)
 
 print(train_ds[0])
 print(train_ds[1])

@@ -53,12 +53,12 @@ def import_main_class(module_path):
     return module_main_cls
 
 
-def load_dataset(name, data_files=None, splits=None, lazy=False):
-
+def load_dataset(name, data_files=None, splits=None, lazy=None):
     module_path = DATASETS_MODULE_PATH + name
 
     reader_cls = import_main_class(module_path)
     reader_instance = reader_cls(lazy)
+
     datasets = []
 
     if data_files:
@@ -333,9 +333,11 @@ class DatasetBuilder:
     `_get_data()` function and `_read()` function should be implemented to download
     data file and read data file into a `Iterable` of the examples.
     """
+    lazy = False
 
-    def __init__(self, lazy: bool=False, max_examples: Optional[int]=None):
-        self.lazy = lazy
+    def __init__(self, lazy=None, max_examples: Optional[int]=None):
+        if lazy is not None:
+            self.lazy = lazy
         self.max_examples = max_examples
 
     def read_datasets(self, path_or_split):
