@@ -96,6 +96,8 @@ python -u ./run_pretrain.py \
 - `n_cards` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可。
 - `use_amp` 指示是否启用自动混合精度训练。
 
+**NOTICE**: 预训练时data目录存放的是经过 `create_pretraining_data.py` 处理后的数据，因此需要通过该数据处理脚本预先处理，否则预训练将会出现报错。
+
 ### 执行Fine-tunning
 
 以GLUE中的SST-2任务为例，启动Fine-tuning的方式如下：
