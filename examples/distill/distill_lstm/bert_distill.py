@@ -16,10 +16,9 @@ import time
 
 import paddle
 import paddle.nn as nn
-from paddle.metric import Metric, Accuracy, Precision, Recall
+from paddle.metric import Accuracy
 
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers.tokenizer_utils import whitespace_tokenize
 from paddlenlp.metrics import AccuracyAndF1
 from paddlenlp.datasets import GlueSST2, GlueQQP, ChnSentiCorp
 

@@ -23,8 +23,13 @@
 
 ## 环境要求
 运行本目录下的范例模型需要安装PaddlePaddle 2.0及以上版本。如果您的 PaddlePaddle 安装版本低于此要求，请按照[安装文档](https://www.paddlepaddle.org.cn/#quick-start)中的说明更新 PaddlePaddle 安装版本。
+另外，本项目还依赖paddlenlp，可以使用下面的命令进行安装：
 
-另外，本文下载并在对英文数据集的训练中使用了Google News语料[预训练的Word Embedding](https://code.google.com/archive/p/word2vec/)初始化小模型的Embedding层，并使用gensim包对该Word Embedding文件进行读取。因此，运行本实验还需要安装`gensim`及下载预训练的Word Embedding。
+```shell
+pip insyall paddlenlp==2.0.0rc
+```
+
+本文下载并在对英文数据集的训练中使用了Google News语料[预训练的Word Embedding](https://code.google.com/archive/p/word2vec/)初始化小模型的Embedding层，并使用gensim包对该Word Embedding文件进行读取。因此，运行本实验还需要安装`gensim`及下载预训练的Word Embedding。
 
 
 ## 数据、预训练模型介绍及获取
@@ -163,7 +168,7 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
 
 | Model          | SST-2(dev acc)    | QQP(dev acc/f1)            | ChnSentiCorp(dev acc) | ChnSentiCorp(dev acc) |
 | -------------- | ----------------- | -------------------------- | --------------------- | --------------------- |
-| teacher  model | bert-base-uncased | bert-base-uncased          | bert-base-chinese     | bert-wwm-ext-chinese  |
+| Teacher  model | bert-base-uncased | bert-base-uncased          | bert-base-chinese     | bert-wwm-ext-chinese  |
 | Teacher        | 0.930046          | 0.905813(acc)/0.873472(f1) | 0.951667              | 0.955000              |
 | Student        | 0.853211          | 0.856171(acc)/0.806057(f1) | 0.920833              | 0.920800              |
 | Distilled      | 0.885321          | 0.874375(acc)/0.829581(f1) | 0.930000              | 0.935000              |
