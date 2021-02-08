@@ -108,7 +108,7 @@ PaddleNLP模型库整体介绍请参考文档[PaddleNLP Model Zoo](./docs/model_
 - [Dataset API](./docs/datasets.md)
   * 数据集相关API，包含自定义数据集，数据集贡献与数据集快速加载等功能说明。
 - [Embedding API](./docs/embeddings.md)
-  * 词向量相关API，支持一键快速加载包预训练的中文词向量，VisulDL高维可视化等功能说明。
+  * 词向量相关API，支持一键快速加载包预训练的中文词向量，VisualDL高维可视化等功能说明。
 - [Metrics API](./docs/metrics.md)
   * 针对NLP场景的评估指标说明，与飞桨2.0框架高层API兼容。
 
