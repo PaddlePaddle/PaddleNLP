@@ -107,6 +107,7 @@ parser.add_argument(
 def evaluate(model, loss_fct, metric, data_loader, label_num):
     model.eval()
     metric.reset()
+    avg_loss, precision, recall, f1_score = 0, 0, 0, 0
     for batch in data_loader:
         input_ids, segment_ids, length, labels = batch
         logits = model(input_ids, segment_ids)
@@ -155,6 +156,7 @@ def do_train(args):
     label_list = train_dataset.label_list
     label_num = len(label_list)
     no_entity_id = label_num - 1
+
     trans_func = partial(
         tokenize_and_align_labels,
         tokenizer=tokenizer,
@@ -162,14 +164,9 @@ def do_train(args):
         max_seq_len=args.max_seq_length)
 
     train_dataset = train_dataset.map(trans_func)
-    train_dataset = train_dataset.shard()
-    '''
-    train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        drop_last=True)
-    '''
+
+    #train_dataset = train_dataset.shard()
+
     ignore_label = -100
 
     batchify_fn = lambda samples, fn=Dict({
@@ -187,10 +184,7 @@ def do_train(args):
         return_list=True)
 
     test_dataset = test_dataset.map(trans_func)
-    '''
-    dev_batch_sampler = paddle.io.BatchSampler(
-        test_dataset, batch_size=args.batch_size, shuffle=False, drop_last=True)
-    '''
+
     test_data_loader = DataLoader(
         dataset=test_dataset,
         collate_fn=batchify_fn,
@@ -203,7 +197,7 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    num_training_steps = args.max_steps if args.max_steps > 0 else 300
+    num_training_steps = 11248
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_steps)
@@ -243,16 +237,17 @@ def do_train(args):
             lr_scheduler.step()
             optimizer.clear_gradients()
             if global_step % args.save_steps == 0:
-                evaluate(model, loss_fct, metric, test_data_loader, label_num)
                 if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+                    evaluate(model, loss_fct, metric, test_data_loader,
+                             label_num)
                     paddle.save(model.state_dict(),
                                 os.path.join(args.output_dir,
                                              "model_%d.pdparams" % global_step))
 
     # Save final model 
     if (global_step) % args.save_steps != 0:
-        evaluate(model, loss_fct, metric, test_data_loader, label_num)
         if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+            evaluate(model, loss_fct, metric, test_data_loader, label_num)
             paddle.save(model.state_dict(),
                         os.path.join(args.output_dir,
                                      "model_%d.pdparams" % global_step))
