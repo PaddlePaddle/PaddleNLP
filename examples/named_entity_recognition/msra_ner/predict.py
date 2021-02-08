@@ -112,7 +112,7 @@ def convert_example(example,
             ret_tokens = []
             ret_labels = []
             for token, label in zip(tokens, labels):
-                sub_token = tokenizer._tokenize(token)
+                sub_token = tokenizer.tokenize(token)
                 if len(sub_token) == 0:
                     continue
                 ret_tokens.extend(sub_token)
@@ -131,7 +131,7 @@ def convert_example(example,
         else:
             ret_tokens = []
             for token in tokens:
-                sub_token = tokenizer._tokenize(token)
+                sub_token = tokenizer.tokenize(token)
                 if len(sub_token) == 0:
                     continue
                 ret_tokens.extend(sub_token)

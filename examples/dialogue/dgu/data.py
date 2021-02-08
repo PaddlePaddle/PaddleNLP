@@ -73,11 +73,11 @@ class UDCv1(Dataset):
                                  text_b: str,
                                  tokenizer,
                                  max_seq_length):
-            tokens_b = tokenizer._tokenize(text_b)
+            tokens_b = tokenizer.tokenize(text_b)
             tokens_b = tokens_b[:min(cls.MAX_LEN_OF_RESPONSE, len(tokens_b))]
             tokens_a = []
             for text in text_a:
-                tokens_a.extend(tokenizer._tokenize(text))
+                tokens_a.extend(tokenizer.tokenize(text))
                 tokens_a.append(INNER_SEP)
             tokens_a = tokens_a[:-1]
             if len(tokens_a) > max_seq_length - len(tokens_b) - 3:
@@ -179,7 +179,7 @@ class DSTC2(Dataset):
         def _truncate_and_concat(texts: List[str], tokenizer, max_seq_length):
             tokens = []
             for text in texts:
-                tokens.extend(tokenizer._tokenize(text))
+                tokens.extend(tokenizer.tokenize(text))
                 tokens.append(INNER_SEP)
             tokens = tokens[:-1]
             if len(tokens) > max_seq_length - 2:
@@ -258,7 +258,7 @@ class ATIS_DSF(Dataset):
         words = text.split()
         assert len(words) == len(labels)
         for word, label in zip(words, labels):
-            piece_words = tokenizer._tokenize(word)
+            piece_words = tokenizer.tokenize(word)
             tokens.extend(piece_words)
             label = cls.get_label(label)
             label_list.extend([label] * len(piece_words))
@@ -328,7 +328,7 @@ class ATIS_DID(Dataset):
     def convert_example(cls, example, tokenizer, max_seq_length=512):
         """ Convert a glue example into necessary features. """
         label, text = example
-        tokens = tokenizer._tokenize(text)
+        tokens = tokenizer.tokenize(text)
         if len(tokens) > max_seq_length - 2:
             tokens = tokens[len(tokens) - max_seq_length + 2:]
         tokens = [tokenizer.cls_token] + tokens + [tokenizer.sep_token]
@@ -403,16 +403,16 @@ def truncate_and_concat(pre_txt: List[str],
                         tokenizer,
                         max_seq_length,
                         max_len_of_cur_text):
-    cur_tokens = tokenizer._tokenize(cur_txt)
+    cur_tokens = tokenizer.tokenize(cur_txt)
     cur_tokens = cur_tokens[:min(max_len_of_cur_text, len(cur_tokens))]
     pre_tokens = []
     for text in pre_txt:
-        pre_tokens.extend(tokenizer._tokenize(text))
+        pre_tokens.extend(tokenizer.tokenize(text))
         pre_tokens.append(INNER_SEP)
     pre_tokens = pre_tokens[:-1]
     suf_tokens = []
     for text in suf_txt:
-        suf_tokens.extend(tokenizer._tokenize(text))
+        suf_tokens.extend(tokenizer.tokenize(text))
         suf_tokens.append(INNER_SEP)
     suf_tokens = suf_tokens[:-1]
     if len(cur_tokens) + len(pre_tokens) + len(suf_tokens) > max_seq_length - 4:

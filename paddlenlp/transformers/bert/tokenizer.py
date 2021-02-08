@@ -344,6 +344,17 @@ class BertTokenizer(PretrainedTokenizer):
                 split_tokens.append(sub_token)
         return split_tokens
 
+    def tokenize(self, text):
+        """
+        End-to-end tokenization for BERT models.
+        Args:
+            text (str): The text to be tokenized.
+        
+        Returns:
+            list: A list of string representing converted tokens.
+        """
+        return self._tokenize(text)
+
     def convert_tokens_to_string(self, tokens):
         """
         Converts a sequence of tokens (list of string) in a single string. Since
