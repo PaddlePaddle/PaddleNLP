@@ -17,11 +17,11 @@ PaddleNLP 2.0拥有**覆盖多场景的模型库**、**简洁易用的全流程A
 ## 特性
 
 - **覆盖多场景的模型库**
-  - PaddleNLP集成了RNN与Transformer等多种主流模型结构，涵盖从[词向量](./exmaples/word_embedding)、[词法分析](./examples/lexical_analysis/)、[命名实体识别](./examples/named_entity_recognition/)、[语义表示](./examples/language_model)等NLP基础技术，到[文本分类](./examples/text_classification)、[文本匹配](./examples/text_matching)、[文本生成](./examples/text_generation)、[文本图学习](./examples/text_graph/erniesage/README.md)等NLP核心技术。同时针对[机器翻译](./examples/machine_translation)、[通用对话](./examples/dialogue/)、[阅读理解](./exampels/machine_reading_comprehension/)等系统应用提供相应核心组件与预训练模型。更多详细介绍请查看[PaddleNLP应用示例](./examples/)。
+  - PaddleNLP集成了RNN与Transformer等多种主流模型结构，涵盖从[词向量](./exmaples/word_embedding/)、[词法分析](./examples/lexical_analysis/)、[命名实体识别](./examples/named_entity_recognition/)、[语义表示](./examples/language_model/)等NLP基础技术，到[文本分类](./examples/text_classification/)、[文本匹配](./examples/text_matching/)、[文本生成](./examples/text_generation/)、[文本图学习](./examples/text_graph/erniesage/)等NLP核心技术。同时针对[机器翻译](./examples/machine_translation/)、[通用对话](./examples/dialogue/)、[阅读理解](./exampels/machine_reading_comprehension/)等系统应用提供相应核心组件与预训练模型。更多详细介绍请查看[PaddleNLP应用示例](./examples/)。
 
 
 - **简洁易用的全流程API**
-  - 深度兼容飞桨2.0的[高层API](https://www.paddlepaddle.org.cn/documentation/docs/zh/tutorial/quick_start/high_level_api/high_level_api.html)体系，内置可复用的文本建模模块([Embedding](./docs/embeddings.md), [CRF](./paddlenlp/layers/crf.py), [Seq2Vec](./paddlenlp/seq2vec/crf.py), [Transformer](./docs/transformers.md))，可大幅度减少在数据处理、模型组网、训练与评估、推理部署环节的开发量，提升NLP任务迭代与落地的效率。
+  - 深度兼容飞桨2.0的[高层API](https://www.paddlepaddle.org.cn/documentation/docs/zh/tutorial/quick_start/high_level_api/high_level_api.html)体系，内置可复用的文本建模模块([Embedding](./docs/embeddings.md), [CRF](./paddlenlp/layers/crf.py), [Seq2Vec](./paddlenlp/seq2vec/encoder.py), [Transformer](./docs/transformers.md))，可大幅度减少在数据处理、模型组网、训练与评估、推理部署环节的开发量，提升NLP任务迭代与落地的效率。
 
 - **动静统一的高性能分布式训练**
   - 基于飞桨2.0核心框架『动静统一』的特性与领先的混合精度优化策略，结合Fleet分布式训练API，可充分利用GPU集群资源，高效完成大规模预训练模型的分布式训练。
@@ -62,7 +62,7 @@ wordemb.cosine_sim("艺术", "火车")
 >>> 0.14792643
 ```
 
-内置50+中文词向量，更多使用方法请参考 [Embedding文档](./examples/word_embedding/README.md)。
+内置50+中文词向量，更多使用方法请参考[Embedding文档](./examples/word_embedding/README.md)。
 
 
 ### 一键加载高质量中文预训练模型
@@ -77,24 +77,24 @@ electra = ElectraModel.from_pretrained('chinese-electra-small')
 gpt2 = GPT2ForPretraining.from_pretrained('gpt2-base-cn')
 ```
 
-请参考 [Pretrained-Models](./docs/transformers.md)查看目前支持的预训练模型。
+请参考[Transformer API文档](./docs/transformers.md)查看目前支持的预训练模型。
 
 ## 模型库及其应用
 
-PaddleNLP模型库整体介绍请参考文档[PaddleNLP Model Zoo](./docs/model_zoo.md).
+PaddleNLP模型库整体介绍请参考文档[PaddleNLP Model Zoo](./docs/model_zoo.md)。
 模型应用场景介绍请参考[PaddleNLP Examples](./examples/)。
 
 - [词向量](./examples/word_embedding/)
 - [词法分析](./examples/lexical_analysis/)
-- [语言模型](./examples/language_model)
-- [文本分类](./examples/text_classification/README.md)
-- [文本生成](./examples/text_generation/README.md)
-- [语义匹配](./examples/text_matching/README.md)
-- [命名实体识别](./examples/named_entity_recognition/README.md)
-- [文本图学习](./examples/text_graph/erniesage/README.md)
-- [通用对话](./examples/dialogue)
-- [机器翻译](./examples/machine_translation)
-- [阅读理解](./examples/machine_reading_comprehension)
+- [命名实体识别](./examples/named_entity_recognition/)
+- [语言模型](./examples/language_model/)
+- [文本分类](./examples/text_classification/)
+- [文本生成](./examples/text_generation/)
+- [语义匹配](./examples/text_matching/)
+- [文本图学习](./examples/text_graph/erniesage/)
+- [通用对话](./examples/dialogue/)
+- [机器翻译](./examples/machine_translation/)
+- [阅读理解](./examples/machine_reading_comprehension/)
 
 ## 进阶应用
 
