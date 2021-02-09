@@ -14,11 +14,7 @@
 
 import numpy as np
 
-__all__ = [
-    'Stack',
-    'Pad',
-    'Tuple',
-]
+__all__ = ['Stack', 'Pad', 'Tuple', 'Dict']
 
 
 class Stack(object):
@@ -99,7 +95,12 @@ class Pad(object):
             '''
      """
 
-    def __init__(self, pad_val=0, axis=0, ret_length=None, dtype=None, pad_right=True):
+    def __init__(self,
+                 pad_val=0,
+                 axis=0,
+                 ret_length=None,
+                 dtype=None,
+                 pad_right=True):
         self._pad_val = pad_val
         self._axis = axis
         self._ret_length = ret_length
@@ -139,7 +140,8 @@ class Pad(object):
                 if self._pad_right:
                     slices[self._axis] = slice(0, arr.shape[self._axis])
                 else:
-                    slices[self._axis] = slice(max_size - arr.shape[self._axis], max_size)
+                    slices[self._axis] = slice(max_size - arr.shape[self._axis],
+                                               max_size)
 
                 if slices[self._axis].start != slices[self._axis].stop:
                     slices = [slice(i, i + 1)] + slices
@@ -203,6 +205,57 @@ class Tuple(object):
         ret = []
         for i, ele_fn in enumerate(self._fn):
             result = ele_fn([ele[i] for ele in data])
+            if isinstance(result, (tuple, list)):
+                ret.extend(result)
+            else:
+                ret.append(result)
+        return tuple(ret)
+
+
+class Dict(object):
+    """
+    Wrap multiple batchify functions together. The input functions will be applied
+    to the corresponding input fields.
+    
+    Each sample should be a dictionary containing multiple fields. Each
+    batchify function with key stored in Dict will be applied on the field which has the same key. 
+    
+    For example, when data sample is {'tokens': tokens, 'labels': labels), you can wrap two batchify
+    functions using `Dict({'tokens': DataBatchify, 'labels': LabelBatchify})` to batchify tokens and
+    labels correspondingly.
+    Args:
+        fn (dict of callable): The batchify functions to wrap.
+    Example:
+        .. code-block:: python
+            from paddle.incubate.hapi.text.data_utils import Dict, Pad, Stack
+            batchify_fn = Dict({'tokens': Pad(axis=0, pad_val=0), 'labels': Stack()})
+    """
+
+    def __init__(self, fn):
+        assert isinstance(fn, (dict)), 'Input pattern not understood. The input of Dict must be a dict with key of input column name and value of collate_fn ' \
+                                   'Received fn=%s' % (str(fn))
+
+        self._fn = fn
+
+        for col_name, ele_fn in self._fn.items():
+            assert callable(
+                ele_fn
+            ), 'Batchify functions must be callable! type(fn[%d]) = %s' % (
+                col_name, str(type(ele_fn)))
+
+    def __call__(self, data):
+        """
+        Batchify data samples by applying each function on the corresponding data
+        field, and each data field is produced by stacking the field data of samples.
+        Args:
+            data (list): The samples to batchfy. Each sample should contain N fields.
+        Returns:
+            tuple: A tuple composed of results from all including batchifying functions.
+        """
+
+        ret = []
+        for col_name, ele_fn in self._fn.items():
+            result = ele_fn([ele[col_name] for ele in data])
             if isinstance(result, (tuple, list)):
                 ret.extend(result)
             else:

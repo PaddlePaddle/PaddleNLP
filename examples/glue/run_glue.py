@@ -259,6 +259,12 @@ def convert_example(example,
         label = np.array([label], dtype=label_dtype)
 
     # Tokenize raw text
+    if len(example) == 1:
+        example = tokenizer(example[0], max_seq_len=max_seq_length)
+    else:
+        example = tokenizer(
+            example[0], text_pair=example[1], max_seq_len=max_seq_length)
+    '''
     tokens_raw = [tokenizer(l) for l in example]
     # Truncate to the truncate_length,
     tokens_trun = _truncate_seqs(tokens_raw, max_seq_length)
@@ -272,10 +278,13 @@ def convert_example(example,
     # The mask has 1 for real tokens and 0 for padding tokens. Only real
     # tokens are attended to.
     # input_mask = [1] * len(input_ids)
+    '''
     if not is_test:
-        return input_ids, segment_ids, valid_length, label
+        return example['input_ids'], example['segment_ids'], len(example[
+            'input_ids']), label
     else:
-        return input_ids, segment_ids, valid_length
+        return example['input_ids'], example['segment_ids'], len(example[
+            'input_ids'])
 
 
 def do_train(args):
