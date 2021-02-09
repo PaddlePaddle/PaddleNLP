@@ -12,21 +12,19 @@ English | [简体中文](./README.md)
 
 ## Introduction
 
-PaddleNLP aims to accelerate NLP applications through powerful model zoo, easy-to-use API with detailed tutorials. It's also the NLP best practice for PaddlePaddle 2.0 API system.
+PaddleNLP aims to accelerate NLP applications through powerful model zoo, easy-to-use API and high performance distributed training. It's also the NLP best practice for PaddlePaddle 2.0 API system.
 
 ## Features
 
 * **Rich and Powerful Model Zoo**
   - Our Model Zoo covers mainstream NLP applications, including Lexical Analysis, Syntactic Parsing, Machine Translation, Text Classification, Text Generation, Text Matching, General Dialogue and Question Answering etc.
 
-* **Easy-to-use API**
+* **Easy-to-use and End-to-End API**
   - The API is fully integrated with PaddlePaddle high-level API system. It minimizes the number of user actions required for common use cases like data loading, text pre-processing, training and evaluation. which enables you to deal with text problems more productively.
 
-* **High Performance and Large-scale Training**
-  - We provide a highly optimized ditributed training implementation for BERT with Fleet API, it can fully utilize GPU clusters for large-scale model pre-training. Please refer to our [benchmark](./benchmark/bert) for more information.
+* **High Performance and Distributed Training**
+-  We provide a highly optimized ditributed training implementation for BERT with Fleet API, bnd based the mixed precision training strategy based on PaddlePaddle 2.0, it can fully utilize GPU clusters for large-scale model pre-training.
 
-* **Detailed Tutorials and Industrial Practices**
-  - We offers detailed and interactable notebook tutorials to show you the best practices of PaddlePaddle 2.0.
 
 ## Installation
 
@@ -64,16 +62,18 @@ wordemb.cosine_sim("艺术", "火车")
 
 ### Rich Chinsese Pre-trained Models
 
+
 ```python
-from paddlenlp.transformers import ErnieModel, BertModel, RobertaModel, ElectraModel
+from paddlenlp.transformers import ErnieModel, BertModel, RobertaModel, ElectraModel, GPT2ForPretraining
 
 ernie = ErnieModel.from_pretrained('ernie-1.0')
 bert = BertModel.from_pretrained('bert-wwm-chinese')
 roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
 electra = ElectraModel.from_pretrained('chinese-electra-small')
+gpt2 = GPT2ForPretraining.from_pretrained('gpt2-base-cn')
 ```
 
-For more pretrained model selection, please refer to [Pretrained-Models](./paddlenlp/transformers/README.md)
+For more pretrained model selection, please refer to [Pretrained-Models](./docs/transformers.md)
 
 ## Model Zoo and Applications
 
@@ -89,6 +89,10 @@ For more pretrained model selection, please refer to [Pretrained-Models](./paddl
 - [Machine Translation](./exmaples/machine_translation)
 - [Question Answering](./exmaples/machine_reading_comprehension)
 
+## Advanced Application
+
+- [Model Compression](./examples/model_compression/)
+
 ## API Usage
 
 - [Transformer API](./docs/transformers.md)
@@ -102,13 +106,13 @@ For more pretrained model selection, please refer to [Pretrained-Models](./paddl
 
 Please refer to our official AI Studio account for more interactive tutorials: [PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)
 
-* [What's Seq2Vec?](https://aistudio.baidu.com/aistudio/projectdetail/1283423) shows how to use LSTM to do sentiment analysis.
+* [What's Seq2Vec?](https://aistudio.baidu.com/aistudio/projectdetail/1283423) shows how to use simple API to finish LSTM model and solve sentiment analysis task.
 
-* [Sentiment Analysis with ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/1294333) shows how to exploit the pretrained ERNIE to make sentiment analysis better.
+* [Sentiment Analysis with ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/1294333) shows how to exploit the pretrained ERNIE to solve sentiment analysis problem.
 
-* [Waybill Information Extraction with BiGRU-CRF Model](https://aistudio.baidu.com/aistudio/projectdetail/1317771) shows how to make use of bigru and crf to do information extraction.
+* [Waybill Information Extraction with BiGRU-CRF Model](https://aistudio.baidu.com/aistudio/projectdetail/1317771) shows how to make use of Bi-GRU plus CRF to finish information extraction task.
 
-* [Waybill Information Extraction with ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/1329361) shows how to exploit the pretrained ERNIE to do information extraction better.
+* [Waybill Information Extraction with ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/1329361) shows how to use ERNIE, the Chinese pre-trained model improve information extraction performance.
 
 
 ## Community
