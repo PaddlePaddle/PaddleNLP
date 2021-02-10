@@ -238,7 +238,7 @@ def do_train(args):
             p.name for n, p in model.named_parameters()
             if not any(nd in n for nd in ["bias", "norm"])
         ],
-        multi_precision=args.use_pure_fp16)
+        multi_precision=False)
     if args.use_amp:
         custom_black_list = (['lookup_table', 'lookup_table_v2']
                              if args.use_pure_fp16 else None)
