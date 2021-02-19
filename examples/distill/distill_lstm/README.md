@@ -1,6 +1,5 @@
 # Distilling Knowledge From Fine-tuned BERT into Bi-LSTM
 
-
 以下是本例的简要目录结构及说明：
 ```
 .
