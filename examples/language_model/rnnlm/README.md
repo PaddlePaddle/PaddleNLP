@@ -29,12 +29,12 @@
 
 * PaddlePaddle 安装
 
-   本项目依赖于 PaddlePaddle 2.0-rc1 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
+   本项目依赖于 PaddlePaddle 2.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
 
 * PaddleNLP 安装
 
    ```shell
-   pip install paddlenlp>=2.0.0b
+   pip install paddlenlp>=2.0.0rc
    ```
 
 * 环境依赖
