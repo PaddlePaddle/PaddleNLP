@@ -400,7 +400,8 @@ class BigBirdModel(BigBirdPretrainedModel):
                  hidden_size=768,
                  hidden_dropout_prob=0.1,
                  max_position_embeddings=512,
-                 type_vocab_size=2):
+                 type_vocab_size=2,
+                 **kwargs):
         super(BigBirdModel, self).__init__()
         # embedding
         self.embeddings = BigBirdEmbeddings(

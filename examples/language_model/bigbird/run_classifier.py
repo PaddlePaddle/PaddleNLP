@@ -22,187 +22,144 @@ import paddle.distributed as dist
 import paddle.nn as nn
 from paddle.io import DataLoader, Dataset
 from paddlenlp.transformers import BigBirdModel, create_bigbird_simulated_attention_mask_list, create_bigbird_rand_mask_idx_list
+from paddlenlp.transformers import BigBirdTokenizer
 from paddlenlp.utils.log import logger
-from paddlenlp.datasets import MapDatasetWrapper
+from paddlenlp.datasets import Imdb
+from paddlenlp.data import Stack
 
-import sentencepiece as spm
 import os
 import random
 from functools import partial
 import time
 
+parser = argparse.ArgumentParser(__doc__)
+parser.add_argument(
+    "--batch_size",
+    default=2,
+    type=int,
+    help="Batch size per GPU/CPU for training.", )
+parser.add_argument(
+    "--n_gpu", type=int, default=1, help="number of gpus to use, 0 for cpu.")
+parser.add_argument(
+    "--data_dir",
+    type=str,
+    default='~/',
+    help="vocab file used to tokenize text")
+parser.add_argument(
+    "--vocab_model_file",
+    type=str,
+    default='sentencepiece_gpt2.model',
+    help="vocab model file used to tokenize text")
+parser.add_argument(
+    "--max_encoder_length",
+    type=int,
+    default=512,
+    help="The maximum total input sequence length after SentencePiece tokenization."
+)
+parser.add_argument(
+    "--num_layers",
+    type=int,
+    default=12,
+    help="The number of BigBird Encoder layers")
+parser.add_argument("--attention_type", type=str, default="bigbird", help="")
+parser.add_argument(
+    "--nhead",
+    type=int,
+    default=12,
+    help="number of heads when compute attention")
+parser.add_argument("--attn_dropout", type=float, default=0.1, help="")
+parser.add_argument("--hidden_size", type=int, default=768, help="")
+parser.add_argument("--num_labels", type=int, default=2, help="")
+parser.add_argument(
+    "--weight_decay",
+    default=0.01,
+    type=float,
+    help="Weight decay if we apply some.")
+parser.add_argument(
+    "--warmup_steps",
+    default=1000,
+    type=int,
+    help="Linear warmup over warmup_steps.")
+parser.add_argument(
+    "--num_train_steps",
+    default=10000,
+    type=int,
+    help="Linear warmup over warmup_steps.")
+parser.add_argument(
+    "--lr", type=float, default=1e-5, help="Learning rate used to train.")
+parser.add_argument(
+    "--save_dir",
+    type=str,
+    default='chekpoints/',
+    help="Directory to save model checkpoint")
+parser.add_argument(
+    "--epochs", type=int, default=10, help="Number of epoches for training.")
+parser.add_argument("--pretrained_model", type=str, default=None)
+parser.add_argument("--dim_feedforward", type=int, default=3072)
+parser.add_argument("--activation", type=str, default="gelu")
+parser.add_argument("--normalize_before", type=bool, default=False)
+parser.add_argument("--block_size", type=int, default=16)
+parser.add_argument("--window_size", type=int, default=3)
+parser.add_argument("--num_rand_blocks", type=int, default=3)
+parser.add_argument("--num_global_blocks", type=int, default=2)
+parser.add_argument("--hidden_dropout_prob", type=float, default=0.1)
+parser.add_argument("--max_position_embeddings", type=int, default=4096)
+parser.add_argument("--type_vocab_size", type=int, default=2)
+parser.add_argument("--seed", type=int, default=None)
+parser.add_argument("--pad_token_id", type=int, default=0)
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--batch_size",
-        default=2,
-        type=int,
-        help="Batch size per GPU/CPU for training.", )
-    parser.add_argument(
-        "--n_gpu",
-        type=int,
-        default=1,
-        help="number of gpus to use, 0 for cpu.")
-    parser.add_argument(
-        "--data_dir",
-        type=str,
-        default='~/',
-        help="vocab file used to tokenize text")
-    parser.add_argument(
-        "--vocab_model_file",
-        type=str,
-        default='gpt2.model',
-        help="vocab model file used to tokenize text")
-    parser.add_argument(
-        "--max_encoder_length",
-        type=int,
-        default=512,
-        help="The maximum total input sequence length after SentencePiece tokenization."
-    )
-    parser.add_argument(
-        "--init_from_check_point",
-        type=str,
-        default=None,
-        help="The path of checkpoint to be loaded.")
-    parser.add_argument(
-        "--num_layers",
-        type=int,
-        default=12,
-        help="The number of BigBird Encoder layers")
-    parser.add_argument(
-        "--attention_type", type=str, default="bigbird", help="")
-    parser.add_argument(
-        "--num_attention_heads",
-        type=int,
-        default=12,
-        help="number of heads when compute attention")
-    parser.add_argument("--attn_dropout", type=float, default=0.1, help="")
-    parser.add_argument("--hidden_size", type=int, default=768, help="")
-    parser.add_argument("--num_labels", type=int, default=2, help="")
-    parser.add_argument(
-        "--weight_decay",
-        default=0.01,
-        type=float,
-        help="Weight decay if we apply some.")
-    parser.add_argument(
-        "--warmup_steps",
-        default=1000,
-        type=int,
-        help="Linear warmup over warmup_steps.")
-    parser.add_argument(
-        "--num_train_steps",
-        default=10000,
-        type=int,
-        help="Linear warmup over warmup_steps.")
-    parser.add_argument(
-        "--lr", type=float, default=1e-5, help="Learning rate used to train.")
-    parser.add_argument(
-        "--save_dir",
-        type=str,
-        default='chekpoints/',
-        help="Directory to save model checkpoint")
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        default=10,
-        help="Number of epoches for training.")
-    parser.add_argument("--pretrained_model", type=str, default=None)
-    parser.add_argument("--dim_feedforward", type=int, default=3072)
-    parser.add_argument("--activation", type=str, default="gelu")
-    parser.add_argument("--normalize_before", type=bool, default=False)
-    parser.add_argument("--block_size", type=int, default=16)
-    parser.add_argument("--window_size", type=int, default=3)
-    parser.add_argument("--num_rand_blocks", type=int, default=3)
-    parser.add_argument("--hidden_dropout_prob", type=float, default=0.1)
-    parser.add_argument("--max_position_embeddings", type=int, default=4096)
-    parser.add_argument("--type_vocab_size", type=int, default=2)
-    args = parser.parse_args()
-    return args
+args = parser.parse_args()
 
 
-def create_tokenizer(model_file):
-    return spm.SentencePieceProcessor(model_file=model_file)
+def create_dataloader(data_dir,
+                      batch_size,
+                      max_encoder_length,
+                      tokenizer,
+                      pad_val=0,
+                      cls_token_id=65,
+                      sep_token_id=66):
+    def _tokenize(text):
+        input_ids = [cls_token_id]
+        input_ids.extend(
+            tokenizer.convert_tokens_to_ids(
+                tokenizer(text)[:max_encoder_length - 2]))
+        input_ids.append(sep_token_id)
+        input_len = len(input_ids)
+        if input_len < max_encoder_length:
+            input_ids.extend([pad_val] * (max_encoder_length - input_len))
+        input_ids = np.array(input_ids).astype('int64')
+        return input_ids
 
+    def _collate_data(data, stack_fn=Stack()):
+        num_fields = len(data[0])
+        out = [None] * num_fields
+        out[0] = stack_fn([_tokenize(x[0]) for x in data])
+        out[1] = stack_fn([x[1] for x in data])
+        return out
 
-class ImdbDataset(Dataset):
-    def __init__(self, input_file, tokenizer, max_encoder_length=512,
-                 pad_val=0):
-        self.samples = []
-        if input_file:
-            with open(input_file, "r") as f:
-                for line in f.readlines():
-                    line = line.rstrip("\n")
-                    sample = line.split(",", 1)
-                    label = np.array(int(sample[0])).astype('int64')
-                    # Add [CLS] (65) and [SEP] (66) special tokens.
-                    input_ids = [65]
-                    input_ids.extend(
-                        tokenizer.tokenize(sample[1])[:max_encoder_length - 2])
-                    input_ids.append(66)
-                    input_len = len(input_ids)
-                    if input_len < max_encoder_length:
-                        input_ids.extend([pad_val] *
-                                         (max_encoder_length - input_len))
-                    input_ids = np.array(input_ids).astype('int64')
-                    self.samples.append([input_ids, label])
-
-    def split(self, rate):
-        num_samples = len(self.samples)
-        num_save = int(num_samples * (1 - rate))
-        random.shuffle(self.samples)
-        split_dataset = ImdbDataset(None, None)
-        split_dataset.samples = self.samples[num_save:]
-        self.samples = self.samples[:num_save]
-        return split_dataset
-
-    def __getitem__(self, index):
-        # [input_ids, label]
-        return self.samples[index]
-
-    def __len__(self):
-        return len(self.samples)
-
-
-def create_dataloader(data_dir, batch_size, max_encoder_length, tokenizer):
-    def _create_dataloader(mode,
-                           tokenizer,
-                           max_encoder_length,
-                           pad_val,
-                           split_dev=True):
-        input_file = os.path.join(data_dir, mode + ".csv")
-        dataset = ImdbDataset(input_file, tokenizer, max_encoder_length,
-                              pad_val)
-        if split_dev:
-            split_dataset = dataset.split(0)
-
-            split_batch_sampler = paddle.io.BatchSampler(
-                split_dataset, batch_size=batch_size)
-            split_data_loader = paddle.io.DataLoader(
-                dataset=split_dataset,
-                batch_sampler=split_batch_sampler,
-                return_list=True)
-
+    def _create_dataloader(mode, tokenizer, max_encoder_length, pad_val):
+        dataset = Imdb(mode=mode)
         batch_sampler = paddle.io.BatchSampler(
             dataset, batch_size=batch_size, shuffle=(mode == "train"))
         data_loader = paddle.io.DataLoader(
-            dataset=dataset, batch_sampler=batch_sampler, return_list=True)
-        if split_dev:
-            return data_loader, split_data_loader
+            dataset=dataset,
+            batch_sampler=batch_sampler,
+            collate_fn=_collate_data,
+            return_list=True)
         return data_loader
 
     train_data_loader = _create_dataloader("train", tokenizer,
-                                           max_encoder_length, 0, False)
+                                           max_encoder_length, 0)
     test_data_loader = _create_dataloader("test", tokenizer, max_encoder_length,
-                                          0, False)
+                                          0)
     return train_data_loader, test_data_loader
 
 
 class ClassifierModel(nn.Layer):
-    def __init__(self, num_labels, **kwargv):
+    def __init__(self, **kwargv):
         super(ClassifierModel, self).__init__()
         self.bigbird = BigBirdModel(**kwargv)
-        self.linear = nn.Linear(kwargv['hidden_size'], num_labels)
+        self.linear = nn.Linear(kwargv['hidden_size'], kwargv['num_labels'])
         self.dropout = nn.Dropout(
             kwargv['hidden_dropout_prob'], mode="upscale_in_train")
         self.kwargv = kwargv
@@ -219,31 +176,6 @@ class ClassifierModel(nn.Layer):
         output = self.dropout(pooled_output)
         output = self.linear(output)
         return output
-
-
-def get_config(args, vocab_size):
-
-    bertConfig = {
-        "num_layers": args.num_layers,
-        "vocab_size": vocab_size,
-        "nhead": args.num_attention_heads,
-        "attn_dropout": args.attn_dropout,
-        "dim_feedforward": args.dim_feedforward,
-        "activation": args.activation,
-        "normalize_before": args.normalize_before,
-        "attention_type": args.attention_type,
-        "block_size": args.block_size,
-        "window_size": args.window_size,
-        "num_global_blocks": 2,
-        "num_rand_blocks": args.num_rand_blocks,
-        "seed": None,
-        "pad_token_id": 0,
-        "hidden_size": args.hidden_size,
-        "hidden_dropout_prob": args.hidden_dropout_prob,
-        "max_position_embeddings": args.max_position_embeddings,
-        "type_vocab_size": args.type_vocab_size
-    }
-    return bertConfig
 
 
 class Timer(object):
@@ -268,17 +200,17 @@ class Timer(object):
         self._accumulate = 0
 
 
-def main(args):
+def main():
     # get dataloader
-    tokenizer = create_tokenizer(args.vocab_model_file)
-    vocab_size = tokenizer.vocab_size()
-    bertConfig = get_config(args, vocab_size)
+    tokenizer = BigBirdTokenizer(args.vocab_model_file)
+    bigbirdConfig = args.__dict__
+    bigbirdConfig["vocab_size"] = tokenizer.vocab_size
 
     train_data_loader, test_data_loader = \
             create_dataloader(args.data_dir, args.batch_size, args.max_encoder_length, tokenizer)
 
     # define model
-    model = ClassifierModel(args.num_labels, **bertConfig)
+    model = ClassifierModel(**bigbirdConfig)
     if args.pretrained_model is not None:
         pretrained_model_dict = paddle.load(args.pretrained_model)
         model.set_state_dict(pretrained_model_dict)
@@ -289,26 +221,17 @@ def main(args):
     metric = paddle.metric.Accuracy()
 
     # define optimizer
+    optimizer = paddle.optimizer.Adam(
+        parameters=model.parameters(), learning_rate=args.lr, epsilon=1e-6)
 
-    lr_scheduler = paddle.optimizer.lr.PolynomialDecay(args.lr,
-                                                       args.num_train_steps, 0)
-    lr_scheduler = paddle.optimizer.lr.LinearWarmup(
-        lr_scheduler, args.warmup_steps, start_lr=0, end_lr=args.lr)
+    do_train(model, criterion, metric, optimizer, train_data_loader,
+             test_data_loader, bigbirdConfig)
 
-    optimizer = paddle.optimizer.AdamW(
-        parameters=model.parameters(),
-        learning_rate=lr_scheduler,
-        weight_decay=args.weight_decay)
-    logger.info("TRAIN")
-
-    do_train(args, model, criterion, metric, optimizer, lr_scheduler,
-             train_data_loader, test_data_loader, bertConfig)
-    logger.info("EVAL")
-    do_evalute(args, model, criterion, metric, test_data_loader, bertConfig)
+    do_evalute(model, criterion, metric, test_data_loader, bigbirdConfig)
 
 
-def do_train(args, model, criterion, metric, optimizer, lr_scheduler,
-             train_data_loader, test_data_loader, config):
+def do_train(model, criterion, metric, optimizer, train_data_loader,
+             test_data_loader, config):
     model.train()
     global_steps = 0
     softmax = nn.Softmax()
@@ -350,7 +273,6 @@ def do_train(args, model, criterion, metric, optimizer, lr_scheduler,
             loss = criterion(output, labels)
             loss.backward()
             optimizer.step()
-            lr_scheduler.step()
             optimizer.clear_gradients()
             # 训练耗时
             train_timer.tac()
@@ -379,7 +301,7 @@ def do_train(args, model, criterion, metric, optimizer, lr_scheduler,
 
 
 @paddle.no_grad()
-def do_evalute(args, model, criterion, metric, test_data_loader, config):
+def do_evalute(model, criterion, metric, test_data_loader, config):
     model.eval()
     global_steps = 0
     softmax = nn.Softmax()
@@ -416,8 +338,7 @@ def do_evalute(args, model, criterion, metric, test_data_loader, config):
 
 
 if __name__ == "__main__":
-    args = parse_args()
     if args.n_gpu > 1:
-        dist.spawn(main, args=(args, ), nprocs=args.n_gpu)
+        dist.spawn(main, args=(), nprocs=args.n_gpu)
     else:
-        main(args)
+        main()
