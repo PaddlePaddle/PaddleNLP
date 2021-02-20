@@ -41,7 +41,7 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 
 
 def do_predict(args):
-    device = paddle.set_device("gpu" if args.use_gpu else "cpu")
+    device = paddle.set_device(args.select_device)
 
     test_loader, src_vocab_size, tgt_vocab_size, bos_id, eos_id = create_infer_loader(
         args)
