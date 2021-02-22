@@ -25,6 +25,7 @@ from model import BiGruCrf
 from paddlenlp.data import Pad, Tuple, Stack
 from paddlenlp.layers.crf import LinearChainCrfLoss, ViterbiDecoder
 from paddlenlp.metrics import ChunkEvaluator
+import distutils.util
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
@@ -39,6 +40,7 @@ parser.add_argument("--base_lr", type=float, default=0.001, help="The basic lear
 parser.add_argument("--emb_dim", type=int, default=128, help="The dimension in which a word is embedded.")
 parser.add_argument("--hidden_size", type=int, default=128, help="The number of hidden nodes in the GRU layer.")
 parser.add_argument("--verbose", type=ast.literal_eval, default=128, help="Print reader and training time in details.")
+parser.add_argument("--do_eval", type=distutils.util.strtobool, default=True, help="To evaluate the model if True.")
 # yapf: enable
 
 
@@ -97,7 +99,7 @@ def train(args):
     callbacks = paddle.callbacks.ProgBarLogger(
         log_freq=10, verbose=3) if args.verbose else None
     model.fit(train_data=train_loader,
-              eval_data=test_loader,
+              eval_data=test_loader if args.do_eval else None,
               batch_size=args.batch_size,
               epochs=args.epochs,
               eval_freq=1,

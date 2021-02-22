@@ -13,8 +13,8 @@
 
 ### 2.1 环境配置
 - Python >= 3.6
-- paddlepaddle >= 2.0.0rc1，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-- paddlenlp >= 2.0.0b, 安装方式：`pip install paddlenlp>=2.0.0b`
+- paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
+- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp==2.0.0rc`
 
 ### 2.2 启动GLUE任务
 以 GLUE/SST-2 任务为例，启动GLUE任务进行Fine-tuning 的方式如下：

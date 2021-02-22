@@ -49,6 +49,12 @@ PaddleNLP提供多个开源的预训练词向量模型，用户仅需在使用`p
 
 ## 英文词向量
 
+### Word2Vec
+
+| 语料 | 名称 |
+|------|------|
+| Google News | w2v.google_news.target.word-word.dim300.en |
+
 ### GloVe
 
 | 语料                | 25维     | 50维      | 100维    | 200维    | 300 维   |
@@ -129,6 +135,7 @@ token_embedding = TokenEmbedding(embedding_name="fasttext.wiki-news.target.word-
 | w2v.sikuquanshu.target.word-bigram.dim300                              | 20.77 MB   | 19529 |
 | w2v.mixed-large.target.word-char.dim300                                | 1.35 GB    | 1292552 |
 | w2v.mixed-large.target.word-word.dim300                                | 1.35 GB    | 1292483 |
+| w2v.google_news.target.word-word.dim300.en                             | 1.61 GB    | 3000000 |
 | glove.wiki2014-gigaword.target.word-word.dim50.en                      | 73.45 MB   | 400002 |
 | glove.wiki2014-gigaword.target.word-word.dim100.en                     | 143.30 MB  | 400002 |
 | glove.wiki2014-gigaword.target.word-word.dim200.en                     | 282.97 MB  | 400002 |
