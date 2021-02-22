@@ -154,7 +154,7 @@ python run_eval.py --model_name_or_path gpt2-medium-en \
     --batch_size 8 \
     --device gpu
 ```
-不设置`init_checkpoint_path` 参数时，可以评估默认预训练好的模型参数。
+其中数据集WikiText采用的是PPL(perplexity)评估指标，LAMBADA采用的是ACC(accuracy)指标。不设置`init_checkpoint_path` 参数时，可以评估默认预训练好的模型参数。
 
 
 ### 文本生成
