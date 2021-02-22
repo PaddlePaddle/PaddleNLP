@@ -26,6 +26,7 @@ def convert_small_example(example,
     input_ids = []
     if task_name == 'senta':
         if is_tokenized:
+            example[0] = example[0][:max_seq_length]
             input_ids = [vocab[token] for token in example[0]]
         else:
             for i, token in enumerate(jieba.cut(example[0])):
@@ -33,6 +34,7 @@ def convert_small_example(example,
                     break
                 token_id = vocab[token]
                 input_ids.append(token_id)
+
     else:
         if is_tokenized:
             tokens = example[0][:max_seq_length]

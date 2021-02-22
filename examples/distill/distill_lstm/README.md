@@ -26,7 +26,7 @@
 另外，本项目还依赖paddlenlp，可以使用下面的命令进行安装：
 
 ```shell
-pip insyall paddlenlp==2.0.0rc
+pip install paddlenlp==2.0.0rc
 ```
 
 本文下载并在对英文数据集的训练中使用了Google News语料[预训练的Word Embedding](https://code.google.com/archive/p/word2vec/)初始化小模型的Embedding层，并使用gensim包对该Word Embedding文件进行读取。因此，运行本实验还需要安装`gensim`及下载预训练的Word Embedding。
@@ -67,7 +67,7 @@ python -u ./run_bert_finetune.py \
     --num_train_epochs 3 \
     --logging_steps 10 \
     --save_steps 10 \
-    --output_dir ../distill/ditill_lstm/model/$TASK_NAME/ \
+    --output_dir ../distill/distill_lstm/model/$TASK_NAME/ \
     --n_gpu 1 \
 
 ```
@@ -89,7 +89,6 @@ CUDA_VISIBLE_DEVICES=0 python small.py \
     --optimizer adam \
     --lr 3e-4 \
     --dropout_prob 0.2 \
-    --use_pretrained_emb False \
     --vocab_path senta_word_dict_subset.txt
 ```
 
@@ -100,8 +99,8 @@ CUDA_VISIBLE_DEVICES=0 python small.py \
     --max_epoch 10 \
     --batch_size 64 \
     --lr 1.0 \
-    --dropout_prob 0.4 \
-    --use_pretrained_emb True
+    --use_pretrained_emb \
+    --dropout_prob 0.4
 ```
 
 ```shell
@@ -111,8 +110,8 @@ CUDA_VISIBLE_DEVICES=0 python small.py \
     --max_epoch 35 \
     --batch_size 256 \
     --lr 2.0 \
-    --dropout_prob 0.4 \
-    --use_pretrained_emb True
+    --use_pretrained_emb \
+    --dropout_prob 0.4
 ```
 
 ### 蒸馏模型
@@ -127,7 +126,6 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --dropout_prob 0.1 \
     --batch_size 64 \
     --model_name bert-wwm-ext-chinese \
-    --use_pretrained_emb False \
     --teacher_path model/senta/best_bert_wwm_ext_model_880/model_state.pdparams \
     --vocab_path senta_word_dict_subset.txt
 ```
@@ -142,7 +140,7 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --dropout_prob 0.2 \
     --batch_size 128 \
     --model_name bert-base-uncased \
-    --use_pretrained_emb True \
+    --use_pretrained_emb \
     --teacher_path model/SST-2/best_model_610/model_state.pdparams
 ```
 
@@ -155,7 +153,7 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --dropout_prob 0.2 \
     --batch_size 256 \
     --model_name bert-base-uncased \
-    --use_pretrained_emb True \
+    --use_pretrained_emb \
     --n_iter 10 \
     --teacher_path model/QQP/best_model_17000/model_state.pdparams
 ```
@@ -164,14 +162,14 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
 
 
 ## 蒸馏实验结果
-本蒸馏实验基于GLUE的SST-2、QQP、中文情感分类ChnSentiCorp数据集。实验效果均使用每个数据集的验证集（dev）进行评价，评价指标是准确率（acc），其中QQP中包含f1值。利用基于BERT的教师模型去蒸馏基于Bi-LSTM的学生模型，对比Bi-LSTM小模型单独训练，在SST-2、QQP、senta(中文情感分类)任务上分别有3.2%、1.8%、1.4%的提升。
+本蒸馏实验基于GLUE的SST-2、QQP、中文情感分类ChnSentiCorp数据集。实验效果均使用每个数据集的验证集（dev）进行评价，评价指标是准确率（acc），其中QQP中包含f1值。利用基于BERT的教师模型去蒸馏基于Bi-LSTM的学生模型，对比Bi-LSTM小模型单独训练，在SST-2、QQP、senta(中文情感分类)任务上分别有3.3%、1.8%、1.4%的提升。
 
 | Model          | SST-2(dev acc)    | QQP(dev acc/f1)            | ChnSentiCorp(dev acc) | ChnSentiCorp(dev acc) |
 | -------------- | ----------------- | -------------------------- | --------------------- | --------------------- |
 | Teacher  model | bert-base-uncased | bert-base-uncased          | bert-base-chinese     | bert-wwm-ext-chinese  |
 | Teacher        | 0.930046          | 0.905813(acc)/0.873472(f1) | 0.951667              | 0.955000              |
-| Student        | 0.853211          | 0.856171(acc)/0.806057(f1) | 0.920833              | 0.920800              |
-| Distilled      | 0.885321          | 0.874375(acc)/0.829581(f1) | 0.930000              | 0.935000              |
+| Student        | 0.852064          | 0.856171(acc)/0.806057(f1) | 0.920000              | 0.920000              |
+| Distilled      | 0.885321          | 0.874375(acc)/0.829581(f1) | 0.930000              | 0.934167              |
 
 
 ## 参考文献

@@ -77,14 +77,16 @@ def do_train(agrs):
         vocab_path=args.vocab_path,
         batch_size=args.batch_size,
         max_seq_length=args.max_seq_length,
-        n_iter=args.n_iter)
+        n_iter=args.n_iter,
+        whole_word_mask=args.whole_word_mask)
 
     emb_tensor = load_embedding(
         args.vocab_path) if args.use_pretrained_emb else None
 
     model = BiLSTM(args.emb_dim, args.hidden_size, args.vocab_size,
-                   args.output_dim, args.padding_idx, args.num_layers,
-                   args.dropout_prob, args.init_scale, emb_tensor)
+                   args.output_dim, args.vocab_path, args.padding_idx,
+                   args.num_layers, args.dropout_prob, args.init_scale,
+                   args.use_pretrained_emb, args.embedding_name, emb_tensor)
 
     if args.optimizer == 'adadelta':
         optimizer = paddle.optimizer.Adadelta(

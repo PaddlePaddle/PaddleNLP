@@ -22,6 +22,7 @@ import paddle.nn.initializer as I
 from paddle.metric import Metric, Accuracy, Precision, Recall
 from paddlenlp.datasets import GlueSST2, GlueQQP, ChnSentiCorp
 from paddlenlp.metrics import AccuracyAndF1
+from paddlenlp.embeddings import TokenEmbedding
 
 from args import parse_args
 from data import load_embedding, create_data_loader_for_small_model, create_pair_loader_for_small_model
@@ -39,15 +40,25 @@ class BiLSTM(nn.Layer):
                  hidden_size,
                  vocab_size,
                  output_dim,
+                 vocab_path,
                  padding_idx=0,
                  num_layers=1,
                  dropout_prob=0.0,
                  init_scale=0.1,
+                 use_pretrained_embedding=True,
+                 embedding_name=None,
                  embed_weight=None):
         super(BiLSTM, self).__init__()
         self.embedder = nn.Embedding(vocab_size, embed_dim, padding_idx)
         self.embedder.weight.set_value(
             embed_weight) if embed_weight is not None else None
+
+        # if use_pretrained_embedding and embedding_name is not None:
+        #     self.embedder = TokenEmbedding(
+        #         embedding_name, extended_vocab_path=vocab_path)
+        #     embed_dim = self.embedder.embedding_dim
+        # else:
+        #     self.embedder = nn.Embedding(vocab_size, embed_dim, padding_idx)
 
         self.lstm = nn.LSTM(
             embed_dim,
@@ -124,6 +135,7 @@ def evaluate(task_name, model, loss_fct, metric, data_loader):
     else:
         print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end='')
     model.train()
+    return res[0] if isinstance(metric, AccuracyAndF1) else res
 
 
 def do_train(args):
@@ -135,24 +147,20 @@ def do_train(args):
             vocab_path=args.vocab_path,
             model_name=args.model_name,
             batch_size=args.batch_size)
-    elif args.task_name == 'senta':
+    else:
         train_data_loader, dev_data_loader = create_data_loader_for_small_model(
             task_name=args.task_name,
             vocab_path=args.vocab_path,
-            batch_size=args.batch_size)
-    else:  # sst-2
-        train_data_loader, dev_data_loader = create_data_loader_for_small_model(
-            task_name=args.task_name,
-            vocab_path=args.vocab_path,
-            model_name=args.model_name,
+            model_name=args.model_name if args.task_name == 'sst-2' else None,
             batch_size=args.batch_size)
 
     emb_tensor = load_embedding(
         args.vocab_path) if args.use_pretrained_emb else None
 
     model = BiLSTM(args.emb_dim, args.hidden_size, args.vocab_size,
-                   args.output_dim, args.padding_idx, args.num_layers,
-                   args.dropout_prob, args.init_scale, emb_tensor)
+                   args.output_dim, args.vocab_path, args.padding_idx,
+                   args.num_layers, args.dropout_prob, args.init_scale,
+                   args.use_pretrained_emb, args.embedding_name, emb_tensor)
 
     loss_fct = nn.CrossEntropyLoss()
 
@@ -188,8 +196,8 @@ def do_train(args):
                            args.log_freq / (time.time() - tic_train)))
                     tic_eval = time.time()
 
-                    evaluate(args.task_name, model, loss_fct, metric,
-                             dev_data_loader)
+                    acc = evaluate(args.task_name, model, loss_fct, metric,
+                                   dev_data_loader)
                     print("eval done total : %s s" % (time.time() - tic_eval))
                 tic_train = time.time()
             global_step += 1
