@@ -89,22 +89,30 @@ def apply_data_augmentation(task_name,
                             n_iter=20,
                             p_mask=0.1,
                             p_ng=0.25,
-                            ngram_range=(2, 6)):
+                            ngram_range=(2, 6),
+                            whole_word_mask=False):
     """
     Data Augmentation contains Masking and n-gram sampling. Tokenization and
     Masking are performed at the same time, so that the masked token can be
     directly replaced by `mask_token`, after what sampling is performed.
     """
 
-    def _data_augmentation(data):
+    def _data_augmentation(data, whole_word_mask=whole_word_mask):
         # 1. Masking
         words = []
-        for word in data.split():
-            words += [[tokenizer.mask_token]] if np.random.rand(
-            ) < p_mask else [tokenizer(word)]
-        # 2. n-gram sampling
+        if not whole_word_mask:
+            tokenized_list = tokenizer(data)
+            words = [
+                tokenizer.mask_token if np.random.rand() < p_mask else word
+                for word in tokenized_list
+            ]
+        else:
+            for word in data.split():
+                words += [[tokenizer.mask_token]] if np.random.rand(
+                ) < p_mask else [tokenizer(word)]
+        # 2. N-gram sampling
         words = ngram_sampling(words, p_ng=p_ng, ngram_range=ngram_range)
-        words = flatten(words)
+        words = flatten(words) if isinstance(words[0], list) else words
         new_text = " ".join(words)
         return words, new_text
 
@@ -145,7 +153,7 @@ def apply_data_augmentation_for_cn(train_dataset,
                                    n_iter=20,
                                    p_mask=0.1,
                                    p_ng=0.25,
-                                   ngram_range=(2, 6)):
+                                   ngram_range=(2, 10)):
     """
     Because BERT and jieba have different `tokenize` function, so it returns
      `[jieba_tokenizer(data[0], bert_tokenizer(data[0]), data[1])]` for each
@@ -167,12 +175,12 @@ def apply_data_augmentation_for_cn(train_dataset,
             words, words_bert = [], []
             for word in jieba.cut(data[0]):
                 if np.random.rand() < p_mask:
-                    words.append([tokenizer.mask_token])
-                    words_bert.append([vocab.mask_token])
+                    words.append([vocab.unk_token])
+                    words_bert.append([tokenizer.unk_token])
                 else:
                     words.append([word])
                     words_bert.append(tokenizer(word))
-            # 2. n-gram sampling
+            # 2. N-gram sampling
             words, words_bert = ngram_sampling(words, words_bert, p_ng,
                                                ngram_range)
             words, words_bert = flatten(words), flatten(words_bert)
@@ -236,7 +244,8 @@ def create_distill_loader(task_name,
                           batch_size=64,
                           max_seq_length=128,
                           shuffle=True,
-                          n_iter=20):
+                          n_iter=20,
+                          whole_word_mask=False):
     """
     Returns batch data for bert and small model.
     Bert and small model have different input representations.
@@ -250,7 +259,6 @@ def create_distill_loader(task_name,
             vocab_path,
             unk_token='[UNK]',
             pad_token='[PAD]',
-            mask_token='[MASK]',
             bos_token=None,
             eos_token=None, )
         pad_val = vocab['[PAD]']
@@ -263,7 +271,11 @@ def create_distill_loader(task_name,
             train_ds, tokenizer, vocab, n_iter=n_iter)
     else:
         train_ds = apply_data_augmentation(
-            task_name, train_ds, tokenizer, n_iter=n_iter)
+            task_name,
+            train_ds,
+            tokenizer,
+            n_iter=n_iter,
+            whole_word_mask=whole_word_mask)
     print("Data augmentation has been applied.")
 
     trans_fn = partial(

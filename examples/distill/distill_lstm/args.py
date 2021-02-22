@@ -34,12 +34,6 @@ def parse_args():
         "--num_layers", type=int, default=1, help="Layers number of LSTM.")
 
     parser.add_argument(
-        '--use_pretrained_emb',
-        type=eval,
-        default=False,
-        help='Whether to use pre-trained embedding tensor.')
-
-    parser.add_argument(
         "--emb_dim", type=int, default=300, help="Embedding dim.")
 
     parser.add_argument(
@@ -105,6 +99,23 @@ def parse_args():
         type=str,
         default='/root/.paddlenlp/models/bert-base-uncased/bert-base-uncased-vocab.txt',
         help="Student model's vocab path.")
+
+    parser.add_argument(
+        "--use_pretrained_emb",
+        action="store_true",
+        help="If True, use pretrained word embedding for training.")
+
+    parser.add_argument(
+        "--whole_word_mask",
+        action="store_true",
+        help="If True, use whole word masking method in data augmentation in distilling."
+    )
+
+    parser.add_argument(
+        "--embedding_name",
+        type=str,
+        default='w2v.google_news.target.word-word.dim300.en',
+        help="The name of pretrained word embedding.")
 
     parser.add_argument(
         "--vocab_size",
