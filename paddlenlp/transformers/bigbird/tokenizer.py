@@ -47,11 +47,15 @@ class BigBirdTokenizer(PretrainedTokenizer):
     }  # for save_pretrained
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
-            "bigbird-base-en":
-            "http://10.21.226.155:8038/sentencepiece_gpt2.model"
+            "bigbird-base-uncased":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/sentencepiece_gpt2.model"
         },
     }
-    pretrained_init_configuration = {"bigbird-base-en": {"do_lower_case": True}}
+    pretrained_init_configuration = {
+        "bigbird-base-uncased": {
+            "do_lower_case": True
+        }
+    }
 
     def __init__(self,
                  sentencepiece_model_file,

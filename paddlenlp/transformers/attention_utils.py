@@ -416,44 +416,6 @@ class DefaultAttention(Attention):
         return out
 
 
-@AttentionRegistry.register("bigbird_simulated")
-class BigBirdSimulatedAttention(Attention):
-    def __init__(self,
-                 num_heads=1,
-                 block_size=1,
-                 window_size=3,
-                 num_global_blocks=1,
-                 num_rand_blocks=1,
-                 seed=None):
-        super(BigBirdSimulatedAttention,
-              self).__init__(num_heads, block_size, window_size,
-                             num_global_blocks, num_rand_blocks, seed)
-        for k, v in locals().items():
-            if k != "self":
-                setattr(self, k, v)
-        self.attn_impl = DefaultAttention(num_heads, block_size, window_size,
-                                          num_global_blocks, num_rand_blocks,
-                                          seed)
-
-    def forward(self,
-                query_matrix,
-                key_matrix,
-                value_matrix,
-                d_head,
-                attn_mask=None,
-                rand_mask_idx=None,
-                query_mask=None,
-                key_mask=None,
-                dropout=None):
-        return self.attn_impl(
-            query_matrix,
-            key_matrix,
-            value_matrix,
-            d_head,
-            attn_mask=attn_mask,
-            dropout=dropout)
-
-
 @AttentionRegistry.register("bigbird")
 class BigBirdSparseAttention(Attention):
     def __init__(self,
@@ -844,7 +806,7 @@ class MultiHeadAttention(Layer):
                  num_global_blocks=1,
                  num_rand_blocks=1,
                  seed=None,
-                 attention_type="default_attention"):
+                 attention_type="bigbird"):
 
         super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim

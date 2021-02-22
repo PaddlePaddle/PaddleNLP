@@ -174,7 +174,7 @@ class TransformerEncoderLayer(Layer):
                  normalize_before=False,
                  weight_attr=None,
                  bias_attr=None,
-                 attention_type="default_attention",
+                 attention_type="bigbird",
                  block_size=1,
                  window_size=3,
                  num_global_blocks=1,
@@ -281,8 +281,6 @@ class BigBirdPooler(Layer):
         super(BigBirdPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.activation = nn.Tanh()
-        self.weight = self.dense.weight
-        self.bias = self.dense.bias
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
@@ -339,26 +337,33 @@ class BigBirdPretrainedModel(PretrainedModel):
 
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
-        "bert-base-uncased": {
-            "vocab_size": 30522,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
+        "bigbird-base-uncased": {
+            "num_layers": 12,
+            "vocab_size": 50358,
+            "nhead": 12,
+            "attn_dropout": 0.1,
+            "dim_feedforward": 3072,
+            "activation": "gelu",
+            "normalize_before": False,
+            "block_size": 16,
+            "window_size": 3,
+            "num_global_blocks": 2,
+            "num_rand_blocks": 3,
+            "seed": None,
             "pad_token_id": 0,
+            "hidden_size": 768,
+            "hidden_dropout_prob": 0.1,
+            "max_position_embeddings": 4096,
+            "type_vocab_size": 2,
+            "num_labels": 2,
+            "initializer_range": 0.02,
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "bert-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bert-base-uncased.pdparams",
+            "bigbird-base-uncased":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/bigbird-base-uncased.pdparams",
         }
     }
     base_model_prefix = "bigbird"
@@ -374,7 +379,7 @@ class BigBirdPretrainedModel(PretrainedModel):
                         mean=0.0,
                         std=self.initializer_range
                         if hasattr(self, "initializer_range") else
-                        self.bert.config["initializer_range"],
+                        self.bigbird.config["initializer_range"],
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
@@ -390,7 +395,6 @@ class BigBirdModel(BigBirdPretrainedModel):
                  dim_feedforward=3072,
                  activation="gelu",
                  normalize_before=False,
-                 attention_type="bigbird",
                  block_size=1,
                  window_size=3,
                  num_global_blocks=1,
@@ -416,7 +420,7 @@ class BigBirdModel(BigBirdPretrainedModel):
             attn_dropout,
             activation,
             normalize_before=normalize_before,
-            attention_type=attention_type,
+            attention_type="bigbird",
             block_size=block_size,
             window_size=window_size,
             num_global_blocks=num_global_blocks,
@@ -424,33 +428,20 @@ class BigBirdModel(BigBirdPretrainedModel):
             seed=seed)
         self.encoder = TransformerEncoder(encoder_layer, num_layers)
         # pooler
-        self.pooler = nn.Linear(hidden_size, hidden_size)
         self.pooler = BigBirdPooler(hidden_size)
         self.pad_token_id = pad_token_id
-        self.attention_type = attention_type
         self.num_layers = num_layers
 
     def _process_mask(self, input_ids, attention_mask_list=None):
         # [B, T]
-        attention_mask = (
-            input_ids == self.pad_token_id).astype(self.pooler.weight.dtype)
+        attention_mask = (input_ids == self.pad_token_id
+                          ).astype(self.pooler.dense.weight.dtype)
         # [B, 1, T, 1]
         query_mask = paddle.unsqueeze(attention_mask, axis=[1, 3])
         # [B, 1, 1, T]
         key_mask = paddle.unsqueeze(attention_mask, axis=[1, 2])
-        if self.attention_type != "bigbird":
-            attention_mask = paddle.unsqueeze(attention_mask, axis=1)
-            attention_mask = paddle.matmul(
-                attention_mask, attention_mask, transpose_x=True) * -1e9
-            attention_mask = paddle.unsqueeze(attention_mask, axis=1)
-            if attention_mask_list is not None:
-                for i in range(len(attention_mask_list)):
-                    attention_mask_list[i] = paddle.unsqueeze(
-                        attention_mask_list[i], axis=0)
-                    attention_mask_list[i] += attention_mask
-        else:
-            query_mask = 1 - query_mask
-            key_mask = 1 - key_mask
+        query_mask = 1 - query_mask
+        key_mask = 1 - key_mask
         return attention_mask_list, query_mask, key_mask
 
     def forward(self,
@@ -465,6 +456,30 @@ class BigBirdModel(BigBirdPretrainedModel):
                                       rand_mask_idx_list, query_mask, key_mask)
         pooled_output = self.pooler(encoder_output)
         return encoder_output, pooled_output
+
+
+class BigBirdForTokenClassification(BigBirdPretrainedModel):
+    def __init__(self, bigbird):
+        super(BigBirdForTokenClassification, self).__init__()
+        self.bigbird = bigbird
+        self.linear = nn.Linear(self.bigbird.config["hidden_size"],
+                                self.bigbird.config["num_labels"])
+        self.dropout = nn.Dropout(
+            self.bigbird.config['hidden_dropout_prob'], mode="upscale_in_train")
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                attention_mask_list=None,
+                rand_mask_idx_list=None):
+        _, pooled_output = self.bigbird(
+            input_ids,
+            None,
+            attention_mask_list=attention_mask_list,
+            rand_mask_idx_list=rand_mask_idx_list)
+        output = self.dropout(pooled_output)
+        output = self.linear(output)
+        return output
 
 
 class BigBirdLMPredictionHead(Layer):

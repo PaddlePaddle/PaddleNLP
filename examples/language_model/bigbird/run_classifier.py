@@ -21,7 +21,7 @@ import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
 from paddle.io import DataLoader, Dataset
-from paddlenlp.transformers import BigBirdModel, create_bigbird_simulated_attention_mask_list, create_bigbird_rand_mask_idx_list
+from paddlenlp.transformers import BigBirdModel, BigBirdForTokenClassification, create_bigbird_simulated_attention_mask_list, create_bigbird_rand_mask_idx_list
 from paddlenlp.transformers import BigBirdTokenizer
 from paddlenlp.utils.log import logger
 from paddlenlp.datasets import Imdb
@@ -61,20 +61,14 @@ parser.add_argument(
     type=int,
     default=12,
     help="The number of BigBird Encoder layers")
-parser.add_argument("--attention_type", type=str, default="bigbird", help="")
+#parser.add_argument("--attention_type", type=str, default="bigbird", help="")
 parser.add_argument(
     "--nhead",
     type=int,
     default=12,
     help="number of heads when compute attention")
 parser.add_argument("--attn_dropout", type=float, default=0.1, help="")
-parser.add_argument("--hidden_size", type=int, default=768, help="")
 parser.add_argument("--num_labels", type=int, default=2, help="")
-parser.add_argument(
-    "--weight_decay",
-    default=0.01,
-    type=float,
-    help="Weight decay if we apply some.")
 parser.add_argument(
     "--warmup_steps",
     default=1000,
@@ -94,6 +88,9 @@ parser.add_argument(
     help="Directory to save model checkpoint")
 parser.add_argument(
     "--epochs", type=int, default=10, help="Number of epoches for training.")
+
+parser.add_argument(
+    "--model_name_or_path", type=str, default="bigbird-base-uncased")
 parser.add_argument("--pretrained_model", type=str, default=None)
 parser.add_argument("--dim_feedforward", type=int, default=3072)
 parser.add_argument("--activation", type=str, default="gelu")
@@ -107,6 +104,7 @@ parser.add_argument("--max_position_embeddings", type=int, default=4096)
 parser.add_argument("--type_vocab_size", type=int, default=2)
 parser.add_argument("--seed", type=int, default=None)
 parser.add_argument("--pad_token_id", type=int, default=0)
+parser.add_argument("--initializer_range", type=float, default=0.02)
 
 args = parser.parse_args()
 
@@ -155,29 +153,6 @@ def create_dataloader(data_dir,
     return train_data_loader, test_data_loader
 
 
-class ClassifierModel(nn.Layer):
-    def __init__(self, **kwargv):
-        super(ClassifierModel, self).__init__()
-        self.bigbird = BigBirdModel(**kwargv)
-        self.linear = nn.Linear(kwargv['hidden_size'], kwargv['num_labels'])
-        self.dropout = nn.Dropout(
-            kwargv['hidden_dropout_prob'], mode="upscale_in_train")
-        self.kwargv = kwargv
-
-    def forward(self,
-                input_ids,
-                attention_mask_list=None,
-                rand_mask_idx_list=None):
-        _, pooled_output = self.bigbird(
-            input_ids,
-            None,
-            attention_mask_list=attention_mask_list,
-            rand_mask_idx_list=rand_mask_idx_list)
-        output = self.dropout(pooled_output)
-        output = self.linear(output)
-        return output
-
-
 class Timer(object):
     def __init__(self):
         self.reset()
@@ -201,20 +176,13 @@ class Timer(object):
 
 
 def main():
-    # get dataloader
-    tokenizer = BigBirdTokenizer(args.vocab_model_file)
-    bigbirdConfig = args.__dict__
-    bigbirdConfig["vocab_size"] = tokenizer.vocab_size
-
+    tokenizer = BigBirdTokenizer.from_pretrained(args.model_name_or_path)
     train_data_loader, test_data_loader = \
             create_dataloader(args.data_dir, args.batch_size, args.max_encoder_length, tokenizer)
-
-    # define model
-    model = ClassifierModel(**bigbirdConfig)
-    if args.pretrained_model is not None:
-        pretrained_model_dict = paddle.load(args.pretrained_model)
-        model.set_state_dict(pretrained_model_dict)
-        logger.info("Pretrained model has been loaded.")
+    bigbird = BigBirdModel.from_pretrained(args.model_name_or_path)
+    model = BigBirdForTokenClassification(bigbird)
+    bigbirdConfig = BigBirdModel.pretrained_init_configuration[
+        args.model_name_or_path]
 
     # define metric
     criterion = nn.CrossEntropyLoss()
@@ -244,32 +212,17 @@ def do_train(model, criterion, metric, optimizer, train_data_loader,
             global_steps += 1
             (input_ids, labels) = batch
             seq_len = input_ids.shape[1]
-            if args.attention_type == "bigbird":
-                # create band mask
-                data_process_timer.tick()
+            # create band mask
+            data_process_timer.tick()
+            rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
+                config["num_layers"], seq_len, seq_len, config["nhead"],
+                config["block_size"], config["window_size"],
+                config["num_global_blocks"], config["num_rand_blocks"],
+                config["seed"])
+            data_process_timer.tac()
 
-                rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
-                    config["num_layers"], seq_len, seq_len, config["nhead"],
-                    config["block_size"], config["window_size"],
-                    config["num_global_blocks"], config["num_rand_blocks"],
-                    config["seed"])
-
-                data_process_timer.tac()
-
-                train_timer.tick()
-                output = model(input_ids, None, rand_mask_idx_list)
-            else:
-                data_process_timer.tick()
-                attention_mask_list, rand_mask_idx_list = create_bigbird_simulated_attention_mask_list(
-                    config["num_layers"], seq_len, seq_len, config["nhead"],
-                    config["block_size"], config["window_size"],
-                    config["num_global_blocks"], config["num_rand_blocks"],
-                    config["seed"])
-                data_process_timer.tac()
-
-                train_timer.tick()
-                output = model(input_ids, attention_mask_list,
-                               rand_mask_idx_list)
+            train_timer.tick()
+            output = model(input_ids, None, rand_mask_idx_list)
             loss = criterion(output, labels)
             loss.backward()
             optimizer.step()
@@ -309,21 +262,13 @@ def do_evalute(model, criterion, metric, test_data_loader, config):
         global_steps += 1
         (input_ids, labels) = batch
         seq_len = input_ids.shape[1]
-        if args.attention_type == "bigbird":
-            # create band mask
-            rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
-                config["num_layers"], seq_len, seq_len, config["nhead"],
-                config["block_size"], config["window_size"],
-                config["num_global_blocks"], config["num_rand_blocks"],
-                config["seed"])
-            output = model(input_ids, None, rand_mask_idx_list)
-        else:
-            attention_mask_list, rand_mask_idx_list = create_bigbird_simulated_attention_mask_list(
-                config["num_layers"], seq_len, seq_len, config["nhead"],
-                config["block_size"], config["window_size"],
-                config["num_global_blocks"], config["num_rand_blocks"],
-                config["seed"])
-            output = model(input_ids, attention_mask_list, rand_mask_idx_list)
+        # create band mask
+        rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
+            config["num_layers"], seq_len, seq_len, config["nhead"],
+            config["block_size"], config["window_size"],
+            config["num_global_blocks"], config["num_rand_blocks"],
+            config["seed"])
+        output = model(input_ids, None, rand_mask_idx_list)
         loss = criterion(output, labels)
         prob = softmax(output)
         correct = metric.compute(prob, labels)
