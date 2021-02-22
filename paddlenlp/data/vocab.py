@@ -326,7 +326,7 @@ class Vocab(object):
         Building vocab accoring to given iterator and other information. Iterate
         over the `iterator` to construct a `Counter` and as `__init__`
         Args:
-            iterator (collections.Iterable): Iterator of tokens.
+            iterator (collections.Iterable): Iterator of tokens. Each tokens should be list of token if wordlevel vocab is needed.
             max_size (int, optional): Max size of vocab, not including special tokens. Default: None.
             min_freq (int): Ignore tokens whose frequencies are less than `min_freq`. Default: 1.
             token_to_idx (dict, optional): A dict specifies the mapping relationship
