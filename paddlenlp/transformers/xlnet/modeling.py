@@ -30,6 +30,8 @@ __all__ = [
     "XLNetForTokenClassification",
 ]
 
+dtype_float = 'float32'
+
 
 def get_activation(activation_string):
     if activation_string in ACT2FN:
@@ -677,7 +679,7 @@ class XLNetModel(XLNetPretrainedModel):
 
     def relative_positional_encoding(self, qlen, klen, bsz=None):
         # create relative positional encoding.
-        freq_seq = paddle.arange(0, self.d_model, 2.0, dtype='float32')
+        freq_seq = paddle.arange(0, self.d_model, 2.0, dtype=dtype_float)
         inv_freq = 1 / 10000 ** (freq_seq / self.d_model)
 
         if self.attn_type == "bi":
@@ -688,8 +690,8 @@ class XLNetModel(XLNetPretrainedModel):
             raise ValueError("Unknown `attn_type` {}.".format(self.attn_type))
 
         if self.bi_data:
-            fwd_pos_seq = paddle.arange(beg, end, -1.0, dtype='float32')
-            bwd_pos_seq = paddle.arange(-beg, -end, 1.0, dtype='float32')
+            fwd_pos_seq = paddle.arange(beg, end, -1.0, dtype=dtype_float)
+            bwd_pos_seq = paddle.arange(-beg, -end, 1.0, dtype=dtype_float)
 
             if self.clamp_len > 0:
                 fwd_pos_seq = fwd_pos_seq.clamp(-self.clamp_len, self.clamp_len)
@@ -703,7 +705,7 @@ class XLNetModel(XLNetPretrainedModel):
                 bwd_pos_emb = self.positional_embedding(bwd_pos_seq, inv_freq)
             pos_emb = paddle.concat([fwd_pos_emb, bwd_pos_emb], axis=1)
         else:
-            fwd_pos_seq = paddle.arange(beg, end, -1.0, dtype='float32')
+            fwd_pos_seq = paddle.arange(beg, end, -1.0, dtype=dtype_float)
             if self.clamp_len > 0:
                 fwd_pos_seq = fwd_pos_seq.clamp(-self.clamp_len, self.clamp_len)
             pos_emb = self.positional_embedding(fwd_pos_seq, inv_freq, bsz)
@@ -754,7 +756,6 @@ class XLNetModel(XLNetPretrainedModel):
 
         mlen = mems[0].shape[0] if mems is not None and mems[0] is not None else 0
         klen = mlen + qlen
-        dtype_float = 'float32'
 
         # Attention mask
         # causal attention mask
@@ -983,13 +984,13 @@ class XLNetLMHeadModel(XLNetPretrainedModel):
         # Build permutation mask so that previous tokens don't see last token
         sequence_length = input_ids.shape[1]
         perm_mask = paddle.zeros(
-            (effective_batch_size, sequence_length, sequence_length), dtype='float32'
+            (effective_batch_size, sequence_length, sequence_length), dtype=dtype_float
         )
         perm_mask[:, :, -1] = 1.0
 
         # We'll only predict the last token
         target_mapping = paddle.zeros(
-            (effective_batch_size, 1, sequence_length), dtype='float32'
+            (effective_batch_size, 1, sequence_length), dtype=dtype_float
         )
         target_mapping[:, 0, -1] = 1.0
 
