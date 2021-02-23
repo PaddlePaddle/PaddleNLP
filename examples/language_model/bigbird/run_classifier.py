@@ -139,21 +139,24 @@ class Timer(object):
 
 
 def main():
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.init_parallel_env()
     tokenizer = BigBirdTokenizer.from_pretrained(args.model_name_or_path)
     train_data_loader, test_data_loader = \
             create_dataloader(args.batch_size, args.max_encoder_length, tokenizer)
 
-    bigbirdConfig = BigBirdModel.pretrained_init_configuration[
-        args.model_name_or_path]
     model = BigBirdForTokenClassification.from_pretrained(
         args.model_name_or_path)
-    # define metric
+    if paddle.distributed.get_world_size() > 1:
+        model = paddle.DataParallel(model)
     criterion = nn.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
     # define optimizer
     optimizer = paddle.optimizer.Adam(
         parameters=model.parameters(), learning_rate=args.lr, epsilon=1e-6)
 
+    bigbirdConfig = BigBirdModel.pretrained_init_configuration[
+        args.model_name_or_path]
     do_train(model, criterion, metric, optimizer, train_data_loader,
              test_data_loader, bigbirdConfig)
 
@@ -212,8 +215,9 @@ def do_train(model, criterion, metric, optimizer, train_data_loader,
                                           "model_%d.pdparams" % (global_steps))
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
-
-                model.save_pretrained(output_dir)
+                model_to_save = model._layers if isinstance(
+                    model, paddle.DataParallel) else model
+                model_to_save.save_pretrained(output_dir)
 
             if global_steps > args.num_train_steps:
                 break
