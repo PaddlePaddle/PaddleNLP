@@ -43,7 +43,7 @@ parser.add_argument(
 parser.add_argument(
     "--max_encoder_length",
     type=int,
-    default=512,
+    default=3072,
     help="The maximum total input sequence length after SentencePiece tokenization."
 )
 parser.add_argument(

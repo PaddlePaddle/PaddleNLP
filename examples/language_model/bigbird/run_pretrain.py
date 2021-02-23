@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ def parse_args():
         ", ".join(MODEL_CLASSES.keys()), )
     parser.add_argument(
         "--model_name_or_path",
-        default=None,
+        default="bigbird-base-uncased",
         type=str,
         required=True,
         help="Path to pre-trained model or shortcut name selected in the list: "
@@ -135,6 +135,40 @@ def parse_args():
         type=int,
         default=1,
         help="number of gpus to use, 0 for cpu.")
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=10,
+        help="Number of epoches for training.")
+    parser.add_argument(
+        "--data_dir",
+        type=str,
+        default='~/',
+        help="vocab file used to tokenize text")
+    parser.add_argument(
+        "--vocab_model_file",
+        type=str,
+        default='sentencepiece_gpt2.model',
+        help="vocab model file used to tokenize text")
+    parser.add_argument(
+        "--max_encoder_length",
+        type=int,
+        default=512,
+        help="The maximum total input sequence length after SentencePiece tokenization."
+    )
+    parser.add_argument("--attn_dropout", type=float, default=0.1, help="")
+    parser.add_argument("--hidden_size", type=int, default=768, help="")
+    parser.add_argument("--pretrained_model", type=str, default=None)
+    parser.add_argument("--dim_feedforward", type=int, default=3072)
+    parser.add_argument("--activation", type=str, default="gelu")
+    parser.add_argument("--normalize_before", type=bool, default=False)
+    parser.add_argument("--block_size", type=int, default=16)
+    parser.add_argument("--window_size", type=int, default=3)
+    parser.add_argument("--num_rand_blocks", type=int, default=3)
+    parser.add_argument("--hidden_dropout_prob", type=float, default=0.1)
+    parser.add_argument("--max_position_embeddings", type=int, default=4096)
+    parser.add_argument("--type_vocab_size", type=int, default=2)
+    parser.add_argument("--data_file", type=str, default="train.csv")
     args = parser.parse_args()
     return args
 
@@ -154,208 +188,188 @@ class WorkerInitObj(object):
         random.seed(self.seed + id)
 
 
-def create_pretraining_dataset(input_file, max_pred_length, shared_list, args,
-                               worker_init):
-    train_data = PretrainingDataset(
-        input_file=input_file, max_pred_length=max_pred_length)
-    # files have been sharded, no need to dispatch again
+class PretrainingDataset(Dataset):
+    def __init__(self,
+                 input_file,
+                 tokenizer,
+                 max_encoder_length=512,
+                 max_predictions_per_seq=75,
+                 masked_lm_prob=0.15,
+                 pad_val=0,
+                 cls_val=65,
+                 sep_val=66,
+                 mask_val=67,
+                 mask_prob=0.8,
+                 random_prob=0.1):
+        self.tokenizer = tokenizer
+        self.max_encoder_length = max_encoder_length
+        self.max_predictions_per_seq = max_predictions_per_seq
+        self.pad_val = pad_val
+        input_file = open(input_file, "r")
+        self.lines = input_file.readlines()
+
+        self.vocab_size = tokenizer.vocab_size
+        self.word_start_subtoken = np.array([
+            tokenizer.vocab.idx_to_token[i][0] == "▁"
+            for i in range(self.vocab_size)
+        ])
+        self.masked_lm_prob = masked_lm_prob
+        self.cls_val = cls_val
+        self.sep_val = sep_val
+        self.mask_val = mask_val
+        self.mask_prob = mask_prob
+        self.random_prob = random_prob
+
+    def _pretrain_masking(self, subtokens):
+        end_pos = self.max_encoder_length - 2 + np.random.randint(
+            max(1, len(subtokens) - self.max_encoder_length - 2))
+        start_pos = max(0, end_pos - self.max_encoder_length + 2)
+        subtokens = np.array(subtokens[start_pos:end_pos])
+
+        word_begin_mark = self.word_start_subtoken[subtokens]
+        word_begins_pos = np.flatnonzero(word_begin_mark).astype(np.int32)
+        if word_begins_pos.size == 0:
+            # if no word boundary present, we do not do whole word masking
+            # and we fall back to random masking.
+            word_begins_pos = np.arange(len(subtokens), dtype=np.int32)
+            word_begin_mark = np.logical_not(word_begin_mark)
+        correct_start_pos = word_begins_pos[0]
+        subtokens = subtokens[correct_start_pos:]
+        word_begin_mark = word_begin_mark[correct_start_pos:]
+        word_begins_pos = word_begins_pos - correct_start_pos
+        num_tokens = len(subtokens)
+
+        words = np.split(
+            np.arange(
+                num_tokens, dtype=np.int32), word_begins_pos)[1:]
+        assert len(words) == len(word_begins_pos)
+
+        num_to_predict = min(
+            self.max_predictions_per_seq,
+            max(1, int(round(len(word_begins_pos) * self.masked_lm_prob))))
+        masked_lm_positions = np.concatenate(
+            np.random.choice(
+                np.array(
+                    [[]] + words, dtype=np.object)[1:],
+                num_to_predict,
+                replace=False),
+            0)
+
+        if len(masked_lm_positions) > self.max_predictions_per_seq:
+            masked_lm_positions = masked_lm_positions[:self.
+                                                      max_predictions_per_seq +
+                                                      1]
+            # however last word can cross word boundaries, remove crossing words
+            truncate_masking_at = np.flatnonzero(word_begin_mark[
+                masked_lm_positions])[-1]
+            masked_lm_positions = masked_lm_positions[:truncate_masking_at]
+
+        masked_lm_positions = np.sort(masked_lm_positions)
+        masked_lm_ids = subtokens[masked_lm_positions]
+
+        randomness = np.random.rand(len(masked_lm_positions))
+
+        mask_index = masked_lm_positions[randomness < self.mask_prob]
+        random_index = masked_lm_positions[randomness > (1 - self.random_prob)]
+
+        subtokens[mask_index] = self.mask_val  # id of masked token
+        subtokens[random_index] = np.random.randint(  # ignore special tokens
+            101,
+            self.vocab_size,
+            len(random_index),
+            dtype=np.int32)
+
+        subtokens = np.concatenate([
+            np.array(
+                [self.cls_val], dtype=np.int32), subtokens, np.array(
+                    [self.sep_val], dtype=np.int32)
+        ])
+
+        # pad everything to correct shape
+        pad_inp = self.max_encoder_length - num_tokens - 2
+        subtokens = np.pad(subtokens, [0, pad_inp], "constant")
+
+        pad_out = self.max_predictions_per_seq - len(masked_lm_positions)
+        masked_lm_weights = np.pad(np.ones_like(
+            masked_lm_positions, dtype=np.float32), [0, pad_out],
+                                   "constant")
+        masked_lm_positions = np.pad(masked_lm_positions + 1, [0, pad_out],
+                                     "constant")
+        masked_lm_ids = np.pad(masked_lm_ids, [0, pad_out], "constant")
+
+        return subtokens, masked_lm_positions, masked_lm_ids, masked_lm_weights
+
+    def __getitem__(self, index):
+        # [input_ids, label]
+        line = self.lines[index].rstrip()
+        # numpy_mask
+        subtokens = self.tokenizer.convert_tokens_to_ids(self.tokenizer(line))
+
+        subtokens, masked_lm_positions, masked_lm_ids, masked_lm_weights = \
+                self._pretrain_masking(subtokens)
+        return [
+            subtokens, np.zeros_like(subtokens), masked_lm_positions,
+            masked_lm_ids, masked_lm_weights, np.zeros(
+                [1], dtype="int64")
+        ]
+
+    def __len__(self):
+        return len(self.lines)
+
+
+def create_dataloader(input_file, tokenizer, worker_init, batch_size):
+    pretrain_dataset = PretrainingDataset(input_file, tokenizer)
     train_batch_sampler = paddle.io.BatchSampler(
-        train_data, batch_size=args.batch_size, shuffle=True)
+        pretrain_dataset, batch_size=batch_size, shuffle=True)
+    # TODO(zhoushunjie): 后续考虑优化masked_lm_position
+    # make masked_lm_positions can be gathered
+    # def _collate_data(data, stack_fn=Stack()):
+    #     # data: input_ids, segment_ids, masked_lm_positions, masked_lm_ids, masked_lm_weights, next_sentence_labels
+    #     #num_fields = len(data[0].keys())
+    #     out = {}
 
-    # DataLoader cannot be pickled because of its place.
-    # If it can be pickled, use global function instead of lambda and use
-    # ProcessPoolExecutor instead of ThreadPoolExecutor to prefetch.
-    def _collate_data(data, stack_fn=Stack()):
-        num_fields = len(data[0])
-        out = [None] * num_fields
-        # input_ids, segment_ids, input_mask, masked_lm_positions,
-        # masked_lm_labels, next_sentence_labels, mask_token_num
-        for i in (0, 1, 2, 5):
-            out[i] = stack_fn([x[i] for x in data])
-        batch_size, seq_length = out[0].shape
-        size = num_mask = sum(len(x[3]) for x in data)
-        # Padding for divisibility by 8 for fp16 or int8 usage
-        if size % 8 != 0:
-            size += 8 - (size % 8)
-        # masked_lm_positions
-        # Organize as a 1D tensor for gather or use gather_nd
-        out[3] = np.full(size, 0, dtype=np.int64)
-        # masked_lm_labels
-        out[4] = np.full([size, 1], -1, dtype=np.int64)
-        mask_token_num = 0
-        for i, x in enumerate(data):
-            for j, pos in enumerate(x[3]):
-                out[3][mask_token_num] = i * seq_length + pos
-                out[4][mask_token_num] = x[4][j]
-                mask_token_num += 1
-        # mask_token_num
-        out.append(np.asarray([mask_token_num], dtype=np.float32))
-        return out
+    #     for i in data[0].keys():
+    #         out[i] = stack_fn([x[i] for x in data])
+    #     # batch_size, seq_length = out[0].shape
+    #     # # Organize as a 1D tensor for gather or use gather_nd
+    #     # mask_token_num = 0
+    #     # for i, x in enumerate(data):
+    #     #     for j, pos in enumerate(x[2]):
+    #     #         out[2][mask_token_num] = i * seq_length + pos
+    #     #         mask_token_num += 1
+    #     # out[2] = 
+    #     print(out,flush=True)
+    #     return out
 
-    train_data_loader = DataLoader(
-        dataset=train_data,
+    dataloader = DataLoader(
+        dataset=pretrain_dataset,
         batch_sampler=train_batch_sampler,
-        collate_fn=_collate_data,
+        # collate_fn=_collate_data,
         num_workers=0,
         worker_init_fn=worker_init,
         return_list=True)
-    return train_data_loader, input_file
-
-
-class PretrainingDataset(Dataset):
-    def __init__(self, input_file, max_pred_length):
-        self.input_file = input_file
-        self.max_pred_length = max_pred_length
-        f = h5py.File(input_file, "r")
-        keys = [
-            'input_ids', 'input_mask', 'segment_ids', 'masked_lm_positions',
-            'masked_lm_ids', 'next_sentence_labels'
-        ]
-        self.inputs = [np.asarray(f[key][:]) for key in keys]
-        f.close()
-
-    def __len__(self):
-        'Denotes the total number of samples'
-        return len(self.inputs[0])
-
-    def __getitem__(self, index):
-
-        [
-            input_ids, input_mask, segment_ids, masked_lm_positions,
-            masked_lm_ids, next_sentence_labels
-        ] = [
-            input[index].astype(np.int64)
-            if indice < 5 else np.asarray(input[index].astype(np.int64))
-            for indice, input in enumerate(self.inputs)
-        ]
-        # TODO: whether to use reversed mask by changing 1s and 0s to be
-        input_mask = (1 - np.reshape(
-            input_mask.astype(np.float32), [1, 1, input_mask.shape[0]])) * -1e9
-
-        index = self.max_pred_length
-        # store number of  masked tokens in index
-        # outputs of torch.nonzero diff with that of numpy.nonzero by zip
-        padded_mask_indices = (masked_lm_positions == 0).nonzero()[0]
-        if len(padded_mask_indices) != 0:
-            index = padded_mask_indices[0].item()
-            mask_token_num = index
-        else:
-            index = 0
-            mask_token_num = 0
-        # masked_lm_labels = np.full(input_ids.shape, -1, dtype=np.int64)
-        # masked_lm_labels[masked_lm_positions[:index]] = masked_lm_ids[:index]
-        masked_lm_labels = masked_lm_ids[:index]
-        masked_lm_positions = masked_lm_positions[:index]
-        # softmax_with_cross_entropy enforce last dim size equal 1
-        masked_lm_labels = np.expand_dims(masked_lm_labels, axis=-1)
-        next_sentence_labels = np.expand_dims(next_sentence_labels, axis=-1)
-
-        return [
-            input_ids, segment_ids, input_mask, masked_lm_positions,
-            masked_lm_labels, next_sentence_labels
-        ]
+    return dataloader
 
 
 def do_train(args):
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-
-    set_seed(args)
     worker_init = WorkerInitObj(args.seed + paddle.distributed.get_rank())
 
-    args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    # get dataloader
+    tokenizer = BigBirdTokenizer.from_pretrained(args.model_name_or_path)
+    dataloader = create_dataloader(args.data_file, tokenizer, worker_init,
+                                   args.batch_size)
 
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    # define model
+    model = BigBirdForPretraining.from_pretrained(args.model_name_or_path)
 
-    model = BigBirdForPretraining(
-        BigBirdModel(**model_class.pretrained_init_configuration[
-            args.model_name_or_path]))
-    criterion = BigBirdPretrainingCriterion(
-        getattr(model, BigBirdForPretraining.base_model_prefix).config[
-            "vocab_size"])
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
+    # define metric
 
-    lr_scheduler = paddle.optimizer.lr.PolynomialDecay(args.learning_rate,
-                                                       args.max_steps, 0)
-    lr_scheduler = paddle.optimizer.lr.LinearWarmup(
-        lr_scheduler,
-        args.warmup_steps,
-        start_lr=0.0,
-        end_lr=args.learning_rate)
+    # define optimizer
 
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        epsilon=args.adam_epsilon,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
-
-    global_step = 0
-    tic_train = time.time()
-    for epoch in range(args.num_train_epochs):
-        files = [
-            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_"
-                not in str(f))
-        ]
-        files.sort()
-        num_files = len(files)
-        for f_id in range(num_files):
-            data_file = files[f_id]
-            train_data_loader = create_pretraining_dataset(
-                args, data_file, worker_init, worker_index, eod_id=eod_id)
-            for step, batch in enumerate(train_data_loader):
-                global_step += 1
-                (input_ids, segment_ids, input_mask, masked_lm_positions,
-                 masked_lm_labels, next_sentence_labels,
-                 masked_lm_scale) = batch
-                prediction_scores, seq_relationship_score = model(
-                    input_ids=input_ids,
-                    token_type_ids=segment_ids,
-                    attention_mask=input_mask,
-                    masked_positions=masked_lm_positions)
-                loss = criterion(prediction_scores, seq_relationship_score,
-                                 masked_lm_labels, next_sentence_labels,
-                                 masked_lm_scale)
-                if global_step % args.logging_steps == 0:
-                    if (not args.n_gpu > 1
-                        ) or paddle.distributed.get_rank() == 0:
-                        logger.info(
-                            "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                            % (global_step, epoch, step, loss,
-                               args.logging_steps / (time.time() - tic_train)))
-                    tic_train = time.time()
-                loss.backward()
-                optimizer.step()
-                lr_scheduler.step()
-                optimizer.clear_gradients()
-                if global_step % args.save_steps == 0:
-                    if (not args.n_gpu > 1
-                        ) or paddle.distributed.get_rank() == 0:
-                        output_dir = os.path.join(args.output_dir,
-                                                  "model_%d" % global_step)
-                        if not os.path.exists(output_dir):
-                            os.makedirs(output_dir)
-                        # need better way to get inner model of DataParallel
-                        model_to_save = model._layers if isinstance(
-                            model, paddle.DataParallel) else model
-                        model_to_save.save_pretrained(output_dir)
-                        tokenizer.save_pretrained(output_dir)
-                        paddle.save(
-                            optimizer.state_dict(),
-                            os.path.join(output_dir, "model_state.pdopt"))
-                if global_step >= args.max_steps:
-                    del train_data_loader
-                    return
-
-            del train_data_loader
-            train_data_loader, data_file = dataset_future.result(timeout=None)
+    # training
 
 
 if __name__ == "__main__":

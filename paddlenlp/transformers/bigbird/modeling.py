@@ -533,14 +533,14 @@ class BigBirdPretrainingHeads(Layer):
 
 
 class BigBirdForPretraining(BigBirdPretrainedModel):
-    def __init__(self, bert):
+    def __init__(self, bigbird):
         super(BigBirdForPretraining, self).__init__()
-        self.bert = bert
+        self.bigbird = bigbird
         self.cls = BigBirdPretrainingHeads(
-            self.bert.config["hidden_size"],
-            self.bert.config["vocab_size"],
-            self.bert.config["hidden_act"],
-            embedding_weights=self.bert.embeddings.word_embeddings.weight)
+            self.bigbird.config["hidden_size"],
+            self.bigbird.config["vocab_size"],
+            self.bigbird.config["hidden_act"],
+            embedding_weights=self.bigbird.embeddings.word_embeddings.weight)
 
         self.apply(self.init_weights)
 
@@ -550,7 +550,7 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 masked_positions=None):
-        outputs = self.bert(
+        outputs = self.bigbird(
             input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
