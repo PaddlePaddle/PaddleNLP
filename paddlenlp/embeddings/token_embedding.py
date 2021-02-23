@@ -58,6 +58,8 @@ class TokenEmbedding(nn.Embedding):
             The file path of extended vocabulary.
         trainable (object: `bool`, optional, default to True):
             Whether the weight of embedding can be trained.
+        keep_extend_vocab_only (object: `bool`, optional, default to True):
+            Whether keep the extend vocabulary only, only effective if provides extended_vocab_path
     """
 
     def __init__(self,
@@ -65,7 +67,8 @@ class TokenEmbedding(nn.Embedding):
                  unknown_token=UNK_TOKEN,
                  unknown_token_vector=None,
                  extended_vocab_path=None,
-                 trainable=True):
+                 trainable=True,
+                 keep_extend_vocab_only=False):
         vector_path = osp.join(EMBEDDING_HOME, embedding_name + ".npz")
         if not osp.exists(vector_path):
             # download
@@ -87,7 +90,8 @@ class TokenEmbedding(nn.Embedding):
             [0] * self.embedding_dim).astype(paddle.get_default_dtype())
         if extended_vocab_path is not None:
             embedding_table = self._extend_vocab(extended_vocab_path, vector_np,
-                                                 pad_vector, unk_vector)
+                                                 pad_vector, unk_vector,
+                                                 keep_extend_vocab_only)
             trainable = True
         else:
             embedding_table = self._init_without_extend_vocab(
@@ -138,7 +142,7 @@ class TokenEmbedding(nn.Embedding):
         return vocab_list
 
     def _extend_vocab(self, extended_vocab_path, vector_np, pad_vector,
-                      unk_vector):
+                      unk_vector, keep_extend_vocab_only):
         """
         Construct index to word list, word to index dict and embedding weight using
         extended vocab.
@@ -182,16 +186,16 @@ class TokenEmbedding(nn.Embedding):
         embedding_table[
             extend_vocab_intersect_index] = pretrained_embedding_table[
                 pretrained_vocab_intersect_index]
+        if not keep_extend_vocab_only:
+            for idx in pretrained_vocab_subtract_index:
+                word = pretrained_idx_to_word[idx]
+                self._idx_to_word.append(word)
+                self._word_to_idx[word] = len(self._idx_to_word) - 1
 
-        for idx in pretrained_vocab_subtract_index:
-            word = pretrained_idx_to_word[idx]
-            self._idx_to_word.append(word)
-            self._word_to_idx[word] = len(self._idx_to_word) - 1
-
-        embedding_table = np.append(
-            embedding_table,
-            pretrained_embedding_table[pretrained_vocab_subtract_index],
-            axis=0)
+            embedding_table = np.append(
+                embedding_table,
+                pretrained_embedding_table[pretrained_vocab_subtract_index],
+                axis=0)
 
         if self.unknown_token not in extend_vocab_set:
             self._idx_to_word.append(self.unknown_token)
