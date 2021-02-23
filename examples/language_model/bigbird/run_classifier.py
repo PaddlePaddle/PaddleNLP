@@ -68,7 +68,10 @@ parser.add_argument(
 parser.add_argument(
     "--epochs", type=int, default=10, help="Number of epoches for training.")
 parser.add_argument(
-    "--model_name_or_path", type=str, default="bigbird-base-uncased")
+    "--model_name_or_path",
+    type=str,
+    default="bigbird-base-uncased",
+    help="pretraining model name or path")
 
 args = parser.parse_args()
 
