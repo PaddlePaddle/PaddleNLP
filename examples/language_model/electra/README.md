@@ -1,36 +1,128 @@
 # ELECTRA with PaddleNLP
 
-[ELECTRA](https://openreview.net/pdf?id=r1xMH1BtvB) 在[BERT](https://arxiv.org/abs/1810.04805)的基础上对其预训练过程进行了改进：预训练由两部分模型网络组成，称为Generator和Discriminator，各自包含1个BERT模型。Generator的预训练使用和BERT一样的Masked Language Model(MLM)任务，但Discriminator的预训练使用Replaced Token Detection(RTD)任务（主要改进点）。预训练完成后，使用Discriminator作为精调模型，后续的Fine-tuning不再使用Generator。根据论文中给出的实验结果，在和BERT具有相同的模型参数、预训练计算量一样的情况下，GLUE得分比BERT明显好，small模型为79.9：75.1，Base模型为85.1：82.2，Large模型为89.0：87.2。作者给出的原因是：
-1. 相比MLM任务只着眼于输入中15%词的完形填空，ELECTRA的RTD任务着眼于整个输入内容，模型更具有全局观
-2. 应用了GAN生成对抗的思想，替换词的时候使用Generator做逼真替换而不是随机替换，加快Discriminator收敛
-3. 虽然预训练模型包括Generator和Discriminator，但也不是完全照搬GAN，和常规GAN不一样的地方：
-   - 输入为真实文本，常规GAN输入为随机噪声
-   - 生成器的输入输出都为句子，而句子中的字词都是离散的，因此判别器的梯度无法传给生成器，而常规GAN是可以传递的
-   - 如果生成出原来的词，则为正例，而常规GAN生成的都是负例
+[ELECTRA](https://openreview.net/pdf?id=r1xMH1BtvB) 在[BERT](https://arxiv.org/abs/1810.04805)的基础上对其预训练过程进行了改进：预训练由两部分模型网络组成，称为Generator和Discriminator，各自包含1个BERT模型。Generator的预训练使用和BERT一样的Masked Language Model(MLM)任务，但Discriminator的预训练使用Replaced Token Detection(RTD)任务（主要改进点）。预训练完成后，使用Discriminator作为精调模型，后续的Fine-tuning不再使用Generator。
+![avatar](./electra_model_brief_introduce.JPG)
+
+图片来源：来自[electra论文](https://openreview.net/pdf?id=r1xMH1BtvB)
+
+根据论文中给出的实验结果，在和BERT具有相同的模型参数、预训练计算量一样的情况下，GLUE得分比BERT明显好，small模型为79.9：75.1，Base模型为85.1：82.2，Large模型为89.0：87.2。
 
 本项目是 ELECTRA 在 Paddle 2.0上的开源实现。
 
-## 发布要点
+## 1. 安装说明
+- Python >= 3.6
+- paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
+- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp==2.0.0rc2`
+- seqeval, 安装方式：`pip install seqeval`
 
-1. 动态图ELECTRA模型，支持 Fine-tuning，在 GLUE 所有任务上进行了验证。
-2. 支持 ELECTRA Pre-training。
+## 2. 数据准备
+### 2.1 建议的预训练数据
+论文中提到预训练需要BookCorpus数据（英文文本），但是当前BookCorpus数据已不再开源，可以使用其它数据替代，只要是纯英文文本数据，utf-8编码即可。
+例如[Gutenberg Dataset](https://web.eecs.umich.edu/~lahiri/gutenberg_dataset.html)
+下面例子假设数据在./BookCorpus/，数据文件为纯文本train.data
 
-## NLP 任务的 Fine-tuning
+### 2.2 自定义预训练数据
+支持用户自定义数据进行训练，自定义数据为文本形式，每行一句英文文本，utf-8编码，下面例子假设数据在./BookCorpus/，数据文件为纯文本train.data
+
+## 3. 模型预训练
+如下所有命令均假设在 PaddleNLP/examples/language_model/electra/ 下执行
+### 3.1 单机单卡
+```shell
+export CUDA_VISIBLE_DEVICES="0"
+export DATA_DIR=./BookCorpus/
+
+python -u ./run_pretrain.py \
+    --model_type electra \
+    --model_name_or_path electra-small \
+    --input_dir $DATA_DIR \
+    --output_dir ./pretrain_model/ \
+    --train_batch_size 64 \
+    --learning_rate 5e-4 \
+    --max_seq_length 128 \
+    --weight_decay 1e-2 \
+    --adam_epsilon 1e-6 \
+    --warmup_steps 10000 \
+    --num_train_epochs 4 \
+    --logging_steps 100 \
+    --save_steps 10000 \
+    --max_steps -1
+```
+其中参数释义如下：
+- `model_type` 表示模型类型，默认为ELECTRA模型。
+- `model_name_or_path` 如果配置1个名字，则表示预训练模型的规模，当前支持的名字为：electra-small（约1400万参数）、electra-base（约1.1亿参数）、electra-large（约3.35亿参数）。如果配置1个路径，则表示按照路径中的模型规模进行训练，这时需配置 --init_from_ckpt 参数一起使用，一般用于断点恢复训练场景。
+- `input_dir` 表示输入数据的目录，该目录下需要有1个train.data纯英文文本文件，utf-8编码。
+- `output_dir` 表示将要保存预训练模型的目录。
+- `train_batch_size` 表示 每次迭代**每张卡**上的样本数目。
+- `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
+- `max_seq_length` 表示最大句子长度，超过该长度将被截断。
+- `weight_decay` 表示每次迭代中参数缩小的比例，该值乘以学习率为真正缩小的比例。
+- `adam_epsilon` 表示adam优化器中的epsilon值。
+- `warmup_steps` 表示学习率逐渐升高到基础学习率（即上面配置的learning_rate）所需要的迭代数，最早的使用可以参考[这篇论文](https://arxiv.org/pdf/1706.02677.pdf)。
+- `num_train_epochs` 表示训练轮数。
+- `logging_steps` 表示日志打印间隔。
+- `save_steps` 表示模型保存间隔。
+- `max_steps` 如果配置且大于0，表示预训练最多执行的迭代数量；如果不配置或配置小于0，则根据输入数据量、train_batch_size和num_train_epochs来确定预训练迭代数量
+
+另外还有一些额外参数不在如上命令中：
+- `use_amp` 表示是否开启混合精度(float16)进行训练，默认不开启。如果在命令中加上了--use_amp，则会开启。
+- `init_from_ckpt` 表示是否从某个checkpoint继续训练（断点恢复训练），默认不开启。如果在命令中加上了--init_from_ckpt，且 --model_name_or_path 配置的是路径，则会开启从某个checkpoint继续训练。
+
+训练过程将按照 `logging_steps`的设置打印如下日志：
+
+```
+global step 100/322448, epoch: 0, loss: 46.2487393681735099, lr: 0.000100000000, speed: 0.6439 step/s
+global step 200/322448, epoch: 0, loss: 45.2436411214760099, lr: 0.000200000000, speed: 0.6041 step/s
+global step 300/322448, epoch: 0, loss: 43.2906827821215998, lr: 0.000300000000, speed: 0.5991 step/s
+```
+
+### 3.2 单机多卡
+```shell
+export CUDA_VISIBLE_DEVICES="0,1,2,3"
+export DATA_DIR=./BookCorpus/
+
+python -u ./run_pretrain.py \
+    --model_type electra \
+    --model_name_or_path electra-small \
+    --input_dir $DATA_DIR \
+    --output_dir ./pretrain_model/ \
+    --train_batch_size 64 \
+    --learning_rate 5e-4 \
+    --max_seq_length 128 \
+    --weight_decay 1e-2 \
+    --adam_epsilon 1e-6 \
+    --warmup_steps 10000 \
+    --num_train_epochs 4 \
+    --logging_steps 100 \
+    --save_steps 10000 \
+    --max_steps -1 \
+    --n_gpu 4
+```
+其中绝大部分和单机单卡一样，这里描述不一样的参数：
+- 环境变量CUDA_VISIBLE_DEVICES可配置多个GPU-id，配置后预训练程序只能使用配置中的GPU，不会使用未配置的GPU
+- 参数`n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可，最大数量不能超过环境变量CUDA_VISIBLE_DEVICES配置的GPU个数；若配置为0，则使用CPU。
+
+## 4. 模型Fine-tuning和预测评估
+### 4.1 从预训练模型得到Fine-tuning所需模型
+由第一段简介得知，Electra Fine-tuning时只需要Discriminator部分，所以通过如下命令从预训练模型中提取出Discriminator，得到Fine-tuning所需模型
+```shell
+python -u ./get_ft_model.py \
+    --model_dir ./pretrain_model/model_40000.pdparams/
+```
+其中参数释义如下：
+- `model_dir` 表示预训练模型所在目录，这里例子取预训练40000步的checkport来生成Fine-tuning所需模型，生成的模型也会在这个目录下。
+此命令可多次执行，但只有第1次会生成Fine-tuning所需模型
+
+### 4.2 运行Fine-tuning
 使用../glue/run_glue.py运行，详细可参考../glue/README.md，有两种方式：
-1. 使用已有的预训练模型运行 Fine-tuning。
-2. 运行 ELECTRA 模型的预训练后，使用预训练模型运行 Fine-tuning（需要很多资源）。
-
-下面的例子基于方式1进行介绍。
-
-### 语句和句对分类任务
+#### 4.2.1 使用Paddle提供的预训练模型运行 Fine-tuning
+此方式无需在本地进行预训练，即可以跳过上面第3章和4.1，直接运行Fine-tuning。
 
 以 GLUE/SST-2 任务为例，启动 Fine-tuning 的方式如下（`paddlenlp` 要已经安装或能在 `PYTHONPATH` 中找到）：
-
 ```shell
 export CUDA_VISIBLE_DEVICES=0,1
 export TASK_NAME=SST-2
 
-cd ../glue/ && python -u ./run_glue.py \
+cd ../../glue/ && python -u ./run_glue.py \
     --model_type electra \
     --model_name_or_path electra-small \
     --task_name $TASK_NAME \
@@ -38,16 +130,14 @@ cd ../glue/ && python -u ./run_glue.py \
     --batch_size 32   \
     --learning_rate 1e-4 \
     --num_train_epochs 3 \
-    --logging_steps 1 \
-    --save_steps 500 \
-    --output_dir ./tmp/$TASK_NAME/ \
-    --n_gpu 1 \
-
+    --logging_steps 100 \
+    --save_steps 100 \
+    --output_dir ./$TASK_NAME/ \
+    --n_gpu 1
 ```
-
 其中参数释义如下：
 - `model_type` 指示了模型类型，当前支持BERT、ELECTRA模型。
-- `model_name_or_path` 指示了使用哪种预训练模型，对应有其预训练模型和预训练时使用的 tokenizer，当前支持electra-small、electra-base、electra-large。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `model_name_or_path` 如果配置模型名（当前支持electra-small、electra-base、electra-large）则为本节介绍的方式。如果配置本地目录（例如执行4.1命令得到Fine-tuning所需模型，配置其所在的目录 pretrain_model/model_40000.pdparams/）则为4.2.2中介绍的方式。
 - `task_name` 表示 Fine-tuning 的任务，当前支持CoLA、SST-2、MRPC、STS-B、QQP、MNLI、QNLI、RTE。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
@@ -58,19 +148,44 @@ cd ../glue/ && python -u ./run_glue.py \
 - `output_dir` 表示模型保存路径。
 - `n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可；若为0，则使用CPU。
 
-训练过程将按照 `logging_steps` 和 `save_steps` 的设置打印如下日志：
+#### 4.2.2 使用本地预训练模型运行 Fine-tuning
+按照上面第3章在本地运行 ELECTRA 模型的预训练后，执行4.1的命令得到Fine-tuning所需模型，然后运行 Fine-tuning。
+
+以 GLUE/SST-2 任务为例，启动 Fine-tuning 的方式如下（`paddlenlp` 要已经安装或能在 `PYTHONPATH` 中找到）：
+
+```shell
+export CUDA_VISIBLE_DEVICES=0,1
+export TASK_NAME=SST-2
+
+cd ../../glue/ && python -u ./run_glue.py \
+    --model_type electra \
+    --model_name_or_path ../language_model/electra/pretrain_model/model_40000.pdparams/ \
+    --task_name $TASK_NAME \
+    --max_seq_length 128 \
+    --batch_size 32   \
+    --learning_rate 1e-4 \
+    --num_train_epochs 3 \
+    --logging_steps 100 \
+    --save_steps 100 \
+    --output_dir ./$TASK_NAME/ \
+    --n_gpu 1
+```
+其中绝大部分参数和4.2.1中一样，只有参数model_name_or_path配置了本地预训练模型的路径
+
+无论使用哪种方式进行 Fine-tuning，过程将按照 `logging_steps` 和 `save_steps` 的设置打印如下日志：
 
 ```
-global step 6310/6315, epoch: 2, batch: 2099, rank_id: 0, loss: 0.035772, lr: 0.0000000880, speed: 3.1527 step/s
-global step 6311/6315, epoch: 2, batch: 2100, rank_id: 0, loss: 0.056789, lr: 0.0000000704, speed: 3.4201 step/s
-global step 6312/6315, epoch: 2, batch: 2101, rank_id: 0, loss: 0.096717, lr: 0.0000000528, speed: 3.4694 step/s
-global step 6313/6315, epoch: 2, batch: 2102, rank_id: 0, loss: 0.044982, lr: 0.0000000352, speed: 3.4513 step/s
-global step 6314/6315, epoch: 2, batch: 2103, rank_id: 0, loss: 0.139579, lr: 0.0000000176, speed: 3.4566 step/s
-global step 6315/6315, epoch: 2, batch: 2104, rank_id: 0, loss: 0.046043, lr: 0.0000000000, speed: 3.4590 step/s
-eval loss: 0.549763, acc: 0.9151376146788991, eval done total : 1.8206987380981445 s
+global step 100/6315, epoch: 0, batch: 99, rank_id: 0, loss: 0.699434, lr: 0.0000158479, speed: 3.3756 step/s
+eval loss: 0.697092, acc: 0.5091743119266054, eval done total : 1.8847179412841797 s
+global step 200/6315, epoch: 0, batch: 199, rank_id: 0, loss: 0.637145, lr: 0.0000316957, speed: 3.1637 step/s
+eval loss: 0.704759, acc: 0.5401376146788991, eval done total : 1.8395519256591797 s
+global step 300/6315, epoch: 0, batch: 299, rank_id: 0, loss: 0.673020, lr: 0.0000475436, speed: 3.1829 step/s
+eval loss: 0.823823, acc: 0.5871559633027523, eval done total : 1.9077861309051514 s
+global step 400/6315, epoch: 0, batch: 399, rank_id: 0, loss: 0.623517, lr: 0.0000633914, speed: 3.1703 step/s
+eval loss: 0.800283, acc: 0.6628440366972477, eval done total : 1.8795380592346191 s
 ```
 
-使用electra-small预训练模型进行单卡 Fine-tuning ，在验证集上有如下结果：
+使用electra-small预训练模型进行单卡 Fine-tuning ，在验证集上有如下结果（这里各类任务的结果是运行3次取最好得到）：
 
 | Task  | Metric                       | Result      |
 |-------|------------------------------|-------------|
@@ -85,28 +200,78 @@ eval loss: 0.549763, acc: 0.9151376146788991, eval done total : 1.82069873809814
 
 注：acc.是Accuracy的简称，表中Metric字段名词取自[GLUE论文](https://openreview.net/pdf?id=rJ4km2R5t7)
 
-## 预训练
-预训练需要BookCorpus数据，当前BookCorpus数据已不再开源，可以使用其它数据替代，只要是纯文本数据即可。
-例如[Gutenberg Dataset](https://web.eecs.umich.edu/~lahiri/gutenberg_dataset.html)
-下面例子假设数据在./BookCorpus/，数据文件为纯文本train.data
 
+## 5. 推理部署
+### 5.1 导出推理模型
 ```shell
-export CUDA_VISIBLE_DEVICES=0,1
-export DATA_DIR=./BookCorpus/
-
-python -u ./run_pretrain.py \
-    --model_type electra \
-    --model_name_or_path electra-small \
-    --train_batch_size 96 \
-    --learning_rate 5e-4 \
-    --weight_decay 1e-2 \
-    --adam_epsilon 1e-6 \
-    --warmup_steps 10000 \
-    --num_train_epochs 4 \
-    --input_dir $DATA_DIR \
-    --output_dir ./tmp2/ \
-    --logging_steps 1 \
-    --save_steps 20000 \
-    --max_steps 1000000 \
-    --n_gpu 2
+python -u ./export_model.py \
+    --input_model_dir ./pretrain_model/model_40000.pdparams/ \
+    --output_model_dir ./ \
+    --model_name electra-small
 ```
+其中参数释义如下：
+- `input_model_dir` 表示输入的预训练模型所在目录，这里例子取预训练40000步的checkport来导出推理模型。
+- `output_model_dir` 表示将要保存推理模型的目录，这里例子取当前路径。
+- `model_name` 表示输入的预训练模型类型，当前支持electra-small（约1400万参数）、electra-base（约1.1亿参数）、electra-large（约3.35亿参数）。
+
+例如，执行如上命令后，可以看到在output_model_dir配置的目录下，导出的推理模型包括3个文件：
+| 文件                         | 说明                                   |
+|------------------------------|----------------------------------------|
+| electra-small.pdiparams      | 模型权重文件，供推理时加载使用               |
+| electra-small.pdiparams.info | 模型权重信息文件                        |
+| electra-small.pdmodel        | 模型结构文件，供推理时加载使用               |
+
+### 5.2 用导出的推理模型进行推理（推理使用paddle inference python api）
+有如下两种方法
+#### 5.2.1 从命令行读取输入数据进行推理
+```shell
+cd ./deploy/python/ && python -u ./predict.py \
+    --model_file ../../electra-small.pdmodel \
+    --params_file ../../electra-small.pdiparams \
+    --predict_sentences "The quick brown fox see over the lazy dog." "The quick brown fox jump over tree lazy dog." \
+    --batch_size 1 \
+    --max_seq_length 128 \
+    --model_name electra-small
+```
+其中参数释义如下：
+- `model_file` 表示推理需要加载的模型结构文件。例如5.1中生成的electra-small.pdmodel。
+- `params_file` 表示推理需要加载的模型权重文件。例如5.1中生成的electra-small.pdiparams。
+- `predict_sentences` 表示用于推理的（句子）数据，可以配置1条或多条。如果此项配置，则predict_file不用配置。
+- `batch_size` 表示每次推理的样本数目。
+- `max_seq_length` 表示输入的最大句子长度，超过该长度将被截断。
+- `model_name` 表示推理模型的类型，当前支持electra-small（约1400万参数）、electra-base（约1.1亿参数）、electra-large（约3.35亿参数）。
+
+另外还有一些额外参数不在如上命令中：
+- `use_gpu` 表示是否使用GPU进行推理，默认不开启。如果在命令中加上了--use_gpu，则使用GPU进行推理。
+- `use_trt` 表示是否使用TensorRT进行推理，默认不开启。如果在命令中加上了--use_trt，且配置了--use_gpu，则使用TensorRT进行推理
+
+#### 5.2.2 从文件读取输入数据进行推理
+```shell
+cd ./deploy/python/ && python -u ./predict.py \
+    --model_file ../../electra-small.pdmodel \
+    --params_file ../../electra-small.pdiparams \
+    --predict_file "../../test.txt" "../../test.txt.1" \
+    --batch_size 1 \
+    --max_seq_length 128 \
+    --model_name electra-small
+```
+其中绝大部分和从命令行读取输入数据一样，这里描述不一样的参数：
+- `predict_file` 表示用于推理的文件数据，可以配置1个或多个文件，每个文件和2.2预训练数据格式一样，为utf-8编码的文本数据，每行1句话。如果此项配置，则predict_sentences不用配置。
+
+对于每1句话模型推理分别给出1个推理结果，即Discriminator的Replaced Token Detection(RTD)任务结果，是由0和1组成的list，list长度等于句子长度加2（因推理时会在每句话首尾添加特殊符号[CLS]和[SEP]，和训练时的数据处理一致），0表示句子中对应位置上的单词没有被替换过（是原文），1表示句子中对应位置上的单词是被替换过的（不是原文&不符合语言逻辑）。
+例如5.1.1命令执行的结果：
+```shell
+Input sentence is : [CLS] The quick brown fox see over the lazy dog. [SEP]
+Output data is : [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0]
+Input sentence is : [CLS] The quick brown fox jump over tree lazy dog. [SEP]
+Output data is : [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]
+```
+此推理结果表示：第1句话中的see 和 第2句话中的tree 是被替换过的单词。
+
+## 6. FAQ
+
+## 7. 更新说明
+2021.2.23 新增本文档
+
+## 8. 参考文献
+[ELECTRA论文](https://openreview.net/pdf?id=r1xMH1BtvB)

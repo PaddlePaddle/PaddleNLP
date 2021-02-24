@@ -98,7 +98,7 @@ class ElectraEmbeddings(nn.Layer):
 
 
 class ElectraDiscriminatorPredictions(nn.Layer):
-    """Prediction module for the discriminator, made up of two dense layers."""
+    """Prediction layer for the discriminator, made up of two dense layers."""
 
     def __init__(self, hidden_size, hidden_act):
         super(ElectraDiscriminatorPredictions, self).__init__()
@@ -116,7 +116,7 @@ class ElectraDiscriminatorPredictions(nn.Layer):
 
 
 class ElectraGeneratorPredictions(nn.Layer):
-    """Prediction module for the generator, made up of two dense layers."""
+    """Prediction layer for the generator, made up of two dense layers."""
 
     def __init__(self, embedding_size, hidden_size, hidden_act):
         super(ElectraGeneratorPredictions, self).__init__()
@@ -262,24 +262,25 @@ class ElectraPretrainedModel(PretrainedModel):
                 self._tie_or_clone_weights(output_embeddings,
                                            self.get_input_embeddings())
 
-    def _init_weights(self, module):
+    def _init_weights(self, layer):
         """ Initialize the weights """
-        if isinstance(module, (nn.Linear, nn.Embedding)):
-            module.weight.set_value(
+        if isinstance(layer, (nn.Linear, nn.Embedding)):
+            layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
                     std=self.initializer_range
                     if hasattr(self, "initializer_range") else
                     self.electra.config["initializer_range"],
-                    shape=module.weight.shape))
-        elif isinstance(module, nn.LayerNorm):
-            module.bias.set_value(paddle.zeros_like(module.bias))
-            module.weight.set_value(paddle.full_like(module.weight, 1.0))
-        if isinstance(module, nn.Linear) and module.bias is not None:
-            module.bias.set_value(paddle.zeros_like(module.bias))
+                    shape=layer.weight.shape))
+        elif isinstance(layer, nn.LayerNorm):
+            layer.bias.set_value(paddle.zeros_like(layer.bias))
+            layer.weight.set_value(paddle.full_like(layer.weight, 1.0))
+            layer._epsilon = 1e-12
+        if isinstance(layer, nn.Linear) and layer.bias is not None:
+            layer.bias.set_value(paddle.zeros_like(layer.bias))
 
     def _tie_or_clone_weights(self, output_embeddings, input_embeddings):
-        """Tie or clone module weights"""
+        """Tie or clone layer weights"""
         if output_embeddings.weight.shape == input_embeddings.weight.shape:
             output_embeddings.weight = input_embeddings.weight
         elif output_embeddings.weight.shape == input_embeddings.weight.t(
@@ -345,7 +346,8 @@ class ElectraModel(ElectraPretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype("float32") * -1e9,
+                (input_ids == self.pad_token_id
+                 ).astype(paddle.get_default_dtype()) * -1e9,
                 axis=[1, 2])
 
         embedding_output = self.embeddings(
@@ -402,7 +404,7 @@ class ElectraGenerator(ElectraPretrainedModel):
         else:
             self.generator_lm_head_bias = paddle.fluid.layers.create_parameter(
                 shape=[self.electra.config["vocab_size"]],
-                dtype='float32',
+                dtype=paddle.get_default_dtype(),
                 is_bias=True)
         self.init_weights()
 
@@ -640,7 +642,8 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
     def sample_from_softmax(self, logits, use_softmax_sample=True):
         if use_softmax_sample:
             #uniform_noise = paddle.uniform(logits.shape, dtype="float32", min=0, max=1)
-            uniform_noise = paddle.rand(logits.shape, dtype="float32")
+            uniform_noise = paddle.rand(
+                logits.shape, dtype=paddle.get_default_dtype())
             gumbel_noise = -paddle.log(-paddle.log(uniform_noise + 1e-9) + 1e-9)
         else:
             gumbel_noise = paddle.zeros_like(logits)
@@ -686,7 +689,13 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
         disc_logits = self.discriminator(disc_inputs, token_type_ids,
                                          position_ids, attention_mask)
 
-        return gen_logits, disc_logits, disc_labels
+        if attention_mask is None:
+            attention_mask = (
+                input_ids != self.discriminator.electra.config["pad_token_id"])
+        else:
+            attention_mask = attention_mask.astype("bool")
+
+        return gen_logits, disc_logits, disc_labels, attention_mask
 
 
 class ElectraPretrainingCriterion(paddle.nn.Layer):
@@ -697,26 +706,45 @@ class ElectraPretrainingCriterion(paddle.nn.Layer):
         self.gen_weight = gen_weight
         self.disc_weight = disc_weight
         self.gen_loss_fct = nn.CrossEntropyLoss(reduction='none')
-        self.disc_loss_fct = nn.BCEWithLogitsLoss()
+        self.disc_loss_fct = nn.BCEWithLogitsLoss(reduction='none')
 
     def forward(self, generator_prediction_scores,
                 discriminator_prediction_scores, generator_labels,
-                discriminator_labels):
+                discriminator_labels, attention_mask):
         # generator loss
         gen_loss = self.gen_loss_fct(
             paddle.reshape(generator_prediction_scores, [-1, self.vocab_size]),
             paddle.reshape(generator_labels, [-1]))
         # todo: we can remove 4 lines after when CrossEntropyLoss(reduction='mean') improved
-        umask_positions = paddle.zeros_like(generator_labels).astype("float32")
-        mask_positions = paddle.ones_like(generator_labels).astype("float32")
+        umask_positions = paddle.zeros_like(generator_labels).astype(
+            paddle.get_default_dtype())
+        mask_positions = paddle.ones_like(generator_labels).astype(
+            paddle.get_default_dtype())
         mask_positions = paddle.where(generator_labels == -100, umask_positions,
                                       mask_positions)
-        gen_loss = gen_loss.sum() / mask_positions.sum()
+        if mask_positions.sum() == 0:
+            gen_loss = paddle.to_tensor([0.0])
+        else:
+            gen_loss = gen_loss.sum() / mask_positions.sum()
 
         # discriminator loss
         seq_length = discriminator_labels.shape[1]
         disc_loss = self.disc_loss_fct(
             paddle.reshape(discriminator_prediction_scores, [-1, seq_length]),
-            discriminator_labels.astype("float32"))
+            discriminator_labels.astype(paddle.get_default_dtype()))
+        if attention_mask is not None:
+            umask_positions = paddle.ones_like(discriminator_labels).astype(
+                paddle.get_default_dtype())
+            mask_positions = paddle.zeros_like(discriminator_labels).astype(
+                paddle.get_default_dtype())
+            use_disc_loss = paddle.where(attention_mask, disc_loss,
+                                         mask_positions)
+            umask_positions = paddle.where(attention_mask, umask_positions,
+                                           mask_positions)
+            disc_loss = use_disc_loss.sum() / umask_positions.sum()
+        else:
+            total_positions = paddle.ones_like(discriminator_labels).astype(
+                paddle.get_default_dtype())
+            disc_loss = disc_loss.sum() / total_positions.sum()
 
         return self.gen_weight * gen_loss + self.disc_weight * disc_loss
