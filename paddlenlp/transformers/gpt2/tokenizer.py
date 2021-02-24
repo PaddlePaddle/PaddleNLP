@@ -202,11 +202,11 @@ class GPT2Tokenizer(PretrainedTokenizer):
                  merges_file,
                  errors='replace',
                  special_tokens=None,
-                 max_len=None,
+                 max_len=1024,
                  do_lower_case=True):
         self._vocab_file = vocab_file
         self._merges_file = merges_file
-        self.max_len = int(1e12)
+        self.max_len = max_len if max_len is not None else int(1e12)
         self.num_command_tokens = 2
         self.num_type_tokens = 2
 
@@ -217,6 +217,7 @@ class GPT2Tokenizer(PretrainedTokenizer):
         self._command_tokens = [
             CommandToken('pad', '<|endoftext|>', self.encoder['<|endoftext|>']),
             CommandToken('eod', '<|endoftext|>', self.encoder['<|endoftext|>']),
+            CommandToken('stop', '.', self.encoder['.']),
         ]
         self.command_name_map = {tok.name: tok for tok in self._command_tokens}
         self.command_token_map = {

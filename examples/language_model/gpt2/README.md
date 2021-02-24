@@ -178,6 +178,38 @@ python generate_sample.py
 对影成三人。
 ```
 
+## 模型导出预测
+
+本repo提供了简单的示例帮助用户将预训练模型导出成预测的参数。
+
+导出中文模型
+```"shell
+python export_model.py --model_type=gpt2-cn \
+    --model_path=gpt2-base-cn \
+    --output_path=./infer_model/model
+```
+用户在`infer_model`中可以看到导出的文件。
+
+对于导出的模型，我们提供了Python的infer脚本，调用预测库对简单的例子进行预测。
+```shell
+python infer.py --model_type gpt2-cn \
+    --model_path ./infer_model/model
+```
+
+
+导出英文模型
+```"shell
+python export_model.py --model_type=gpt2 \
+    --model_path=gpt2-medium-en \
+    --output_path=./infer_model/model
+
+python deploy/python/inference.py --model_type gpt2 \
+    --model_path ./infer_model/model
+```
+
+用户可以看到屏幕输出预测结果。
+
+
 ## 参考文献
 - [Language Models are Unsupervised Multitask Learners](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
 - [CPM: A Large-scale Generative Chinese Pre-trained Language Model](https://arxiv.org/abs/2012.00413)
