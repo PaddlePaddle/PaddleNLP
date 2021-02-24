@@ -121,7 +121,7 @@ class ElectraTokenizer(PretrainedTokenizer):
                 split_tokens.append(sub_token)
         return split_tokens
 
-    def __call__(self, text):
+    def tokenize(self, text):
         """
         End-to-end tokenization for Electra models.
         Args:
