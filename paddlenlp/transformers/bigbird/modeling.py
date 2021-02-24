@@ -539,7 +539,7 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
         self.cls = BigBirdPretrainingHeads(
             self.bigbird.config["hidden_size"],
             self.bigbird.config["vocab_size"],
-            self.bigbird.config["hidden_act"],
+            self.bigbird.config["activation"],
             embedding_weights=self.bigbird.embeddings.word_embeddings.weight)
 
         self.apply(self.init_weights)
@@ -548,13 +548,13 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None,
+                rand_mask_idx_list=None,
                 masked_positions=None):
         outputs = self.bigbird(
             input_ids,
             token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+            attention_mask_list=None,
+            rand_mask_idx_list=rand_mask_idx_list)
         sequence_output, pooled_output = outputs[:2]
         prediction_scores, seq_relationship_score = self.cls(
             sequence_output, pooled_output, masked_positions)

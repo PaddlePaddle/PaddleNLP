@@ -31,11 +31,8 @@ from paddle.io import DataLoader, Dataset
 
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import BigBirdForPretraining, BigBirdModel, BigBirdPretrainingCriterion
-from paddlenlp.transformers import BigBirdTokenizer
-
-FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
+from paddlenlp.transformers import BigBirdTokenizer, LinearDecayWithWarmup, create_bigbird_rand_mask_idx_list
+from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {"bigbird": (BigBirdForPretraining, BigBirdTokenizer), }
 
@@ -43,36 +40,28 @@ MODEL_CLASSES = {"bigbird": (BigBirdForPretraining, BigBirdTokenizer), }
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model_type",
-        default=None,
-        type=str,
-        required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
-    parser.add_argument(
         "--model_name_or_path",
         default="bigbird-base-uncased",
         type=str,
-        required=True,
         help="Path to pre-trained model or shortcut name selected in the list: "
         + ", ".join(
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
             ], [])), )
-    parser.add_argument(
-        "--input_dir",
-        default=None,
-        type=str,
-        required=True,
-        help="The input directory where the data will be read from.", )
-    parser.add_argument(
-        "--output_dir",
-        default=None,
-        type=str,
-        required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
-    )
+    # parser.add_argument(
+    #     "--input_dir",
+    #     default=None,
+    #     type=str,
+    #     required=True,
+    #     help="The input directory where the data will be read from.", )
+    # parser.add_argument(
+    #     "--output_dir",
+    #     default=None,
+    #     type=str,
+    #     required=True,
+    #     help="The output directory where the model predictions and checkpoints will be written.",
+    # )
 
     parser.add_argument(
         "--max_predictions_per_seq",
@@ -156,6 +145,11 @@ def parse_args():
         default=512,
         help="The maximum total input sequence length after SentencePiece tokenization."
     )
+    parser.add_argument(
+        "--num_train_steps",
+        default=10000,
+        type=int,
+        help="Linear warmup over warmup_steps.")
     parser.add_argument("--attn_dropout", type=float, default=0.1, help="")
     parser.add_argument("--hidden_size", type=int, default=768, help="")
     parser.add_argument("--pretrained_model", type=str, default=None)
@@ -317,34 +311,42 @@ class PretrainingDataset(Dataset):
         return len(self.lines)
 
 
-def create_dataloader(input_file, tokenizer, worker_init, batch_size):
-    pretrain_dataset = PretrainingDataset(input_file, tokenizer)
+def create_dataloader(input_file, tokenizer, worker_init, batch_size,
+                      max_encoder_length):
+    pretrain_dataset = PretrainingDataset(input_file, tokenizer,
+                                          max_encoder_length)
     train_batch_sampler = paddle.io.BatchSampler(
         pretrain_dataset, batch_size=batch_size, shuffle=True)
-    # TODO(zhoushunjie): 后续考虑优化masked_lm_position
-    # make masked_lm_positions can be gathered
-    # def _collate_data(data, stack_fn=Stack()):
-    #     # data: input_ids, segment_ids, masked_lm_positions, masked_lm_ids, masked_lm_weights, next_sentence_labels
-    #     #num_fields = len(data[0].keys())
-    #     out = {}
 
-    #     for i in data[0].keys():
-    #         out[i] = stack_fn([x[i] for x in data])
-    #     # batch_size, seq_length = out[0].shape
-    #     # # Organize as a 1D tensor for gather or use gather_nd
-    #     # mask_token_num = 0
-    #     # for i, x in enumerate(data):
-    #     #     for j, pos in enumerate(x[2]):
-    #     #         out[2][mask_token_num] = i * seq_length + pos
-    #     #         mask_token_num += 1
-    #     # out[2] = 
-    #     print(out,flush=True)
-    #     return out
+    # make masked_lm_positions can be gathered
+    def _collate_data(data, stack_fn=Stack()):
+        # data: input_ids, segment_ids, masked_lm_positions, masked_lm_ids, masked_lm_weights, next_sentence_labels
+        num_fields = len(data[0])
+        out = [None] * num_fields
+
+        for i in [0, 1, 4, 5]:
+            out[i] = stack_fn([x[i] for x in data])
+        batch_size, seq_length = out[0].shape
+        size = num_mask = sum(len(x[2]) for x in data)
+        # if size % 8 != 0:
+        #     size += 8 - (size % 8)
+        out[2] = np.full(size, 0, dtype=np.int32)
+        # masked_lm_labels
+        out[3] = np.full([size, 1], -1, dtype=np.int64)
+        # # Organize as a 1D tensor for gather or use gather_nd
+        mask_token_num = 0
+        for i, x in enumerate(data):
+            for j, pos in enumerate(x[2]):
+                out[2][mask_token_num] = i * seq_length + pos
+                out[3][mask_token_num] = x[3][j]
+                mask_token_num += 1
+        out.append(np.asarray([mask_token_num], dtype=np.float32))
+        return out
 
     dataloader = DataLoader(
         dataset=pretrain_dataset,
         batch_sampler=train_batch_sampler,
-        # collate_fn=_collate_data,
+        collate_fn=_collate_data,
         num_workers=0,
         worker_init_fn=worker_init,
         return_list=True)
@@ -359,17 +361,72 @@ def do_train(args):
 
     # get dataloader
     tokenizer = BigBirdTokenizer.from_pretrained(args.model_name_or_path)
-    dataloader = create_dataloader(args.data_file, tokenizer, worker_init,
-                                   args.batch_size)
+    train_data_loader = create_dataloader(args.data_file, tokenizer,
+                                          worker_init, args.batch_size,
+                                          args.max_encoder_length)
+    logger.info("Dataloader has been created")
 
     # define model
     model = BigBirdForPretraining.from_pretrained(args.model_name_or_path)
 
     # define metric
+    criterion = BigBirdPretrainingCriterion(
+        getattr(model, BigBirdForPretraining.base_model_prefix).config[
+            "vocab_size"])
 
     # define optimizer
+    lr_scheduler = LinearDecayWithWarmup(
+        args.learning_rate,
+        args.num_train_steps,
+        args.warmup_steps,
+        last_epoch=0)
 
+    optimizer = paddle.optimizer.AdamW(
+        learning_rate=lr_scheduler,
+        epsilon=args.adam_epsilon,
+        parameters=model.parameters(),
+        weight_decay=args.weight_decay,
+        apply_decay_param_fun=lambda x: x in [
+            p.name for n, p in model.named_parameters()
+            if not any(nd in n for nd in ["bias", "norm"])
+        ])
+    bigbirdConfig = BigBirdModel.pretrained_init_configuration[
+        args.model_name_or_path]
     # training
+    model.train()
+    global_steps = 0
+    for epoch in range(args.epochs):
+        if global_steps > args.num_train_steps:
+            break
+        for step, batch in enumerate(train_data_loader):
+            (input_ids, segment_ids, masked_lm_positions, masked_lm_ids,
+             masked_lm_weights, next_sentence_labels, masked_lm_scale) = batch
+            seq_len = input_ids.shape[1]
+            rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
+                bigbirdConfig["num_layers"], seq_len, seq_len,
+                bigbirdConfig["nhead"], bigbirdConfig["block_size"],
+                bigbirdConfig["window_size"],
+                bigbirdConfig["num_global_blocks"],
+                bigbirdConfig["num_rand_blocks"], bigbirdConfig["seed"])
+
+            prediction_scores, seq_relationship_score = model(
+                input_ids=input_ids,
+                token_type_ids=segment_ids,
+                rand_mask_idx_list=rand_mask_idx_list,
+                masked_positions=masked_lm_positions)
+            loss = criterion(prediction_scores, seq_relationship_score,
+                             masked_lm_ids, next_sentence_labels,
+                             masked_lm_scale)
+            loss.backward()
+            optimizer.step()
+            optimizer.clear_gradients()
+            if global_steps % args.logging_steps == 0:
+                logger.info("global step %d, epoch: %d, loss: %f" %
+                            (global_steps, epoch, loss))
+
+            global_steps += 1
+            if global_steps > args.num_train_steps:
+                break
 
 
 if __name__ == "__main__":
