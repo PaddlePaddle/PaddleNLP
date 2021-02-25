@@ -79,6 +79,12 @@ def parse_args():
         help="The frequency to print evaluation logs.")
 
     parser.add_argument(
+        "--save_steps",
+        type=int,
+        default=100,
+        help="The frequency to print evaluation logs.")
+
+    parser.add_argument(
         "--padding_idx",
         type=int,
         default=0,
@@ -101,9 +107,10 @@ def parse_args():
         help="Student model's vocab path.")
 
     parser.add_argument(
-        "--use_pretrained_emb",
-        action="store_true",
-        help="If True, use pretrained word embedding for training.")
+        "--output_dir",
+        type=str,
+        default='models',
+        help="Directory to save models .")
 
     parser.add_argument(
         "--whole_word_mask",
@@ -114,7 +121,7 @@ def parse_args():
     parser.add_argument(
         "--embedding_name",
         type=str,
-        default='w2v.google_news.target.word-word.dim300.en',
+        default=None,
         help="The name of pretrained word embedding.")
 
     parser.add_argument(

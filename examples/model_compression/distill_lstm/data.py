@@ -15,7 +15,6 @@
 
 import io
 from functools import partial
-import gensim
 import numpy as np
 import jieba
 
@@ -42,27 +41,6 @@ def load_vocab(vocab_file):
         token = token.rstrip("\n").split("\t")[0]
         vocab[token] = index
     return vocab
-
-
-def load_embedding(vocab_path,
-                   emb_dim=300,
-                   embedding_path='GoogleNews-vectors-negative300.bin'):
-    """Load pre-trained embeddings to improve small models acc trained by English dataset."""
-    vocab_list = []
-    with io.open(vocab_path) as f:
-        for line in f:
-            vocab_list.append(line.strip())
-    vocab_size = len(vocab_list)
-    emb_np = np.random.rand(vocab_size, emb_dim).astype("float32")
-    word2vec_dict = gensim.models.KeyedVectors.load_word2vec_format(
-        embedding_path, binary=True)
-
-    for i in range(vocab_size):
-        word = vocab_list[i]
-        if word in word2vec_dict:
-            emb_np[i] = word2vec_dict[word]
-    emb_tensor = paddle.to_tensor(emb_np)
-    return emb_tensor
 
 
 def ngram_sampling(words, words_2=None, p_ng=0.25, ngram_range=(2, 6)):
@@ -101,7 +79,7 @@ def apply_data_augmentation(task_name,
         # 1. Masking
         words = []
         if not whole_word_mask:
-            tokenized_list = tokenizer(data)
+            tokenized_list = tokenizer.tokenize(data)
             words = [
                 tokenizer.mask_token if np.random.rand() < p_mask else word
                 for word in tokenized_list
@@ -109,7 +87,7 @@ def apply_data_augmentation(task_name,
         else:
             for word in data.split():
                 words += [[tokenizer.mask_token]] if np.random.rand(
-                ) < p_mask else [tokenizer(word)]
+                ) < p_mask else [tokenizer.tokenize(word)]
         # 2. N-gram sampling
         words = ngram_sampling(words, p_ng=p_ng, ngram_range=ngram_range)
         words = flatten(words) if isinstance(words[0], list) else words
@@ -118,10 +96,10 @@ def apply_data_augmentation(task_name,
 
     used_texts, new_data = [], []
     for data in train_dataset:
-        data_list = tokenizer(data[0])
+        data_list = tokenizer.tokenize(data[0])
         used_texts.append(" ".join(data_list))
         if task_name == 'qqp':
-            data_list_2 = tokenizer(data[1])
+            data_list_2 = tokenizer.tokenize(data[1])
             used_texts.append(" ".join(data_list_2))
             new_data.append([data_list, data_list_2, data[2]])
         else:
@@ -168,7 +146,7 @@ def apply_data_augmentation_for_cn(train_dataset,
     new_data = []
     for data in train_dataset:
         words = [word for word in jieba.cut(data[0])]
-        words_bert = tokenizer(data[0])
+        words_bert = tokenizer.tokenize(data[0])
         new_data.append([words, words_bert, data[1]])
         for _ in range(n_iter):
             # 1. Masking
@@ -179,7 +157,7 @@ def apply_data_augmentation_for_cn(train_dataset,
                     words_bert.append([tokenizer.unk_token])
                 else:
                     words.append([word])
-                    words_bert.append(tokenizer(word))
+                    words_bert.append(tokenizer.tokenize(word))
             # 2. N-gram sampling
             words, words_bert = ngram_sampling(words, words_bert, p_ng,
                                                ngram_range)
