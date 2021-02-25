@@ -18,7 +18,7 @@
 
 - Python >= 3.6
 
-- paddlepaddle >= 2.0.0rc1，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
+- paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
 
 - paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp\>=2.0.0rc`
 
@@ -27,7 +27,7 @@
 我们提供了少数样本用以示例输入数据格式。执行以下命令，下载并解压示例数据集：
 
 ```bash
-wget --no-check-certificate https://paddlenlp.bj.bcebos.com/datasets/lexical_analysis_dataset_tiny.tar.gz
+wget https://paddlenlp.bj.bcebos.com/datasets/lexical_analysis_dataset_tiny.tar.gz
 tar xvf lexical_analysis_dataset_tiny.tar.gz
 ```
 

@@ -35,20 +35,8 @@ wget https://paddlenlp.bj.bcebos.com/data/dict.txt
 
 我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在验证集（dev.tsv）验证。
 
-CPU 启动：
-
+启动训练：
 ```
-# 使用paddlenlp.embeddings.TokenEmbedding
-python train.py --vocab_path='./dict.txt' --use_gpu=False --lr=5e-4 --batch_size=64 --epochs=20 --use_token_embedding=True --vdl_dir='./vdl_dir'
-
-# 使用paddle.nn.Embedding
-python train.py --vocab_path='./dict.txt' --use_gpu=False --lr=1e-4 --batch_size=64 --epochs=20 --use_token_embedding=False --vdl_dir='./vdl_dir'
-```
-
-GPU 启动：
-```
-export CUDA_VISIBLE_DEVICES=0
-
 # 使用paddlenlp.embeddings.TokenEmbedding
 python train.py --vocab_path='./dict.txt' --use_gpu=True --lr=5e-4 --batch_size=64 --epochs=20 --use_token_embedding=True --vdl_dir='./vdl_dir'
 

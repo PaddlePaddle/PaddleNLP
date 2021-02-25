@@ -256,7 +256,6 @@ class GPT2Dataset(paddle.io.Dataset):
         offset_l = self.sample_idx[idx + 1][1]
         tokens = self._get_single_sample_from_idx(doc_index_f, doc_index_l,
                                                   offset_f, offset_l)
-        token_arr = np.array(tokens, dtype="int64")
         return self._construct_sample(tokens)
 
     def __len__(self):
