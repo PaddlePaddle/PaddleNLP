@@ -361,8 +361,6 @@ class DatasetBuilder:
         In this case your implementation of `_read()` must also be lazy
         (that is, not load all examples into memory at once).
         """
-        if not isinstance(root, str):
-            root = str(root)
 
         if self.lazy:
             label_list = self.get_labels()
