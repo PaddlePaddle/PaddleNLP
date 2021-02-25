@@ -124,9 +124,6 @@ def get_datasets(cls, *args, **kwargs):
     return datasets if len(datasets) > 1 else datasets[0]
 
 
-Dataset.get_datasets = get_datasets
-
-
 class MapDataset(Dataset):
     """
     Wraps a dataset-like object as a instance of Dataset, and equips it with
