@@ -13,6 +13,9 @@
 - Python >= 3.6
 - paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
 - paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp==2.0.0rc2`
+- jieba, 安装方式：`pip install jieba`
+- colorlog, 安装方式：`pip install colorlog`
+- colorama, 安装方式：`pip install colorama`
 - seqeval, 安装方式：`pip install seqeval`
 
 ## 2. 数据准备
@@ -25,7 +28,7 @@
 支持用户自定义数据进行训练，自定义数据为文本形式，每行一句英文文本，utf-8编码，下面例子假设数据在./BookCorpus/，数据文件为纯文本train.data
 
 ## 3. 模型预训练
-如下所有命令均假设在 PaddleNLP/examples/language_model/electra/ 下执行
+如下所有命令均假设在 **PaddleNLP/examples/language_model/electra/** 下执行，包括预训练、Fine-tuning 和 推理部署的命令
 ### 3.1 单机单卡
 ```shell
 export CUDA_VISIBLE_DEVICES="0"
@@ -109,20 +112,21 @@ python -u ./get_ft_model.py \
     --model_dir ./pretrain_model/model_40000.pdparams/
 ```
 其中参数释义如下：
-- `model_dir` 表示预训练模型所在目录，这里例子取预训练40000步的checkport来生成Fine-tuning所需模型，生成的模型也会在这个目录下。
+- `model_dir` 表示预训练模型所在目录，这里例子取预训练40000步的checkpoint来生成Fine-tuning所需模型，生成的用于Fine-tuning的模型也会在这个目录下。
+
 此命令可多次执行，但只有第1次会生成Fine-tuning所需模型
 
 ### 4.2 运行Fine-tuning
-使用../glue/run_glue.py运行，详细可参考../glue/README.md，有两种方式：
+使用./run_glue.py运行，有两种方式：
 #### 4.2.1 使用Paddle提供的预训练模型运行 Fine-tuning
 此方式无需在本地进行预训练，即可以跳过上面第3章和4.1，直接运行Fine-tuning。
 
-以 GLUE/SST-2 任务为例，启动 Fine-tuning 的方式如下（`paddlenlp` 要已经安装或能在 `PYTHONPATH` 中找到）：
+以 GLUE/SST-2 任务为例，启动 Fine-tuning 的方式如下：
 ```shell
 export CUDA_VISIBLE_DEVICES=0,1
 export TASK_NAME=SST-2
 
-cd ../../glue/ && python -u ./run_glue.py \
+python -u ./run_glue.py \
     --model_type electra \
     --model_name_or_path electra-small \
     --task_name $TASK_NAME \
@@ -136,8 +140,8 @@ cd ../../glue/ && python -u ./run_glue.py \
     --n_gpu 1
 ```
 其中参数释义如下：
-- `model_type` 指示了模型类型，当前支持BERT、ELECTRA模型。
-- `model_name_or_path` 如果配置模型名（当前支持electra-small、electra-base、electra-large）则为本节介绍的方式。如果配置本地目录（例如执行4.1命令得到Fine-tuning所需模型，配置其所在的目录 pretrain_model/model_40000.pdparams/）则为4.2.2中介绍的方式。
+- `model_type` 指示了模型类型，当前支持BERT、ELECTRA、ERNIE模型。
+- `model_name_or_path` 如果配置模型名（electra模型当前支持electra-small、electra-base、electra-large几种规格）则为本节介绍的方式。如果配置本地目录（例如执行4.1命令得到Fine-tuning所需模型，配置其所在的目录 pretrain_model/model_40000.pdparams/）则为4.2.2中介绍的方式。
 - `task_name` 表示 Fine-tuning 的任务，当前支持CoLA、SST-2、MRPC、STS-B、QQP、MNLI、QNLI、RTE。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
@@ -146,18 +150,17 @@ cd ../../glue/ && python -u ./run_glue.py \
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
-- `n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可；若为0，则使用CPU。
+- `n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可,最大数量不能超过环境变量CUDA_VISIBLE_DEVICES配置的GPU个数；若为0，则使用CPU。
 
 #### 4.2.2 使用本地预训练模型运行 Fine-tuning
 按照上面第3章在本地运行 ELECTRA 模型的预训练后，执行4.1的命令得到Fine-tuning所需模型，然后运行 Fine-tuning。
 
-以 GLUE/SST-2 任务为例，启动 Fine-tuning 的方式如下（`paddlenlp` 要已经安装或能在 `PYTHONPATH` 中找到）：
-
+以 GLUE/SST-2 任务为例，启动 Fine-tuning 的方式如下：
 ```shell
 export CUDA_VISIBLE_DEVICES=0,1
 export TASK_NAME=SST-2
 
-cd ../../glue/ && python -u ./run_glue.py \
+python -u ./run_glue.py \
     --model_type electra \
     --model_name_or_path ../language_model/electra/pretrain_model/model_40000.pdparams/ \
     --task_name $TASK_NAME \
@@ -172,17 +175,19 @@ cd ../../glue/ && python -u ./run_glue.py \
 ```
 其中绝大部分参数和4.2.1中一样，只有参数model_name_or_path配置了本地预训练模型的路径
 
-无论使用哪种方式进行 Fine-tuning，过程将按照 `logging_steps` 和 `save_steps` 的设置打印如下日志：
+无论使用哪种方式进行 Fine-tuning，过程将按照 `logging_steps` 和 `save_steps` 的设置打印如下格式的日志：
 
 ```
-global step 100/6315, epoch: 0, batch: 99, rank_id: 0, loss: 0.699434, lr: 0.0000158479, speed: 3.3756 step/s
-eval loss: 0.697092, acc: 0.5091743119266054, eval done total : 1.8847179412841797 s
-global step 200/6315, epoch: 0, batch: 199, rank_id: 0, loss: 0.637145, lr: 0.0000316957, speed: 3.1637 step/s
-eval loss: 0.704759, acc: 0.5401376146788991, eval done total : 1.8395519256591797 s
-global step 300/6315, epoch: 0, batch: 299, rank_id: 0, loss: 0.673020, lr: 0.0000475436, speed: 3.1829 step/s
-eval loss: 0.823823, acc: 0.5871559633027523, eval done total : 1.9077861309051514 s
-global step 400/6315, epoch: 0, batch: 399, rank_id: 0, loss: 0.623517, lr: 0.0000633914, speed: 3.1703 step/s
-eval loss: 0.800283, acc: 0.6628440366972477, eval done total : 1.8795380592346191 s
+global step 100/6315, epoch: 0, batch: 99, rank_id: 0, loss: 0.687738, lr: 0.0000158479, speed: 3.3566 step/s
+eval loss: 0.693736, acc: 0.5137614678899083, eval done total : 2.0170159339904785 s
+global step 200/6315, epoch: 0, batch: 199, rank_id: 0, loss: 0.342201, lr: 0.0000316957, speed: 3.1531 step/s
+eval loss: 0.715023, acc: 0.8256880733944955, eval done total : 1.9682419300079346 s
+global step 300/6315, epoch: 0, batch: 299, rank_id: 0, loss: 0.516034, lr: 0.0000475436, speed: 3.1663 step/s
+eval loss: 0.653879, acc: 0.8658256880733946, eval done total : 1.9738705158233643 s
+global step 400/6315, epoch: 0, batch: 399, rank_id: 0, loss: 0.228789, lr: 0.0000633914, speed: 3.1512 step/s
+eval loss: 0.863306, acc: 0.8600917431192661, eval done total : 1.960683822631836 s
+global step 500/6315, epoch: 0, batch: 499, rank_id: 0, loss: 0.320570, lr: 0.0000792393, speed: 3.1495 step/s
+eval loss: 0.732358, acc: 0.8704128440366973, eval done total : 1.9749321937561035 s
 ```
 
 使用electra-small预训练模型进行单卡 Fine-tuning ，在验证集上有如下结果（这里各类任务的结果是运行3次取最好得到）：
@@ -202,40 +207,42 @@ eval loss: 0.800283, acc: 0.6628440366972477, eval done total : 1.87953805923461
 
 
 ## 5. 推理部署
+运行某个GLUE任务后（还是继续以GLUE/SST-2 情感分类任务为例），想要将Fine-tuning模型导出以加速类似场景更多数据的推理，可以按照如下步骤完成推理部署
+
 ### 5.1 导出推理模型
 ```shell
 python -u ./export_model.py \
-    --input_model_dir ./pretrain_model/model_40000.pdparams/ \
+    --input_model_dir ./SST-2/sst-2_ft_model_6000.pdparams/ \
     --output_model_dir ./ \
-    --model_name electra-small
+    --model_name electra-deploy
 ```
 其中参数释义如下：
-- `input_model_dir` 表示输入的预训练模型所在目录，这里例子取预训练40000步的checkport来导出推理模型。
+- `input_model_dir` 表示输入的预训练模型所在目录，这里例子取SST-2 Fine-tuning 6000步的checkpoint来导出推理模型。
 - `output_model_dir` 表示将要保存推理模型的目录，这里例子取当前路径。
-- `model_name` 表示输入的预训练模型类型，当前支持electra-small（约1400万参数）、electra-base（约1.1亿参数）、electra-large（约3.35亿参数）。
+- `model_name` 表示输出推理模型的名字前缀，任意字符串均可，默认为electra-deploy。
 
 例如，执行如上命令后，可以看到在output_model_dir配置的目录下，导出的推理模型包括3个文件：
-| 文件                         | 说明                                   |
-|------------------------------|----------------------------------------|
-| electra-small.pdiparams      | 模型权重文件，供推理时加载使用               |
-| electra-small.pdiparams.info | 模型权重信息文件                        |
-| electra-small.pdmodel        | 模型结构文件，供推理时加载使用               |
+| 文件                          | 说明                                   |
+|-------------------------------|----------------------------------------|
+| electra-deploy.pdiparams      | 模型权重文件，供推理时加载使用            |
+| electra-deploy.pdiparams.info | 模型权重信息文件                         |
+| electra-deploy.pdmodel        | 模型结构文件，供推理时加载使用            |
 
 ### 5.2 用导出的推理模型进行推理（推理使用paddle inference python api）
 有如下两种方法
 #### 5.2.1 从命令行读取输入数据进行推理
 ```shell
-cd ./deploy/python/ && python -u ./predict.py \
-    --model_file ../../electra-small.pdmodel \
-    --params_file ../../electra-small.pdiparams \
-    --predict_sentences "The quick brown fox see over the lazy dog." "The quick brown fox jump over tree lazy dog." \
-    --batch_size 1 \
+python -u ./deploy/python/predict.py \
+    --model_file ./electra-deploy.pdmodel \
+    --params_file ./electra-deploy.pdiparams \
+    --predict_sentences "uneasy mishmash of styles and genres ." "director rob marshall went out gunning to make a great one ." \
+    --batch_size 2 \
     --max_seq_length 128 \
     --model_name electra-small
 ```
 其中参数释义如下：
-- `model_file` 表示推理需要加载的模型结构文件。例如5.1中生成的electra-small.pdmodel。
-- `params_file` 表示推理需要加载的模型权重文件。例如5.1中生成的electra-small.pdiparams。
+- `model_file` 表示推理需要加载的模型结构文件。例如5.1中生成的electra-deploy.pdmodel。
+- `params_file` 表示推理需要加载的模型权重文件。例如5.1中生成的electra-deploy.pdiparams。
 - `predict_sentences` 表示用于推理的（句子）数据，可以配置1条或多条。如果此项配置，则predict_file不用配置。
 - `batch_size` 表示每次推理的样本数目。
 - `max_seq_length` 表示输入的最大句子长度，超过该长度将被截断。
@@ -243,30 +250,32 @@ cd ./deploy/python/ && python -u ./predict.py \
 
 另外还有一些额外参数不在如上命令中：
 - `use_gpu` 表示是否使用GPU进行推理，默认不开启。如果在命令中加上了--use_gpu，则使用GPU进行推理。
-- `use_trt` 表示是否使用TensorRT进行推理，默认不开启。如果在命令中加上了--use_trt，且配置了--use_gpu，则使用TensorRT进行推理
+- `use_trt` 表示是否使用TensorRT进行推理，默认不开启。如果在命令中加上了--use_trt，且配置了--use_gpu，则使用TensorRT进行推理。前提条件：1）需提前安装TensorRT或使用[Paddle提供的TensorRT docker镜像](https://github.com/PaddlePaddle/Serving/blob/v0.5.0/doc/DOCKER_IMAGES_CN.md)。2）需根据cuda、cudnn、tensorRT和python的版本，安装[匹配版本的Paddle包](https://www.paddlepaddle.org.cn/documentation/docs/zh/install/Tables.html)
 
 #### 5.2.2 从文件读取输入数据进行推理
 ```shell
-cd ./deploy/python/ && python -u ./predict.py \
-    --model_file ../../electra-small.pdmodel \
-    --params_file ../../electra-small.pdiparams \
-    --predict_file "../../test.txt" "../../test.txt.1" \
-    --batch_size 1 \
+python -u ./deploy/python/predict.py \
+    --model_file ./electra-deploy.pdmodel \
+    --params_file ./electra-deploy.pdiparams \
+    --predict_file "./sst-2.test.tsv.1" "./sst-2.test.tsv.2" \
+    --batch_size 2 \
     --max_seq_length 128 \
     --model_name electra-small
 ```
 其中绝大部分和从命令行读取输入数据一样，这里描述不一样的参数：
-- `predict_file` 表示用于推理的文件数据，可以配置1个或多个文件，每个文件和2.2预训练数据格式一样，为utf-8编码的文本数据，每行1句话。如果此项配置，则predict_sentences不用配置。
+- `predict_file` 表示用于推理的文件数据，可以配置1个或多个文件，每个文件和2.2预训练数据格式一样，为utf-8编码的文本数据，每行1句文本。如果此项配置，则predict_sentences不用配置。
 
-对于每1句话模型推理分别给出1个推理结果，即Discriminator的Replaced Token Detection(RTD)任务结果，是由0和1组成的list，list长度等于句子长度加2（因推理时会在每句话首尾添加特殊符号[CLS]和[SEP]，和训练时的数据处理一致），0表示句子中对应位置上的单词没有被替换过（是原文），1表示句子中对应位置上的单词是被替换过的（不是原文&不符合语言逻辑）。
+对于每1句话模型推理分别给出1个推理结果，这里为执行5.2.1中的命令得到的SST-2情感分类结果，0表示句子是负向情感，1表示句子为正向情感。因为batch_size=2，所以只有1个batch。
 例如5.1.1命令执行的结果：
 ```shell
-Input sentence is : [CLS] The quick brown fox see over the lazy dog. [SEP]
-Output data is : [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0]
-Input sentence is : [CLS] The quick brown fox jump over tree lazy dog. [SEP]
-Output data is : [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]
+===== batch 0 =====
+Input sentence is : [CLS] uneasy mishmash of styles and genres . [SEP]
+Output data is : 0
+Input sentence is : [CLS] director rob marshall went out gunning to make a great one . [SEP]
+Output data is : 1
+inference total 1 sentences done, total time : 0.0849156379699707 s
 ```
-此推理结果表示：第1句话中的see 和 第2句话中的tree 是被替换过的单词。
+此推理结果表示：第1句话是负向情感，第2句话是正向情感。
 
 ## 6. FAQ
 

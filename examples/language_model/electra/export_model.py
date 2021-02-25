@@ -19,6 +19,7 @@ from __future__ import print_function
 import os
 import hashlib
 import argparse
+import json
 
 import paddle
 import paddle.nn as nn
@@ -42,46 +43,47 @@ def get_md5sum(file_path):
 
 
 def main():
-    input_model_file = os.path.join(args.input_model_dir,
-                                    "model_state.pdparams")
-    print(
-        "load ElectraForTotalPreTraining model to get static model : %s \nmodel md5sum : %s"
-        % (input_model_file, get_md5sum(input_model_file)))
-    # depart total_pretraining_model to generator and discriminator state_dict
-    total_pretraining_model = paddle.load(input_model_file)
-    discriminator_state_dict = {}
-    total_keys = []
-
-    if all((s.startswith("generator") or s.startswith("discriminator"))
-           for s in total_pretraining_model.keys()):
-        print("we are load total electra model")
-        num_keys = 0
-        for key in total_pretraining_model.keys():
-            new_key = None
-            if "discriminator." in key:
-                new_key = key.replace("discriminator.", "", 1)
-                discriminator_state_dict[new_key] = total_pretraining_model[key]
-            num_keys += 1
-        print("total electra keys : ", num_keys)
-    elif "discriminator_predictions.dense.weight" in total_pretraining_model:
-        print("we are load discriminator model")
-        discriminator_state_dict = total_pretraining_model
-    else:
-        print(
-            "the model file : %s may not be electra pretrained model, please check"
-            % input_model_file)
+    # check and load config
+    with open(os.path.join(args.input_model_dir, "model_config.json"),
+              'r') as f:
+        config_dict = json.load(f)
+        num_classes = config_dict['num_classes']
+    if num_classes is None or num_classes <= 0:
+        print("%s/model_config.json may not be right, please check" %
+              args.input_model_dir)
         exit(1)
 
-    discriminator_model = ElectraDiscriminator(
-        ElectraModel(**ElectraForTotalPretraining.pretrained_init_configuration[
-            args.model_name + "-discriminator"]))
-    discriminator_model.set_state_dict(
-        discriminator_state_dict, use_structured_name=True)
-    print("total discriminator keys : ", len(discriminator_state_dict))
+    # check and load model
+    input_model_file = os.path.join(args.input_model_dir,
+                                    "model_state.pdparams")
+    print("load model to get static model : %s \nmodel md5sum : %s" %
+          (input_model_file, get_md5sum(input_model_file)))
+    model_state_dict = paddle.load(input_model_file)
+
+    if all((s.startswith("generator") or s.startswith("discriminator"))
+           for s in model_state_dict.keys()):
+        print(
+            "the model : %s is electra pretrain model, we need fine-tuning model to deploy"
+            % input_model_file)
+        exit(1)
+    elif "discriminator_predictions.dense.weight" in model_state_dict:
+        print(
+            "the model : %s is electra discriminator model, we need fine-tuning model to deploy"
+            % input_model_file)
+        exit(1)
+    elif "classifier.dense.weight" in model_state_dict:
+        print("we are load glue fine-tuning model")
+        model = ElectraForSequenceClassification.from_pretrained(
+            args.input_model_dir, num_classes=num_classes)
+        print("total model layers : ", len(model_state_dict))
+    else:
+        print("the model file : %s may not be fine-tuning model, please check" %
+              input_model_file)
+        exit(1)
 
     # save static model to disk
     paddle.jit.save(
-        layer=discriminator_model,
+        layer=model,
         path=os.path.join(args.output_model_dir, args.model_name),
         input_spec=[InputSpec(
             shape=[None, None], dtype='int64')])
@@ -102,13 +104,8 @@ if __name__ == "__main__":
         help="Directory for output Electra inference model")
     parser.add_argument(
         "--model_name",
-        default="electra-small",
+        default="electra-deploy",
         type=str,
-        help="Path to pre-trained model or shortcut name selected in the list: "
-        + ", ".join(
-            sum([
-                list(classes[-1].pretrained_init_configuration.keys())
-                for classes in MODEL_CLASSES.values()
-            ], [])), )
+        help="prefix name of output model and parameters")
     args, unparsed = parser.parse_known_args()
     main()

@@ -71,38 +71,48 @@ def read_file(path):
     return lines
 
 
-def get_predicted_input(predicted_data, tokenizer, max_seq_length):
+def get_predicted_input(predicted_data, tokenizer, max_seq_length, batch_size):
     if predicted_data == [] or not isinstance(predicted_data, list):
         raise TypeError("The predicted_data is inconsistent with expectations.")
 
+    sen_ids_batch = []
+    sen_words_batch = []
     sen_ids = []
     sen_words = []
+    batch_num = 0
+    pad_token_id = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
     for sen in predicted_data:
-        #tokens = tokenizer(sen)
-        #ids = tokenizer.convert_tokens_to_ids(tokens)
-        #sen_id = truncation_ids(ids, tokenizer, max_seq_length)
         sen_id = tokenizer(sen, max_seq_len=max_seq_length)['input_ids']
         sen_ids.append(sen_id)
         sen_words.append(tokenizer.cls_token + " " + sen + " " +
                          tokenizer.sep_token)
+        batch_num += 1
+        if batch_num == batch_size:
+            tmp_list = []
+            max_length = max([len(i) for i in sen_ids])
+            for i in sen_ids:
+                if len(i) < max_length:
+                    tmp_list.append(i + (max_length - len(i)) * [pad_token_id])
+                else:
+                    tmp_list.append(i)
+            sen_ids_batch.append(tmp_list)
+            sen_words_batch.append(sen_words)
+            sen_ids = []
+            sen_words = []
+            batch_num = 0
 
-    return sen_ids, sen_words
+    if len(sen_ids) > 0:
+        tmp_list = []
+        max_length = max([len(i) for i in sen_ids])
+        for i in sen_ids:
+            if len(i) < max_length:
+                tmp_list.append(i + (max_length - len(i)) * [pad_token_id])
+            else:
+                tmp_list.append(i)
+        sen_ids_batch.append(tmp_list)
+        sen_words_batch.append(sen_words)
 
-
-def truncation_ids(ids, tokenizer, max_seq_length):
-    cls_token_id = tokenizer.convert_tokens_to_ids(tokenizer.cls_token)
-    sep_token_id = tokenizer.convert_tokens_to_ids(tokenizer.sep_token)
-    pad_token_id = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
-    if len(ids) <= (max_seq_length - 2):
-        padding_num = max_seq_length - len(ids) - 2
-        #return [cls_token_id] + ids + [sep_token_id] + ([pad_token_id] * padding_num)
-        return [cls_token_id] + ids + [sep_token_id]
-    else:
-        return [cls_token_id] + ids[:(max_seq_length - 2)] + [sep_token_id]
-    #if len(ids) <= max_seq_length:
-    #    return ids
-    #else:
-    #    return ids[:max_seq_length]
+    return sen_ids_batch, sen_words_batch
 
 
 def predict(args, sentences=[], paths=[]):
@@ -126,7 +136,7 @@ def predict(args, sentences=[], paths=[]):
 
     tokenizer = ElectraTokenizer.from_pretrained(args.model_name)
     predicted_input, predicted_sens = get_predicted_input(
-        predicted_data, tokenizer, args.max_seq_length)
+        predicted_data, tokenizer, args.max_seq_length, args.batch_size)
 
     # config
     config = AnalysisConfig(args.model_file, args.params_file)
@@ -148,10 +158,9 @@ def predict(args, sentences=[], paths=[]):
 
     start_time = time.time()
     output_datas = []
+    count = 0
     for i, sen in enumerate(predicted_input):
-        #import pdb; pdb.set_trace()
         sen = np.array(sen).astype("int64")
-        sen = np.expand_dims(sen, axis=0)
         # get input name
         input_names = predictor.get_input_names()
         # get input pointer and copy data
@@ -168,22 +177,23 @@ def predict(args, sentences=[], paths=[]):
         # get output pointer and copy data(nd.array)
         output_tensor = predictor.get_output_tensor(output_names[0])
         output_data = output_tensor.copy_to_cpu()
-        output_res = np.where(output_data > 0, 1, 0).tolist()
+        output_res = np.argmax(output_data, axis=1).tolist()
         output_datas.append(output_res)
 
-        print("Input sentence is : {}".format(predicted_sens[i]))
-        #print("Output logis is : {}".format(output_data))
-        print("Output data is : {}".format(output_res))
-    #import pdb; pdb.set_trace()
+        print("===== batch {} =====".format(i))
+        for j in range(len(predicted_sens[i])):
+            print("Input sentence is : {}".format(predicted_sens[i][j]))
+            #print("Output logis is : {}".format(output_data[j]))
+            print("Output data is : {}".format(output_res[j]))
+        count += len(predicted_sens[i])
     print("inference total %s sentences done, total time : %s s" %
-          (i, time.time() - start_time))
+          (count, time.time() - start_time))
 
 
 if __name__ == "__main__":
     args = parse_args()
     sentences = args.predict_sentences
     paths = args.predict_file
-    #import pdb; pdb.set_trace()
     #sentences = ["The quick brown fox see over the lazy dog.", "The quick brown fox jump over tree lazy dog."]
     #paths = ["../../debug/test.txt", "../../debug/test.txt.1"]
     predict(args, sentences, paths)
