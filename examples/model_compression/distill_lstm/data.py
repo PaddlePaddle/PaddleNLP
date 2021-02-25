@@ -68,7 +68,8 @@ def apply_data_augmentation(task_name,
                             p_mask=0.1,
                             p_ng=0.25,
                             ngram_range=(2, 6),
-                            whole_word_mask=False):
+                            whole_word_mask=False,
+                            seed=0):
     """
     Data Augmentation contains Masking and n-gram sampling. Tokenization and
     Masking are performed at the same time, so that the masked token can be
@@ -94,6 +95,7 @@ def apply_data_augmentation(task_name,
         new_text = " ".join(words)
         return words, new_text
 
+    np.random.seed(seed)
     used_texts, new_data = [], []
     for data in train_dataset:
         data_list = tokenizer.tokenize(data[0])
@@ -131,7 +133,8 @@ def apply_data_augmentation_for_cn(train_dataset,
                                    n_iter=20,
                                    p_mask=0.1,
                                    p_ng=0.25,
-                                   ngram_range=(2, 10)):
+                                   ngram_range=(2, 10),
+                                   seed=0):
     """
     Because BERT and jieba have different `tokenize` function, so it returns
      `[jieba_tokenizer(data[0], bert_tokenizer(data[0]), data[1])]` for each
@@ -141,6 +144,7 @@ def apply_data_augmentation_for_cn(train_dataset,
     could be stored or tokenized by BERT tokenization, from which tokenized
     data for student model and teacher model would get at the same time.
     """
+    np.random.seed(seed)
     used_texts = [data[0] for data in train_dataset]
     used_texts = set(used_texts)
     new_data = []
@@ -223,7 +227,8 @@ def create_distill_loader(task_name,
                           max_seq_length=128,
                           shuffle=True,
                           n_iter=20,
-                          whole_word_mask=False):
+                          whole_word_mask=False,
+                          seed=0):
     """
     Returns batch data for bert and small model.
     Bert and small model have different input representations.
@@ -246,14 +251,15 @@ def create_distill_loader(task_name,
 
     if task_name == 'senta':
         train_ds = apply_data_augmentation_for_cn(
-            train_ds, tokenizer, vocab, n_iter=n_iter)
+            train_ds, tokenizer, vocab, n_iter=n_iter, seed=seed)
     else:
         train_ds = apply_data_augmentation(
             task_name,
             train_ds,
             tokenizer,
             n_iter=n_iter,
-            whole_word_mask=whole_word_mask)
+            whole_word_mask=whole_word_mask,
+            seed=seed)
     print("Data augmentation has been applied.")
 
     trans_fn = partial(

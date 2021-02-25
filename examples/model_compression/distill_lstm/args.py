@@ -136,5 +136,12 @@ def parse_args():
         default=0.0,
         help="Weight balance between cross entropy loss and mean square loss.")
 
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=2021,
+        help="Random seed for model parameter initialization, data augmentation and so on."
+    )
+
     args = parser.parse_args()
     return args

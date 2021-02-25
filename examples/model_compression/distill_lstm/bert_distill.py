@@ -78,7 +78,8 @@ def do_train(agrs):
         batch_size=args.batch_size,
         max_seq_length=args.max_seq_length,
         n_iter=args.n_iter,
-        whole_word_mask=args.whole_word_mask)
+        whole_word_mask=args.whole_word_mask,
+        seed=args.seed)
 
     model = BiLSTM(args.emb_dim, args.hidden_size, args.vocab_size,
                    args.output_dim, args.vocab_path, args.padding_idx,
@@ -155,8 +156,7 @@ def do_train(agrs):
 
 
 if __name__ == '__main__':
-    paddle.seed(2021)
     args = parse_args()
     print(args)
-
+    paddle.seed(args.seed)
     do_train(args)
