@@ -403,13 +403,13 @@ def do_train(args):
             (input_ids, segment_ids, masked_lm_positions, masked_lm_ids,
              masked_lm_weights, next_sentence_labels, masked_lm_scale) = batch
             seq_len = input_ids.shape[1]
-            rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
-                bigbirdConfig["num_layers"], seq_len, seq_len,
-                bigbirdConfig["nhead"], bigbirdConfig["block_size"],
-                bigbirdConfig["window_size"],
-                bigbirdConfig["num_global_blocks"],
-                bigbirdConfig["num_rand_blocks"], bigbirdConfig["seed"])
-
+            # rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
+            #     bigbirdConfig["num_layers"], seq_len, seq_len,
+            #     bigbirdConfig["nhead"], bigbirdConfig["block_size"],
+            #     bigbirdConfig["window_size"],
+            #     bigbirdConfig["num_global_blocks"],
+            #     bigbirdConfig["num_rand_blocks"], bigbirdConfig["seed"])
+            rand_mask_idx_list = None
             prediction_scores, seq_relationship_score = model(
                 input_ids=input_ids,
                 token_type_ids=segment_ids,
