@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = '2.0.0rc2'
+__version__ = '2.0.0rc3'
 
 from . import data
 from . import datasets
