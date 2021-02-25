@@ -443,12 +443,13 @@ class ElectraClassificationHead(nn.Layer):
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
         self.out_proj = nn.Linear(hidden_size, num_classes)
+        self.act = get_activation("gelu")
 
     def forward(self, features, **kwargs):
         x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
         x = self.dropout(x)
         x = self.dense(x)
-        x = get_activation("gelu")(x)  # Electra paper used gelu here
+        x = self.act(x)  # Electra paper used gelu here
         x = self.dropout(x)
         x = self.out_proj(x)
         return x
