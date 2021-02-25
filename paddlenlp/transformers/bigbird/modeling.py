@@ -341,7 +341,7 @@ class BigBirdPretrainedModel(PretrainedModel):
             "num_layers": 12,
             "vocab_size": 50358,
             "nhead": 12,
-            "attn_dropout": 0.1,
+            "attn_dropout": 0,
             "dim_feedforward": 3072,
             "activation": "gelu",
             "normalize_before": False,
@@ -352,7 +352,7 @@ class BigBirdPretrainedModel(PretrainedModel):
             "seed": None,
             "pad_token_id": 0,
             "hidden_size": 768,
-            "hidden_dropout_prob": 0.1,
+            "hidden_dropout_prob": 0,
             "max_position_embeddings": 4096,
             "type_vocab_size": 2,
             "num_labels": 2,
@@ -491,7 +491,7 @@ class BigBirdLMPredictionHead(Layer):
         super(BigBirdLMPredictionHead, self).__init__()
         self.transform = nn.Linear(hidden_size, hidden_size)
         self.activation = getattr(nn.functional, activation)
-        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=1e-12)
         self.decoder_weight = self.create_parameter(
             shape=[hidden_size, vocab_size],
             dtype=self.transform.weight.dtype,
@@ -569,10 +569,13 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
         self.vocab_size = vocab_size
 
     def forward(self, prediction_scores, seq_relationship_score,
-                masked_lm_labels, next_sentence_labels, masked_lm_scale):
+                masked_lm_labels, next_sentence_labels, masked_lm_scale,
+                masked_lm_weights):
         masked_lm_loss = paddle.nn.functional.softmax_with_cross_entropy(
             prediction_scores, masked_lm_labels, ignore_index=-1)
-        masked_lm_loss = masked_lm_loss / masked_lm_scale
+        masked_lm_loss = paddle.transpose(masked_lm_loss, [1, 0])
+        masked_lm_loss = paddle.sum(masked_lm_loss * masked_lm_weights) / (
+            paddle.sum(masked_lm_weights) + 1e-5)
         next_sentence_loss = paddle.nn.functional.softmax_with_cross_entropy(
             seq_relationship_score, next_sentence_labels)
-        return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)
+        return masked_lm_loss + paddle.mean(next_sentence_loss)
