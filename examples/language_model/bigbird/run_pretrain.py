@@ -40,6 +40,12 @@ MODEL_CLASSES = {"bigbird": (BigBirdForPretraining, BigBirdTokenizer), }
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--model_type",
+        default="bigbird",
+        type=str,
+        help="Model type selected in the list: " +
+        ", ".join(MODEL_CLASSES.keys()), )
+    parser.add_argument(
         "--model_name_or_path",
         default="bigbird-base-uncased",
         type=str,
@@ -359,14 +365,17 @@ def do_train(args):
     worker_init = WorkerInitObj(args.seed + paddle.distributed.get_rank())
 
     # get dataloader
-    tokenizer = BigBirdTokenizer.from_pretrained(args.model_name_or_path)
+    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     train_data_loader = create_dataloader(args.data_file, tokenizer,
                                           worker_init, args.batch_size,
                                           args.max_encoder_length)
     logger.info("Dataloader has been created")
 
     # define model
-    model = BigBirdForPretraining.from_pretrained(args.model_name_or_path)
+    model = BigBirdForPretraining(
+        BigBirdModel(**BigBirdForPretraining.pretrained_init_configuration[
+            args.model_name_or_path]))
 
     # define metric
     criterion = BigBirdPretrainingCriterion(
