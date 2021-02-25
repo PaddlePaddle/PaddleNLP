@@ -15,6 +15,7 @@
 import io
 import os
 import six
+import re
 import numpy as np
 from paddle.utils import try_import
 from paddlenlp.data import Vocab
@@ -61,7 +62,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
                  sentencepiece_model_file,
                  do_lower_case=True,
                  encoding="utf8",
-                 unk_token="[UNK]",
+                 unk_token="<unk>",
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
@@ -81,11 +82,16 @@ class BigBirdTokenizer(PretrainedTokenizer):
         vocab_dict = {}
         for id in range(self.sp_model.get_piece_size()):
             vocab_dict[self.sp_model.id_to_piece(id)] = id
-        self.vocab = Vocab.from_dict(vocab_dict)
+        self.vocab = Vocab.from_dict(vocab_dict, unk_token=unk_token)
         self.start_word_tokens = np.array([
-            self.vocab._idx_to_token[i] == "▁"
+            self.vocab._idx_to_token[i][0] == "▁"
             for i in range(0, len(self.vocab))
         ])
+        self.unk_token = unk_token
+        self.mask_id = vocab_dict[mask_token]
+        self.unk_id = vocab_dict[unk_token]
+        self.cls_id = vocab_dict[cls_token]
+        self.sep_id = vocab_dict[sep_token]
 
     @property
     def vocab_size(self):
@@ -112,10 +118,11 @@ class BigBirdTokenizer(PretrainedTokenizer):
 
         tokens = self.sp_model.EncodeAsPieces(text)
         in_vocab_tokens = []
-        unk_token = self.vocab.unk_token
         for token in tokens:
             if token in self.vocab:
                 in_vocab_tokens.append(token)
+            else:
+                in_vocab_tokens.append(self.unk_token)
         return in_vocab_tokens
 
     def __call__(self, text):
@@ -142,12 +149,12 @@ class BigBirdTokenizer(PretrainedTokenizer):
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
 
-    def encode(self, text, max_seq_len, max_pred_len, masked_lm_prob=0.15):
+    def encode(self, text, max_seq_len=None, max_pred_len=None, masked_lm_prob=0.15):
         """
         """
-
         def get_input_ids(text):
             if isinstance(text, str):
+                text = re.sub('[\n]+', '', text)
                 tokens = self._tokenize(text)
                 return self.convert_tokens_to_ids(tokens)
             elif isinstance(text,
@@ -165,29 +172,28 @@ class BigBirdTokenizer(PretrainedTokenizer):
 
         ids = get_input_ids(text)
         # Find the span for in the text 
+        max_seq_len = len(ids) if max_seq_len is None else max_seq_len
+        max_pred_len = len(ids) if max_pred_len is None else max_pred_len
+    
         end_pos = max_seq_len - 2 + np.random.randint(
             max(1, len(ids) - max_seq_len - 2))
         start_pos = max(0, end_pos - max_seq_len + 2)
         span_ids = ids[start_pos:end_pos]
-        num_tokens = len(spand_ids)
 
-        # Get the word start pos 
         word_begin_flag = self.start_word_tokens[span_ids]
         word_begin_pos = np.flatnonzero(word_begin_flag).astype(np.int32)
         if word_begin_pos.size == 0:
             word_begin_pos = np.arange(len(span_ids), dtype=np.int32)
             word_begin_flag = np.logical_not(word_begin_flag)
 
-        # We drop the un-word start tokens, the postition will change
         first_start_pos = word_begin_pos[0]
         span_ids = span_ids[first_start_pos:]
+        num_tokens = len(span_ids)
         word_begin_pos = word_begin_pos - first_start_pos
         words = np.split(
             np.arange(
-                len(spand_ids), dtype="int32"), word_begin_pos)[1:]
+                len(span_ids), dtype="int32"), word_begin_pos)[1:]
         assert len(words) == len(word_begin_pos)
-
-        # Select masked poistion to train 
         num_to_predict = min(
             max_pred_len,
             max(1, int(round(len(word_begin_pos) * masked_lm_prob))))
@@ -199,42 +205,36 @@ class BigBirdTokenizer(PretrainedTokenizer):
                 num_to_predict,
                 replace=False),
             0)
-
-        masked_lm_positions = np.concatenate(
-            np.random.choice(
-                np.array(
-                    [[]] + words, dtype=np.object)[1:],
-                num_to_predict,
-                replace=False),
-            0)
-
+        if len(masked_lm_positions) > max_pred_len:
+            masked_lm_positions = masked_lm_positions[:max_pred_len+1]
+            truncate_masking_flag = np.flatnonzero(
+                            word_begin_flag[masked_lm_positions])[-1]
+            masked_lm_positions = masked_lm_positions[:truncate_masking_flag]
+        span_ids = np.array(span_ids, dtype="int32")
         masked_lm_positions = np.sort(masked_lm_positions)
-        masked_lm_ids = span_ids[masked_lm_positions]
+        masked_lm_ids = np.array(span_ids)[masked_lm_positions]
 
-        # replance input token with [MASK] 80%, random 10%, or leave it as it is.
         random_prob = np.random.rand(len(masked_lm_positions))
         mask_pos = masked_lm_positions[random_prob < 0.8]
         random_pos = masked_lm_positions[random_prob > 0.9]
-
-        span_ids[mask_pos] = 67  # id of masked token
-        span_ids[random_pos] = np.random.randint(  # ignore special tokens
-            101,
+        span_ids[mask_pos] = self.mask_id
+        span_ids[random_pos] = np.random.randint(
+            self.unk_id+1,
             self.vocab_size,
             len(random_pos),
             dtype=np.int32)
-
         span_ids = np.concatenate([
             np.array(
-                [65], dtype=np.int32), span_ids, np.array(
-                    [66], dtype=np.int32)
+                [self.cls_id], dtype=np.int32), span_ids, np.array(
+                    [self.sep_id], dtype=np.int32)
         ])
         padding_len = max_seq_len - num_tokens - 2
-        spand_ids = np.pad(span_ids, [0, padding_len], "constant")
+        span_ids = np.pad(span_ids, [0, padding_len], "constant")
         pred_padding_len = max_pred_len - len(masked_lm_positions)
         masked_lm_weights = np.pad(np.ones_like(
             masked_lm_positions, dtype=np.float32), [0, pred_padding_len],
                                    "constant")
         masked_lm_positions = np.pad(masked_lm_positions + 1,
                                      [0, pred_padding_len], "constant")
-        masked_lm_ids = np.pad(masked_lm_ids, [0, pad_out], "constant")
-        return subtokens, masked_lm_positions, masked_lm_ids, masked_lm_weights
+        masked_lm_ids = np.pad(masked_lm_ids, [0, pred_padding_len], "constant")
+        return span_ids, masked_lm_positions, masked_lm_ids, masked_lm_weights
