@@ -746,7 +746,8 @@ class BigBirdSparseAttention(Attention):
         rand_mask = self._get_rand_mask(blocked_query_mask, blocked_key_mask,
                                         rand_mask_idx, B, T)
         # [B, H, L-G, bs, (G+W+R)*bs]
-        second_mask = paddle.concat([band_mask, rand_mask], axis=4)
+        # second_mask = paddle.concat([band_mask, rand_mask], axis=4)
+        second_mask = band_mask
 
         # [B, H, L-G, R, bs, -1]
         random_keys = self._gather_random_key_value(blocked_key_matrix,
@@ -760,11 +761,13 @@ class BigBirdSparseAttention(Attention):
         # [B, H, L - G, bs, -1]
         second_query_matrix = blocked_query_matrix[:, :, GF:-GB]
         # [B, H, L - G, (G+W+R)*bs, -1]
-        second_key_matrix = paddle.concat(
-            [band_keys_matrix, random_keys], axis=3)
+        # second_key_matrix = paddle.concat(
+        #     [band_keys_matrix, random_keys], axis=3)
+        second_key_matrix = band_keys_matrix
         # [B, H, L - G, (G+W+R)*bs, -1]
-        second_value_matrix = paddle.concat(
-            [band_value_matrix, random_values], axis=3)
+        # second_value_matrix = paddle.concat(
+        #     [band_value_matrix, random_values], axis=3)
+        second_value_matrix = band_value_matrix
 
         second_product = paddle.matmul(
             second_query_matrix, second_key_matrix, transpose_y=True)
