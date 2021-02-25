@@ -91,7 +91,7 @@ def parse_args():
         help="Weight decay if we apply some.")
     parser.add_argument(
         "--adam_epsilon",
-        default=1e-8,
+        default=1e-6,
         type=float,
         help="Epsilon for Adam optimizer.")
     parser.add_argument(
@@ -316,7 +316,7 @@ def create_dataloader(input_file, tokenizer, worker_init, batch_size,
     pretrain_dataset = PretrainingDataset(input_file, tokenizer,
                                           max_encoder_length)
     train_batch_sampler = paddle.io.BatchSampler(
-        pretrain_dataset, batch_size=batch_size, shuffle=True)
+        pretrain_dataset, batch_size=batch_size, shuffle=False)
 
     # make masked_lm_positions can be gathered
     def _collate_data(data, stack_fn=Stack()):
@@ -348,13 +348,12 @@ def create_dataloader(input_file, tokenizer, worker_init, batch_size,
         batch_sampler=train_batch_sampler,
         collate_fn=_collate_data,
         num_workers=0,
-        worker_init_fn=worker_init,
+        #worker_init_fn=worker_init,
         return_list=True)
     return dataloader
 
 
 def do_train(args):
-
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
     worker_init = WorkerInitObj(args.seed + paddle.distributed.get_rank())
@@ -395,6 +394,8 @@ def do_train(args):
     # training
     model.train()
     global_steps = 0
+    seed = 0
+    np.random.seed(seed)
     for epoch in range(args.epochs):
         if global_steps > args.num_train_steps:
             break
@@ -402,13 +403,13 @@ def do_train(args):
             (input_ids, segment_ids, masked_lm_positions, masked_lm_ids,
              masked_lm_weights, next_sentence_labels, masked_lm_scale) = batch
             seq_len = input_ids.shape[1]
-            rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
-                bigbirdConfig["num_layers"], seq_len, seq_len,
-                bigbirdConfig["nhead"], bigbirdConfig["block_size"],
-                bigbirdConfig["window_size"],
-                bigbirdConfig["num_global_blocks"],
-                bigbirdConfig["num_rand_blocks"], bigbirdConfig["seed"])
-
+            # rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
+            #     bigbirdConfig["num_layers"], seq_len, seq_len,
+            #     bigbirdConfig["nhead"], bigbirdConfig["block_size"],
+            #     bigbirdConfig["window_size"],
+            #     bigbirdConfig["num_global_blocks"],
+            #     bigbirdConfig["num_rand_blocks"], bigbirdConfig["seed"])
+            rand_mask_idx_list = None
             prediction_scores, seq_relationship_score = model(
                 input_ids=input_ids,
                 token_type_ids=segment_ids,
@@ -416,9 +417,9 @@ def do_train(args):
                 masked_positions=masked_lm_positions)
             loss = criterion(prediction_scores, seq_relationship_score,
                              masked_lm_ids, next_sentence_labels,
-                             masked_lm_scale)
+                             masked_lm_scale, masked_lm_weights)
             loss.backward()
-            optimizer.step()
+            #optimizer.step()
             optimizer.clear_gradients()
             if global_steps % args.logging_steps == 0:
                 logger.info("global step %d, epoch: %d, loss: %f" %
@@ -427,6 +428,7 @@ def do_train(args):
             global_steps += 1
             if global_steps > args.num_train_steps:
                 break
+            np.random.seed(seed)
 
 
 if __name__ == "__main__":
