@@ -207,8 +207,7 @@ def do_train(args):
 
 
 if __name__ == '__main__':
-    paddle.seed(2021)
     args = parse_args()
     print(args)
-
+    paddle.seed(args.seed)
     do_train(args)

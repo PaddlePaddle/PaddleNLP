@@ -137,7 +137,7 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --model_name bert-wwm-ext-chinese \
     --teacher_path pretrained_models/senta/best_bert_wwm_ext_model_880/model_state.pdparams \
     --vocab_path senta_word_dict_subset.txt \
-    --output_dir  distilled_models/senta
+    --output_dir distilled_models/senta
 
 ```
 
@@ -152,7 +152,7 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --batch_size 128 \
     --model_name bert-base-uncased \
     --embedding_name w2v.google_news.target.word-word.dim300.en \
-    --output_dir  distilled_models/SST-2 \
+    --output_dir distilled_models/SST-2 \
     --teacher_path pretrained_models/SST-2/best_model_610/model_state.pdparams
 
 ```
@@ -168,7 +168,7 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --model_name bert-base-uncased \
     --embedding_name w2v.google_news.target.word-word.dim300.en \
     --n_iter 10 \
-    --output_dir  distilled_models/QQP \
+    --output_dir distilled_models/QQP \
     --teacher_path pretrained_models/QQP/best_model_17000/model_state.pdparams
 
 ```
@@ -177,15 +177,14 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
 
 
 ## 蒸馏实验结果
-本蒸馏实验基于GLUE的SST-2、QQP、中文情感分类ChnSentiCorp数据集。实验效果均使用每个数据集的验证集（dev）进行评价，评价指标是准确率（acc），其中QQP中包含f1值。利用基于BERT的教师模型去蒸馏基于Bi-LSTM的学生模型，对比Bi-LSTM小模型单独训练，在SST-2、QQP、senta(中文情感分类)任务上分别有3.3%、1.4%、1.4%的提升。
+本蒸馏实验基于GLUE的SST-2、QQP、中文情感分类ChnSentiCorp数据集。实验效果均使用每个数据集的验证集（dev）进行评价，评价指标是准确率（acc），其中QQP中包含f1值。利用基于BERT的教师模型去蒸馏基于Bi-LSTM的学生模型，对比Bi-LSTM小模型单独训练，在SST-2、QQP、senta(中文情感分类)任务上分别有3.3%、1.9%、1.4%的提升。
 
 | Model             | SST-2(dev acc)    | QQP(dev acc/f1)            | ChnSentiCorp(dev acc) | ChnSentiCorp(dev acc) |
 | ----------------- | ----------------- | -------------------------- | --------------------- | --------------------- |
 | Teacher  model    | bert-base-uncased | bert-base-uncased          | bert-base-chinese     | bert-wwm-ext-chinese  |
 | BERT-base         | 0.930046          | 0.905813(acc)/0.873472(f1) | 0.951667              | 0.955000              |
 | Bi-LSTM           | 0.854358          | 0.856616(acc)/0.799682(f1) | 0.920000              | 0.920000              |
-| Distilled Bi-LSTM | 0.887615          | 0.870517(acc)/0.824676(f1) | 0.932500              | 0.934167              |
-
+| Distilled Bi-LSTM | 0.887615          | 0.875216(acc)/0.831254(f1) | 0.932500              | 0.934167              |
 
 ## 参考文献
 
