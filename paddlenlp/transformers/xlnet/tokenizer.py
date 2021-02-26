@@ -1,4 +1,6 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 Google AI, Google Brain and Carnegie Mellon University Authors and the HuggingFace Inc. team.
+# Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,8 +44,8 @@ class XLNetTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "spiece.model"}
     pretrained_resource_files_map = {
         "vocab_file": {
-            "xlnet-base-cased": "https://huggingface.co/xlnet-base-cased/resolve/main/spiece.model",
-            "xlnet-large-cased": "https://huggingface.co/xlnet-large-cased/resolve/main/spiece.model",
+            "xlnet-base-cased": "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-base-cased-spiece.model",
+            "xlnet-large-cased": "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-large-cased-spiece.model",
         }
     }
     pretrained_init_configuration = {
@@ -281,17 +283,10 @@ class XLNetTokenizer(PretrainedTokenizer):
             return len(token_ids_0 + sep) * [0] + cls_segment_id
         return len(token_ids_0 + sep) * [0] + len(token_ids_1 + sep) * [1] + cls_segment_id
 
-    def save_vocabulary(self, save_directory: str, filename_prefix: Optional[str] = None) -> Tuple[str]:
-        if not os.path.isdir(save_directory):
-            raise ValueError("Vocabulary path ({}) should be a directory".format(save_directory))
-
-        out_vocab_file = os.path.join(
-            save_directory, (filename_prefix + "-" if filename_prefix else "") + self.resource_files_names["vocab_file"]
-        )
-
-        if os.path.abspath(self.vocab_file) != os.path.abspath(out_vocab_file):
-            copyfile(self.vocab_file, out_vocab_file)
-        return (out_vocab_file,)
+    def save_vocabulary(self, filepath, vocab):
+        if os.path.abspath(self.vocab_file) != os.path.abspath(filepath):
+            copyfile(self.vocab_file, filepath)
+        return (filepath,)
 
     def encode(self,
                text,

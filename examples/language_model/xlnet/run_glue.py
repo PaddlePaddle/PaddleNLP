@@ -17,7 +17,6 @@ import argparse
 import os
 import random
 import time
-import math
 from functools import partial
 
 import numpy as np
@@ -26,14 +25,15 @@ from paddle.io import DataLoader
 from paddle.metric import Accuracy
 from paddlenlp.datasets import GlueCoLA, GlueSST2, GlueMRPC, GlueSTSB, GlueQQP, GlueMNLI, GlueQNLI, GlueRTE
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers.xlnet.modeling import *
+from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers.xlnet.modeling import XLNetForSequenceClassification
 from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger(__name__)
+final_res = "Not evaluated yet!"
 
 TASK_CLASSES = {
     "cola": (GlueCoLA, Mcc),
@@ -46,7 +46,9 @@ TASK_CLASSES = {
     "rte": (GlueRTE, Accuracy),
 }
 
-MODEL_CLASSES = {"xlnet": (XLNetForSequenceClassification, XLNetTokenizer), }
+MODEL_CLASSES = {
+    "xlnet": (XLNetForSequenceClassification, XLNetTokenizer),
+}
 
 
 def parse_args():
@@ -134,16 +136,10 @@ def parse_args():
         type=int,
         help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
 
-    # parser.add_argument(
-    #     "--warmup_steps",
-    #     default=0,
-    #     type=int,
-    #     help="Linear warmup over warmup_steps.")
-
     parser.add_argument(
         "--logging_steps",
         type=int,
-        default=500,
+        default=100,
         help="Log every X updates steps.")
 
     parser.add_argument(
@@ -165,9 +161,6 @@ def parse_args():
         help="number of gpus to use, 0 for cpu.")
 
     parser.add_argument(
-        "--params_pd_path", type=str, default=None, help="params pd path")
-
-    parser.add_argument(
         "--warmup_proportion",
         default=0.1,
         type=float,
@@ -187,27 +180,34 @@ def set_seed(args):
 def evaluate(model, loss_fct, metric, data_loader):
     model.eval()
     metric.reset()
-    # losses = []
+    losses = []
+    global final_res
     for batch in data_loader:
         input_ids, segment_ids, attention_mask, labels = batch
         logits = model(input_ids, segment_ids, attention_mask)[0]
         loss = loss_fct(logits, labels)
-        # losses.append(loss)
+        losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
     if isinstance(metric, AccuracyAndF1):
-        logger.info(
-            "eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s."
-            % (loss.numpy(), res[0], res[1], res[2], res[3], res[4]))
+        print(
+            "eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s"
+            % (np.average(losses), res[0], res[1], res[2], res[3], res[4]))
+
+        final_res = "final:    acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s"\
+                    % (res[0], res[1], res[2], res[3], res[4])
     elif isinstance(metric, Mcc):
-        logger.info("eval loss: %f, mcc: %s." % (loss.numpy(), res[0]))
+        print("eval loss: %f, mcc: %s" % (np.average(losses), res[0]))
+        final_res = "final:    mcc: %s" % (res[0])
     elif isinstance(metric, PearsonAndSpearman):
-        logger.info(
-            "eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s."
-            % (loss.numpy(), res[0], res[1], res[2]))
+        print(
+            "eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s"
+            % (np.average(losses), res[0], res[1], res[2]))
+        final_res = "final:    pearson: %s, spearman: %s, pearson and spearman: %s" % (res[0], res[1], res[2])
     else:
-        logger.info("eval loss: %f, acc: %s." % (loss.numpy(), res))
+        print("eval loss: %f, acc: %s" % (np.average(losses), res))
+        final_res = "final:    acc: %s" % res
     model.train()
 
 
@@ -300,7 +300,7 @@ def do_train(args):
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
-    train_dataset, dev_dataset = dataset_class.get_datasets(["train", "dev"])
+    train_dataset = dataset_class.get_datasets(["train"])
 
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     label_list = train_dataset.get_labels()
@@ -310,16 +310,16 @@ def do_train(args):
         label_list=label_list,
         max_seq_length=args.max_seq_length)
 
-    train_dataset = train_dataset.apply(trans_func, lazy=False)
-    train_batch_sampler = SamplerHelper(train_dataset).batch(
-        batch_size=args.batch_size, drop_last=False)
+    train_dataset = train_dataset.apply(trans_func, lazy=True)
+    train_batch_sampler = paddle.io.DistributedBatchSampler(
+        train_dataset, batch_size=args.batch_size, shuffle=True)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.sp_model.PieceToId(tokenizer.pad_token), pad_right=False),  # input
-        Pad(axis=0, pad_val=3, pad_right=False),  # segment
-        Pad(axis=0, pad_val=0, pad_right=False),  # attention_mask
-        Stack(),  # length
-        Stack(dtype="int64" if label_list else "float32")  # label
+        Pad(axis=0, pad_val=3, pad_right=False),                                                  # segment
+        Pad(axis=0, pad_val=0, pad_right=False),                                                  # attention_mask
+        Stack(),                                                                                  # length
+        Stack(dtype="int64" if label_list else "float32"),                                        # label
     ): [data for i, data in enumerate(fn(samples)) if i != 3]
 
     train_data_loader = DataLoader(
@@ -329,21 +329,46 @@ def do_train(args):
         num_workers=0,
         return_list=True)
 
-    dev_dataset = dev_dataset.apply(trans_func, lazy=False)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_dataset,
-        batch_size=args.batch_size,
-        shuffle=False)
+    if args.task_name == "mnli":
+        dev_dataset_matched, dev_dataset_mismatched = dataset_class.get_datasets(
+            ["dev_matched", "dev_mismatched"])
+        dev_dataset_matched = dev_dataset_matched.apply(trans_func, lazy=True)
+        dev_dataset_mismatched = dev_dataset_mismatched.apply(
+            trans_func, lazy=True)
+        dev_batch_sampler_matched = paddle.io.BatchSampler(
+            dev_dataset_matched, batch_size=args.batch_size, shuffle=False)
+        dev_data_loader_matched = DataLoader(
+            dataset=dev_dataset_matched,
+            batch_sampler=dev_batch_sampler_matched,
+            collate_fn=batchify_fn,
+            num_workers=0,
+            return_list=True)
+        dev_batch_sampler_mismatched = paddle.io.BatchSampler(
+            dev_dataset_mismatched, batch_size=args.batch_size, shuffle=False)
+        dev_data_loader_mismatched = DataLoader(
+            dataset=dev_dataset_mismatched,
+            batch_sampler=dev_batch_sampler_mismatched,
+            collate_fn=batchify_fn,
+            num_workers=0,
+            return_list=True)
+    else:
+        dev_dataset = dataset_class.get_datasets(["dev"])
+        dev_dataset = dev_dataset.apply(trans_func, lazy=True)
+        dev_batch_sampler = paddle.io.BatchSampler(
+            dev_dataset,
+            batch_size=args.batch_size,
+            shuffle=False)
 
-    dev_data_loader = DataLoader(
-        dataset=dev_dataset,
-        batch_sampler=dev_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+        dev_data_loader = DataLoader(
+            dataset=dev_dataset,
+            batch_sampler=dev_batch_sampler,
+            collate_fn=batchify_fn,
+            num_workers=0,
+            return_list=True)
 
-    config = model_class.pretrained_init_configuration[args.model_name_or_path]
-    model = XLNetForSequenceClassification(XLNetModel(**config))
+    num_classes = 1 if train_dataset.get_labels() is None else len(train_dataset.get_labels())
+    model = model_class.from_pretrained(
+        args.model_name_or_path, num_classes=num_classes)
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -351,40 +376,31 @@ def do_train(args):
     num_training_steps = args.max_steps if args.max_steps > 0 else (
         len(train_data_loader) * args.num_train_epochs)
 
-    warmup_steps = int(math.floor(num_training_steps * args.warmup_proportion))
-
-    lr_scheduler = paddle.optimizer.lr.LambdaDecay(
-        args.learning_rate,
-        lambda current_step, num_warmup_steps=warmup_steps,
-        num_training_steps=num_training_steps : float(
-            current_step) / float(max(1, num_warmup_steps))
-        if current_step < num_warmup_steps else max(
-            0.0,
-            float(num_training_steps - current_step - 1) / float(
-                max(1, num_training_steps - num_warmup_steps))))
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
+                                         args.warmup_proportion)
 
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
+        beta1=0.9,
+        beta2=0.999,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in [
             p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
+            if not any(nd in n for nd in ["bias", "norm", "LayerNorm"])
         ])
 
     loss_fct = paddle.nn.loss.CrossEntropyLoss() if label_list else paddle.nn.loss.MSELoss()
 
     metric = metric_class()
 
-    state_dict = paddle.load("{}.pdparams".format(args.model_name_or_path))
-    model.set_state_dict(state_dict=state_dict)
-
-    global_step = 1
+    global_step = 0
     tic_train = time.time()
     model.train()
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
+            global_step += 1
             input_ids, segment_ids, attention_mask, labels = batch
             logits = model(input_ids, segment_ids, attention_mask, labels=labels)[0]
             loss = loss_fct(logits, labels)
@@ -392,26 +408,51 @@ def do_train(args):
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_gradients()
+
             if global_step % args.logging_steps == 0:
-                logger.info(
+                print(
                     "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
                     % (global_step, num_training_steps, epoch, step,
                        paddle.distributed.get_rank(), loss, optimizer.get_lr(),
                        args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
-            if global_step % args.save_steps == 0:
-                evaluate(model, loss_fct, metric, dev_data_loader)
+
+            if global_step % args.save_steps == 0 or global_step == num_training_steps:
+                tic_eval = time.time()
+                if args.task_name == "mnli":
+                    evaluate(model, loss_fct, metric, dev_data_loader_matched)
+                    evaluate(model, loss_fct, metric, dev_data_loader_mismatched)
+                    print("eval done total : %s s" % (time.time() - tic_eval))
+                else:
+                    evaluate(model, loss_fct, metric, dev_data_loader)
+                    print("eval done total : %s s" % (time.time() - tic_eval))
                 if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
-                    paddle.save(
-                        model.state_dict(),
-                        os.path.join(args.output_dir, "model_%d.pdparams" % global_step)
-                    )
-            global_step += 1
-    evaluate(model, loss_fct, metric, dev_data_loader)
+                    output_dir = os.path.join(args.output_dir,
+                                              "%s_ft_model_%d" %
+                                              (args.task_name, global_step))
+                    if not os.path.exists(output_dir):
+                        os.makedirs(output_dir)
+                    # Need better way to get inner model of DataParallel
+                    model_to_save = model._layers if isinstance(
+                        model, paddle.DataParallel) else model
+                    model_to_save.save_pretrained(output_dir)
+                    tokenizer.save_pretrained(output_dir)
+                if global_step == num_training_steps:
+                    print(final_res)
+                tic_train += time.time() - tic_eval
+
+
+def print_arguments(args):
+    """print arguments"""
+    print('-----------  Configuration Arguments -----------')
+    for arg, value in sorted(vars(args).items()):
+        print('%s: %s' % (arg, value))
+    print('------------------------------------------------')
 
 
 if __name__ == "__main__":
     args = parse_args()
+    print_arguments(args)
     if args.n_gpu > 1:
         paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_gpu)
     else:

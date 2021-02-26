@@ -1,4 +1,6 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 Google AI, Google Brain and Carnegie Mellon University Authors and the HuggingFace Inc. team.
+# Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+""" Modeling classes for XLNet model."""
 
 import re
 import paddle
@@ -502,7 +504,12 @@ class XLNetPretrainedModel(PretrainedModel):
     }
 
     resource_files_names = {"model_state": "model_state.pdparams"}
-    pretrained_resource_files_map = {"xlnet-base-cased": "/yingyibiao/pretrained_models/xlnet-base-cased.pdparams"}
+    pretrained_resource_files_map = {
+        "model_state": {
+            "xlnet-base-cased":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-base-cased.pdparams",
+        }
+    }
     base_model_prefix = "xlnet"
 
     def init_weights(self):
