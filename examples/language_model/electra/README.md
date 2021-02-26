@@ -12,7 +12,7 @@
 ## 1. 安装说明
 - Python >= 3.6
 - paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp==2.0.0rc2`
+- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp\>=2.0rc`
 - jieba, 安装方式：`pip install jieba`
 - colorlog, 安装方式：`pip install colorlog`
 - colorama, 安装方式：`pip install colorama`
