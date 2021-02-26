@@ -34,12 +34,6 @@ def parse_args():
         "--num_layers", type=int, default=1, help="Layers number of LSTM.")
 
     parser.add_argument(
-        '--use_pretrained_emb',
-        type=eval,
-        default=False,
-        help='Whether to use pre-trained embedding tensor.')
-
-    parser.add_argument(
         "--emb_dim", type=int, default=300, help="Embedding dim.")
 
     parser.add_argument(
@@ -85,6 +79,12 @@ def parse_args():
         help="The frequency to print evaluation logs.")
 
     parser.add_argument(
+        "--save_steps",
+        type=int,
+        default=100,
+        help="The frequency to print evaluation logs.")
+
+    parser.add_argument(
         "--padding_idx",
         type=int,
         default=0,
@@ -107,6 +107,24 @@ def parse_args():
         help="Student model's vocab path.")
 
     parser.add_argument(
+        "--output_dir",
+        type=str,
+        default='models',
+        help="Directory to save models .")
+
+    parser.add_argument(
+        "--whole_word_mask",
+        action="store_true",
+        help="If True, use whole word masking method in data augmentation in distilling."
+    )
+
+    parser.add_argument(
+        "--embedding_name",
+        type=str,
+        default=None,
+        help="The name of pretrained word embedding.")
+
+    parser.add_argument(
         "--vocab_size",
         type=int,
         default=10000,
@@ -117,6 +135,13 @@ def parse_args():
         type=float,
         default=0.0,
         help="Weight balance between cross entropy loss and mean square loss.")
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=2021,
+        help="Random seed for model parameter initialization, data augmentation and so on."
+    )
 
     args = parser.parse_args()
     return args

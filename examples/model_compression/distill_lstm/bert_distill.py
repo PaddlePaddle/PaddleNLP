@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import time
 
 import paddle
 import paddle.nn as nn
-from paddle.metric import Metric, Accuracy, Precision, Recall
+from paddle.metric import Accuracy
 
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers.tokenizer_utils import whitespace_tokenize
+from paddlenlp.transformers import BertForSequenceClassification
 from paddlenlp.metrics import AccuracyAndF1
 from paddlenlp.datasets import GlueSST2, GlueQQP, ChnSentiCorp
 
 from args import parse_args
 from small import BiLSTM
-from data import create_distill_loader, load_embedding
+from data import create_distill_loader
 
 TASK_CLASSES = {
     "sst-2": (GlueSST2, Accuracy),
@@ -36,7 +36,6 @@ TASK_CLASSES = {
 
 class TeacherModel(object):
     def __init__(self, model_name, param_path):
-        self.tokenizer = BertTokenizer.from_pretrained(model_name)
         self.model = BertForSequenceClassification.from_pretrained(model_name)
         self.model.set_state_dict(paddle.load(param_path))
         self.model.eval()
@@ -78,14 +77,14 @@ def do_train(agrs):
         vocab_path=args.vocab_path,
         batch_size=args.batch_size,
         max_seq_length=args.max_seq_length,
-        n_iter=args.n_iter)
-
-    emb_tensor = load_embedding(
-        args.vocab_path) if args.use_pretrained_emb else None
+        n_iter=args.n_iter,
+        whole_word_mask=args.whole_word_mask,
+        seed=args.seed)
 
     model = BiLSTM(args.emb_dim, args.hidden_size, args.vocab_size,
-                   args.output_dim, args.padding_idx, args.num_layers,
-                   args.dropout_prob, args.init_scale, emb_tensor)
+                   args.output_dim, args.vocab_path, args.padding_idx,
+                   args.num_layers, args.dropout_prob, args.init_scale,
+                   args.embedding_name)
 
     if args.optimizer == 'adadelta':
         optimizer = paddle.optimizer.Adadelta(
@@ -143,12 +142,21 @@ def do_train(agrs):
                 acc = evaluate(args.task_name, model, metric, dev_data_loader)
                 print("eval done total : %s s" % (time.time() - tic_eval))
                 tic_train = time.time()
+
+            if i % args.save_steps == 0:
+                paddle.save(
+                    model.state_dict(),
+                    os.path.join(args.output_dir,
+                                 "step_" + str(global_step) + ".pdparams"))
+                paddle.save(optimizer.state_dict(),
+                            os.path.join(args.output_dir,
+                                         "step_" + str(global_step) + ".pdopt"))
+
             global_step += 1
 
 
 if __name__ == '__main__':
-    paddle.seed(2021)
     args = parse_args()
     print(args)
-
+    paddle.seed(args.seed)
     do_train(args)
