@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import time
 import numpy as np
 
@@ -22,9 +23,10 @@ import paddle.nn.initializer as I
 from paddle.metric import Metric, Accuracy, Precision, Recall
 from paddlenlp.datasets import GlueSST2, GlueQQP, ChnSentiCorp
 from paddlenlp.metrics import AccuracyAndF1
+from paddlenlp.embeddings import TokenEmbedding
 
 from args import parse_args
-from data import load_embedding, create_data_loader_for_small_model, create_pair_loader_for_small_model
+from data import create_data_loader_for_small_model, create_pair_loader_for_small_model
 
 TASK_CLASSES = {
     "sst-2": (GlueSST2, Accuracy),
@@ -39,15 +41,21 @@ class BiLSTM(nn.Layer):
                  hidden_size,
                  vocab_size,
                  output_dim,
+                 vocab_path,
                  padding_idx=0,
                  num_layers=1,
                  dropout_prob=0.0,
                  init_scale=0.1,
-                 embed_weight=None):
+                 embedding_name=None):
         super(BiLSTM, self).__init__()
-        self.embedder = nn.Embedding(vocab_size, embed_dim, padding_idx)
-        self.embedder.weight.set_value(
-            embed_weight) if embed_weight is not None else None
+        if embedding_name is not None:
+            self.embedder = TokenEmbedding(
+                embedding_name,
+                extended_vocab_path=vocab_path,
+                keep_extended_vocab_only=True)
+            embed_dim = self.embedder.embedding_dim
+        else:
+            self.embedder = nn.Embedding(vocab_size, embed_dim, padding_idx)
 
         self.lstm = nn.LSTM(
             embed_dim,
@@ -124,6 +132,7 @@ def evaluate(task_name, model, loss_fct, metric, data_loader):
     else:
         print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end='')
     model.train()
+    return res[0] if isinstance(metric, AccuracyAndF1) else res
 
 
 def do_train(args):
@@ -135,24 +144,17 @@ def do_train(args):
             vocab_path=args.vocab_path,
             model_name=args.model_name,
             batch_size=args.batch_size)
-    elif args.task_name == 'senta':
+    else:
         train_data_loader, dev_data_loader = create_data_loader_for_small_model(
             task_name=args.task_name,
             vocab_path=args.vocab_path,
+            model_name=args.model_name if args.task_name == 'sst-2' else None,
             batch_size=args.batch_size)
-    else:  # sst-2
-        train_data_loader, dev_data_loader = create_data_loader_for_small_model(
-            task_name=args.task_name,
-            vocab_path=args.vocab_path,
-            model_name=args.model_name,
-            batch_size=args.batch_size)
-
-    emb_tensor = load_embedding(
-        args.vocab_path) if args.use_pretrained_emb else None
 
     model = BiLSTM(args.emb_dim, args.hidden_size, args.vocab_size,
-                   args.output_dim, args.padding_idx, args.num_layers,
-                   args.dropout_prob, args.init_scale, emb_tensor)
+                   args.output_dim, args.vocab_path, args.padding_idx,
+                   args.num_layers, args.dropout_prob, args.init_scale,
+                   args.embedding_name)
 
     loss_fct = nn.CrossEntropyLoss()
 
@@ -188,16 +190,24 @@ def do_train(args):
                            args.log_freq / (time.time() - tic_train)))
                     tic_eval = time.time()
 
-                    evaluate(args.task_name, model, loss_fct, metric,
-                             dev_data_loader)
+                    acc = evaluate(args.task_name, model, loss_fct, metric,
+                                   dev_data_loader)
                     print("eval done total : %s s" % (time.time() - tic_eval))
                 tic_train = time.time()
+
+            if i % args.save_steps == 0:
+                paddle.save(
+                    model.state_dict(),
+                    os.path.join(args.output_dir,
+                                 "step_" + str(global_step) + ".pdparams"))
+                paddle.save(optimizer.state_dict(),
+                            os.path.join(args.output_dir,
+                                         "step_" + str(global_step) + ".pdopt"))
             global_step += 1
 
 
 if __name__ == '__main__':
-    paddle.seed(2021)
     args = parse_args()
     print(args)
-
+    paddle.seed(args.seed)
     do_train(args)
