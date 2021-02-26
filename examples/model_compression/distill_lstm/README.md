@@ -34,7 +34,7 @@
 另外，本项目还依赖paddlenlp，可以使用下面的命令进行安装：
 
 ```shell
-pip install paddlenlp==2.0.0rc
+pip install paddlenlp\>=2.0rc
 ```
 
 ## 数据、预训练模型介绍及获取
