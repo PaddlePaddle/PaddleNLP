@@ -169,7 +169,7 @@ def predict(args, sentences=[], paths=[]):
         input_tensor.copy_from_cpu(sen)
         #input_tensor.copy_from_cpu(fake_input.copy())
 
-        # run 运行predictor
+        # run predictor
         predictor.zero_copy_run()
 
         # get output name

@@ -20,15 +20,23 @@
 
 ## 2. 数据准备
 ### 2.1 建议的预训练数据
-论文中提到预训练需要BookCorpus数据（英文文本），但是当前BookCorpus数据已不再开源，可以使用其它数据替代，只要是纯英文文本数据，utf-8编码即可。
+论文中提到预训练需要两部分数据：Book Corpus数据 和 Wikipedia Corpus数据，均为英文文本，utf-8编码。但是当前BookCorpus数据已不再开源，可以使用其它数据替代，只要是纯英文文本数据，utf-8编码即可。
 例如[Gutenberg Dataset](https://web.eecs.umich.edu/~lahiri/gutenberg_dataset.html)
-下面例子假设数据在./BookCorpus/，数据文件为纯文本train.data
+。另外，Wikipedia Corpus数据建议从[官方获取](https://www.english-corpora.org/wiki/)，下面例子假设这些数据都已获取并都放在./BookCorpus/train.data 文件中，每行一句英文文本
 
 ### 2.2 自定义预训练数据
-支持用户自定义数据进行训练，自定义数据为文本形式，每行一句英文文本，utf-8编码，下面例子假设数据在./BookCorpus/，数据文件为纯文本train.data
+支持用户自定义数据进行训练，自定义数据为文本形式，每行一句英文文本，utf-8编码，下面例子假设数据在./BookCorpus/train.data
+
+### 2.3 Fine-tuning数据
+Fine-tuning 使用GLUE数据，这部分Paddle已提供，在执行第4章 Fine-tuning 命令时会自动下载并加载
+
+### 2.4 推理数据
+可以使用GLUE test数据集（Paddle已提供，在Fine-tuning时会自动下载），或者也可以自定义，格式要求和2.2 自定义预训练数据一样，每行一句英文文本，utf-8编码
 
 ## 3. 模型预训练
 如下所有命令均假设在 **PaddleNLP/examples/language_model/electra/** 下执行，包括预训练、Fine-tuning 和 推理部署的命令
+
+**特别注意**：预训练模型如果想要达到较好的效果，需要训练几乎全量的Book Corpus数据 和 Wikipedia Corpus数据，原始文本接近20G，使用CPU训练时间很长，建议用GPU进行预训练，最好4片GPU以上。如果资源较少，Paddle提供已经预训练好的模型进行Fine-tuning，可以直接跳转到下面 4.2.1 一节：使用Paddle提供的预训练模型运行 Fine-tuning
 ### 3.1 单机单卡
 ```shell
 export CUDA_VISIBLE_DEVICES="0"
