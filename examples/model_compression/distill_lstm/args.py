@@ -113,6 +113,12 @@ def parse_args():
         help="Directory to save models .")
 
     parser.add_argument(
+        "--init_from_ckpt",
+        type=str,
+        default=None,
+        help="The path of layer and optimizer to be loaded.")
+
+    parser.add_argument(
         "--whole_word_mask",
         action="store_true",
         help="If True, use whole word masking method in data augmentation in distilling."
@@ -142,6 +148,12 @@ def parse_args():
         default=2021,
         help="Random seed for model parameter initialization, data augmentation and so on."
     )
+
+    parser.add_argument(
+        "--select_device",
+        default="gpu",
+        choices=["gpu", "cpu", "xpu"],
+        help="Device selected for inference.")
 
     args = parser.parse_args()
     return args

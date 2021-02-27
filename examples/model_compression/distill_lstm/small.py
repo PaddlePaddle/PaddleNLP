@@ -136,6 +136,7 @@ def evaluate(task_name, model, loss_fct, metric, data_loader):
 
 
 def do_train(args):
+    device = paddle.set_device(args.select_device)
     metric_class = TASK_CLASSES[args.task_name][1]
     metric = metric_class()
     if args.task_name == 'qqp':
@@ -164,6 +165,11 @@ def do_train(args):
     else:
         optimizer = paddle.optimizer.Adam(
             learning_rate=args.lr, parameters=model.parameters())
+
+    if args.init_from_ckpt:
+        model.set_state_dict(paddle.load(args.init_from_ckpt + ".pdparams"))
+        optimizer.set_state_dict(paddle.load(args.init_from_ckpt + ".pdopt"))
+        print("Loaded checkpoint from %s" % args.init_from_ckpt)
 
     global_step = 0
     tic_train = time.time()
