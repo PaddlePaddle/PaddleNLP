@@ -1,6 +1,6 @@
 # PaddleNLP 应用示例
 
-[**PaddleNLP**](https://github.com/PaddlePaddle/models/tree/develop/PaddleNLP) 是基于 PaddlePaddle 深度学习框架开发的自然语言处理 (NLP) 工具，算法，模型和数据的开源项目。百度在 NLP 领域十几年的深厚积淀为 PaddleNLP 提供了强大的核心动力。PaddleNLP 提供较为丰富的模型库，基本涵盖了主流的NLP任务，因为模型库中使用了PaddleNLP提供的基础NLP工具，例如数据集处理，高层API，使得模型库的算法简洁易懂。下面是 PaddleNLP 支持任务的具体信息，涵盖了 **NLP基础技术**, **NLP核心技术**, **NLP系统应用**三大领域。同时随着NLP序列建模技术的成熟，我们还提供了更多的基于NLP序列建模技术的应用场景。
+[**PaddleNLP**](https://github.com/PaddlePaddle/models/tree/develop/PaddleNLP) 是基于 PaddlePaddle 深度学习框架开发的自然语言处理 (NLP) 工具，算法，模型和数据的开源项目。百度在 NLP 领域十几年的深厚积淀为 PaddleNLP 提供了强大的核心动力。PaddleNLP 提供较为丰富的模型库，基本涵盖了主流的NLP任务，因为模型库中使用了PaddleNLP提供的基础NLP工具，例如数据集处理，高层API，使得模型库的算法简洁易懂。下面是 PaddleNLP 支持任务的具体信息，涵盖了 **[NLP基础技术](#nlp基础技术) **[NLP核心技术](#nlp核心技术) **[NLP系统应用](#nlp系统应用)三大领域。同时随着NLP序列建模技术的成熟，我们还提供了更多的基于NLP序列建模技术的应用场景如[蛋白质二级结构预测](#蛋白质二级结构预测-protein-secondary-structure-prediction)以及进阶的[模型压缩](#模型压缩-model-compression)应用示例。
 
 ## NLP基础技术
 
@@ -126,3 +126,12 @@
 | 模型     | 简介    |
 | -------- | ------- |
 | [TAPE](https://arxiv.org/abs/1906.08230) | 借鉴自然语言处理中对大量未标记的序列使用自监督学习的方式进行预训练（如Transformer, LSTM等序列建模结构），从而提取蛋白质中有用的生物学信息，并将这些信息迁移到其他带标签的任务，使得这些任务训练更快更稳定的收敛。更多详情可以参考[PaddleHelix蛋白质预训练模型](https://github.com/PaddlePaddle/PaddleHelix/blob/dev/apps/pretrained_protein/tape/README_cn.md#%E5%BA%8F%E5%88%97%E6%A8%A1%E5%9E%8B)|
+
+## 进阶用法
+
+### 模型压缩 (Model Compression)
+
+| 模型     | 简介    |
+| -------- | ------- |
+| [Distill-LSTM](./model_compression/distill_lstm/) | 基于[Distilling Task-Specific Knowledge from BERT into Simple Neural Networks](https://arxiv.org/abs/1903.12136)论文策略的实现，将BERT中英文分类的下游模型知识通过蒸馏的方式迁移至LSTM的小模型结构中，取得比LSTM单独训练更好的效果。|
+| [OFA-BERT](./model_compression/ofa/) | 基于PaddleSlim Once-For-ALL(OFA)策略对BERT在GLUE任务上下游模型进行压缩，在精度无损的情况下参数量减少33%。 |
