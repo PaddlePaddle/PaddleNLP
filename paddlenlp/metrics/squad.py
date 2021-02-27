@@ -21,8 +21,6 @@ import numpy as np
 import os
 import math
 
-from tqdm.auto import tqdm
-
 
 def compute_prediction(examples,
                        features,
@@ -79,7 +77,7 @@ def compute_prediction(examples,
     scores_diff_json = collections.OrderedDict()
 
     # Let's loop over all the examples!
-    for example_index, example in enumerate(tqdm(examples)):
+    for example_index, example in enumerate(examples):
         # Those are the indices of the features associated to the current example.
         feature_indices = features_per_example[example_index]
 
