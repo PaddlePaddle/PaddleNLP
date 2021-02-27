@@ -71,6 +71,7 @@ def evaluate(task_name, model, metric, data_loader):
 
 
 def do_train(agrs):
+    device = paddle.set_device(args.select_device)
     train_data_loader, dev_data_loader = create_distill_loader(
         args.task_name,
         model_name=args.model_name,
@@ -104,6 +105,11 @@ def do_train(agrs):
         model_name=args.model_name, param_path=args.teacher_path)
 
     print("Start to distill student model.")
+
+    if args.init_from_ckpt:
+        model.set_state_dict(paddle.load(args.init_from_ckpt + ".pdparams"))
+        optimizer.set_state_dict(paddle.load(args.init_from_ckpt + ".pdopt"))
+        print("Loaded checkpoint from %s" % args.init_from_ckpt)
 
     global_step = 0
     tic_train = time.time()
