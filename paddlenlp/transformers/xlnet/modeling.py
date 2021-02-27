@@ -1,6 +1,5 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 Google AI, Google Brain and Carnegie Mellon University Authors and the HuggingFace Inc. team.
-# Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,13 +25,12 @@ from .. import PretrainedModel, register_base_model
 __all__ = [
     "XLNetModel",
     "XLNetPretrainedModel",
-    "XLNetLMHeadModel",
     "XLNetClassificationHead",
     "XLNetForSequenceClassification",
     "XLNetForTokenClassification",
 ]
 
-dtype_float = 'float32'
+dtype_float = paddle.get_default_dtype()
 
 
 def get_activation(activation_string):
@@ -128,6 +126,7 @@ class XLNetRelativeAttention(Layer):
 
     @staticmethod
     def rel_shift_bnij(x, klen=-1):
+        # relative shift of the attention matrix from bd~ to bd (refer to Appendix B in the Transformer-XL paper)
         x_size = x.shape
 
         x = paddle.reshape(x, [x_size[0], x_size[1], x_size[3], x_size[2]])
@@ -229,23 +228,23 @@ class XLNetRelativeAttention(Layer):
             # Content-based key head
             # Compute k_head_h = einsum4x4("ibh,h(n*d)->ibnd", cat, self.k)
             k_head_h = paddle.matmul(cat, self.k)
-            k_head_h = paddle.reshape(k_head_h, shape=[h.shape[0], h.shape[1], self.n_head, self.d_head])
+            k_head_h = paddle.reshape(k_head_h, shape=[cat.shape[0], cat.shape[1], self.n_head, self.d_head])
 
             # Content-based value head
             # Compute v_head_h = einsum4x4("ibh,h(n*d)->ibnd", cat, self.v)
             v_head_h = paddle.matmul(cat, self.v)
-            v_head_h = paddle.reshape(v_head_h, shape=[h.shape[0], h.shape[1], self.n_head, self.d_head])
+            v_head_h = paddle.reshape(v_head_h, shape=[cat.shape[0], cat.shape[1], self.n_head, self.d_head])
 
             # Position-based key head
             # Compute k_head_r = einsum4x4("ibh,h(n*d)->ibnd", r, self.r)
             k_head_r = paddle.matmul(r, self.r)
-            k_head_r = paddle.reshape(k_head_r, shape=[h.shape[0], h.shape[1], self.n_head, self.d_head])
+            k_head_r = paddle.reshape(k_head_r, shape=[cat.shape[0], cat.shape[1], self.n_head, self.d_head])
 
             # h-stream
             # Content-stream query head
             # Compute q_head_h = einsum4x4("ibh,h(n*d)->ibnd", h, self.q)
             q_head_h = paddle.matmul(h, self.q)  # shape
-            q_head_h = paddle.reshape(q_head_h, shape=[h.shape[0], h.shape[1], self.n_head, self.d_head])
+            q_head_h = paddle.reshape(q_head_h, shape=[cat.shape[0], cat.shape[1], self.n_head, self.d_head])
 
             # core attention ops
             attn_vec_h = self.rel_attn_core(
@@ -508,6 +507,8 @@ class XLNetPretrainedModel(PretrainedModel):
         "model_state": {
             "xlnet-base-cased":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-base-cased.pdparams",
+            "xlnet-large-cased":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-large-cased.pdparams",
         }
     }
     base_model_prefix = "xlnet"
@@ -923,151 +924,6 @@ class XLNetModel(XLNetPretrainedModel):
                 "mems": new_mems,
                 "hidden_states": hidden_states,
                 "attentions": attentions,
-                }
-
-
-class XLNetLMHeadModel(XLNetPretrainedModel):
-    def __init__(self,
-                 mem_len,
-                 reuse_len,
-                 d_model,
-                 same_length,
-                 attn_type,
-                 bi_data,
-                 clamp_len,
-                 n_layer,
-                 vocab_size,
-                 dropout,
-                 n_head,
-                 d_head,
-                 layer_norm_eps,
-                 d_inner,
-                 ff_activation,):
-        super(XLNetLMHeadModel, self).__init__()
-
-        self.attn_type = attn_type
-        self.same_length = same_length
-
-        self.transformer = XLNetModel(mem_len,
-                                      reuse_len,
-                                      d_model,
-                                      same_length,
-                                      attn_type,
-                                      bi_data,
-                                      clamp_len,
-                                      n_layer,
-                                      vocab_size,
-                                      dropout,
-                                      n_head,
-                                      d_head,
-                                      layer_norm_eps,
-                                      d_inner,
-                                      ff_activation,)
-        self.lm_loss = nn.Linear(d_model, vocab_size)
-        self.init_weights()
-
-    def get_output_embeddings(self):
-        return self.lm_loss
-
-    def set_output_embeddings(self, new_embeddings):
-        self.lm_loss = new_embeddings
-
-    def prepare_inputs_for_generation(self, input_ids, past=None, use_mems_train=False, use_mems_eval=False, **kwargs):
-        # Add dummy token at the end (no attention on this one)
-
-        effective_batch_size = input_ids.shape[0]
-        dummy_token = paddle.zeros((effective_batch_size, 1), dtype='int64')
-
-        # At every pass, the attention values for the new token and the two last generated tokens
-        # are computed, the rest is reloaded from the `past` cache. A purely auto-regressive model would have
-        # offset = 1; offset = 2 seems to have slightly better computation.
-        offset = 2
-
-        if past:
-            input_ids = paddle.concat([input_ids[:, -offset:], dummy_token], axis=1)
-        else:
-            input_ids = paddle.concat([input_ids, dummy_token], axis=1)
-
-        # Build permutation mask so that previous tokens don't see last token
-        sequence_length = input_ids.shape[1]
-        perm_mask = paddle.zeros(
-            (effective_batch_size, sequence_length, sequence_length), dtype=dtype_float
-        )
-        perm_mask[:, :, -1] = 1.0
-
-        # We'll only predict the last token
-        target_mapping = paddle.zeros(
-            (effective_batch_size, 1, sequence_length), dtype=dtype_float
-        )
-        target_mapping[:, 0, -1] = 1.0
-
-        inputs = {
-            "input_ids": input_ids,
-            "perm_mask": perm_mask,
-            "target_mapping": target_mapping,
-            "use_mems_train": use_mems_train,
-            "use_mems_eval": use_mems_eval,
-        }
-
-        # if past is defined in model kwargs then use it for faster decoding
-        if past:
-            inputs["mems"] = tuple(layer_past[:-offset, :, :] for layer_past in past)
-
-        return inputs
-
-    def forward(
-        self,
-        input_ids=None,
-        token_type_ids=None,
-        attention_mask=None,
-        mems=None,
-        perm_mask=None,
-        target_mapping=None,
-        input_mask=None,
-        head_mask=None,
-        inputs_embeds=None,
-        labels=None,
-        use_mems_train=False,
-        use_mems_eval=False,
-        output_attentions=False,
-        output_hidden_states=False,
-        return_dict=False,
-    ):
-
-        transformer_outputs = self.transformer(
-            input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask,
-            mems=mems,
-            perm_mask=perm_mask,
-            target_mapping=target_mapping,
-            input_mask=input_mask,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
-            use_mems_train=use_mems_train,
-            use_mens_eval=use_mems_eval,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
-
-        logits = self.lm_loss(transformer_outputs[0])
-
-        loss = None
-        if labels is not None:
-            # Flatten the tokens
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(logits.reshape([-1, logits.shape[-1]]), labels.reshape([-1]))
-
-        if not return_dict:
-            output = (logits,) + transformer_outputs[1:]
-            return ((loss,) + output) if loss is not None else output
-
-        return {"loss": loss,
-                "logits": logits,
-                "mems": transformer_outputs.mems,
-                "hidden_states": transformer_outputs.hidden_states,
-                "attentions": transformer_outputs.attentions,
                 }
 
 

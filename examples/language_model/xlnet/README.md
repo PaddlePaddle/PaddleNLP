@@ -36,7 +36,6 @@ GLUE评测任务所含数据集已在paddlenlp中以API形式提供，无需预�
 
 ```shell
 python -u ./run_glue.py \
-    --model_type xlnet \
     --model_name_or_path xlnet-base-cased \
     --task_name SST-2 \
     --max_seq_length 128 \
@@ -50,7 +49,6 @@ python -u ./run_glue.py \
 ```
 
 其中参数释义如下：
-- `model_type` 指示了模型类型，使用XLNet模型时设置为xlnet即可。
 - `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
 - `task_name` 表示Fine-tuning的任务。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
@@ -62,7 +60,7 @@ python -u ./run_glue.py \
 - `output_dir` 表示模型保存路径。
 - `n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可。
 
-##### 基于`xlnet-base-cased`在GLUE各评测任务上Fine-tuning后，在验证集上有如下结果：
+基于`xlnet-base-cased`在GLUE各评测任务上Fine-tuning后，在验证集上有如下结果：
 
 | Task  | Metric                       | Result             |     
 |:-----:|:----------------------------:|:------------------:|

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import argparse
 import os
 import random
@@ -23,16 +22,14 @@ import numpy as np
 import paddle
 from paddle.io import DataLoader
 from paddle.metric import Accuracy
+
 from paddlenlp.datasets import GlueCoLA, GlueSST2, GlueMRPC, GlueSTSB, GlueQQP, GlueMNLI, GlueQNLI, GlueRTE
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers.xlnet.modeling import XLNetForSequenceClassification
+from paddlenlp.transformers.xlnet.modeling import XLNetPretrainedModel, XLNetForSequenceClassification
 from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 
-FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
 final_res = "Not evaluated yet!"
 
 TASK_CLASSES = {
@@ -44,10 +41,6 @@ TASK_CLASSES = {
     "mnli": (GlueMNLI, Accuracy),
     "qnli": (GlueQNLI, Accuracy),
     "rte": (GlueRTE, Accuracy),
-}
-
-MODEL_CLASSES = {
-    "xlnet": (XLNetForSequenceClassification, XLNetTokenizer),
 }
 
 
@@ -64,24 +57,12 @@ def parse_args():
         ", ".join(TASK_CLASSES.keys()), )
 
     parser.add_argument(
-        "--model_type",
-        default=None,
-        type=str,
-        required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
-
-    parser.add_argument(
         "--model_name_or_path",
         default=None,
         type=str,
         required=True,
         help="Path to pre-trained model or shortcut name selected in the list: "
-        + ", ".join(
-            sum([
-                list(classes[-1].pretrained_init_configuration.keys())
-                for classes in MODEL_CLASSES.values()
-            ], [])), )
+        + ", ".join(XLNetPretrainedModel.pretrained_init_configuration.keys()), )
 
     parser.add_argument(
         "--output_dir",
@@ -264,27 +245,16 @@ def convert_example(example,
             label = label_map[label]
         label = np.array([label], dtype=label_dtype)
 
-    # tokenize raw text
-    tokens_raw = [tokenizer(l) for l in example]
-    # truncate to the truncate_length,
-    tokens_trun = _truncate_seqs(tokens_raw, max_seq_length)
-    
-    # concat the sequences with special tokens
-    tokens, segment_ids, p_mask = _concat_seqs(tokens_trun, [[tokenizer.sep_token]] * len(tokens_trun))
-    tokens = tokens + [tokenizer.cls_token]
-    segment_ids = segment_ids + [2]
-    
-    # convert the token to ids
-    input_ids = tokenizer.convert_tokens_to_ids(tokens)
-    valid_length = len(input_ids)
-
-    # The mask has 1 for real tokens and 0 for padding tokens. Only real
-    # tokens are attended to.
-    attention_mask = [1] * len(input_ids)
-    if not is_test:
-        return input_ids, segment_ids, attention_mask, valid_length, label
+    # Tokenize raw text
+    if len(example) == 1:
+        example = tokenizer(example[0], max_seq_len=max_seq_length, return_input_mask=True)
     else:
-        return input_ids, segment_ids, attention_mask, valid_length
+        example = tokenizer(example[0], text_pair=example[1], max_seq_len=max_seq_length, return_input_mask=True)
+
+    if not is_test:
+        return example['input_ids'], example['segment_ids'], example['input_mask'], len(example['input_ids']), label
+    else:
+        return example['input_ids'], example['segment_ids'], example['input_mask'], len(example['input_ids'])
 
 
 def do_train(args):
@@ -297,8 +267,7 @@ def do_train(args):
 
     args.task_name = args.task_name.lower()
     dataset_class, metric_class = TASK_CLASSES[args.task_name]
-    args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    model_class, tokenizer_class = XLNetForSequenceClassification, XLNetTokenizer
 
     train_dataset = dataset_class.get_datasets(["train"])
 
@@ -367,7 +336,7 @@ def do_train(args):
             return_list=True)
 
     num_classes = 1 if train_dataset.get_labels() is None else len(train_dataset.get_labels())
-    model = model_class.from_pretrained(
+    model = XLNetForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
 
     if paddle.distributed.get_world_size() > 1:
