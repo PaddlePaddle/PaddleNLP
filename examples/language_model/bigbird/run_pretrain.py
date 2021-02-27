@@ -33,6 +33,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import BigBirdForPretraining, BigBirdModel, BigBirdPretrainingCriterion
 from paddlenlp.transformers import BigBirdTokenizer, LinearDecayWithWarmup, create_bigbird_rand_mask_idx_list
 from paddlenlp.utils.log import logger
+import time
 
 MODEL_CLASSES = {"bigbird": (BigBirdForPretraining, BigBirdTokenizer), }
 
@@ -220,93 +221,14 @@ class PretrainingDataset(Dataset):
         self.mask_prob = mask_prob
         self.random_prob = random_prob
 
-    def _pretrain_masking(self, subtokens):
-        end_pos = self.max_encoder_length - 2 + np.random.randint(
-            max(1, len(subtokens) - self.max_encoder_length - 2))
-        start_pos = max(0, end_pos - self.max_encoder_length + 2)
-        subtokens = np.array(subtokens[start_pos:end_pos])
-
-        word_begin_mark = self.word_start_subtoken[subtokens]
-        word_begins_pos = np.flatnonzero(word_begin_mark).astype(np.int32)
-        if word_begins_pos.size == 0:
-            # if no word boundary present, we do not do whole word masking
-            # and we fall back to random masking.
-            word_begins_pos = np.arange(len(subtokens), dtype=np.int32)
-            word_begin_mark = np.logical_not(word_begin_mark)
-        correct_start_pos = word_begins_pos[0]
-        subtokens = subtokens[correct_start_pos:]
-        word_begin_mark = word_begin_mark[correct_start_pos:]
-        word_begins_pos = word_begins_pos - correct_start_pos
-        num_tokens = len(subtokens)
-
-        words = np.split(
-            np.arange(
-                num_tokens, dtype=np.int32), word_begins_pos)[1:]
-        assert len(words) == len(word_begins_pos)
-
-        num_to_predict = min(
-            self.max_predictions_per_seq,
-            max(1, int(round(len(word_begins_pos) * self.masked_lm_prob))))
-        masked_lm_positions = np.concatenate(
-            np.random.choice(
-                np.array(
-                    [[]] + words, dtype=np.object)[1:],
-                num_to_predict,
-                replace=False),
-            0)
-
-        if len(masked_lm_positions) > self.max_predictions_per_seq:
-            masked_lm_positions = masked_lm_positions[:self.
-                                                      max_predictions_per_seq +
-                                                      1]
-            # however last word can cross word boundaries, remove crossing words
-            truncate_masking_at = np.flatnonzero(word_begin_mark[
-                masked_lm_positions])[-1]
-            masked_lm_positions = masked_lm_positions[:truncate_masking_at]
-
-        masked_lm_positions = np.sort(masked_lm_positions)
-        masked_lm_ids = subtokens[masked_lm_positions]
-
-        randomness = np.random.rand(len(masked_lm_positions))
-
-        mask_index = masked_lm_positions[randomness < self.mask_prob]
-        random_index = masked_lm_positions[randomness > (1 - self.random_prob)]
-
-        subtokens[mask_index] = self.mask_val  # id of masked token
-        subtokens[random_index] = np.random.randint(  # ignore special tokens
-            101,
-            self.vocab_size,
-            len(random_index),
-            dtype=np.int32)
-
-        subtokens = np.concatenate([
-            np.array(
-                [self.cls_val], dtype=np.int32), subtokens, np.array(
-                    [self.sep_val], dtype=np.int32)
-        ])
-
-        # pad everything to correct shape
-        pad_inp = self.max_encoder_length - num_tokens - 2
-        subtokens = np.pad(subtokens, [0, pad_inp], "constant")
-
-        pad_out = self.max_predictions_per_seq - len(masked_lm_positions)
-        masked_lm_weights = np.pad(np.ones_like(
-            masked_lm_positions, dtype=np.float32), [0, pad_out],
-                                   "constant")
-        masked_lm_positions = np.pad(masked_lm_positions + 1, [0, pad_out],
-                                     "constant")
-        masked_lm_ids = np.pad(masked_lm_ids, [0, pad_out], "constant")
-
-        return subtokens, masked_lm_positions, masked_lm_ids, masked_lm_weights
-
     def __getitem__(self, index):
         # [input_ids, label]
         line = self.lines[index].rstrip()
         # numpy_mask
-        subtokens = self.tokenizer.convert_tokens_to_ids(self.tokenizer(line))
-
-        subtokens, masked_lm_positions, masked_lm_ids, masked_lm_weights = \
-                self._pretrain_masking(subtokens)
+        subtokens, masked_lm_positions, masked_lm_ids, masked_lm_weights = self.tokenizer.encode(
+            line,
+            max_seq_len=self.max_encoder_length,
+            max_pred_len=self.max_predictions_per_seq)
         return [
             subtokens, np.zeros_like(subtokens), masked_lm_positions,
             masked_lm_ids, masked_lm_weights, np.zeros(
@@ -330,7 +252,7 @@ def create_dataloader(input_file, tokenizer, worker_init, batch_size,
         num_fields = len(data[0])
         out = [None] * num_fields
 
-        for i in [0, 1, 4, 5]:
+        for i in [0, 1, 5]:
             out[i] = stack_fn([x[i] for x in data])
         batch_size, seq_length = out[0].shape
         size = num_mask = sum(len(x[2]) for x in data)
@@ -339,12 +261,15 @@ def create_dataloader(input_file, tokenizer, worker_init, batch_size,
         out[2] = np.full(size, 0, dtype=np.int32)
         # masked_lm_labels
         out[3] = np.full([size, 1], -1, dtype=np.int64)
+        # masked weight
+        out[4] = np.full([size], 0, dtype="float32")
         # # Organize as a 1D tensor for gather or use gather_nd
         mask_token_num = 0
         for i, x in enumerate(data):
             for j, pos in enumerate(x[2]):
                 out[2][mask_token_num] = i * seq_length + pos
                 out[3][mask_token_num] = x[3][j]
+                out[4][mask_token_num] = x[4][j]
                 mask_token_num += 1
         out.append(np.asarray([mask_token_num], dtype=np.float32))
         return out
