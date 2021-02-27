@@ -67,7 +67,10 @@ def load_dataset(name, data_files=None, splits=None, lazy=None):
         ) or (
             isinstance(data_files, tuple) and isinstance(data_files[0], str)
         ), "`data_files` should be a string or list of string or a tuple of string."
-        datasets += reader_instance.read_datasets(data_files)
+        if isinstance(data_files, str):
+            datasets += reader_instance.read_datasets([data_files])
+        else:
+            datasets += reader_instance.read_datasets(data_files)
 
     if splits:
         assert isinstance(splits, str) or (
@@ -75,9 +78,12 @@ def load_dataset(name, data_files=None, splits=None, lazy=None):
         ) or (
             isinstance(splits, tuple) and isinstance(splits[0], str)
         ), "`splits` should be a string or list of string or a tuple of string."
-        datasets += reader_instance.read_datasets(splits)
+        if isinstance(splits, str):
+            datasets += reader_instance.read_datasets([splits])
+        else:
+            datasets += reader_instance.read_datasets(splits)
 
-    return datasets
+    return datasets if len(datasets) > 1 else datasets[0]
 
 
 @classmethod
