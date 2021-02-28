@@ -4,10 +4,17 @@ import argparse
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--data_path",
+        "--train_file",
         type=str,
+        required=False,
         default=None,
-        help="Directory of all the data for train, valid, test.")
+        help="Train data path.")
+    parser.add_argument(
+        "--predict_file",
+        type=str,
+        required=False,
+        default=None,
+        help="Predict data path.")
     parser.add_argument(
         "--model_type",
         default=None,
@@ -123,6 +130,9 @@ def parse_args():
         action='store_true',
         help="If true, the SQuAD examples contain some that do not have an answer. If using squad v2.0, it should be set true."
     )
-
+    parser.add_argument(
+        "--do_train", action='store_true', help="Whether to train the model.")
+    parser.add_argument(
+        "--do_pred", action='store_true', help="Whether to predict.")
     args = parser.parse_args()
     return args
