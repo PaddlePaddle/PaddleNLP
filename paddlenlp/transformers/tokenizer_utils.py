@@ -922,7 +922,12 @@ class PretrainedTokenizer(object):
 
                 token_start_offset = 0
                 for token in token_ids:
-                    sub_tokens = self._tokenize(token)
+                    sub_tokens = []
+                    for basic_token in self.basic_tokenizer.tokenize(token):
+                        for sub_token in self.wordpiece_tokenizer.tokenize(
+                                basic_token):
+                            sub_tokens.append(sub_token if sub_token !=
+                                              self.unk_token else basic_token)
                     for i in range(len(sub_tokens)):
                         if i == len(sub_tokens) - 1:
                             token_ids_offset_mapping.append(
@@ -939,7 +944,12 @@ class PretrainedTokenizer(object):
 
                 token_start_offset = 0
                 for token in token_pair_ids:
-                    sub_tokens = self._tokenize(token)
+                    sub_tokens = []
+                    for basic_token in self.basic_tokenizer.tokenize(token):
+                        for sub_token in self.wordpiece_tokenizer.tokenize(
+                                basic_token):
+                            sub_tokens.append(sub_token if sub_token !=
+                                              self.unk_token else basic_token)
                     for i in range(len(sub_tokens)):
                         if i == len(sub_tokens) - 1:
                             token_pair_ids_offset_mapping.append(

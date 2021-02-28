@@ -28,8 +28,7 @@ def compute_prediction(examples,
                        version_2_with_negative: bool=False,
                        n_best_size: int=20,
                        max_answer_length: int=30,
-                       null_score_diff_threshold: float=0.0,
-                       is_whitespace_splited=True):
+                       null_score_diff_threshold: float=0.0):
     """
     Post-processes the predictions of a question-answering model to convert them to answers that are substrings of the
     original contexts. This is the base postprocessing functions for models that only return start and end logits.
