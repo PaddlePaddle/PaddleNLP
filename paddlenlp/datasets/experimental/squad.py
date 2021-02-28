@@ -54,6 +54,8 @@ class SQuAD(DatasetBuilder):
                 for qa in paragraph["qas"]:
                     qas_id = qa["id"]
                     question = qa["question"].strip()
+                    answer_starts = []
+                    answers = []
                     is_impossible = False
 
                     if "is_impossible" in qa.keys():
