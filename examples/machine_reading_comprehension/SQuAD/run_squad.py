@@ -114,7 +114,7 @@ def run(args):
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
         # in one example possible giving several features when a context is long, each of those features having a
         # context that overlaps a bit the context of the previous feature.
-
+        #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
         contexts = [examples[i]['context'] for i in range(len(examples))]
         questions = [examples[i]['question'] for i in range(len(examples))]
 
@@ -124,18 +124,14 @@ def run(args):
             stride=args.doc_stride,
             max_seq_len=args.max_seq_length)
 
-        # Since one example might give us several features if it has a long context, we need a map from a feature to
-        # its corresponding example. This key gives us just that.
-
-        # The offset mappings will give us a map from token to character position in the original context. This will
-        # help us compute the start_positions and end_positions.
-
         # Let's label those examples!
-
         for i, tokenized_example in enumerate(tokenized_examples):
             # We will label impossible answers with the index of the CLS token.
             input_ids = tokenized_example["input_ids"]
             cls_index = input_ids.index(tokenizer.cls_token_id)
+
+            # The offset mappings will give us a map from token to character position in the original context. This will
+            # help us compute the start_positions and end_positions.
             offsets = tokenized_example['offset_mapping']
 
             # Grab the sequence corresponding to that example (to know what is the context and what is the question).
@@ -145,8 +141,8 @@ def run(args):
             sample_index = tokenized_example['overflow_to_sample']
             answers = examples[sample_index]['answers']
             answer_starts = examples[sample_index]['answer_starts']
-            # If no answers are given, set the cls_index as answer.
 
+            # If no answers are given, set the cls_index as answer.
             if len(answer_starts) == 0:
                 tokenized_examples[i]["start_positions"] = cls_index
                 tokenized_examples[i]["end_positions"] = cls_index
@@ -274,6 +270,7 @@ def run(args):
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
         # in one example possible giving several features when a context is long, each of those features having a
         # context that overlaps a bit the context of the previous feature.
+        #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
         contexts = [examples[i]['context'] for i in range(len(examples))]
         questions = [examples[i]['question'] for i in range(len(examples))]
 
@@ -283,14 +280,13 @@ def run(args):
             stride=args.doc_stride,
             max_seq_len=args.max_seq_length)
 
-        # Since one example might give us several features if it has a long context, we need a map from a feature to
-        # its corresponding example. This key gives us just that.
+        # For validation, there is no need to compute start and end positions
         for i, tokenized_example in enumerate(tokenized_examples):
             # Grab the sequence corresponding to that example (to know what is the context and what is the question).
             sequence_ids = tokenized_example['segment_ids']
-            sample_index = tokenized_example['overflow_to_sample']
 
             # One example can give several spans, this is the index of the example containing this span of text.
+            sample_index = tokenized_example['overflow_to_sample']
             tokenized_examples[i]["example_id"] = examples[sample_index]['id']
 
             # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token

@@ -213,7 +213,7 @@ def compute_prediction(examples,
 def make_qid_to_has_ans(examples):
     qid_to_has_ans = {}
     for example in examples:
-        qid_to_has_ans[example['id']] = not example['is_impossible']
+        qid_to_has_ans[example['id']] = not example.get('is_impossible', False)
     return qid_to_has_ans
 
 
