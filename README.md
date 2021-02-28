@@ -34,6 +34,8 @@ PaddleNLP 2.0拥有**覆盖多场景的模型库**、**简洁易用的全流程A
 - python >= 3.6
 - paddlepaddle >= 2.0.0
 
+### pip安装
+
 ```
 pip install paddlenlp\>=2.0.0rc
 ```
