@@ -353,7 +353,8 @@ def do_train(args):
                              masked_lm_ids, next_sentence_labels,
                              masked_lm_scale, masked_lm_weights)
             loss.backward()
-            #optimizer.step()
+            optimizer.step()
+            lr_scheduler.step()
             optimizer.clear_gradients()
             if global_steps % args.logging_steps == 0:
                 logger.info(batch)
