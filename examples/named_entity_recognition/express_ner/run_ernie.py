@@ -15,7 +15,7 @@ from functools import partial
 
 import paddle
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import ErnieTokenizer, ErniePretrainedModel, ErnieForTokenClassification
+from paddlenlp.transformers import ErnieTokenizer, ErnieForTokenClassification
 from paddlenlp.metrics import ChunkEvaluator
 
 
@@ -74,13 +74,12 @@ def predict(model, data_loader, ds):
 
 def convert_example(example, tokenizer, label_vocab):
     tokens, labels = example
-    tokens = [tokenizer.cls_token] + tokens + [tokenizer.sep_token]
-    input_ids = tokenizer.convert_tokens_to_ids(tokens)
-    segment_ids = [0] * len(tokens)
-    lens = len(input_ids)
+    tokenized_input = tokenizer(
+        tokens, return_length=True, is_split_into_words=True)
     labels = ['O'] + labels + ['O']
-    labels = [label_vocab[x] for x in labels]
-    return input_ids, segment_ids, lens, labels
+    tokenized_input['labels'] = [label_vocab[x] for x in labels]
+    return tokenized_input['input_ids'], tokenized_input[
+        'segment_ids'], tokenized_input['seq_len'], tokenized_input['labels']
 
 
 def load_dict(dict_path):
@@ -93,7 +92,6 @@ def load_dict(dict_path):
 
 class ExpressDataset(paddle.io.Dataset):
     def __init__(self, data_path):
-        self.word_vocab = load_dict('./conf/word.dic')
         self.label_vocab = load_dict('./conf/tag.dic')
         self.word_ids = []
         self.label_ids = []
@@ -105,7 +103,6 @@ class ExpressDataset(paddle.io.Dataset):
                 labels = labels.split('\002')
                 self.word_ids.append(words)
                 self.label_ids.append(labels)
-        self.word_num = max(self.word_vocab.values()) + 1
         self.label_num = max(self.label_vocab.values()) + 1
 
     def __len__(self):
@@ -123,6 +120,7 @@ if __name__ == '__main__':
     test_ds = ExpressDataset('./data/test.txt')
 
     tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+
     trans_func = partial(
         convert_example, tokenizer=tokenizer, label_vocab=train_ds.label_vocab)
 
@@ -178,4 +176,11 @@ if __name__ == '__main__':
                     './ernie_result/model_%d.pdparams' % step)
 
     preds = predict(model, test_loader, test_ds)
-    print('\n'.join(preds[:10]))
+    file_path = "ernie_results.txt"
+    with open(file_path, "w", encoding="utf8") as fout:
+        fout.write("\n".join(preds))
+    # Print some examples
+    print(
+        "The results have been saved in the file: %s, some examples are shown below: "
+        % file_path)
+    print("\n".join(preds[:10]))
