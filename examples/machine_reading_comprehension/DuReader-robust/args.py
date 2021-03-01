@@ -10,10 +10,18 @@ def parse_args():
         required=True,
         help="The name of the task.")
     parser.add_argument(
-        "--data_path",
+        "--train_file",
         type=str,
+        required=False,
         default=None,
-        help="Directory of all the data for train, valid, test.")
+        help="Train data path.")
+    parser.add_argument(
+        "--predict_file",
+        type=str,
+        required=False,
+        default=None,
+        help="Predict data path.",
+        nargs='+')
     parser.add_argument(
         "--model_type",
         default=None,
@@ -118,6 +126,9 @@ def parse_args():
     )
     parser.add_argument(
         "--verbose", action='store_true', help="Whether to output verbose log.")
-
+    parser.add_argument(
+        "--do_train", action='store_true', help="Whether to train the model.")
+    parser.add_argument(
+        "--do_predict", action='store_true', help="Whether to predict.")
     args = parser.parse_args()
     return args

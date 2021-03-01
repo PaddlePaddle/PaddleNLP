@@ -59,31 +59,10 @@ def load_dataset(name, data_files=None, splits=None, lazy=None):
     reader_cls = import_main_class(module_path)
     reader_instance = reader_cls(lazy)
 
-    datasets = []
+    datasets = reader_instance.read_datasets(
+        data_files=data_files, splits=splits)
 
-    if data_files:
-        assert isinstance(data_files, str) or (
-            isinstance(data_files, list) and isinstance(data_files[0], str)
-        ) or (
-            isinstance(data_files, tuple) and isinstance(data_files[0], str)
-        ), "`data_files` should be a string or list of string or a tuple of string."
-        if isinstance(data_files, str):
-            datasets += reader_instance.read_datasets([data_files])
-        else:
-            datasets += reader_instance.read_datasets(data_files)
-
-    if splits:
-        assert isinstance(splits, str) or (
-            isinstance(splits, list) and isinstance(splits[0], str)
-        ) or (
-            isinstance(splits, tuple) and isinstance(splits[0], str)
-        ), "`splits` should be a string or list of string or a tuple of string."
-        if isinstance(splits, str):
-            datasets += reader_instance.read_datasets([splits])
-        else:
-            datasets += reader_instance.read_datasets(splits)
-
-    return datasets if len(datasets) > 1 else datasets[0]
+    return datasets
 
 
 @classmethod
@@ -343,16 +322,36 @@ class DatasetBuilder:
             self.lazy = lazy
         self.max_examples = max_examples
 
-    def read_datasets(self, path_or_split):
+    def read_datasets(self, splits=None, data_files=None):
         datasets = []
-        for arg in path_or_split:
-            if os.path.exists(arg):
-                datasets.append(self.read(arg))
-            else:
-                root = self._get_data(arg)
-                datasets.append(self.read(root))
+        assert splits or data_files, "`data_files` and `splits` can not both be None."
 
-        return datasets
+        if data_files:
+            assert isinstance(data_files, str) or (
+                isinstance(data_files, list) and isinstance(data_files[0], str)
+            ) or (
+                isinstance(data_files, tuple) and isinstance(data_files[0], str)
+            ), "`data_files` should be a string or list of string or a tuple of string."
+            if isinstance(data_files, str):
+                datasets.append(self.read(data_files))
+            else:
+                datasets += [self.read(data_file) for data_file in data_files]
+
+        if splits:
+            assert isinstance(splits, str) or (
+                isinstance(splits, list) and isinstance(splits[0], str)
+            ) or (
+                isinstance(splits, tuple) and isinstance(splits[0], str)
+            ), "`splits` should be a string or list of string or a tuple of string."
+            if isinstance(splits, str):
+                root = self._get_data(splits)
+                datasets.append(self.read(root))
+            else:
+                for split in splits:
+                    root = self._get_data(split)
+                    datasets.append(self.read(root))
+
+        return datasets if len(datasets) > 1 else datasets[0]
 
     def read(self, root):
         """
