@@ -10,6 +10,8 @@ init_from_pretrain_model: ""
 init_from_params: "./step_final/"  # "./trained_models/step_final/"
 # The directory for saving model
 save_model: "trained_models"
+# The directory for saving inference model 
+inference_model_dir: "infer_model"
 # Set seed for CE or debug
 random_seed: None
 # The file to output the translation results of predict_file to.
@@ -54,7 +56,7 @@ label_smooth_eps: 0.1
 
 # Hyparams for generation:
 # The parameters for beam search.
-beam_size: 4
+beam_size: 5
 max_out_len: 256
 # The number of decoded sentences to output.
 n_best: 1

@@ -1,3 +1,5 @@
+import os
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -20,12 +22,20 @@ class FasterTransformer(TransformerModel):
                  bos_id=0,
                  eos_id=1,
                  beam_size=4,
-                 max_out_len=256):
+                 max_out_len=256,
+                 decoding_lib=None):
+        if decoding_lib is None:
+            raise ValueError(
+                "The args decoding_lib must be set to use Faster Transformer. ")
+        elif not os.path.exists(decoding_lib):
+            raise ValueError("The path to decoding lib is not exist.")
+
         args = dict(locals())
         args.pop("self")
         args.pop("__class__", None)
         self.beam_size = args.pop("beam_size")
         self.max_out_len = args.pop("max_out_len")
+        self.decoding_lib = args.pop("decoding_lib")
         self.dropout = dropout
         self.weight_sharing = weight_sharing
         self.trg_vocab_size = trg_vocab_size
@@ -46,7 +56,8 @@ class FasterTransformer(TransformerModel):
             bos_id=bos_id,
             eos_id=eos_id,
             beam_size=beam_size,
-            max_out_len=max_out_len)
+            max_out_len=max_out_len,
+            decoding_lib=self.decoding_lib)
 
     def forward(self, src_word):
         if self.weight_sharing:

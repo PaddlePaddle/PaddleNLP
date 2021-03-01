@@ -1,3 +1,4 @@
+import os
 import numpy as np
 
 import paddle
@@ -107,9 +108,16 @@ class InferTransformerDecoding(nn.Layer):
                  eos_id=1,
                  beam_size=4,
                  max_out_len=256,
-                 beam_search_diversity_rate=0.0):
+                 beam_search_diversity_rate=0.0,
+                 decoding_lib=None):
+        if decoding_lib is None:
+            raise ValueError(
+                "The args decoding_lib must be set to use Faster Transformer. ")
+        elif not os.path.exists(decoding_lib):
+            raise ValueError("The path to decoding lib is not exist.")
+
         super(InferTransformerDecoding, self).__init__()
-        paddle.utils.load_op_library("../build/lib/libdecoding_op.so")
+        paddle.utils.load_op_library(decoding_lib)
         for arg, value in locals().items():
             if arg not in [
                     "self", "decoder", "word_embedding", "positional_embedding",
