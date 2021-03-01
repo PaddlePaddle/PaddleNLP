@@ -116,6 +116,7 @@ def do_train(agrs):
     for epoch in range(args.max_epoch):
         model.train()
         for i, batch in enumerate(train_data_loader):
+            global_step += 1
             if args.task_name == 'qqp':
                 bert_input_ids, bert_segment_ids, student_input_ids_1, seq_len_1, student_input_ids_2, seq_len_2, labels = batch
             else:
@@ -139,7 +140,7 @@ def do_train(agrs):
             optimizer.step()
             optimizer.clear_grad()
 
-            if i % args.log_freq == 0:
+            if global_step % args.log_freq == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.4f step/s"
                     % (global_step, epoch, i, loss,
@@ -149,7 +150,7 @@ def do_train(agrs):
                 print("eval done total : %s s" % (time.time() - tic_eval))
                 tic_train = time.time()
 
-            if i % args.save_steps == 0:
+            if global_step % args.save_steps == 0:
                 paddle.save(
                     model.state_dict(),
                     os.path.join(args.output_dir,
@@ -157,8 +158,6 @@ def do_train(agrs):
                 paddle.save(optimizer.state_dict(),
                             os.path.join(args.output_dir,
                                          "step_" + str(global_step) + ".pdopt"))
-
-            global_step += 1
 
 
 if __name__ == '__main__':
