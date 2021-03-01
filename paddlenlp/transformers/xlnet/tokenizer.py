@@ -228,6 +228,31 @@ class XLNetTokenizer(PretrainedTokenizer):
             return token_ids_0 + sep + cls
         return token_ids_0 + sep + token_ids_1 + sep + cls
 
+    def build_offset_mapping_with_special_tokens(self,
+                                                 offset_mapping_0,
+                                                 offset_mapping_1=None):
+        """
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
+        A XLNet offset_mapping has the following format:
+        ::
+            - single sequence: ``X (0,0) (0,0)``
+            - pair of sequences: ``A (0,0) B (0,0) (0,0)``
+
+        Args:
+            offset_mapping_0 (:obj:`List[tuple]`):
+                List of char offsets to which the special tokens will be added.
+            offset_mapping_1 (:obj:`List[tuple]`, `optional`):
+                Optional second list of char offsets for offset mapping pairs.
+
+        Returns:
+            :obj:`List[tuple]`: List of char offsets with the appropriate offsets of special tokens.
+        """
+        if offset_mapping_1 is None:
+            return offset_mapping_0 + [(0, 0)] + [(0, 0)]
+
+        return offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)] + [(0, 0)]
+
     def get_special_tokens_mask(
         self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None, already_has_special_tokens: bool = False
     ) -> List[int]:
@@ -291,6 +316,11 @@ class XLNetTokenizer(PretrainedTokenizer):
         return len(token_ids_0 + sep) * [0] + len(token_ids_1 + sep) * [1] + cls_segment_id
 
     def save_resources(self, save_directory):
+        """
+        Save tokenizer related resources to files under `save_directory`.
+        Args:
+            save_directory (str): Directory to save files into.
+        """
         for name, file_name in self.resource_files_names.items():
             save_path = os.path.join(save_directory, file_name)
             if os.path.abspath(self.vocab_file) != os.path.abspath(save_path):

@@ -107,13 +107,23 @@ class XLNetRelativeAttention(Layer):
         self.d_model = d_model
         self.scale = 1 / (d_head ** 0.5)
 
-        for _str in ["q", "k", "v", "o", "r"]:
-            paras = self.create_parameter([self.d_model, self.n_head * self.d_head])
-            exec("self.add_parameter(_str, paras)")
+        q = self.create_parameter([self.d_model, self.n_head * self.d_head])
+        self.add_parameter("q", q)
+        k = self.create_parameter([self.d_model, self.n_head * self.d_head])
+        self.add_parameter("k", k)
+        v = self.create_parameter([self.d_model, self.n_head * self.d_head])
+        self.add_parameter("v", v)
+        o = self.create_parameter([self.d_model, self.n_head * self.d_head])
+        self.add_parameter("o", o)
+        r = self.create_parameter([self.d_model, self.n_head * self.d_head])
+        self.add_parameter("r", r)
 
-        for _str in ["r_r_bias", "r_s_bias", "r_w_bias"]:
-            paras = self.create_parameter([self.n_head, self.d_head], is_bias=True)
-            exec("self.add_parameter(_str, paras)")
+        r_r_bias = self.create_parameter([self.n_head, self.d_head], is_bias=True)
+        self.add_parameter("r_r_bias", r_r_bias)
+        r_s_bias = self.create_parameter([self.n_head, self.d_head], is_bias=True)
+        self.add_parameter("r_s_bias", r_s_bias)
+        r_w_bias = self.create_parameter([self.n_head, self.d_head], is_bias=True)
+        self.add_parameter("r_w_bias", r_w_bias)
 
         seg_embed = self.create_parameter([2, self.n_head, self.d_head], is_bias=False)
         self.add_parameter("seg_embed", seg_embed)
@@ -126,7 +136,7 @@ class XLNetRelativeAttention(Layer):
 
     @staticmethod
     def rel_shift_bnij(x, klen=-1):
-        # relative shift of the attention matrix from bd~ to bd (refer to Appendix B in the Transformer-XL paper)
+        # Relative shift of the attention matrix from bd~ to bd (refer to Appendix B in the Transformer-XL paper)
         x_size = x.shape
 
         x = paddle.reshape(x, [x_size[0], x_size[1], x_size[3], x_size[2]])
@@ -219,7 +229,7 @@ class XLNetRelativeAttention(Layer):
     ):
         if g is not None:
             # Two-stream attention with relative positional encoding.
-            # content based attention score
+            # Content based attention score
             if mems is not None and mems.dim() > 1:
                 cat = paddle.concat([mems, h], axis=0)
             else:
@@ -240,13 +250,13 @@ class XLNetRelativeAttention(Layer):
             k_head_r = paddle.matmul(r, self.r)
             k_head_r = paddle.reshape(k_head_r, shape=[cat.shape[0], cat.shape[1], self.n_head, self.d_head])
 
-            # h-stream
+            # H-stream
             # Content-stream query head
             # Compute q_head_h = einsum4x4("ibh,h(n*d)->ibnd", h, self.q)
             q_head_h = paddle.matmul(h, self.q)  # shape
             q_head_h = paddle.reshape(q_head_h, shape=[cat.shape[0], cat.shape[1], self.n_head, self.d_head])
 
-            # core attention ops
+            # Core attention ops
             attn_vec_h = self.rel_attn_core(
                 q_head_h,
                 k_head_h,
@@ -261,16 +271,16 @@ class XLNetRelativeAttention(Layer):
             if output_attentions:
                 attn_vec_h, attn_prob_h = attn_vec_h
 
-            # post processing
+            # Post processing
             output_h = self.post_attention(h, attn_vec_h)
 
-            # g-stream
-            # query-stream query head
+            # G-stream
+            # Query-stream query head
             # Compute q_head_g = einsum4x4("ibh,hnd->ibnd", g, self.q)
             shape = g.shape
             q_head_g = paddle.matmul(g, self.q).reshape([shape[0], shape[1], self.n_head, self.d_head])
 
-            # core attention ops
+            # Core attention ops
             if target_mapping is not None:
                 # Compute q_head_g = einsum4x4("mbnd,mlb->lbnd", q_head_g, target_mapping)
                 q_head_g = q_head_g.transpose([1, 2, 3, 0])
@@ -310,7 +320,7 @@ class XLNetRelativeAttention(Layer):
                 if output_attentions:
                     attn_vec_g, attn_prob_g = attn_vec_g
 
-            # post processing
+            # Post processing
             output_g = self.post_attention(g, attn_vec_g)
 
             if output_attentions:
@@ -323,9 +333,9 @@ class XLNetRelativeAttention(Layer):
             else:
                 cat = h
 
-            # content heads
+            # Content heads
             # Compute q_head_h = einsum4x4("ibh,hnd->ibnd", h, self.q)
-            q_head_h = paddle.matmul(h, self.q)  # shape
+            q_head_h = paddle.matmul(h, self.q)
             q_head_h = paddle.reshape(q_head_h, shape=[h.shape[0], h.shape[1], self.n_head, self.d_head])
 
             # Compute k_head_h = einsum4x4("ibh,hnd->ibnd", cat, self.k)
@@ -341,7 +351,7 @@ class XLNetRelativeAttention(Layer):
             k_head_r = paddle.matmul(r, self.r)
             k_head_r = paddle.reshape(k_head_r, shape=[k_head_r.shape[0], -1, self.n_head, self.d_head])
 
-            # core attention ops
+            # Core attention ops
             attn_vec = self.rel_attn_core(
                 q_head_h,
                 k_head_h,
@@ -356,7 +366,7 @@ class XLNetRelativeAttention(Layer):
             if output_attentions:
                 attn_vec, attn_prob = attn_vec
 
-            # post processing
+            # Post processing
             output_h = self.post_attention(h, attn_vec)
             output_g = None
 
@@ -653,7 +663,7 @@ class XLNetModel(XLNetPretrainedModel):
         return ret
 
     def cache_mem(self, curr_out, prev_mem):
-        # cache hidden states into memory.
+        # Cache hidden states into memory.
         if self.reuse_len is not None and self.reuse_len > 0:
             curr_out = curr_out[: self.reuse_len]
 
@@ -666,7 +676,7 @@ class XLNetModel(XLNetPretrainedModel):
             # states. This is the preferred setting for training and long-form generation.
             cutoff = -self.mem_len
         if prev_mem is None:
-            # if :obj:`use_mems` is active and `mem_len` is defined, the model
+            # If :obj:`use_mems` is active and `mem_len` is defined, the model
             new_mem = curr_out[cutoff:]
         else:
             new_mem = paddle.concat([prev_mem, curr_out], axis=0)[cutoff:]
@@ -686,7 +696,7 @@ class XLNetModel(XLNetPretrainedModel):
         return pos_emb
 
     def relative_positional_encoding(self, qlen, klen, bsz=None):
-        # create relative positional encoding.
+        # Create relative positional encoding.
         freq_seq = paddle.arange(0, self.d_model, 2.0, dtype=dtype_float)
         inv_freq = 1 / 10000 ** (freq_seq / self.d_model)
 
@@ -766,7 +776,7 @@ class XLNetModel(XLNetPretrainedModel):
         klen = mlen + qlen
 
         # Attention mask
-        # causal attention mask
+        # Causal attention mask
         if self.attn_type == "uni":
             attn_mask = self.create_mask(qlen, mlen)
             attn_mask = paddle.unsqueeze(attn_mask, axis=[2, 3])
@@ -775,7 +785,7 @@ class XLNetModel(XLNetPretrainedModel):
         else:
             raise ValueError("Unsupported attention type: {}".format(self.attn_type))
 
-        # data mask: input mask & perm mask
+        # Data mask: input mask & perm mask
         assert input_mask is None or attention_mask is None, "You can only use one of input_mask (uses 1 for padding) "
         "or attention_mask (uses 0 for padding, added for compatibility with BERT). Please choose one."
         if input_mask is None and attention_mask is not None:
@@ -790,7 +800,7 @@ class XLNetModel(XLNetPretrainedModel):
             data_mask = None
 
         if data_mask is not None:
-            # all mems can be attended to
+            # All mems can be attended to
             if mlen > 0:
                 mems_mask = paddle.cast(paddle.zeros([data_mask.shape[0], mlen, bsz]), dtype=dtype_float)
                 data_mask = paddle.concat([mems_mask, data_mask], axis=1)
@@ -849,9 +859,9 @@ class XLNetModel(XLNetPretrainedModel):
 
         # Prepare head mask if needed
         # 1.0 in head_mask indicate we keep the head
-        # attention_probs has shape bsz x n_heads x N x N
-        # input head_mask has shape [num_heads] or [num_hidden_layers x num_heads] (a head_mask for each layer)
-        # and head_mask is converted to shape [num_hidden_layers x qlen x klen x bsz x n_head]
+        # Attention_probs has shape bsz x n_heads x N x N
+        # Input head_mask has shape [num_heads] or [num_hidden_layers x num_heads] (a head_mask for each layer)
+        # And head_mask is converted to shape [num_hidden_layers x qlen x klen x bsz x n_head]
         if head_mask is not None:
             if head_mask.dim() == 1:
                 head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(0).unsqueeze(0)
@@ -869,7 +879,7 @@ class XLNetModel(XLNetPretrainedModel):
         hidden_states = [] if output_hidden_states else None
         for i, layer_module in enumerate(self.layer):
             if use_mems:
-                # cache new mems
+                # Cache new mems
                 new_mems = new_mems + (self.cache_mem(output_h, mems[i]),)
             if output_hidden_states:
                 hidden_states.append((output_h, output_g) if output_g is not None else output_h)
@@ -911,7 +921,7 @@ class XLNetModel(XLNetPretrainedModel):
 
         if output_attentions:
             if target_mapping is not None:
-                # when target_mapping is provided, there are 2-tuple of attentions
+                # When target_mapping is provided, there are 2-tuple of attentions
                 attentions = tuple(
                     tuple(paddle.transpose(att_stream, perm=[2, 3, 0, 1]) for att_stream in t) for t in attentions
                 )
@@ -937,7 +947,7 @@ class XLNetClassificationHead(Layer):
         self.out_proj = nn.Linear(hidden_size, num_classes)
 
     def forward(self, features, **kwargs):
-        x = features[:, -1, :]  # take <cls> token
+        x = features[:, -1, :]  # Take <cls> token
         x = self.dropout(x)
         x = self.dense(x)
         x = get_activation("tanh")(x)
@@ -947,6 +957,14 @@ class XLNetClassificationHead(Layer):
 
 
 class XLNetForSequenceClassification(XLNetPretrainedModel):
+    """
+    XLNet Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
+    Args:
+        xlnet (XLNetModel): An instance of XLNetModel.
+        num_classes (int, optional): The number of classes. Default 2
+    """
+
     def __init__(self, xlnet, num_classes=2):
         super(XLNetForSequenceClassification, self).__init__()
         self.num_classes = num_classes
@@ -1004,6 +1022,14 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
 
 
 class XLNetForTokenClassification(XLNetPretrainedModel):
+    """
+    XLNet Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g. for
+    Named-Entity-Recognition (NER) tasks.
+    Args:
+        xlnet (XLNetModel): An instance of XLNetModel.
+        num_classes (int, optional): The number of classes. Default 2
+    """
+
     def __init__(self, xlnet, num_classes=2):
         super(XLNetForTokenClassification, self).__init__()
         self.num_classes = num_classes

@@ -17,8 +17,9 @@
 * PaddleNLP 安装
 
    ```shell
-   pip install paddlenlp>=2.0.0rc
+   pip install paddlenlp\>=2.0.0rc
    ```
+  
 * SentencePiece 安装
    ```shell
    pip install sentencepiece

@@ -199,45 +199,13 @@ def convert_example(example,
                     is_test=False):
     """convert a glue example into necessary features"""
 
-    def _truncate_seqs(seqs, max_seq_length):
-        if len(seqs) == 1:  # single sentence
-            # Account for <SEP> and <CLS> with "- 2"
-            seqs[0] = seqs[0][0:(max_seq_length - 2)]
-        else:  # sentence pair
-            # Account for <SEP>, <SEP> and <CLS> with "- 3"
-            tokens_a, tokens_b = seqs
-            max_seq_length -= 3
-            while True:  # truncate with longest_first strategy
-                total_length = len(tokens_a) + len(tokens_b)
-                if total_length <= max_seq_length:
-                    break
-                if len(tokens_a) > len(tokens_b):
-                    tokens_a.pop()
-                else:
-                    tokens_b.pop()
-        return seqs
-
-    def _concat_seqs(seqs, separators, seq_mask=0, separator_mask=1):
-        concat = sum((seq + sep for sep, seq in zip(separators, seqs)), [])
-        segment_ids = sum(
-            ([i] * (len(seq) + len(sep))
-             for i, (sep, seq) in enumerate(zip(separators, seqs))), [])
-        if isinstance(seq_mask, int):
-            seq_mask = [[seq_mask] * len(seq) for seq in seqs]
-        if isinstance(separator_mask, int):
-            separator_mask = [[separator_mask] * len(sep) for sep in separators]
-        p_mask = sum((s_mask + mask
-                      for sep, seq, s_mask, mask in zip(
-                          separators, seqs, seq_mask, separator_mask)), [])
-        return concat, segment_ids, p_mask
-
     if not is_test:
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
-        # get the label
+        # Get the label
         label = example[-1]
         example = example[:-1]
-        # create label maps if classification task
+        # Create label maps if classification task
         if label_list:
             label_map = {}
             for (i, l) in enumerate(label_list):
