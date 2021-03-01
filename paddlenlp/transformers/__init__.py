@@ -28,3 +28,5 @@ from .electra.tokenizer import *
 from .transformer.modeling import *
 from .ernie_gen.modeling import ErnieForGeneration
 from .optimization import *
+from .UnifiedTransformer.modeling import *
+from .UnifiedTransformer.tokenizer import *
