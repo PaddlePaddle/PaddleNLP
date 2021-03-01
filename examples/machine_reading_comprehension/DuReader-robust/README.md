@@ -57,7 +57,7 @@ python -u ./run_du.py \
     --batch_size 12 \
     --learning_rate 3e-5 \
     --num_train_epochs 1 \
-    --logging_steps 100 \
+    --logging_steps 10 \
     --save_steps 1000 \
     --warmup_proportion 0.1 \
     --weight_decay 0.01 \
