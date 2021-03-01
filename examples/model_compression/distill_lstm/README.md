@@ -88,13 +88,13 @@ python -u ./run_bert_finetune.py \
 CUDA_VISIBLE_DEVICES=0 python small.py \
     --task_name senta \
     --max_epoch 20 \
-    --vocab_size 29496 \
+    --vocab_size 1256608 \
     --batch_size 64 \
     --model_name bert-wwm-ext-chinese \
     --optimizer adam \
     --lr 3e-4 \
     --dropout_prob 0.2 \
-    --vocab_path senta_word_dict_subset.txt \
+    --vocab_path senta_word_dict.txt \
     --output_dir small_models/senta/
 
 ```
@@ -131,14 +131,14 @@ CUDA_VISIBLE_DEVICES=0 python small.py \
 ```shell
 CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --task_name senta \
-    --vocab_size 29496 \
+    --vocab_size 1256608 \
     --max_epoch 6 \
     --lr 1.0 \
     --dropout_prob 0.1 \
     --batch_size 64 \
     --model_name bert-wwm-ext-chinese \
     --teacher_path pretrained_models/senta/best_bert_wwm_ext_model_880/model_state.pdparams \
-    --vocab_path senta_word_dict_subset.txt \
+    --vocab_path senta_word_dict.txt \
     --output_dir distilled_models/senta
 
 ```
