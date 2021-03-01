@@ -18,8 +18,6 @@ import re
 import string
 import json
 import numpy as np
-import os
-import math
 
 
 def compute_prediction(examples,
@@ -28,8 +26,7 @@ def compute_prediction(examples,
                        version_2_with_negative: bool=False,
                        n_best_size: int=20,
                        max_answer_length: int=30,
-                       null_score_diff_threshold: float=0.0,
-                       is_whitespace_splited=True):
+                       null_score_diff_threshold: float=0.0):
     """
     Post-processes the predictions of a question-answering model to convert them to answers that are substrings of the
     original contexts. This is the base postprocessing functions for models that only return start and end logits.
@@ -120,7 +117,9 @@ def compute_prediction(examples,
                     if (start_index >= len(offset_mapping) or
                             end_index >= len(offset_mapping) or
                             offset_mapping[start_index] is None or
-                            offset_mapping[end_index] is None):
+                            offset_mapping[end_index] is None or
+                            offset_mapping[start_index] == (0, 0) or
+                            offset_mapping[end_index] == (0, 0)):
                         continue
                     # Don't consider answers with a length that is either < 0 or > max_answer_length.
                     if end_index < start_index or end_index - start_index + 1 > max_answer_length:
