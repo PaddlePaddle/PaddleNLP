@@ -164,8 +164,8 @@ def evaluate(model, loss_fct, metric, data_loader):
     losses = []
     global final_res
     for batch in data_loader:
-        input_ids, segment_ids, attention_mask, labels = batch
-        logits = model(input_ids, segment_ids, attention_mask)[0]
+        input_ids, token_type_ids, attention_mask, labels = batch
+        logits = model(input_ids, token_type_ids, attention_mask)[0]
         loss = loss_fct(logits, labels)
         losses.append(loss.detach().numpy())
         correct = metric.compute(logits, labels)
@@ -215,14 +215,16 @@ def convert_example(example,
 
     # Tokenize raw text
     if len(example) == 1:
-        example = tokenizer(example[0], max_seq_len=max_seq_length, return_input_mask=True)
+        example = tokenizer(example[0], max_seq_len=max_seq_length, return_attention_mask=True)
     else:
-        example = tokenizer(example[0], text_pair=example[1], max_seq_len=max_seq_length, return_input_mask=True)
+        example = tokenizer(example[0], text_pair=example[1], max_seq_len=max_seq_length, return_attention_mask=True)
 
     if not is_test:
-        return example['input_ids'], example['segment_ids'], example['input_mask'], len(example['input_ids']), label
+        return example['input_ids'], example['token_type_ids'], example['attention_mask'], \
+               len(example['input_ids']), label
     else:
-        return example['input_ids'], example['segment_ids'], example['input_mask'], len(example['input_ids'])
+        return example['input_ids'], example['token_type_ids'], example['attention_mask'], \
+               len(example['input_ids'])
 
 
 def do_train(args):
@@ -253,7 +255,7 @@ def do_train(args):
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.sp_model.PieceToId(tokenizer.pad_token), pad_right=False),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, pad_right=False),                        # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, pad_right=False),                        # token_type
         Pad(axis=0, pad_val=0, pad_right=False),                                                  # attention_mask
         Stack(),                                                                                  # length
         Stack(dtype="int64" if label_list else "float32"),                                        # label
@@ -338,8 +340,8 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
-            input_ids, segment_ids, attention_mask, labels = batch
-            logits = model(input_ids, segment_ids, attention_mask, labels=labels)[0]
+            input_ids, token_type_ids, attention_mask, labels = batch
+            logits = model(input_ids, token_type_ids, attention_mask, labels=labels)[0]
             loss = loss_fct(logits, labels)
             loss.backward()
             optimizer.step()
