@@ -766,9 +766,9 @@ class PretrainedTokenizer(object):
                     encoded_inputs["attention_mask"] = [1] * len(encoded_inputs[
                         "input_ids"]) + [0] * difference
                 if return_token_type_ids:
-                    # 0 for padding token mask
                     encoded_inputs["token_type_ids"] = (
-                        encoded_inputs["token_type_ids"] + [0] * difference)
+                        encoded_inputs["token_type_ids"] +
+                        [self.pad_token_type_id] * difference)
                 if return_special_tokens_mask:
                     encoded_inputs["special_tokens_mask"] = encoded_inputs[
                         "special_tokens_mask"] + [1] * difference
@@ -780,9 +780,9 @@ class PretrainedTokenizer(object):
                         1
                     ] * len(encoded_inputs["input_ids"])
                 if return_token_type_ids:
-                    # 0 for padding token mask
                     encoded_inputs["token_type_ids"] = (
-                        [0] * difference + encoded_inputs["token_type_ids"])
+                        [self.pad_token_type_id] * difference +
+                        encoded_inputs["token_type_ids"])
                 if return_special_tokens_mask:
                     encoded_inputs["special_tokens_mask"] = [
                         1
