@@ -1,0 +1,51 @@
+#!/bin/bash
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+export CUDA_VISIBLE_DEVICES=0
+export FLAGS_call_stack_level=2
+export FLAGS_eager_delete_tensor_gb=0
+export FLAGS_fraction_of_gpu_memory_to_use=0.3
+
+data_dir=$1
+conf_path=$2
+vocab_path=$3
+ckpt_dir=$4
+pretrain_model=ernie-1.0
+predict_data=$5
+learning_rate=$6
+is_train=$7
+max_seq_len=$8
+batch_size=$9
+epoch=${10}
+pred_save_path=${11}
+
+python sequence_labeling.py --num_epoch ${epoch} \
+    --learning_rate ${learning_rate} \
+    --tag_path ${conf_path} \
+    --vocab_path ${vocab_path} \
+    --train_data ${data_dir}/train.tsv \
+    --dev_data ${data_dir}/dev.tsv \
+    --test_data ${data_dir}/test.tsv \
+    --predict_data ${predict_data} \
+    --do_train ${is_train} \
+    --do_predict True \
+    --max_seq_len ${max_seq_len} \
+    --batch_size ${batch_size} \
+    --skip_step 10 \
+    --valid_step 50 \
+    --pretrain_model ${pretrain_model} \
+    --checkpoints ${ckpt_dir} \
+    --init_ckpt ${ckpt_dir}/best.pdparams \
+    --predict_save_path ${pred_save_path} \
+    --n_gpu 1
