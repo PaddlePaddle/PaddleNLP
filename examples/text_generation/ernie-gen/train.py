@@ -188,9 +188,9 @@ def train():
     label_num = model.word_emb.weight.shape[0]
     train_model = StackModel(model)
     if paddle.distributed.get_world_size() > 1:
-        # All 'forward' outputs deerived from the module parameters using in DataParallel
+        # All 'forward' outputs derived from the module parameters using in DataParallel
         # must participate in the calculation of losses and subsequent gradient calculations.
-        # so we use StackModel here to make the model only output loss in its 'forward' function. 
+        # So we use StackModel here to make the model only output loss in its 'forward' function. 
         train_model = paddle.DataParallel(train_model)
 
     max_steps = len(train_data_loader) * args.num_epochs
