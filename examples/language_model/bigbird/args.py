@@ -102,12 +102,6 @@ def parse_args():
         help="Select cpu, gpu, xpu devices to train model.")
 
     parser.add_argument(
-        "--n_procs",
-        type=int,
-        default=1,
-        help="Number of device for the train the model.")
-
-    parser.add_argument(
         "--epochs",
         type=int,
         default=10,

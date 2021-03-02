@@ -460,9 +460,9 @@ class BigBirdModel(BigBirdPretrainedModel):
         return encoder_output, pooled_output
 
 
-class BigBirdForTokenClassification(BigBirdPretrainedModel):
+class BigBirdForSequenceClassification(BigBirdPretrainedModel):
     def __init__(self, bigbird):
-        super(BigBirdForTokenClassification, self).__init__()
+        super(BigBirdForSequenceClassification, self).__init__()
         self.bigbird = bigbird
         self.linear = nn.Linear(self.bigbird.config["hidden_size"],
                                 self.bigbird.config["num_labels"])
