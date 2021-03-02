@@ -41,7 +41,7 @@ SQuAD v2.0
 
 
 ### 数据准备
-为了方便开发者进行测试，我们内置了数据下载脚本，用户可以通过命令行传入`--version_2_with_negative`控制所需要的SQuAD数据集版本，也可以通过`--train_file`和`--prediction_file`传入本地数据集的位置，数据集需保证与SQuAD数据集格式一致。
+为了方便开发者进行测试，我们内置了数据下载脚本，用户可以通过命令行传入`--version_2_with_negative`控制所需要的SQuAD数据集版本，也可以通过`--train_file`和`--predict_file`传入本地数据集的位置，数据集需保证与SQuAD数据集格式一致。
 
 
 ### Fine-tune
@@ -62,7 +62,7 @@ python -u ./run_squad.py \
     --weight_decay 0.01 \
     --output_dir ./tmp/squad/ \
     --do_train \
-    --do_pred \
+    --do_predict \
     --n_gpu 1
  ```
 
@@ -70,7 +70,7 @@ python -u ./run_squad.py \
 * `model_name_or_path`: 预训练模型的具体名称。如bert-base-uncased，bert-large-cased等。或者是模型文件的本地路径。
 * `output_dir`: 保存模型checkpoint的路径。
 * `do_train`: 是否进行训练。
-* `do_pred`: 是否进行预测。
+* `do_predict`: 是否进行预测。
 
 训练结束后模型会自动对结果进行评估，得到类似如下的输出：
 
