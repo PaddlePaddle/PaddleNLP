@@ -7,24 +7,21 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['SQuAD']
+__all__ = ['CMRC2018']
 
 
-class SQuAD(DatasetBuilder):
+class CMRC2018(DatasetBuilder):
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
     SPLITS = {
-        'train_v1': META_INFO(
-            os.path.join('train-v1.1.json'), '981b29407e0affa3b1b156f72073b945',
-            'https://paddlenlp.bj.bcebos.com/datasets/squad/train-v1.1.json'),
-        'dev_v1': META_INFO(
-            os.path.join('dev-v1.1.json'), '3e85deb501d4e538b6bc56f786231552',
-            'https://paddlenlp.bj.bcebos.com/datasets/squad/dev-v1.1.json'),
-        'train_v2': META_INFO(
-            os.path.join('train-v2.0.json'), '62108c273c268d70893182d5cf8df740',
-            'https://paddlenlp.bj.bcebos.com/datasets/squad/train-v2.0.json'),
-        'dev_v2': META_INFO(
-            os.path.join('dev-v2.0.json'), '246adae8b7002f8679c027697b0b7cf8',
-            'https://paddlenlp.bj.bcebos.com/datasets/squad/dev-v2.0.json')
+        'train': META_INFO(
+            os.path.join('cmrc2018_train.json'), None,
+            'https://paddlenlp.bj.bcebos.com/datasets/cmrc/cmrc2018_train.json'),
+        'dev': META_INFO(
+            os.path.join('cmrc2018_dev.json'), None,
+            'https://paddlenlp.bj.bcebos.com/datasets/cmrc/cmrc2018_dev.json'),
+        'trial': META_INFO(
+            os.path.join('cmrc2018_trial.json'), None,
+            'https://paddlenlp.bj.bcebos.com/datasets/cmrc/cmrc2018_trial.json')
     }
 
     def _get_data(self, mode, **kwargs):
@@ -48,20 +45,12 @@ class SQuAD(DatasetBuilder):
                 for qa in paragraph["qas"]:
                     qas_id = qa["id"]
                     question = qa["question"].strip()
-                    answer_starts = []
-                    answers = []
-                    is_impossible = False
-
-                    if "is_impossible" in qa.keys():
-                        is_impossible = qa["is_impossible"]
-
-                    if not is_impossible:
-                        answer_starts = [
-                            answer["answer_start"] for answer in qa["answers"]
-                        ]
-                        answers = [
-                            answer["text"].strip() for answer in qa["answers"]
-                        ]
+                    answer_starts = [
+                        answer["answer_start"] for answer in qa["answers"]
+                    ]
+                    answers = [
+                        answer["text"].strip() for answer in qa["answers"]
+                    ]
 
                     yield {
                         'id': qas_id,
@@ -69,6 +58,5 @@ class SQuAD(DatasetBuilder):
                         'context': context,
                         'question': question,
                         'answers': answers,
-                        'answer_starts': answer_starts,
-                        'is_impossible': is_impossible
+                        'answer_starts': answer_starts
                     }

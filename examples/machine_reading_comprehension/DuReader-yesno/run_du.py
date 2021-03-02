@@ -91,7 +91,7 @@ def convert_example(example,
         qas_id = example[-1]
         example = example[:-2]
     # tokenize raw text
-    tokens_raw = [tokenizer(l) for l in example]
+    tokens_raw = [tokenizer.tokenize(l) for l in example]
     # truncate to the truncate_length,
     tokens_trun = _truncate_seqs(tokens_raw, max_seq_length)
     # concate the sequences with special tokens
