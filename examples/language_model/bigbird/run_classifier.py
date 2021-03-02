@@ -22,10 +22,9 @@ import time
 
 import numpy as np
 import paddle
-import paddle.distributed as dist
 import paddle.nn as nn
 from paddle.io import DataLoader, Dataset
-from paddlenlp.transformers import BigBirdModel, BigBirdForTokenClassification, BigBirdTokenizer
+from paddlenlp.transformers import BigBirdModel, BigBirdForSequenceClassification, BigBirdTokenizer
 from paddlenlp.transformers import create_bigbird_rand_mask_idx_list
 from paddlenlp.utils.log import logger
 from paddlenlp.datasets import Imdb
@@ -34,14 +33,14 @@ from paddlenlp.data import Stack
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--model_name_or_path", type=str, default="bigbird-base-uncased", help="pretraining model name or path")
 parser.add_argument("--max_encoder_length", type=int, default=3072, help="The maximum total input sequence length after SentencePiece tokenization.")
-parser.add_argument("--num_train_steps", default=10000, type=int, help="Linear warmup over warmup_steps.")
 parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate used to train.")
+parser.add_argument("--max_steps", default=10000, type=int, help="Max training steps to train.")
 parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
 parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
-parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
+parser.add_argument("--output_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
 parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")
-parser.add_argument("--model_name_or_path", type=str, default="bigbird-base-uncased", help="pretraining model name or path")
 parser.add_argument("--attn_dropout", type=float, default=0.0, help="Attention ffn model dropout.")
 parser.add_argument("--hidden_dropout_prob", type=float, default=0.0, help="The dropout rate for the embedding pooler.")
 parser.add_argument("--device", type=str, default="gpu", help="Select cpu, gpu, xpu devices to train model.")
@@ -98,17 +97,12 @@ def create_dataloader(batch_size, max_encoder_length, tokenizer, pad_val=0):
 def main():
     # Initialization for the parallel enviroment
     paddle.set_device(args.device)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
-
     # Define the model and metric 
     bigbird_model = BigBirdModel.from_pretrained(
         args.model_name_or_path,
         attn_dropout=args.attn_dropout,
         hidden_dropout_prob=args.hidden_dropout_prob)
-    model = BigBirdForTokenClassification(bigbird_model)
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
+    model = BigBirdForSequenceClassification(bigbird_model)
     criterion = nn.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
 
@@ -123,7 +117,7 @@ def main():
     optimizer = paddle.optimizer.Adam(
         parameters=model.parameters(),
         learning_rate=args.learning_rate,
-        epsilon=1e-7)
+        epsilon=1e-6)
 
     # Finetune the classification model
     do_train(model, criterion, metric, optimizer, train_data_loader,
@@ -152,8 +146,7 @@ def do_train(model, criterion, metric, optimizer, train_data_loader,
             correct = metric.compute(output, labels)
             metric.update(correct)
 
-            if global_steps % args.logging_steps == 0 and \
-                paddle.distributed.get_rank() == 0:
+            if global_steps % args.logging_steps == 0:
                 logger.info(
                     "train: global step %d, epoch: %d, loss: %f, acc:%f, speed: %.2f step/s"
                     % (global_steps, epoch, loss, metric.accumulate(),
@@ -161,7 +154,7 @@ def do_train(model, criterion, metric, optimizer, train_data_loader,
                 tic_train = time.time()
 
             if global_steps % args.save_steps == 0:
-                output_dir = os.path.join(args.save_dir,
+                output_dir = os.path.join(args.output_dir,
                                           "model_%d.pdparams" % (global_steps))
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
@@ -169,7 +162,7 @@ def do_train(model, criterion, metric, optimizer, train_data_loader,
                     model, paddle.DataParallel) else model
                 model_to_save.save_pretrained(output_dir)
 
-            if global_steps >= args.num_train_steps:
+            if global_steps >= args.max_steps:
                 break
         metric.reset()
 
