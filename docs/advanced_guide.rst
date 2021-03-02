@@ -7,6 +7,6 @@
 .. toctree::
    :maxdepth: 1
 
-   /advanced_guide/deployment
-   /advanced_guide/distributed_training
-   /advanced_guide/model_distill
+   /advanced_guide/deployment.rst
+   /advanced_guide/distributed_training.rst
+   /advanced_guide/model_compression.rst

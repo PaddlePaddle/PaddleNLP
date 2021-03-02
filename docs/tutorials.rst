@@ -7,12 +7,12 @@
    :maxdepth: 1
 
    /tutorials/classify.rst
-   /tutorials/embedding
-   /tutorials/semantic_matching
-   /tutorials/text_generation
-   /tutorials/machine_translation
-   /tutorials/reading_comprehension
-   /tutorials/general_dialogue
-   /tutorials/ner
-   /tutorials/lexical_analysis
+   /tutorials/embedding.rst
+   /tutorials/semantic_matching.rst
+   /tutorials/text_generation.rst
+   /tutorials/machine_translation.rst
+   /tutorials/reading_comprehension.rst
+   /tutorials/general_dialogue.rst
+   /tutorials/ner.rst
+   /tutorials/lexical_analysis.rst
 
