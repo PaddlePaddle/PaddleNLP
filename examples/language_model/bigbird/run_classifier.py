@@ -98,11 +98,8 @@ def main():
     # Initialization for the parallel enviroment
     paddle.set_device(args.device)
     # Define the model and metric 
-    bigbird_model = BigBirdModel.from_pretrained(
-        args.model_name_or_path,
-        attn_dropout=args.attn_dropout,
-        hidden_dropout_prob=args.hidden_dropout_prob)
-    model = BigBirdForSequenceClassification(bigbird_model)
+    model = BigBirdForSequenceClassification.from_pretrained(
+        args.model_name_or_path)
     criterion = nn.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
 

@@ -76,7 +76,7 @@ python -m paddle.distributed.launch --gpus "0"  run_pretrain.py --model_name_or_
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python run_classifier.py --model_name_or_path bigbird-base-uncased \
+python run_classifier.py --model_name_or_path bigbird-base-uncased-finetune \
     --output_dir "output" \
     --batch_size 2 \
     --learning_rate 1e-5 \
