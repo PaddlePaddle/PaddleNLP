@@ -680,9 +680,8 @@ class BigBirdSparseAttention(Attention):
         return global_product
 
     def _get_splited_matrix(self, matrix):
-        W = self.window_size
-        return matrix[:, :, 0:W // 2], matrix[:, :, W // 2:-W //
-                                              2], matrix[:, :, -W // 2:]
+        W = self.window_size // 2
+        return matrix[:, :, 0:W], matrix[:, :, W:-W], matrix[:, :, -W:]
 
     def forward(self,
                 query_matrix,
@@ -703,9 +702,7 @@ class BigBirdSparseAttention(Attention):
             rand_mask_idx: [H, T//bs, bs]
             Global Attention
             Random Attention
-            Window Attention
-            key_matrix分为4块：
-            
+            Window Attention            
         '''
         B = query_matrix.shape[0]  # batch_size
         H = self.num_heads
@@ -725,7 +722,6 @@ class BigBirdSparseAttention(Attention):
         blocked_query_mask = paddle.reshape(query_mask, [B, L, bs])
         blocked_key_mask = paddle.reshape(key_mask, [B, L, bs])
 
-        # 所有global_block中的query与所有key做点积
         ########################## global_front_product ##########################
         global_front_out = self._get_global_out(
             query_matrix, key_matrix, value_matrix, key_mask, d_head, dropout)
@@ -747,7 +743,7 @@ class BigBirdSparseAttention(Attention):
         # [B, H, L-G, bs, (G+W+R)*bs]
         second_mask = paddle.concat([band_mask, rand_mask], axis=4)
 
-        # [B, H, L-G, R, bs, -1]
+        # [B, H, L-G, R * bs, -1]
         random_keys = self._gather_random_key_value(blocked_key_matrix,
                                                     rand_mask_idx, B, T)
         random_values = self._gather_random_key_value(blocked_value_matrix,
@@ -772,6 +768,7 @@ class BigBirdSparseAttention(Attention):
         second_product = second_product * (d_head**-0.5)
         second_product += (1 - second_mask) * -1e6
         second_weights = F.softmax(second_product)
+
         second_top_weights, second_middle_weights, second_bottom_weights = \
             self._get_splited_matrix(second_weights)
         second_top_out = paddle.matmul(second_top_weights,
