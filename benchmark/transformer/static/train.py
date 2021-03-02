@@ -147,7 +147,7 @@ def do_train(args):
 
     if args.use_amp:
         optimizer.amp_init(places[0])
-    
+
     # the best cross-entropy value with label smoothing
     loss_normalizer = -(
         (1. - args.label_smooth_eps) * np.log(
@@ -181,6 +181,9 @@ def do_train(args):
                                    'lbl_word': data[i][2],
                                } for i in range(trainer_count)],
                                fetch_list=[sum_cost.name, token_num.name])
+                train_batch_cost = time.time() - batch_start
+                batch_ips_avg.record(train_batch_cost,
+                                     np.asarray(outs[1]).sum())
             else:
                 outs = exe.run(compiled_train_program,
                                feed=[{
@@ -189,12 +192,13 @@ def do_train(args):
                                    'lbl_word': data[i][2],
                                } for i in range(trainer_count)],
                                fetch_list=[sum_cost.name, token_num.name])
+                train_batch_cost = time.time() - batch_start
+                batch_ips_avg.record(train_batch_cost,
+                                     np.asarray(outs[1]).sum() / trainer_count)
             scheduler.step()
 
-            train_batch_cost = time.time() - batch_start
             reader_cost_avg.record(train_reader_cost)
             batch_cost_avg.record(train_batch_cost)
-            batch_ips_avg.record(train_batch_cost, np.asarray(outs[1]).sum())
 
             if step_idx % args.print_step == 0:
                 sum_cost_val, token_num_val = np.array(outs[0]), np.array(outs[
