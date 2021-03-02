@@ -77,7 +77,8 @@ def do_predict(args):
         eos_id=args.eos_idx,
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
-        decoding_lib=args.decoding_lib)
+        decoding_lib=args.decoding_lib,
+        use_fp16_decoding=args.use_fp16_decoding)
 
     # Set evaluate mode
     transformer.eval()
@@ -95,10 +96,17 @@ def do_predict(args):
         args.max_length + 1, args.d_model)
     model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
         args.max_length + 1, args.d_model)
+
+    if args.use_fp16_decoding:
+        for item in transformer.state_dict():
+            if "decoder" in item:
+                model_dict[item] = np.float16(model_dict[item])
+
     transformer.load_dict(model_dict)
 
     f = open(args.output_file, "w")
     with paddle.no_grad():
+        start = time.time()
         for (src_word, ) in test_loader:
             finished_seq = transformer(src_word=src_word)
             finished_seq = finished_seq.numpy().transpose([1, 2, 0])
@@ -110,6 +118,7 @@ def do_predict(args):
                     word_list = to_tokens(id_list)
                     sequence = " ".join(word_list) + "\n"
                     f.write(sequence)
+        print(time.time() - start)
 
 
 if __name__ == "__main__":

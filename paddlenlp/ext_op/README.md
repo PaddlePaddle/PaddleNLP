@@ -78,22 +78,41 @@ transformer = FasterTransformer(
     eos_id=args.eos_idx,
     beam_size=args.beam_size,
     max_out_len=args.max_out_len,
-    decoding_lib=args.decoding_lib)
+    decoding_lib=args.decoding_lib,
+    use_fp16_decoding=args.use_fp16_decoding)
 ```
 
 更详细的例子可以参考 `./sample/decoding_sample.py`，我们提供了更详细用例。
 
 #### 模型推断
 
-#### 使用动态图预测
+#### 使用动态图预测(使用 float32 decoding 预测)
 
 以英德翻译数据为例，模型训练完成后可以执行以下命令对指定文件中的文本进行翻译：
 
 ``` sh
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
-python sample/decoding_sample.py --config ./sample/config/transformer.base.yaml
+python sample/decoding_sample.py --config ./sample/config/transformer.base.yaml --decoding-lib ./build/lib/libdecoding_op.so
 ```
+
+其中，`--config` 选项用于指明配置文件的位置，而 `--decoding-lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。
+
+翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `./sample/config/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 base model 的配置。
+
+需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
+
+#### 使用动态图预测(使用 float16 decoding 预测)
+
+float16 与 float32 预测的基本流程相同，不过在使用 float16 的 decoding 进行预测的时候，需要在配置文件中修改 `use_fp16_decoding` 配置为 `True`。后按照与之前相同的方式执行即可。具体执行方式如下：
+
+``` sh
+# setting visible devices for prediction
+export CUDA_VISIBLE_DEVICES=0
+python sample/decoding_sample.py --config ./sample/config/transformer.base.yaml --decoding-lib ./build/lib/libdecoding_op.so
+```
+
+其中，`--config` 选项用于指明配置文件的位置，而 `--decoding-lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。
 
 翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `./sample/config/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 base model 的配置。
 

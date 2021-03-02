@@ -94,6 +94,13 @@ def finalize(beam_size, output_ids, parent_ids, out_seq_lens, max_seq_len=None):
     return ids
 
 
+def transfer_param(p, is_bias=False):
+    param_shape = p.shape
+    del p
+    return paddle.create_parameter(
+        shape=param_shape, dtype="float16", is_bias=is_bias)
+
+
 class InferTransformerDecoding(nn.Layer):
     def __init__(self,
                  decoder,
@@ -109,7 +116,8 @@ class InferTransformerDecoding(nn.Layer):
                  beam_size=4,
                  max_out_len=256,
                  beam_search_diversity_rate=0.0,
-                 decoding_lib=None):
+                 decoding_lib=None,
+                 use_fp16_decoding=False):
         if decoding_lib is None:
             raise ValueError(
                 "The args decoding_lib must be set to use Faster Transformer. ")
@@ -125,6 +133,60 @@ class InferTransformerDecoding(nn.Layer):
             ]:
                 setattr(self, "_" + arg, value)
         # process weights
+        if use_fp16_decoding:
+            for mod in decoder.layers:
+                mod.norm1.weight = transfer_param(mod.norm1.weight)
+                mod.norm1.bias = transfer_param(mod.norm1.bias, is_bias=True)
+                mod.self_attn.q_proj.weight = transfer_param(
+                    mod.self_attn.q_proj.weight)
+                mod.self_attn.q_proj.bias = transfer_param(
+                    mod.self_attn.q_proj.bias, is_bias=True)
+                mod.self_attn.k_proj.weight = transfer_param(
+                    mod.self_attn.k_proj.weight)
+                mod.self_attn.k_proj.bias = transfer_param(
+                    mod.self_attn.k_proj.bias, is_bias=True)
+                mod.self_attn.v_proj.weight = transfer_param(
+                    mod.self_attn.v_proj.weight)
+                mod.self_attn.v_proj.bias = transfer_param(
+                    mod.self_attn.v_proj.bias, is_bias=True)
+                mod.self_attn.out_proj.weight = transfer_param(
+                    mod.self_attn.out_proj.weight)
+                mod.self_attn.out_proj.bias = transfer_param(
+                    mod.self_attn.out_proj.bias, is_bias=True)
+
+                mod.norm2.weight = transfer_param(mod.norm2.weight)
+                mod.norm2.bias = transfer_param(mod.norm2.bias, is_bias=True)
+                mod.cross_attn.q_proj.weight = transfer_param(
+                    mod.cross_attn.q_proj.weight)
+                mod.cross_attn.q_proj.bias = transfer_param(
+                    mod.cross_attn.q_proj.bias, is_bias=True)
+                mod.cross_attn.k_proj.weight = transfer_param(
+                    mod.cross_attn.k_proj.weight)
+                mod.cross_attn.k_proj.bias = transfer_param(
+                    mod.cross_attn.k_proj.bias, is_bias=True)
+                mod.cross_attn.v_proj.weight = transfer_param(
+                    mod.cross_attn.v_proj.weight)
+                mod.cross_attn.v_proj.bias = transfer_param(
+                    mod.cross_attn.v_proj.bias, is_bias=True)
+                mod.cross_attn.out_proj.weight = transfer_param(
+                    mod.cross_attn.out_proj.weight)
+                mod.cross_attn.out_proj.bias = transfer_param(
+                    mod.cross_attn.out_proj.bias, is_bias=True)
+
+                mod.norm3.weight = transfer_param(mod.norm3.weight)
+                mod.norm3.bias = transfer_param(mod.norm3.bias, is_bias=True)
+                mod.linear1.weight = transfer_param(mod.linear1.weight)
+                mod.linear1.bias = transfer_param(
+                    mod.linear1.bias, is_bias=True)
+                mod.linear2.weight = transfer_param(mod.linear2.weight)
+                mod.linear2.bias = transfer_param(
+                    mod.linear2.bias, is_bias=True)
+
+            decoder.norm.weight = transfer_param(decoder.norm.weight)
+            decoder.norm.bias = transfer_param(decoder.norm.bias, is_bias=True)
+
+            linear.weight = transfer_param(linear.weight)
+
         self.slf_ln_weight = []
         self.slf_ln_bias = []
         self.slf_q_weight = []
@@ -204,20 +266,50 @@ class InferTransformerDecoding(nn.Layer):
         self.word_emb[0].set_value(np_word_emb)
 
         output_ids, parent_ids, sequence_length = infer_transformer_decoder(
-            [enc_output], [memory_seq_lens], self.word_emb, self.slf_ln_weight,
-            self.slf_ln_bias, self.slf_q_weight, self.slf_q_bias,
-            self.slf_k_weight, self.slf_k_bias, self.slf_v_weight,
-            self.slf_v_bias, self.slf_out_weight, self.slf_out_bias,
-            self.cross_ln_weight, self.cross_ln_bias, self.cross_q_weight,
-            self.cross_q_bias, self.cross_k_weight, self.cross_k_bias,
-            self.cross_v_weight, self.cross_v_bias, self.cross_out_weight,
-            self.cross_out_bias, self.ffn_ln_weight, self.ffn_ln_bias,
-            self.ffn_inter_weight, self.ffn_inter_bias, self.ffn_out_weight,
-            self.ffn_out_bias, self.decoder_ln_weight, self.decoder_ln_bias,
-            self.linear_weight, self.linear_bias, self.pos_emb, self._beam_size,
+            [enc_output], [memory_seq_lens],
+            [paddle.cast(
+                self.word_emb[0], dtype="float16")]
+            if self._use_fp16_decoding else self.word_emb,
+            self.slf_ln_weight,
+            self.slf_ln_bias,
+            self.slf_q_weight,
+            self.slf_q_bias,
+            self.slf_k_weight,
+            self.slf_k_bias,
+            self.slf_v_weight,
+            self.slf_v_bias,
+            self.slf_out_weight,
+            self.slf_out_bias,
+            self.cross_ln_weight,
+            self.cross_ln_bias,
+            self.cross_q_weight,
+            self.cross_q_bias,
+            self.cross_k_weight,
+            self.cross_k_bias,
+            self.cross_v_weight,
+            self.cross_v_bias,
+            self.cross_out_weight,
+            self.cross_out_bias,
+            self.ffn_ln_weight,
+            self.ffn_ln_bias,
+            self.ffn_inter_weight,
+            self.ffn_inter_bias,
+            self.ffn_out_weight,
+            self.ffn_out_bias,
+            self.decoder_ln_weight,
+            self.decoder_ln_bias,
+            self.linear_weight,
+            self.linear_bias, [paddle.cast(
+                self.pos_emb[0], dtype="float16")]
+            if self._use_fp16_decoding else self.pos_emb,
+            self._beam_size,
             self._n_head,
-            int(self._d_model / self._n_head), self._n_layer, self._bos_id,
-            self._eos_id, self._max_out_len, self._beam_search_diversity_rate)
+            int(self._d_model / self._n_head),
+            self._n_layer,
+            self._bos_id,
+            self._eos_id,
+            self._max_out_len,
+            self._beam_search_diversity_rate)
 
         ids = finalize(self._beam_size, output_ids, parent_ids, sequence_length)
 

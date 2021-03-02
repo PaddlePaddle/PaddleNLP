@@ -20,6 +20,8 @@ output_file: "predict.txt"
 special_token: ["<s>", "<e>", "<unk>"]
 # The directory to store data.
 root: None
+# Whether to use fp16 Faster Transformer decoding. 
+use_fp16_decoding: True
 
 # Whether to use cuda
 use_gpu: True
@@ -56,7 +58,7 @@ label_smooth_eps: 0.1
 
 # Hyparams for generation:
 # The parameters for beam search.
-beam_size: 5
+beam_size: 4
 max_out_len: 256
 # The number of decoded sentences to output.
 n_best: 1

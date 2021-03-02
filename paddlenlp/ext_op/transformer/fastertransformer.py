@@ -23,7 +23,8 @@ class FasterTransformer(TransformerModel):
                  eos_id=1,
                  beam_size=4,
                  max_out_len=256,
-                 decoding_lib=None):
+                 decoding_lib=None,
+                 use_fp16_decoding=False):
         if decoding_lib is None:
             raise ValueError(
                 "The args decoding_lib must be set to use Faster Transformer. ")
@@ -36,6 +37,7 @@ class FasterTransformer(TransformerModel):
         self.beam_size = args.pop("beam_size")
         self.max_out_len = args.pop("max_out_len")
         self.decoding_lib = args.pop("decoding_lib")
+        self.use_fp16_decoding = args.pop("use_fp16_decoding")
         self.dropout = dropout
         self.weight_sharing = weight_sharing
         self.trg_vocab_size = trg_vocab_size
@@ -57,12 +59,17 @@ class FasterTransformer(TransformerModel):
             eos_id=eos_id,
             beam_size=beam_size,
             max_out_len=max_out_len,
-            decoding_lib=self.decoding_lib)
+            decoding_lib=self.decoding_lib,
+            use_fp16_decoding=self.use_fp16_decoding)
 
     def forward(self, src_word):
         if self.weight_sharing:
-            self.decoding_linear.weight.set_value(
-                self.trg_word_embedding.word_embedding.weight.t())
+            decoding_linear_weight = self.trg_word_embedding.word_embedding.weight.t(
+            )
+            if self.use_fp16_decoding:
+                decoding_linear_weight = paddle.cast(
+                    decoding_linear_weight, dtype="float16")
+            self.decoding_linear.weight.set_value(decoding_linear_weight)
             self.decoding_linear.bias = paddle.create_parameter(
                 shape=[self.trg_vocab_size],
                 dtype=paddle.get_default_dtype(),
@@ -87,6 +94,9 @@ class FasterTransformer(TransformerModel):
             src_emb, p=self.dropout,
             training=False) if self.dropout else src_emb
         enc_output = self.transformer.encoder(enc_input, src_slf_attn_bias)
+
+        if self.use_fp16_decoding:
+            enc_output = paddle.cast(enc_output, dtype="float16")
 
         mem_seq_lens = paddle.sum(paddle.cast(
             src_word != self.bos_id, dtype="int32"),
