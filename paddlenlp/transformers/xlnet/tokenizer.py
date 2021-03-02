@@ -62,6 +62,7 @@ class XLNetTokenizer(PretrainedTokenizer):
     }
     max_model_input_sizes = pretrained_positional_embedding_sizes
     padding_side = "left"
+    pad_token_type_id = 3
 
     def __init__(
         self,
@@ -78,7 +79,6 @@ class XLNetTokenizer(PretrainedTokenizer):
         mask_token="<mask>",
         additional_special_tokens=["<eop>", "<eod>"],
     ):
-        self._pad_token_type_id = 3
 
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space

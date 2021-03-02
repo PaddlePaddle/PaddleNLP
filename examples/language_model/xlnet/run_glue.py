@@ -167,7 +167,7 @@ def evaluate(model, loss_fct, metric, data_loader):
         input_ids, segment_ids, attention_mask, labels = batch
         logits = model(input_ids, segment_ids, attention_mask)[0]
         loss = loss_fct(logits, labels)
-        losses.append(loss.numpy())
+        losses.append(loss.detach().numpy())
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
@@ -253,7 +253,7 @@ def do_train(args):
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.sp_model.PieceToId(tokenizer.pad_token), pad_right=False),  # input
-        Pad(axis=0, pad_val=3, pad_right=False),                                                  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, pad_right=False),                        # segment
         Pad(axis=0, pad_val=0, pad_right=False),                                                  # attention_mask
         Stack(),                                                                                  # length
         Stack(dtype="int64" if label_list else "float32"),                                        # label
