@@ -106,7 +106,6 @@ def do_predict(args):
 
     f = open(args.output_file, "w")
     with paddle.no_grad():
-        start = time.time()
         for (src_word, ) in test_loader:
             finished_seq = transformer(src_word=src_word)
             finished_seq = finished_seq.numpy().transpose([1, 2, 0])
@@ -118,7 +117,6 @@ def do_predict(args):
                     word_list = to_tokens(id_list)
                     sequence = " ".join(word_list) + "\n"
                     f.write(sequence)
-        print(time.time() - start)
 
 
 if __name__ == "__main__":
