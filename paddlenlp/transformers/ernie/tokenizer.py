@@ -1,5 +1,6 @@
 # Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
-#
+# Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
+
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -132,7 +133,7 @@ class ErnieTokenizer(PretrainedTokenizer):
                 split_tokens.append(sub_token)
         return split_tokens
 
-    def __call__(self, text):
+    def tokenize(self, text):
         """
         End-to-end tokenization for ERNIE models.
         Args:
@@ -182,7 +183,7 @@ class ErnieTokenizer(PretrainedTokenizer):
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens. 
         
-        A BERT sequence has the following format:
+        A ERNIE sequence has the following format:
         ::
             - single sequence: ``[CLS] X [SEP]``
             - pair of sequences: ``[CLS] A [SEP] B [SEP]``
@@ -202,13 +203,39 @@ class ErnieTokenizer(PretrainedTokenizer):
         _sep = [self.sep_token_id]
         return _cls + token_ids_0 + _sep + token_ids_1 + _sep
 
+    def build_offset_mapping_with_special_tokens(self,
+                                                 offset_mapping_0,
+                                                 offset_mapping_1=None):
+        """
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens. 
+        
+        A ERNIE offset_mapping has the following format:
+        ::
+            - single sequence: ``(0,0) X (0,0)``
+            - pair of sequences: `(0,0) A (0,0) B (0,0)``
+        
+        Args:
+            offset_mapping_ids_0 (:obj:`List[tuple]`):
+                List of char offsets to which the special tokens will be added.
+            offset_mapping_ids_1 (:obj:`List[tuple]`, `optional`):
+                Optional second list of char offsets for offset mapping pairs.
+
+        Returns:
+            :obj:`List[tuple]`: List of char offsets with the appropriate offsets of special tokens.
+        """
+        if offset_mapping_1 is None:
+            return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)
+                                              ] + offset_mapping_1 + [(0, 0)]
+
     def create_token_type_ids_from_sequences(self,
                                              token_ids_0,
                                              token_ids_1=None):
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task. 
 
-        A BERT sequence pair mask has the following format:
+        A ERNIE sequence pair mask has the following format:
         ::
 
             0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
@@ -231,174 +258,6 @@ class ErnieTokenizer(PretrainedTokenizer):
             return len(_cls + token_ids_0 + _sep) * [0]
         return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 +
                                                           _sep) * [1]
-
-    def encode(self,
-               text,
-               text_pair=None,
-               max_seq_len=None,
-               pad_to_max_seq_len=True,
-               truncation_strategy="longest_first",
-               return_position_ids=True,
-               return_segment_ids=True,
-               return_input_mask=True,
-               return_length=True,
-               return_overflowing_tokens=False,
-               return_special_tokens_mask=False):
-        """
-        Returns a dictionary containing the encoded sequence or sequence pair and additional information:
-        the mask for sequence classification and the overflowing elements if a ``max_seq_len`` is specified.
-
-        Args:
-            text (:obj:`str`, :obj:`List[str]` or :obj:`List[int]`):
-                The first sequence to be encoded. This can be a string, a list of strings (tokenized string using
-                the `tokenize` method) or a list of integers (tokenized string ids using the `convert_tokens_to_ids`
-                method)
-            text_pair (:obj:`str`, :obj:`List[str]` or :obj:`List[int]`, `optional`, defaults to :obj:`None`):
-                Optional second sequence to be encoded. This can be a string, a list of strings (tokenized
-                string using the `tokenize` method) or a list of integers (tokenized string ids using the
-                `convert_tokens_to_ids` method)
-            max_seq_len (:obj:`int`, `optional`, defaults to :int:`None`):
-                If set to a number, will limit the total sequence returned so that it has a maximum length.
-                If there are overflowing tokens, those will be added to the returned dictionary
-            pad_to_max_seq_len (:obj:`bool`, `optional`, defaults to :obj:`True`):
-                If set to True, the returned sequences will be padded according to the model's padding side and
-                padding index, up to their max length. If no max length is specified, the padding is done up to the
-                model's max length.
-            truncation_strategy (:obj:`str`, `optional`, defaults to `longest_first`):
-                String selected in the following options:
-
-                - 'longest_first' (default) Iteratively reduce the inputs sequence until the input is under max_seq_len
-                  starting from the longest one at each token (when there is a pair of input sequences)
-                - 'only_first': Only truncate the first sequence
-                - 'only_second': Only truncate the second sequence
-                - 'do_not_truncate': Does not truncate (raise an error if the input sequence is longer than max_seq_len)
-            return_position_ids (:obj:`bool`, `optional`, defaults to :obj:`True`):
-                Set to True to return tokens position ids (default True).
-            return_segment_ids (:obj:`bool`, `optional`, defaults to :obj:`True`):
-                Whether to return token type IDs.
-            return_input_mask (:obj:`bool`, `optional`, defaults to :obj:`True`):
-                Whether to return the attention mask.
-            return_length (:obj:`int`, defaults to :obj:`True`):
-                If set the resulting dictionary will include the length of each encoded inputs
-            return_overflowing_tokens (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Set to True to return overflowing token information (default False).
-            return_special_tokens_mask (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Set to True to return special tokens mask information (default False).
-
-        Return:
-            A Dictionary of shape::
-
-                {
-                    input_ids: list[int],
-                    position_ids: list[int] if return_position_ids is True (default)
-                    segment_ids: list[int] if return_segment_ids is True (default)
-                    input_mask: list[int] if return_input_mask is True (default)
-                    seq_len: int if return_length is True (default)
-                    overflowing_tokens: list[int] if a ``max_seq_len`` is specified and return_overflowing_tokens is True
-                    num_truncated_tokens: int if a ``max_seq_len`` is specified and return_overflowing_tokens is True
-                    special_tokens_mask: list[int] if return_special_tokens_mask is True
-                }
-
-            With the fields:
-
-            - ``input_ids``: list of token ids to be fed to a model
-            - ``position_ids``: list of token position ids to be fed to a model
-            - ``segment_ids``: list of token type ids to be fed to a model
-            - ``input_mask``: list of indices specifying which tokens should be attended to by the model
-            - ``length``: the input_ids length
-            - ``overflowing_tokens``: list of overflowing tokens if a max length is specified.
-            - ``num_truncated_tokens``: number of overflowing tokens a ``max_seq_len`` is specified
-            - ``special_tokens_mask``: if adding special tokens, this is a list of [0, 1], with 0 specifying special added
-              tokens and 1 specifying sequence tokens.
-        """
-
-        def get_input_ids(text):
-            if isinstance(text, str):
-                tokens = self._tokenize(text)
-                return self.convert_tokens_to_ids(tokens)
-            elif isinstance(text,
-                            (list, tuple)) and len(text) > 0 and isinstance(
-                                text[0], str):
-                return self.convert_tokens_to_ids(text)
-            elif isinstance(text,
-                            (list, tuple)) and len(text) > 0 and isinstance(
-                                text[0], int):
-                return text
-            else:
-                raise ValueError(
-                    "Input is not valid. Should be a string, a list/tuple of strings or a list/tuple of integers."
-                )
-
-        ids = get_input_ids(text)
-        pair_ids = get_input_ids(text_pair) if text_pair is not None else None
-
-        pair = bool(pair_ids is not None)
-        len_ids = len(ids)
-        len_pair_ids = len(pair_ids) if pair else 0
-
-        encoded_inputs = {}
-
-        # Truncation: Handle max sequence length
-        total_len = len_ids + len_pair_ids + (self.num_special_tokens_to_add(
-            pair=pair))
-        if max_seq_len and total_len > max_seq_len:
-            ids, pair_ids, overflowing_tokens = self.truncate_sequences(
-                ids,
-                pair_ids=pair_ids,
-                num_tokens_to_remove=total_len - max_seq_len,
-                truncation_strategy=truncation_strategy, )
-            if return_overflowing_tokens:
-                encoded_inputs["overflowing_tokens"] = overflowing_tokens
-                encoded_inputs["num_truncated_tokens"] = total_len - max_seq_len
-
-        # Add special tokens
-        sequence = self.build_inputs_with_special_tokens(ids, pair_ids)
-        segment_ids = self.create_token_type_ids_from_sequences(ids, pair_ids)
-
-        # Build output dictionnary
-        encoded_inputs["input_ids"] = sequence
-        if return_segment_ids:
-            encoded_inputs["segment_ids"] = segment_ids
-        if return_special_tokens_mask:
-            encoded_inputs[
-                "special_tokens_mask"] = self.get_special_tokens_mask(ids,
-                                                                      pair_ids)
-        if return_length:
-            encoded_inputs["seq_len"] = len(encoded_inputs["input_ids"])
-
-        # Check lengths
-        assert max_seq_len is None or len(encoded_inputs[
-            "input_ids"]) <= max_seq_len
-
-        # Padding
-        needs_to_be_padded = pad_to_max_seq_len and \
-                             max_seq_len and len(encoded_inputs["input_ids"]) < max_seq_len
-
-        if needs_to_be_padded:
-            difference = max_seq_len - len(encoded_inputs["input_ids"])
-            if return_input_mask:
-                encoded_inputs["input_mask"] = [1] * len(encoded_inputs[
-                    "input_ids"]) + [0] * difference
-            if return_segment_ids:
-                # 0 for padding token mask
-                encoded_inputs["segment_ids"] = (
-                    encoded_inputs["segment_ids"] + [0] * difference)
-            if return_special_tokens_mask:
-                encoded_inputs["special_tokens_mask"] = encoded_inputs[
-                    "special_tokens_mask"] + [1] * difference
-            encoded_inputs["input_ids"] = encoded_inputs["input_ids"] + [
-                self.pad_token_id
-            ] * difference
-        else:
-            if return_input_mask:
-                encoded_inputs["input_mask"] = [1] * len(encoded_inputs[
-                    "input_ids"])
-
-        if return_position_ids:
-            encoded_inputs["position_ids"] = list(
-                range(len(encoded_inputs["input_ids"])))
-
-        return encoded_inputs
 
 
 class ErnieTinyTokenizer(PretrainedTokenizer):
@@ -537,7 +396,7 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
                 in_vocab_tokens.append(unk_token)
         return in_vocab_tokens
 
-    def __call__(self, text):
+    def tokenize(self, text):
         """
         End-to-end tokenization for ERNIE Tiny models.
         Args:
@@ -600,7 +459,7 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens. 
         
-        A BERT sequence has the following format:
+        A ERNIE sequence has the following format:
         ::
             - single sequence: ``[CLS] X [SEP]``
             - pair of sequences: ``[CLS] A [SEP] B [SEP]``
@@ -620,13 +479,39 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         _sep = [self.sep_token_id]
         return _cls + token_ids_0 + _sep + token_ids_1 + _sep
 
+    def build_offset_mapping_with_special_tokens(self,
+                                                 offset_mapping_0,
+                                                 offset_mapping_1=None):
+        """
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens. 
+        
+        A ERNIE offset_mapping has the following format:
+        ::
+            - single sequence: ``(0,0) X (0,0)``
+            - pair of sequences: `(0,0) A (0,0) B (0,0)``
+        
+        Args:
+            offset_mapping_ids_0 (:obj:`List[tuple]`):
+                List of char offsets to which the special tokens will be added.
+            offset_mapping_ids_1 (:obj:`List[tuple]`, `optional`):
+                Optional second list of char offsets for offset mapping pairs.
+
+        Returns:
+            :obj:`List[tuple]`: List of char offsets with the appropriate offsets of special tokens.
+        """
+        if offset_mapping_1 is None:
+            return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)
+                                              ] + offset_mapping_1 + [(0, 0)]
+
     def create_token_type_ids_from_sequences(self,
                                              token_ids_0,
                                              token_ids_1=None):
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task. 
 
-        A BERT sequence pair mask has the following format:
+        A ERNIE sequence pair mask has the following format:
         ::
 
             0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
@@ -682,171 +567,3 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             return [1] + ([0] * len(token_ids_0)) + [1] + (
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
-
-    def encode(self,
-               text,
-               text_pair=None,
-               max_seq_len=None,
-               pad_to_max_seq_len=True,
-               truncation_strategy="longest_first",
-               return_position_ids=True,
-               return_segment_ids=True,
-               return_input_mask=True,
-               return_length=True,
-               return_overflowing_tokens=False,
-               return_special_tokens_mask=False):
-        """
-        Returns a dictionary containing the encoded sequence or sequence pair and additional information:
-        the mask for sequence classification and the overflowing elements if a ``max_seq_len`` is specified.
-
-        Args:
-            text (:obj:`str`, :obj:`List[str]` or :obj:`List[int]`):
-                The first sequence to be encoded. This can be a string, a list of strings (tokenized string using
-                the `tokenize` method) or a list of integers (tokenized string ids using the `convert_tokens_to_ids`
-                method)
-            text_pair (:obj:`str`, :obj:`List[str]` or :obj:`List[int]`, `optional`, defaults to :obj:`None`):
-                Optional second sequence to be encoded. This can be a string, a list of strings (tokenized
-                string using the `tokenize` method) or a list of integers (tokenized string ids using the
-                `convert_tokens_to_ids` method)
-            max_seq_len (:obj:`int`, `optional`, defaults to :int:`None`):
-                If set to a number, will limit the total sequence returned so that it has a maximum length.
-                If there are overflowing tokens, those will be added to the returned dictionary
-            pad_to_max_seq_len (:obj:`bool`, `optional`, defaults to :obj:`True`):
-                If set to True, the returned sequences will be padded according to the model's padding side and
-                padding index, up to their max length. If no max length is specified, the padding is done up to the
-                model's max length.
-            truncation_strategy (:obj:`str`, `optional`, defaults to `longest_first`):
-                String selected in the following options:
-
-                - 'longest_first' (default) Iteratively reduce the inputs sequence until the input is under max_seq_len
-                  starting from the longest one at each token (when there is a pair of input sequences)
-                - 'only_first': Only truncate the first sequence
-                - 'only_second': Only truncate the second sequence
-                - 'do_not_truncate': Does not truncate (raise an error if the input sequence is longer than max_seq_len)
-            return_position_ids (:obj:`bool`, `optional`, defaults to :obj:`True`):
-                Set to True to return tokens position ids (default True).
-            return_segment_ids (:obj:`bool`, `optional`, defaults to :obj:`True`):
-                Whether to return token type IDs.
-            return_input_mask (:obj:`bool`, `optional`, defaults to :obj:`True`):
-                Whether to return the attention mask.
-            return_length (:obj:`int`, defaults to :obj:`True`):
-                If set the resulting dictionary will include the length of each encoded inputs
-            return_overflowing_tokens (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Set to True to return overflowing token information (default False).
-            return_special_tokens_mask (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Set to True to return special tokens mask information (default False).
-
-        Return:
-            A Dictionary of shape::
-
-                {
-                    input_ids: list[int],
-                    position_ids: list[int] if return_position_ids is True (default)
-                    segment_ids: list[int] if return_segment_ids is True (default)
-                    input_mask: list[int] if return_input_mask is True (default)
-                    seq_len: int if return_length is True (default)
-                    overflowing_tokens: list[int] if a ``max_seq_len`` is specified and return_overflowing_tokens is True
-                    num_truncated_tokens: int if a ``max_seq_len`` is specified and return_overflowing_tokens is True
-                    special_tokens_mask: list[int] if return_special_tokens_mask is True
-                }
-
-            With the fields:
-
-            - ``input_ids``: list of token ids to be fed to a model
-            - ``position_ids``: list of token position ids to be fed to a model
-            - ``segment_ids``: list of token type ids to be fed to a model
-            - ``input_mask``: list of indices specifying which tokens should be attended to by the model
-            - ``length``: the input_ids length
-            - ``overflowing_tokens``: list of overflowing tokens if a max length is specified.
-            - ``num_truncated_tokens``: number of overflowing tokens a ``max_seq_len`` is specified
-            - ``special_tokens_mask``: if adding special tokens, this is a list of [0, 1], with 0 specifying special added
-              tokens and 1 specifying sequence tokens.
-        """
-
-        def get_input_ids(text):
-            if isinstance(text, str):
-                tokens = self._tokenize(text)
-                return self.convert_tokens_to_ids(tokens)
-            elif isinstance(text,
-                            (list, tuple)) and len(text) > 0 and isinstance(
-                                text[0], str):
-                return self.convert_tokens_to_ids(text)
-            elif isinstance(text,
-                            (list, tuple)) and len(text) > 0 and isinstance(
-                                text[0], int):
-                return text
-            else:
-                raise ValueError(
-                    "Input is not valid. Should be a string, a list/tuple of strings or a list/tuple of integers."
-                )
-
-        ids = get_input_ids(text)
-        pair_ids = get_input_ids(text_pair) if text_pair is not None else None
-
-        pair = bool(pair_ids is not None)
-        len_ids = len(ids)
-        len_pair_ids = len(pair_ids) if pair else 0
-
-        encoded_inputs = {}
-
-        # Truncation: Handle max sequence length
-        total_len = len_ids + len_pair_ids + (self.num_special_tokens_to_add(
-            pair=pair))
-        if max_seq_len and total_len > max_seq_len:
-            ids, pair_ids, overflowing_tokens = self.truncate_sequences(
-                ids,
-                pair_ids=pair_ids,
-                num_tokens_to_remove=total_len - max_seq_len,
-                truncation_strategy=truncation_strategy, )
-            if return_overflowing_tokens:
-                encoded_inputs["overflowing_tokens"] = overflowing_tokens
-                encoded_inputs["num_truncated_tokens"] = total_len - max_seq_len
-
-        # Add special tokens
-        sequence = self.build_inputs_with_special_tokens(ids, pair_ids)
-        segment_ids = self.create_token_type_ids_from_sequences(ids, pair_ids)
-
-        # Build output dictionnary
-        encoded_inputs["input_ids"] = sequence
-        if return_segment_ids:
-            encoded_inputs["segment_ids"] = segment_ids
-        if return_special_tokens_mask:
-            encoded_inputs[
-                "special_tokens_mask"] = self.get_special_tokens_mask(ids,
-                                                                      pair_ids)
-        if return_length:
-            encoded_inputs["seq_len"] = len(encoded_inputs["input_ids"])
-
-        # Check lengths
-        assert max_seq_len is None or len(encoded_inputs[
-            "input_ids"]) <= max_seq_len
-
-        # Padding
-        needs_to_be_padded = pad_to_max_seq_len and \
-                             max_seq_len and len(encoded_inputs["input_ids"]) < max_seq_len
-
-        if needs_to_be_padded:
-            difference = max_seq_len - len(encoded_inputs["input_ids"])
-            if return_input_mask:
-                encoded_inputs["input_mask"] = [1] * len(encoded_inputs[
-                    "input_ids"]) + [0] * difference
-            if return_segment_ids:
-                # 0 for padding token mask
-                encoded_inputs["segment_ids"] = (
-                    encoded_inputs["segment_ids"] + [0] * difference)
-            if return_special_tokens_mask:
-                encoded_inputs["special_tokens_mask"] = encoded_inputs[
-                    "special_tokens_mask"] + [1] * difference
-            encoded_inputs["input_ids"] = encoded_inputs["input_ids"] + [
-                self.pad_token_id
-            ] * difference
-        else:
-            if return_input_mask:
-                encoded_inputs["input_mask"] = [1] * len(encoded_inputs[
-                    "input_ids"])
-
-        if return_position_ids:
-            encoded_inputs["position_ids"] = list(
-                range(len(encoded_inputs["input_ids"])))
-
-        return encoded_inputs

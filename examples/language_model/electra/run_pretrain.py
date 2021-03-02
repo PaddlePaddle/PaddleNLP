@@ -20,6 +20,7 @@ import os
 import io
 import random
 import time
+import json
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
@@ -136,10 +137,13 @@ def parse_args():
         help="Save checkpoint every X updates steps.")
     parser.add_argument(
         "--init_from_ckpt",
-        type=bool,
-        default=False,
-        help="Whether to load model checkpoint. if True, args.model_name_or_path must be dir store ckpt"
+        action="store_true",
+        help="Whether to load model checkpoint. if True, args.model_name_or_path must be dir store ckpt or will train from fresh start"
     )
+    parser.add_argument(
+        "--use_amp",
+        action="store_true",
+        help="Whether to use float16(Automatic Mixed Precision) to train.")
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
@@ -154,9 +158,13 @@ def parse_args():
 
 
 def set_seed(args):
-    random.seed(args.seed + paddle.distributed.get_rank())
-    np.random.seed(args.seed + paddle.distributed.get_rank())
-    paddle.seed(args.seed + paddle.distributed.get_rank())
+    # Use the same data seed(for data shuffle) for all procs to guarantee data
+    # consistency after sharding.
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    # Maybe different op seeds(for dropout) for different procs is better. By:
+    # `paddle.seed(args.seed + paddle.distributed.get_rank())`
+    paddle.seed(args.seed)
 
 
 class WorkerInitObj(object):
@@ -212,12 +220,16 @@ class BookCorpus(paddle.io.Dataset):
         else:
             with io.open(input_file, "r", encoding="UTF-8") as f:
                 examples = []
-                for line in f.read().splitlines():
-                    if (len(line) > 0 and not line.isspace()):
-                        tokens = self.tokenizer(line)
-                        ids = self.tokenizer.convert_tokens_to_ids(tokens)
-                        example = self.truncation_ids(ids, self.max_seq_length)
-                        examples.append(example)
+                while True:
+                    line = f.readline()
+                    if line:
+                        if (len(line) > 0 and not line.isspace()):
+                            example = self.tokenizer(
+                                line,
+                                max_seq_len=self.max_seq_length)['input_ids']
+                            examples.append(example)
+                    else:
+                        break
                 return examples
 
     def truncation_ids(self, ids, max_seq_length):
@@ -292,25 +304,23 @@ class DataCollatorForElectra(object):
         for ids in inputs:
             if len(ids) > max_length:
                 max_length = len(ids)
-        max_length = min(max_length + 2, max_seq_length)
+        max_length = min(max_length, max_seq_length)
 
         for ids in inputs:
-            if len(ids) <= (max_length - 2):
-                padding_num = max_length - len(ids) - 2
-                full_inputs.append([cls_token_id] + ids + [sep_token_id] + (
-                    [pad_token_id] * padding_num))
-                full_maskprob.append([0] + ([self.mlm_probability] * len(ids)) +
-                                     [0] + ([0] * padding_num))
+            if len(ids) <= max_length:
+                padding_num = max_length - len(ids)
+                full_inputs.append(ids + ([pad_token_id] * padding_num))
+                full_maskprob.append([0] + ([self.mlm_probability] * (len(
+                    ids) - 2)) + [0] + ([0] * padding_num))
             else:
                 if truncation:
-                    full_inputs.append([cls_token_id] + ids[:(max_length - 2)] +
-                                       [sep_token_id])
+                    full_inputs.append(ids[:max_length])
                     full_maskprob.append([0] + ([self.mlm_probability] * (
                         max_length - 2)) + [0])
                 else:
-                    full_inputs.append([cls_token_id] + ids + [sep_token_id])
-                    full_maskprob.append([0] + ([self.mlm_probability] * len(
-                        ids)) + [0])
+                    full_inputs.append(ids)
+                    full_maskprob.append([0] + ([self.mlm_probability] * (len(
+                        ids) - 2)) + [0])
         return full_inputs, full_maskprob
 
     def mask_tokens(self, examples):
@@ -327,26 +337,26 @@ class DataCollatorForElectra(object):
         inputs = raw_inputs.clone()
         labels = raw_inputs.clone()
 
-        total_indices = paddle.bernoulli(probability_matrix).astype("bool")
-        unuse_labels = paddle.full(labels.shape, -100).astype("int64")
-        labels = paddle.where(total_indices, labels, unuse_labels)
+        total_indices = paddle.bernoulli(probability_matrix).astype(
+            "bool").numpy()
+        labels[~total_indices] = -100
 
         # 80% MASK
         indices_mask = paddle.bernoulli(paddle.full(labels.shape, 0.8)).astype(
-            "bool").logical_and(total_indices)
-        masked_inputs = paddle.full(inputs.shape, mask_token_id).astype("int64")
-        inputs = paddle.where(indices_mask, masked_inputs, inputs)
+            "bool").numpy() & total_indices
+        inputs[indices_mask] = mask_token_id
 
         # 10% Random
         indices_random = paddle.bernoulli(paddle.full(
-            labels.shape, 0.5)).astype("bool").logical_and(
-                total_indices).logical_and(indices_mask.logical_not())
+            labels.shape, 0.5)).astype("bool").numpy(
+            ) & total_indices & ~indices_mask
         random_words = paddle.randint(
             low=0,
             high=self.tokenizer.vocab_size,
             shape=labels.shape,
             dtype="int64")
-        inputs = paddle.where(indices_random, random_words, inputs)
+        inputs = paddle.where(
+            paddle.to_tensor(indices_random), random_words, inputs)
 
         # 10% Original
         return inputs, raw_inputs, labels
@@ -374,7 +384,6 @@ def create_dataloader(dataset,
         dataloader(obj:`paddle.io.DataLoader`): The dataloader which generates batches.
     """
 
-    #print("%s.data has batch_size : %s" % (mode, batch_size))
     if mode == 'train' and use_gpu:
         sampler = paddle.io.DistributedBatchSampler(
             dataset=dataset, batch_size=batch_size, shuffle=True)
@@ -422,20 +431,41 @@ def do_train(args):
             ElectraModel(**model_class.pretrained_init_configuration[
                 args.model_name_or_path + "-discriminator"]))
         model = model_class(generator, discriminator)
+        args.init_from_ckpt = False
     else:
         if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
-            # load checkpoint
+            # Load checkpoint
             tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-            for file_id, file_name in model_class.resource_files_names.items():
-                full_file_name = os.path.join(args.model_name_or_path,
-                                              file_name)
-                # to be write : load model ckpt file
+            with open(
+                    os.path.join(args.model_name_or_path, "run_states.json"),
+                    'r') as f:
+                config_dict = json.load(f)
+                model_name = config_dict["model_name"]
+            if model_name in pretrained_models:
+                generator = ElectraGenerator(
+                    ElectraModel(**model_class.pretrained_init_configuration[
+                        model_name + "-generator"]))
+                discriminator = ElectraDiscriminator(
+                    ElectraModel(**model_class.pretrained_init_configuration[
+                        model_name + "-discriminator"]))
+                model = model_class(generator, discriminator)
+                model.set_state_dict(
+                    paddle.load(
+                        os.path.join(args.model_name_or_path,
+                                     "model_state.pdparams")))
+            else:
+                raise ValueError(
+                    "initialize a model from ckpt need model_name "
+                    "in model_config_file. The supported model_name "
+                    "are as follows: {}".format(
+                        tokenizer_class.pretrained_init_configuration.keys()))
         else:
-            raise ValueError("initialize a model need identifier or the "
-                             "path to a directory instead. The supported model "
-                             "identifiers are as follows: {}".format(
-                                 model_class.pretrained_init_configuration.keys(
-                                 )))
+            raise ValueError(
+                "initialize a model need identifier or the "
+                "directory of storing model. if use identifier, the supported model "
+                "identifiers are as follows: {}, if use directory, "
+                "make sure set init_from_ckpt as True".format(
+                    model_class.pretrained_init_configuration.keys()))
 
     criterion = ElectraPretrainingCriterion(
         getattr(model.generator,
@@ -486,32 +516,90 @@ def do_train(args):
             p.name for n, p in model.named_parameters()
             if not any(nd in n for nd in ["bias", "norm"])
         ])
+    if args.use_amp:
+        scaler = paddle.amp.GradScaler(init_loss_scaling=1024)
 
     print("start train : %s" %
           (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    global_step = 0
+    trained_global_step = global_step = 0
+    t_loss = paddle.to_tensor([0.0])
+    log_loss = paddle.to_tensor([0.0])
+    loss_list = []
+    log_list = []
     tic_train = time.time()
+    if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
+        optimizer.set_state_dict(
+            paddle.load(
+                os.path.join(args.model_name_or_path, "model_state.pdopt")))
+        trained_global_step = global_step = config_dict["global_step"]
+        if trained_global_step < num_training_steps:
+            print(
+                "[ start train from checkpoint ] we have already trained %s steps, seeking next step : %s"
+                % (trained_global_step, trained_global_step + 1))
+        else:
+            print(
+                "[ start train from checkpoint ] we have already trained %s steps, but total training steps is %s, please check configuration !"
+                % (trained_global_step, num_training_steps))
+            exit(0)
+
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
+            if trained_global_step > 0:
+                trained_global_step -= 1
+                continue
             global_step += 1
             input_ids, raw_input_ids, gen_labels = batch
-            gen_logits, disc_logits, disc_labels = model(
-                input_ids=input_ids,
-                raw_input_ids=raw_input_ids,
-                gen_labels=gen_labels)
-            loss = criterion(gen_logits, disc_logits, gen_labels, disc_labels)
-            loss.backward()
-            optimizer.step()
+            if args.use_amp:
+                with paddle.amp.auto_cast():
+                    gen_logits, disc_logits, disc_labels, attention_mask = model(
+                        input_ids=input_ids,
+                        raw_input_ids=raw_input_ids,
+                        gen_labels=gen_labels)
+                    loss = criterion(gen_logits, disc_logits, gen_labels,
+                                     disc_labels, attention_mask)
+                scaled = scaler.scale(loss)
+                scaled.backward()
+                t_loss += loss.detach()
+                scaler.minimize(optimizer, scaled)
+            else:
+                gen_logits, disc_logits, disc_labels, attention_mask = model(
+                    input_ids=input_ids,
+                    raw_input_ids=raw_input_ids,
+                    gen_labels=gen_labels)
+                loss = criterion(gen_logits, disc_logits, gen_labels,
+                                 disc_labels, attention_mask)
+                loss.backward()
+                t_loss += loss.detach()
+                optimizer.step()
             lr_scheduler.step()
             optimizer.clear_gradients()
-            #print("backward done, total %s s" % (time.time() - tic_train))
-            #tic_train = time.time()
             if global_step % args.logging_steps == 0:
-                print(
-                    "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
-                    % (global_step, num_training_steps, epoch, step,
-                       paddle.distributed.get_rank(), loss, optimizer.get_lr(),
-                       args.logging_steps / (time.time() - tic_train)))
+                local_loss = (t_loss - log_loss) / args.logging_steps
+                if (args.n_gpu > 1):
+                    paddle.distributed.all_gather(loss_list, local_loss)
+                    if paddle.distributed.get_rank() == 0:
+                        log_str = (
+                            "global step {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, "
+                            "avg_loss: {4:.15f}, lr: {5:.10f}, speed: {6:.2f} s/it"
+                        ).format(global_step, num_training_steps, epoch, step,
+                                 float((paddle.stack(loss_list).sum() / len(
+                                     loss_list)).numpy()),
+                                 optimizer.get_lr(),
+                                 (time.time() - tic_train) / args.logging_steps)
+                        print(log_str)
+                        log_list.append(log_str)
+                        loss_list = []
+                else:
+                    log_str = (
+                        "global step {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, "
+                        "loss: {4:.15f}, lr: {5:.10f}, speed: {6:.2f} s/it"
+                    ).format(global_step, num_training_steps, epoch, step,
+                             float(local_loss.numpy()),
+                             optimizer.get_lr(),
+                             (time.time() - tic_train) / args.logging_steps)
+                    print(log_str)
+                    log_list.append(log_str)
+                log_loss = t_loss
                 tic_train = time.time()
             if global_step % args.save_steps == 0:
                 if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
@@ -519,16 +607,36 @@ def do_train(args):
                                               "model_%d.pdparams" % global_step)
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
-                    # need better way to get inner model of DataParallel
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
-                    #model_to_save.save_pretrained(output_dir)
+                    config_to_save = model_to_save.discriminator.electra.config
+                    run_states = {
+                        "model_name": model_name
+                        if args.init_from_ckpt else args.model_name_or_path,
+                        "global_step": global_step,
+                        "epoch": epoch,
+                        "step": step,
+                    }
+                    with open(
+                            os.path.join(output_dir, "model_config.json"),
+                            'w') as f:
+                        json.dump(config_to_save, f)
+                    with open(
+                            os.path.join(output_dir, "run_states.json"),
+                            'w') as f:
+                        json.dump(run_states, f)
                     paddle.save(model.state_dict(),
                                 os.path.join(output_dir,
                                              "model_state.pdparams"))
                     tokenizer.save_pretrained(output_dir)
                     paddle.save(optimizer.state_dict(),
                                 os.path.join(output_dir, "model_state.pdopt"))
+                    if len(log_list) > 0:
+                        with open(os.path.join(output_dir, "train.log"),
+                                  'w') as f:
+                            for log in log_list:
+                                if len(log.strip()) > 0:
+                                    f.write(log.strip() + '\n')
 
 
 def print_arguments(args):

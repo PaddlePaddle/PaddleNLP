@@ -25,16 +25,21 @@ def convert_small_example(example,
                           is_test=False):
     input_ids = []
     if task_name == 'senta':
-        for i, token in enumerate(jieba.cut(example[0])):
-            if i == max_seq_length:
-                break
-            token_id = vocab[token]
-            input_ids.append(token_id)
+        if is_tokenized:
+            example[0] = example[0][:max_seq_length]
+            input_ids = [vocab[token] for token in example[0]]
+        else:
+            for i, token in enumerate(jieba.cut(example[0])):
+                if i == max_seq_length:
+                    break
+                token_id = vocab[token]
+                input_ids.append(token_id)
+
     else:
         if is_tokenized:
             tokens = example[0][:max_seq_length]
         else:
-            tokens = vocab(example[0])[:max_seq_length]
+            tokens = vocab.tokenize(example[0])[:max_seq_length]
         input_ids = vocab.convert_tokens_to_ids(tokens)
 
     valid_length = np.array(len(input_ids), dtype='int64')
@@ -42,8 +47,7 @@ def convert_small_example(example,
     if not is_test:
         label = np.array(example[-1], dtype="int64")
         return input_ids, valid_length, label
-    else:
-        return input_ids, valid_length
+    return input_ids, valid_length
 
 
 def convert_pair_example(example,
@@ -52,7 +56,6 @@ def convert_pair_example(example,
                          is_tokenized=True,
                          max_seq_length=128,
                          is_test=False):
-    is_tokenized &= (task_name != 'senta')
     seq1 = convert_small_example([example[0], example[2]], task_name, vocab,
                                  is_tokenized, max_seq_length, is_test)[:2]
 
@@ -71,14 +74,14 @@ def convert_two_example(example,
                         vocab,
                         is_tokenized=True,
                         is_test=False):
-    is_tokenized &= (task_name != 'senta')
     bert_features = convert_example(
-        example,
+        example[1:] if task_name == 'senta' and is_tokenized else example,
         tokenizer=tokenizer,
         label_list=label_list,
         is_tokenized=is_tokenized,
         max_seq_length=max_seq_length,
         is_test=is_test)
+
     if task_name == 'qqp':
         small_features = convert_pair_example(
             example, task_name, vocab, is_tokenized, max_seq_length, is_test)
@@ -143,27 +146,22 @@ def convert_example(example,
             label = label_map[label]
         label = np.array([label], dtype=label_dtype)
 
-    if is_tokenized:
-        tokens_raw = example
+    # Tokenize raw text
+    if len(example) == 1:
+        example = tokenizer(
+            example[0],
+            max_seq_len=max_seq_length,
+            is_split_into_words=is_tokenized)
     else:
-        # Tokenize raw text
-        tokens_raw = [tokenizer(l) for l in example]
-    # Truncate to the truncate_length,
-    tokens_trun = _truncate_seqs(tokens_raw, max_seq_length)
+        example = tokenizer(
+            example[0],
+            text_pair=example[1],
+            max_seq_len=max_seq_length,
+            is_split_into_words=is_tokenized)
 
-    # Concate the sequences with special tokens
-    tokens_trun[0] = [tokenizer.cls_token] + tokens_trun[0]
-    tokens, segment_ids, _ = _concat_seqs(tokens_trun, [[tokenizer.sep_token]] *
-                                          len(tokens_trun))
-    # Convert the token to ids
-    input_ids = tokenizer.convert_tokens_to_ids(tokens)
-    valid_length = len(input_ids)
-    # The mask has 1 for real tokens and 0 for padding tokens. Only real
-    # tokens are attended to.
-    # input_mask = [1] * len(input_ids)
     if not is_test:
-        return input_ids, segment_ids, valid_length, label
-    else:
-        return input_ids, segment_ids, valid_length
+        return example['input_ids'], example['segment_ids'], len(example[
+            'input_ids']), label
 
-        return output_list
+    return example['input_ids'], example['segment_ids'], len(example[
+        'input_ids'])
