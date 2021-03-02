@@ -25,7 +25,7 @@ import paddle
 from paddle.io import DataLoader
 
 import paddlenlp as ppnlp
-from paddlenlp.datasets.experimental import load_dataset
+from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
 
@@ -72,6 +72,7 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
         is_split_into_words=True,
         max_seq_len=max_seq_len)
 
+    # -2 for [CLS] and [SEP]
     if len(tokenized_input['input_ids']) - 2 < len(labels):
         labels = labels[:len(tokenized_input['input_ids']) - 2]
     tokenized_input['labels'] = [no_entity_id] + labels + [no_entity_id]
@@ -113,11 +114,11 @@ def parse_decodes(input_words, id2label, decodes, lens):
 def do_predict(args):
     paddle.set_device("gpu" if args.use_gpu else "cpu")
 
-    train_dataset, predict_dataset = load_dataset(
+    train_ds, predict_ds = load_dataset(
         'msra_ner', splits=('train', 'test'), lazy=False)
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
 
-    label_list = train_dataset.label_list
+    label_list = train_ds.label_list
     label_num = len(label_list)
     no_entity_id = label_num - 1
     trans_func = partial(
@@ -128,18 +129,18 @@ def do_predict(args):
 
     ignore_label = -100
     batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input
-        'segment_ids': Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # segment
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+        'token_tpye_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
         'seq_len': Stack(),
         'labels': Pad(axis=0, pad_val=ignore_label)  # label
     }): fn(samples)
-    raw_data = predict_dataset.data
+    raw_data = predict_ds.data
 
-    id2label = dict(enumerate(predict_dataset.label_list))
+    id2label = dict(enumerate(predict_ds.label_list))
 
-    predict_dataset = predict_dataset.map(trans_func)
+    predict_ds = predict_ds.map(trans_func)
     predict_data_loader = DataLoader(
-        dataset=predict_dataset,
+        dataset=predict_ds,
         collate_fn=batchify_fn,
         num_workers=0,
         batch_size=args.batch_size,
@@ -155,8 +156,8 @@ def do_predict(args):
     pred_list = []
     len_list = []
     for step, batch in enumerate(predict_data_loader):
-        input_ids, segment_ids, length, labels = batch
-        logits = model(input_ids, segment_ids)
+        input_ids, token_tpye_ids, length, labels = batch
+        logits = model(input_ids, token_tpye_ids)
         pred = paddle.argmax(logits, axis=-1)
         pred_list.append(pred.numpy())
         len_list.append(length.numpy())

@@ -12,7 +12,7 @@
 
 - paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
 
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp\>=2.0.0rc`
+- paddlenlp >= 2.0.0rc4, 安装方式：`pip install paddlenlp\>=2.0.0rc4`
 
 
 ### 2.2 数据准备

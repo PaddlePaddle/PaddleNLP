@@ -26,7 +26,7 @@ from paddle.io import DataLoader
 import paddlenlp as ppnlp
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.datasets.experimental import load_dataset
+from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 
@@ -109,8 +109,8 @@ def evaluate(model, loss_fct, metric, data_loader, label_num):
     metric.reset()
     avg_loss, precision, recall, f1_score = 0, 0, 0, 0
     for batch in data_loader:
-        input_ids, segment_ids, length, labels = batch
-        logits = model(input_ids, segment_ids)
+        input_ids, token_tpye_ids, length, labels = batch
+        logits = model(input_ids, token_tpye_ids)
         loss = loss_fct(logits.reshape([-1, label_num]), labels.reshape([-1]))
         avg_loss = paddle.mean(loss)
         preds = logits.argmax(axis=2)
@@ -134,6 +134,7 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
         is_split_into_words=True,
         max_seq_len=max_seq_len)
 
+    # -2 for [CLS] and [SEP]
     if len(tokenized_input['input_ids']) - 2 < len(labels):
         labels = labels[:len(tokenized_input['input_ids']) - 2]
     tokenized_input['labels'] = [no_entity_id] + labels + [no_entity_id]
@@ -148,12 +149,12 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    train_dataset, test_dataset = load_dataset(
+    train_ds, test_ds = load_dataset(
         'msra_ner', splits=('train', 'test'), lazy=False)
 
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
 
-    label_list = train_dataset.label_list
+    label_list = train_ds.label_list
     label_num = len(label_list)
     no_entity_id = label_num - 1
 
@@ -163,30 +164,31 @@ def do_train(args):
         no_entity_id=no_entity_id,
         max_seq_len=args.max_seq_length)
 
-    train_dataset = train_dataset.map(trans_func)
-
-    train_dataset = train_dataset.shard()
+    train_ds = train_ds.map(trans_func)
 
     ignore_label = -100
 
     batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input
-        'segment_ids': Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # segment
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+        'token_tpye_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
         'seq_len': Stack(),
         'labels': Pad(axis=0, pad_val=ignore_label)  # label
     }): fn(samples)
 
+    train_batch_sampler = paddle.io.DistributedBatchSampler(
+        train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)
+
     train_data_loader = DataLoader(
-        dataset=train_dataset,
+        dataset=train_ds,
         collate_fn=batchify_fn,
         num_workers=0,
-        batch_size=args.batch_size,
+        batch_sampler=train_batch_sampler,
         return_list=True)
 
-    test_dataset = test_dataset.map(trans_func)
+    test_ds = test_ds.map(trans_func)
 
     test_data_loader = DataLoader(
-        dataset=test_dataset,
+        dataset=test_ds,
         collate_fn=batchify_fn,
         num_workers=0,
         batch_size=args.batch_size,
@@ -218,12 +220,13 @@ def do_train(args):
     metric = ChunkEvaluator(label_list=label_list)
 
     global_step = 0
+    last_step = args.num_train_epochs * len(train_data_loader)
     tic_train = time.time()
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
-            input_ids, segment_ids, _, labels = batch
-            logits = model(input_ids, segment_ids)
+            input_ids, token_tpye_ids, _, labels = batch
+            logits = model(input_ids, token_tpye_ids)
             loss = loss_fct(
                 logits.reshape([-1, label_num]), labels.reshape([-1]))
             avg_loss = paddle.mean(loss)
@@ -237,21 +240,13 @@ def do_train(args):
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_gradients()
-            if global_step % args.save_steps == 0:
+            if global_step % args.save_steps == 0 or global_step == last_step:
                 if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
                     evaluate(model, loss_fct, metric, test_data_loader,
                              label_num)
                     paddle.save(model.state_dict(),
                                 os.path.join(args.output_dir,
                                              "model_%d.pdparams" % global_step))
-
-    # Save final model 
-    if (global_step) % args.save_steps != 0:
-        if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
-            evaluate(model, loss_fct, metric, test_data_loader, label_num)
-            paddle.save(model.state_dict(),
-                        os.path.join(args.output_dir,
-                                     "model_%d.pdparams" % global_step))
 
 
 if __name__ == "__main__":
