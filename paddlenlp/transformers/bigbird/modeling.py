@@ -101,14 +101,16 @@ class Mask(object):
             if self.num_global_blocks > left_key_block_idx:
                 num_fill_blocks = self.num_global_blocks - left_key_block_idx
                 illegal_blocks_idx.extend([
-                    i for i in range(self.num_key_blocks - num_fill_blocks,
-                                     self.num_key_blocks)
+                    i
+                    for i in range(self.num_key_blocks - num_fill_blocks,
+                                   self.num_key_blocks)
                 ])
             if right_key_block_idx >= self.num_key_blocks:
                 num_fill_blocks = right_key_block_idx - self.num_key_blocks + 1
                 illegal_blocks_idx.extend([
-                    i for i in range(self.num_global_blocks,
-                                     self.num_global_blocks + num_fill_blocks)
+                    i
+                    for i in range(self.num_global_blocks,
+                                   self.num_global_blocks + num_fill_blocks)
                 ])
 
             illegal_blocks_idx = set(illegal_blocks_idx)
@@ -259,14 +261,12 @@ class TransformerEncoder(Layer):
             output = self.norm(output)
 
         for i, mod in enumerate(self.layers):
-            rand_mask_id = None
-            if rand_mask_idx_list is not None:
-                rand_mask_id = rand_mask_idx_list[i]
             if src_mask_list is None:
-                output = mod(output, None, rand_mask_id, query_mask, key_mask)
-            else:
-                output = mod(output, src_mask_list[i], rand_mask_id, query_mask,
+                output = mod(output, None, rand_mask_idx_list[i], query_mask,
                              key_mask)
+            else:
+                output = mod(output, src_mask_list[i], rand_mask_idx_list[i],
+                             query_mask, key_mask)
 
         if self.normalize_before:
             output = self.norm(output)
