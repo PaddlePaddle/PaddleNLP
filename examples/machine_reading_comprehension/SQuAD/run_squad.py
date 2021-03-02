@@ -1,4 +1,3 @@
-import collections
 import os
 import random
 import time
@@ -39,8 +38,9 @@ def evaluate(model, data_loader, args):
     tic_eval = time.time()
 
     for batch in data_loader:
-        input_ids, segment_ids = batch
-        start_logits_tensor, end_logits_tensor = model(input_ids, segment_ids)
+        input_ids, token_type_ids = batch
+        start_logits_tensor, end_logits_tensor = model(input_ids,
+                                                       token_type_ids)
 
         for idx in range(start_logits_tensor.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
@@ -136,7 +136,7 @@ def run(args):
             offsets = tokenized_example['offset_mapping']
 
             # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-            sequence_ids = tokenized_example['segment_ids']
+            sequence_ids = tokenized_example['token_type_ids']
 
             # One example can give several spans, this is the index of the example containing this span of text.
             sample_index = tokenized_example['overflow_to_sample']
@@ -192,10 +192,10 @@ def run(args):
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
         train_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input
-            "segment_ids": Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # segment
-            "start_positions": Stack(dtype="int64"),  # start_pos
-            "end_positions": Stack(dtype="int64")  # end_pos
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            "start_positions": Stack(dtype="int64"),
+            "end_positions": Stack(dtype="int64")
         }): fn(samples)
 
         train_data_loader = DataLoader(
@@ -226,9 +226,10 @@ def run(args):
         for epoch in range(args.num_train_epochs):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
-                input_ids, segment_ids, start_positions, end_positions = batch
+                input_ids, token_type_ids, start_positions, end_positions = batch
 
-                logits = model(input_ids=input_ids, token_type_ids=segment_ids)
+                logits = model(
+                    input_ids=input_ids, token_type_ids=token_type_ids)
                 loss = criterion(logits, (start_positions, end_positions))
 
                 if global_step % args.logging_steps == 0:
@@ -242,7 +243,7 @@ def run(args):
                 lr_scheduler.step()
                 optimizer.clear_gradients()
 
-                if global_step % args.save_steps == 0:
+                if global_step % args.save_steps == 0 or global_step == num_training_steps:
                     if (not args.n_gpu > 1
                         ) or paddle.distributed.get_rank() == 0:
                         output_dir = os.path.join(args.output_dir,
@@ -255,17 +256,6 @@ def run(args):
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
                         print('Saving checkpoint to:', output_dir)
-
-        if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
-            output_dir = os.path.join(args.output_dir, "model_%d" % global_step)
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
-            # need better way to get inner model of DataParallel
-            model_to_save = model._layers if isinstance(
-                model, paddle.DataParallel) else model
-            model_to_save.save_pretrained(output_dir)
-            tokenizer.save_pretrained(output_dir)
-            print('Saving checkpoint to:', output_dir)
 
     def prepare_validation_features(examples):
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
@@ -285,7 +275,7 @@ def run(args):
         # For validation, there is no need to compute start and end positions
         for i, tokenized_example in enumerate(tokenized_examples):
             # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-            sequence_ids = tokenized_example['segment_ids']
+            sequence_ids = tokenized_example['token_type_ids']
 
             # One example can give several spans, this is the index of the example containing this span of text.
             sample_index = tokenized_example['overflow_to_sample']
@@ -300,7 +290,7 @@ def run(args):
 
         return tokenized_examples
 
-    if args.do_pred:
+    if args.do_predict:
         if args.predict_file:
             dev_ds = load_dataset('sqaud', data_files=args.predict_file)
         elif args.version_2_with_negative:
@@ -313,8 +303,8 @@ def run(args):
             dev_ds, batch_size=args.batch_size, shuffle=False)
 
         dev_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input
-            "segment_ids": Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token])  # segment
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
         }): fn(samples)
 
         dev_data_loader = DataLoader(

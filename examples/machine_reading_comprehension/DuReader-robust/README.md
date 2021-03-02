@@ -41,7 +41,7 @@ DuReader-robust数据集是单篇章、抽取式阅读理解数据集，具体�
 
 ### 数据准备
 
-为了方便开发者进行测试，我们内置了数据下载脚本，也可以通过`--data_path`传入本地数据集的位置，数据集需保证与DuReader-robust数据集格式一致。
+为了方便开发者进行测试，我们内置了数据下载脚本，也可以通过`--train_file`和`--predict_file`传入本地数据集的位置，数据集需保证与DuReader-robust数据集格式一致。
 
 
 ### Fine-tune
@@ -50,7 +50,7 @@ DuReader-robust数据集是单篇章、抽取式阅读理解数据集，具体�
 
 ```shell
 python -u ./run_du.py \
-    --task_name dureader-robust \
+    --task_name dureader_robust \
     --model_type bert \
     --model_name_or_path bert-base-chinese \
     --max_seq_length 384 \
@@ -61,14 +61,18 @@ python -u ./run_du.py \
     --save_steps 1000 \
     --warmup_proportion 0.1 \
     --weight_decay 0.01 \
-    --output_dir ./tmp/dureader-robust/ \
+    --output_dir ./tmp/dureader_robust/ \
+    --do_predict \
+    --do_train \
     --n_gpu 1 \
  ```
 
-* `task_name`: 数据集的名称，不区分大小写，如dureader-robust，cmrc等。
+* `task_name`: 数据集的名称，不区分大小写，如dureader_robust，cmrc2018, drcd。
 * `model_type`: 预训练模型的种类。如bert，ernie，roberta等。
-* `model_name_or_path`: 预训练模型的具体名称。如bert-base-uncased，bert-large-cased等。或者是模型文件的本地路径。
+* `model_name_or_path`: 预训练模型的具体名称。如bert-base-chinese，roberta-wwm-ext等。或者是模型文件的本地路径。
 * `output_dir`: 保存模型checkpoint的路径。
+* `do_train`: 是否进行训练。
+* `do_predict`: 是否进行预测。
 
 训练结束后模型会自动对结果进行评估，得到类似如下的输出：
 
