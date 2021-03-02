@@ -49,11 +49,16 @@ class BigBirdTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
             "bigbird-base-uncased":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/sentencepiece_gpt2.model",
+            "bigbird-base-uncased-finetune":
             "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/sentencepiece_gpt2.model"
         },
     }
     pretrained_init_configuration = {
         "bigbird-base-uncased": {
+            "do_lower_case": True
+        },
+        "bigbird-base-uncased-finetune": {
             "do_lower_case": True
         }
     }
@@ -149,9 +154,14 @@ class BigBirdTokenizer(PretrainedTokenizer):
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
 
-    def encode(self, text, max_seq_len=None, max_pred_len=None, masked_lm_prob=0.15):
+    def encode(self,
+               text,
+               max_seq_len=None,
+               max_pred_len=None,
+               masked_lm_prob=0.15):
         """
         """
+
         def get_input_ids(text):
             if isinstance(text, str):
                 text = re.sub('[\n]+', '', text)
@@ -174,7 +184,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
         # Find the span for in the text 
         max_seq_len = len(ids) if max_seq_len is None else max_seq_len
         max_pred_len = len(ids) if max_pred_len is None else max_pred_len
-    
+
         end_pos = max_seq_len - 2 + np.random.randint(
             max(1, len(ids) - max_seq_len - 2))
         start_pos = max(0, end_pos - max_seq_len + 2)
@@ -206,9 +216,9 @@ class BigBirdTokenizer(PretrainedTokenizer):
                 replace=False),
             0)
         if len(masked_lm_positions) > max_pred_len:
-            masked_lm_positions = masked_lm_positions[:max_pred_len+1]
-            truncate_masking_flag = np.flatnonzero(
-                            word_begin_flag[masked_lm_positions])[-1]
+            masked_lm_positions = masked_lm_positions[:max_pred_len + 1]
+            truncate_masking_flag = np.flatnonzero(word_begin_flag[
+                masked_lm_positions])[-1]
             masked_lm_positions = masked_lm_positions[:truncate_masking_flag]
         span_ids = np.array(span_ids, dtype="int32")
         masked_lm_positions = np.sort(masked_lm_positions)
@@ -219,10 +229,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
         random_pos = masked_lm_positions[random_prob > 0.9]
         span_ids[mask_pos] = self.mask_id
         span_ids[random_pos] = np.random.randint(
-            self.unk_id+1,
-            self.vocab_size,
-            len(random_pos),
-            dtype=np.int32)
+            self.unk_id + 1, self.vocab_size, len(random_pos), dtype=np.int32)
         span_ids = np.concatenate([
             np.array(
                 [self.cls_id], dtype=np.int32), span_ids, np.array(
