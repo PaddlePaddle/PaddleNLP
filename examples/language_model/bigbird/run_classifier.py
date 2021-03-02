@@ -15,8 +15,12 @@
 import argparse
 import collections
 
-import numpy as np
+import os
+import random
+from functools import partial
+import time
 
+import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
@@ -27,67 +31,31 @@ from paddlenlp.utils.log import logger
 from paddlenlp.datasets import Imdb
 from paddlenlp.data import Stack
 
-import os
-import random
-from functools import partial
-import time
-
-parser = argparse.ArgumentParser(__doc__)
-parser.add_argument(
-    "--batch_size",
-    default=2,
-    type=int,
-    help="Batch size per GPU/CPU for training.", )
-parser.add_argument(
-    "--n_gpu", type=int, default=1, help="number of gpus to use, 0 for cpu.")
-parser.add_argument(
-    "--max_encoder_length",
-    type=int,
-    default=3072,
-    help="The maximum total input sequence length after SentencePiece tokenization."
-)
-parser.add_argument(
-    "--num_train_steps",
-    default=10000,
-    type=int,
-    help="Linear warmup over warmup_steps.")
-parser.add_argument(
-    "--lr", type=float, default=1e-5, help="Learning rate used to train.")
-parser.add_argument(
-    "--save_steps",
-    type=int,
-    default=100,
-    help="Save checkpoint every X updates steps.")
-parser.add_argument(
-    "--logging_steps", type=int, default=100, help="Log every X updates steps.")
-parser.add_argument(
-    "--save_dir",
-    type=str,
-    default='checkpoints/',
-    help="Directory to save model checkpoint")
-parser.add_argument(
-    "--epochs", type=int, default=10, help="Number of epoches for training.")
-parser.add_argument(
-    "--model_name_or_path",
-    type=str,
-    default="bigbird-base-uncased",
-    help="pretraining model name or path")
-
+# yapf: disable
+parser = argparse.ArgumentParser()
+parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--max_encoder_length", type=int, default=3072, help="The maximum total input sequence length after SentencePiece tokenization.")
+parser.add_argument("--num_train_steps", default=10000, type=int, help="Linear warmup over warmup_steps.")
+parser.add_argument("--lr", type=float, default=1e-5, help="Learning rate used to train.")
+parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
+parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
+parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
+parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")
+parser.add_argument("--model_name_or_path", type=str, default="bigbird-base-uncased", help="pretraining model name or path")
+parser.add_argument("--attn_dropout", type=float, default=0.0, help="Attention ffn model dropout.")
+parser.add_argument("--hidden_dropout_prob", type=float, default=0.0, help="The dropout rate for the embedding pooler.")
+parser.add_argument("--device", type=str, default="gpu", help="Select cpu, gpu, xpu devices to train model.")
+# yapf: enable
 args = parser.parse_args()
 
 
-def create_dataloader(batch_size,
-                      max_encoder_length,
-                      tokenizer,
-                      pad_val=0,
-                      cls_token_id=65,
-                      sep_token_id=66):
+def create_dataloader(batch_size, max_encoder_length, tokenizer, pad_val=0):
     def _tokenize(text):
-        input_ids = [cls_token_id]
+        input_ids = [tokenizer.cls_id]
         input_ids.extend(
             tokenizer.convert_tokens_to_ids(
-                tokenizer(text)[:max_encoder_length - 2]))
-        input_ids.append(sep_token_id)
+                tokenizer._tokenize(text)[:max_encoder_length - 2]))
+        input_ids.append(tokenizer.sep_id)
         input_len = len(input_ids)
         if input_len < max_encoder_length:
             input_ids.extend([pad_val] * (max_encoder_length - input_len))
@@ -99,9 +67,17 @@ def create_dataloader(batch_size,
         out = [None] * num_fields
         out[0] = stack_fn([_tokenize(x[0]) for x in data])
         out[1] = stack_fn([x[1] for x in data])
+        seq_len = len(out[0][0])
+        # Construct the random attention mask for the random attention
+        rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
+            config["num_layers"], seq_len, seq_len, config["nhead"],
+            config["block_size"], config["window_size"],
+            config["num_global_blocks"], config["num_rand_blocks"],
+            config["seed"])
+        out.extend(rand_mask_idx_list)
         return out
 
-    def _create_dataloader(mode, tokenizer, max_encoder_length, pad_val):
+    def _create_dataloader(mode, tokenizer, max_encoder_length, pad_val=0):
         dataset = Imdb(mode=mode)
         batch_sampler = paddle.io.BatchSampler(
             dataset, batch_size=batch_size, shuffle=(mode == "train"))
@@ -119,100 +95,70 @@ def create_dataloader(batch_size,
     return train_data_loader, test_data_loader
 
 
-class Timer(object):
-    def __init__(self):
-        self.reset()
-
-    def tick(self):
-        self._start = time.perf_counter()
-
-    def tac(self):
-        curr = time.perf_counter()
-        self._accumulate += curr - self._start
-
-    def accumulate(self):
-        '''
-        return second
-        '''
-        return self._accumulate
-
-    def reset(self):
-        self._start = -1
-        self._accumulate = 0
-
-
 def main():
+    # Initialization for the parallel enviroment
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-    tokenizer = BigBirdTokenizer.from_pretrained(args.model_name_or_path)
-    train_data_loader, test_data_loader = \
-            create_dataloader(args.batch_size, args.max_encoder_length, tokenizer)
 
-    model = BigBirdForTokenClassification.from_pretrained(
-        args.model_name_or_path)
+    # Define the model and metric 
+    bigbird_model = BigBirdModel.from_pretrained(
+        args.model_name_or_path,
+        attn_dropout=args.attn_dropout,
+        hidden_dropout_prob=args.hidden_dropout_prob)
+    #bigbird_model = BigBirdModel.from_pretrained(args.model_name_or_path)
+    model = BigBirdForTokenClassification(bigbird_model)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
     criterion = nn.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
-    # define optimizer
+
+    # Define the tokenizer and dataloader
+    tokenizer = BigBirdTokenizer.from_pretrained(args.model_name_or_path)
+    global config
+    config = BigBirdModel.pretrained_init_configuration[args.model_name_or_path]
+    train_data_loader, test_data_loader = \
+            create_dataloader(args.batch_size, args.max_encoder_length, tokenizer)
+
+    # Define the Adam optimizer 
     optimizer = paddle.optimizer.Adam(
-        parameters=model.parameters(), learning_rate=args.lr, epsilon=1e-6)
+        parameters=model.parameters(), learning_rate=args.lr, epsilon=1e-7)
 
-    bigbirdConfig = BigBirdModel.pretrained_init_configuration[
-        args.model_name_or_path]
+    # Finetune the classification model
     do_train(model, criterion, metric, optimizer, train_data_loader,
-             test_data_loader, bigbirdConfig)
+             test_data_loader)
 
-    do_evalute(model, criterion, metric, test_data_loader, bigbirdConfig)
+    # Evaluate the finetune model
+    do_evalute(model, criterion, metric, test_data_loader)
 
 
 def do_train(model, criterion, metric, optimizer, train_data_loader,
-             test_data_loader, config):
+             test_data_loader):
     model.train()
     global_steps = 0
-    data_process_timer = Timer()
-    train_timer = Timer()
+    tic_train = time.time()
     for epoch in range(args.epochs):
-        if global_steps > args.num_train_steps:
-            break
         for step, batch in enumerate(train_data_loader):
             global_steps += 1
-            (input_ids, labels) = batch
-            seq_len = input_ids.shape[1]
-            # create band mask
-            data_process_timer.tick()
-
-            rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
-                config["num_layers"], seq_len, seq_len, config["nhead"],
-                config["block_size"], config["window_size"],
-                config["num_global_blocks"], config["num_rand_blocks"],
-                config["seed"])
-
-            data_process_timer.tac()
-
-            train_timer.tick()
+            input_ids, labels = batch[:2]
+            rand_mask_idx_list = batch[2:]
 
             output = model(input_ids, None, rand_mask_idx_list)
             loss = criterion(output, labels)
             loss.backward()
             optimizer.step()
             optimizer.clear_gradients()
-
-            train_timer.tac()
-
             correct = metric.compute(output, labels)
             metric.update(correct)
-            # print loss
-            if global_steps % args.logging_steps == 0:
-                logger.info("global step %d, epoch: %d, loss: %f, acc %f" %
-                            (global_steps, epoch, loss, metric.accumulate()))
-                logger.info(
-                    "Data processing spend %f s, training spend %f s" %
-                    (data_process_timer.accumulate(), train_timer.accumulate()))
-                data_process_timer.reset()
-                train_timer.reset()
 
-            # save model
+            if global_steps % args.logging_steps == 0 and \
+                paddle.distributed.get_rank() == 0:
+                logger.info(
+                    "train: global step %d, epoch: %d, loss: %f, acc:%f, speed: %.2f step/s"
+                    % (global_steps, epoch, loss, metric.accumulate(),
+                       args.logging_steps / (time.time() - tic_train)))
+                tic_train = time.time()
+
             if global_steps % args.save_steps == 0:
                 output_dir = os.path.join(args.save_dir,
                                           "model_%d.pdparams" % (global_steps))
@@ -222,43 +168,30 @@ def do_train(model, criterion, metric, optimizer, train_data_loader,
                     model, paddle.DataParallel) else model
                 model_to_save.save_pretrained(output_dir)
 
-            if global_steps > args.num_train_steps:
+            if global_steps >= args.num_train_steps:
                 break
-
-        logger.info("global step %d, epoch: %d, loss: %f, acc %f" %
-                    (global_steps, epoch, loss, metric.accumulate()))
         metric.reset()
 
 
 @paddle.no_grad()
-def do_evalute(model, criterion, metric, test_data_loader, config):
+def do_evalute(model, criterion, metric, test_data_loader):
     model.eval()
     global_steps = 0
     for step, batch in enumerate(test_data_loader):
         global_steps += 1
-        (input_ids, labels) = batch
-        seq_len = input_ids.shape[1]
-        # create band mask
-        rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
-            config["num_layers"], seq_len, seq_len, config["nhead"],
-            config["block_size"], config["window_size"],
-            config["num_global_blocks"], config["num_rand_blocks"],
-            config["seed"])
+        input_ids, labels = batch[:2]
+        rand_mask_idx_list = batch[2:]
         output = model(input_ids, None, rand_mask_idx_list)
         loss = criterion(output, labels)
         correct = metric.compute(output, labels)
         metric.update(correct)
         if global_steps % args.logging_steps == 0:
-            logger.info("global step %d, loss: %f, acc %f" %
+            logger.info("eval: global step %d, loss: %f, acc %f" %
                         (global_steps, loss, metric.accumulate()))
-    logger.info("global step %d: loss: %f, acc %f" %
-                (global_steps, loss, metric.accumulate()))
+    logger.info("final eval: loss: %f, acc %f" % (loss, metric.accumulate()))
     metric.reset()
     model.train()
 
 
 if __name__ == "__main__":
-    if args.n_gpu > 1:
-        dist.spawn(main, args=(), nprocs=args.n_gpu)
-    else:
-        main()
+    main()

@@ -101,16 +101,14 @@ class Mask(object):
             if self.num_global_blocks > left_key_block_idx:
                 num_fill_blocks = self.num_global_blocks - left_key_block_idx
                 illegal_blocks_idx.extend([
-                    i
-                    for i in range(self.num_key_blocks - num_fill_blocks,
-                                   self.num_key_blocks)
+                    i for i in range(self.num_key_blocks - num_fill_blocks,
+                                     self.num_key_blocks)
                 ])
             if right_key_block_idx >= self.num_key_blocks:
                 num_fill_blocks = right_key_block_idx - self.num_key_blocks + 1
                 illegal_blocks_idx.extend([
-                    i
-                    for i in range(self.num_global_blocks,
-                                   self.num_global_blocks + num_fill_blocks)
+                    i for i in range(self.num_global_blocks,
+                                     self.num_global_blocks + num_fill_blocks)
                 ])
 
             illegal_blocks_idx = set(illegal_blocks_idx)
@@ -343,7 +341,7 @@ class BigBirdPretrainedModel(PretrainedModel):
             "num_layers": 12,
             "vocab_size": 50358,
             "nhead": 12,
-            "attn_dropout": 0,
+            "attn_dropout": 0.1,
             "dim_feedforward": 3072,
             "activation": "gelu",
             "normalize_before": False,
@@ -354,7 +352,7 @@ class BigBirdPretrainedModel(PretrainedModel):
             "seed": None,
             "pad_token_id": 0,
             "hidden_size": 768,
-            "hidden_dropout_prob": 0,
+            "hidden_dropout_prob": 0.1,
             "max_position_embeddings": 4096,
             "type_vocab_size": 2,
             "num_labels": 2,
@@ -564,11 +562,12 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
 
 
 class BigBirdPretrainingCriterion(paddle.nn.Layer):
-    def __init__(self, vocab_size):
+    def __init__(self, vocab_size, use_nsp=False):
         super(BigBirdPretrainingCriterion, self).__init__()
         # CrossEntropyLoss is expensive since the inner reshape (copy)
         self.loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=-1)
         self.vocab_size = vocab_size
+        self.use_nsp = use_nsp
 
     def forward(self, prediction_scores, seq_relationship_score,
                 masked_lm_labels, next_sentence_labels, masked_lm_scale,
@@ -578,6 +577,8 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
         masked_lm_loss = paddle.transpose(masked_lm_loss, [1, 0])
         masked_lm_loss = paddle.sum(masked_lm_loss * masked_lm_weights) / (
             paddle.sum(masked_lm_weights) + 1e-5)
+        if not self.use_nsp:
+            return masked_lm_loss
         next_sentence_loss = paddle.nn.functional.softmax_with_cross_entropy(
             seq_relationship_score, next_sentence_labels)
         return masked_lm_loss + paddle.mean(next_sentence_loss)
