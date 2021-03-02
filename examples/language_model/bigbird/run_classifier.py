@@ -36,7 +36,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--max_encoder_length", type=int, default=3072, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--num_train_steps", default=10000, type=int, help="Linear warmup over warmup_steps.")
-parser.add_argument("--lr", type=float, default=1e-5, help="Learning rate used to train.")
+parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate used to train.")
 parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
 parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
 parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
@@ -106,7 +106,6 @@ def main():
         args.model_name_or_path,
         attn_dropout=args.attn_dropout,
         hidden_dropout_prob=args.hidden_dropout_prob)
-    #bigbird_model = BigBirdModel.from_pretrained(args.model_name_or_path)
     model = BigBirdForTokenClassification(bigbird_model)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -122,7 +121,9 @@ def main():
 
     # Define the Adam optimizer 
     optimizer = paddle.optimizer.Adam(
-        parameters=model.parameters(), learning_rate=args.lr, epsilon=1e-7)
+        parameters=model.parameters(),
+        learning_rate=args.learning_rate,
+        epsilon=1e-7)
 
     # Finetune the classification model
     do_train(model, criterion, metric, optimizer, train_data_loader,
