@@ -1,3 +1,17 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import ast
 import time
@@ -8,16 +22,15 @@ import paddle
 from tqdm import tqdm
 import paddle.nn as nn
 from paddle.io import DataLoader
-from paddlenlp.transformers import ErnieForGeneration
-from paddlenlp.transformers import ErnieTokenizer, ErnieTinyTokenizer, BertTokenizer, ElectraTokenizer, RobertaTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import ErnieForGeneration, ErnieTokenizer, ErnieTinyTokenizer, BertTokenizer, ElectraTokenizer, RobertaTokenizer, LinearDecayWithWarmup
 from paddlenlp.datasets import Poetry
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.metrics import Rouge1, Rouge2
 from paddlenlp.utils.log import logger
 
 from encode import convert_example, after_padding
-from decode import beam_search_infilling, post_process, greedy_search_infilling
+from decode import post_process, beam_search_infilling
+from model import StackModel
 
 # yapf: disable
 parser = argparse.ArgumentParser('seq2seq model with ERNIE-GEN')
@@ -173,8 +186,12 @@ def train():
         return_list=True)
 
     label_num = model.word_emb.weight.shape[0]
+    train_model = StackModel(model)
     if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
+        # All 'forward' outputs derived from the module parameters using in DataParallel
+        # must participate in the calculation of losses and subsequent gradient calculations.
+        # So we use StackModel here to make the model only output loss in its 'forward' function. 
+        train_model = paddle.DataParallel(train_model)
 
     max_steps = len(train_data_loader) * args.num_epochs
 
@@ -203,39 +220,15 @@ def train():
              mask_src_2_src, mask_tgt_2_srctgt, mask_attn_2_srctgtattn,
              tgt_labels, _) = batch
             # import pdb; pdb.set_trace()
-            _, __, info = model(
-                src_ids,
-                sent_ids=src_sids,
-                pos_ids=src_pids,
-                attn_bias=mask_src_2_src,
-                encode_only=True)
-            cached_k, cached_v = info['caches']
-            _, __, info = model(
-                tgt_ids,
-                sent_ids=tgt_sids,
-                pos_ids=tgt_pids,
-                attn_bias=mask_tgt_2_srctgt,
-                past_cache=(cached_k, cached_v),
-                encode_only=True)
-            cached_k2, cached_v2 = info['caches']
-            past_cache_k = [
-                paddle.concat([k, k2], 1) for k, k2 in zip(cached_k, cached_k2)
-            ]
-            past_cache_v = [
-                paddle.concat([v, v2], 1) for v, v2 in zip(cached_v, cached_v2)
-            ]
             if args.label_smooth > 0.:
                 tgt_labels = nn.functional.label_smooth(
                     nn.functional.one_hot(tgt_labels, label_num),
                     epsilon=args.label_smooth)
-            loss, _, __ = model(
-                attn_ids,
-                sent_ids=tgt_sids,
-                pos_ids=tgt_pids,
-                attn_bias=mask_attn_2_srctgtattn,
-                past_cache=(past_cache_k, past_cache_v),
-                tgt_labels=tgt_labels,
-                tgt_pos=paddle.nonzero(attn_ids == attn_id))
+            tgt_pos = paddle.nonzero(attn_ids == attn_id)
+            loss = train_model(src_ids, src_sids, src_pids, tgt_ids, tgt_sids,
+                               tgt_pids, attn_ids, mask_src_2_src,
+                               mask_tgt_2_srctgt, mask_attn_2_srctgtattn,
+                               tgt_labels, tgt_pos)
             if global_step % args.logging_steps == 0:
                 if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
                     logger.info(
