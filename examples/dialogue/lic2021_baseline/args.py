@@ -16,7 +16,7 @@ def parse_args():
     parser.add_argument('--seed', type=int, default=2021, help='Random seed for initialization.')
     parser.add_argument('--n_gpus', type=int, default=1, help='The number of gpus to use, 0 for cpu.')
     parser.add_argument('--batch_size', type=int, default=8192, help='Batch size per GPU/CPU for training.')
-    parser.add_argument('--infer_batch_size', type=int, default=2, help='Batch size per GPU/CPU for infer.')
+    parser.add_argument('--infer_batch_size', type=int, default=4, help='Batch size per GPU/CPU for infer.')
     parser.add_argument('--lr', type=float, default=1e-5, help='The initial learning rate.')
     parser.add_argument('--weight_decay', type=float, default=0.01, help='The weight decay for optimizer.')
     parser.add_argument('--epochs', type=int, default=10, help='Total number of training epochs to perform.')
@@ -26,7 +26,7 @@ def parse_args():
     parser.add_argument('--topk', type=int, default=5, help='The number of highest probability vocabulary tokens to keep for top-k sampling.')
     parser.add_argument('--min_dec_len', type=int, default=1, help='The minimum sequence length of generation.')
     parser.add_argument('--max_dec_len', type=int, default=64, help='The maximum sequence length of generation.')
-    parser.add_argument('--num_samples', type=int, default=2, help='The decode numbers in generation.')
+    parser.add_argument('--num_samples', type=int, default=20, help='The decode numbers in generation.')
     parser.add_argument('--decode_strategy', type=str, default='sampling', help='The decode strategy in generation.')
 
     args = parser.parse_args()

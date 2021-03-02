@@ -73,12 +73,11 @@ def infer(model, data_loader, tokenizer):
         responses.extend(results)
 
         start_time = time.time()
-        break
 
     with open(args.output_path, 'w') as fout:
         for response in responses:
             fout.write(response + '\n')
-    print('Save inference result into: %s' % args.output_path)
+    print('\nSave inference result into: %s' % args.output_path)
 
 
 if __name__ == '__main__':

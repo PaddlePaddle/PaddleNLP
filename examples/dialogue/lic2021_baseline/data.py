@@ -248,8 +248,9 @@ def select_response(ids, scores, tokenizer, max_dec_len=None, num_samples=1):
     scores = scores.numpy()
 
     if len(ids) != len(scores) or (len(ids) % num_samples) != 0:
-        raise ValueError("the length of output is error: {}, {}".format(
-            len(ids), len(scores)))
+        raise ValueError(
+            "the length of `ids` is {}, but the `num_samples` is {}".format(
+                len(ids), num_samples))
 
     group = []
     tmp = []
