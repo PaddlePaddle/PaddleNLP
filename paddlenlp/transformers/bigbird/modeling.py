@@ -261,12 +261,14 @@ class TransformerEncoder(Layer):
             output = self.norm(output)
 
         for i, mod in enumerate(self.layers):
+            rand_mask_id = None
+            if rand_mask_idx_list is not None:
+                rand_mask_id = rand_mask_idx_list[i]
             if src_mask_list is None:
-                output = mod(output, None, rand_mask_idx_list[i], query_mask,
-                             key_mask)
+                output = mod(output, None, rand_mask_id, query_mask, key_mask)
             else:
-                output = mod(output, src_mask_list[i], rand_mask_idx_list[i],
-                             query_mask, key_mask)
+                output = mod(output, src_mask_list[i], rand_mask_id, query_mask,
+                             key_mask)
 
         if self.normalize_before:
             output = self.norm(output)

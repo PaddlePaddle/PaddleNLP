@@ -675,15 +675,14 @@ class BigBirdSparseAttention(Attention):
         global_product = global_product * (d_head**-0.5)
         global_product += (1 - key_mask) * -1e6
         global_weights = F.softmax(global_product)
-        if dropout:
-            global_weights = F.dropout(
-                global_weights,
-                dropout,
-                training=self.training,
-                mode="upscale_in_train")
         # [B, H, GF*bs, T] * [B, H, T, D] -> [B, H, GF*bs, D]
         global_product = paddle.matmul(global_weights, value_matrix)
         return global_product
+
+    def _get_splited_matrix(self, matrix):
+        W = self.window_size
+        return matrix[:, :, 0:W // 2], matrix[:, :, W // 2:-W //
+                                              2], matrix[:, :, -W // 2:]
 
     def forward(self,
                 query_matrix,
@@ -765,20 +764,38 @@ class BigBirdSparseAttention(Attention):
         # [B, H, L - G, (G+W+R)*bs, -1]
         second_value_matrix = paddle.concat(
             [band_value_matrix, random_values], axis=3)
+        second_top_value_matrix, second_middle_value_matrix, second_bottom_value_matrix = \
+            self._get_splited_matrix(second_value_matrix)
 
         second_product = paddle.matmul(
             second_query_matrix, second_key_matrix, transpose_y=True)
         second_product = second_product * (d_head**-0.5)
         second_product += (1 - second_mask) * -1e6
         second_weights = F.softmax(second_product)
-        if dropout:
-            second_weights = F.dropout(
-                second_weights,
-                dropout,
-                training=self.training,
-                mode="upscale_in_train")
-        # [B, H, L - G, bs, (G+W+R)*bs] *  [B, H, L - G, (G+W+R)*bs, -1] = [B, H, L-G, bs, -1]
-        second_out = paddle.matmul(second_weights, second_value_matrix)
+        second_top_weights, second_middle_weights, second_bottom_weights = \
+            self._get_splited_matrix(second_weights)
+        second_top_out = paddle.matmul(second_top_weights,
+                                       second_top_value_matrix)
+
+        second_middle_out = paddle.matmul(
+            second_middle_weights[:, :, :, :, GF * bs:-(GB + R) * bs],
+            second_middle_value_matrix[:, :, :, GF * bs:-(GB + R) * bs])
+        # add global block attention
+        second_middle_out += paddle.matmul(
+            second_middle_weights[:, :, :, :, :GF * bs],
+            blocked_value_matrix[:, :, 0:GF])
+        second_middle_out += paddle.matmul(
+            second_middle_weights[:, :, :, :, -(GB + R) * bs:-R * bs],
+            blocked_value_matrix[:, :, -GB:])
+        # add random block attention
+        second_middle_out += paddle.matmul(
+            second_middle_weights[:, :, :, :, -R * bs:],
+            random_values[:, :, GF:-GB])
+
+        second_bottom_out = paddle.matmul(second_bottom_weights,
+                                          second_bottom_value_matrix)
+        second_out = paddle.concat(
+            [second_top_out, second_middle_out, second_bottom_out], axis=2)
         second_out = paddle.reshape(second_out, [B, H, (L - G) * bs, -1])
 
         # [B, H, T, D]
