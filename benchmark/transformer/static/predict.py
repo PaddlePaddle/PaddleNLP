@@ -20,6 +20,7 @@ FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger(__name__)
 
+
 def cast_parameters_to_fp32(place, program, scope=None):
     all_parameters = []
     for block in program.blocks:
@@ -32,6 +33,7 @@ def cast_parameters_to_fp32(place, program, scope=None):
             'fp32' in str(param.dtype).lower():
             data = np.array(tensor)
             tensor.set(np.float32(data), place)
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
