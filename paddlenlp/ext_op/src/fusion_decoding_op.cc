@@ -48,62 +48,125 @@ public:
              "The input represents embedding tensors for target Ids. ");
 
     AddInput("SelfLayernormWeight",
-             "The tensors of layer norm's scale before different self "
+             "The tensors of layer norm's scale before self "
              "attention layers. ")
         .AsDuplicable();
     AddInput("SelfLayernormBias",
-             "The tensors of layer norm's bias before different self attention "
+             "The tensors of layer norm's bias before self attention "
              "layers. ")
         .AsDuplicable()
         .AsDispensable();
     AddInput("SelfQueryWeight",
              "The tensors of self attention's query projection weights. ")
         .AsDuplicable();
-    AddInput("SelfQueryBias", "").AsDuplicable().AsDispensable();
-    AddInput("SelfKeyWeight", "").AsDuplicable();
-    AddInput("SelfKeyBias", "").AsDuplicable().AsDispensable();
-    AddInput("SelfValueWeight", "").AsDuplicable();
-    AddInput("SelfValueBias", "").AsDuplicable().AsDispensable();
-    AddInput("SelfOutWeight", "").AsDuplicable();
-    AddInput("SelfOutBias", "").AsDuplicable().AsDispensable();
+    AddInput("SelfQueryBias",
+             "The tensors of self attention's query projection biases. ")
+        .AsDuplicable()
+        .AsDispensable();
+    AddInput("SelfKeyWeight",
+             "The tensors of self attention's key projection weights. ")
+        .AsDuplicable();
+    AddInput("SelfKeyBias",
+             "The tensors of self attention's key projection biases. ")
+        .AsDuplicable()
+        .AsDispensable();
+    AddInput("SelfValueWeight",
+             "The tensors of self attention's value projection weights. ")
+        .AsDuplicable();
+    AddInput("SelfValueBias",
+             "The tensors of self attention's value projection biases. ")
+        .AsDuplicable()
+        .AsDispensable();
+    AddInput("SelfOutWeight",
+             "The tensors of self attention's output projection weights. ")
+        .AsDuplicable();
+    AddInput("SelfOutBias",
+             "The tensors of self attention's output projection biases. ")
+        .AsDuplicable()
+        .AsDispensable();
 
-    AddInput("CrossLayernormWeight", "").AsDuplicable();
-    AddInput("CrossLayernormBias", "").AsDuplicable().AsDispensable();
-    AddInput("CrossQueryWeight", "").AsDuplicable();
-    AddInput("CrossQueryBias", "").AsDuplicable().AsDispensable();
-    AddInput("CrossKeyWeight", "").AsDuplicable();
-    AddInput("CrossKeyBias", "").AsDuplicable().AsDispensable();
-    AddInput("CrossValueWeight", "").AsDuplicable();
-    AddInput("CrossValueBias", "").AsDuplicable().AsDispensable();
-    AddInput("CrossOutWeight", "").AsDuplicable();
-    AddInput("CrossOutBias", "").AsDuplicable().AsDispensable();
+    AddInput(
+        "CrossLayernormWeight",
+        "The tensors of layer norm's weights before cross attention layers. ")
+        .AsDuplicable();
+    AddInput(
+        "CrossLayernormBias",
+        "The tensors of layer norm's biases before cross attention layers. ")
+        .AsDuplicable()
+        .AsDispensable();
+    AddInput("CrossQueryWeight",
+             "The tensors of cross attention's query projection weights. ")
+        .AsDuplicable();
+    AddInput("CrossQueryBias",
+             "The tensors of cross attention's query projection biases. ")
+        .AsDuplicable()
+        .AsDispensable();
+    AddInput("CrossKeyWeight",
+             "The tensors of cross attention's key projection weights. ")
+        .AsDuplicable();
+    AddInput("CrossKeyBias",
+             "The tensors of cross attention's key projection biases. ")
+        .AsDuplicable()
+        .AsDispensable();
+    AddInput("CrossValueWeight",
+             "The tensors of cross attention's value projection weights. ")
+        .AsDuplicable();
+    AddInput("CrossValueBias",
+             "The tensors of cross attention's value projection biases. ")
+        .AsDuplicable()
+        .AsDispensable();
+    AddInput("CrossOutWeight",
+             "The tensors of cross attention's output projection weights. ")
+        .AsDuplicable();
+    AddInput("CrossOutBias",
+             "The tensors of cross attention's output projection biases. ")
+        .AsDuplicable()
+        .AsDispensable();
 
-    AddInput("FFNLayernormWeight", "").AsDuplicable();
-    AddInput("FFNLayernormBias", "").AsDuplicable().AsDispensable();
-    AddInput("FFNInterWeight", "").AsDuplicable();
-    AddInput("FFNInterBias", "").AsDuplicable().AsDispensable();
-    AddInput("FFNOutWeight", "").AsDuplicable();
-    AddInput("FFNOutBias", "").AsDuplicable().AsDispensable();
+    AddInput("FFNLayernormWeight",
+             "The tensors of layer norm's weights before ffn. ")
+        .AsDuplicable();
+    AddInput("FFNLayernormBias",
+             "The tensors of layer norm's biases before ffn. ")
+        .AsDuplicable()
+        .AsDispensable();
+    AddInput("FFNInterWeight", "The tensors of inter fc weights. ")
+        .AsDuplicable();
+    AddInput("FFNInterBias", "The tensors of inter fc biases. ")
+        .AsDuplicable()
+        .AsDispensable();
+    AddInput("FFNOutWeight", "The tensors of output weights. ").AsDuplicable();
+    AddInput("FFNOutBias", "The tensors of output biases. ")
+        .AsDuplicable()
+        .AsDispensable();
 
-    AddInput("DecoderLayernormWeight", "");
-    AddInput("DecoderLayernormBias", "");
-    AddInput("EmbWeight", "");
-    AddInput("EmbBias", "").AsDispensable();
-    AddInput("PositionEncEmb", "");
+    AddInput("DecoderLayernormWeight",
+             "The tensor of layer norm's weights after decoders. ");
+    AddInput("DecoderLayernormBias",
+             "The tensor of layer norm's biases after decoders. ");
+    AddInput("EmbWeight", "The tensor of logits projection weight. ");
+    AddInput("EmbBias", "The tensor of logits projection bias. ")
+        .AsDispensable();
+    AddInput("PositionEncEmb", "The tensor of positional enbedding table. ");
 
-    AddOutput("OutputIds", "");
-    AddOutput("ParentIds", "");
-    AddOutput("SequenceLength", "");
+    AddOutput("OutputIds", "The tensor of output ids. ");
+    AddOutput("ParentIds", "The tensor of parent ids. ");
+    AddOutput("SequenceLength", "The tensor of sequence length. ");
 
-    AddAttr<std::string>("decoding_strategy", "").SetDefault("beam_search");
-    AddAttr<int>("beam_size", "").SetDefault(1);
-    AddAttr<int>("n_head", "").SetDefault(8);
-    AddAttr<int>("size_per_head", "").SetDefault(64);
-    AddAttr<int>("num_layer", "").SetDefault(6);
-    AddAttr<int>("bos_id", "").SetDefault(0);
-    AddAttr<int>("eos_id", "").SetDefault(1);
-    AddAttr<int64_t>("max_len", "").SetDefault(256);
-    AddAttr<float>("beam_search_diversity_rate", "").SetDefault(0.0);
+    AddAttr<std::string>(
+        "decoding_strategy",
+        "Decoding strategies. As for now, only beam search is supported. ")
+        .SetDefault("beam_search");
+    AddAttr<int>("beam_size", "The beam size for beam search. ").SetDefault(1);
+    AddAttr<int>("n_head", "The number of heads. ").SetDefault(8);
+    AddAttr<int>("size_per_head", "The size per head. ").SetDefault(64);
+    AddAttr<int>("num_layer", "The number of layers. ").SetDefault(6);
+    AddAttr<int>("bos_id", "Start id. ").SetDefault(0);
+    AddAttr<int>("eos_id", "End id. ").SetDefault(1);
+    AddAttr<int64_t>("max_len", "Max output length. ").SetDefault(256);
+    AddAttr<float>("beam_search_diversity_rate",
+                   "The diversity rate for beam search. ")
+        .SetDefault(0.0);
 
     AddComment(R"DOC(
     Decoding Operator.
