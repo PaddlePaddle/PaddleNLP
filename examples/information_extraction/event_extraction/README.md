@@ -3,6 +3,10 @@
 
 信息抽取旨在从非结构化自然语言文本中提取结构化知识，如实体、关系、事件等。事件抽取的目标是对于给定的自然语言句子，根据预先指定的事件类型和论元角色，识别句子中所有目标事件类型的事件，并根据相应的论元角色集合抽取事件所对应的论元。其中目标事件类型 (event_type) 和论元角色 (role) 限定了抽取的范围，例如 (event_type：胜负，role：时间，胜者，败者，赛事名称)、(event_type：夺冠，role：夺冠事件，夺冠赛事，冠军)。
 
+<div align="center">
+<img src="pictures/DuEE-Fin/ee.png" width="500" height="400" alt="事件抽取" align=center />
+</div>
+
 该示例展示了如何使用PaddleNLP快速复现[LIC2021事件抽取比赛](http://aistudio-bce.bcc-bdbl.baidu.com/aistudio/competition/detail/141)基线并进阶优化基线。
 
 
@@ -48,14 +52,6 @@ event_extraction/
 篇章级事件抽取数据集（DuEE-Fin）是金融领域篇章级别事件抽取数据集，
 共包含13个已定义好的事件类型约束和1.15万中文篇章（存在部分非目标篇章作为负样例），其中6900训练集，1150验证集和3450测试集，数据集下载[地址]() 。
 在该数据集上基线采用基于[ERNIE](https://github.com/PaddlePaddle/ERNIE)的序列标注（sequence labeling）方案，分为基于序列标注的触发词抽取模型、基于序列标注的论元抽取模型和枚举属性分类模型，属于PipeLine模型；基于序列标注的触发词抽取模型采用BIO方式，识别触发词的位置以及对应的事件类型，基于序列标注的论元抽取模型采用BIO方式识别出事件中的论元以及对应的论元角色；枚举属性分类模型采用ernie进行分类。
-
-基于序列标注的触发词抽取模型是整体模型的一部分，该部分主要是给定事件类型，识别句子中出现的事件触发词对应的位置以及对应的事件类别，该模型是基于ERNIE开发序列标注模型，模型原理图如下：
-
-<div align="center">
-<img src="pictures/DuEE-Fin/trigger_model.png" width="500" height="400" alt="基于序列标注的触发词抽取模型" align=center />
-</div>
-
-上述样例中模型通过模型识别出触发词"收购"，并分配给"B-收购"、"I-收购"标签，最终可以得到该文本中包含 “结婚”事件类型。
 
 ### 评测方法
 
