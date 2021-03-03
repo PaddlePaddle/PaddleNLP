@@ -79,7 +79,7 @@ def convert_example(example, tokenizer, label_vocab):
     labels = ['O'] + labels + ['O']
     tokenized_input['labels'] = [label_vocab[x] for x in labels]
     return tokenized_input['input_ids'], tokenized_input[
-        'segment_ids'], tokenized_input['seq_len'], tokenized_input['labels']
+        'token_type_ids'], tokenized_input['seq_len'], tokenized_input['labels']
 
 
 def load_dict(dict_path):
@@ -160,9 +160,9 @@ if __name__ == '__main__':
     step = 0
     for epoch in range(10):
         model.train()
-        for idx, (input_ids, segment_ids, length,
+        for idx, (input_ids, token_type_ids, length,
                   labels) in enumerate(train_loader):
-            logits = model(input_ids, segment_ids).reshape(
+            logits = model(input_ids, token_type_ids).reshape(
                 [-1, train_ds.label_num])
             loss = paddle.mean(loss_fn(logits, labels.reshape([-1])))
             loss.backward()

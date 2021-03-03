@@ -109,8 +109,8 @@ def evaluate(model, loss_fct, metric, data_loader, label_num):
     metric.reset()
     avg_loss, precision, recall, f1_score = 0, 0, 0, 0
     for batch in data_loader:
-        input_ids, token_tpye_ids, length, labels = batch
-        logits = model(input_ids, token_tpye_ids)
+        input_ids, token_type_ids, length, labels = batch
+        logits = model(input_ids, token_type_ids)
         loss = loss_fct(logits.reshape([-1, label_num]), labels.reshape([-1]))
         avg_loss = paddle.mean(loss)
         preds = logits.argmax(axis=2)
@@ -140,7 +140,6 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
     tokenized_input['labels'] = [no_entity_id] + labels + [no_entity_id]
     tokenized_input['labels'] += [no_entity_id] * (
         len(tokenized_input['input_ids']) - len(tokenized_input['labels']))
-
     return tokenized_input
 
 
@@ -170,7 +169,7 @@ def do_train(args):
 
     batchify_fn = lambda samples, fn=Dict({
         'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        'token_tpye_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
         'seq_len': Stack(),
         'labels': Pad(axis=0, pad_val=ignore_label)  # label
     }): fn(samples)
@@ -225,8 +224,8 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
-            input_ids, token_tpye_ids, _, labels = batch
-            logits = model(input_ids, token_tpye_ids)
+            input_ids, token_type_ids, _, labels = batch
+            logits = model(input_ids, token_type_ids)
             loss = loss_fct(
                 logits.reshape([-1, label_num]), labels.reshape([-1]))
             avg_loss = paddle.mean(loss)

@@ -130,7 +130,7 @@ def do_predict(args):
     ignore_label = -100
     batchify_fn = lambda samples, fn=Dict({
         'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        'token_tpye_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
         'seq_len': Stack(),
         'labels': Pad(axis=0, pad_val=ignore_label)  # label
     }): fn(samples)
@@ -156,8 +156,8 @@ def do_predict(args):
     pred_list = []
     len_list = []
     for step, batch in enumerate(predict_data_loader):
-        input_ids, token_tpye_ids, length, labels = batch
-        logits = model(input_ids, token_tpye_ids)
+        input_ids, token_type_ids, length, labels = batch
+        logits = model(input_ids, token_type_ids)
         pred = paddle.argmax(logits, axis=-1)
         pred_list.append(pred.numpy())
         len_list.append(length.numpy())
