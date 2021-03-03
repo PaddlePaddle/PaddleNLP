@@ -25,8 +25,8 @@ import paddle
 from paddle.io import DataLoader
 
 import paddlenlp as ppnlp
-from paddlenlp.datasets import MSRA_NER
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.datasets import load_dataset
+from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
 
 parser = argparse.ArgumentParser()
@@ -62,121 +62,24 @@ parser.add_argument(
     help="If set, use GPU for training.")
 
 
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    no_entity_id,
-                    max_seq_length=512,
-                    is_test=False):
-    """convert a glue example into necessary features"""
+def tokenize_and_align_labels(example, tokenizer, no_entity_id,
+                              max_seq_len=512):
+    labels = example['labels']
+    example = example['tokens']
+    tokenized_input = tokenizer(
+        example,
+        return_length=True,
+        is_split_into_words=True,
+        max_seq_len=max_seq_len)
 
-    def _truncate_seqs(seqs, max_seq_length):
-        if len(seqs) == 1:  # single sentence
-            # Account for [CLS] and [SEP] with "- 2"
-            seqs[0] = seqs[0][0:(max_seq_length - 2)]
-        else:  # sentence pair
-            # Account for [CLS], [SEP], [SEP] with "- 3"
-            tokens_a, tokens_b = seqs
-            max_seq_length -= 3
-            while True:  # truncate with longest_first strategy
-                total_length = len(tokens_a) + len(tokens_b)
-                if total_length <= max_seq_length:
-                    break
-                if len(tokens_a) > len(tokens_b):
-                    tokens_a.pop()
-                else:
-                    tokens_b.pop()
-        return seqs
+    # -2 for [CLS] and [SEP]
+    if len(tokenized_input['input_ids']) - 2 < len(labels):
+        labels = labels[:len(tokenized_input['input_ids']) - 2]
+    tokenized_input['labels'] = [no_entity_id] + labels + [no_entity_id]
+    tokenized_input['labels'] += [no_entity_id] * (
+        len(tokenized_input['input_ids']) - len(tokenized_input['labels']))
 
-    '''
-    def _concat_seqs(seqs, separators, seq_mask=0, separator_mask=1):
-        concat = sum((seq + sep for sep, seq in zip(separators, seqs)), [])
-        segment_ids = sum(
-            ([i] * (len(seq) + len(sep))
-             for i, (sep, seq) in enumerate(zip(separators, seqs))), [])
-        if isinstance(seq_mask, int):
-            seq_mask = [[seq_mask] * len(seq) for seq in seqs]
-        if isinstance(separator_mask, int):
-            separator_mask = [[separator_mask] * len(sep) for sep in separators]
-        p_mask = sum((s_mask + mask
-                      for sep, seq, s_mask, mask in zip(
-                          separators, seqs, seq_mask, separator_mask)), [])
-        return concat, segment_ids, p_mask
-    '''
-
-    def _reseg_token_label(tokens, tokenizer, labels=None):
-        if labels:
-            if len(tokens) != len(labels):
-                raise ValueError(
-                    "The length of tokens must be same with labels")
-            ret_tokens = []
-            ret_labels = []
-            for token, label in zip(tokens, labels):
-                sub_token = tokenizer.tokenize(token)
-                if len(sub_token) == 0:
-                    continue
-                ret_tokens.extend(sub_token)
-                ret_labels.append(label)
-                if len(sub_token) < 2:
-                    continue
-                sub_label = label
-                if label.startswith("B-"):
-                    sub_label = "I-" + label[2:]
-                ret_labels.extend([sub_label] * (len(sub_token) - 1))
-
-            if len(ret_tokens) != len(ret_labels):
-                raise ValueError(
-                    "The length of ret_tokens can't match with labels")
-            return ret_tokens, ret_labels
-        else:
-            ret_tokens = []
-            for token in tokens:
-                sub_token = tokenizer.tokenize(token)
-                if len(sub_token) == 0:
-                    continue
-                ret_tokens.extend(sub_token)
-                if len(sub_token) < 2:
-                    continue
-
-            return ret_tokens, None
-
-    if not is_test:
-        # get the label
-        label = example[-1].split("\002")
-        example = example[0].split("\002")
-        #create label maps if classification task
-        label_map = {}
-        for (i, l) in enumerate(label_list):
-            label_map[l] = i
-    else:
-        label = None
-
-    tokens_raw, labels_raw = _reseg_token_label(
-        tokens=example, labels=label, tokenizer=tokenizer)
-
-    encoded_input = tokenizer(
-        tokens_raw, is_split_into_words=True, max_seq_len=max_seq_length)
-    '''
-    # truncate to the truncate_length,
-    tokens_trun = _truncate_seqs([tokens_raw], max_seq_length)
-    # concate the sequences with special tokens
-    tokens_trun[0] = [tokenizer.cls_token] + tokens_trun[0]
-    tokens, segment_ids, _ = _concat_seqs(tokens_trun, [[tokenizer.sep_token]] *
-                                          len(tokens_trun))
-    # convert the token to ids
-    input_ids = tokenizer.convert_tokens_to_ids(tokens)
-    '''
-    valid_length = len(encoded_input['input_ids'])
-    if labels_raw:
-        labels_trun = _truncate_seqs([labels_raw], max_seq_length)[0]
-        labels_id = [no_entity_id] + [label_map[lbl]
-                                      for lbl in labels_trun] + [no_entity_id]
-    if not is_test:
-        return encoded_input['input_ids'], encoded_input[
-            'segment_ids'], valid_length, labels_id
-    else:
-        return encoded_input['input_ids'], encoded_input[
-            'segment_ids'], valid_length
+    return tokenized_input
 
 
 def parse_decodes(input_words, id2label, decodes, lens):
@@ -185,7 +88,7 @@ def parse_decodes(input_words, id2label, decodes, lens):
 
     outputs = []
     for idx, end in enumerate(lens):
-        sent = input_words[idx][0].replace("\002", "")[:end]
+        sent = "".join(input_words[idx]['tokens'])
         tags = [id2label[x] for x in decodes[idx][1:end]]
         sent_out = []
         tags_out = []
@@ -211,41 +114,36 @@ def parse_decodes(input_words, id2label, decodes, lens):
 def do_predict(args):
     paddle.set_device("gpu" if args.use_gpu else "cpu")
 
-    train_dataset, predict_dataset = ppnlp.datasets.MSRA_NER.get_datasets(
-        ["train", "test"])
+    train_ds, predict_ds = load_dataset(
+        'msra_ner', splits=('train', 'test'), lazy=False)
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
 
-    label_list = train_dataset.get_labels()
+    label_list = train_ds.label_list
     label_num = len(label_list)
     no_entity_id = label_num - 1
     trans_func = partial(
-        convert_example,
+        tokenize_and_align_labels,
         tokenizer=tokenizer,
-        label_list=label_list,
-        no_entity_id=label_num - 1,
-        max_seq_length=args.max_seq_length)
+        no_entity_id=no_entity_id,
+        max_seq_len=args.max_seq_length)
+
     ignore_label = -100
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # segment
-        Stack(),  # length
-        Pad(axis=0, pad_val=ignore_label)  # label
-    ): fn(samples)
-    raw_data = predict_dataset.data
+    batchify_fn = lambda samples, fn=Dict({
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+        'seq_len': Stack(),
+        'labels': Pad(axis=0, pad_val=ignore_label)  # label
+    }): fn(samples)
+    raw_data = predict_ds.data
 
-    id2label = dict(enumerate(predict_dataset.get_labels()))
+    id2label = dict(enumerate(predict_ds.label_list))
 
-    predict_dataset = predict_dataset.apply(trans_func, lazy=True)
-    predict_batch_sampler = paddle.io.BatchSampler(
-        predict_dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        drop_last=True)
+    predict_ds = predict_ds.map(trans_func)
     predict_data_loader = DataLoader(
-        dataset=predict_dataset,
-        batch_sampler=predict_batch_sampler,
+        dataset=predict_ds,
         collate_fn=batchify_fn,
         num_workers=0,
+        batch_size=args.batch_size,
         return_list=True)
 
     model = BertForTokenClassification.from_pretrained(
@@ -258,8 +156,8 @@ def do_predict(args):
     pred_list = []
     len_list = []
     for step, batch in enumerate(predict_data_loader):
-        input_ids, segment_ids, length, labels = batch
-        logits = model(input_ids, segment_ids)
+        input_ids, token_type_ids, length, labels = batch
+        logits = model(input_ids, token_type_ids)
         pred = paddle.argmax(logits, axis=-1)
         pred_list.append(pred.numpy())
         len_list.append(length.numpy())

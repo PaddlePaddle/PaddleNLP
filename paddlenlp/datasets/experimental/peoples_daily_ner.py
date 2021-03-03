@@ -22,16 +22,17 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['MSRA_NER']
+__all__ = ['PeoplesDailyNER']
 
 
-class MSRA_NER(DatasetBuilder):
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/msra_ner.tar.gz"
+class PeoplesDailyNER(DatasetBuilder):
+    URL = "https://paddlenlp.bj.bcebos.com/datasets/peoples_daily_ner.tar.gz"
     MD5 = None
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(os.path.join('msra_ner', 'train.tsv'), None),
-        'test': META_INFO(os.path.join('msra_ner', 'test.tsv'), None)
+        'train':
+        META_INFO(os.path.join('peoples_daily_ner', 'train.tsv'), None),
+        'test': META_INFO(os.path.join('peoples_daily_ner', 'test.tsv'), None)
     }
 
     def _get_data(self, mode, **kwargs):
@@ -40,7 +41,6 @@ class MSRA_NER(DatasetBuilder):
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-
             get_path_from_url(self.URL, default_root, self.MD5)
 
         return fullname
