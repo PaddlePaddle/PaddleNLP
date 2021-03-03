@@ -216,8 +216,8 @@ class Glue(DatasetBuilder):
     }
 
     def _get_data(self, mode, **kwargs):
-        builder_config = self.BUILDER_CONFIGS[self.sub_name]
-        if self.sub_name != 'mrpc':
+        builder_config = self.BUILDER_CONFIGS[self.name]
+        if self.name != 'mrpc':
             default_root = os.path.join(DATA_HOME, self.__class__.__name__)
             filename, data_hash, _, _ = builder_config['splits'][mode]
             fullname = os.path.join(default_root, filename)
@@ -289,7 +289,7 @@ class Glue(DatasetBuilder):
 
     def _read(self, filename, split):
         _, _, field_indices, num_discard_samples = self.BUILDER_CONFIGS[
-            self.sub_name]['splits'][split]
+            self.name]['splits'][split]
         with open(filename, 'r', encoding='utf-8') as f:
             for idx, line in enumerate(f):
                 if idx < num_discard_samples:
@@ -298,7 +298,7 @@ class Glue(DatasetBuilder):
                 if not line_stripped:
                     break
                 example = [line_stripped[indice] for indice in field_indices]
-                if self.sub_name in ['cola', 'sst-2']:
+                if self.name in ['cola', 'sst-2']:
                     yield {
                         'sentence': example[0]
                     } if 'test' in split else {
@@ -319,4 +319,4 @@ class Glue(DatasetBuilder):
         """
         Return labels of the Glue task.
         """
-        return self.BUILDER_CONFIGS[self.sub_name]['labels']
+        return self.BUILDER_CONFIGS[self.name]['labels']

@@ -53,14 +53,14 @@ def import_main_class(module_path):
     return module_main_cls
 
 
-def load_dataset(name, data_files=None, splits=None, lazy=None, sub_name=None):
-    module_path = DATASETS_MODULE_PATH + name
+def load_dataset(path, name=None, data_files=None, splits=None, lazy=None):
+    module_path = DATASETS_MODULE_PATH + path
 
     reader_cls = import_main_class(module_path)
-    if not sub_name:
+    if not name:
         reader_instance = reader_cls(lazy=lazy)
     else:
-        reader_instance = reader_cls(lazy=lazy, sub_name=sub_name)
+        reader_instance = reader_cls(lazy=lazy, name=name)
 
     datasets = reader_instance.read_datasets(
         data_files=data_files, splits=splits)
@@ -320,10 +320,10 @@ class DatasetBuilder:
     """
     lazy = False
 
-    def __init__(self, lazy=None, sub_name=None):
+    def __init__(self, lazy=None, name=None):
         if lazy is not None:
             self.lazy = lazy
-        self.sub_name = sub_name
+        self.name = name
 
     def read_datasets(self, splits=None, data_files=None):
         datasets = []
@@ -359,7 +359,7 @@ class DatasetBuilder:
 
         return datasets if len(datasets) > 1 else datasets[0]
 
-    def read(self, filename, split):
+    def read(self, filename, split='train'):
         """
         Returns an dataset containing all the examples that can be read from the file path.
         If `self.lazy` is `False`, this eagerly reads all instances from `self._read()`

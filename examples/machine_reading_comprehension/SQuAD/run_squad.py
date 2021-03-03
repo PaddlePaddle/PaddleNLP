@@ -158,9 +158,11 @@ def run(args):
                     token_start_index += 1
 
                 # End token index of the current span in the text.
-                token_end_index = len(input_ids) - 2
+                token_end_index = len(input_ids) - 1
                 while sequence_ids[token_end_index] != 1:
                     token_end_index -= 1
+                # Minus one more to reach actual text
+                token_end_index -= 1
 
                 # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
                 if not (offsets[token_start_index][0] <= start_char and

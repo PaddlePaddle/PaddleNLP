@@ -244,69 +244,63 @@ def do_train(args):
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
-    train_dataset = load_dataset(
-        'glue', splits="train", sub_name=args.task_name)
+    train_ds = load_dataset('glue', args.task_name, splits="train")
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    print(train_dataset[0])
+
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
-        label_list=train_dataset.label_list,
+        label_list=train_ds.label_list,
         max_seq_length=args.max_seq_length)
-    train_dataset = train_dataset.map(trans_func, lazy=True)
+    train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_dataset, batch_size=args.batch_size, shuffle=True)
+        train_ds, batch_size=args.batch_size, shuffle=True)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Stack(dtype="int64" if train_dataset.label_list else "float32")  # label
+        Stack(dtype="int64" if train_ds.label_list else "float32")  # label
     ): fn(samples)
     train_data_loader = DataLoader(
-        dataset=train_dataset,
+        dataset=train_ds,
         batch_sampler=train_batch_sampler,
         collate_fn=batchify_fn,
         num_workers=0,
         return_list=True)
     if args.task_name == "mnli":
-        dev_dataset_matched, dev_dataset_mismatched = load_dataset(
-            'glue',
-            splits=["dev_matched", "dev_mismatched"],
-            sub_name=args.task_name)
+        dev_ds_matched, dev_ds_mismatched = load_dataset(
+            'glue', args.task_name, splits=["dev_matched", "dev_mismatched"])
 
-        dev_dataset_matched = dev_dataset_matched.map(trans_func, lazy=True)
-        dev_dataset_mismatched = dev_dataset_mismatched.map(trans_func,
-                                                            lazy=True)
+        dev_ds_matched = dev_ds_matched.map(trans_func, lazy=True)
+        dev_ds_mismatched = dev_ds_mismatched.map(trans_func, lazy=True)
         dev_batch_sampler_matched = paddle.io.BatchSampler(
-            dev_dataset_matched, batch_size=args.batch_size, shuffle=False)
+            dev_ds_matched, batch_size=args.batch_size, shuffle=False)
         dev_data_loader_matched = DataLoader(
-            dataset=dev_dataset_matched,
+            dataset=dev_ds_matched,
             batch_sampler=dev_batch_sampler_matched,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
         dev_batch_sampler_mismatched = paddle.io.BatchSampler(
-            dev_dataset_mismatched, batch_size=args.batch_size, shuffle=False)
+            dev_ds_mismatched, batch_size=args.batch_size, shuffle=False)
         dev_data_loader_mismatched = DataLoader(
-            dataset=dev_dataset_mismatched,
+            dataset=dev_ds_mismatched,
             batch_sampler=dev_batch_sampler_mismatched,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
     else:
-        dev_dataset = load_dataset(
-            'glue', splits='dev', sub_name=args.task_name)
-        dev_dataset = dev_dataset.map(trans_func, lazy=True)
+        dev_ds = load_dataset('glue', args.task_name, splits='dev')
+        dev_ds = dev_ds.map(trans_func, lazy=True)
         dev_batch_sampler = paddle.io.BatchSampler(
-            dev_dataset, batch_size=args.batch_size, shuffle=False)
+            dev_ds, batch_size=args.batch_size, shuffle=False)
         dev_data_loader = DataLoader(
-            dataset=dev_dataset,
+            dataset=dev_ds,
             batch_sampler=dev_batch_sampler,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
 
-    num_classes = 1 if train_dataset.label_list == None else len(
-        train_dataset.label_list)
+    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
@@ -332,7 +326,7 @@ def do_train(args):
         ])
 
     loss_fct = paddle.nn.loss.CrossEntropyLoss(
-    ) if train_dataset.label_list else paddle.nn.loss.MSELoss()
+    ) if train_ds.label_list else paddle.nn.loss.MSELoss()
 
     metric = metric_class()
 
@@ -341,6 +335,7 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
+
             input_ids, segment_ids, labels = batch
             logits = model(input_ids, segment_ids)
             loss = loss_fct(logits, labels)
