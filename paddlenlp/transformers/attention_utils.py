@@ -426,15 +426,11 @@ class BigBirdSparseAttention(Attention):
                                          [B, L - G, bs, 1])
         temp_key_mask_front = paddle.reshape(blocked_key_mask[:, :GF],
                                              [B, 1, 1, GF * bs])
-        temp_key_mask_front = paddle.expand(temp_key_mask_front,
-                                            [B, L - G, 1, GF * bs])
         global_block_mask_front = paddle.matmul(temp_query_mask,
                                                 temp_key_mask_front)
 
         temp_key_mask_back = paddle.reshape(blocked_key_mask[:, -GB:],
                                             [B, 1, 1, GB * bs])
-        temp_key_mask_back = paddle.expand(temp_key_mask_back,
-                                           [B, L - G, 1, GB * bs])
         global_block_mask_back = paddle.matmul(temp_query_mask,
                                                temp_key_mask_back)
 
@@ -443,8 +439,8 @@ class BigBirdSparseAttention(Attention):
         for query_block_id in range(GF, GF + W // 2):
             left_block_id = query_block_id - W // 2
             right_block_id = query_block_id + W // 2
-            zero_key_mask = blocked_key_mask[:, -(W - (right_block_id + 1 - G)):
-                                             -GB] * 0
+            zero_key_mask = paddle.zeros_like(blocked_key_mask[:, -(W - (
+                right_block_id + 1 - G)):-GB])
             temp_key_mask = paddle.concat(
                 [blocked_key_mask[:, GF:(right_block_id + 1)], zero_key_mask],
                 axis=1)
@@ -467,8 +463,8 @@ class BigBirdSparseAttention(Attention):
         for query_block_id in range((L - GB) - W // 2, L - GB):
             left_block_id = query_block_id - W // 2
             right_block_id = query_block_id + W // 2
-            zero_key_mask = blocked_key_mask[:, GF:GF + W - (L - left_block_id -
-                                                             GB)] * 0
+            zero_key_mask = paddle.zeros_like(blocked_key_mask[:, GF:GF + W - (
+                L - left_block_id - GB)])
             temp_key_mask = paddle.concat(
                 [zero_key_mask, blocked_key_mask[:, left_block_id:-GB]], axis=1)
             temp_key_mask = paddle.unsqueeze(temp_key_mask, 1)
