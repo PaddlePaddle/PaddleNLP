@@ -53,11 +53,14 @@ def import_main_class(module_path):
     return module_main_cls
 
 
-def load_dataset(name, data_files=None, splits=None, lazy=None):
-    module_path = DATASETS_MODULE_PATH + name
+def load_dataset(path, name=None, data_files=None, splits=None, lazy=None):
+    module_path = DATASETS_MODULE_PATH + path
 
     reader_cls = import_main_class(module_path)
-    reader_instance = reader_cls(lazy)
+    if not name:
+        reader_instance = reader_cls(lazy=lazy)
+    else:
+        reader_instance = reader_cls(lazy=lazy, name=name)
 
     datasets = reader_instance.read_datasets(
         data_files=data_files, splits=splits)
@@ -317,25 +320,28 @@ class DatasetBuilder:
     """
     lazy = False
 
-    def __init__(self, lazy=None, max_examples: Optional[int]=None):
+    def __init__(self, lazy=None, name=None):
         if lazy is not None:
             self.lazy = lazy
-        self.max_examples = max_examples
+        self.name = name
 
     def read_datasets(self, splits=None, data_files=None):
         datasets = []
         assert splits or data_files, "`data_files` and `splits` can not both be None."
 
         if data_files:
-            assert isinstance(data_files, str) or (
-                isinstance(data_files, list) and isinstance(data_files[0], str)
-            ) or (
-                isinstance(data_files, tuple) and isinstance(data_files[0], str)
-            ), "`data_files` should be a string or list of string or a tuple of string."
+            assert isinstance(data_files, str) or isinstance(
+                data_files, dict
+            ), "`data_files` should be a string or a dictionary whose key is split name ande value is a path of data file."
             if isinstance(data_files, str):
-                datasets.append(self.read(data_files))
+                split = 'train'
+                datasets.append(self.read(filename=data_files, split=split))
             else:
-                datasets += [self.read(data_file) for data_file in data_files]
+                datasets += [
+                    self.read(
+                        filename=filename, split=split)
+                    for split, filename in data_files.items()
+                ]
 
         if splits:
             assert isinstance(splits, str) or (
@@ -344,16 +350,16 @@ class DatasetBuilder:
                 isinstance(splits, tuple) and isinstance(splits[0], str)
             ), "`splits` should be a string or list of string or a tuple of string."
             if isinstance(splits, str):
-                root = self._get_data(splits)
-                datasets.append(self.read(root))
+                filename = self._get_data(splits)
+                datasets.append(self.read(filename=filename, split=splits))
             else:
                 for split in splits:
-                    root = self._get_data(split)
-                    datasets.append(self.read(root))
+                    filename = self._get_data(split)
+                    datasets.append(self.read(filename=filename, split=split))
 
         return datasets if len(datasets) > 1 else datasets[0]
 
-    def read(self, root):
+    def read(self, filename, split='train'):
         """
         Returns an dataset containing all the examples that can be read from the file path.
         If `self.lazy` is `False`, this eagerly reads all instances from `self._read()`
@@ -367,35 +373,34 @@ class DatasetBuilder:
         if self.lazy:
             label_list = self.get_labels()
 
-            if label_list is not None:
-                label_dict = {}
-                for i, label in enumerate(label_list):
-                    label_dict[label] = i
-
-                def generate_examples():
-                    for example in self._read(root):
-                        if 'labels' not in example.keys():
-                            raise ValueError(
-                                "Keyword 'labels' should be in example if get_label() is specified."
-                            )
-                        else:
+            def generate_examples():
+                generator = self._read(
+                    filename, split
+                ) if self._read.__code__.co_argcount > 2 else self._read(
+                    filename)
+                for example in generator:
+                    if label_list is not None and 'labels' in example.keys():
+                        label_dict = {}
+                        for i, label in enumerate(label_list):
+                            label_dict[label] = i
+                        if isinstance(example['labels'], list) or isinstance(
+                                examples[idx]['labels'], tuple):
                             for label_idx in range(len(example['labels'])):
                                 example['labels'][label_idx] = label_dict[
                                     example['labels'][label_idx]]
+                        else:
+                            example['labels'] = label_dict[example['labels']]
 
-                            yield example
-
-                return IterDataset(generate_examples, label_list=label_list)
-            else:
-
-                def generate_examples():
-                    for example in self._read(root):
+                        yield example
+                    else:
                         yield example
 
-                return IterDataset(generate_examples)
-
+            return IterDataset(generate_examples, label_list=label_list)
         else:
-            examples = self._read(root)
+            examples = self._read(
+                filename,
+                split) if self._read.__code__.co_argcount > 2 else self._read(
+                    filename)
 
             # Then some validation.
             if not isinstance(examples, list):
@@ -404,30 +409,27 @@ class DatasetBuilder:
             if not examples:
                 raise ValueError(
                     "No instances were read from the given filepath {}. "
-                    "Is the path correct?".format(root))
+                    "Is the path correct?".format(filename))
 
             label_list = self.get_labels()
             # Convert class label to label ids.
-            if label_list is not None:
-                if 'labels' not in examples[0].keys():
-                    raise ValueError(
-                        "Key 'labels' should be in example if get_label() is specified."
-                    )
-
+            if label_list is not None and 'labels' in examples[0].keys():
                 label_dict = {}
                 for i, label in enumerate(label_list):
                     label_dict[label] = i
-
                 for idx in range(len(examples)):
-                    for label_idx in range(len(examples[idx]['labels'])):
-                        examples[idx]['labels'][label_idx] = label_dict[
-                            examples[idx]['labels'][label_idx]]
+                    if isinstance(examples[idx]['labels'], list) or isinstance(
+                            examples[idx]['labels'], tuple):
+                        for label_idx in range(len(examples[idx]['labels'])):
+                            examples[idx]['labels'][label_idx] = label_dict[
+                                examples[idx]['labels'][label_idx]]
+                    else:
+                        examples[idx]['labels'] = label_dict[examples[idx][
+                            'labels']]
 
-            return MapDataset(
-                examples,
-                label_list=label_list) if label_list else MapDataset(examples)
+            return MapDataset(examples, label_list=label_list)
 
-    def _read(self, file_path: str):
+    def _read(self, filename: str, *args):
         """
         Reads examples from the given file_path and returns them as an
         `Iterable` (which could be a list or could be a generator).
