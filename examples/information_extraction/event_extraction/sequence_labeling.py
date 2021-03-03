@@ -51,7 +51,6 @@ parser.add_argument("--valid_step", type=int, default=100, help="validation step
 parser.add_argument("--skip_step", type=int, default=20, help="skip step")
 parser.add_argument("--batch_size", type=int, default=32, help="Total examples' number in batch for training.")
 parser.add_argument("--checkpoints", type=str, default=None, help="Directory to model checkpoint")
-parser.add_argument("--pretrain_model", type=str, default="ernie-1.0", help="pretrain model name")
 parser.add_argument("--init_ckpt", type=str, default=None, help="already pretraining model checkpoint")
 parser.add_argument("--predict_save_path", type=str, default=None, help="predict data save path")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
@@ -181,11 +180,10 @@ def do_train():
     no_entity_label = "O"
     ignore_label = -1
 
-    tokenizer = ErnieTokenizer.from_pretrained(args.pretrain_model)
+    tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
-    model = ErnieForTokenClassification.from_pretrained(
-        args.pretrain_model, num_classes=len(label_map))
+    model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
     model = paddle.DataParallel(model)
 
     print("============start train==========")
@@ -223,15 +221,16 @@ def do_train():
         collate_fn=batchify_fn)
 
     num_training_steps = len(train_loader) * args.num_epoch
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+    # lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
+    # optimizer = paddle.optimizer.AdamW(
+    #     learning_rate=lr_scheduler,
+    #     parameters=model.parameters(),
+    #     weight_decay=args.weight_decay,
+    #     apply_decay_param_fun=lambda x: x in [
+    #         p.name for n, p in model.named_parameters()
+    #         if not any(nd in n for nd in ["bias", "norm"])
+    #     ])
+    optimizer = paddle.optimizer.AdamW(learning_rate=args.learning_rate, parameters=model.parameters())
 
     metric = ChunkEvaluator(label_list=train_ds.label_vocab.keys(), suffix=True)
     criterion = paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label)
@@ -269,11 +268,10 @@ def do_predict():
     no_entity_label = "O"
     ignore_label = -1
 
-    tokenizer = ErnieTokenizer.from_pretrained(args.pretrain_model)
+    tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
-    model = ErnieForTokenClassification.from_pretrained(
-        args.pretrain_model, num_classes=len(label_map))
+    model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
 
     print("============start predict==========")
     if not args.init_ckpt or not os.path.isfile(args.init_ckpt):
@@ -327,10 +325,9 @@ def do_predict():
 
 if __name__ == '__main__':
 
-    if args.n_gpu > 1 and do_train:
+    if args.n_gpu > 1 and args.do_train:
         paddle.distributed.spawn(do_train, nprocs=args.n_gpu)
-    elif do_train:
+    elif args.do_train:
         do_train()
-
-    if do_predict:
+    elif args.do_predict:
         do_predict()

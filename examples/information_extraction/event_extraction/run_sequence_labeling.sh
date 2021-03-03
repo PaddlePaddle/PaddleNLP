@@ -7,7 +7,6 @@ data_dir=$1
 conf_path=$2
 vocab_path=$3
 ckpt_dir=$4
-pretrain_model=ernie-1.0
 predict_data=$5
 learning_rate=$6
 is_train=$7
@@ -30,7 +29,6 @@ python sequence_labeling.py --num_epoch ${epoch} \
     --batch_size ${batch_size} \
     --skip_step 10 \
     --valid_step 50 \
-    --pretrain_model ${pretrain_model} \
     --checkpoints ${ckpt_dir} \
     --init_ckpt ${ckpt_dir}/best.pdparams \
     --predict_save_path ${pred_save_path} \

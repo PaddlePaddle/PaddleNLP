@@ -214,7 +214,7 @@ def docs_data_process(path):
 if __name__ == "__main__":
     # schema process
     print("\n=================【DUEE FINANCE DATASET】==============")
-    conf_dir = "../conf/DuEE-Fin"
+    conf_dir = "./conf/DuEE-Fin"
     schema_path = "{}/event_schema.json".format(conf_dir)
     tags_trigger_path = "{}/trigger_tag.dict".format(conf_dir)
     tags_role_path = "{}/role_tag.dict".format(conf_dir)
@@ -234,7 +234,7 @@ if __name__ == "__main__":
     print("=================end schema process===============")
 
     # data process
-    data_dir = "../data/DuEE-Fin"
+    data_dir = "./data/DuEE-Fin"
     sentence_dir = "{}/sentence".format(data_dir)
     trigger_save_dir = "{}/trigger".format(data_dir)
     role_save_dir = "{}/role".format(data_dir)
