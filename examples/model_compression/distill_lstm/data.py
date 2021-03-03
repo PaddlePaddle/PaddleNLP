@@ -282,7 +282,7 @@ def create_distill_loader(task_name,
     if task_name == 'qqp':
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # bert input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # bert segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # bert segment
             Pad(axis=0, pad_val=pad_val),  # small input_ids
             Stack(dtype="int64"),  # small seq len
             Pad(axis=0, pad_val=pad_val),  # small input_ids
@@ -292,7 +292,7 @@ def create_distill_loader(task_name,
     else:
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # bert input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # bert segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # bert segment
             Pad(axis=0, pad_val=pad_val),  # small input_ids
             Stack(dtype="int64"),  # small seq len
             Stack(dtype="int64")  # small label

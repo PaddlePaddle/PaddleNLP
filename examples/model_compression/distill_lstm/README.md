@@ -62,7 +62,7 @@ wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
 cd ../../glue
 export CUDA_VISIBLE_DEVICES=0
 export TASK_NAME=SST-2
-python -u ./run_bert_finetune.py \
+python -u ./run_glue.py \
     --model_type bert \
     --model_name_or_path bert-base-uncased \
     --task_name $TASK_NAME \

@@ -264,26 +264,12 @@ def convert_example(example,
     else:
         example = tokenizer(
             example[0], text_pair=example[1], max_seq_len=max_seq_length)
-    '''
-    tokens_raw = [tokenizer(l) for l in example]
-    # Truncate to the truncate_length,
-    tokens_trun = _truncate_seqs(tokens_raw, max_seq_length)
-    # Concate the sequences with special tokens
-    tokens_trun[0] = [tokenizer.cls_token] + tokens_trun[0]
-    tokens, segment_ids, _ = _concat_seqs(tokens_trun, [[tokenizer.sep_token]] *
-                                          len(tokens_trun))
-    # Convert the token to ids
-    input_ids = tokenizer.convert_tokens_to_ids(tokens)
-    valid_length = len(input_ids)
-    # The mask has 1 for real tokens and 0 for padding tokens. Only real
-    # tokens are attended to.
-    # input_mask = [1] * len(input_ids)
-    '''
+
     if not is_test:
-        return example['input_ids'], example['segment_ids'], len(example[
+        return example['input_ids'], example['token_type_ids'], len(example[
             'input_ids']), label
     else:
-        return example['input_ids'], example['segment_ids'], len(example[
+        return example['input_ids'], example['token_type_ids'], len(example[
             'input_ids'])
 
 
@@ -312,7 +298,7 @@ def do_train(args):
         train_dataset, batch_size=args.batch_size, shuffle=True)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(),  # length
         Stack(dtype="int64" if train_dataset.get_labels() else "float32")  # label
     ): [data for i, data in enumerate(fn(samples)) if i != 2]
