@@ -76,6 +76,9 @@ python -u ./run_glue.py \
     --n_gpu 1 \
 
 ```
+
+如果需要训练基于ChnSentiCorp数据集的BERT finetuning模型，可以将[glue目录](https://github.com/PaddlePaddle/models/tree/develop/PaddleNLP/examples/glue)下的`run_glue.py`稍作修改，在字典`TASK_CLASSES`中配置ChnSentiCorp数据集相关的信息，增加一组键值对：`"senta":(ChnSentiCorp, Accuracy)`，并且记得导入数据集`from paddlenlp.datasets import ChnSentiCorp`。训练时将参数`TASK_NAME`设为`"senta"`，参数`model_name_or_path`可以是`bert-wwm-ext-chinese`或者`bert-base-chinese`。
+
 训练完成之后，可将训练效果最好的模型保存在本项目下的`pretrained_models/$TASK_NAME/`下。模型目录下有`model_config.json`, `model_state.pdparams`, `tokenizer_config.json`及`vocab.txt`这几个文件。
 
 
