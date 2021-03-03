@@ -22,16 +22,23 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['MSRA_NER']
+__all__ = ['Poetry']
 
 
-class MSRA_NER(DatasetBuilder):
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/msra_ner.tar.gz"
-    MD5 = None
+class Poetry(DatasetBuilder):
+    URL = "https://paddlenlp.bj.bcebos.com/datasets/poetry.tar.gz"
+    MD5 = '8edd7eda1b273145b70ef29c82cd622b'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(os.path.join('msra_ner', 'train.tsv'), None),
-        'test': META_INFO(os.path.join('msra_ner', 'test.tsv'), None)
+        'train': META_INFO(
+            os.path.join('poetry', 'train.tsv'),
+            '176c6202b5e71656ae7e7848eec4c54f'),
+        'dev': META_INFO(
+            os.path.join('poetry', 'dev.tsv'),
+            '737e4b6da5facdc0ac33fe688df19931'),
+        'test': META_INFO(
+            os.path.join('poetry', 'test.tsv'),
+            '1dca907b2d712730c7c828f8acee7431'),
     }
 
     def _get_data(self, mode, **kwargs):
@@ -52,13 +59,9 @@ class MSRA_NER(DatasetBuilder):
                 if not line_stripped:
                     break
                 if len(line_stripped) == 2:
-                    tokens = line_stripped[0].split("\002")
-                    tags = line_stripped[1].split("\002")
+                    tokens = line_stripped[0]
+                    labels = line_stripped[1]
                 else:
-                    tokens = line_stripped.split("\002")
-                    tags = []
-                yield {"tokens": tokens, "labels": tags}
-
-    def get_labels(self):
-
-        return ["B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "O"]
+                    tokens = line_stripped
+                    labels = []
+                yield {"tokens": tokens, "labels": labels}
