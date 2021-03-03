@@ -133,6 +133,6 @@ def parse_args():
     parser.add_argument(
         "--do_train", action='store_true', help="Whether to train the model.")
     parser.add_argument(
-        "--do_pred", action='store_true', help="Whether to predict.")
+        "--do_predict", action='store_true', help="Whether to predict.")
     args = parser.parse_args()
     return args

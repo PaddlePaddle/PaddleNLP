@@ -26,4 +26,4 @@ from .dureader import *
 from .cnndm import *
 from .poetry import *
 from .couplet import *
-from .experimental import load_dataset
+from .experimental import load_dataset, DatasetBuilder
