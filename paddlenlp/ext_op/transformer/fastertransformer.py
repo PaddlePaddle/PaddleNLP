@@ -1,11 +1,54 @@
 import os
+import numpy as np
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddlenlp.transformers import TransformerModel
+from paddlenlp.transformers import TransformerModel, position_encoding_init
 from paddlenlp.ext_op import InferTransformerDecoding
+
+
+def load_dygraph_ckpt(model, init_from_params, trg_vocab_size, max_length,
+                      d_model, pad_idx, weight_sharing, use_fp16_decoding):
+    # Load the trained model
+    assert init_from_params, (
+        "Please set init_from_params to load the infer model.")
+
+    model_dict = paddle.load(
+        os.path.join(init_from_params, "transformer.pdparams"))
+
+    # To set weight[padding_idx] to 0.
+    model_dict["trg_word_embedding.word_embedding.weight"][
+        pad_idx] = [0] * d_model
+
+    # Dealing with weight sharing. 
+    if weight_sharing:
+        model_dict["decoding_linear.weight"] = np.transpose(model_dict[
+            "trg_word_embedding.word_embedding.weight"])
+        model_dict["decoding_linear.bias"] = np.zeros(
+            [trg_vocab_size], dtype="float32")
+    else:
+        model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
+        model_dict["decoding_linear.bias"] = np.zeros(
+            [trg_vocab_size], dtype="float32")
+
+    # To avoid a longer length than training, reset the size of position
+    # encoding to max_length
+    model_dict["encoder.pos_encoder.weight"] = position_encoding_init(
+        max_length + 1, d_model)
+    model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
+        max_length + 1, d_model)
+
+    if use_fp16_decoding:
+        for item in model.state_dict():
+            if "decoder" in item:
+                model_dict[item] = np.float16(model_dict[item])
+        model_dict["decoding_linear.weight"] = np.float16(model_dict[
+            "decoding_linear.weight"])
+
+    model.load_dict(model_dict)
+    return model
 
 
 class FasterTransformer(TransformerModel):
@@ -63,21 +106,6 @@ class FasterTransformer(TransformerModel):
             use_fp16_decoding=self.use_fp16_decoding)
 
     def forward(self, src_word):
-        if self.weight_sharing:
-            decoding_linear_weight = self.trg_word_embedding.word_embedding.weight.t(
-            )
-            if self.use_fp16_decoding:
-                decoding_linear_weight = paddle.cast(
-                    decoding_linear_weight, dtype="float16")
-            self.decoding_linear.weight.set_value(decoding_linear_weight)
-            self.decoding_linear.bias = paddle.create_parameter(
-                shape=[self.trg_vocab_size],
-                dtype=paddle.get_default_dtype(),
-                is_bias=True,
-                default_initializer=paddle.nn.initializer.Constant(value=0.0))
-        else:
-            self.decoding_linear = self.linear
-
         src_max_len = paddle.shape(src_word)[-1]
         src_slf_attn_bias = paddle.cast(
             src_word == self.bos_id,

@@ -49,6 +49,7 @@ mkdir build
 cd build/
 cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release
 make -j
+cd ../
 ```
 
 注意：`xx` 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)。
@@ -82,7 +83,19 @@ transformer = FasterTransformer(
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 
-更详细的例子可以参考 `./sample/decoding_sample.py`，我们提供了更详细用例。
+更详细的例子可以参考 `./sample/decoding_sample.py` 以及 `./sample/encoder_decoding_sample.py`，我们提供了更详细用例。
+
+#### 执行 decoding on PaddlePaddle
+
+使用 PaddlePaddle 仅执行 decoding 测试：
+
+``` sh
+export CUDA_VISIBLE_DEVICES=0
+./build/third-party/build/bin/decoding_gemm 32 4 8 64 30000 32 512 False
+python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml --decoding-lib ./build/lib/libdecoding_op.so
+```
+
+其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer/v3.1#execute-the-decoderdecoding-demos)。
 
 #### 模型推断
 
@@ -93,7 +106,7 @@ transformer = FasterTransformer(
 ``` sh
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
-python sample/decoding_sample.py --config ./sample/config/transformer.base.yaml --decoding-lib ./build/lib/libdecoding_op.so
+python sample/encoder_decoding_sample.py --config ./sample/config/transformer.base.yaml --decoding-lib ./build/lib/libdecoding_op.so
 ```
 
 其中，`--config` 选项用于指明配置文件的位置，而 `--decoding-lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。
@@ -109,7 +122,7 @@ float16 与 float32 预测的基本流程相同，不过在使用 float16 的 de
 ``` sh
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
-python sample/decoding_sample.py --config ./sample/config/transformer.base.yaml --decoding-lib ./build/lib/libdecoding_op.so
+python sample/encoder_decoding_sample.py --config ./sample/config/transformer.base.yaml --decoding-lib ./build/lib/libdecoding_op.so
 ```
 
 其中，`--config` 选项用于指明配置文件的位置，而 `--decoding-lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。

@@ -261,10 +261,6 @@ class InferTransformerDecoding(nn.Layer):
         memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
             memory_seq_lens, self._beam_size)
 
-        np_word_emb = self.word_emb[0].numpy()
-        np_word_emb[self._bos_id] = [0] * np_word_emb.shape[1]
-        self.word_emb[0].set_value(np_word_emb)
-
         output_ids, parent_ids, sequence_length = infer_transformer_decoder(
             [enc_output], [memory_seq_lens],
             [paddle.cast(

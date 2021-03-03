@@ -14,9 +14,7 @@ from pprint import pprint
 
 from paddlenlp.transformers import TransformerModel
 from paddlenlp.transformers import position_encoding_init
-from paddlenlp.ext_op import FasterTransformer
-
-from paddlenlp.utils.log import logger
+from paddlenlp.ext_op import FasterTransformer, load_dygraph_ckpt
 
 import reader
 
@@ -25,7 +23,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
-        default="./sample/config/decoding.sample.yaml",
+        default="./sample/config/transformer.base.yaml",
         type=str,
         help="Path of the config file. ")
     parser.add_argument(
@@ -53,37 +51,16 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
     return seq
 
 
-def generate_encoder_result(batch_size, max_seq_len, memory_hidden_dim, dtype):
-    memory_sequence_length = np.random.randint(
-        1, max_seq_len, size=batch_size).astype(np.int32)
-    memory_sequence_length[np.random.randint(0, batch_size)] = max_seq_len
-    outter_embbeding = np.random.randn(memory_hidden_dim) * 0.01
-
-    memory = []
-    mem_max_seq_len = np.max(memory_sequence_length)
-    for i in range(batch_size):
-        data = np.random.randn(mem_max_seq_len, memory_hidden_dim) * 0.01
-        for j in range(memory_sequence_length[i], mem_max_seq_len):
-            data[j] = outter_embbeding
-        memory.append(data)
-    memory = np.asarray(memory)
-    memory = paddle.to_tensor(memory, dtype=dtype)
-    memory_sequence_length = paddle.to_tensor(
-        memory_sequence_length, dtype="int32")
-
-    return memory, memory_sequence_length
-
-
 def do_predict(args):
     if args.use_gpu:
         place = "gpu:0"
     else:
         place = "cpu"
 
-    place = paddle.set_device(place)
+    paddle.set_device(place)
 
-    args.src_vocab_size = 30000
-    args.trg_vocab_size = 30000
+    # Define data loader
+    test_loader, to_tokens = reader.create_infer_loader(args)
 
     # Define model
     transformer = FasterTransformer(
@@ -106,18 +83,30 @@ def do_predict(args):
     # Set evaluate mode
     transformer.eval()
 
-    enc_output, mem_seq_len = generate_encoder_result(
-        args.infer_batch_size, args.max_length, args.d_model, "float16"
-        if args.use_fp16_decoding else "float32")
+    # Load checkpoint.
+    transformer = load_dygraph_ckpt(
+        transformer,
+        init_from_params=args.init_from_params,
+        trg_vocab_size=args.trg_vocab_size,
+        max_length=args.max_length,
+        d_model=args.d_model,
+        pad_idx=args.bos_idx,
+        weight_sharing=args.weight_sharing,
+        use_fp16_decoding=args.use_fp16_decoding)
+
+    f = open(args.output_file, "w")
     with paddle.no_grad():
-        for i in range(100):
-            # For warmup. 
-            if 50 == i:
-                start = time.time()
-            transformer.decoding(
-                enc_output=enc_output, memory_seq_lens=mem_seq_len)
-        logger.info("Average test time for decoding is %f ms" % (
-            (time.time() - start) / 50 * 1000))
+        for (src_word, ) in test_loader:
+            finished_seq = transformer(src_word=src_word)
+            finished_seq = finished_seq.numpy().transpose([1, 2, 0])
+            for ins in finished_seq:
+                for beam_idx, beam in enumerate(ins):
+                    if beam_idx >= args.n_best:
+                        break
+                    id_list = post_process_seq(beam, args.bos_idx, args.eos_idx)
+                    word_list = to_tokens(id_list)
+                    sequence = " ".join(word_list) + "\n"
+                    f.write(sequence)
 
 
 if __name__ == "__main__":
