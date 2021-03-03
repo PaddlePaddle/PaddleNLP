@@ -197,8 +197,7 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    num_training_steps = args.max_steps if args.max_steps > 0 else len(
-        train_data_loader) * args.num_train_epochs
+    num_training_steps = 2812
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_steps)
