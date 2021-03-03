@@ -28,6 +28,7 @@ import paddlenlp as ppnlp
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
+from paddlenlp.metrics import ChunkEvaluator
 
 parser = argparse.ArgumentParser()
 
@@ -60,39 +61,10 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
     return tokenized_input
 
 
-def parse_decodes(input_words, id2label, decodes, lens):
-    decodes = [x for batch in decodes for x in batch]
-    lens = [x for batch in lens for x in batch]
-
-    outputs = []
-    for idx, end in enumerate(lens):
-        sent = "".join(input_words[idx]['tokens'])
-        tags = [id2label[x] for x in decodes[idx][1:end]]
-        sent_out = []
-        tags_out = []
-        words = ""
-        for s, t in zip(sent, tags):
-            if t.startswith('B-') or t == 'O':
-                if len(words):
-                    sent_out.append(words)
-                if t.startswith('B-'):
-                    tags_out.append(t.split('-')[1])
-                else:
-                    tags_out.append(t)
-                words = s
-            else:
-                words += s
-        if len(sent_out) < len(tags_out):
-            sent_out.append(words)
-        outputs.append(''.join(
-            [str((s, t)) for s, t in zip(sent_out, tags_out)]))
-    return outputs
-
-
-def do_predict(args):
+def do_eval(args):
     paddle.set_device("gpu" if args.use_gpu else "cpu")
 
-    train_ds, predict_ds = load_dataset(
+    train_ds, eval_ds = load_dataset(
         'msra_ner', splits=('train', 'test'), lazy=False)
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
 
@@ -104,7 +76,6 @@ def do_predict(args):
         tokenizer=tokenizer,
         no_entity_id=no_entity_id,
         max_seq_len=args.max_seq_length)
-
     ignore_label = -100
     batchify_fn = lambda samples, fn=Dict({
         'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
@@ -112,13 +83,9 @@ def do_predict(args):
         'seq_len': Stack(),
         'labels': Pad(axis=0, pad_val=ignore_label)  # label
     }): fn(samples)
-    raw_data = predict_ds.data
-
-    id2label = dict(enumerate(predict_ds.label_list))
-
-    predict_ds = predict_ds.map(trans_func)
-    predict_data_loader = DataLoader(
-        dataset=predict_ds,
+    eval_ds = eval_ds.map(trans_func)
+    eval_data_loader = DataLoader(
+        dataset=eval_ds,
         collate_fn=batchify_fn,
         num_workers=0,
         batch_size=args.batch_size,
@@ -129,29 +96,27 @@ def do_predict(args):
     if args.init_checkpoint_path:
         model_dict = paddle.load(args.init_checkpoint_path)
         model.set_dict(model_dict)
+    loss_fct = paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label)
+
+    metric = ChunkEvaluator(label_list=label_list)
 
     model.eval()
-    pred_list = []
-    len_list = []
-    for step, batch in enumerate(predict_data_loader):
+    metric.reset()
+    for step, batch in enumerate(eval_data_loader):
         input_ids, token_type_ids, length, labels = batch
         logits = model(input_ids, token_type_ids)
-        pred = paddle.argmax(logits, axis=-1)
-        pred_list.append(pred.numpy())
-        len_list.append(length.numpy())
-
-    preds = parse_decodes(raw_data, id2label, pred_list, len_list)
-
-    file_path = "results.txt"
-    with open(file_path, "w", encoding="utf8") as fout:
-        fout.write("\n".join(preds))
-    # Print some examples
-    print(
-        "The results have been saved in the file: %s, some examples are shown below: "
-        % file_path)
-    print("\n".join(preds[:10]))
+        loss = loss_fct(logits.reshape([-1, label_num]), labels.reshape([-1]))
+        avg_loss = paddle.mean(loss)
+        preds = logits.argmax(axis=2)
+        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
+            None, length, preds, labels)
+        metric.update(num_infer_chunks.numpy(),
+                      num_label_chunks.numpy(), num_correct_chunks.numpy())
+        precision, recall, f1_score = metric.accumulate()
+    print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
+          (avg_loss, precision, recall, f1_score))
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    do_predict(args)
+    do_eval(args)
