@@ -41,13 +41,11 @@ class PeoplesDailyNER(DatasetBuilder):
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-
             get_path_from_url(self.URL, default_root, self.MD5)
-            fullname = os.path.join(default_root, filename)
 
         return fullname
 
-    def _read(self, filename):
+    def _read(self, filename, *args):
         with open(filename, 'r', encoding='utf-8') as f:
             for line in f:
                 line_stripped = line.strip().split('\t')
