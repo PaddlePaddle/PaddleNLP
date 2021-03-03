@@ -9,48 +9,6 @@ from paddlenlp.transformers import TransformerModel, position_encoding_init
 from paddlenlp.ext_op import InferTransformerDecoding
 
 
-def load_dygraph_ckpt(model, init_from_params, trg_vocab_size, max_length,
-                      d_model, pad_idx, weight_sharing, use_fp16_decoding):
-    # Load the trained model
-    assert init_from_params, (
-        "Please set init_from_params to load the infer model.")
-
-    model_dict = paddle.load(
-        os.path.join(init_from_params, "transformer.pdparams"))
-
-    # To set weight[padding_idx] to 0.
-    model_dict["trg_word_embedding.word_embedding.weight"][
-        pad_idx] = [0] * d_model
-
-    # Dealing with weight sharing. 
-    if weight_sharing:
-        model_dict["decoding_linear.weight"] = np.transpose(model_dict[
-            "trg_word_embedding.word_embedding.weight"])
-        model_dict["decoding_linear.bias"] = np.zeros(
-            [trg_vocab_size], dtype="float32")
-    else:
-        model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
-        model_dict["decoding_linear.bias"] = np.zeros(
-            [trg_vocab_size], dtype="float32")
-
-    # To avoid a longer length than training, reset the size of position
-    # encoding to max_length
-    model_dict["encoder.pos_encoder.weight"] = position_encoding_init(
-        max_length + 1, d_model)
-    model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
-        max_length + 1, d_model)
-
-    if use_fp16_decoding:
-        for item in model.state_dict():
-            if "decoder" in item:
-                model_dict[item] = np.float16(model_dict[item])
-        model_dict["decoding_linear.weight"] = np.float16(model_dict[
-            "decoding_linear.weight"])
-
-    model.load_dict(model_dict)
-    return model
-
-
 class FasterTransformer(TransformerModel):
     def __init__(self,
                  src_vocab_size,
@@ -132,3 +90,45 @@ class FasterTransformer(TransformerModel):
         ids = self.decoding(enc_output, mem_seq_lens)
 
         return ids
+
+    @staticmethod
+    def load_dygraph_ckpt(model, init_from_params, trg_vocab_size, max_length,
+                          d_model, pad_idx, weight_sharing, use_fp16_decoding):
+        # Load the trained model
+        assert init_from_params, (
+            "Please set init_from_params to load the infer model.")
+
+        model_dict = paddle.load(
+            os.path.join(init_from_params, "transformer.pdparams"))
+
+        # To set weight[padding_idx] to 0.
+        model_dict["trg_word_embedding.word_embedding.weight"][
+            pad_idx] = [0] * d_model
+
+        # Dealing with weight sharing. 
+        if weight_sharing:
+            model_dict["decoding_linear.weight"] = np.transpose(model_dict[
+                "trg_word_embedding.word_embedding.weight"])
+            model_dict["decoding_linear.bias"] = np.zeros(
+                [trg_vocab_size], dtype="float32")
+        else:
+            model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
+            model_dict["decoding_linear.bias"] = np.zeros(
+                [trg_vocab_size], dtype="float32")
+
+        # To avoid a longer length than training, reset the size of position
+        # encoding to max_length
+        model_dict["encoder.pos_encoder.weight"] = position_encoding_init(
+            max_length + 1, d_model)
+        model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
+            max_length + 1, d_model)
+
+        if use_fp16_decoding:
+            for item in model.state_dict():
+                if "decoder" in item:
+                    model_dict[item] = np.float16(model_dict[item])
+            model_dict["decoding_linear.weight"] = np.float16(model_dict[
+                "decoding_linear.weight"])
+
+        model.load_dict(model_dict)
+        return model

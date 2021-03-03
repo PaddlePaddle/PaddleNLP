@@ -14,16 +14,17 @@ from pprint import pprint
 
 from paddlenlp.transformers import TransformerModel
 from paddlenlp.transformers import position_encoding_init
-from paddlenlp.ext_op import FasterTransformer, load_dygraph_ckpt
+from paddlenlp.ext_op import FasterTransformer
 
-import reader
+from paddlenlp.utils.log import logger
+from paddlenlp.data import Pad
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
-        default="./sample/config/transformer.base.yaml",
+        default="./sample/config/decoding.sample.yaml",
         type=str,
         help="Path of the config file. ")
     parser.add_argument(
@@ -35,32 +36,27 @@ def parse_args():
     return args
 
 
-def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
-    """
-    Post-process the decoded sequence.
-    """
-    eos_pos = len(seq) - 1
-    for i, idx in enumerate(seq):
-        if idx == eos_idx:
-            eos_pos = i
-            break
-    seq = [
-        idx for idx in seq[:eos_pos + 1]
-        if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)
-    ]
-    return seq
+def generate_src_word(batch_size, vocab_size, max_length, eos_idx, pad_idx):
+    memory_sequence_length = np.random.randint(
+        low=1, high=max_length, size=batch_size).astype(np.int32)
+    data = []
+    for i in range(batch_size):
+        data.append(
+            np.random.randint(
+                low=3,
+                high=vocab_size,
+                size=memory_sequence_length[i],
+                dtype=np.int64))
+
+    word_pad = Pad(pad_idx)
+    src_word = word_pad([list(word) + [eos_idx] for word in data])
+
+    return paddle.to_tensor(src_word, dtype="int64")
 
 
 def do_predict(args):
-    if args.use_gpu:
-        place = "gpu:0"
-    else:
-        place = "cpu"
-
+    place = "gpu:0"
     paddle.set_device(place)
-
-    # Define data loader
-    test_loader, to_tokens = reader.create_infer_loader(args)
 
     # Define model
     transformer = FasterTransformer(
@@ -83,30 +79,21 @@ def do_predict(args):
     # Set evaluate mode
     transformer.eval()
 
-    # Load checkpoint.
-    transformer = load_dygraph_ckpt(
-        transformer,
-        init_from_params=args.init_from_params,
-        trg_vocab_size=args.trg_vocab_size,
+    src_word = generate_src_word(
+        batch_size=args.infer_batch_size,
+        vocab_size=args.src_vocab_size,
         max_length=args.max_length,
-        d_model=args.d_model,
-        pad_idx=args.bos_idx,
-        weight_sharing=args.weight_sharing,
-        use_fp16_decoding=args.use_fp16_decoding)
+        eos_idx=args.eos_idx,
+        pad_idx=args.bos_idx)
 
-    f = open(args.output_file, "w")
     with paddle.no_grad():
-        for (src_word, ) in test_loader:
-            finished_seq = transformer(src_word=src_word)
-            finished_seq = finished_seq.numpy().transpose([1, 2, 0])
-            for ins in finished_seq:
-                for beam_idx, beam in enumerate(ins):
-                    if beam_idx >= args.n_best:
-                        break
-                    id_list = post_process_seq(beam, args.bos_idx, args.eos_idx)
-                    word_list = to_tokens(id_list)
-                    sequence = " ".join(word_list) + "\n"
-                    f.write(sequence)
+        for i in range(100):
+            # For warmup. 
+            if 50 == i:
+                start = time.time()
+            transformer(src_word=src_word)
+        logger.info("Average test time for decoding is %f ms" % (
+            (time.time() - start) / 50 * 1000))
 
 
 if __name__ == "__main__":

@@ -1,13 +1,5 @@
-# 自定义OP编译使用
+# Faster Transformer 预测
 
-## 子目录结构
-
-```text
-.
-├── sample/                 # 基于 Transformer 机器翻译使用样例（beam search）
-├── src/                    # 自定义 OP C++ CUDA 代码
-└── transformer/            # Python API 封装脚本
-```
 
 ## 使用环境说明
 
@@ -22,7 +14,7 @@
 
 ### 编译自定义OP
 
-自定义 OP 需要将实现的 C++、CUDA 代码编译成动态库，我们提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。
+自定义 OP 需要将实现的 C++、CUDA 代码编译成动态库，我们提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。同样的自定义 op 编译的说明也可以在自定义 op 对应的路径 `PaddleNLP/paddlenlp/ext_op/` 下面找到。
 
 #### 克隆 PaddleNLP
 
@@ -56,7 +48,7 @@ cd ../
 
 最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 Faster Transformer decoding 执行的库。
 
-#### 使用
+## 使用 Faster Transformer 完成预测
 
 编写 python 脚本的时候，调用 `FasterTransformer` API 并传入 `libdecoding_op.so` 的位置即可实现将 Faster Transformer 用于当前的预测。
 
@@ -83,22 +75,12 @@ transformer = FasterTransformer(
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 
-更详细的例子可以参考 `./sample/decoding_sample.py` 以及 `./sample/encoder_decoding_sample.py`，我们提供了更详细用例。
-
-#### 执行 decoding on PaddlePaddle
-
-使用 PaddlePaddle 仅执行 decoding 测试：
-
-``` sh
-export CUDA_VISIBLE_DEVICES=0
-./build/third-party/build/bin/decoding_gemm 32 4 8 64 30000 32 512 False
-python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml --decoding-lib ./build/lib/libdecoding_op.so
-```
-
-其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer/v3.1#execute-the-decoderdecoding-demos)。
+更详细的例子可以参考 `encoder_decoding_predict.py`，我们提供了更详细用例。
 
 
 #### 模型推断
+
+使用模型推断前提是需要指定一个合适的 checkpoint，需要在对应的 `../configs/transformer.base.yaml` 或是 `../configs/transformer.big.yaml` 中修改对应的模型载入的路径参数 `init_from_params`。
 
 #### 使用动态图预测(使用 float32 decoding 预测)
 
@@ -107,23 +89,22 @@ python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml -
 ``` sh
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
-python sample/encoder_decoding_sample.py --config ./sample/config/transformer.base.yaml --decoding-lib ./build/lib/libdecoding_op.so
+python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding-lib ../../../../paddlenlp/ext_op/build/lib/libdecoding_op.so
 ```
 
 其中，`--config` 选项用于指明配置文件的位置，而 `--decoding-lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。
 
 翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `./sample/config/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 base model 的配置。
 
-需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
 #### 使用动态图预测(使用 float16 decoding 预测)
 
-float16 与 float32 预测的基本流程相同，不过在使用 float16 的 decoding 进行预测的时候，需要在配置文件中修改 `use_fp16_decoding` 配置为 `True`。后按照与之前相同的方式执行即可。具体执行方式如下：
+float16 与 float32 预测的基本流程相同，不过在使用 float16 的 decoding 进行预测的时候，需要再加上 `--use-fp16-decoding` 选项。后按照与之前相同的方式执行即可。具体执行方式如下：
 
 ``` sh
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
-python sample/encoder_decoding_sample.py --config ./sample/config/transformer.base.yaml --decoding-lib ./build/lib/libdecoding_op.so
+python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding-lib ../../../../paddlenlp/ext_op/build/lib/libdecoding_op.so --use-fp16-decoding
 ```
 
 其中，`--config` 选项用于指明配置文件的位置，而 `--decoding-lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。
@@ -134,7 +115,7 @@ python sample/encoder_decoding_sample.py --config ./sample/config/transformer.ba
 
 ## 模型评估
 
-预测结果中每行输出是对应行输入的得分最高的翻译，对于使用 BPE 的数据，预测出的翻译结果也将是 BPE 表示的数据，要还原成原始的数据（这里指 tokenize 后的数据）才能进行正确的评估。评估过程具体如下（BLEU 是翻译任务常用的自动评估方法指标）：
+评估方式与动态图评估方式相同，预测结果中每行输出是对应行输入的得分最高的翻译，对于使用 BPE 的数据，预测出的翻译结果也将是 BPE 表示的数据，要还原成原始的数据（这里指 tokenize 后的数据）才能进行正确的评估。评估过程具体如下（BLEU 是翻译任务常用的自动评估方法指标）：
 
 ``` sh
 # 还原 predict.txt 中的预测结果为 tokenize 后的数据
@@ -147,5 +128,5 @@ perl mosesdecoder/scripts/generic/multi-bleu.perl ~/.paddlenlp/datasets/machine_
 
 执行上述操作之后，可以看到类似如下的结果，此处结果是 base model 在 newstest2014 上的 BLEU 结果：
 ```
-BLEU = 26.86, 58.3/32.5/20.5/13.4 (BP=1.000, ratio=1.013, hyp_len=65326, ref_len=64506)
+BLEU = 26.89, 58.4/32.6/20.5/13.4 (BP=1.000, ratio=1.010, hyp_len=65166, ref_len=64506)
 ```
