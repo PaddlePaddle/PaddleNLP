@@ -82,9 +82,6 @@ def do_predict(args):
 
     place = paddle.set_device(place)
 
-    args.src_vocab_size = 30000
-    args.trg_vocab_size = 30000
-
     # Define model
     transformer = FasterTransformer(
         src_vocab_size=args.src_vocab_size,
