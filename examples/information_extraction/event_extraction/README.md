@@ -4,7 +4,7 @@
 信息抽取旨在从非结构化自然语言文本中提取结构化知识，如实体、关系、事件等。事件抽取的目标是对于给定的自然语言句子，根据预先指定的事件类型和论元角色，识别句子中所有目标事件类型的事件，并根据相应的论元角色集合抽取事件所对应的论元。其中目标事件类型 (event_type) 和论元角色 (role) 限定了抽取的范围，例如 (event_type：胜负，role：时间，胜者，败者，赛事名称)、(event_type：夺冠，role：夺冠事件，夺冠赛事，冠军)。
 
 <div align="center">
-<img src="pictures/DuEE-Fin/ee.png" width="500" height="400" alt="事件抽取" align=center />
+<img src="pictures/DuEE-Fin/ee.png" width="600" height="200" alt="事件抽取" align=center />
 </div>
 
 该示例展示了如何使用PaddleNLP快速复现[LIC2021事件抽取比赛](http://aistudio-bce.bcc-bdbl.baidu.com/aistudio/competition/detail/141)基线并进阶优化基线。
