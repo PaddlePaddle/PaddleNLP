@@ -72,7 +72,7 @@ tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
 文本数据处理直接调用tokenizer即可输出模型所需输入数据。
 
 ```python
-inputs = tokenizer(text="请输入测试样例", max_seq_len)
+inputs = tokenizer(text="请输入测试样例", max_seq_len=20)
 # {'input_ids': [1, 647, 789, 109, 558, 525, 314, 656, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 # 'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 # 'seq_len': 9}
