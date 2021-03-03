@@ -321,47 +321,14 @@ class Linear3D(Layer):
 
     def forward(self, input):
         # abc,cde->adbe
-        reshape_input = paddle.unsqueeze(input, 1)
-        reshape_w = paddle.reshape(
-            self.weight,
-            [self.hidden_size, self.num_attention_heads, self.size_per_head])
-        reshape_w = paddle.transpose(reshape_w, [1, 0, 2])
-        reshape_w = paddle.unsqueeze(reshape_w, 0)
-        result = paddle.matmul(reshape_input, reshape_w)
-        reshape_b = paddle.reshape(
-            self.bias, [1, self.num_attention_heads, 1, self.size_per_head])
-        result += reshape_b
-        return result
-
-
-class LinearProj3D(Layer):
-    def __init__(self,
-                 hidden_size,
-                 num_attention_heads,
-                 size_per_head,
-                 weight_attr=None,
-                 bias_attr=None):
-        super(LinearProj3D, self).__init__()
-        self._dtype = self._helper.get_default_dtype()
-        self._weight_attr = weight_attr
-        self._bias_attr = bias_attr
-        self.weight = self.create_parameter(
-            shape=[hidden_size, hidden_size],
-            attr=self._weight_attr,
-            dtype=self._dtype,
-            is_bias=False)
-        self.bias = self.create_parameter(
-            shape=[hidden_size],
-            attr=self._bias_attr,
-            dtype=self._dtype,
-            is_bias=True)
-        self.size_per_head = size_per_head
-        self.num_attention_heads = num_attention_heads
-        self.hidden_size = hidden_size
-
-    def forward(self, input):
-        # BFNH,NHD->BFD
+        B, T, D = input.shape
+        H = self.num_attention_heads
         result = paddle.matmul(input, self.weight)
+        reshape_b = paddle.reshape(self.bias, [1, 1, D])
+        result += reshape_b
+        result = paddle.reshape(result, [B, T, H, -1])
+        result = paddle.transpose(result, [0, 2, 1, 3])
+        return result
 
 
 class Attention(Layer):
