@@ -38,7 +38,7 @@ event_extraction/
 └── utils.py # 效能函数
 ```
 
-## 知识抽取基线
+## 关系抽取基线
 
 针对 DuIE2.0 任务中多条、交叠SPO这一抽取目标，比赛对标准的 'BIO' 标注进行了扩展。
 对于每个 token，根据其在实体span中的位置（包括B、I、O三种），我们为其打上三类标签，并且根据其所参与构建的predicate种类，将 B 标签进一步区分。给定 schema 集合，对于 N 种不同 predicate，以及头实体/尾实体两种情况，我们设计对应的共 2*N 种 B 标签，再合并 I 和 O 标签，故每个 token 一共有 (2*N+2) 个标签，如下图所示。
@@ -87,12 +87,6 @@ inputs = tokenizer(text="请输入测试样例", max_seq_len)
 我们可以加载自定义数据集。通过继承[`paddle.io.Dataset`](https://www.paddlepaddle.org.cn/documentation/docs/zh/api/paddle/io/Dataset_cn.html#dataset)，自定义实现`__getitem__` 和 `__len__`两个方法。
 
 
-```
-sh run_duee_fin.sh data_prepare
-```
-
-之后，我们可以加载自定义数据集。通过继承[`paddle.io.Dataset`](https://www.paddlepaddle.org.cn/documentation/docs/zh/api/paddle/io/Dataset_cn.html#dataset)，自定义实现`__getitem__` 和 `__len__`两个方法。
-
 如下代码已完成加载数据集操作：
 
 ```python
@@ -115,7 +109,6 @@ test_dataset = DuIEDataset.from_file(
 
 启动训练：
 ```shell
-# 训练触发词识别模型
 sh train.sh
 ```
 
