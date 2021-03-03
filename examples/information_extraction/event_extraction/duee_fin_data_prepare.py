@@ -46,6 +46,8 @@ def data_process(path, model="trigger", is_predict=False):
         else:
             if model == u"trigger":
                 labels = ["O"] * len(text_a)
+                if len(d_json.get("event_list", [])) == 0:
+                    continue
                 for event in d_json.get("event_list", []):
                     event_type = event["event_type"]
                     start = event["trigger_start_index"]
