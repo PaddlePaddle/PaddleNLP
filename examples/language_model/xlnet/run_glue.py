@@ -154,10 +154,9 @@ def do_train(args):
     dataset_class, metric_class = TASK_CLASSES[args.task_name]
     model_class, tokenizer_class = XLNetForSequenceClassification, XLNetTokenizer
 
-    # train_dataset = dataset_class.get_datasets(["train"])
     train_ds = load_dataset('glue', args.task_name, splits="train")
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    label_list = train_ds.get_labels()
+    # label_list = train_ds.get_labels()
 
     trans_func = partial(
         convert_example,
@@ -165,7 +164,6 @@ def do_train(args):
         label_list=train_ds.label_list,
         max_seq_length=args.max_seq_length)
     train_ds = train_ds.map(trans_func, lazy=True)
-    # train_dataset = train_dataset.apply(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
 
@@ -246,7 +244,7 @@ def do_train(args):
             if not any(nd in n for nd in ["bias", "norm", "LayerNorm"])
         ])
 
-    loss_fct = paddle.nn.loss.CrossEntropyLoss() if label_list else paddle.nn.loss.MSELoss()
+    loss_fct = paddle.nn.loss.CrossEntropyLoss() if train_ds.label_list else paddle.nn.loss.MSELoss()
 
     metric = metric_class()
 
