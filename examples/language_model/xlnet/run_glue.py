@@ -23,8 +23,9 @@ import paddle
 from paddle.io import DataLoader
 from paddle.metric import Accuracy
 
+from paddlenlp.datasets import load_dataset
 from paddlenlp.datasets import GlueCoLA, GlueSST2, GlueMRPC, GlueSTSB, GlueQQP, GlueMNLI, GlueQNLI, GlueRTE
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers.xlnet.modeling import XLNetPretrainedModel, XLNetForSequenceClassification
 from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
@@ -117,33 +118,29 @@ def convert_example(example,
                     max_seq_length=512,
                     is_test=False):
     """convert a glue example into necessary features"""
-
     if not is_test:
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
         # Get the label
-        label = example[-1]
-        example = example[:-1]
-        # Create label maps if classification task
-        if label_list:
-            label_map = {}
-            for (i, l) in enumerate(label_list):
-                label_map[l] = i
-            label = label_map[label]
+        label = example['labels']
         label = np.array([label], dtype=label_dtype)
-
-    # Tokenize raw text
-    if len(example) == 1:
-        example = tokenizer(example[0], max_seq_len=max_seq_length, return_attention_mask=True)
+    # Convert raw text to feature
+    if len(example) == 2:
+        example = tokenizer(
+            example['sentence'],
+            max_seq_len=max_seq_length,
+            return_attention_mask=True)
     else:
-        example = tokenizer(example[0], text_pair=example[1], max_seq_len=max_seq_length, return_attention_mask=True)
+        example = tokenizer(
+            example['sentence1'],
+            text_pair=example['sentence2'],
+            max_seq_len=max_seq_length,
+            return_attention_mask=True)
 
     if not is_test:
-        return example['input_ids'], example['token_type_ids'], example['attention_mask'], \
-               len(example['input_ids']), label
+        return example['input_ids'], example['token_type_ids'], example['attention_mask'], label
     else:
-        return example['input_ids'], example['token_type_ids'], example['attention_mask'], \
-               len(example['input_ids'])
+        return example['input_ids'], example['token_type_ids'], example['attention_mask']
 
 
 def do_train(args):
@@ -157,73 +154,72 @@ def do_train(args):
     dataset_class, metric_class = TASK_CLASSES[args.task_name]
     model_class, tokenizer_class = XLNetForSequenceClassification, XLNetTokenizer
 
-    train_dataset = dataset_class.get_datasets(["train"])
-
+    # train_dataset = dataset_class.get_datasets(["train"])
+    train_ds = load_dataset('glue', args.task_name, splits="train")
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    label_list = train_dataset.get_labels()
+    label_list = train_ds.get_labels()
+
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
-        label_list=label_list,
+        label_list=train_ds.label_list,
         max_seq_length=args.max_seq_length)
-
-    train_dataset = train_dataset.apply(trans_func, lazy=True)
+    train_ds = train_ds.map(trans_func, lazy=True)
+    # train_dataset = train_dataset.apply(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_dataset, batch_size=args.batch_size, shuffle=True)
+        train_ds, batch_size=args.batch_size, shuffle=True)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.sp_model.PieceToId(tokenizer.pad_token), pad_right=False),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, pad_right=False),                        # token_type
-        Pad(axis=0, pad_val=0, pad_right=False),                                                  # attention_mask
-        Stack(),                                                                                  # length
-        Stack(dtype="int64" if label_list else "float32"),                                        # label
-    ): [data for i, data in enumerate(fn(samples)) if i != 3]
+    batchify_fn = lambda samples, fn=Dict({
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, pad_right=False),              # input
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, pad_right=False),    # token_type
+        'attention_mask': Pad(axis=0, pad_val=0, pad_right=False),                              # attention_mask
+        'labels': Stack(dtype="int64" if train_ds.label_list else "float32"),                   # label
+        }): fn(samples)
 
     train_data_loader = DataLoader(
-        dataset=train_dataset,
+        dataset=train_ds,
         batch_sampler=train_batch_sampler,
         collate_fn=batchify_fn,
         num_workers=0,
         return_list=True)
 
     if args.task_name == "mnli":
-        dev_dataset_matched, dev_dataset_mismatched = dataset_class.get_datasets(
-            ["dev_matched", "dev_mismatched"])
-        dev_dataset_matched = dev_dataset_matched.apply(trans_func, lazy=True)
-        dev_dataset_mismatched = dev_dataset_mismatched.apply(
-            trans_func, lazy=True)
+        dev_ds_matched, dev_ds_mismatched = load_dataset(
+            'glue', args.task_name, splits=["dev_matched", "dev_mismatched"])
+        dev_ds_matched = dev_ds_matched.map(trans_func, lazy=True)
+        dev_ds_mismatched = dev_ds_mismatched.map(trans_func, lazy=True)
         dev_batch_sampler_matched = paddle.io.BatchSampler(
-            dev_dataset_matched, batch_size=args.batch_size, shuffle=False)
+            dev_ds_matched, batch_size=args.batch_size, shuffle=False)
         dev_data_loader_matched = DataLoader(
-            dataset=dev_dataset_matched,
+            dataset=dev_ds_matched,
             batch_sampler=dev_batch_sampler_matched,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
         dev_batch_sampler_mismatched = paddle.io.BatchSampler(
-            dev_dataset_mismatched, batch_size=args.batch_size, shuffle=False)
+            dev_ds_mismatched, batch_size=args.batch_size, shuffle=False)
         dev_data_loader_mismatched = DataLoader(
-            dataset=dev_dataset_mismatched,
+            dataset=dev_ds_mismatched,
             batch_sampler=dev_batch_sampler_mismatched,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
     else:
-        dev_dataset = dataset_class.get_datasets(["dev"])
-        dev_dataset = dev_dataset.apply(trans_func, lazy=True)
+        dev_ds = load_dataset('glue', args.task_name, splits='dev')
+        dev_ds = dev_ds.map(trans_func, lazy=True)
         dev_batch_sampler = paddle.io.BatchSampler(
-            dev_dataset,
+            dev_ds,
             batch_size=args.batch_size,
             shuffle=False)
 
         dev_data_loader = DataLoader(
-            dataset=dev_dataset,
+            dataset=dev_ds,
             batch_sampler=dev_batch_sampler,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
 
-    num_classes = 1 if train_dataset.get_labels() is None else len(train_dataset.get_labels())
+    num_classes = 1 if train_ds.get_labels() is None else len(train_ds.get_labels())
     model = XLNetForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
 
