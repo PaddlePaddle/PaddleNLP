@@ -117,7 +117,7 @@ model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=((l
 > 给定文本，对文本进行分类，得到不同类别上的概率 筹备上市（0.8）、暂停上市（0.02）、正式上市（0.15）、终止上市（0.03）
 
 
-**同样地，PaddleNLP提供了ERNIE预训练模型常用序列标注模型，可以通过指定模型名字完成一键加载**：
+**同样地，PaddleNLP提供了ERNIE预训练模型常用文本分类模型，可以通过指定模型名字完成一键加载**：
 
 ```python
 model = ErnieForSequenceClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))

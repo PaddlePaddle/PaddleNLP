@@ -5,7 +5,6 @@ export CKPT=./checkpoints/model_90000.pdparams
 export DATASET_FILE=./data/dev_data.json
 
 CUDA_VISIBLE_DEVICES=0 python run_duie.py \
-                   --model_name_or_path ernie-1.0 \
                    --do_predict \
                    --init_checkpoint $CKPT \
                    --predict_data_file $DATASET_FILE \
