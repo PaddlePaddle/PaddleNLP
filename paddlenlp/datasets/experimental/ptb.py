@@ -1,5 +1,4 @@
 import os
-import math
 import collections
 
 from paddle.io import Dataset
@@ -7,9 +6,7 @@ from paddle.io import Dataset
 from paddle.utils.download import get_path_from_url
 from paddle.dataset.common import md5file
 from paddlenlp.utils.env import DATA_HOME
-import paddle.distributed as dist
 from . import DatasetBuilder
-import numpy as np
 
 __all__ = ['PTB']
 

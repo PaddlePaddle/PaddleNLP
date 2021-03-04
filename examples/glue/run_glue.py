@@ -67,7 +67,7 @@ def parse_args():
         type=str,
         required=True,
         help="The name of the task to train selected in the list: " +
-        ", ".join(TASK_CLASSES.keys()), )
+        ", ".join(METRIC_CLASSES.keys()), )
     parser.add_argument(
         "--model_type",
         default=None,
@@ -240,7 +240,7 @@ def do_train(args):
     set_seed(args)
 
     args.task_name = args.task_name.lower()
-    metric_class = TASK_CLASSES[args.task_name]
+    metric_class = METRIC_CLASSES[args.task_name]
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
