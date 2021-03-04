@@ -341,12 +341,12 @@ class DatasetBuilder:
                     filename)
                 for example in generator:
                     if label_list is not None and 'labels' in example.keys(
-                    ) and examples[0]['labels']:
+                    ) and example['labels']:
                         label_dict = {}
                         for i, label in enumerate(label_list):
                             label_dict[label] = i
                         if isinstance(example['labels'], list) or isinstance(
-                                examples[idx]['labels'], tuple):
+                                example['labels'], tuple):
                             for label_idx in range(len(example['labels'])):
                                 example['labels'][label_idx] = label_dict[
                                     example['labels'][label_idx]]
