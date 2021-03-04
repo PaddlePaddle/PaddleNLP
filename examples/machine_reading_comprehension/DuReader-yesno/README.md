@@ -46,7 +46,7 @@
 * PaddleNLP 安装
 
    ```shell
-   pip install paddlenlp==2.0.0rc
+   pip install paddlenlp\>=2.0.0rc
    ```
 
 * 环境依赖
@@ -54,7 +54,7 @@
     Python的版本要求 3.6+
 
 ### 数据准备
-为了方便开发者进行测试，我们内置了数据下载脚本，也可以通过`--data_path`传入本地数据集的位置，数据集需保证与DuReader-yesno数据集格式一致。
+为了方便开发者进行测试，我们内置了数据下载脚本。
 
 
 ### Fine-tune

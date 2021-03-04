@@ -24,13 +24,19 @@ import paddle
 from paddle.io import DataLoader
 from args import parse_args
 import json
-import paddlenlp as ppnlp
 
-from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.data import Pad, Stack, Dict
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
+from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.transformers import RobertaForSequenceClassification, RobertaTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 
-MODEL_CLASSES = {"bert": (BertForSequenceClassification, BertTokenizer)}
+MODEL_CLASSES = {
+    "bert": (BertForSequenceClassification, BertTokenizer),
+    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
+    "roberta": (RobertaForSequenceClassification, RobertaTokenizer),
+}
 
 
 def set_seed(args):
@@ -39,99 +45,46 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_length=512,
-                    is_test=False):
-    """convert a DuReaderYesNo example into necessary features"""
+def convert_example(example, tokenizer):
+    """convert a Dureader-yesno example into necessary features"""
 
-    def _truncate_seqs(seqs, max_seq_length):
-        # Account for [CLS], [SEP], [SEP] with "- 3"
-        tokens_a, tokens_b = seqs
-        max_seq_length -= 3
-        while True:  # truncate with longest_first strategy
-            total_length = len(tokens_a) + len(tokens_b)
-            if total_length <= max_seq_length:
-                break
-            if len(tokens_a) > len(tokens_b):
-                tokens_a.pop()
-            else:
-                tokens_b.pop()
-        return seqs
+    feature = tokenizer(
+        text=example['question'],
+        text_pair=example['answer'],
+        max_seq_len=args.max_seq_length)
+    feature['labels'] = example['labels']
+    feature['id'] = example['id']
 
-    def _concat_seqs(seqs, separators, seq_mask=0, separator_mask=1):
-        concat = sum((seq + sep for sep, seq in zip(separators, seqs)), [])
-        segment_ids = sum(
-            ([i] * (len(seq) + len(sep))
-             for i, (sep, seq) in enumerate(zip(separators, seqs))), [])
-        if isinstance(seq_mask, int):
-            seq_mask = [[seq_mask] * len(seq) for seq in seqs]
-        if isinstance(separator_mask, int):
-            separator_mask = [[separator_mask] * len(sep) for sep in separators]
-        p_mask = sum((s_mask + mask
-                      for sep, seq, s_mask, mask in zip(
-                          separators, seqs, seq_mask, separator_mask)), [])
-        return concat, segment_ids, p_mask
-
-    if not is_test:
-        # `label_list == None` is for regression task
-        label_dtype = "int64" if label_list else "float32"
-        # get the label
-        label = example[-2]
-        example = example[:-2]
-        #create label maps if classification task
-        if label_list:
-            label_map = {}
-            for (i, l) in enumerate(label_list):
-                label_map[l] = i
-            label = label_map[label]
-        label = np.array([label], dtype=label_dtype)
-    else:
-        qas_id = example[-1]
-        example = example[:-2]
-    # tokenize raw text
-    tokens_raw = [tokenizer.tokenize(l) for l in example]
-    # truncate to the truncate_length,
-    tokens_trun = _truncate_seqs(tokens_raw, max_seq_length)
-    # concate the sequences with special tokens
-    tokens_trun[0] = [tokenizer.cls_token] + tokens_trun[0]
-    tokens, segment_ids, _ = _concat_seqs(tokens_trun, [[tokenizer.sep_token]] *
-                                          len(tokens_trun))
-    # convert the token to ids
-    input_ids = tokenizer.convert_tokens_to_ids(tokens)
-    valid_length = len(input_ids)
-
-    if not is_test:
-        return input_ids, segment_ids, valid_length, label
-    else:
-        return input_ids, segment_ids, valid_length, qas_id
+    return feature
 
 
-def evaluate(model, metric, data_loader, do_pred=False):
+@paddle.no_grad()
+def evaluate(model, metric, data_loader):
     model.eval()
-    if not do_pred:
-        metric.reset()
-        for batch in data_loader:
-            input_ids, segment_ids, labels = batch
-            logits = model(input_ids, segment_ids)
-            correct = metric.compute(logits, labels)
-            metric.update(correct)
-            accu = metric.accumulate()
-        print("accu: %f" % (accu))
-    else:
-        res = {}
-        for batch in data_loader:
-            input_ids, segment_ids, qas_id = batch
-            logits = model(input_ids, segment_ids)
-            qas_id = qas_id.numpy()
-            preds = paddle.argmax(logits, axis=1).numpy()
-            for i in range(len(preds)):
-                res[str(qas_id[i])] = data_loader.dataset.get_labels()[preds[i]]
-        with open('prediction.json', "w") as writer:
-            writer.write(json.dumps(res, ensure_ascii=False, indent=4) + "\n")
-
+    metric.reset()
+    for batch in data_loader:
+        input_ids, segment_ids, labels = batch
+        logits = model(input_ids, segment_ids)
+        correct = metric.compute(logits, labels)
+        metric.update(correct)
+        accu = metric.accumulate()
+    print("accu: %f" % (accu))
     model.train()
+
+
+@paddle.no_grad()
+def predict(model, data_loader):
+    model.eval()
+    res = {}
+    for batch in data_loader:
+        input_ids, segment_ids, qas_id = batch
+        logits = model(input_ids, segment_ids)
+        qas_id = qas_id.numpy()
+        preds = paddle.argmax(logits, axis=1).numpy()
+        for i in range(len(preds)):
+            res[str(qas_id[i])] = data_loader.dataset.label_list[preds[i]]
+    model.train()
+    return res
 
 
 def do_train(args):
@@ -145,78 +98,61 @@ def do_train(args):
 
     set_seed(args)
 
-    train_ds, dev_ds, test_ds = ppnlp.datasets.DuReaderYesNo.get_datasets(
-        ['train', 'dev', 'test'])
+    train_ds, dev_ds, test_ds = load_dataset(
+        'dureader_yesno', splits=['train', 'dev', 'test'])
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        label_list=train_ds.get_labels(),
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example, tokenizer=tokenizer)
 
-    train_ds = train_ds.apply(trans_func, lazy=True)
+    train_batchify_fn = lambda samples, fn=Dict({
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+        'labels': Stack(dtype="int64")
+    }): fn(samples)
 
+    test_batchify_fn = lambda samples, fn=Dict({
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+        'id': Stack()
+    }): fn(samples)
+
+    train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
-
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # segment
-        Stack(),  # length
-        Stack(dtype="int64"),  # start_pos
-    ): [data for i, data in enumerate(fn(samples)) if i != 2]
-
     train_data_loader = DataLoader(
         dataset=train_ds,
         batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
+        collate_fn=train_batchify_fn,
         return_list=True)
 
-    dev_ds = dev_ds.apply(trans_func, lazy=True)
-
+    dev_ds = dev_ds.map(trans_func, lazy=True)
     dev_batch_sampler = paddle.io.BatchSampler(
         dev_ds, batch_size=args.batch_size, shuffle=False)
-
     dev_data_loader = DataLoader(
         dataset=dev_ds,
         batch_sampler=dev_batch_sampler,
-        collate_fn=batchify_fn,
+        collate_fn=train_batchify_fn,
         return_list=True)
 
-    test_trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        label_list=train_ds.get_labels(),
-        max_seq_length=args.max_seq_length,
-        is_test=True)
-
-    test_ds = test_ds.apply(test_trans_func, lazy=True)
+    test_ds = test_ds.map(trans_func, lazy=True)
     test_batch_sampler = paddle.io.BatchSampler(
         test_ds, batch_size=args.batch_size, shuffle=False)
-
-    test_batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # segment
-        Stack()  # length
-    ): fn(samples)
-
     test_data_loader = DataLoader(
         dataset=test_ds,
         batch_sampler=test_batch_sampler,
-        collate_fn=batchify_fn,
+        collate_fn=test_batchify_fn,
         return_list=True)
 
-    model = model_class.from_pretrained(args.model_name_or_path, num_classes=3)
+    model = model_class.from_pretrained(
+        args.model_name_or_path, num_classes=len(train_ds.label_list))
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
     num_training_steps = args.max_steps if args.max_steps > 0 else len(
-        train_ds.examples) // args.batch_size * args.num_train_epochs
+        train_data_loader) * args.num_train_epochs
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
-
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
@@ -250,8 +186,9 @@ def do_train(args):
             lr_scheduler.step()
             optimizer.clear_gradients()
 
-            if global_step % args.save_steps == 0:
+            if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+                    evaluate(model, metric, dev_data_loader)
                     output_dir = os.path.join(args.output_dir,
                                               "model_%d" % global_step)
                     if not os.path.exists(output_dir):
@@ -263,11 +200,12 @@ def do_train(args):
                     tokenizer.save_pretrained(output_dir)
                     print('Saving checkpoint to:', output_dir)
 
-        if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
-            evaluate(model, metric, dev_data_loader)
-
     if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
-        evaluate(model, metric, test_data_loader, True)
+        predictions = predict(model, test_data_loader)
+        with open('prediction.json', "w") as writer:
+            writer.write(
+                json.dumps(
+                    predictions, ensure_ascii=False, indent=4) + "\n")
 
 
 if __name__ == "__main__":
