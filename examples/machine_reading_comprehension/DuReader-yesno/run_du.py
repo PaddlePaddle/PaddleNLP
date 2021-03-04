@@ -58,6 +58,7 @@ def convert_example(example, tokenizer):
     return feature
 
 
+@paddle.no_grad()
 def evaluate(model, metric, data_loader):
     model.eval()
     metric.reset()
@@ -71,6 +72,7 @@ def evaluate(model, metric, data_loader):
     model.train()
 
 
+@paddle.no_grad()
 def predict(model, data_loader):
     model.eval()
     res = {}

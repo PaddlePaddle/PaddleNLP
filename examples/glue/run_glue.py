@@ -172,6 +172,7 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
+@paddle.no_grad()
 def evaluate(model, loss_fct, metric, data_loader):
     model.eval()
     metric.reset()
