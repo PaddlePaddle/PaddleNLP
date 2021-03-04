@@ -146,7 +146,7 @@ def main():
         is_test=True)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(),  # length
     ): [data for i, data in enumerate(fn(samples)) if i != 2]
     dataset = dataset.apply(transform_fn)

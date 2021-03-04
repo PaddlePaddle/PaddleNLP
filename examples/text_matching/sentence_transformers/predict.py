@@ -135,9 +135,9 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
     ]
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
     ): [data for data in fn(samples)]
 
     results = []
