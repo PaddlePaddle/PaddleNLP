@@ -39,7 +39,7 @@ FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger(__name__)
 
-TASK_CLASSES = {
+METRIC_CLASSES = {
     "cola": Mcc,
     "sst-2": Accuracy,
     "mrpc": AccuracyAndF1,

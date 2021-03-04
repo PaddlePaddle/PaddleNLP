@@ -53,7 +53,12 @@ def import_main_class(module_path):
     return module_main_cls
 
 
-def load_dataset(path, name=None, data_files=None, splits=None, lazy=None):
+def load_dataset(path,
+                 name=None,
+                 data_files=None,
+                 splits=None,
+                 lazy=None,
+                 **kwargs):
     module_path = DATASETS_MODULE_PATH + path
 
     reader_cls = import_main_class(module_path)
