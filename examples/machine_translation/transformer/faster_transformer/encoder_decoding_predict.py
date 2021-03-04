@@ -85,15 +85,10 @@ def do_predict(args):
     transformer.eval()
 
     # Load checkpoint.
-    transformer = FasterTransformer.load_dygraph_ckpt(
-        transformer,
-        init_from_params=args.init_from_params,
-        trg_vocab_size=args.trg_vocab_size,
-        max_length=args.max_length,
-        d_model=args.d_model,
-        pad_idx=args.bos_idx,
-        weight_sharing=args.weight_sharing,
-        use_fp16_decoding=args.use_fp16_decoding)
+    transformer.load_dygraph_ckpt(
+        init_from_params=os.path.join(args.init_from_params,
+                                      "transformer.pdparams"),
+        max_length=args.max_length)
 
     f = open(args.output_file, "w")
     with paddle.no_grad():

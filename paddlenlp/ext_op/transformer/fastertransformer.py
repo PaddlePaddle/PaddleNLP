@@ -42,6 +42,8 @@ class FasterTransformer(TransformerModel):
         self.dropout = dropout
         self.weight_sharing = weight_sharing
         self.trg_vocab_size = trg_vocab_size
+        self.d_model = d_model
+        self.bos_id = bos_id
         super(FasterTransformer, self).__init__(**args)
 
         self.decoding_linear = nn.Linear(
@@ -91,44 +93,40 @@ class FasterTransformer(TransformerModel):
 
         return ids
 
-    @staticmethod
-    def load_dygraph_ckpt(model, init_from_params, trg_vocab_size, max_length,
-                          d_model, pad_idx, weight_sharing, use_fp16_decoding):
+    def load_dygraph_ckpt(self, init_from_params, max_length):
         # Load the trained model
         assert init_from_params, (
             "Please set init_from_params to load the infer model.")
 
-        model_dict = paddle.load(
-            os.path.join(init_from_params, "transformer.pdparams"))
+        model_dict = paddle.load(init_from_params)
 
         # To set weight[padding_idx] to 0.
         model_dict["trg_word_embedding.word_embedding.weight"][
-            pad_idx] = [0] * d_model
+            self.bos_id] = [0] * self.d_model
 
         # Dealing with weight sharing. 
-        if weight_sharing:
+        if self.weight_sharing:
             model_dict["decoding_linear.weight"] = np.transpose(model_dict[
                 "trg_word_embedding.word_embedding.weight"])
             model_dict["decoding_linear.bias"] = np.zeros(
-                [trg_vocab_size], dtype="float32")
+                [self.trg_vocab_size], dtype="float32")
         else:
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
             model_dict["decoding_linear.bias"] = np.zeros(
-                [trg_vocab_size], dtype="float32")
+                [self.trg_vocab_size], dtype="float32")
 
         # To avoid a longer length than training, reset the size of position
         # encoding to max_length
         model_dict["encoder.pos_encoder.weight"] = position_encoding_init(
-            max_length + 1, d_model)
+            max_length + 1, self.d_model)
         model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
-            max_length + 1, d_model)
+            max_length + 1, self.d_model)
 
-        if use_fp16_decoding:
-            for item in model.state_dict():
+        if self.use_fp16_decoding:
+            for item in self.state_dict():
                 if "decoder" in item:
                     model_dict[item] = np.float16(model_dict[item])
             model_dict["decoding_linear.weight"] = np.float16(model_dict[
                 "decoding_linear.weight"])
 
-        model.load_dict(model_dict)
-        return model
+        self.load_dict(model_dict)
