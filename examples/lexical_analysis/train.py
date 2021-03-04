@@ -19,13 +19,14 @@ import argparse
 
 import numpy as np
 import paddle
-
-from data import LacDataset
-from model import BiGruCrf
+from paddle.static import InputSpec
 from paddlenlp.data import Pad, Tuple, Stack
 from paddlenlp.layers.crf import LinearChainCrfLoss, ViterbiDecoder
 from paddlenlp.metrics import ChunkEvaluator
 import distutils.util
+
+from data import LacDataset
+from model import BiGruCrf, get_loss
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
@@ -83,15 +84,18 @@ def train(args):
     # Define the model netword and its loss
     network = BiGruCrf(args.emb_dim, args.hidden_size, train_dataset.vocab_size,
                        train_dataset.num_labels)
-    model = paddle.Model(network)
+
+    inputs = InputSpec(shape=(-1, ), dtype="int16", name='inputs')
+    lengths = InputSpec(shape=(-1, ), dtype="int16", name='lengths')
+    labels = InputSpec(shape=(-1, ), dtype="int16", name='labels')
+    model = paddle.Model(network, inputs=[inputs, lengths, labels])
 
     # Prepare optimizer, loss and metric evaluator
     optimizer = paddle.optimizer.Adam(
         learning_rate=args.base_lr, parameters=model.parameters())
-    crf_loss = LinearChainCrfLoss(network.crf)
     chunk_evaluator = ChunkEvaluator(
         label_list=train_dataset.label_vocab.keys(), suffix=True)
-    model.prepare(optimizer, crf_loss, chunk_evaluator)
+    model.prepare(optimizer, get_loss, chunk_evaluator)
     if args.init_checkpoint:
         model.load(args.init_checkpoint)
 

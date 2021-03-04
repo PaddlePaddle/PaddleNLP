@@ -160,8 +160,8 @@ def convert_example(example,
             is_split_into_words=is_tokenized)
 
     if not is_test:
-        return example['input_ids'], example['segment_ids'], len(example[
+        return example['input_ids'], example['token_type_ids'], len(example[
             'input_ids']), label
 
-    return example['input_ids'], example['segment_ids'], len(example[
+    return example['input_ids'], example['token_type_ids'], len(example[
         'input_ids'])

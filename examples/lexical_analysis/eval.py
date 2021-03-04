@@ -18,8 +18,9 @@ import ast
 import math
 import argparse
 
-import paddle
 import numpy as np
+import paddle
+from paddle.static import InputSpec
 from paddlenlp.data import Pad, Tuple, Stack
 from paddlenlp.metrics import ChunkEvaluator
 
@@ -67,7 +68,9 @@ def evaluate(args):
     # Define the model network and metric evaluator
     network = BiGruCrf(args.emb_dim, args.hidden_size, test_dataset.vocab_size,
                        test_dataset.num_labels)
-    model = paddle.Model(network)
+    inputs = InputSpec(shape=(-1, ), dtype="int16", name='inputs')
+    lengths = InputSpec(shape=(-1, ), dtype="int16", name='lengths')
+    model = paddle.Model(network, inputs=[inputs, lengths])
     chunk_evaluator = ChunkEvaluator(
         label_list=test_dataset.label_vocab.keys(), suffix=True)
     model.prepare(None, None, chunk_evaluator)
