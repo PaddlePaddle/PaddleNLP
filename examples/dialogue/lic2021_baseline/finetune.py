@@ -82,9 +82,8 @@ def main(args):
             step += 1
             token_ids, type_ids, pos_ids, generation_mask, tgt_label, tgt_pos = inputs
 
-            outputs = model(token_ids, type_ids, pos_ids, generation_mask,
-                            tgt_pos)
-            logits = outputs['logits']
+            logits = model(token_ids, type_ids, pos_ids, generation_mask,
+                           tgt_pos)
             loss = F.cross_entropy(logits, tgt_label)
             loss.backward()
             optimizer.step()
@@ -118,8 +117,7 @@ def evaluation(model, data_loader):
         step += 1
         token_ids, type_ids, pos_ids, generation_mask, tgt_label, tgt_pos = inputs
 
-        outputs = model(token_ids, type_ids, pos_ids, generation_mask, tgt_pos)
-        logits = outputs['logits']
+        logits = model(token_ids, type_ids, pos_ids, generation_mask, tgt_pos)
         loss = F.cross_entropy(logits, tgt_label, reduction='sum')
 
         total_loss += loss.numpy()[0]

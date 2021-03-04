@@ -13,12 +13,6 @@ from args import parse_args, print_args
 from data import DialogueDataset, select_response
 
 
-def load_ckpt(init_from_ckpt, model):
-    params_state_dict = paddle.load(init_from_ckpt + '.pdparams')
-    model.set_state_dict(params_state_dict)
-    print('Loaded checkpoint from %s' % init_from_ckpt)
-
-
 def main(args):
     paddle.set_device('gpu' if args.n_gpus else 'cpu')
     paddle.seed(args.seed)
@@ -36,9 +30,6 @@ def main(args):
         mode='test')
     test_dataloader = DataLoader(
         test_dataset, return_list=True, batch_size=None)
-
-    if args.init_from_ckpt:
-        load_ckpt(args.init_from_ckpt, model)
 
     infer(model, test_dataloader, tokenizer)
 

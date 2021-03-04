@@ -1,5 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +19,7 @@ import os
 import six
 import re
 import unicodedata
+from shutil import copyfile
 
 from paddle.utils import try_import
 
@@ -78,23 +78,30 @@ def encode_pieces(spm_model, text, return_unicode=True, sample=False):
 
 class UnifiedTransformerTokenizer(PretrainedTokenizer):
     resource_files_names = {
-        "sentencepiece_model_file": "unified_transformer-12L-cn-spm.model",
-        "vocab_file": "unified_transformer-12L-cn-vocab.txt"
+        "vocab_file": "vocab.txt",
+        "sentencepiece_model_file": "spm.model",
     }  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
             "unified_transformer-12L-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-vocab.txt"
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-vocab.txt",
+            "unified_transformer-12L-cn-luge":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-vocab.txt",
         },
         "sentencepiece_model_file": {
             "unified_transformer-12L-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-spm.model"
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-spm.model",
+            "unified_transformer-12L-cn-luge":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-spm.model",
         },
     }
     pretrained_init_configuration = {
         "unified_transformer-12L-cn": {
             "do_lower_case": False
-        }
+        },
+        "unified_transformer-12L-cn-luge": {
+            "do_lower_case": False
+        },
     }
 
     def __init__(self,
@@ -108,7 +115,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                  mask_token="[MASK]",
                  special_tokens_file=""):
         mod = try_import('sentencepiece')
-        self.sp_model = mod.SentencePieceProcessor()
+        self.spm_model = mod.SentencePieceProcessor()
 
         self.do_lower_case = do_lower_case
         if not os.path.isfile(vocab_file):
@@ -127,7 +134,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
 
         # if the sentencepiece_model_file is not exists, just the default sentence-piece model 
         if os.path.isfile(sentencepiece_model_file):
-            self.sp_model.Load(sentencepiece_model_file)
+            self.spm_model.Load(sentencepiece_model_file)
 
         pat_str = ""
         if os.path.isfile(special_tokens_file):
@@ -139,6 +146,9 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
 
         pat_str += r"([a-zA-Z0-9\S]+)"
         self.pat = re.compile(pat_str)
+
+        self.vocab_file = vocab_file
+        self.sentencepiece_model_file = sentencepiece_model_file
 
     @property
     def vocab_size(self):
@@ -217,6 +227,18 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         out_string = self.convert_tokens_to_string(tokens)
         return out_string
 
+    def save_resources(self, save_directory):
+        """
+        Save tokenizer related resources to files under `save_directory`.
+        Args:
+            save_directory (str): Directory to save files into.
+        """
+        for name, file_name in self.resource_files_names.items():
+            src_path = getattr(self, name)
+            save_path = os.path.join(save_directory, file_name)
+            if os.path.abspath(src_path) != os.path.abspath(save_path):
+                copyfile(src_path, save_path)
+
     @staticmethod
     def read_file(filepath):
         token_to_idx = {}
@@ -239,9 +261,9 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                         eos_token=None,
                         **kwargs):
         """
-        Instantiate an instance of `Vocab` from a file reserving all tokens
-        by using `Vocab.from_dict`. The file contains a token per line, and the
-        line number would be the index of corresponding token.
+        Instantiate an instance of `Vocab` from a file reserving all tokens by 
+        using `Vocab.from_dict`. The file contains a token and index of the 
+        token per line, separated by '\t'.
         Args:
             filepath (str): path of file to construct vocabulary.
             unk_token (str): special token for unknown token. If no need, it also

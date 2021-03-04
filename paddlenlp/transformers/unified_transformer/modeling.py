@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -55,12 +55,33 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "eos_token_id": 2,
             "mask_token_id": 30000,
         },
+        "unified_transformer-12L-cn-luge": {
+            "vocab_size": 30004,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": True,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "unk_token_id": 0,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 2,
+            "mask_token_id": 30000,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "unified_transformer-12L-cn":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn.pdparams",
+            "unified_transformer-12L-cn-luge":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-luge.pdparams",
         }
     }
     base_model_prefix = "unified_transformer"
@@ -168,10 +189,10 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 cache = self.encoder.gen_cache(embedding_output)
             sequence_output, cache = self.encoder(embedding_output,
                                                   attention_mask, cache)
-            return {"sequence_output": sequence_output, "cache": cache}
+            return sequence_output, cache
         else:
             sequence_output = self.encoder(embedding_output, attention_mask)
-            return {"sequence_output": sequence_output}
+            return sequence_output
 
 
 class UnifiedTransformerLMHead(nn.Layer):
@@ -225,16 +246,16 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 masked_positions=None,
                 use_cache=False,
                 cache=None):
-        with paddle.static.amp.fp16_guard():
-            outputs = self.unified_transformer(input_ids, token_type_ids,
-                                               position_ids, attention_mask,
-                                               use_cache, cache)
-            sequence_output = outputs["sequence_output"]
-            lm_logits = self.lm_head(sequence_output, masked_positions)
-            if use_cache:
-                return {"logits": lm_logits, "cache": outputs["cache"]}
-            else:
-                return {"logits": lm_logits}
+        outputs = self.unified_transformer(input_ids, token_type_ids,
+                                           position_ids, attention_mask,
+                                           use_cache, cache)
+        sequence_output = outputs[0] if use_cache else outputs
+        logits = self.lm_head(sequence_output, masked_positions)
+        if use_cache:
+            cache = outputs[1]
+            return logits, cache
+        else:
+            return logits
 
     def adjust_logits_during_generation(self, logits):
         # pre-process distribution
