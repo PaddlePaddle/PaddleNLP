@@ -100,6 +100,12 @@ def do_train(args):
     else:
         model = GPT2ForPretraining.from_pretrained(args.model_name_or_path)
 
+    # creat the critrion for the gpt model
+    criterion = GPT2PretrainingCriterion()
+
+    if paddle.distributed.get_world_size() > 1:
+        model = paddle.DataParallel(model)
+
     if args.decay_steps is None:
         args.decay_steps = args.max_steps
     warmup_step = args.warmup_rate * args.decay_steps
@@ -127,9 +133,6 @@ def do_train(args):
         opt_dict = paddle.load(
             os.path.join(args.model_name_or_path, "model_state.pdopt"))
         optimizer.set_state_dict(opt_dict)
-
-    # creat the critrion for the gpt model
-    criterion = GPT2PretrainingCriterion()
 
     global_step = 0
     tic_train = time.time()
