@@ -37,6 +37,7 @@ class ErnieEmbeddings(nn.Layer):
                  type_vocab_size=2,
                  pad_token_id=0):
         super(ErnieEmbeddings, self).__init__()
+
         self.word_embeddings = nn.Embedding(
             vocab_size, hidden_size, padding_idx=pad_token_id)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
@@ -55,7 +56,6 @@ class ErnieEmbeddings(nn.Layer):
             position_ids.stop_gradient = True
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
-
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
@@ -324,6 +324,56 @@ class ErnieForTokenClassification(ErniePretrainedModel):
         return logits
 
 
+class ErnieLMPredictionHead(nn.Layer):
+    def __init__(self,
+                 hidden_size,
+                 vocab_size,
+                 activation,
+                 embedding_weights=None):
+        super(ErnieLMPredictionHead, self).__init__()
+        self.transform = nn.Linear(hidden_size, hidden_size)
+        self.activation = getattr(nn.functional, activation)
+        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.decoder_weight = self.create_parameter(
+            shape=[hidden_size, vocab_size],
+            dtype=self.transform.weight.dtype,
+            is_bias=True) if embedding_weights is None else embedding_weights
+        self.decoder_bias = self.create_parameter(
+            shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
+
+    def forward(self, hidden_states, masked_positions=None):
+        if masked_positions is not None:
+            hidden_states = paddle.reshape(hidden_states,
+                                           [-1, hidden_states.shape[-1]])
+            hidden_states = paddle.tensor.gather(hidden_states,
+                                                 masked_positions)
+        # gather masked tokens might be more quick
+        hidden_states = self.transform(hidden_states)
+        hidden_states = self.activation(hidden_states)
+        hidden_states = self.layer_norm(hidden_states)
+        hidden_states = paddle.tensor.matmul(
+            hidden_states, self.decoder_weight,
+            transpose_y=True) + self.decoder_bias
+        return hidden_states
+
+
+class ErniePretrainingHeads(nn.Layer):
+    def __init__(self,
+                 hidden_size,
+                 vocab_size,
+                 activation,
+                 embedding_weights=None):
+        super(ErniePretrainingHeads, self).__init__()
+        self.predictions = ErnieLMPredictionHead(hidden_size, vocab_size,
+                                                 activation, embedding_weights)
+        self.seq_relationship = nn.Linear(hidden_size, 2)
+
+    def forward(self, sequence_output, pooled_output, masked_positions=None):
+        prediction_scores = self.predictions(sequence_output, masked_positions)
+        seq_relationship_score = self.seq_relationship(pooled_output)
+        return prediction_scores, seq_relationship_score
+
+
 class ErnieForPretraining(ErniePretrainedModel):
     def __init__(self, ernie):
         super(ErnieForPretraining, self).__init__()
@@ -342,15 +392,16 @@ class ErnieForPretraining(ErniePretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 masked_positions=None):
-        outputs = self.ernie(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
-        sequence_output, pooled_output = outputs[:2]
-        prediction_scores, seq_relationship_score = self.cls(
-            sequence_output, pooled_output, masked_positions)
-        return prediction_scores, seq_relationship_score
+        with paddle.static.amp.fp16_guard():
+            outputs = self.ernie(
+                input_ids,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask)
+            sequence_output, pooled_output = outputs[:2]
+            prediction_scores, seq_relationship_score = self.cls(
+                sequence_output, pooled_output, masked_positions)
+            return prediction_scores, seq_relationship_score
 
 
 class ErniePretrainingCriterion(paddle.nn.Layer):
@@ -361,9 +412,10 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
 
     def forward(self, prediction_scores, seq_relationship_score,
                 masked_lm_labels, next_sentence_labels, masked_lm_scale):
-        masked_lm_loss = paddle.nn.functional.softmax_with_cross_entropy(
-            prediction_scores, masked_lm_labels, ignore_index=-1)
-        masked_lm_loss = masked_lm_loss / masked_lm_scale
-        next_sentence_loss = paddle.nn.functional.softmax_with_cross_entropy(
-            seq_relationship_score, next_sentence_labels)
-        return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)
+        with paddle.static.amp.fp16_guard():
+            masked_lm_loss = paddle.nn.functional.softmax_with_cross_entropy(
+                prediction_scores, masked_lm_labels, ignore_index=-1)
+            masked_lm_loss = masked_lm_loss / masked_lm_scale
+            next_sentence_loss = paddle.nn.functional.softmax_with_cross_entropy(
+                seq_relationship_score, next_sentence_labels)
+            return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)

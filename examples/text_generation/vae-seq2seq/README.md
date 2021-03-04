@@ -1,5 +1,3 @@
-运行本目录下的范例模型需要安装PaddlePaddle 2.0-rc1及以上版本。如果您的 PaddlePaddle 安装版本低于此要求，请按照[安装文档](https://www.paddlepaddle.org.cn/#quick-start)中的说明更新 PaddlePaddle 安装版本。
-
 # Variational Autoencoder (VAE) for Text Generation
 以下是本范例模型的简要目录结构及说明：
 
@@ -15,6 +13,7 @@
 ```
 
 ## 简介
+
 本目录下此范例模型的实现，旨在展示如何用Paddle构建用于文本生成的VAE示例，其中LSTM作为编码器和解码器。分别对官方PTB数据和yahoo数据集进行训练。
 
 关于VAE的详细介绍参照： [(Bowman et al., 2015) Generating Sentences from a Continuous Space](https://arxiv.org/pdf/1511.06349.pdf)
@@ -123,8 +122,6 @@ python predict.py \
 ```
 
 ## 效果评价
-
-
 
 ||Test PPL|Test NLL|
 |:-|:-:|:-:|

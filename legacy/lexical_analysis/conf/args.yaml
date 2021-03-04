@@ -1,0 +1,81 @@
+model:
+  word_emb_dim:
+    val: 128
+    meaning: "The dimension in which a word is embedded."
+  grnn_hidden_dim:
+    val: 128
+    meaning: "The number of hidden nodes in the GRNN layer."
+  bigru_num:
+    val: 2
+    meaning: "The number of bi_gru layers in the network."
+  init_checkpoint:
+    val: ""
+    meaning: "Path to init model"
+  inference_save_dir:
+    val: ""
+    meaning: "Path to save inference model"
+
+train:
+  random_seed:
+    val: 0
+    meaning: "Random seed for training"
+  print_steps:
+    val: 1
+    meaning: "Print the result per xxx batch of training"
+  save_steps:
+    val: 10
+    meaning: "Save the model once per xxxx batch of training"
+  validation_steps:
+    val: 10
+    meaning: "Do the validation once per xxxx batch of training"
+  batch_size:
+    val: 300
+    meaning: "The number of sequences contained in a mini-batch"
+  epoch:
+    val: 10
+    meaning: "Corpus iteration num"
+  use_cuda:
+    val: False
+    meaning: "If set, use GPU for training."
+  traindata_shuffle_buffer:
+    val: 20000
+    meaning: "The buffer size used in shuffle the training data."
+  base_learning_rate:
+    val: 0.001
+    meaning: "The basic learning rate that affects the entire network."
+  emb_learning_rate:
+    val: 2
+    meaning: "The real learning rate of the embedding layer will be (emb_learning_rate * base_learning_rate)."
+  crf_learning_rate:
+    val: 0.2
+    meaning: "The real learning rate of the embedding layer will be (crf_learning_rate * base_learning_rate)."
+  enable_ce:
+    val: false
+    meaning: 'If set, run the task with continuous evaluation logs.'
+  cpu_num:
+    val: 10
+    meaning: "The number of cpu used to train model, this argument wouldn't be valid if use_cuda=true"
+
+data:
+  word_dict_path:
+    val: "./conf/word.dic"
+    meaning: "The path of the word dictionary."
+  label_dict_path:
+    val: "./conf/tag.dic"
+    meaning: "The path of the label dictionary."
+  word_rep_dict_path:
+    val: "./conf/q2b.dic"
+    meaning: "The path of the word replacement Dictionary."
+  train_data:
+    val: "./data/train.tsv"
+    meaning: "The folder where the training data is located."
+  test_data:
+    val: "./data/test.tsv"
+    meaning: "The folder where the test data is located."
+  infer_data:
+    val: "./data/infer.tsv"
+    meaning: "The folder where the infer data is located."
+  model_save_dir:
+    val: "./models"
+    meaning: "The model will be saved in this path."
+

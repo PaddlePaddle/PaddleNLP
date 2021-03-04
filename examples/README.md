@@ -1,28 +1,30 @@
 # PaddleNLP 应用示例
 
-[**PaddleNLP**](https://github.com/PaddlePaddle/models/tree/develop/PaddleNLP) 是基于 PaddlePaddle 深度学习框架开发的自然语言处理 (NLP) 工具，算法，模型和数据的开源项目。百度在 NLP 领域十几年的深厚积淀为 PaddleNLP 提供了强大的核心动力。PaddleNLP 提供较为丰富的模型库，基本涵盖了主流的NLP任务，因为模型库中使用了PaddleNLP提供的基础NLP工具，例如数据集处理，高层API，使得模型库的算法简洁易懂。下面是 PaddleNLP 支持任务的具体信息，涵盖了 **NLP基础技术**, **NLP核心技术**, **NLP系统应用**三大领域。同时随着NLP序列建模技术的成熟，我们还提供了更多的基于NLP序列建模技术的应用场景。
+[**PaddleNLP**](https://github.com/PaddlePaddle/models/tree/develop/PaddleNLP) 是基于 PaddlePaddle 深度学习框架开发的自然语言处理 (NLP) 工具，算法，模型和数据的开源项目。百度在 NLP 领域十几年的深厚积淀为 PaddleNLP 提供了强大的核心动力。PaddleNLP 提供较为丰富的模型库，基本涵盖了主流的NLP任务，因为模型库中使用了PaddleNLP提供的基础NLP工具，例如数据集处理，高层API，使得模型库的算法简洁易懂。
+
+下面是 PaddleNLP 支持任务的具体信息，涵盖了 [**NLP基础技术**](#nlp基础技术) [**NLP核心技术**](#nlp核心技术) [**NLP系统应用**](#nlp系统应用)三大领域。同时随着NLP序列建模技术的成熟，我们还提供了更多的基于NLP序列建模技术的应用场景如[蛋白质二级结构预测](#蛋白质二级结构预测-protein-secondary-structure-prediction)以及进阶的[模型压缩](#模型压缩-model-compression)应用示例。
 
 ## NLP基础技术
 
 ### 词法分析 (Lexical Analysis)
 | 模型   | 简介   |
 | ------ | ----- |
-| [BiGRU-CRF] (./examples/lexical_analysis) | 百度自主研发中文特色模型词法分析任务，集成了中文分词、词性标注和命名实体识别任务。输入是一个字符串，而输出是句子中的词边界和词性、实体类别。 |
+| [BiGRU-CRF](../examples/lexical_analysis) | 百度自主研发中文特色模型词法分析任务，集成了中文分词、词性标注和命名实体识别任务。输入是一个字符串，而输出是句子中的词边界和词性、实体类别。 |
 
 ### 词向量 (Word Embedding)
 | 模型   | 简介   |
 | ------ | ----- |
-| [Word Embedding](./examples/word_embedding) | 提供了丰富的中文预训练词向量，通过简单配置即可使用词向量来进行热启训练，能支持较多的中文场景下的训练任务的热启训练，加快训练收敛速度。|
+| [Word Embedding](../examples/word_embedding) | 提供了丰富的中文预训练词向量，通过简单配置即可使用词向量来进行热启训练，能支持较多的中文场景下的训练任务的热启训练，加快训练收敛速度。|
 
 ### 命名实体识别 (Named Entity Recognition)
 
 命名实体识别（Named Entity Recognition，NER）是NLP中一项非常基础的任务。NER是信息提取、问答系统、句法分析、机器翻译等众多NLP任务的重要基础工具。命名实体识别的准确度，决定了下游任务的效果，是NLP中非常重要的一个基础问题。
 在NER任务提供了两种解决方案，一类LSTM/GRU + CRF(Conditional Random Field)，RNN类的模型来抽取底层文本的信息，而CRF(条件随机场)模型来学习底层Token之间的联系；另外一类是通过预训练模型，例如ERNIE，BERT模型，直接来预测Token的标签信息。
-因为该类模型较为抽象，提供了一份快递单信息抽取的训练脚本给大家使用，具体的任务是通过两类的模型来抽取快递单的核心信息，例如地址，姓名，手机号码，具体的[快递单任务链接](./examples/named_entity_recognition/express_ner)。
+因为该类模型较为抽象，提供了一份快递单信息抽取的训练脚本给大家使用，具体的任务是通过两类的模型来抽取快递单的核心信息，例如地址，姓名，手机号码，具体的[快递单任务链接](../examples/named_entity_recognition/express_ner)。
 
 | 模型   | 简介   |
 | ------ | ----- |
-| [BiGRU-CRF](./examples/named_entity_recognition/express_ner) |传统的序列标注模型，通过双向GRU模型能抽取文本序列的信息和联系，通过CRF模型来学习文本Token之间的联系，本模型集成PaddleNLP自己开发的CRF模型，模型结构清晰易懂。 |
+| [BiGRU-CRF](../examples/named_entity_recognition/express_ner) |传统的序列标注模型，通过双向GRU模型能抽取文本序列的信息和联系，通过CRF模型来学习文本Token之间的联系，本模型集成PaddleNLP自己开发的CRF模型，模型结构清晰易懂。 |
 | [ERNIE/BERT Token Classification](./named_entity_recognition) |通过预训练模型提供的强大的语义信息和ERNIE/BERT类模型的Self-Attention机制来覆盖Token之间的联系，直接通过BERT/ERNIE的序列分类模型来预测文本每个token的标签信息，模型结构简单，效果优异。|
 
 ### 语言模型 (Language Model)
@@ -30,19 +32,21 @@
 
 | 模型   | 简介   |
 | ------ | ----- |
-| [RNNLM](./examples/language_model/rnnlm) | 序列任务常用的RNN网络，实现了一个两层的LSTM网络，然后LSTM的结果去预测下一个词出现的概率。是基于RNN的常规的语言模型。|
-| [ELMo](./examples/language_model/elmo) | [Deep contextualized word representations](https://allennlp.org/elmo), 发表于NAACL2018的动态词向量开山之作。|
+| [RNNLM](../examples/language_model/rnnlm) | 序列任务常用的RNN网络，实现了一个两层的LSTM网络，然后LSTM的结果去预测下一个词出现的概率。是基于RNN的常规的语言模型。|
+| [ELMo](../examples/language_model/elmo) | [Deep contextualized word representations](https://allennlp.org/elmo), 发表于NAACL2018的动态词向量开山之作。|
 | [Transformer-XL](../examples/language_model/transformer-xl/) | [Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context](https://arxiv.org/abs/1901.02860)    |
 
 ### 预训练模型 (Pretrained Language Model)
+PaddleNLP 提供了多种成熟的预训练模型技术，适用于自然语言理解(NLU)和自然语言生成(NLG)等多种场景。
+
 | 模型    | 简介     |
 | ------- | ------- |
 | [BERT](../examples/language_model/bert/) |[BERT(Bidirectional Encoder Representation from Transformers)](./examples/language_model/bert)     |
-| [ERNIE](../examples/text_classification/rnn) | [ERNIE: Enhanced Representation through Knowledge Integration](https://arxiv.org/abs/1904.09223)   |
-| [ERNIE-Tiny](../examples/text_classification/rnn) | 百度自研的小型化ERNIE网络结构，采用浅层Transformer，加宽隐层参数，中文subword粒度词表结合蒸馏的方法使模型相比SOTA Before BERT 提升8.35%， 速度提升4.3倍。 |
+| [ERNIE](../examples/text_classification/pretrained_models) | [ERNIE: Enhanced Representation through Knowledge Integration](https://arxiv.org/abs/1904.09223)   |
+| [ERNIE-Tiny](../examples/text_classification/pretrained_models) | 百度自研的小型化ERNIE网络结构，采用浅层Transformer，加宽隐层参数，中文subword粒度词表结合蒸馏的方法使模型相比SOTA Before BERT 提升8.35%， 速度提升4.3倍。 |
 | [ERNIE-GEN](../examples/text_generation/ernie-gen) | [ERNIE-GEN: An Enhanced Multi-Flow Pre-training and Fine-tuning Framework for Natural Language Generation](https://arxiv.org/abs/2001.11314) ERNIE-GEN是百度发布的生成式预训练模型，通过Global-Attention的方式解决训练和预测曝光偏差的问题，同时使用Multi-Flow Attention机制来分别进行Global和Context信息的交互，同时通过片段生成的方式来增加语义相关性。    |
 | [ELECTRA](../examples/language_model/electra/)  | [ELECTRA: Pre-training Text Encoders as Discriminators Rather Than Generators](https://arxiv.org/abs/2003.10555) ELECTRA 创新性地引入GAN的思想对BERT预训练过程进行了改进，在和BERT具有相同的模型参数、预训练计算量一样的情况下，ELECTRA GLUE得分明显好。同时相比GPT、ELMo，在GLUE得分略好时，ELECTRA预训练模型只需要很少的参数和计算量。|
-| [RoBERTa](../examples/text_classification/rnn) | [RoBERTa: A Robustly Optimized BERT Pretraining Approach](https://arxiv.org/abs/1907.11692)   |
+| [RoBERTa](../examples/text_classification/pretrained_models) | [RoBERTa: A Robustly Optimized BERT Pretraining Approach](https://arxiv.org/abs/1907.11692)   |
 | [PLATO-2](../examples/dialogue/plato-2) | 百度自研领先的开放域对话预训练模型 [PLATO-2: Towards Building an Open-Domain Chatbot via Curriculum Learning](https://arxiv.org/abs/2006.16779) |
 | [GPT-2](../examples/language_model/gpt2) | [Language Models are Unsupervised Multitask Learners](https://d4mucfpksywv.cloudfront.net/better-language-models/language-models.pdf)   |
 
@@ -54,8 +58,8 @@
 
 | 模型  | 简介    |
 | ----- | ------ |
-| [RNN/GRU/LSTM](./examples/text_classification/rnn) | 面向通用场景的文本分类模型，网络结构接入常见的RNN类模型，例如LSTM，GRU，RNN。整体模型结构集成在百度的自研的Senta文本情感分类模型上，效果突出，用法简易。|
-| [ERNIE/BERT Fine-tuning](../examples/text_classification/pretrained_models) |基于预训练后模型的文本分类的模型，多达11种的预训练模型可供使用，其中有较多中文预训练模型，预训练模型切换简单，情感分析任务上效果突出。|
+| [RNN/CNN/GRU/LSTM](../examples/text_classification/rnn) | 面向通用场景的文本分类模型，网络结构接入常见的RNN类模型，例如CNN, LSTM, GRU, RNN。整体模型结构集成在百度的自研的Senta文本情感分类模型上，效果突出，用法简易。|
+| [ERNIE/BERT Fine-tuning](../examples/text_classification/pretrained_models) | 基于预训练模型的文本分类的模型，多达11种的预训练模型可供使用，其中有较多中文预训练模型，预训练模型切换简单，情感分析任务上效果突出。|
 
 ### 文本生成 (Text Generation)
 
@@ -63,7 +67,7 @@
 
 | 模型                                                         | 简介                                                         |
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| [ERNIE-GEN(An Enhanced Multi-Flow Pre-training and Fine-tuning Framework for Natural Language Generation)](./examples/text_generation/ernie-gen) | ERNIE-GEN是百度发布的生成式预训练模型，通过Global-Attention的方式解决训练和预测曝光偏差的问题，同时使用Multi-Flow Attention机制来分别进行Global和Context信息的交互，同时通过片段生成的方式来增加语义相关性。|
+| [ERNIE-GEN](../examples/text_generation/ernie-gen) | ERNIE-GEN是百度自研的生成式预训练模型，通过Global-Attention的方式解决训练和预测曝光偏差的问题，同时使用Multi-Flow Attention机制来分别进行Global和Context信息的交互，同时通过片段生成的方式来增加语义相关性。更多技术细节可参考[An Enhanced Multi-Flow Pre-training and Fine-tuning Framework for Natural Language Generation](https://arxiv.org/abs/2001.11314) |
 
 
 ### 文本匹配 (Text Matching)
@@ -80,7 +84,7 @@
 
 | 模型   | 简介     |
 | ------- | ------- |
-| [ERNIESage(ERNIE SAmple aggreGatE)](../examples/text_graph/erniesage)|通过Graph(图)来构建自身节点和邻居节点的连接关系，将自身节点和邻居节点的关系构建成一个关联样本输入到ERNIE中，ERNIE作为聚合函数（Aggregators）来表征自身节点和邻居节点的语义关系，最终强化图中节点的语义表示。|
+| [ERNIESage(ERNIE SAmple aggreGatE)](../examples/text_graph/erniesage)| 通过Graph(图)来构建自身节点和邻居节点的连接关系，将自身节点和邻居节点的关系构建成一个关联样本输入到ERNIE中，ERNIE作为聚合函数（Aggregators）来表征自身节点和邻居节点的语义关系，最终强化图中节点的语义表示。|
 
 
 ## NLP系统应用
@@ -90,8 +94,8 @@
 
 | 模型    | 简介     |
 | ------ | ------- |
-| [Seq2Seq](./examples/machine_translation/seq2seq) | 使用编码器-解码器（Encoder-Decoder）结构, 同时使用了Attention机制来加强Decoder和Encoder之间的信息交互，Seq2Seq 广泛应用于机器翻译，自动对话机器人，文档摘要自动生成，图片描述自动生成等任务中。|
-| [Transformer](./examples/machine_translation/transformer) |基于PaddlePaddle框架的Transformer结构搭建的机器翻译模型，Transformer 计算并行度高，能解决学习长程依赖问题。并且模型框架集成了训练，验证，预测任务，功能完备，效果突出。|
+| [Seq2Seq](../examples/machine_translation/seq2seq) | 使用编码器-解码器（Encoder-Decoder）结构, 同时使用了Attention机制来加强Decoder和Encoder之间的信息交互，Seq2Seq 广泛应用于机器翻译，自动对话机器人，文档摘要自动生成，图片描述自动生成等任务中。|
+| [Transformer](../examples/machine_translation/transformer) |基于PaddlePaddle框架的Transformer结构搭建的机器翻译模型，Transformer 计算并行度高，能解决学习长程依赖问题。并且模型框架集成了训练，验证，预测任务，功能完备，效果突出。|
 
 
 ### 阅读理解 (Machine Reading Comprehension)
@@ -107,8 +111,8 @@
 
 | 模型   | 简介      |
 | --------- | ------|
-| [Dialogue General Understanding](./examples/dialogue/dgu) | 提供基于BERT通用对话理解模型，通过对文本分类、序列标注等操作就可以完成对话中的意图识别，行文识别，状态跟踪等理解任务。|
-| [PLATO-2](./examples/dialogue/plato-2) | 百度自研领先的开放域对话预训练模型。[PLATO-2: Towards Building an Open-Domain Chatbot via Curriculum Learning](https://arxiv.org/abs/2006.16779) |
+| [Dialogue General Understanding](../examples/dialogue/dgu) | 提供基于BERT通用对话理解模型，通过对文本分类、序列标注等操作就可以完成对话中的意图识别，行文识别，状态跟踪等理解任务。|
+| [PLATO-2](../examples/dialogue/plato-2) | 百度自研领先的开放域对话预训练模型。[PLATO-2: Towards Building an Open-Domain Chatbot via Curriculum Learning](https://arxiv.org/abs/2006.16779) |
 
 ## 更多序列建模应用
 
@@ -119,10 +123,19 @@
 
 | 模型     | 简介    |
 | -------- | ------- |
-| [TCN(Temporal Convolutional Network)](./examples/time_series)|TCN模型基于卷积的时间序列模型，通过因果卷积(Causal Convolution)和空洞卷积(Dilated Convolution) 特定的组合方式解决卷积不适合时间序列任务的问题，TCN具备并行度高，内存低等诸多优点，在某些时间序列任务上效果已经超过传统的RNN模型。|
+| [TCN(Temporal Convolutional Network)](../examples/time_series)|TCN模型基于卷积的时间序列模型，通过因果卷积(Causal Convolution)和空洞卷积(Dilated Convolution) 特定的组合方式解决卷积不适合时间序列任务的问题，TCN具备并行度高，内存低等诸多优点，在某些时间序列任务上效果已经超过传统的RNN模型。|
 
 ### 蛋白质二级结构预测 (Protein Secondary Structure Prediction)
 
 | 模型     | 简介    |
 | -------- | ------- |
 | [TAPE](https://arxiv.org/abs/1906.08230) | 借鉴自然语言处理中对大量未标记的序列使用自监督学习的方式进行预训练（如Transformer, LSTM等序列建模结构），从而提取蛋白质中有用的生物学信息，并将这些信息迁移到其他带标签的任务，使得这些任务训练更快更稳定的收敛。更多详情可以参考[PaddleHelix蛋白质预训练模型](https://github.com/PaddlePaddle/PaddleHelix/blob/dev/apps/pretrained_protein/tape/README_cn.md#%E5%BA%8F%E5%88%97%E6%A8%A1%E5%9E%8B)|
+
+## 进阶用法
+
+### 模型压缩 (Model Compression)
+
+| 模型     | 简介    |
+| -------- | ------- |
+| [Distill-LSTM](./model_compression/distill_lstm/) | 基于[Distilling Task-Specific Knowledge from BERT into Simple Neural Networks](https://arxiv.org/abs/1903.12136)论文策略的实现，将BERT中英文分类的下游模型知识通过蒸馏的方式迁移至LSTM的小模型结构中，取得比LSTM单独训练更好的效果。|
+| [OFA-BERT](./model_compression/ofa/) | 基于PaddleSlim Once-For-ALL(OFA)策略对BERT在GLUE任务上下游模型进行压缩，在精度无损的情况下参数量减少33%。 |

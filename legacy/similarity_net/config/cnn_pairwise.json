@@ -1,0 +1,24 @@
+{
+    "net": {
+        "module_name": "cnn",
+        "class_name": "CNN",
+        "emb_dim": 128, 
+        "filter_size": 3,
+        "num_filters": 256,
+        "hidden_dim": 128
+    },
+    "loss": {
+        "module_name": "hinge_loss",
+        "class_name": "HingeLoss",
+        "margin": 0.1
+    },
+    "optimizer": {
+        "class_name": "AdamOptimizer",
+        "learning_rate": 0.2,
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "epsilon": 1e-08
+    },
+    "task_mode": "pairwise",
+    "model_path": "cnn_pairwise"
+}

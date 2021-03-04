@@ -35,20 +35,8 @@ wget https://paddlenlp.bj.bcebos.com/data/dict.txt
 
 我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在验证集（dev.tsv）验证。
 
-CPU 启动：
-
+启动训练：
 ```
-# 使用paddlenlp.embeddings.TokenEmbedding
-python train.py --vocab_path='./dict.txt' --use_gpu=False --lr=5e-4 --batch_size=64 --epochs=20 --use_token_embedding=True --vdl_dir='./vdl_dir'
-
-# 使用paddle.nn.Embedding
-python train.py --vocab_path='./dict.txt' --use_gpu=False --lr=1e-4 --batch_size=64 --epochs=20 --use_token_embedding=False --vdl_dir='./vdl_dir'
-```
-
-GPU 启动：
-```
-export CUDA_VISIBLE_DEVICES=0
-
 # 使用paddlenlp.embeddings.TokenEmbedding
 python train.py --vocab_path='./dict.txt' --use_gpu=True --lr=5e-4 --batch_size=64 --epochs=20 --use_token_embedding=True --vdl_dir='./vdl_dir'
 
@@ -68,9 +56,27 @@ python train.py --vocab_path='./dict.txt' --use_gpu=True --lr=1e-4 --batch_size=
 
 该脚本还提供以下参数：
 
-* `save_dir`: 模型保存目录。
-* `init_from_ckpt`: 恢复模型训练的断点路径。
+* `save_dir`: 模型保存目录。默认值为"./checkpoints/"。
+* `init_from_ckpt`: 恢复模型训练的断点路径。默认值为None，表示不恢复训练。
 * `embedding_name`: 预训练Embedding名称，默认为`w2v.baidu_encyclopedia.target.word-word.dim300`. 支持的预训练Embedding可参考[Embedding 模型汇总](../../docs/embeddings.md)。
+
+**注意：**
+
+程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存模型在指定的`save_dir`中。训练过程中会实时保存每个epoch的模型参数，并以当前epoch值命名。如第2个Epochs，模型参数会被保存为`./checkpoints/2.pdparams`，优化器状态保存为`./checkpoints/2.pdopt`。
+
+如：
+```text
+checkpoints/
+├── 0.pdopt
+├── 0.pdparams
+├── 1.pdopt
+├── 1.pdparams
+├── ...
+└── final.pdparams
+```
+
+如需恢复模型训练，则init_from_ckpt只需指定到文件名即可，不需要添加文件尾缀。如果用户想热启第10个Epoch保存的模型，则设置 `--init_from_ckpt=./checkpoints/10`即可，程序会自动加载模型参数`./checkpoints/10.pdparams`，也会自动加载优化器状态`./checkpoints/10.pdopt`。
+
 
 ### 启动VisualDL
 

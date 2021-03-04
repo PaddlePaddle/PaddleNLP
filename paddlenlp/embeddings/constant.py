@@ -84,7 +84,8 @@ EMBEDDING_NAME_LIST = [
     # Mix-large
     "w2v.mixed-large.target.word-char.dim300",
     "w2v.mixed-large.target.word-word.dim300",
-
+    # GOOGLE NEWS
+    "w2v.google_news.target.word-word.dim300.en",
     # GloVe
     "glove.wiki2014-gigaword.target.word-word.dim50.en",
     "glove.wiki2014-gigaword.target.word-word.dim100.en",

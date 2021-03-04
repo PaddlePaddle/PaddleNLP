@@ -14,19 +14,20 @@
 from functools import partial
 
 import paddle
+from paddlenlp.datasets import MapDataset
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import ErnieTokenizer, ErniePretrainedModel, ErnieForTokenClassification
+from paddlenlp.transformers import ErnieTokenizer, ErnieForTokenClassification
 from paddlenlp.metrics import ChunkEvaluator
 
 
-def parse_decodes(ds, decodes, lens):
+def parse_decodes(ds, decodes, lens, label_vocab):
     decodes = [x for batch in decodes for x in batch]
     lens = [x for batch in lens for x in batch]
-    id_label = dict(zip(ds.label_vocab.values(), ds.label_vocab.keys()))
+    id_label = dict(zip(label_vocab.values(), label_vocab.keys()))
 
     outputs = []
     for idx, end in enumerate(lens):
-        sent = ds.word_ids[idx][:end]
+        sent = ds.data[idx][0][:end]
         tags = [id_label[x] for x in decodes[idx][1:end]]
         sent_out = []
         tags_out = []
@@ -60,7 +61,7 @@ def evaluate(model, metric, data_loader):
           (precision, recall, f1_score))
 
 
-def predict(model, data_loader, ds):
+def predict(model, data_loader, ds, label_vocab):
     pred_list = []
     len_list = []
     for input_ids, seg_ids, lens, labels in data_loader:
@@ -68,19 +69,18 @@ def predict(model, data_loader, ds):
         pred = paddle.argmax(logits, axis=-1)
         pred_list.append(pred.numpy())
         len_list.append(lens.numpy())
-    preds = parse_decodes(ds, pred_list, len_list)
+    preds = parse_decodes(ds, pred_list, len_list, label_vocab)
     return preds
 
 
 def convert_example(example, tokenizer, label_vocab):
     tokens, labels = example
-    tokens = [tokenizer.cls_token] + tokens + [tokenizer.sep_token]
-    input_ids = tokenizer.convert_tokens_to_ids(tokens)
-    segment_ids = [0] * len(tokens)
-    lens = len(input_ids)
+    tokenized_input = tokenizer(
+        tokens, return_length=True, is_split_into_words=True)
     labels = ['O'] + labels + ['O']
-    labels = [label_vocab[x] for x in labels]
-    return input_ids, segment_ids, lens, labels
+    tokenized_input['labels'] = [label_vocab[x] for x in labels]
+    return tokenized_input['input_ids'], tokenized_input[
+        'token_type_ids'], tokenized_input['seq_len'], tokenized_input['labels']
 
 
 def load_dict(dict_path):
@@ -91,53 +91,49 @@ def load_dict(dict_path):
     return vocab
 
 
-class ExpressDataset(paddle.io.Dataset):
-    def __init__(self, data_path):
-        self.word_vocab = load_dict('./conf/word.dic')
-        self.label_vocab = load_dict('./conf/tag.dic')
-        self.word_ids = []
-        self.label_ids = []
+def load_dataset(datafiles):
+    def read(data_path):
         with open(data_path, 'r', encoding='utf-8') as fp:
             next(fp)
             for line in fp.readlines():
                 words, labels = line.strip('\n').split('\t')
                 words = words.split('\002')
                 labels = labels.split('\002')
-                self.word_ids.append(words)
-                self.label_ids.append(labels)
-        self.word_num = max(self.word_vocab.values()) + 1
-        self.label_num = max(self.label_vocab.values()) + 1
+                yield words, labels
 
-    def __len__(self):
-        return len(self.word_ids)
-
-    def __getitem__(self, index):
-        return self.word_ids[index], self.label_ids[index]
+    if isinstance(datafiles, str):
+        return MapDataset(list(read(datafiles)))
+    elif isinstance(datafiles, list) or isinstance(datafiles, tuple):
+        return [MapDataset(list(read(datafile))) for datafile in datafiles]
 
 
 if __name__ == '__main__':
     paddle.set_device('gpu')
+    train_ds, dev_ds, test_ds = load_dataset(datafiles=(
+        './data/train.txt', './data/dev.txt', './data/test.txt'))
 
-    train_ds = ExpressDataset('./data/train.txt')
-    dev_ds = ExpressDataset('./data/dev.txt')
-    test_ds = ExpressDataset('./data/test.txt')
-
+    label_vocab = load_dict('./conf/tag.dic')
     tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+
     trans_func = partial(
-        convert_example, tokenizer=tokenizer, label_vocab=train_ds.label_vocab)
+        convert_example, tokenizer=tokenizer, label_vocab=label_vocab)
+
+    train_ds.map(trans_func)
+    dev_ds.map(trans_func)
+    test_ds.map(trans_func)
 
     ignore_label = -1
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
         Stack(),
         Pad(axis=0, pad_val=ignore_label)
-    ): fn(list(map(trans_func, samples)))
+    ): fn(samples)
 
     train_loader = paddle.io.DataLoader(
         dataset=train_ds,
         batch_size=200,
-        shuffle=True,
+        shuffle=False,
         return_list=True,
         collate_fn=batchify_fn)
     dev_loader = paddle.io.DataLoader(
@@ -152,9 +148,9 @@ if __name__ == '__main__':
         collate_fn=batchify_fn)
 
     model = ErnieForTokenClassification.from_pretrained(
-        "ernie-1.0", num_classes=train_ds.label_num)
+        "ernie-1.0", num_classes=len(label_vocab))
 
-    metric = ChunkEvaluator(label_list=train_ds.label_vocab.keys(), suffix=True)
+    metric = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
     loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label)
     optimizer = paddle.optimizer.AdamW(
         learning_rate=2e-5, parameters=model.parameters())
@@ -162,10 +158,10 @@ if __name__ == '__main__':
     step = 0
     for epoch in range(10):
         model.train()
-        for idx, (input_ids, segment_ids, length,
+        for idx, (input_ids, token_type_ids, length,
                   labels) in enumerate(train_loader):
-            logits = model(input_ids, segment_ids).reshape(
-                [-1, train_ds.label_num])
+            logits = model(input_ids, token_type_ids).reshape(
+                [-1, len(label_vocab)])
             loss = paddle.mean(loss_fn(logits, labels.reshape([-1])))
             loss.backward()
             optimizer.step()
@@ -177,5 +173,12 @@ if __name__ == '__main__':
         paddle.save(model.state_dict(),
                     './ernie_result/model_%d.pdparams' % step)
 
-    preds = predict(model, test_loader, test_ds)
-    print('\n'.join(preds[:10]))
+    preds = predict(model, test_loader, test_ds, label_vocab)
+    file_path = "ernie_results.txt"
+    with open(file_path, "w", encoding="utf8") as fout:
+        fout.write("\n".join(preds))
+    # Print some examples
+    print(
+        "The results have been saved in the file: %s, some examples are shown below: "
+        % file_path)
+    print("\n".join(preds[:10]))

@@ -1,0 +1,1 @@
+fluid_1.2 tokenizer.py --test_data_dir ./test.txt.utf8 --batch_size 1 > res
