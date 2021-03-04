@@ -5,6 +5,10 @@
 
 该示例展示了如何使用PaddleNLP快速复现[LIC2021关系抽取比赛](http://aistudio-bce.bcc-bdbl.baidu.com/aistudio/competition/detail/141)基线并进阶优化模型基线。
 
+同时，我们提供了该示例在线运行展示教程：
+[PaddleNLP实战——LIC2021关系抽取任务基线](https://aistudio.baidu.com/aistudio/projectdetail/1611211)
+
+
 ## 环境依赖
 
 * PaddlePaddle 安装

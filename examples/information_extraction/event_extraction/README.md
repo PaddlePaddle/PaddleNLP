@@ -9,6 +9,9 @@
 
 该示例展示了如何使用PaddleNLP快速复现[LIC2021事件抽取比赛](http://aistudio-bce.bcc-bdbl.baidu.com/aistudio/competition/detail/141)基线并进阶优化基线。
 
+同时，我们提供了该示例在线运行展示教程：
+[PaddleNLP实战——LIC2021事件抽取任务基线](https://aistudio.baidu.com/aistudio/projectdetail/1605425)
+
 
 ## 环境依赖
 
