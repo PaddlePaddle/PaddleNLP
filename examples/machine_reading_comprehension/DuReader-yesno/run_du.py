@@ -28,14 +28,14 @@ import json
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Pad, Stack, Dict
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.transformers import RobertaForSequenceClassification, RobertaTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 MODEL_CLASSES = {
     "bert": (BertForSequenceClassification, BertTokenizer),
-    "electra": (ElectraForSequenceClassification, ElectraTokenizer),
     "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
+    "roberta": (RobertaForSequenceClassification, RobertaTokenizer),
 }
 
 
