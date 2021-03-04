@@ -107,26 +107,16 @@ class XLNetRelativeAttention(Layer):
         self.d_model = d_model
         self.scale = 1 / (d_head ** 0.5)
 
-        q = self.create_parameter([self.d_model, self.n_head * self.d_head])
-        self.add_parameter("q", q)
-        k = self.create_parameter([self.d_model, self.n_head * self.d_head])
-        self.add_parameter("k", k)
-        v = self.create_parameter([self.d_model, self.n_head * self.d_head])
-        self.add_parameter("v", v)
-        o = self.create_parameter([self.d_model, self.n_head * self.d_head])
-        self.add_parameter("o", o)
-        r = self.create_parameter([self.d_model, self.n_head * self.d_head])
-        self.add_parameter("r", r)
+        self.q = self.create_parameter([self.d_model, self.n_head * self.d_head])
+        self.k = self.create_parameter([self.d_model, self.n_head * self.d_head])
+        self.v = self.create_parameter([self.d_model, self.n_head * self.d_head])
+        self.o = self.create_parameter([self.d_model, self.n_head * self.d_head])
+        self.r = self.create_parameter([self.d_model, self.n_head * self.d_head])
 
-        r_r_bias = self.create_parameter([self.n_head, self.d_head], is_bias=True)
-        self.add_parameter("r_r_bias", r_r_bias)
-        r_s_bias = self.create_parameter([self.n_head, self.d_head], is_bias=True)
-        self.add_parameter("r_s_bias", r_s_bias)
-        r_w_bias = self.create_parameter([self.n_head, self.d_head], is_bias=True)
-        self.add_parameter("r_w_bias", r_w_bias)
-
-        seg_embed = self.create_parameter([2, self.n_head, self.d_head], is_bias=False)
-        self.add_parameter("seg_embed", seg_embed)
+        self.r_r_bias = self.create_parameter([self.n_head, self.d_head], is_bias=True)
+        self.r_s_bias = self.create_parameter([self.n_head, self.d_head], is_bias=True)
+        self.r_w_bias = self.create_parameter([self.n_head, self.d_head], is_bias=True)
+        self.seg_embed = self.create_parameter([2, self.n_head, self.d_head], is_bias=False)
 
         self.layer_norm = nn.LayerNorm(d_model, epsilon=layer_norm_eps)
         self.dropout = nn.Dropout(dropout)
@@ -423,7 +413,6 @@ class XLNetLayer(Layer):
 
         self.rel_attn = XLNetRelativeAttention(n_head, d_head, d_model, layer_norm_eps, dropout)
         self.ff = XLNetFeedForward(d_model, d_inner, layer_norm_eps, dropout, ff_activation)
-        self.dropout = nn.Dropout(dropout)
         self.seq_len_dim = 1
 
     def forward(
@@ -481,6 +470,7 @@ class XLNetPretrainedModel(PretrainedModel):
             "d_inner": 3072,
             "d_model": 768,
             "dropout": 0.1,
+            "classifier_dropout": 0.1,
             "ff_activation": "gelu",
             "initializer_range": 0.02,
             "layer_norm_eps": 1e-12,
@@ -500,6 +490,7 @@ class XLNetPretrainedModel(PretrainedModel):
             "d_inner": 4096,
             "d_model": 1024,
             "dropout": 0.1,
+            "classifier_dropout": 0.1,
             "ff_activation": "gelu",
             "initializer_range": 0.02,
             "layer_norm_eps": 1e-12,
@@ -607,8 +598,7 @@ class XLNetModel(XLNetPretrainedModel):
         self.n_layer = n_layer
         self.dropout = nn.Dropout(dropout)
         self.word_embedding = nn.Embedding(vocab_size, d_model)
-        mask_emb = self.create_parameter([1, 1, d_model])
-        self.add_parameter("mask_emb", mask_emb)
+        self.mask_emb = self.create_parameter([1, 1, d_model])
         self.layer = nn.LayerList(
             [
                 XLNetLayer(
@@ -971,7 +961,7 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
         self.transformer = xlnet
         self.classifier = XLNetClassificationHead(
             self.transformer.d_model,
-            self.transformer.config["dropout"],
+            self.transformer.config["classifier_dropout"],
             num_classes)
         self.init_weights()
 
@@ -986,7 +976,6 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
         input_mask=None,
         head_mask=None,
         inputs_embeds=None,
-        labels=None,
         use_mems_train=False,
         use_mems_eval=False,
         output_attentions=False,
@@ -1050,7 +1039,6 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
         input_mask=None,
         head_mask=None,
         inputs_embeds=None,
-        labels=None,
         use_mems_train=False,
         use_mems_eval=False,
         output_attentions=False,

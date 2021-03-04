@@ -45,107 +45,26 @@ TASK_CLASSES = {
 
 
 def parse_args():
+    # yapf: disable
     parser = argparse.ArgumentParser()
-
-    # Required parameters
-    parser.add_argument(
-        "--task_name",
-        default=None,
-        type=str,
-        required=True,
-        help="The name of the task to train selected in the list: " +
-        ", ".join(TASK_CLASSES.keys()), )
-
-    parser.add_argument(
-        "--model_name_or_path",
-        default=None,
-        type=str,
-        required=True,
-        help="Path to pre-trained model or shortcut name selected in the list: "
-        + ", ".join(XLNetPretrainedModel.pretrained_init_configuration.keys()), )
-
-    parser.add_argument(
-        "--output_dir",
-        default=None,
-        type=str,
-        required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",)
-
-    parser.add_argument(
-        "--max_seq_length",
-        default=128,
-        type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
-
-    parser.add_argument(
-        "--batch_size",
-        default=8,
-        type=int,
-        help="Batch size per GPU/CPU for training.", )
-
-    parser.add_argument(
-        "--learning_rate",
-        default=5e-5,
-        type=float,
-        help="The initial learning rate for Adam.")
-
-    parser.add_argument(
-        "--weight_decay",
-        default=0.0,
-        type=float,
-        help="Weight decay if we apply some.")
-
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-8,
-        type=float,
-        help="Epsilon for Adam optimizer.")
-
-    parser.add_argument(
-        "--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
-
-    parser.add_argument(
-        "--num_train_epochs",
-        default=3,
-        type=int,
-        help="Total number of training epochs to perform.", )
-
-    parser.add_argument(
-        "--max_steps",
-        default=-1,
-        type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
-
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=100,
-        help="Log every X updates steps.")
-
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=500,
-        help="Save checkpoint every X updates steps.")
-
-    parser.add_argument(
-        "--seed", type=int, default=42, help="random seed for initialization")
-
-    parser.add_argument(
-        "--eager_run", type=eval, default=True, help="Use dygraph mode.")
-
-    parser.add_argument(
-        "--n_gpu",
-        type=int,
-        default=1,
-        help="number of gpus to use, 0 for cpu.")
-
-    parser.add_argument(
-        "--warmup_proportion",
-        default=0.1,
-        type=float,
-        help="Linear warmup proportion over total steps.")
+    parser.add_argument("--task_name", default=None, type=str, required=True, help="The name of the task to train selected in the list: " + ", ".join(TASK_CLASSES.keys()),)
+    parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(XLNetPretrainedModel.pretrained_init_configuration.keys()),)
+    parser.add_argument("--output_dir", default=None, type=str, required=True, help="The output directory where the model predictions and checkpoints will be written.",)
+    parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.",)
+    parser.add_argument("--batch_size", default=8, type=int, help="Batch size per device for training.",)
+    parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.",)
+    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.",)
+    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.",)
+    parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.",)
+    parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.",)
+    parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
+    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.",)
+    parser.add_argument("--save_steps", type=int, default=500, help="Save checkpoint every X updates steps.",)
+    parser.add_argument("--seed", type=int, default=42, help="random seed for initialization",)
+    parser.add_argument("--device", type=str, default="gpu", help="Select cpu, gpu, xpu devices.",)
+    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup_steps. If > 0: Override warmup_proportion",)
+    parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over total steps.",)
+    # yapf: enable
 
     args = parser.parse_args()
     return args
@@ -229,7 +148,7 @@ def convert_example(example,
 
 def do_train(args):
     paddle.enable_static() if not args.eager_run else None
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -315,8 +234,8 @@ def do_train(args):
     num_training_steps = args.max_steps if args.max_steps > 0 else (
         len(train_data_loader) * args.num_train_epochs)
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+    warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, warmup)
 
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
@@ -365,7 +284,7 @@ def do_train(args):
                 else:
                     evaluate(model, loss_fct, metric, dev_data_loader)
                     print("eval done total : %s s" % (time.time() - tic_eval))
-                if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+                if (not paddle.distributed.get_world_size() > 1) or paddle.distributed.get_rank() == 0:
                     output_dir = os.path.join(args.output_dir,
                                               "%s_ft_model_%d" %
                                               (args.task_name, global_step))
@@ -392,7 +311,4 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_gpu)
-    else:
-        do_train(args)
+    do_train(args)

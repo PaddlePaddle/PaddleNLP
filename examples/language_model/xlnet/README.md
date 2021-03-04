@@ -36,7 +36,9 @@ GLUE评测任务所含数据集已在paddlenlp中以API形式提供，无需预�
 以GLUE中的SST-2任务为例，启动Fine-tuning的方式如下：
 
 ```shell
-python -u ./run_glue.py \
+# 设置当前使用设备，如第0号卡
+export CUDA_VISIBLE_DEVICES=0
+python -m paddle.distributed.launch ./run_glue.py \
     --model_name_or_path xlnet-base-cased \
     --task_name SST-2 \
     --max_seq_length 128 \
@@ -45,8 +47,7 @@ python -u ./run_glue.py \
     --num_train_epochs 3 \
     --logging_steps 100 \
     --save_steps 500 \
-    --output_dir ./tmp/ \
-    --n_gpu 1
+    --output_dir ./tmp/
 ```
 
 其中参数释义如下：
@@ -59,7 +60,6 @@ python -u ./run_glue.py \
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
-- `n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可。
 
 基于`xlnet-base-cased`在GLUE各评测任务上Fine-tuning后，在验证集上有如下结果：
 
