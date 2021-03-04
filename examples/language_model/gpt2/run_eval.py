@@ -35,7 +35,7 @@ MODEL_CLASSES = {
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: "
+parser.add_argument("--model_name", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: "
         + ", ".join(sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])), )
 parser.add_argument("--eval_path", default=None, type=str, required=True, help="The eval file path.", )
 parser.add_argument('--cloze_eval', action='store_true', help='Evaluation dataset from `--eval_path` is a cloze task')

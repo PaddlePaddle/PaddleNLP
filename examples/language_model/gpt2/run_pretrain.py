@@ -130,6 +130,7 @@ def do_train(args):
 
     # creat the critrion for the gpt model
     criterion = GPT2PretrainingCriterion()
+    model = paddle.DataParallel(model)
 
     global_step = 0
     tic_train = time.time()
