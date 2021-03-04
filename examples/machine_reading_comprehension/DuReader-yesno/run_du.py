@@ -58,30 +58,31 @@ def convert_example(example, tokenizer):
     return feature
 
 
-def evaluate(model, metric, data_loader, do_predict=False):
+def evaluate(model, metric, data_loader):
     model.eval()
-    if not do_predict:
-        metric.reset()
-        for batch in data_loader:
-            input_ids, segment_ids, labels = batch
-            logits = model(input_ids, segment_ids)
-            correct = metric.compute(logits, labels)
-            metric.update(correct)
-            accu = metric.accumulate()
-        print("accu: %f" % (accu))
-    else:
-        res = {}
-        for batch in data_loader:
-            input_ids, segment_ids, qas_id = batch
-            logits = model(input_ids, segment_ids)
-            qas_id = qas_id.numpy()
-            preds = paddle.argmax(logits, axis=1).numpy()
-            for i in range(len(preds)):
-                res[str(qas_id[i])] = data_loader.dataset.label_list[preds[i]]
-        with open('prediction.json', "w") as writer:
-            writer.write(json.dumps(res, ensure_ascii=False, indent=4) + "\n")
-
+    metric.reset()
+    for batch in data_loader:
+        input_ids, segment_ids, labels = batch
+        logits = model(input_ids, segment_ids)
+        correct = metric.compute(logits, labels)
+        metric.update(correct)
+        accu = metric.accumulate()
+    print("accu: %f" % (accu))
     model.train()
+
+
+def predict(model, data_loader):
+    model.eval()
+    res = {}
+    for batch in data_loader:
+        input_ids, segment_ids, qas_id = batch
+        logits = model(input_ids, segment_ids)
+        qas_id = qas_id.numpy()
+        preds = paddle.argmax(logits, axis=1).numpy()
+        for i in range(len(preds)):
+            res[str(qas_id[i])] = data_loader.dataset.label_list[preds[i]]
+    model.train()
+    return res
 
 
 def do_train(args):
@@ -198,7 +199,11 @@ def do_train(args):
                     print('Saving checkpoint to:', output_dir)
 
     if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
-        evaluate(model, metric, test_data_loader, True)
+        predictions = predict(model, test_data_loader)
+        with open('prediction.json', "w") as writer:
+            writer.write(
+                json.dumps(
+                    predictions, ensure_ascii=False, indent=4) + "\n")
 
 
 if __name__ == "__main__":
