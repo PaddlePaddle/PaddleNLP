@@ -44,8 +44,15 @@ parser.add_argument("--epochs", type=int, default=10, help="Number of epoches fo
 parser.add_argument("--attn_dropout", type=float, default=0.0, help="Attention ffn model dropout.")
 parser.add_argument("--hidden_dropout_prob", type=float, default=0.0, help="The dropout rate for the embedding pooler.")
 parser.add_argument("--device", type=str, default="gpu", help="Select cpu, gpu, xpu devices to train model.")
+parser.add_argument("--seed", type=int, default=8, help="Random seed for initialization.")
 # yapf: enable
 args = parser.parse_args()
+
+
+def set_seed(args):
+    random.seed(args.seed + paddle.distributed.get_rank())
+    np.random.seed(args.seed + paddle.distributed.get_rank())
+    paddle.seed(args.seed + paddle.distributed.get_rank())
 
 
 def create_dataloader(batch_size, max_encoder_length, tokenizer, pad_val=0):
@@ -97,6 +104,7 @@ def create_dataloader(batch_size, max_encoder_length, tokenizer, pad_val=0):
 def main():
     # Initialization for the parallel enviroment
     paddle.set_device(args.device)
+    set_seed(args)
     # Define the model and metric 
     model = BigBirdForSequenceClassification.from_pretrained(
         args.model_name_or_path)
