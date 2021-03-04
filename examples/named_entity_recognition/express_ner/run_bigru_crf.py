@@ -179,4 +179,11 @@ if __name__ == '__main__':
     outputs, lens, decodes = model.predict(test_data=test_loader)
     preds = parse_decodes(test_ds, decodes, lens)
 
-    print('\n'.join(preds[:10]))
+    file_path = "bigru_results.txt"
+    with open(file_path, "w", encoding="utf8") as fout:
+        fout.write("\n".join(preds))
+    # Print some examples
+    print(
+        "The results have been saved in the file: %s, some examples are shown below: "
+        % file_path)
+    print("\n".join(preds[:10]))
