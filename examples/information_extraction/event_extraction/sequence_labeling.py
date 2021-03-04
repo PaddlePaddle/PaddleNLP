@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 Baidu.com, Inc. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -85,41 +85,6 @@ def evaluate(model, criterion, metric, num_label, data_loader):
     return precision, recall, f1_score, avg_loss
 
 
-def convert_example(example, tokenizer, label_vocab=None, max_seq_len=512, no_entity_label="O", is_test=False):
-    """convert_example"""
-    def _truncate_seqs(seqs, max_seq_len):
-        """_truncate_seqs"""
-        if len(seqs) == 1:  # single sentence
-            # Account for [CLS] and [SEP] with "- 2"
-            seqs[0] = seqs[0][0:(max_seq_len - 2)]
-        else:  # sentence pair
-            # Account for [CLS], [SEP], [SEP] with "- 3"
-            tokens_a, tokens_b = seqs
-            max_seq_len -= 3
-            while True:  # truncate with longest_first strategy
-                total_len = len(tokens_a) + len(tokens_b)
-                if total_len <= max_seq_len:
-                    break
-                if len(tokens_a) > len(tokens_b):
-                    tokens_a.pop()
-                else:
-                    tokens_b.pop()
-        return seqs
-
-    tokens, labels = example
-    tokens = _truncate_seqs([tokens], max_seq_len)[0]   # truncate token
-    tokens = [tokenizer.cls_token] + tokens + [tokenizer.sep_token]
-    input_ids = tokenizer.convert_tokens_to_ids(tokens)
-    token_type_ids = [0] * len(tokens)
-    seq_lens = len(input_ids)
-    if is_test:
-        return input_ids, token_type_ids, seq_lens
-    else:
-        labels = _truncate_seqs([labels], max_seq_len)[0]   # truncate labels
-        labels = [no_entity_label] + labels + [no_entity_label]
-        labels = [label_vocab[x] for x in labels]
-        return input_ids, token_type_ids, seq_lens, labels
-
 def convert_example_to_feature(example, tokenizer, label_vocab=None, max_seq_len=512, no_entity_label="O", ignore_label=-1, is_test=False):
     tokens, labels = example
     tokenized_input = tokenizer(
@@ -152,7 +117,8 @@ class DuEventExtraction(paddle.io.Dataset):
         self.word_ids = []
         self.label_ids = []
         with open(data_path, 'r', encoding='utf-8') as fp:
-            next(fp) # 去掉第一行
+            # skip the head line
+            next(fp)
             for line in fp.readlines():
                 words, labels = line.strip('\n').split('\t')
                 words = words.split('\002')
@@ -221,15 +187,6 @@ def do_train():
         collate_fn=batchify_fn)
 
     num_training_steps = len(train_loader) * args.num_epoch
-    # lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
-    # optimizer = paddle.optimizer.AdamW(
-    #     learning_rate=lr_scheduler,
-    #     parameters=model.parameters(),
-    #     weight_decay=args.weight_decay,
-    #     apply_decay_param_fun=lambda x: x in [
-    #         p.name for n, p in model.named_parameters()
-    #         if not any(nd in n for nd in ["bias", "norm"])
-    #     ])
     optimizer = paddle.optimizer.AdamW(learning_rate=args.learning_rate, parameters=model.parameters())
 
     metric = ChunkEvaluator(label_list=train_ds.label_vocab.keys(), suffix=True)
@@ -247,10 +204,10 @@ def do_train():
             optimizer.clear_gradients()
             loss_item = loss.numpy().item()
             if step > 0 and step % args.skip_step == 0 and paddle.distributed.get_rank() == 0:
-                print(f'【train】epoch: {epoch} - step: {step} (total: {num_training_steps}) - loss: {loss_item:.6f}')
+                print(f'train epoch: {epoch} - step: {step} (total: {num_training_steps}) - loss: {loss_item:.6f}')
             if step > 0 and step % args.valid_step == 0 and paddle.distributed.get_rank() == 0:
                 p, r, f1, avg_loss = evaluate(model, criterion, metric, len(label_map), dev_loader)
-                print(f'【dev】step: {step} - loss: {avg_loss:.5f}, precision: {p:.5f}, recall: {r:.5f}, ' \
+                print(f'dev step: {step} - loss: {avg_loss:.5f}, precision: {p:.5f}, recall: {r:.5f}, ' \
                         f'f1: {f1:.5f} current best {best_f1:.5f}')
                 if f1 > best_f1:
                     best_f1 = f1

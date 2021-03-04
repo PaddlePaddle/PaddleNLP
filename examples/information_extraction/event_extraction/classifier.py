@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 Baidu.com, Inc. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,10 +34,10 @@ from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenize
 
 from utils import read_by_lines, write_by_lines, load_dict
 
-warnings.filterwarnings('ignore')
+# warnings.filterwarnings('ignore')
 """
-for all pre-trained model（English and Chinese）,
-go go go https://github.com/PaddlePaddle/PaddleNLP/docs/transformers.md
+For All pre-trained model（English and Chinese),
+Please refer to https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/transformers.md.
 """
 
 # yapf: disable
@@ -241,11 +241,11 @@ def do_train():
             optimizer.clear_gradients()
             loss_item = loss.numpy().item()
             if step > 0 and step % args.skip_step == 0 and paddle.distributed.get_rank() == 0:
-                print(f'【train】epoch: {epoch} - step: {step} (total: {num_training_steps}) ' \
+                print(f'train epoch: {epoch} - step: {step} (total: {num_training_steps}) ' \
                     f'- loss: {loss_item:.6f} acc {acc:.5f}')
             if step > 0 and step % args.valid_step == 0 and paddle.distributed.get_rank() == 0:
                 loss_dev, acc_dev = evaluate(model, criterion, metric, dev_loader)
-                print(f'【dev】step: {step} - loss: {loss_dev:.6f} accuracy: {acc_dev:.5f}, ' \
+                print(f'dev step: {step} - loss: {loss_dev:.6f} accuracy: {acc_dev:.5f}, ' \
                         f'current best {best_performerence:.5f}')
                 if acc_dev > best_performerence:
                     best_performerence = acc_dev

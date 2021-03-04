@@ -1,7 +1,4 @@
 export CUDA_VISIBLE_DEVICES=0
-export FLAGS_call_stack_level=2
-export FLAGS_eager_delete_tensor_gb=0
-export FLAGS_fraction_of_gpu_memory_to_use=0.3
 
 data_dir=$1
 conf_path=$2

@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-#   Copyright (c) 2019 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 Baidu.com, Inc. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,20 +25,21 @@ def predict_data_process(trigger_file, role_file, schema_file, save_path):
     """predict_data_process"""
     pred_ret = []
     trigger_datas = read_by_lines(trigger_file)
-    role_datas = read_by_lines(role_file)
+    role_data = read_by_lines(role_file)
     schema_datas = read_by_lines(schema_file)
     print("trigger predict {} load from {}".format(
         len(trigger_datas), trigger_file))
-    print("role predict {} load from {}".format(len(role_datas), role_file))
+    print("role predict {} load from {}".format(len(role_data), role_file))
     print("schema {} load from {}".format(len(schema_datas), schema_file))
 
     schema = {}
     for s in schema_datas:
         d_json = json.loads(s)
         schema[d_json["event_type"]] = [r["role"] for r in d_json["role_list"]]
-    # 将role数据进行处理
+
+    # process the role data
     sent_role_mapping = {}
-    for d in role_datas:
+    for d in role_data:
         d_json = json.loads(d)
         r_ret = extract_result(d_json["text"], d_json["pred"]["labels"])
         role_ret = {}
@@ -64,7 +63,6 @@ def predict_data_process(trigger_file, role_file, schema_file, save_path):
                     continue
                 for arg in ags:
                     if len(arg) == 1:
-                        # 一点小trick
                         continue
                     arguments.append({"role": role_type, "argument": arg})
             event = {"event_type": event_type, "arguments": arguments}

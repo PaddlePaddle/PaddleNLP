@@ -1,5 +1,4 @@
-########################################################
-# Copyright (c) 2021, Baidu Inc. All rights reserved.
+# Copyright (c) 2021 Baidu.com, Inc. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # imitations under the License.
-########################################################
 """
 This module to calculate precision, recall and f1-value 
 of the predicated results.

@@ -1,4 +1,4 @@
-#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 Baidu.com, Inc. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -215,7 +215,7 @@ def docs_data_process(path):
 
 if __name__ == "__main__":
     # schema process
-    print("\n=================【DUEE FINANCE DATASET】==============")
+    print("\n=================DUEE FINANCE DATASET==============")
     conf_dir = "./conf/DuEE-Fin"
     schema_path = "{}/event_schema.json".format(conf_dir)
     tags_trigger_path = "{}/trigger_tag.dict".format(conf_dir)
@@ -256,8 +256,8 @@ if __name__ == "__main__":
     print("********** end document process **********")
 
     print("\n********** start sentence process **********")
-    print("\n----【trigger】------for dir {} to {}".format(sentence_dir,
-                                                         trigger_save_dir))
+    print("\n----trigger------for dir {} to {}".format(sentence_dir,
+                                                       trigger_save_dir))
     if not os.path.exists(trigger_save_dir):
         os.makedirs(trigger_save_dir)
     train_tri = data_process("{}/train.json".format(sentence_dir), "trigger")
@@ -269,8 +269,8 @@ if __name__ == "__main__":
     print("train {} dev {} test {}".format(
         len(train_tri), len(dev_tri), len(test_tri)))
 
-    print("\n----【role】------for dir {} to {}".format(sentence_dir,
-                                                      role_save_dir))
+    print("\n----role------for dir {} to {}".format(sentence_dir,
+                                                    role_save_dir))
     if not os.path.exists(role_save_dir):
         os.makedirs(role_save_dir)
     train_role = data_process("{}/train.json".format(sentence_dir), "role")
@@ -282,8 +282,8 @@ if __name__ == "__main__":
     print("train {} dev {} test {}".format(
         len(train_role), len(dev_role), len(test_role)))
 
-    print("\n----【enum】------for dir {} to {}".format(sentence_dir,
-                                                      enum_save_dir))
+    print("\n----enum------for dir {} to {}".format(sentence_dir,
+                                                    enum_save_dir))
     if not os.path.exists(enum_save_dir):
         os.makedirs(enum_save_dir)
     trian_enum = enum_data_process("{}/train.json".format(sentence_dir))

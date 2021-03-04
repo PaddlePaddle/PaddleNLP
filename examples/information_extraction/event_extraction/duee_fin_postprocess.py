@@ -1,4 +1,4 @@
-#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 Baidu.com, Inc. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,23 +33,23 @@ def predict_data_process(trigger_file, role_file, enum_file, schema_file,
                          save_path):
     """predict_data_process"""
     pred_ret = []
-    trigger_datas = read_by_lines(trigger_file)
-    role_datas = read_by_lines(role_file)
-    enum_datas = read_by_lines(enum_file)
-    schema_datas = read_by_lines(schema_file)
+    trigger_data = read_by_lines(trigger_file)
+    role_data = read_by_lines(role_file)
+    enum_data = read_by_lines(enum_file)
+    schema_data = read_by_lines(schema_file)
     print("trigger predict {} load from {}".format(
-        len(trigger_datas), trigger_file))
-    print("role predict {} load from {}".format(len(role_datas), role_file))
-    print("enum predict {} load from {}".format(len(enum_datas), enum_file))
-    print("schema {} load from {}".format(len(schema_datas), schema_file))
+        len(trigger_data), trigger_file))
+    print("role predict {} load from {}".format(len(role_data), role_file))
+    print("enum predict {} load from {}".format(len(enum_data), enum_file))
+    print("schema {} load from {}".format(len(schema_data), schema_file))
 
     schema, sent_role_mapping, sent_enum_mapping = {}, {}, {}
-    for s in schema_datas:
+    for s in schema_data:
         d_json = json.loads(s)
         schema[d_json["event_type"]] = [r["role"] for r in d_json["role_list"]]
-    # 将role数据进行处理
-    # 需要id + sent_id 确定1个数据
-    for d in role_datas:
+
+    # role depends on id and sent_id 
+    for d in role_data:
         d_json = json.loads(d)
         r_ret = extract_result(d_json["text"], d_json["pred"]["labels"])
         role_ret = {}
@@ -61,15 +61,15 @@ def predict_data_process(trigger_file, role_file, enum_file, schema_file,
         _id = "{}\t{}".format(d_json["id"], d_json["sent_id"])
         sent_role_mapping[_id] = role_ret
 
-    # 处理环节数据
-    for d in enum_datas:
+    # process the enum_role data
+    for d in enum_data:
         d_json = json.loads(d)
         _id = "{}\t{}".format(d_json["id"], d_json["sent_id"])
         label = d_json["pred"]["label"]
         sent_enum_mapping[_id] = label
 
-    # 处理trigger数据并合并
-    for d in trigger_datas:
+    # process trigger data
+    for d in trigger_data:
         d_json = json.loads(d)
         t_ret = extract_result(d_json["text"], d_json["pred"]["labels"])
         pred_event_types = list(set([t["type"] for t in t_ret]))
@@ -107,7 +107,7 @@ def predict_data_process(trigger_file, role_file, enum_file, schema_file,
             doc_pred[d["id"]] = {"id": d["id"], "event_list": []}
         doc_pred[d["id"]]["event_list"].extend(d["event_list"])
 
-    # 需要归一后再写入数据
+    # unfiy the all prediction results and save them
     doc_pred = [
         json.dumps(
             event_normalization(r), ensure_ascii=False)

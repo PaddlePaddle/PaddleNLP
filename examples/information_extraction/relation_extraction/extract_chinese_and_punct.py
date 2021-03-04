@@ -1,4 +1,3 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 # Copyright (c) 2021 Baidu.com, Inc. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,12 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-requirements:
-Authors: daisongtai(daisongtai@baidu.com)
-Date:    2019/5/29 6:38 PM
-"""
-from __future__ import print_function
 import sys
 import re
 import io

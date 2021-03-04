@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-#   Copyright (c) 2019 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 Baidu.com, Inc. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -93,7 +91,7 @@ def schema_process(path, model="trigger"):
 
 
 if __name__ == "__main__":
-    print("\n=================【DUEE 1.0 DATASET】==============")
+    print("\n=================DUEE 1.0 DATASET==============")
     conf_dir = "./conf/DuEE1.0"
     schema_path = "{}/event_schema.json".format(conf_dir)
     tags_trigger_path = "{}/trigger_tag.dict".format(conf_dir)
@@ -118,8 +116,8 @@ if __name__ == "__main__":
         os.makedirs(trigger_save_dir)
     if not os.path.exists(role_save_dir):
         os.makedirs(role_save_dir)
-    print("\n----【trigger】------for dir {} to {}".format(data_dir,
-                                                         trigger_save_dir))
+    print("\n----trigger------for dir {} to {}".format(data_dir,
+                                                       trigger_save_dir))
     train_tri = data_process("{}/train.json".format(data_dir), "trigger")
     write_by_lines("{}/train.tsv".format(trigger_save_dir), train_tri)
     dev_tri = data_process("{}/dev.json".format(data_dir), "trigger")
@@ -128,7 +126,7 @@ if __name__ == "__main__":
     write_by_lines("{}/test.tsv".format(trigger_save_dir), test_tri)
     print("train {} dev {} test {}".format(
         len(train_tri), len(dev_tri), len(test_tri)))
-    print("\n----【role】------for dir {} to {}".format(data_dir, role_save_dir))
+    print("\n----role------for dir {} to {}".format(data_dir, role_save_dir))
     train_role = data_process("{}/train.json".format(data_dir), "role")
     write_by_lines("{}/train.tsv".format(role_save_dir), train_role)
     dev_role = data_process("{}/dev.json".format(data_dir), "role")
