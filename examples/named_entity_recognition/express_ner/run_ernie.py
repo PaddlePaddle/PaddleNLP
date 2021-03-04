@@ -14,7 +14,7 @@
 from functools import partial
 
 import paddle
-from paddlenlp.datasets.experimental import MapDataset
+from paddlenlp.datasets import MapDataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import ErnieTokenizer, ErnieForTokenClassification
 from paddlenlp.metrics import ChunkEvaluator
@@ -124,8 +124,8 @@ if __name__ == '__main__':
 
     ignore_label = -1
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token_type_id]),
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
         Stack(),
         Pad(axis=0, pad_val=ignore_label)
     ): fn(samples)
@@ -133,7 +133,7 @@ if __name__ == '__main__':
     train_loader = paddle.io.DataLoader(
         dataset=train_ds,
         batch_size=200,
-        shuffle=True,
+        shuffle=False,
         return_list=True,
         collate_fn=batchify_fn)
     dev_loader = paddle.io.DataLoader(

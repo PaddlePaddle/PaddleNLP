@@ -47,7 +47,7 @@ PaddleNLP提供了
 
 | 数据集名称  | 简介 | 调用方法 |
 | ----  | --------- | ------ |
-|  [CSSE COVID-19](../examples/time_series) |约翰·霍普金斯大学系统科学与工程中心新冠病例数据 | [time_series](https://github.com/PaddlePaddle/models/tree/develop/PaddleNLP/examples/time_series)|
+|  [CSSE COVID-19](https://github.com/CSSEGISandData/COVID-19) |约翰·霍普金斯大学系统科学与工程中心新冠病例数据 | [time_series](../examples/time_series)|
 |  [UCIHousing](https://archive.ics.uci.edu/ml/datasets/Housing) | 波士顿房价预测数据集 | `paddle.text.datasets.UCIHousing`|
 
 ## 语料库
