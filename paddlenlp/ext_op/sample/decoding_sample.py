@@ -6,14 +6,10 @@ import argparse
 import time
 
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
 
 import yaml
 from pprint import pprint
 
-from paddlenlp.transformers import TransformerModel
-from paddlenlp.transformers import position_encoding_init
 from paddlenlp.ext_op import FasterTransformer
 
 from paddlenlp.utils.log import logger
@@ -33,22 +29,6 @@ def parse_args():
         help="Path of libdecoding_op.so. ")
     args = parser.parse_args()
     return args
-
-
-def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
-    """
-    Post-process the decoded sequence.
-    """
-    eos_pos = len(seq) - 1
-    for i, idx in enumerate(seq):
-        if idx == eos_idx:
-            eos_pos = i
-            break
-    seq = [
-        idx for idx in seq[:eos_pos + 1]
-        if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)
-    ]
-    return seq
 
 
 def generate_encoder_result(batch_size, max_seq_len, memory_hidden_dim, dtype):

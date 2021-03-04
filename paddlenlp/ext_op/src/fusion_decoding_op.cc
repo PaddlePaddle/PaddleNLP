@@ -178,6 +178,7 @@ public:
 }  // namespace paddle
 
 namespace ops = paddle::operators;
+
 REGISTER_OP_WITHOUT_GRADIENT(fusion_decoding,
                              ops::FusionDecodingOp,
                              ops::FusionDecodingOpMaker);

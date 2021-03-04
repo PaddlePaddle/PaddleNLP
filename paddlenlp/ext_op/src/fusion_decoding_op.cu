@@ -78,6 +78,7 @@ public:
     auto* parent_ids = ctx.Output<Tensor>("ParentIds");
     auto* sequence_length = ctx.Output<Tensor>("SequenceLength");
 
+    // Not used for now.
     std::string decoding_strategy = ctx.Attr<std::string>("decoding_strategy");
     int beam_width_ =
         (decoding_strategy == "beam_search") ? ctx.Attr<int>("beam_size") : 1;
@@ -129,84 +130,114 @@ public:
         end_id_,
         beam_search_diversity_rate_);
 
-    decoding_params.memory_tensor = reinterpret_cast<const DataType_*>(input->data<T>());
+    decoding_params.memory_tensor =
+        reinterpret_cast<const DataType_*>(input->data<T>());
     decoding_params.memory_sequence_length =
         memory_sequence_length->data<int>();
 
-    DecoderInitParam<DataType_>* params = new DecoderInitParam<DataType_>[num_layer_];
+    DecoderInitParam<DataType_>* params =
+        new DecoderInitParam<DataType_>[num_layer_];
 
     for (int i = 0; i < num_layer_; i++) {
       params[i].stream = stream;
       params[i].cublas_handle = dev_ctx.cublas_handle();
 
       // self attn
-      params[i].self_layernorm.gamma = reinterpret_cast<const DataType_*>(self_layernorm_weight[i]->data<T>());
-      params[i].self_layernorm.beta = reinterpret_cast<const DataType_*>(self_layernorm_bias[i]->data<T>());
+      params[i].self_layernorm.gamma = reinterpret_cast<const DataType_*>(
+          self_layernorm_weight[i]->data<T>());
+      params[i].self_layernorm.beta =
+          reinterpret_cast<const DataType_*>(self_layernorm_bias[i]->data<T>());
       // query
       params[i].self_attention.query_weight.kernel =
-          reinterpret_cast<const DataType_*>(self_attn_query_weight[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              self_attn_query_weight[i]->data<T>());
       params[i].self_attention.query_weight.bias =
-          reinterpret_cast<const DataType_*>(self_attn_query_bias[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              self_attn_query_bias[i]->data<T>());
       // key
       params[i].self_attention.key_weight.kernel =
-          reinterpret_cast<const DataType_*>(self_attn_key_weight[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              self_attn_key_weight[i]->data<T>());
       params[i].self_attention.key_weight.bias =
           reinterpret_cast<const DataType_*>(self_attn_key_bias[i]->data<T>());
       // value
       params[i].self_attention.value_weight.kernel =
-          reinterpret_cast<const DataType_*>(self_attn_value_weight[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              self_attn_value_weight[i]->data<T>());
       params[i].self_attention.value_weight.bias =
-          reinterpret_cast<const DataType_*>(self_attn_value_bias[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              self_attn_value_bias[i]->data<T>());
       // out proj
       params[i].self_attention.attention_output_weight.kernel =
-          reinterpret_cast<const DataType_*>(self_attn_output_weight[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              self_attn_output_weight[i]->data<T>());
       params[i].self_attention.attention_output_weight.bias =
-          reinterpret_cast<const DataType_*>(self_attn_output_bias[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              self_attn_output_bias[i]->data<T>());
 
       // cross
-      params[i].cross_layernorm.gamma = reinterpret_cast<const DataType_*>(cross_layernorm_weight[i]->data<T>());
-      params[i].cross_layernorm.beta = reinterpret_cast<const DataType_*>(cross_layernorm_bias[i]->data<T>());
+      params[i].cross_layernorm.gamma = reinterpret_cast<const DataType_*>(
+          cross_layernorm_weight[i]->data<T>());
+      params[i].cross_layernorm.beta = reinterpret_cast<const DataType_*>(
+          cross_layernorm_bias[i]->data<T>());
       // query
       params[i].cross_attention.query_weight.kernel =
-          reinterpret_cast<const DataType_*>(cross_attn_query_weight[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              cross_attn_query_weight[i]->data<T>());
       params[i].cross_attention.query_weight.bias =
-          reinterpret_cast<const DataType_*>(cross_attn_query_bias[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              cross_attn_query_bias[i]->data<T>());
       // key
       params[i].cross_attention.key_weight.kernel =
-          reinterpret_cast<const DataType_*>(cross_attn_key_weight[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              cross_attn_key_weight[i]->data<T>());
       params[i].cross_attention.key_weight.bias =
           reinterpret_cast<const DataType_*>(cross_attn_key_bias[i]->data<T>());
       // value
       params[i].cross_attention.value_weight.kernel =
-          reinterpret_cast<const DataType_*>(cross_attn_value_weight[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              cross_attn_value_weight[i]->data<T>());
       params[i].cross_attention.value_weight.bias =
-          reinterpret_cast<const DataType_*>(cross_attn_value_bias[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              cross_attn_value_bias[i]->data<T>());
       // out proj
       params[i].cross_attention.attention_output_weight.kernel =
-          reinterpret_cast<const DataType_*>(cross_attn_output_weight[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              cross_attn_output_weight[i]->data<T>());
       params[i].cross_attention.attention_output_weight.bias =
-          reinterpret_cast<const DataType_*>(cross_attn_output_bias[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              cross_attn_output_bias[i]->data<T>());
 
       // ffn
-      params[i].ffn_layernorm.gamma = reinterpret_cast<const DataType_*>(ffn_layernorm_weight[i]->data<T>());
-      params[i].ffn_layernorm.beta = reinterpret_cast<const DataType_*>(ffn_layernorm_bias[i]->data<T>());
+      params[i].ffn_layernorm.gamma = reinterpret_cast<const DataType_*>(
+          ffn_layernorm_weight[i]->data<T>());
+      params[i].ffn_layernorm.beta =
+          reinterpret_cast<const DataType_*>(ffn_layernorm_bias[i]->data<T>());
       // intermediate proj
       params[i].ffn.intermediate_weight.kernel =
-          reinterpret_cast<const DataType_*>(ffn_intermediate_weight[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              ffn_intermediate_weight[i]->data<T>());
       params[i].ffn.intermediate_weight.bias =
-          reinterpret_cast<const DataType_*>(ffn_intermediate_bias[i]->data<T>());
+          reinterpret_cast<const DataType_*>(
+              ffn_intermediate_bias[i]->data<T>());
       // out proj
-      params[i].ffn.output_weight.kernel = reinterpret_cast<const DataType_*>(ffn_output_weight[i]->data<T>());
-      params[i].ffn.output_weight.bias = reinterpret_cast<const DataType_*>(ffn_output_bias[i]->data<T>());
+      params[i].ffn.output_weight.kernel =
+          reinterpret_cast<const DataType_*>(ffn_output_weight[i]->data<T>());
+      params[i].ffn.output_weight.bias =
+          reinterpret_cast<const DataType_*>(ffn_output_bias[i]->data<T>());
     }
 
-    decoding_params.layernorm.gamma = reinterpret_cast<const DataType_*>(decoder_layernorm_weight->data<T>());
-    decoding_params.layernorm.beta = reinterpret_cast<const DataType_*>(decoder_layernorm_bias->data<T>());
+    decoding_params.layernorm.gamma =
+        reinterpret_cast<const DataType_*>(decoder_layernorm_weight->data<T>());
+    decoding_params.layernorm.beta =
+        reinterpret_cast<const DataType_*>(decoder_layernorm_bias->data<T>());
     // for embedding
-    decoding_params.embedding_table = reinterpret_cast<const DataType_*>(word_emb->data<T>());
+    decoding_params.embedding_table =
+        reinterpret_cast<const DataType_*>(word_emb->data<T>());
 
     // for weight sharing matmul
-    decoding_params.embedding_kernel = reinterpret_cast<const DataType_*>(embedding_weight->data<T>());
+    decoding_params.embedding_kernel =
+        reinterpret_cast<const DataType_*>(embedding_weight->data<T>());
     // for matmul bias
     decoding_params.embedding_bias =
         (embedding_bias)
@@ -231,4 +262,5 @@ namespace plf = paddle::platform;
 REGISTER_OP_CUDA_KERNEL(
     fusion_decoding,
     ops::FusionDecodingKernel<paddle::platform::CUDADeviceContext, float>,
-    ops::FusionDecodingKernel<paddle::platform::CUDADeviceContext, plf::float16>);
+    ops::FusionDecodingKernel<paddle::platform::CUDADeviceContext,
+                              plf::float16>);

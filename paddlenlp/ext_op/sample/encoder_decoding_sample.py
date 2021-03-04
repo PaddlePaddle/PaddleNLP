@@ -6,14 +6,10 @@ import argparse
 import time
 
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
 
 import yaml
 from pprint import pprint
 
-from paddlenlp.transformers import TransformerModel
-from paddlenlp.transformers import position_encoding_init
 from paddlenlp.ext_op import FasterTransformer
 
 from paddlenlp.utils.log import logger
@@ -92,7 +88,7 @@ def do_predict(args):
             if 50 == i:
                 start = time.time()
             transformer(src_word=src_word)
-        logger.info("Average test time for decoding is %f ms" % (
+        logger.info("Average test time for encoder-decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
 
 
