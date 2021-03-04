@@ -218,8 +218,13 @@ class BigBirdTokenizer(PretrainedTokenizer):
         if len(masked_lm_positions) > max_pred_len:
             masked_lm_positions = masked_lm_positions[:max_pred_len + 1]
             truncate_masking_flag = np.flatnonzero(word_begin_flag[
-                masked_lm_positions])[-1]
-            masked_lm_positions = masked_lm_positions[:truncate_masking_flag]
+                masked_lm_positions])
+            if len(truncate_masking_flag) == 0:
+                truncate_masking_index = max_pred_len
+            else:
+                truncate_masking_index = np.flatnonzero(word_begin_flag[
+                    masked_lm_positions])[-1]
+            masked_lm_positions = masked_lm_positions[:truncate_masking_index]
         span_ids = np.array(span_ids, dtype="int32")
         masked_lm_positions = np.sort(masked_lm_positions)
         masked_lm_ids = np.array(span_ids)[masked_lm_positions]
