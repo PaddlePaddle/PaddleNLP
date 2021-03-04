@@ -31,6 +31,7 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
+@paddle.no_grad()
 def evaluate(model, data_loader, args):
     model.eval()
 

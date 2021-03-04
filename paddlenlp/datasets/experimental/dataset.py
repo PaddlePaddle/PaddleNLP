@@ -73,50 +73,6 @@ def load_dataset(path,
     return datasets
 
 
-@classmethod
-def get_datasets(cls, *args, **kwargs):
-    """
-    Get muitiple datasets like train, valid and test of current dataset.
-
-    Example:
-        .. code-block:: python
-
-            from paddlenlp.datasets import GlueQNLI
-            train_dataset, dev_dataset, test_dataset = GlueQNLI.get_datasets(['train', 'dev', 'test'])
-            train_dataset, dev_dataset, test_dataset = GlueQNLI.get_datasets(mode=['train', 'dev', 'test'])
-            train_dataset = GlueQNLI.get_datasets('train')
-            train_dataset = GlueQNLI.get_datasets(['train'])
-            train_dataset = GlueQNLI.get_datasets(mode='train')
-    """
-    if not args and not kwargs:
-        try:
-            args = cls.SPLITS.keys()
-        except:
-            raise AttributeError(
-                'Dataset must have SPLITS attridute to use get_dataset if configs is None.'
-            )
-
-        datasets = tuple(MapDataset(cls(arg)) for arg in args)
-    else:
-
-        for arg in args:
-            if not isinstance(arg, list):
-                return MapDataset(cls(*args, **kwargs))
-        for value in kwargs.values():
-            if not isinstance(value, list):
-                return MapDataset(cls(*args, **kwargs))
-
-        num_datasets = len(args[0]) if args else len(list(kwargs.values())[0])
-        datasets = tuple(
-            MapDataset(
-                cls(*(args[i] for args in args), **(
-                    {key: value[i]
-                     for key, value in kwargs.items()})))
-            for i in range(num_datasets))
-
-    return datasets if len(datasets) > 1 else datasets[0]
-
-
 class MapDataset(Dataset):
     """
     Wraps a dataset-like object as a instance of Dataset, and equips it with
@@ -384,12 +340,13 @@ class DatasetBuilder:
                 ) if self._read.__code__.co_argcount > 2 else self._read(
                     filename)
                 for example in generator:
-                    if label_list is not None and 'labels' in example.keys():
+                    if label_list is not None and 'labels' in example.keys(
+                    ) and example['labels']:
                         label_dict = {}
                         for i, label in enumerate(label_list):
                             label_dict[label] = i
                         if isinstance(example['labels'], list) or isinstance(
-                                examples[idx]['labels'], tuple):
+                                example['labels'], tuple):
                             for label_idx in range(len(example['labels'])):
                                 example['labels'][label_idx] = label_dict[
                                     example['labels'][label_idx]]
@@ -418,7 +375,8 @@ class DatasetBuilder:
 
             label_list = self.get_labels()
             # Convert class label to label ids.
-            if label_list is not None and 'labels' in examples[0].keys():
+            if label_list is not None and 'labels' in examples[0].keys(
+            ) and examples[0]['labels']:
                 label_dict = {}
                 for i, label in enumerate(label_list):
                     label_dict[label] = i
