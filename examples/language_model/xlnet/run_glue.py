@@ -24,8 +24,7 @@ from paddle.io import DataLoader
 from paddle.metric import Accuracy
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.datasets import GlueCoLA, GlueSST2, GlueMRPC, GlueSTSB, GlueQQP, GlueMNLI, GlueQNLI, GlueRTE
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers.xlnet.modeling import XLNetPretrainedModel, XLNetForSequenceClassification
 from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
@@ -33,22 +32,22 @@ from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 
 final_res = "Not evaluated yet!"
 
-TASK_CLASSES = {
-    "cola": (GlueCoLA, Mcc),
-    "sst-2": (GlueSST2, Accuracy),
-    "mrpc": (GlueMRPC, AccuracyAndF1),
-    "sts-b": (GlueSTSB, PearsonAndSpearman),
-    "qqp": (GlueQQP, AccuracyAndF1),
-    "mnli": (GlueMNLI, Accuracy),
-    "qnli": (GlueQNLI, Accuracy),
-    "rte": (GlueRTE, Accuracy),
+METRIC_CLASSES = {
+    "cola": Mcc,
+    "sst-2": Accuracy,
+    "mrpc": AccuracyAndF1,
+    "sts-b": PearsonAndSpearman,
+    "qqp": AccuracyAndF1,
+    "mnli": Accuracy,
+    "qnli": Accuracy,
+    "rte": Accuracy,
 }
 
 
 def parse_args():
     # yapf: disable
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task_name", default=None, type=str, required=True, help="The name of the task to train selected in the list: " + ", ".join(TASK_CLASSES.keys()),)
+    parser.add_argument("--task_name", default=None, type=str, required=True, help="The name of the task to train selected in the list: " + ", ".join(METRIC_CLASSES.keys()),)
     parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(XLNetPretrainedModel.pretrained_init_configuration.keys()),)
     parser.add_argument("--output_dir", default=None, type=str, required=True, help="The output directory where the model predictions and checkpoints will be written.",)
     parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.",)
@@ -151,12 +150,11 @@ def do_train(args):
     set_seed(args)
 
     args.task_name = args.task_name.lower()
-    dataset_class, metric_class = TASK_CLASSES[args.task_name]
+    metric_class = METRIC_CLASSES[args.task_name]
     model_class, tokenizer_class = XLNetForSequenceClassification, XLNetTokenizer
 
     train_ds = load_dataset('glue', args.task_name, splits="train")
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    # label_list = train_ds.get_labels()
 
     trans_func = partial(
         convert_example,
@@ -167,12 +165,12 @@ def do_train(args):
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
 
-    batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, pad_right=False),              # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, pad_right=False),    # token_type
-        'attention_mask': Pad(axis=0, pad_val=0, pad_right=False),                              # attention_mask
-        'labels': Stack(dtype="int64" if train_ds.label_list else "float32"),                   # label
-        }): fn(samples)
+    batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, pad_right=False),         # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, pad_right=False),    # token_type
+        Pad(axis=0, pad_val=0, pad_right=False),                              # attention_mask
+        Stack(dtype="int64" if train_ds.label_list else "float32"),           # label
+        ): fn(samples)
 
     train_data_loader = DataLoader(
         dataset=train_ds,
@@ -217,7 +215,7 @@ def do_train(args):
             num_workers=0,
             return_list=True)
 
-    num_classes = 1 if train_ds.get_labels() is None else len(train_ds.get_labels())
+    num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
     model = XLNetForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
 

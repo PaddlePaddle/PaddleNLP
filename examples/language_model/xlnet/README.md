@@ -65,7 +65,7 @@ python -m paddle.distributed.launch ./run_glue.py \
 
 | Task  | Metric                       | Result             |     
 |:-----:|:----------------------------:|:------------------:|
-| SST-2 | Accuracy                     |      94.725        |     
+| SST-2 | Accuracy                     |      94.266        |     
 | QNLI  | Accuracy                     |      91.708        |         
 | CoLA  | Mattehew's corr              |      50.264        |      
 | MRPC  | F1/Accuracy                  |   91.071/87.745    |     
