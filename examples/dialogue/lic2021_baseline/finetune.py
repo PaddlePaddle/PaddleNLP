@@ -15,20 +15,15 @@ from args import parse_args, print_args
 from data import DialogueDataset
 
 
-def load_ckpt(init_from_ckpt, model, optimizer=None):
-    params_state_dict = paddle.load(init_from_ckpt + '.pdparams')
-    model.set_state_dict(params_state_dict)
-    if optimizer:
-        opt_state_dict = paddle.load(init_from_ckpt + '.pdopt')
-        optimizer.set_state_dict(opt_state_dict)
-    print('Loaded checkpoint from %s' % init_from_ckpt)
-
-
-def save_ckpt(model, optimizer, output_dir, name):
-    params_path = os.path.join(output_dir, '{}.pdparams'.format(name))
-    opt_path = os.path.join(output_dir, '{}.pdopt'.format(name))
-    paddle.save(model.state_dict(), params_path)
-    paddle.save(optimizer.state_dict(), opt_path)
+def save_ckpt(model, tokenizer, save_dir, name):
+    output_dir = os.path.join(save_dir, "model_{}".format(name))
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    # Need better way to get inner model of DataParallel
+    model_to_save = model._layers if isinstance(model,
+                                                paddle.DataParallel) else model
+    model_to_save.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
 
 
 def main(args):
@@ -77,9 +72,6 @@ def main(args):
             if not any(nd in n for nd in ["bias", "norm"])],
         grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm))
 
-    if args.init_from_ckpt:
-        load_ckpt(args.init_from_ckpt, model)
-
     step = 0
     total_time = 0.0
     for epoch in range(args.epochs):
@@ -110,7 +102,7 @@ def main(args):
                     total_time = 0.0
                 if step % args.save_steps == 0:
                     evaluation(model, valid_dataloader)
-                    save_ckpt(model, optimizer, args.save_dir, step)
+                    save_ckpt(model, tokenizer, args.save_dir, step)
             batch_start_time = time.time()
 
 

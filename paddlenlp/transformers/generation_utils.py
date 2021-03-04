@@ -248,6 +248,8 @@ class BeamSearchScorer(object):
 
 
 class GenerationMixin(object):
+    r"""The class which implements the interface for generation task."""
+
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id):
         if bos_token_id is None:
@@ -378,6 +380,56 @@ class GenerationMixin(object):
                  num_return_sequences=1,
                  use_cache=True,
                  **model_kwargs):
+        r"""
+        The interface to generate sequences in generation task.
+
+        Parameters:
+            input_ids (Tensor, optional): The input sequence ids for the generation. 
+                It is a tensor with shape `[batch_size, sequence_length]`. The 
+                data type should be int32 or int64. If None, use the function 
+                `prepare_input_ids_for_generation` as initialization. Default None.
+            max_length (int, optional): The maximum length of the sequence to 
+                be generated. Default 20.
+            min_length (int, optional): The minimum length of the sequence to 
+                be generated. Default 0.
+            decode_strategy (str, optional): The decode strategy in generation.
+                There has three decode strategies: 'greedy_search', 'sampling', 
+                'beam_search'. Default 'greedy_search'.
+            temperature (float, optional): The value used to module the next 
+                token probabilities. Default 1.0.
+            top_k (int, optional): The number of highest probability tokens to 
+                keep for top-k-filtering. Default 0.
+            top_p (float, optional): The cumulative probability for top-p-filtering. 
+                The value should satisfy :math:`0 <= top_p < 1`. Default 1.0.
+            num_beams (int, optional): The number of beams for beam search. Default 1.
+            length_penalty (float, optional): The exponential penalty to the 
+                sequence length for beam search. :math:`length_penalty = 1.0` 
+                means no penalty. If :math:`length_penalty < 1.0`, the model will 
+                generate shorter sequences. If :math:`length_penalty > 1.0`, the 
+                model will generate longer sequences. Default 1.0.
+            early_stopping (bool, optional): Whether to stop the beam search when 
+                at least `num_beams` sentences are finished per batch or not.
+            bos_token_id (int, optional): The id of the bos_token. Default None.
+            eos_token_id (int, optional): The id of the eos_token. Default None.
+            pad_token_id (int, optional): The id of the pad_token. Default None.
+            num_return_sequences (int, optional): The number of independently 
+                computed returned sequences for each element in the batch. 
+                Default 1.
+            use_cache: (bool, optional): Whether or not the model should use the 
+                cache to speed up decoding. Default True.
+            model_kwargs (dict): It can be used to specify additional kwargs 
+                passed to the model.
+
+        Returns:
+            tuple (Tensor): It is a tuple includes generated sequence ids and 
+                scores. The generated sequence ids is a tensor with shape 
+                `[batch_size * num_return_sequences, sequence_length]`. The 
+                data type is same as the input `input_ids`. The scores is a 
+                tensor with shape `[batch_size * num_return_sequences, 1]`. The 
+                data type is float32 or float64, as same as the parameters of 
+                the model.
+        """
+
         # params check
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self, 'bos_token_id', None)
@@ -401,14 +453,8 @@ class GenerationMixin(object):
             print("Setting `pad_token_id` to `eos_token_id`:{} for "
                   "open-end generation.".format(eos_token_id))
             pad_token_id = eos_token_id
-        """
-        # TODO
-        if is_encoder_decoder:
-            # Add encoder_outputs to model_kwargs
-            # Update input_ids
-            raise ValueError(
-                "Not support `is_encoder_decoder = True` currently.")
-        """
+
+        # TODO Add relevant processing for encoder_decoder model.
 
         model_kwargs["use_cache"] = use_cache
         max_length += input_ids.shape[-1]
