@@ -15,21 +15,21 @@
 import paddle
 import paddle.nn as nn
 
+from paddlenlp.datasets import MapDataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.layers import LinearChainCrf, ViterbiDecoder, LinearChainCrfLoss
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.embeddings import TokenEmbedding
 
 
-def parse_decodes(ds, decodes, lens):
+def parse_decodes(ds, decodes, lens, label_vocab):
     decodes = [x for batch in decodes for x in batch]
     lens = [x for batch in lens for x in batch]
-    id_word = dict(zip(ds.word_vocab.values(), ds.word_vocab.keys()))
-    id_label = dict(zip(ds.label_vocab.values(), ds.label_vocab.keys()))
+    id_label = dict(zip(label_vocab.values(), label_vocab.keys()))
 
     outputs = []
     for idx, end in enumerate(lens):
-        sent = [id_word[x] for x in ds.word_ids[idx][:end]]
+        sent = ds.data[idx][0][:end]
         tags = [id_label[x] for x in decodes[idx][:end]]
         sent_out = []
         tags_out = []
@@ -66,33 +66,20 @@ def load_dict(dict_path):
     return vocab
 
 
-class ExpressDataset(paddle.io.Dataset):
-    def __init__(self, data_path):
-        self.word_vocab = load_dict('./conf/word.dic')
-        self.label_vocab = load_dict('./conf/tag.dic')
-        self.word_ids = []
-        self.label_ids = []
+def load_dataset(datafiles):
+    def read(data_path):
         with open(data_path, 'r', encoding='utf-8') as fp:
             next(fp)
             for line in fp.readlines():
                 words, labels = line.strip('\n').split('\t')
                 words = words.split('\002')
                 labels = labels.split('\002')
-                sub_word_ids = convert_tokens_to_ids(words, self.word_vocab,
-                                                     'OOV')
-                sub_label_ids = convert_tokens_to_ids(labels, self.label_vocab,
-                                                      'O')
-                self.word_ids.append(sub_word_ids)
-                self.label_ids.append(sub_label_ids)
-        self.word_num = max(self.word_vocab.values()) + 1
-        self.label_num = max(self.label_vocab.values()) + 1
+                yield words, labels
 
-    def __len__(self):
-        return len(self.word_ids)
-
-    def __getitem__(self, index):
-        return self.word_ids[index], len(self.word_ids[index]), self.label_ids[
-            index]
+    if isinstance(datafiles, str):
+        return MapDataset(list(read(datafiles)))
+    elif isinstance(datafiles, list) or isinstance(datafiles, tuple):
+        return [MapDataset(list(read(datafile))) for datafile in datafiles]
 
 
 class BiGRUWithCRF(nn.Layer):
@@ -127,14 +114,26 @@ class BiGRUWithCRF(nn.Layer):
 if __name__ == '__main__':
     paddle.set_device('gpu')
 
-    train_ds = ExpressDataset('./data/train.txt')
-    dev_ds = ExpressDataset('./data/dev.txt')
-    test_ds = ExpressDataset('./data/test.txt')
+    train_ds, dev_ds, test_ds = load_dataset(datafiles=(
+        './data/train.txt', './data/dev.txt', './data/test.txt'))
+
+    label_vocab = load_dict('./conf/tag.dic')
+    word_vocab = load_dict('./conf/word.dic')
+
+    def convert_example(example):
+        tokens, labels = example
+        tokens_ids = convert_tokens_to_ids(tokens, word_vocab, 'OOV')
+        label_ids = convert_tokens_to_ids(labels, label_vocab, 'O')
+        return tokens_ids, len(tokens_ids), label_ids
+
+    train_ds.map(convert_example)
+    dev_ds.map(convert_example)
+    test_ds.map(convert_example)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=train_ds.word_vocab.get('OOV')),
+        Pad(axis=0, pad_val=word_vocab.get('OOV')),
         Stack(),
-        Pad(axis=0, pad_val=train_ds.label_vocab.get('O'))
+        Pad(axis=0, pad_val=label_vocab.get('O'))
         ): fn(samples)
 
     train_loader = paddle.io.DataLoader(
@@ -159,14 +158,13 @@ if __name__ == '__main__':
         return_list=True,
         collate_fn=batchify_fn)
 
-    network = BiGRUWithCRF(300, 300, train_ds.word_num, train_ds.label_num)
+    network = BiGRUWithCRF(300, 300, len(word_vocab), len(label_vocab))
     model = paddle.Model(network)
 
     optimizer = paddle.optimizer.Adam(
         learning_rate=0.001, parameters=model.parameters())
     crf_loss = LinearChainCrfLoss(network.crf)
-    chunk_evaluator = ChunkEvaluator(
-        label_list=train_ds.label_vocab.keys(), suffix=True)
+    chunk_evaluator = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
     model.prepare(optimizer, crf_loss, chunk_evaluator)
 
     model.fit(train_data=train_loader,
@@ -177,7 +175,7 @@ if __name__ == '__main__':
 
     model.evaluate(eval_data=test_loader)
     outputs, lens, decodes = model.predict(test_data=test_loader)
-    preds = parse_decodes(test_ds, decodes, lens)
+    preds = parse_decodes(test_ds, decodes, lens, label_vocab)
 
     file_path = "bigru_results.txt"
     with open(file_path, "w", encoding="utf8") as fout:
