@@ -65,7 +65,7 @@ PaddleNLP提供了丰富的预训练模型，并且可以便捷地获取PaddlePa
 * PaddleNLP 安装
 
    ```shell
-   pip install paddlenlp >= 2.0.0rc
+   pip install paddlenlp\>=2.0.0rc
    ```
 
 * 环境依赖
