@@ -79,7 +79,7 @@ def do_eval(args):
     ignore_label = -100
     batchify_fn = lambda samples, fn=Dict({
         'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         'seq_len': Stack(),
         'labels': Pad(axis=0, pad_val=ignore_label)  # label
     }): fn(samples)
