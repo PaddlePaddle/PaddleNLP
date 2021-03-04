@@ -237,12 +237,14 @@ def do_train(args):
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, warmup)
 
+    clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.max_grad_norm)
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         beta1=0.9,
         beta2=0.999,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
+        grad_clip=clip,
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in [
             p.name for n, p in model.named_parameters()
