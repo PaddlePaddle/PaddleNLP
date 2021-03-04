@@ -579,6 +579,7 @@ class XLNetModel(XLNetPretrainedModel):
             clamp_len=-1,
             n_layer=12,
             dropout=0.1,
+            classifier_dropout=0.1,
             n_head=12,
             d_head=64,
             layer_norm_eps=1e-12,

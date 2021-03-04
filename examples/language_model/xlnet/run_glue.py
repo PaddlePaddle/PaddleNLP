@@ -147,7 +147,6 @@ def convert_example(example,
 
 
 def do_train(args):
-    paddle.enable_static() if not args.eager_run else None
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -262,7 +261,7 @@ def do_train(args):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
             input_ids, token_type_ids, attention_mask, labels = batch
-            logits = model(input_ids, token_type_ids, attention_mask, labels=labels)[0]
+            logits = model(input_ids, token_type_ids, attention_mask)[0]
             loss = loss_fct(logits, labels)
             loss.backward()
             optimizer.step()
