@@ -147,7 +147,7 @@ inputs = tokenizer(text="请输入测试样例", max_seq_len=20)
 
 ### 快速复现基线Step4：定义损失函数和优化器，开始训练
 
-在该基线上，我们选择交叉墒作为损失函数，使用[`paddle.optimizer.Adam`](https://www.paddlepaddle.org.cn/documentation/docs/zh/api/paddle/optimizer/adam/Adam_cn.html#adam)作为优化器。
+在该基线上，我们选择交叉墒作为损失函数，使用[`paddle.optimizer.AdamW`](https://www.paddlepaddle.org.cn/documentation/docs/zh/api/paddle/optimizer/adamw/AdamW_cn.html#adamw)作为优化器。
 
 启动训练：
 ```shell
