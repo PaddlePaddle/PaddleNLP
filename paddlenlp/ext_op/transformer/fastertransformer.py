@@ -44,6 +44,7 @@ class FasterTransformer(TransformerModel):
         self.trg_vocab_size = trg_vocab_size
         self.d_model = d_model
         self.bos_id = bos_id
+        self.max_length = max_length
         super(FasterTransformer, self).__init__(**args)
 
         self.decoding_linear = nn.Linear(
@@ -93,7 +94,7 @@ class FasterTransformer(TransformerModel):
 
         return ids
 
-    def load_dygraph_ckpt(self, init_from_params, max_length):
+    def load(self, init_from_params):
         # Load the trained model
         assert init_from_params, (
             "Please set init_from_params to load the infer model.")
@@ -118,9 +119,9 @@ class FasterTransformer(TransformerModel):
         # To avoid a longer length than training, reset the size of position
         # encoding to max_length
         model_dict["encoder.pos_encoder.weight"] = position_encoding_init(
-            max_length + 1, self.d_model)
+            self.max_length, self.d_model)
         model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
-            max_length + 1, self.d_model)
+            self.max_length, self.d_model)
 
         if self.use_fp16_decoding:
             for item in self.state_dict():

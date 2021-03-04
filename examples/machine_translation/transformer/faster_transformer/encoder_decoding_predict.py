@@ -85,10 +85,8 @@ def do_predict(args):
     transformer.eval()
 
     # Load checkpoint.
-    transformer.load_dygraph_ckpt(
-        init_from_params=os.path.join(args.init_from_params,
-                                      "transformer.pdparams"),
-        max_length=args.max_length)
+    transformer.load(init_from_params=os.path.join(args.init_from_params,
+                                                   "transformer.pdparams"))
 
     f = open(args.output_file, "w")
     with paddle.no_grad():
