@@ -301,9 +301,11 @@ class BigBirdEmbeddings(Layer):
                  hidden_size=768,
                  hidden_dropout_prob=0.1,
                  max_position_embeddings=512,
-                 type_vocab_size=16):
+                 type_vocab_size=16,
+                 padding_idx=0):
         super(BigBirdEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
+        self.word_embeddings = nn.Embedding(
+            vocab_size, hidden_size, padding_idx=padding_idx)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
@@ -433,7 +435,7 @@ class BigBirdModel(BigBirdPretrainedModel):
         # embedding
         self.embeddings = BigBirdEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size)
+            max_position_embeddings, type_vocab_size, pad_token_id)
 
         # encoder
         encoder_layer = TransformerEncoderLayer(
@@ -585,18 +587,19 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
 
 
 class BigBirdPretrainingCriterion(paddle.nn.Layer):
-    def __init__(self, vocab_size, use_nsp=False):
+    def __init__(self, vocab_size, use_nsp=False, ignore_index=0):
         super(BigBirdPretrainingCriterion, self).__init__()
         # CrossEntropyLoss is expensive since the inner reshape (copy)
         self.loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=-1)
         self.vocab_size = vocab_size
         self.use_nsp = use_nsp
+        self.ignore_index = ignore_index
 
     def forward(self, prediction_scores, seq_relationship_score,
                 masked_lm_labels, next_sentence_labels, masked_lm_scale,
                 masked_lm_weights):
         masked_lm_loss = paddle.nn.functional.softmax_with_cross_entropy(
-            prediction_scores, masked_lm_labels, ignore_index=-1)
+            prediction_scores, masked_lm_labels, ignore_index=self.ignore_index)
         masked_lm_loss = paddle.transpose(masked_lm_loss, [1, 0])
         masked_lm_loss = paddle.sum(masked_lm_loss * masked_lm_weights) / (
             paddle.sum(masked_lm_weights) + 1e-5)

@@ -45,9 +45,9 @@ unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0"  run_pretrain.py --model_name_or_path bigbird-base-uncased \
     --input_dir "./data" \
     --output_dir "output" \
-    --batch_size 16 \
+    --batch_size 4 \
     --weight_decay 0.01 \
-    --learning_rate 1e-4 \
+    --learning_rate 1e-5 \
     --max_steps 100000 \
     --save_steps 10000 \
     --logging_steps 1 \
