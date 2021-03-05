@@ -97,6 +97,7 @@ python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml -
 ```
 
 使用 PaddlePaddle 仅执行 decoding 测试（float16）：
+执行 float16 的 decoding，需要在执行的时候，加上 `--use-fp16-decoding` 选项。
 
 ``` sh
 export CUDA_VISIBLE_DEVICES=0

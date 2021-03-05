@@ -83,6 +83,15 @@ transformer = FasterTransformer(
 
 使用模型推断前提是需要指定一个合适的 checkpoint，需要在对应的 `../configs/transformer.base.yaml` 或是 `../configs/transformer.big.yaml` 中修改对应的模型载入的路径参数 `init_from_params`。
 
+我们提供一个已经训练好的动态图的 base model 的 checkpoint 以供使用，可以通过[tranformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz)下载。
+
+``` sh
+wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz
+tar -zxf tranformer-base-wmt_ende_bpe.tar.gz
+```
+
+然后，需要修改对应的 `../configs/transformer.base.yaml` 配置文件中的 `init_from_params` 的值为 `./base_trained_models/step_final/`。
+
 #### 使用动态图预测(使用 float32 decoding 预测)
 
 以英德翻译数据为例，模型训练完成后可以执行以下命令对指定文件中的文本进行翻译：
