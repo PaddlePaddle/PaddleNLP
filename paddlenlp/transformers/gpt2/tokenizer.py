@@ -20,6 +20,7 @@ import json
 import jieba
 import shutil
 from paddle.utils import try_import
+from paddlenlp.utils.log import logger
 
 from .. import PretrainedTokenizer
 from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize,\
@@ -202,7 +203,7 @@ class GPT2Tokenizer(PretrainedTokenizer):
                  merges_file,
                  errors='replace',
                  special_tokens=None,
-                 max_len=1024,
+                 max_len=None,
                  do_lower_case=True):
         self._vocab_file = vocab_file
         self._merges_file = merges_file
