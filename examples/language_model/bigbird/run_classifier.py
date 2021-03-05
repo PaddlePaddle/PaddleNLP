@@ -33,7 +33,7 @@ from paddlenlp.data import Stack
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--model_name_or_path", type=str, default="bigbird-base-uncased", help="pretraining model name or path")
+parser.add_argument("--model_name_or_path", type=str, default="bigbird-base-uncased-finetune", help="pretraining model name or path")
 parser.add_argument("--max_encoder_length", type=int, default=3072, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate used to train.")
 parser.add_argument("--max_steps", default=10000, type=int, help="Max training steps to train.")
