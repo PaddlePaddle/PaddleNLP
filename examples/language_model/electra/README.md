@@ -63,7 +63,7 @@ python -u ./run_pretrain.py \
 - `model_name_or_path` 如果配置1个名字，则表示预训练模型的规模，当前支持的名字为：electra-small（约1400万参数）、electra-base（约1.1亿参数）、electra-large（约3.35亿参数）。如果配置1个路径，则表示按照路径中的模型规模进行训练，这时需配置 --init_from_ckpt 参数一起使用，一般用于断点恢复训练场景。
 - `input_dir` 表示输入数据的目录，该目录下需要有1个train.data纯英文文本文件，utf-8编码。
 - `output_dir` 表示将要保存预训练模型的目录。
-- `train_batch_size` 表示 每次迭代**每张卡**上的样本数目。
+- `train_batch_size` 表示 每次迭代**每张卡**上的样本数目。此例子train_batch_size=64 运行时大致需要单卡12G显存，如果实际GPU显存小于12G或大大多于12G，可适当调小/调大此配置。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 - `weight_decay` 表示每次迭代中参数缩小的比例，该值乘以学习率为真正缩小的比例。
@@ -76,7 +76,28 @@ python -u ./run_pretrain.py \
 
 另外还有一些额外参数不在如上命令中：
 - `use_amp` 表示是否开启混合精度(float16)进行训练，默认不开启。如果在命令中加上了--use_amp，则会开启。
-- `init_from_ckpt` 表示是否从某个checkpoint继续训练（断点恢复训练），默认不开启。如果在命令中加上了--init_from_ckpt，且 --model_name_or_path 配置的是路径，则会开启从某个checkpoint继续训练。
+- `init_from_ckpt` 表示是否从某个checkpoint继续训练（断点恢复训练），默认不开启。如果在命令中加上了--init_from_ckpt，且 --model_name_or_path 配置的是路径，则会开启从某个checkpoint继续训练。例如下面的命令从第40000步的checkpoint继续训练：
+```shell
+export CUDA_VISIBLE_DEVICES="0"
+export DATA_DIR=./BookCorpus/
+
+python -u ./run_pretrain.py \
+    --model_type electra \
+    --model_name_or_path ./pretrain_model/model_40000.pdparams/ \
+    --input_dir $DATA_DIR \
+    --output_dir ./pretrain_model/ \
+    --train_batch_size 64 \
+    --learning_rate 5e-4 \
+    --max_seq_length 128 \
+    --weight_decay 1e-2 \
+    --adam_epsilon 1e-6 \
+    --warmup_steps 10000 \
+    --num_train_epochs 4 \
+    --logging_steps 100 \
+    --save_steps 10000 \
+    --max_steps -1 \
+    --init_from_ckpt
+```
 
 训练过程将按照 `logging_steps`的设置打印如下日志：
 
@@ -124,6 +145,8 @@ python -u ./get_ft_model.py \
 
 此命令可多次执行，但只有第1次会生成Fine-tuning所需模型
 
+**特别注意**：如果使用windows系统执行此命令，需使用**管理员**权限运行，否则会出错。Linux无此限制
+
 ### 4.2 运行Fine-tuning
 使用./run_glue.py运行，有两种方式：
 #### 4.2.1 使用Paddle提供的预训练模型运行 Fine-tuning
@@ -170,7 +193,7 @@ export TASK_NAME=SST-2
 
 python -u ./run_glue.py \
     --model_type electra \
-    --model_name_or_path ../language_model/electra/pretrain_model/model_40000.pdparams/ \
+    --model_name_or_path ./pretrain_model/model_40000.pdparams/ \
     --task_name $TASK_NAME \
     --max_seq_length 128 \
     --batch_size 32   \
