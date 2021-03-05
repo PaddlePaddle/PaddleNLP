@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#import collections
-#import itertools
 import os
 import logging
 import random
@@ -21,7 +19,6 @@ import time
 import numpy as np
 
 import paddle
-import paddle.distributed as dist
 from paddle.io import DataLoader, Dataset
 
 from paddlenlp.data import Stack, Tuple, Pad
@@ -55,10 +52,6 @@ class PretrainingDataset(Dataset):
         self.lines = input_file.readlines()
 
         self.vocab_size = tokenizer.vocab_size
-        self.word_start_subtoken = np.array([
-            tokenizer.vocab.idx_to_token[i][0] == "▁"
-            for i in range(self.vocab_size)
-        ])
 
     def __getitem__(self, index):
         line = self.lines[index].rstrip()

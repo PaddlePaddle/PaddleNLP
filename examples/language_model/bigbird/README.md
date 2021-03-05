@@ -70,7 +70,7 @@ python -m paddle.distributed.launch --gpus "0"  run_pretrain.py --model_name_or_
 
 
 ### 验证任务
-通过预训练任务训练完成之后，可以预训练的模型参数，在 Big Bird 的验证任务中通过IMDB数据集来进行最终模型效果的验证，[IMDB数据集](http://ai.stanford.edu/~amaas/data/sentiment/) ，IMDB数据集主要是包含了50000条偏向明显的评论，其中25000条作为训练集，25000作为测试集。label为pos(positive)和neg(negative)，是一个序列文本分类任务，具体的执行脚本如下。
+通过预训练任务训练完成之后，可以预训练的模型参数，在 Big Bird 的验证任务中通过IMDB数据集来进行最终模型效果的验证，[IMDB数据集](http://ai.stanford.edu/~amaas/data/sentiment/) ，IMDB数据集是关于电影用户评论情感分析的数据集，主要是包含了50000条偏向明显的评论，其中25000条作为训练集，25000作为测试集。label为pos(positive)和neg(negative)，是一个序列文本分类任务，具体的执行脚本如下。
 
 
 ```shell

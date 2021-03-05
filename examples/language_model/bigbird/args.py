@@ -54,7 +54,7 @@ def parse_args():
         "--learning_rate",
         default=5e-5,
         type=float,
-        help="The initial learning rate for Adam.")
+        help="The initial learning rate for AdamW.")
 
     parser.add_argument(
         "--warmup_steps",
@@ -66,7 +66,7 @@ def parse_args():
         "--weight_decay",
         default=0.01,
         type=float,
-        help="Weight decay if we apply some.")
+        help=" Weight decay rate if we apply in the optimizer of Adamw.")
 
     parser.add_argument(
         "--adam_epsilon",

@@ -50,9 +50,9 @@ args = parser.parse_args()
 
 
 def set_seed(args):
-    random.seed(args.seed + paddle.distributed.get_rank())
-    np.random.seed(args.seed + paddle.distributed.get_rank())
-    paddle.seed(args.seed + paddle.distributed.get_rank())
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    paddle.seed(args.seed)
 
 
 def create_dataloader(batch_size, max_encoder_length, tokenizer, pad_val=0):

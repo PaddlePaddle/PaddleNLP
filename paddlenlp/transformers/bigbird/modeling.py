@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import paddle
 import numpy as np
+
+import paddle
 from paddle.nn import Linear, Dropout, LayerNorm, LayerList, Layer
 import paddle.nn.functional as F
 import paddle.nn as nn
@@ -101,14 +102,16 @@ class Mask(object):
             if self.num_global_blocks > left_key_block_idx:
                 num_fill_blocks = self.num_global_blocks - left_key_block_idx
                 illegal_blocks_idx.extend([
-                    i for i in range(self.num_key_blocks - num_fill_blocks,
-                                     self.num_key_blocks)
+                    i
+                    for i in range(self.num_key_blocks - num_fill_blocks,
+                                   self.num_key_blocks)
                 ])
             if right_key_block_idx >= self.num_key_blocks:
                 num_fill_blocks = right_key_block_idx - self.num_key_blocks + 1
                 illegal_blocks_idx.extend([
-                    i for i in range(self.num_global_blocks,
-                                     self.num_global_blocks + num_fill_blocks)
+                    i
+                    for i in range(self.num_global_blocks,
+                                   self.num_global_blocks + num_fill_blocks)
                 ])
 
             illegal_blocks_idx = set(illegal_blocks_idx)

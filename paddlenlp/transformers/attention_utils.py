@@ -16,11 +16,12 @@ import numpy as np
 import copy
 import collections
 
-from paddle import ParamAttr
 import paddle
-from paddle.nn import Linear, Dropout, LayerNorm, LayerList, Layer
 import paddle.nn as nn
 import paddle.nn.functional as F
+
+from paddle.nn import Linear, Dropout, LayerNorm, LayerList, Layer
+from paddle import ParamAttr
 
 
 class Registry(object):
