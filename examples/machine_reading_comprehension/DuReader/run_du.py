@@ -206,7 +206,7 @@ def do_train(args):
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
 
             if global_step % args.save_steps == 0 and paddle.distributed.get_rank(
             ) == 0:

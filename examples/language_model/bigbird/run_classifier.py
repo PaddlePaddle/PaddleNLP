@@ -147,7 +147,7 @@ def do_train(model, criterion, metric, optimizer, train_data_loader,
             loss = criterion(output, labels)
             loss.backward()
             optimizer.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             correct = metric.compute(output, labels)
             metric.update(correct)
 

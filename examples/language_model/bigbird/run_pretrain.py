@@ -211,7 +211,7 @@ def do_train(args):
                 loss.backward()
                 optimizer.step()
                 lr_scheduler.step()
-                optimizer.clear_gradients()
+                optimizer.clear_grad()
                 if global_step % args.save_steps == 0:
                     if worker_index == 0:
                         output_dir = os.path.join(args.output_dir,

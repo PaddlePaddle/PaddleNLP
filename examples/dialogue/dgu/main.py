@@ -144,7 +144,7 @@ def train(args, model, train_data_loader, dev_data_loader, metric, rank):
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             total_time += (time.time() - batch_start_time)
             if rank == 0:
                 if step % args.logging_steps == 0:

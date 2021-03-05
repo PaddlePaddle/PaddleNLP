@@ -235,7 +235,7 @@ def do_train(args):
             avg_loss.backward()
             optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             if global_step % args.save_steps == 0:
                 if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
                     evaluate(model, loss_fct, metric, test_data_loader,

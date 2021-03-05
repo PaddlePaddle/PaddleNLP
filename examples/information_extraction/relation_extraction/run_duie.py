@@ -219,7 +219,7 @@ def do_train():
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             loss_item = loss.numpy().item()
 
             if global_step % logging_steps == 0 and paddle.distributed.get_rank(
