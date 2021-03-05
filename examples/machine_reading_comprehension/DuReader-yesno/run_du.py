@@ -184,7 +184,7 @@ def do_train(args):
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
 
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:

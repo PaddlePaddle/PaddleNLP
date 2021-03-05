@@ -201,7 +201,7 @@ def do_train():
             loss = paddle.mean(criterion(logits, labels.reshape([-1])))
             loss.backward()
             optimizer.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             loss_item = loss.numpy().item()
             if step > 0 and step % args.skip_step == 0 and paddle.distributed.get_rank() == 0:
                 print(f'train epoch: {epoch} - step: {step} (total: {num_training_steps}) - loss: {loss_item:.6f}')

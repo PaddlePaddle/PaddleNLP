@@ -572,7 +572,7 @@ def do_train(args):
                 t_loss += loss.detach()
                 optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             if global_step % args.logging_steps == 0:
                 local_loss = (t_loss - log_loss) / args.logging_steps
                 if (args.n_gpu > 1):

@@ -253,7 +253,7 @@ def do_train():
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             if global_step % 100 == 0 and paddle.distributed.get_rank() == 0:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):

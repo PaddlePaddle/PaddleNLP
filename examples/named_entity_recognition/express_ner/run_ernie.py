@@ -165,7 +165,7 @@ if __name__ == '__main__':
             loss = paddle.mean(loss_fn(logits, labels.reshape([-1])))
             loss.backward()
             optimizer.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             step += 1
             print("epoch:%d - step:%d - loss: %f" % (epoch, step, loss))
         evaluate(model, metric, dev_loader)

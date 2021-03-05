@@ -398,7 +398,7 @@ def do_train(args):
                     loss.backward()
                     optimizer.step()
                 lr_scheduler.step()
-                optimizer.clear_gradients()
+                optimizer.clear_grad()
                 if global_step % args.logging_steps == 0:
                     if (not args.n_cards > 1
                         ) or paddle.distributed.get_rank() == 0:

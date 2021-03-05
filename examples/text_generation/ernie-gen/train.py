@@ -240,7 +240,7 @@ def train():
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             if global_step % args.save_steps == 0 and (
                 (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0):
                 evaluate(model, dev_data_loader, tokenizer, rouge1, rouge2,
