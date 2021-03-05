@@ -1,11 +1,11 @@
 # PaddleNLP Transformer API
 
-随着深度学习的发展，NLP领域涌现了一大批高质量的Transformer类预训练模型，多次刷新各种NLP任务SOTA。PaddleNLP为用户提供了常用的BERT、ERNIE、RoBERTa等经典结构预训练模型，让开发者能够方便快捷应用各类Transformer预训练模型及其下游任务。
+随着深度学习的发展，NLP领域涌现了一大批高质量的Transformer类预训练模型，多次刷新各种NLP任务SOTA。PaddleNLP为用户提供了常用的BERT、ERNIE、RoBERTa、XLNet经典结构预训练模型，让开发者能够方便快捷应用各类Transformer预训练模型及其下游任务。
 
 
 ## Transformer预训练模型汇总
 
-下表汇总了目前PaddleNLP支持的各类预训练模型。用户可以使用PaddleNLP提供的模型，完成问答、文本分类、序列标注、文本生成等任务。同时我们提供了27种预训练的参数权重供用户使用，其中包含了12种中文语言模型的预训练权重。
+下表汇总了目前PaddleNLP支持的各类预训练模型。用户可以使用PaddleNLP提供的模型，完成问答、文本分类、序列标注、文本生成等任务。同时我们提供了29种预训练的参数权重供用户使用，其中包含了12种中文语言模型的预训练权重。
 
 | Model | Tokenizer | Supported Task | Pretrained Weight|
 |---|---|---|---|
@@ -15,6 +15,7 @@
 |[GPT-2](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)| GPT2Tokenizer<br> GPT2ChineseTokenizer| GPT2ForGreedyGeneration| `gpt2-base-cn` <br> `gpt2-medium-en`|
 |[RoBERTa](https://arxiv.org/abs/1907.11692)|RobertaTokenizer| RobertaModel<br>RobertaForQuestionAnswering<br>RobertaForSequenceClassification<br>RobertaForTokenClassification| `roberta-wwm-ext`<br> `roberta-wwm-ext-large`<br> `rbt3`<br> `rbtl3`|
 |[ELECTRA](https://arxiv.org/abs/2003.10555) | ElectraTokenizer| ElectraModel<br>ElectraForSequenceClassification<br>ElectraForTokenClassification<br>|`electra-small`<br> `electra-base`<br> `electra-large`<br> `chinese-electra-small`<br> `chinese-electra-base`<br>|
+|[XLNet](https://arxiv.org/abs/1906.08237)| XLNetTokenizer| XLNetModel<br> XLNetForSequenceClassification<br> XLNetForTokenClassification |`xlnet-base-cased`<br> `xlnet-large-cased`|
 |[Transformer](https://arxiv.org/abs/1706.03762) |- | TransformerModel | - |
 
 **NOTE**：其中中文的预训练模型有`bert-base-chinese, bert-wwm-chinese, bert-wwm-ext-chinese, ernie-1.0, ernie-tiny, gpt2-base-cn, roberta-wwm-ext, roberta-wwm-ext-large, rbt3, rbtl3, chinese-electra-base, chinese-electra-small`。
@@ -40,8 +41,8 @@ optimizer = paddle.optimizer.AdamW(learning_rate=0.001, parameters=model.paramet
 
 criterion = paddle.nn.loss.CrossEntropyLoss()
 
-for input_ids, segment_ids, labels in train_dataloader:
-    logits = model(input_ids, segment_ids)
+for input_ids, token_type_ids, labels in train_dataloader:
+    logits = model(input_ids, token_type_ids)
     loss = criterion(logits, labels)
     probs = paddle.nn.functional.softmax(logits, axis=1)
     loss.backward()
@@ -62,12 +63,12 @@ for input_ids, segment_ids, labels in train_dataloader:
 本小节按照模型适用的不同任务类型，对上表[Transformer预训练模型汇总](#Transformer预训练模型汇总)的Task进行分类汇总。主要包括文本分类、序列标注、问答任务、文本生成、机器翻译等。
 
 |任务|模型|应用场景|预训练权重|
-|-|-|-| -|
-|文本分类<br>SequenceClassification |BertForSequenceClassification <br> ErnieForSequenceClassification <br> RobertaForSequenceClassification <br> ElectraForSequenceClassification| [文本分类](../examples/text_classification/pretrained_models/)、[阅读理解](../examples/machine_reading_comprehension/DuReader-yesno/)等| [见上表](#Transformer预训练模型汇总)|
-|序列标注<br>TokenClassification|BertForTokenClassification <br> ErnieForTokenClassification <br> RobertaForTokenClassification <br> ElectraForTokenClassification | [命名实体标注](../examples/named_entity_recognition/)等|[见上表](#Transformer预训练模型汇总)|
+|---|---|---|---|
+|文本分类<br>SequenceClassification |BertForSequenceClassification <br> ErnieForSequenceClassification <br> RobertaForSequenceClassification <br> ElectraForSequenceClassification <br> XLNetForSequenceClassification | [文本分类](../examples/text_classification/pretrained_models/)、[阅读理解](../examples/machine_reading_comprehension/DuReader-yesno/)等| [见上表](#Transformer预训练模型汇总)|
+|序列标注<br>TokenClassification|BertForTokenClassification <br> ErnieForTokenClassification <br> RobertaForTokenClassification <br> ElectraForTokenClassification <br> XLNetForTokenClassification | [命名实体标注](../examples/named_entity_recognition/)等|[见上表](#Transformer预训练模型汇总)|
 |问答任务<br>QuestionAnswering|BertForQuestionAnswering <br> ErnieForQuestionAnswering <br> RobertaForQuestionAnswering| [阅读理解](../examples/machine_reading_comprehension/SQuAD/)等|[见上表](#Transformer预训练模型汇总)|
 |文本生成<br>TextGeneration | 	ErnieForGeneration <br> GPT2ForGreedyGeneration |[文本生成](../examples/text_generation/ernie-gen)等|[见上表](#Transformer预训练模型汇总)|
-|机器翻译 <br> MachineTranslation| TransformerModel | [机器翻译](../examples/machine_translation/transformer/)|[见上表](#Transformer预训练模型汇总)|
+|机器翻译<br>MachineTranslation| TransformerModel | [机器翻译](../examples/machine_translation/transformer/)|[见上表](#Transformer预训练模型汇总)|
 
 用户可以切换表格中的不同模型，来处理相同类型的任务。如对于[预训练模型使用方法](#预训练模型使用方法)中的文本分类任务，用户可以将`BertForSequenceClassification`换成`ErnieForSequenceClassification`, 来寻找更适合的预训练模型。
 
