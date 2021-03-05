@@ -196,7 +196,7 @@ def create_eval_dataset(args):
     eval_batch_size = args.batch_size
     seq_len = args.seq_length
 
-    tokenizer = GPT2Tokenizer.from_pretrained(args.model_name_or_path)
+    tokenizer = GPT2Tokenizer.from_pretrained(args.model_name)
     pad_token = tokenizer.command_name_map["pad"].Id
 
     if not args.cloze_eval:
@@ -241,19 +241,19 @@ def do_eval(args):
         "cpu", "gpu", "xpu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
     paddle.set_device(args.device)
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_name_or_path]
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    model_class, tokenizer_class = MODEL_CLASSES[args.model_name]
+    tokenizer = tokenizer_class.from_pretrained(args.model_name)
 
     if args.init_checkpoint_path is not None:
         model = GPT2ForPretraining(
             GPT2Model(**model_class.pretrained_init_configuration[
-                args.model_name_or_path]))
+                args.model_name]))
 
         logger.info("Load model checkpoint from %s" % args.init_checkpoint_path)
         model_dict = paddle.load(os.path.join(args.init_checkpoint_path))
         model.set_dict(model_dict)
     else:
-        model = model_class.from_pretrained(args.model_name_or_path)
+        model = model_class.from_pretrained(args.model_name)
 
     tic_eval = time.time()
     eval_data_loader = create_eval_dataset(args)
