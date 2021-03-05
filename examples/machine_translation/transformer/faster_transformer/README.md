@@ -79,6 +79,20 @@ transformer = FasterTransformer(
 更详细的例子可以参考 `encoder_decoding_predict.py`，我们提供了更详细用例。
 
 
+#### 数据准备
+
+公开数据集：WMT 翻译大赛是机器翻译领域最具权威的国际评测大赛，其中英德翻译任务提供了一个中等规模的数据集，这个数据集是较多论文中使用的数据集，也是 Transformer 论文中用到的一个数据集。我们也将[WMT'14 EN-DE 数据集](http://www.statmt.org/wmt14/translation-task.html)作为示例提供。
+
+同时，我们提供了一份已经处理好的数据集，可以编写如下代码，对应的数据集将会自动下载并且解压到 `~/.paddlenlp/datasets/machine_translation/WMT14ende/`。
+
+``` python
+# 获取默认的数据处理方式
+transform_func = WMT14ende.get_default_transform_func(root=root)
+# 下载并处理 WMT14.en-de 翻译数据集
+dataset = WMT14ende.get_datasets(mode="train", transform_func=transform_func)
+```
+
+
 #### 模型推断
 
 使用模型推断前提是需要指定一个合适的 checkpoint，需要在对应的 `../configs/transformer.base.yaml` 或是 `../configs/transformer.big.yaml` 中修改对应的模型载入的路径参数 `init_from_params`。
