@@ -33,6 +33,7 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from paddleslim.nas.ofa import OFA, DistillConfig, utils
+from paddleslim.nas.ofa.utils import nlp_utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
 
 METRIC_CLASSES = {
@@ -221,13 +222,13 @@ def reorder_neuron_head(model, head_importance, neuron_importance):
     for layer, current_importance in enumerate(neuron_importance):
         # reorder heads
         idx = paddle.argsort(head_importance[layer], descending=True)
-        utils.reorder_head(model.bert.encoder.layers[layer].self_attn, idx)
+        nlp_utils.reorder_head(model.bert.encoder.layers[layer].self_attn, idx)
         # reorder neurons
         idx = paddle.argsort(
             paddle.to_tensor(current_importance), descending=True)
-        utils.reorder_neuron(
+        nlp_utils.reorder_neuron(
             model.bert.encoder.layers[layer].linear1.fn, idx, dim=1)
-        utils.reorder_neuron(
+        nlp_utils.reorder_neuron(
             model.bert.encoder.layers[layer].linear2.fn, idx, dim=0)
 
 
@@ -235,28 +236,6 @@ def soft_cross_entropy(inp, target):
     inp_likelihood = F.log_softmax(inp, axis=-1)
     target_prob = F.softmax(target, axis=-1)
     return -1. * paddle.mean(paddle.sum(inp_likelihood * target_prob, axis=-1))
-
-
-### get certain config
-def apply_config(model, width_mult):
-    new_config = dict()
-
-    def fix_exp(idx):
-        if (idx - 3) % 6 == 0 or (idx - 5) % 6 == 0:
-            return True
-        return False
-
-    for idx, (block_k, block_v) in enumerate(model.layers.items()):
-        if len(block_v.keys()) != 0:
-            name, name_idx = block_k.split('_'), int(block_k.split('_')[1])
-            if fix_exp(name_idx) or 'emb' in block_k or idx == (
-                    len(model.layers.items()) - 2):
-                block_v['expand_ratio'] = 1.0
-            else:
-                block_v['expand_ratio'] = width_mult
-        new_config[block_k] = block_v
-    return new_config
-
 
 def convert_example(example,
                     tokenizer,
@@ -323,32 +302,32 @@ def do_train(args):
     if args.task_name == "mnli":
         dev_ds_matched, dev_ds_mismatched = load_dataset(
             'glue', args.task_name, splits=["dev_matched", "dev_mismatched"])
-        dev_dataset_matched = dev_dataset_matched.map(trans_func, lazy=True)
-        dev_dataset_mismatched = dev_dataset_mismatched.map(trans_func,
+        dev_ds_matched = dev_ds_matched.map(trans_func, lazy=True)
+        dev_ds_mismatched = dev_ds_mismatched.map(trans_func,
                                                             lazy=True)
         dev_batch_sampler_matched = paddle.io.BatchSampler(
-            dev_dataset_matched, batch_size=args.batch_size, shuffle=False)
+            dev_ds_matched, batch_size=args.batch_size, shuffle=False)
         dev_data_loader_matched = DataLoader(
-            dataset=dev_dataset_matched,
+            dataset=dev_ds_matched,
             batch_sampler=dev_batch_sampler_matched,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
         dev_batch_sampler_mismatched = paddle.io.BatchSampler(
-            dev_dataset_mismatched, batch_size=args.batch_size, shuffle=False)
+            dev_ds_mismatched, batch_size=args.batch_size, shuffle=False)
         dev_data_loader_mismatched = DataLoader(
-            dataset=dev_dataset_mismatched,
+            dataset=dev_ds_mismatched,
             batch_sampler=dev_batch_sampler_mismatched,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
     else:
-        dev_dataset = load_dataset('glue', args.task_name, splits='dev')
-        dev_dataset = dev_dataset.map(trans_func, lazy=True)
+        dev_ds = load_dataset('glue', args.task_name, splits='dev')
+        dev_ds = dev_ds.map(trans_func, lazy=True)
         dev_batch_sampler = paddle.io.BatchSampler(
-            dev_dataset, batch_size=args.batch_size, shuffle=False)
+            dev_ds, batch_size=args.batch_size, shuffle=False)
         dev_data_loader = DataLoader(
-            dataset=dev_dataset,
+            dataset=dev_ds,
             batch_sampler=dev_batch_sampler,
             collate_fn=batchify_fn,
             num_workers=0,
@@ -402,6 +381,17 @@ def do_train(args):
     if args.task_name == "mnli":
         dev_data_loader = (dev_data_loader_matched, dev_data_loader_mismatched)
 
+    # Step6: Calculate the importance of neurons and head, 
+    # and then reorder them according to the importance.
+    head_importance, neuron_importance = nlp_utils.compute_neuron_head_importance(
+        args.task_name,
+        ofa_model.model,
+        dev_data_loader,
+        loss_fct=criterion,
+        num_layers=model.bert.config['num_hidden_layers'],
+        num_heads=model.bert.config['num_attention_heads'])
+    reorder_neuron_head(ofa_model.model, head_importance, neuron_importance)
+
     num_training_steps = args.max_steps if args.max_steps > 0 else len(
         train_data_loader) * args.num_train_epochs
 
@@ -432,7 +422,7 @@ def do_train(args):
             for width_mult in args.width_mult_list:
                 # Step8: Broadcast supernet config from width_mult,
                 # and use this config in supernet training.
-                net_config = apply_config(ofa_model, width_mult)
+                net_config = utils.dynabert_config(ofa_model, width_mult)
                 ofa_model.set_net_config(net_config)
                 logits, teacher_logits = ofa_model(
                     input_ids, segment_ids, attention_mask=[None, None])
@@ -478,7 +468,7 @@ def do_train(args):
                         dev_data_loader,
                         width_mult=100)
                 for idx, width_mult in enumerate(args.width_mult_list):
-                    net_config = apply_config(ofa_model, width_mult)
+                    net_config = utils.dynabert_config(ofa_model, width_mult)
                     ofa_model.set_net_config(net_config)
                     tic_eval = time.time()
                     if args.task_name == "mnli":

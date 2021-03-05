@@ -53,10 +53,8 @@ Fine-tuning 在dev上的结果如压缩结果表格中Result那一列所示。
 ### 环境配置
 压缩功能依赖最新版本的PaddleNLP和PaddleSlim.
 ```shell
-pip install paddlenlp\>=2.0rc
-git clone https://github.com/PaddlePaddle/PaddleSlim.git
-cd Paddleslim
-python setup.py install
+pip install paddlenlp==2.0.0rc7 -i https://pypi.org/simple
+pip install paddleslim==2.0.0 -i https://pypi.org/simple
 ```
 
 ### 压缩训练
