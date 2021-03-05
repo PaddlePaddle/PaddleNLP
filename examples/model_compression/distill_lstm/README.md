@@ -43,7 +43,7 @@ pip install paddlenlp\>=2.0rc
 
 对于BERT的fine-tuning任务，本实验中使用了预训练模型`bert-bas-uncased`、`bert-wwm-ext-chinese`、`bert-base-chinese`。同样，这几个模型在训练时会被自动下载到`paddlenlp.utils.env.DATA_HOME`路径下。例如，对于`bert-base-uncased`模型，在linux系统下，会被下载到`~/.paddlenlp/models/bert-base-uncased`下。
 
-在中文数据集上的小模型训练的输入利用jieba分词，其中词表同本repo下[`example/text_classification/rnn`](https://github.com/PaddlePaddle/models/tree/develop/PaddleNLP/examples/text_classification/rnn)的词表，可通过运行以下命令进行下载：
+在中文数据集上的小模型训练的输入利用jieba分词，其中词表同本repo下[文本分类项目](../../text_classification/rnn)的词表，可通过运行以下命令进行下载：
 
 ```shell
 wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
@@ -54,7 +54,7 @@ wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
 
 ## 蒸馏实验过程
 ### 训练BERT fine-tuning模型
-训练BERT的fine-tuning模型，可以去本repo下example中的[glue目录](https://github.com/PaddlePaddle/models/tree/develop/PaddleNLP/examples/glue)下。关于glue的更多详细说明，可见glue目录下的README文档。
+训练BERT的fine-tuning模型，可以去本repo下example中的[glue目录](../../glue)下。关于glue的更多详细说明，可见glue目录下的README文档。
 
 以GLUE的SST-2任务为例，调用BERT fine-tune的训练脚本，配置如下的参数，训练SST-2任务：
 
@@ -76,6 +76,9 @@ python -u ./run_glue.py \
     --n_gpu 1 \
 
 ```
+
+如果需要训练基于ChnSentiCorp数据集的BERT finetuning模型，可以进入[文本分类目录](../../text_classification/pretrained_models)下，将预训练模型改成BERT，并基于bert-base-chinese和bert-wwm-ext-chinese模型进行fine-tuning训练。
+
 训练完成之后，可将训练效果最好的模型保存在本项目下的`pretrained_models/$TASK_NAME/`下。模型目录下有`model_config.json`, `model_state.pdparams`, `tokenizer_config.json`及`vocab.txt`这几个文件。
 
 

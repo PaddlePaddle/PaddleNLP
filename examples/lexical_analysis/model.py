@@ -18,7 +18,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 
-from paddlenlp.layers.crf import LinearChainCrf, ViterbiDecoder
+from paddlenlp.layers.crf import LinearChainCrf, ViterbiDecoder, LinearChainCrfLoss
 
 
 class BiGruCrf(nn.Layer):
@@ -83,12 +83,22 @@ class BiGruCrf(nn.Layer):
 
         self.crf = LinearChainCrf(self.num_labels, self.crf_lr,
                                   with_start_stop_tag)
+        self.crf_loss = LinearChainCrfLoss(self.crf)
         self.viterbi_decoder = ViterbiDecoder(self.crf.transitions,
                                               with_start_stop_tag)
 
-    def forward(self, inputs, lengths):
+    def forward(self, inputs, lengths, labels=None):
         word_embed = self.word_embedding(inputs)
         bigru_output, _ = self.gru(word_embed)
         emission = self.fc(bigru_output)
         _, prediction = self.viterbi_decoder(emission, lengths)
-        return emission, lengths, prediction
+        if labels is not None:
+            loss = self.crf_loss(emission, lengths, prediction, labels)
+            return loss, lengths, prediction, labels
+        else:
+            return inputs, lengths, prediction
+
+
+def get_loss(loss, lengths, prediction, labels):
+    # get loss from the output from the BiGruCrf forward
+    return loss

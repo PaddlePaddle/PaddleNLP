@@ -187,7 +187,7 @@ def do_train():
         max_seq_length=args.max_seq_length)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
     train_data_loader = create_dataloader(

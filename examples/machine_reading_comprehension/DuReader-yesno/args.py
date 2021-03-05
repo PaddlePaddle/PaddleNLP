@@ -4,11 +4,6 @@ import argparse
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--data_path",
-        type=str,
-        default=None,
-        help="Directory of all the data for train, valid, test.")
-    parser.add_argument(
         "--model_type",
         default=None,
         type=str,
