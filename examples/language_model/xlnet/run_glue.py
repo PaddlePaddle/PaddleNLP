@@ -239,7 +239,7 @@ def do_train(args):
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in [
             p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm", "LayerNorm"])
+            if not any(nd in n for nd in ["bias", "layer_norm"])
         ])
 
     loss_fct = paddle.nn.loss.CrossEntropyLoss() if train_ds.label_list else paddle.nn.loss.MSELoss()
@@ -258,7 +258,7 @@ def do_train(args):
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
 
             if global_step % args.logging_steps == 0:
                 print(
