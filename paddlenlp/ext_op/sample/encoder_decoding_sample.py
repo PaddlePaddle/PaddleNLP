@@ -55,7 +55,7 @@ def generate_src_word(batch_size, vocab_size, max_length, eos_idx, pad_idx):
 
 
 def do_predict(args):
-    place = "gpu:0"
+    place = "gpu"
     paddle.set_device(place)
 
     # Define model

@@ -57,7 +57,7 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 
 
 def do_predict(args):
-    place = "gpu:0"
+    place = "gpu"
     paddle.set_device(place)
 
     # Define data loader

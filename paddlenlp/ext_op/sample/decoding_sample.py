@@ -57,11 +57,7 @@ def generate_encoder_result(batch_size, max_seq_len, memory_hidden_dim, dtype):
 
 
 def do_predict(args):
-    if args.use_gpu:
-        place = "gpu:0"
-    else:
-        place = "cpu"
-
+    place = "gpu"
     place = paddle.set_device(place)
 
     # Define model
