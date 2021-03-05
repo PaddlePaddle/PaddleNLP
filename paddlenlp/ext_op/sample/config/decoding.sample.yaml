@@ -20,8 +20,6 @@ output_file: "predict.txt"
 special_token: ["<s>", "<e>", "<unk>"]
 # The directory to store data.
 root: None
-# Whether to use fp16 Faster Transformer decoding. 
-use_fp16_decoding: False
 
 # Whether to use cuda
 use_gpu: True

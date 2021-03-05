@@ -27,6 +27,10 @@ def parse_args():
         default="./build/lib/libdecoding_op.so",
         type=str,
         help="Path of libdecoding_op.so. ")
+    parser.add_argument(
+        "--use-fp16-decoding",
+        action="store_true",
+        help="Whether to use fp16 decoding to predict. ")
     args = parser.parse_args()
     return args
 
@@ -102,5 +106,6 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
     args.decoding_lib = ARGS.decoding_lib
+    args.use_fp16_decoding = ARGS.use_fp16_decoding
 
     do_predict(args)
