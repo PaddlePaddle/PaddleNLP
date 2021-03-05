@@ -197,14 +197,14 @@ class DialogueDataset(IterableDataset):
                 append_mask[:, -1, :] = 1.0
                 generation_mask = np.concatenate(
                     (generation_mask, append_mask), axis=2)
-                generation_mask = (generation_mask - 1.0) * 1e4
+                generation_mask = (generation_mask - 1.0) * 1e9
                 generation_mask = np.expand_dims(generation_mask, axis=1)
                 yield (pad_token_ids, pad_type_ids, pad_pos_ids,
                        generation_mask)
             else:
                 tgt_label, tgt_pos = self.gen_tgt_label_and_pos(token_ids,
                                                                 tgt_start_idx)
-                generation_mask = (generation_mask - 1.0) * 1e4
+                generation_mask = (generation_mask - 1.0) * 1e9
                 generation_mask = np.expand_dims(generation_mask, axis=1)
                 yield (pad_token_ids, pad_type_ids, pad_pos_ids,
                        generation_mask, tgt_label, tgt_pos)
@@ -217,7 +217,7 @@ def post_process_response(token_ids, tokenizer):
     """
     eos_pos = len(token_ids)
     for i, tok_id in enumerate(token_ids):
-        if tok_id == tokenizer.eos_token_id:
+        if tok_id == tokenizer.sep_token_id:
             eos_pos = i
             break
     token_ids = token_ids[:eos_pos]

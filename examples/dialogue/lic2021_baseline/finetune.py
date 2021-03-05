@@ -45,7 +45,7 @@ def main(args):
         args.train_data_path,
         args.batch_size,
         tokenizer.pad_token_id,
-        tokenizer.bos_token_id,
+        tokenizer.cls_token_id,
         args.sort_pool_size,
         args.seed,
         mode='train')
@@ -55,7 +55,7 @@ def main(args):
         args.valid_data_path,
         args.batch_size,
         tokenizer.pad_token_id,
-        tokenizer.bos_token_id,
+        tokenizer.cls_token_id,
         args.sort_pool_size,
         mode='valid')
     valid_dataloader = DataLoader(

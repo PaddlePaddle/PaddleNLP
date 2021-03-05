@@ -6,7 +6,7 @@ def parse_args():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument('--model_name_or_path', type=str, default='unified_transformer-12L-cn', help='The path or shortcut name of the pre-trained model.')
     parser.add_argument('--save_dir', type=str, default='./checkpoints', help='The directory where the checkpoints will be saved.')
-    parser.add_argument('--output_path', type=str, default='./output/predict.txt', help='The file path where the infer result will be saved.')
+    parser.add_argument('--output_path', type=str, default='./predict.txt', help='The file path where the infer result will be saved.')
     parser.add_argument('--train_data_path', type=str, default='./datasets/train.txt', help='Specify the path to load train data.')
     parser.add_argument('--valid_data_path', type=str, default='./datasets/valid.txt', help='Specify the path to load valid data.')
     parser.add_argument('--test_data_path', type=str, default='./datasets/test.txt', help='Specify the path to load test data.')

@@ -26,7 +26,7 @@ def main(args):
         args.test_data_path,
         args.infer_batch_size,
         tokenizer.pad_token_id,
-        tokenizer.bos_token_id,
+        tokenizer.cls_token_id,
         mode='test')
     test_dataloader = DataLoader(
         test_dataset, return_list=True, batch_size=None)

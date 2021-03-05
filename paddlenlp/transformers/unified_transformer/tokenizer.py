@@ -200,8 +200,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
     def convert_tokens_to_string(self, tokens):
         """
         Converts a sequence of tokens (list of string) in a single string. Since
-        the usage of WordPiece introducing `##` to concat subwords, also remove
-        `##` when converting.
+        the usage of WordPiece introducing `__` to concat subwords, also remove
+        `__` when converting.
         Args:
             tokens (list): A list of string representing tokens to be converted.
         Returns:
