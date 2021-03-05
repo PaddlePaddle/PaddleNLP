@@ -343,12 +343,16 @@ class DatasetBuilder:
                 ) if self._read.__code__.co_argcount > 2 else self._read(
                     filename)
                 for example in generator:
+                    # We need to check if the example contains label column and confirm its name.
+                    # For now we only allow `label` or `labels` to be the name of label column.
                     if 'labels' in example.keys():
                         label_col = 'labels'
                     elif 'label' in example.keys():
                         label_col = 'label'
                     else:
                         label_col = None
+
+                    # Convert class label to label ids.
                     if label_list is not None and example.get(label_col, None):
                         label_dict = {}
                         for i, label in enumerate(label_list):
@@ -381,12 +385,15 @@ class DatasetBuilder:
                     "No instances were read from the given filepath {}. "
                     "Is the path correct?".format(filename))
 
+            # We need to check if the example contains label column and confirm its name.
+            # For now we only allow `label` or `labels` to be the name of label column.
             if 'labels' in examples[0].keys():
                 label_col = 'labels'
             elif 'label' in examples[0].keys():
                 label_col = 'label'
             else:
                 label_col = None
+
             # Convert class label to label ids.
             if label_list is not None and examples[0].get(label_col, None):
                 label_dict = {}
