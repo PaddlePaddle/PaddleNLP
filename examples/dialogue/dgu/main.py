@@ -12,7 +12,7 @@ from paddle.io import DataLoader, DistributedBatchSampler, BatchSampler
 from paddle.optimizer import AdamW
 from paddle.metric import Accuracy
 
-from paddlenlp.datasets import MapDatasetWrapper
+from paddlenlp.datasets import MapDataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import BertTokenizer, BertForSequenceClassification, BertForTokenClassification
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -196,7 +196,7 @@ def evaluation(args, model, data_loader, metric):
 
 def create_data_loader(args, dataset_class, trans_func, batchify_fn, mode):
     dataset = dataset_class(args.data_dir, mode)
-    dataset = MapDatasetWrapper(dataset).apply(trans_func, lazy=True)
+    dataset = MapDataset(dataset).map(trans_func, lazy=True)
     if mode == 'train':
         batch_sampler = DistributedBatchSampler(
             dataset, batch_size=args.batch_size, shuffle=True)
@@ -235,7 +235,7 @@ def main(args):
     if args.task_name in ('udc', 'dstc2', 'atis_intent', 'mrda', 'swda'):
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
             Stack(dtype='int64')  # label
         ): fn(samples)
         model = BertForSequenceClassification.from_pretrained(
@@ -243,7 +243,7 @@ def main(args):
     elif args.task_name == 'atis_slot':
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
             Pad(axis=0, pad_val=0, dtype='int64')  # label
         ): fn(samples)
         model = BertForTokenClassification.from_pretrained(

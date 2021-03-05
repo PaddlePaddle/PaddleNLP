@@ -31,11 +31,10 @@ class CMRC2018(DatasetBuilder):
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
             get_path_from_url(URL, default_root)
-            fullname = os.path.join(default_root, filename)
 
         return fullname
 
-    def _read(self, filename):
+    def _read(self, filename, *args):
         with open(filename, "r", encoding="utf8") as f:
             input_data = json.load(f)["data"]
         for entry in input_data:

@@ -19,6 +19,7 @@ import argparse
 
 import numpy as np
 import paddle
+from paddle.static import InputSpec
 from paddlenlp.data import Pad, Tuple, Stack
 from paddlenlp.metrics import ChunkEvaluator
 
@@ -66,7 +67,9 @@ def infer(args):
     # Define the model network
     network = BiGruCrf(args.emb_dim, args.hidden_size, infer_dataset.vocab_size,
                        infer_dataset.num_labels)
-    model = paddle.Model(network)
+    inputs = InputSpec(shape=(-1, ), dtype="int16", name='inputs')
+    lengths = InputSpec(shape=(-1, ), dtype="int16", name='lengths')
+    model = paddle.Model(network, inputs=[inputs, lengths])
     model.prepare()
 
     # Load the model and start predicting

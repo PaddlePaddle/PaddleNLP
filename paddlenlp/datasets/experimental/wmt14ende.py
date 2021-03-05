@@ -82,7 +82,7 @@ class WMT14ende(DatasetBuilder):
 
         return src_fullname, tgt_fullname
 
-    def _read(self, filename):
+    def _read(self, filename, *args):
         src_filename, tgt_filename = filename
         with open(src_filename, 'r', encoding='utf-8') as src_f:
             with open(tgt_filename, 'r', encoding='utf-8') as tgt_f:

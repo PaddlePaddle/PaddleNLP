@@ -232,14 +232,16 @@ def convert_example(example,
 
     def _concat_seqs(seqs, separators, seq_mask=0, separator_mask=1):
         concat = sum((seq + sep for sep, seq in zip(separators, seqs)), [])
-        segment_ids = sum(([i] * (len(seq) + len(sep)) for i, (sep, seq) in
-                           enumerate(zip(separators, seqs))), [])
+        segment_ids = sum(
+            ([i] * (len(seq) + len(sep))
+             for i, (sep, seq) in enumerate(zip(separators, seqs))), [])
         if isinstance(seq_mask, int):
             seq_mask = [[seq_mask] * len(seq) for seq in seqs]
         if isinstance(separator_mask, int):
             separator_mask = [[separator_mask] * len(sep) for sep in separators]
-        p_mask = sum((s_mask + mask for sep, seq, s_mask, mask in
-                      zip(separators, seqs, seq_mask, separator_mask)), [])
+        p_mask = sum((s_mask + mask
+                      for sep, seq, s_mask, mask in zip(
+                          separators, seqs, seq_mask, separator_mask)), [])
         return concat, segment_ids, p_mask
 
     if not is_test:
@@ -295,7 +297,7 @@ def do_train(args):
         train_dataset, batch_size=args.batch_size, shuffle=True)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(),  # length
         Stack(dtype="int64" if train_dataset.get_labels() else "float32")  # label
     ): [data for i, data in enumerate(fn(samples)) if i != 2]

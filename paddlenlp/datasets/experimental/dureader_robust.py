@@ -32,12 +32,11 @@ class DuReaderRobust(DatasetBuilder):
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-            get_path_from_url(self.URL, default_root)
-            fullname = os.path.join(default_root, filename)
+            get_path_from_url(self.URL, default_root, self.MD5)
 
         return fullname
 
-    def _read(self, filename):
+    def _read(self, filename, *args):
         with open(filename, "r", encoding="utf8") as f:
             input_data = json.load(f)["data"]
         for entry in input_data:
