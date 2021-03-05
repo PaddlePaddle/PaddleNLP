@@ -26,8 +26,7 @@ BERT-base模型是一个迁移能力很强的通用语义表示模型，但是�
 首先需要对Pretrain-Model在实际的下游任务上进行Finetuning，得到需要压缩的模型。
 
 ```shell
-cd ../bert/
-export PYTHOPATH=${PATH_OF_PaddleNLP}
+cd ../../glue/
 ```
 
 ```python
@@ -47,15 +46,14 @@ python -u ./run_glue.py \
     --output_dir ./tmp/$TASK_NAME/ \
     --n_gpu 1 \
 ```
-参数详细含义参考[README.md](https://github.com/PaddlePaddle/models/tree/develop/PaddleNLP/examples/bert)
+参数详细含义参考[README.md](../../glue)
 Fine-tuning 在dev上的结果如压缩结果表格中Result那一列所示。
 
-### 安装PaddleSlim
-压缩功能依赖最新版本的PaddleSlim.
+### 环境配置
+压缩功能依赖PaddlePaddle 2.0及以上版本，以及最新版本的PaddleNLP和PaddleSlim.
 ```shell
-git clone https://github.com/PaddlePaddle/PaddleSlim.git
-cd Paddleslim
-python setup.py install
+pip install paddlenlp\>=2.0rc
+pip install paddleslim==2.0.0 -i https://pypi.org/simple
 ```
 
 ### 压缩训练
