@@ -95,7 +95,7 @@ dataset = WMT14ende.get_datasets(mode="train", transform_func=transform_func)
 
 #### 模型推断
 
-使用模型推断前提是需要指定一个合适的 checkpoint，需要在对应的 `../configs/transformer.base.yaml` 或是 `../configs/transformer.big.yaml` 中修改对应的模型载入的路径参数 `init_from_params`。
+使用模型推断前提是需要指定一个合适的 checkpoint，需要在对应的 `../configs/transformer.base.yaml` 中修改对应的模型载入的路径参数 `init_from_params`。
 
 我们提供一个已经训练好的动态图的 base model 的 checkpoint 以供使用，可以通过[tranformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz)下载。
 
