@@ -50,9 +50,10 @@ python -u ./run_glue.py \
 参数详细含义参考[README.md](https://github.com/PaddlePaddle/models/tree/develop/PaddleNLP/examples/bert)
 Fine-tuning 在dev上的结果如压缩结果表格中Result那一列所示。
 
-### 安装PaddleSlim
-压缩功能依赖最新版本的PaddleSlim.
+### 环境配置
+压缩功能依赖最新版本的PaddleNLP和PaddleSlim.
 ```shell
+pip install paddlenlp\>=2.0rc
 git clone https://github.com/PaddlePaddle/PaddleSlim.git
 cd Paddleslim
 python setup.py install
