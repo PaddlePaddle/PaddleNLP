@@ -27,23 +27,24 @@ from paddle.metric import Metric, Accuracy, Precision, Recall
 
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.data.sampler import SamplerHelper
+from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertModel, BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
-import paddlenlp.datasets as datasets
 from paddleslim.nas.ofa import OFA, DistillConfig, utils
+from paddleslim.nas.ofa.utils import nlp_utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
 
-TASK_CLASSES = {
-    "cola": (datasets.GlueCoLA, Mcc),
-    "sst-2": (datasets.GlueSST2, Accuracy),
-    "mrpc": (datasets.GlueMRPC, AccuracyAndF1),
-    "sts-b": (datasets.GlueSTSB, PearsonAndSpearman),
-    "qqp": (datasets.GlueQQP, AccuracyAndF1),
-    "mnli": (datasets.GlueMNLI, Accuracy),
-    "qnli": (datasets.GlueQNLI, Accuracy),
-    "rte": (datasets.GlueRTE, Accuracy),
+METRIC_CLASSES = {
+    "cola": Mcc,
+    "sst-2": Accuracy,
+    "mrpc": AccuracyAndF1,
+    "sts-b": PearsonAndSpearman,
+    "qqp": AccuracyAndF1,
+    "mnli": Accuracy,
+    "qnli": Accuracy,
+    "rte": Accuracy,
 }
 
 MODEL_CLASSES = {"bert": (BertForSequenceClassification, BertTokenizer), }
@@ -59,7 +60,7 @@ def parse_args():
         type=str,
         required=True,
         help="The name of the task to train selected in the list: " +
-        ", ".join(TASK_CLASSES.keys()), )
+        ", ".join(METRIC_CLASSES.keys()), )
     parser.add_argument(
         "--model_type",
         default=None,
@@ -221,13 +222,13 @@ def reorder_neuron_head(model, head_importance, neuron_importance):
     for layer, current_importance in enumerate(neuron_importance):
         # reorder heads
         idx = paddle.argsort(head_importance[layer], descending=True)
-        utils.reorder_head(model.bert.encoder.layers[layer].self_attn, idx)
+        nlp_utils.reorder_head(model.bert.encoder.layers[layer].self_attn, idx)
         # reorder neurons
         idx = paddle.argsort(
             paddle.to_tensor(current_importance), descending=True)
-        utils.reorder_neuron(
+        nlp_utils.reorder_neuron(
             model.bert.encoder.layers[layer].linear1.fn, idx, dim=1)
-        utils.reorder_neuron(
+        nlp_utils.reorder_neuron(
             model.bert.encoder.layers[layer].linear2.fn, idx, dim=0)
 
 
@@ -236,108 +237,31 @@ def soft_cross_entropy(inp, target):
     target_prob = F.softmax(target, axis=-1)
     return -1. * paddle.mean(paddle.sum(inp_likelihood * target_prob, axis=-1))
 
-
-### get certain config
-def apply_config(model, width_mult):
-    new_config = dict()
-
-    def fix_exp(idx):
-        if (idx - 3) % 6 == 0 or (idx - 5) % 6 == 0:
-            return True
-        return False
-
-    for idx, (block_k, block_v) in enumerate(model.layers.items()):
-        if len(block_v.keys()) != 0:
-            name, name_idx = block_k.split('_'), int(block_k.split('_')[1])
-            if fix_exp(name_idx) or 'emb' in block_k or idx == (
-                    len(model.layers.items()) - 2):
-                block_v['expand_ratio'] = 1.0
-            else:
-                block_v['expand_ratio'] = width_mult
-        new_config[block_k] = block_v
-    return new_config
-
-
 def convert_example(example,
                     tokenizer,
                     label_list,
                     max_seq_length=512,
                     is_test=False):
     """convert a glue example into necessary features"""
-
-    def _truncate_seqs(seqs, max_seq_length):
-        if len(seqs) == 1:  # single sentence
-            # Account for [CLS] and [SEP] with "- 2"
-            seqs[0] = seqs[0][0:(max_seq_length - 2)]
-        else:  # Sentence pair
-            # Account for [CLS], [SEP], [SEP] with "- 3"
-            tokens_a, tokens_b = seqs
-            max_seq_length -= 3
-            while True:  # Truncate with longest_first strategy
-                total_length = len(tokens_a) + len(tokens_b)
-                if total_length <= max_seq_length:
-                    break
-                if len(tokens_a) > len(tokens_b):
-                    tokens_a.pop()
-                else:
-                    tokens_b.pop()
-        return seqs
-
-    def _concat_seqs(seqs, separators, seq_mask=0, separator_mask=1):
-        concat = sum((seq + sep for sep, seq in zip(separators, seqs)), [])
-        segment_ids = sum(
-            ([i] * (len(seq) + len(sep))
-             for i, (sep, seq) in enumerate(zip(separators, seqs))), [])
-        if isinstance(seq_mask, int):
-            seq_mask = [[seq_mask] * len(seq) for seq in seqs]
-        if isinstance(separator_mask, int):
-            separator_mask = [[separator_mask] * len(sep) for sep in separators]
-        p_mask = sum((s_mask + mask
-                      for sep, seq, s_mask, mask in zip(
-                          separators, seqs, seq_mask, separator_mask)), [])
-        return concat, segment_ids, p_mask
-
     if not is_test:
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
         # Get the label
-        label = example[-1]
-        example = example[:-1]
-        # Create label maps if classification task
-        if label_list:
-            label_map = {}
-            for (i, l) in enumerate(label_list):
-                label_map[l] = i
-            label = label_map[label]
+        label = example['labels']
         label = np.array([label], dtype=label_dtype)
-
-    # Tokenize raw text
-    if len(example) == 1:
-        example = tokenizer(example[0], max_seq_len=max_seq_length)
+    # Convert raw text to feature
+    if len(example) == 2:
+        example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
     else:
         example = tokenizer(
-            example[0], text_pair=example[1], max_seq_len=max_seq_length)
-    '''
-    tokens_raw = [tokenizer(l) for l in example]
-    # Truncate to the truncate_length,
-    tokens_trun = _truncate_seqs(tokens_raw, max_seq_length)
-    # Concate the sequences with special tokens
-    tokens_trun[0] = [tokenizer.cls_token] + tokens_trun[0]
-    tokens, segment_ids, _ = _concat_seqs(tokens_trun, [[tokenizer.sep_token]] *
-                                          len(tokens_trun))
-    # Convert the token to ids
-    input_ids = tokenizer.convert_tokens_to_ids(tokens)
-    valid_length = len(input_ids)
-    # The mask has 1 for real tokens and 0 for padding tokens. Only real
-    # tokens are attended to.
-    # input_mask = [1] * len(input_ids)
-    '''
+            example['sentence1'],
+            text_pair=example['sentence2'],
+            max_seq_len=max_seq_length)
+
     if not is_test:
-        return example['input_ids'], example['segment_ids'], len(example[
-            'input_ids']), label
+        return example['input_ids'], example['token_type_ids'], label
     else:
-        return example['input_ids'], example['segment_ids'], len(example[
-            'input_ids'])
+        return example['input_ids'], example['token_type_ids']
 
 
 def do_train(args):
@@ -348,27 +272,27 @@ def do_train(args):
     set_seed(args)
 
     args.task_name = args.task_name.lower()
-    dataset_class, metric_class = TASK_CLASSES[args.task_name]
+    metric_class = METRIC_CLASSES[args.task_name]
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
-    train_ds = dataset_class.get_datasets(['train'])
+    train_ds = load_dataset('glue', args.task_name, splits="train")
 
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
-        label_list=train_ds.get_labels(),
+        label_list=train_ds.label_list,
         max_seq_length=args.max_seq_length)
-    train_ds = train_ds.apply(trans_func, lazy=True)
+    train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Stack(),  # length
-        Stack(dtype="int64" if train_ds.get_labels() else "float32")  # label
-    ): [data for i, data in enumerate(fn(samples)) if i != 2]
+        Stack(dtype="int64" if train_ds.label_list else "float32")  # label
+    ): fn(samples)
+
     train_data_loader = DataLoader(
         dataset=train_ds,
         batch_sampler=train_batch_sampler,
@@ -376,41 +300,40 @@ def do_train(args):
         num_workers=0,
         return_list=True)
     if args.task_name == "mnli":
-        dev_dataset_matched, dev_dataset_mismatched = dataset_class.get_datasets(
-            ["dev_matched", "dev_mismatched"])
-        dev_dataset_matched = dev_dataset_matched.apply(trans_func, lazy=True)
-        dev_dataset_mismatched = dev_dataset_mismatched.apply(
-            trans_func, lazy=True)
+        dev_ds_matched, dev_ds_mismatched = load_dataset(
+            'glue', args.task_name, splits=["dev_matched", "dev_mismatched"])
+        dev_ds_matched = dev_ds_matched.map(trans_func, lazy=True)
+        dev_ds_mismatched = dev_ds_mismatched.map(trans_func,
+                                                            lazy=True)
         dev_batch_sampler_matched = paddle.io.BatchSampler(
-            dev_dataset_matched, batch_size=args.batch_size, shuffle=False)
+            dev_ds_matched, batch_size=args.batch_size, shuffle=False)
         dev_data_loader_matched = DataLoader(
-            dataset=dev_dataset_matched,
+            dataset=dev_ds_matched,
             batch_sampler=dev_batch_sampler_matched,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
         dev_batch_sampler_mismatched = paddle.io.BatchSampler(
-            dev_dataset_mismatched, batch_size=args.batch_size, shuffle=False)
+            dev_ds_mismatched, batch_size=args.batch_size, shuffle=False)
         dev_data_loader_mismatched = DataLoader(
-            dataset=dev_dataset_mismatched,
+            dataset=dev_ds_mismatched,
             batch_sampler=dev_batch_sampler_mismatched,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
     else:
-        dev_dataset = dataset_class.get_datasets(["dev"])
-        dev_dataset = dev_dataset.apply(trans_func, lazy=True)
+        dev_ds = load_dataset('glue', args.task_name, splits='dev')
+        dev_ds = dev_ds.map(trans_func, lazy=True)
         dev_batch_sampler = paddle.io.BatchSampler(
-            dev_dataset, batch_size=args.batch_size, shuffle=False)
+            dev_ds, batch_size=args.batch_size, shuffle=False)
         dev_data_loader = DataLoader(
-            dataset=dev_dataset,
+            dataset=dev_ds,
             batch_sampler=dev_batch_sampler,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
 
-    num_labels = 1 if train_ds.get_labels() == None else len(
-        train_ds.get_labels())
+    num_labels = 1 if train_ds.label_list == None else len(train_ds.label_list)
 
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
@@ -450,17 +373,17 @@ def do_train(args):
                     distill_config=distill_config,
                     elastic_order=['width'])
 
-    criterion = paddle.nn.loss.CrossEntropyLoss() if train_ds.get_labels(
-    ) else paddle.nn.loss.MSELoss()
+    criterion = paddle.nn.loss.CrossEntropyLoss(
+    ) if train_ds.label_list else paddle.nn.loss.MSELoss()
 
     metric = metric_class()
 
     if args.task_name == "mnli":
         dev_data_loader = (dev_data_loader_matched, dev_data_loader_mismatched)
 
-    # Step6: Calculate the importance of neurons and head,
+    # Step6: Calculate the importance of neurons and head, 
     # and then reorder them according to the importance.
-    head_importance, neuron_importance = utils.compute_neuron_head_importance(
+    head_importance, neuron_importance = nlp_utils.compute_neuron_head_importance(
         args.task_name,
         ofa_model.model,
         dev_data_loader,
@@ -499,7 +422,7 @@ def do_train(args):
             for width_mult in args.width_mult_list:
                 # Step8: Broadcast supernet config from width_mult,
                 # and use this config in supernet training.
-                net_config = apply_config(ofa_model, width_mult)
+                net_config = utils.dynabert_config(ofa_model, width_mult)
                 ofa_model.set_net_config(net_config)
                 logits, teacher_logits = ofa_model(
                     input_ids, segment_ids, attention_mask=[None, None])
@@ -545,7 +468,7 @@ def do_train(args):
                         dev_data_loader,
                         width_mult=100)
                 for idx, width_mult in enumerate(args.width_mult_list):
-                    net_config = apply_config(ofa_model, width_mult)
+                    net_config = utils.dynabert_config(ofa_model, width_mult)
                     ofa_model.set_net_config(net_config)
                     tic_eval = time.time()
                     if args.task_name == "mnli":
