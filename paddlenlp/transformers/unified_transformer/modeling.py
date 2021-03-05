@@ -273,7 +273,7 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
         attention_mask = kwargs.get("attention_mask", None)
         position_ids = kwargs.get("position_ids", None)
         # only last token for inputs_ids if cache is defined in kwargs
-        if cache:
+        if cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
             if token_type_ids is not None:
                 token_type_ids = token_type_ids[:, -1].unsqueeze(-1)

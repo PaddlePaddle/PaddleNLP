@@ -366,8 +366,7 @@ class GenerationMixin(object):
                                      unfinished_flag):
         # update scores
         unfinished_scores = (scores * length + next_scores) / (length + 1)
-        scores = unfinished_scores * unfinished_flag.astype(
-            scores.dtype) + scores * (1 - unfinished_flag).astype(scores.dtype)
+        scores = paddle.where(unfinished_flag, unfinished_scores, scores)
         return scores
 
     def adjust_logits_during_generation(self, logits):
@@ -532,7 +531,7 @@ class GenerationMixin(object):
                       pad_token_id, eos_token_id, **model_kwargs):
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
-        unfinished_flag = paddle.full([batch_size, 1], 1, dtype='int64')
+        unfinished_flag = paddle.full([batch_size, 1], True, dtype='bool')
         scores = paddle.full(
             [batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
@@ -555,8 +554,9 @@ class GenerationMixin(object):
             next_scores = paddle.index_sample(probs, next_tokens)
 
             if eos_token_id is not None:
-                next_tokens = next_tokens * unfinished_flag + pad_token_id * (
-                    1 - unfinished_flag)
+                next_tokens = paddle.where(unfinished_flag, next_tokens,
+                                           paddle.full_like(next_tokens,
+                                                            pad_token_id))
 
             scores = self.update_scores_for_generation(
                 scores, next_scores, cur_len - origin_len, unfinished_flag)
@@ -565,11 +565,11 @@ class GenerationMixin(object):
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
             if eos_token_id is not None:
-                unfinished_flag = unfinished_flag * (
-                    next_tokens != eos_token_id).astype('int64')
+                unfinished_flag = paddle.logical_and(
+                    unfinished_flag, next_tokens != eos_token_id)
 
             # Stop when there is a </s> in all sentences
-            if paddle.max(unfinished_flag) == 0:
+            if not paddle.any(unfinished_flag):
                 break
 
             model_kwargs = self.update_model_kwargs_for_generation(outputs,
@@ -625,7 +625,7 @@ class GenerationMixin(object):
 
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
-        unfinished_flag = paddle.full([batch_size, 1], 1, dtype='int64')
+        unfinished_flag = paddle.full([batch_size, 1], True, dtype='bool')
         scores = paddle.full(
             [batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
@@ -655,8 +655,9 @@ class GenerationMixin(object):
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
-                next_tokens = next_tokens * unfinished_flag + pad_token_id * (
-                    1 - unfinished_flag)
+                next_tokens = paddle.where(unfinished_flag, next_tokens,
+                                           paddle.full_like(next_tokens,
+                                                            pad_token_id))
 
             scores = self.update_scores_for_generation(
                 scores, next_scores, cur_len - origin_len, unfinished_flag)
@@ -665,11 +666,11 @@ class GenerationMixin(object):
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
             if eos_token_id is not None:
-                unfinished_flag = unfinished_flag * (
-                    next_tokens != eos_token_id).astype('int64')
+                unfinished_flag = paddle.logical_and(
+                    unfinished_flag, next_tokens != eos_token_id)
 
             # Stop when there is a </s> in all sentences
-            if paddle.max(unfinished_flag) == 0:
+            if not paddle.any(unfinished_flag):
                 break
             model_kwargs = self.update_model_kwargs_for_generation(outputs,
                                                                    model_kwargs)

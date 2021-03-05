@@ -30,52 +30,6 @@ from ...data.vocab import Vocab
 __all__ = ['UnifiedTransformerTokenizer']
 
 
-def clean_text(text):
-    """Performs invalid character removal and whitespace cleanup on text."""
-    text = text.replace(u"“", u'"')\
-        .replace(u'”', u'"')\
-        .replace(u'‘', "'")\
-        .replace(u'’', u"'")\
-        .replace(u'—', u'-')
-
-    output = []
-    for char in text:
-        if _is_control(char):
-            continue
-        if _is_whitespace(char):
-            output.append(" ")
-        else:
-            output.append(char)
-    return "".join(output)
-
-
-def preprocess_text(inputs, remove_space=True, lower=False):
-    """preprocess data by removing extra space and normalize data."""
-    outputs = inputs
-    if remove_space:
-        outputs = " ".join(inputs.strip().split())
-
-    outputs = unicodedata.normalize("NFKD", outputs)
-    outputs = "".join([c for c in outputs if not unicodedata.combining(c)])
-    if lower:
-        outputs = outputs.lower()
-
-    return outputs
-
-
-def encode_pieces(spm_model, text, return_unicode=True, sample=False):
-    """turn sentences into word pieces."""
-    # liujiaxiang: add for ernie-albert, mainly consider for “/”/‘/’/— causing too many unk
-    text = clean_text(text)
-
-    if not sample:
-        pieces = spm_model.EncodeAsPieces(text)
-    else:
-        pieces = spm_model.SampleEncodeAsPieces(text, 64, 0.1)
-
-    return pieces
-
-
 class UnifiedTransformerTokenizer(PretrainedTokenizer):
     resource_files_names = {
         "vocab_file": "vocab.txt",
@@ -110,8 +64,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                  do_lower_case=False,
                  unk_token="[UNK]",
                  pad_token="[PAD]",
-                 bos_token="[CLS]",
-                 eos_token="[SEP]",
+                 cls_token="[CLS]",
+                 sep_token="[SEP]",
                  mask_token="[MASK]",
                  special_tokens_file=""):
         mod = try_import('sentencepiece')
@@ -128,8 +82,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             vocab_file,
             unk_token,
             pad_token,
-            bos_token,
-            eos_token,
+            cls_token,
+            sep_token,
             mask_token=mask_token)
 
         # if the sentencepiece_model_file is not exists, just the default sentence-piece model 
@@ -159,6 +113,44 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         """
         return len(self.vocab)
 
+    def preprocess_text(self, inputs, remove_space=True, lower=False):
+        """preprocess data by removing extra space and normalize data."""
+        outputs = inputs
+        if remove_space:
+            outputs = " ".join(inputs.strip().split())
+        outputs = unicodedata.normalize("NFKD", outputs)
+        outputs = "".join([c for c in outputs if not unicodedata.combining(c)])
+        if lower:
+            outputs = outputs.lower()
+        return outputs
+
+    def clean_text(self, text):
+        """Performs invalid character removal and whitespace cleanup on text."""
+        text = text.replace(u"“", u'"')\
+            .replace(u'”', u'"')\
+            .replace(u'‘', "'")\
+            .replace(u'’', u"'")\
+            .replace(u'—', u'-')
+        output = []
+        for char in text:
+            if _is_control(char):
+                continue
+            if _is_whitespace(char):
+                output.append(" ")
+            else:
+                output.append(char)
+        return "".join(output)
+
+    def encode_pieces(self, spm_model, text, return_unicode=True, sample=False):
+        """turn sentences into word pieces."""
+        # liujiaxiang: add for ernie-albert, mainly consider for “/”/‘/’/— causing too many unk
+        text = self.clean_text(text)
+        if not sample:
+            pieces = spm_model.EncodeAsPieces(text)
+        else:
+            pieces = spm_model.SampleEncodeAsPieces(text, 64, 0.1)
+        return pieces
+
     def _tokenize(self, text):
         """
         End-to-end tokenization for BERT models.
@@ -168,14 +160,14 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         Returns:
             list: A list of string representing converted tokens.
         """
-        text = preprocess_text(text, lower=self.do_lower_case)
+        text = self.preprocess_text(text, lower=self.do_lower_case)
         tokens = []
         for match in self.pat.finditer(text):
             part_text = match.group(0)
             if part_text in self.specials:
                 tokens.append(part_text)
                 continue
-            part_tokens = encode_pieces(self.spm_model, part_text)
+            part_tokens = self.encode_pieces(self.spm_model, part_text)
             tokens.extend(part_tokens)
         return tokens
 
@@ -221,11 +213,144 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                                                               "\n").strip()
         return out_string
 
-    def convert_ids_to_str(self, ids):
+    def convert_ids_to_string(self, ids):
         """Convert ids to string."""
         tokens = self.convert_ids_to_tokens(ids)
         out_string = self.convert_tokens_to_string(tokens)
         return out_string
+
+    def num_special_tokens_to_add(self, pair=False):
+        """
+        Returns the number of added tokens when encoding a sequence with special 
+        tokens. 
+        Note:
+            This encodes inputs and checks the number of added tokens, and is 
+            therefore not efficient. Do not put this inside your training loop.
+        Args:
+            pair (bool, optional): Returns the number of added tokens in the 
+                case of a sequence pair if set to True, returns the number of 
+                added tokens in the case of a single sequence if set to False.
+                Default False.
+        Returns:
+            Number of tokens added to sequences
+        """
+        token_ids_0 = []
+        token_ids_1 = []
+        return len(
+            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
+                                                  if pair else None))
+
+    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        """
+        Build model inputs from a sequence or a pair of sequence by concatenating 
+        and adding special tokens. 
+        An UnifiedTransformer sequence has the following format:
+        ::
+            - single sequence: ``[CLS] X [SEP]``
+            - pair of sequences: ``[CLS] A [SEP] [CLS] B [SEP]``
+        Args:
+            token_ids_0 (list): List of IDs to which the special tokens will be 
+                added.
+            token_ids_1 (list, optional): Optional second list of IDs for sequence 
+                pairs. Default None.
+        Returns:
+            list: List of input_ids with the appropriate special tokens.
+        """
+        _cls = [self.cls_token_id]
+        _sep = [self.sep_token_id]
+        if token_ids_1 is None:
+            return _cls + token_ids_0 + _sep
+        return _cls + token_ids_0 + _sep + token_ids_1 + _sep
+
+    def build_offset_mapping_with_special_tokens(self,
+                                                 offset_mapping_0,
+                                                 offset_mapping_1=None):
+        """
+        Build offset map from a pair of offset map by concatenating and adding 
+        offsets of special tokens.
+        An UnifiedTransformer offset_mapping has the following format:
+        ::
+            - single sequence: ``(0,0) X (0,0)``
+            - pair of sequences: `(0,0) A (0,0) B (0,0)``
+        
+        Args:
+            offset_mapping_ids_0 (list): List of char offsets to which the special 
+                tokens will be added.
+            offset_mapping_ids_1 (list, optional): Optional second list of char 
+                offsets for offset mapping pairs. Dafault None
+
+        Returns:
+            list: List of char offsets with the appropriate offsets of special 
+                tokens.
+        """
+        if offset_mapping_1 is None:
+            return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)
+                                              ] + offset_mapping_1 + [(0, 0)]
+
+    def create_token_type_ids_from_sequences(self,
+                                             token_ids_0,
+                                             token_ids_1=None):
+        """
+        Create the token_type_ids from the two sequences passed for the model.
+
+        An UnifiedTransformer sequence token_type_ids has the following format:
+        ::
+
+            0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
+            | first sequence    | second sequence |
+
+        If `token_ids_1` is None, this method only returns the first portion (0s).
+
+        Args:
+            token_ids_0 (list): List of IDs.
+            token_ids_1 (list, optional): Optional second list of IDs for sequence 
+                pairs. Default None
+
+        Returns:
+            list: List of token_type_id according to the given sequence(s).
+        """
+        _cls = [self.cls_token_id]
+        _sep = [self.sep_token_id]
+        if token_ids_1 is None:
+            return [0] * len(_cls + token_ids_0 + _sep)
+        return [0] * len(_cls + token_ids_0 + _sep) + [1] * len(token_ids_1 +
+                                                                _sep)
+
+    def get_special_tokens_mask(self,
+                                token_ids_0,
+                                token_ids_1=None,
+                                already_has_special_tokens=False):
+        """
+        Retrieve sequence ids from a token list that has no special tokens added. 
+        This method is called when adding special tokens using the tokenizer 
+        ``prepare_for_model`` method.
+        Args:
+            token_ids_0 (list): List of IDs.
+            token_ids_1 (list, optional): Optional second list of IDs for sequence 
+                pairs. Default None.
+            already_has_special_tokens (bool, optional): Whether or not the token 
+                list is already formatted with special tokens for the model. Default
+                False.
+        Returns:
+            list: A list of integers in the range [0, 1]. 1 for a special token, 
+                0 for a sequence token.
+        """
+        if already_has_special_tokens:
+            if token_ids_1 is not None:
+                raise ValueError(
+                    "You should not supply a second sequence if the provided sequence of "
+                    "ids is already formatted with special tokens for the model."
+                )
+            return list(
+                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                    token_ids_0))
+
+        if token_ids_1 is not None:
+            return [1] + ([0] * len(token_ids_0)) + [1] + (
+                [0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1]
 
     def save_resources(self, save_directory):
         """
