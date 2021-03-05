@@ -20,14 +20,14 @@ import numpy as np
 import paddle
 import paddlenlp as ppnlp
 from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
-from paddlenlp.datasets import ChnSentiCorp
+from paddlenlp.datasets import load_dataset
 
 from utils import convert_example
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")
-parser.add_argument('--use_gpu', type=eval, default=False, help="Whether use GPU for training, input should be True or False")
+parser.add_argument('--use_gpu', type=eval, default=True, help="Whether use GPU for training, input should be True or False")
 parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate used to train.")
 parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
@@ -68,7 +68,7 @@ def create_dataloader(dataset,
         dataloader(obj:`paddle.io.DataLoader`): The dataloader which generates batches.
     """
     if trans_fn:
-        dataset = dataset.apply(trans_fn, lazy=True)
+        dataset = dataset.map(trans_fn)
 
     if mode == 'train' and use_gpu:
         sampler = paddle.io.DistributedBatchSampler(
@@ -97,15 +97,14 @@ if __name__ == "__main__":
     vocab = Vocab.load_vocabulary(
         args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
     # Loads dataset.
-    train_ds, dev_ds, test_ds = ChnSentiCorp.get_datasets(
-        ['train', 'dev', 'test'])
+    train_ds, dev_ds, test_ds = load_dataset(
+        "chnsenticorp", splits=["train", "dev", "test"], lazy=False)
 
     # Constructs the newtork.
-    label_list = train_ds.get_labels()
     model = ppnlp.models.Senta(
         network=args.network,
         vocab_size=len(vocab),
-        num_classes=len(label_list))
+        num_classes=len(train_ds.label_list))
     model = paddle.Model(model)
 
     # Reads data and generates mini-batches.
