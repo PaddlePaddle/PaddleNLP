@@ -79,8 +79,7 @@ export CUDA_VISIBLE_DEVICES=0
 python run_classifier.py --model_name_or_path bigbird-base-uncased-finetune \
     --output_dir "output" \
     --batch_size 2 \
-    --learning_rate 1e-4 \
-    --logging_steps 1000 \
+    --learning_rate 1e-5 \
     --max_steps 10000 \
     --save_steps 1000 \
     --logging_steps 1000 \
@@ -99,8 +98,8 @@ python run_classifier.py --model_name_or_path bigbird-base-uncased-finetune \
 - `max_encoder_length` MLM任务的最大的token数目。
 
 
-基于`bigbird-base-uncased`在IMDB评测任务上Fine-tuning后，在验证集上有如下结果：
+基于`bigbird-base-uncased-finetune`在IMDB评测任务上Fine-tuning后，在验证集上有如下结果：
 
 | Task  | Metric                       | Result            |
 |:-----:|:----------------------------:|:-----------------:|
-| IMDB  | Accuracy                     |      0.936        |
+| IMDB  | Accuracy                     |      0.9449       |
