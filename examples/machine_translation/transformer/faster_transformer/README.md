@@ -90,6 +90,9 @@ transformer = FasterTransformer(
 ``` sh
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
+export FLAGS_fraction_of_gpu_memory_to_use=0.1
+cp -rf ../../../../paddlenlp/ext_op/build/third-party/build/bin/decoding_gemm ./
+./decoding_gemm 8 4 8 64 38512 32 512 0
 python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding-lib ../../../../paddlenlp/ext_op/build/lib/libdecoding_op.so
 ```
 
@@ -105,6 +108,9 @@ float16 与 float32 预测的基本流程相同，不过在使用 float16 的 de
 ``` sh
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
+export FLAGS_fraction_of_gpu_memory_to_use=0.1
+cp -rf ../../../../paddlenlp/ext_op/build/third-party/build/bin/decoding_gemm ./
+./decoding_gemm 8 4 8 64 38512 32 512 1
 python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding-lib ../../../../paddlenlp/ext_op/build/lib/libdecoding_op.so --use-fp16-decoding
 ```
 

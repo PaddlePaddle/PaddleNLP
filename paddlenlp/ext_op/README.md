@@ -91,7 +91,8 @@ transformer = FasterTransformer(
 
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
-./build/third-party/build/bin/decoding_gemm 32 4 8 64 30000 32 512 False
+export FLAGS_fraction_of_gpu_memory_to_use=0.1
+./build/third-party/build/bin/decoding_gemm 32 4 8 64 30000 32 512 0
 python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml --decoding-lib ./build/lib/libdecoding_op.so
 ```
 

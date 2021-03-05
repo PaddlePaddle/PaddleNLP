@@ -1,2 +1,2 @@
 from .transformer.decoding import *
-from .transformer.fastertransformer import *
+from .transformer.faster_transformer import *
