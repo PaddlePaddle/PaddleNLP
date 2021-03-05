@@ -1,5 +1,4 @@
-# coding=utf-8
-# Copyright 2020 The HuggingFace Datasets Authors and the TensorFlow Datasets Authors.
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -83,12 +82,12 @@ class MapDataset(Dataset):
             subclass of Dataset.
     """
 
-    def __init__(self, data, **kargs):
+    def __init__(self, data, **kwargs):
         self.data = data
         self._transform_pipline = []
         self.new_data = self.data
-        if 'label_list' in kargs.keys():
-            self.label_list = kargs['label_list']
+        if 'label_list' in kwargs.keys():
+            self.label_list = kwargs['label_list']
 
     def _transform(self, data):
         for fn in reversed(self._transform_pipline):
@@ -139,7 +138,6 @@ class MapDataset(Dataset):
             index = dist.get_rank()
 
         num_samples = int(math.ceil(len(self.new_data) * 1.0 / num_shards))
-        total_size = num_samples * num_shards
         # add extra samples to make it evenly divisible
         self.new_data = [
             self.new_data[idx] for idx in range(len(self.new_data))
@@ -150,21 +148,29 @@ class MapDataset(Dataset):
 
         return self
 
-    def map(self, fn, lazy=True):
+    def map(self, fn, lazy=True, batched=False):
         """
         Performs specific function on the dataset to transform and update every sample.
         Args:
             fn (callable): Transformations to be performed. It receives single
-                sample as argument if lazy is True. Else it receives all examples.
+                sample as argument if batched is False. Else it receives all examples.
             lazy (bool, optional): If True, transformations would be delayed and
                 performed on demand. Otherwise, transforms all samples at once. Note that if `fn` is
                 stochastic, `lazy` should be True or you will get the same
                 result on all epochs. Defalt: False.
+            batched(bool, optional): If True, transformations would take all examples as input and 
+                return a collection of transformed examples. Note that if set True, `lazy` option 
+                would be ignored. 
         """
-        if lazy:
+        if batched:
+            self.new_data = fn(self.new_data)
+        elif lazy:
             self._transform_pipline.append(fn)
         else:
-            self.new_data = fn(self.new_data)
+            self.new_data = [
+                fn(self.new_data[idx]) for idx in range(len(self.new_data))
+            ]
+
         return self
 
     def __getattr__(self, name):
@@ -181,12 +187,12 @@ class IterDataset(IterableDataset):
             subclass of Dataset.
     """
 
-    def __init__(self, data, **kargs):
+    def __init__(self, data, **kwargs):
         self.data = data
         self._transform_pipline = []
         self._filter_pipline = []
-        if 'label_list' in kargs.keys():
-            self.label_list = kargs['label_list']
+        if 'label_list' in kwargs.keys():
+            self.label_list = kwargs['label_list']
 
     def _transform(self, data):
         for fn in reversed(self._transform_pipline):
@@ -256,11 +262,7 @@ class IterDataset(IterableDataset):
         Performs specific function on the dataset to transform and update every sample.
         Args:
             fn (callable): Transformations to be performed. It receives single
-                sample as argument if lazy is True. Else it receives all examples.
-            lazy (bool, optional): If True, transformations would be delayed and
-                performed on demand. Otherwise, transforms all samples at once. Note that if `fn` is
-                stochastic, `lazy` should be True or you will get the same
-                result on all epochs. Defalt: False.
+                sample as argument.
         """
 
         self._transform_pipline.append(fn)
@@ -331,8 +333,9 @@ class DatasetBuilder:
         (that is, not load all examples into memory at once).
         """
 
+        label_list = self.get_labels()
+
         if self.lazy:
-            label_list = self.get_labels()
 
             def generate_examples():
                 generator = self._read(
@@ -340,18 +343,27 @@ class DatasetBuilder:
                 ) if self._read.__code__.co_argcount > 2 else self._read(
                     filename)
                 for example in generator:
-                    if label_list is not None and 'labels' in example.keys(
-                    ) and example['labels']:
+                    # We need to check if the example contains label column and confirm its name.
+                    # For now we only allow `label` or `labels` to be the name of label column.
+                    if 'labels' in example.keys():
+                        label_col = 'labels'
+                    elif 'label' in example.keys():
+                        label_col = 'label'
+                    else:
+                        label_col = None
+
+                    # Convert class label to label ids.
+                    if label_list is not None and example.get(label_col, None):
                         label_dict = {}
                         for i, label in enumerate(label_list):
                             label_dict[label] = i
-                        if isinstance(example['labels'], list) or isinstance(
-                                example['labels'], tuple):
-                            for label_idx in range(len(example['labels'])):
-                                example['labels'][label_idx] = label_dict[
-                                    example['labels'][label_idx]]
+                        if isinstance(example[label_col], list) or isinstance(
+                                example[label_col], tuple):
+                            for label_idx in range(len(example[label_col])):
+                                example[label_col][label_idx] = label_dict[
+                                    example[label_col][label_idx]]
                         else:
-                            example['labels'] = label_dict[example['labels']]
+                            example[label_col] = label_dict[example[label_col]]
 
                         yield example
                     else:
@@ -373,22 +385,29 @@ class DatasetBuilder:
                     "No instances were read from the given filepath {}. "
                     "Is the path correct?".format(filename))
 
-            label_list = self.get_labels()
+            # We need to check if the example contains label column and confirm its name.
+            # For now we only allow `label` or `labels` to be the name of label column.
+            if 'labels' in examples[0].keys():
+                label_col = 'labels'
+            elif 'label' in examples[0].keys():
+                label_col = 'label'
+            else:
+                label_col = None
+
             # Convert class label to label ids.
-            if label_list is not None and 'labels' in examples[0].keys(
-            ) and examples[0]['labels']:
+            if label_list is not None and examples[0].get(label_col, None):
                 label_dict = {}
                 for i, label in enumerate(label_list):
                     label_dict[label] = i
                 for idx in range(len(examples)):
-                    if isinstance(examples[idx]['labels'], list) or isinstance(
-                            examples[idx]['labels'], tuple):
-                        for label_idx in range(len(examples[idx]['labels'])):
-                            examples[idx]['labels'][label_idx] = label_dict[
-                                examples[idx]['labels'][label_idx]]
+                    if isinstance(examples[idx][label_col], list) or isinstance(
+                            examples[idx][label_col], tuple):
+                        for label_idx in range(len(examples[idx][label_col])):
+                            examples[idx][label_col][label_idx] = label_dict[
+                                examples[idx][label_col][label_idx]]
                     else:
-                        examples[idx]['labels'] = label_dict[examples[idx][
-                            'labels']]
+                        examples[idx][label_col] = label_dict[examples[idx][
+                            label_col]]
 
             return MapDataset(examples, label_list=label_list)
 

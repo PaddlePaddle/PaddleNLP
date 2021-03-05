@@ -1,3 +1,18 @@
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 The HuggingFace Inc. team.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import random
 import time
@@ -183,7 +198,7 @@ def run(args):
             train_ds = load_dataset(task_name, data_files=args.train_file)
         else:
             train_ds = load_dataset(task_name, splits='train')
-        train_ds.map(prepare_train_features, lazy=False)
+        train_ds.map(prepare_train_features, batched=True)
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
         train_batchify_fn = lambda samples, fn=Dict({
@@ -289,7 +304,7 @@ def run(args):
         else:
             dev_ds = load_dataset(task_name, splits='dev')
 
-        dev_ds.map(prepare_validation_features, lazy=False)
+        dev_ds.map(prepare_validation_features, batched=True)
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.batch_size, shuffle=False)
 
