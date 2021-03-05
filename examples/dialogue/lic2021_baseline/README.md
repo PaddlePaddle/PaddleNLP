@@ -72,8 +72,8 @@ python -u infer.py --model_name_or_path=./checkpoints/model_80000
 
 采用不同的模型在样例测试集上有如下结果：
 
-|       model_name_or_path        ||  F1   | BLEU1 / BLEU2 | DISTINCT1 / DISTINCT2 |
-| :-----------------------------: || :---: | :-----------: | :-------------------: |
-|   unified_transformer-12L-cn    || 10.62 | 0.070 / 0.022 |     0.065 / 0.304     |
-| unified_transformer-12L-cn-luge || 33.11 | 0.245 / 0.157 |     0.074 / 0.238     |
-|    ./checkpoints/model_80000    || 32.38 | 0.239 / 0.150 |     0.070 / 0.219     |
+|       model_name_or_path        |  F1   | BLEU1 / BLEU2 | DISTINCT1 / DISTINCT2 |
+| :-----------------------------: | :---: | :-----------: | :-------------------: |
+|   unified_transformer-12L-cn    | 10.62 | 0.070 / 0.022 |     0.065 / 0.304     |
+| unified_transformer-12L-cn-luge | 33.11 | 0.245 / 0.157 |     0.074 / 0.238     |
+|    ./checkpoints/model_80000    | 32.38 | 0.239 / 0.150 |     0.070 / 0.219     |
