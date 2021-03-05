@@ -1,9 +1,8 @@
 # Big Bird
 
 ## 模型介绍
-[Big Bird](https://arxiv.org/abs/2007.14062)(Transformers for Longer Sequences) Google的研究人员提出的长序列预训练模型，使用了稀疏注意力机制，将复杂度降到线性。
-
-本项目 Big Bird 的 PaddlePaddle 实现， 包含模型训练，模型验证等内容。下是本例的简要目录结构及说明：
+[Big Bird](https://arxiv.org/abs/2007.14062)(Transformers for Longer Sequences) 是Google的研究人员提出的针对长序列预训练模型，使用了稀疏注意力机制，将计算复杂度、空间复杂度降到线性复杂度，大大提升了长序列任务的预测能力。
+本项目是 Big Bird 的 PaddlePaddle 实现， 包含模型训练，模型验证等内容。以下是本例的简要目录结构及说明：
 
 ```text
 .
@@ -82,7 +81,6 @@ python run_classifier.py --model_name_or_path bigbird-base-uncased-finetune \
     --learning_rate 1e-5 \
     --max_steps 10000 \
     --save_steps 1000 \
-    --logging_steps 1000 \
     --max_encoder_length 3072
 ```
 

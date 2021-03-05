@@ -685,16 +685,16 @@ class BigBirdSparseAttention(Attention):
         blocked_query_mask = paddle.reshape(query_mask, [B, L, bs])
         blocked_key_mask = paddle.reshape(key_mask, [B, L, bs])
 
-        ########################## global_front_product ##########################
+        # 1. global_front_product 
         global_front_out = self._get_global_out(
             query_matrix, key_matrix, value_matrix, key_mask, d_head, dropout)
 
-        ########################## global_back_product ##########################
+        # 2. global_back_product
         global_back_out = self._get_global_out(query_matrix, key_matrix,
                                                value_matrix, key_mask, d_head,
                                                dropout, False)
 
-        ########################### second_product #############################
+        # 3. second_product
 
         # create second matrix
         # [B, 1, L-G, bs, (G+W)*bs]
