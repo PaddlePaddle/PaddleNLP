@@ -96,7 +96,7 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
 
     train_ds, test_ds = load_dataset(
-        'msra_ner', splits=('train', 'test'), lazy=True)
+        'msra_ner', splits=('train', 'test'), lazy=False)
 
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
 
