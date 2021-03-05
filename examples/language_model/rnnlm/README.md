@@ -34,7 +34,7 @@
 * PaddleNLP 安装
 
    ```shell
-   pip install paddlenlp>=2.0.0rc
+   pip install paddlenlp\>=2.0.0rc
    ```
 
 * 环境依赖
@@ -50,7 +50,7 @@
 任务训练启动命令如下：
 
 ```
-python train_hapi.py
+python train.py
 ```
 
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存模型到checkpoint、中。

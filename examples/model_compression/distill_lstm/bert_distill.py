@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import time
 
 import paddle
 import paddle.nn as nn
-from paddle.metric import Metric, Accuracy, Precision, Recall
+from paddle.metric import Accuracy
 
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers.tokenizer_utils import whitespace_tokenize
+from paddlenlp.transformers import BertForSequenceClassification
 from paddlenlp.metrics import AccuracyAndF1
 from paddlenlp.datasets import GlueSST2, GlueQQP, ChnSentiCorp
 
 from args import parse_args
 from small import BiLSTM
-from data import create_distill_loader, load_embedding
+from data import create_distill_loader
 
 TASK_CLASSES = {
     "sst-2": (GlueSST2, Accuracy),
@@ -36,7 +36,6 @@ TASK_CLASSES = {
 
 class TeacherModel(object):
     def __init__(self, model_name, param_path):
-        self.tokenizer = BertTokenizer.from_pretrained(model_name)
         self.model = BertForSequenceClassification.from_pretrained(model_name)
         self.model.set_state_dict(paddle.load(param_path))
         self.model.eval()
@@ -72,20 +71,21 @@ def evaluate(task_name, model, metric, data_loader):
 
 
 def do_train(agrs):
+    device = paddle.set_device(args.select_device)
     train_data_loader, dev_data_loader = create_distill_loader(
         args.task_name,
         model_name=args.model_name,
         vocab_path=args.vocab_path,
         batch_size=args.batch_size,
         max_seq_length=args.max_seq_length,
-        n_iter=args.n_iter)
-
-    emb_tensor = load_embedding(
-        args.vocab_path) if args.use_pretrained_emb else None
+        n_iter=args.n_iter,
+        whole_word_mask=args.whole_word_mask,
+        seed=args.seed)
 
     model = BiLSTM(args.emb_dim, args.hidden_size, args.vocab_size,
-                   args.output_dim, args.padding_idx, args.num_layers,
-                   args.dropout_prob, args.init_scale, emb_tensor)
+                   args.output_dim, args.vocab_path, args.padding_idx,
+                   args.num_layers, args.dropout_prob, args.init_scale,
+                   args.embedding_name)
 
     if args.optimizer == 'adadelta':
         optimizer = paddle.optimizer.Adadelta(
@@ -106,11 +106,17 @@ def do_train(agrs):
 
     print("Start to distill student model.")
 
+    if args.init_from_ckpt:
+        model.set_state_dict(paddle.load(args.init_from_ckpt + ".pdparams"))
+        optimizer.set_state_dict(paddle.load(args.init_from_ckpt + ".pdopt"))
+        print("Loaded checkpoint from %s" % args.init_from_ckpt)
+
     global_step = 0
     tic_train = time.time()
     for epoch in range(args.max_epoch):
         model.train()
         for i, batch in enumerate(train_data_loader):
+            global_step += 1
             if args.task_name == 'qqp':
                 bert_input_ids, bert_segment_ids, student_input_ids_1, seq_len_1, student_input_ids_2, seq_len_2, labels = batch
             else:
@@ -134,7 +140,7 @@ def do_train(agrs):
             optimizer.step()
             optimizer.clear_grad()
 
-            if i % args.log_freq == 0:
+            if global_step % args.log_freq == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.4f step/s"
                     % (global_step, epoch, i, loss,
@@ -143,12 +149,19 @@ def do_train(agrs):
                 acc = evaluate(args.task_name, model, metric, dev_data_loader)
                 print("eval done total : %s s" % (time.time() - tic_eval))
                 tic_train = time.time()
-            global_step += 1
+
+            if global_step % args.save_steps == 0:
+                paddle.save(
+                    model.state_dict(),
+                    os.path.join(args.output_dir,
+                                 "step_" + str(global_step) + ".pdparams"))
+                paddle.save(optimizer.state_dict(),
+                            os.path.join(args.output_dir,
+                                         "step_" + str(global_step) + ".pdopt"))
 
 
 if __name__ == '__main__':
-    paddle.seed(2021)
     args = parse_args()
     print(args)
-
+    paddle.seed(args.seed)
     do_train(args)

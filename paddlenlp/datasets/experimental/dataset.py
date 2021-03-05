@@ -53,78 +53,24 @@ def import_main_class(module_path):
     return module_main_cls
 
 
-def load_dataset(name, data_files=None, splits=None, lazy=None):
-    module_path = DATASETS_MODULE_PATH + name
+def load_dataset(path,
+                 name=None,
+                 data_files=None,
+                 splits=None,
+                 lazy=None,
+                 **kwargs):
+    module_path = DATASETS_MODULE_PATH + path
 
     reader_cls = import_main_class(module_path)
-    reader_instance = reader_cls(lazy)
+    if not name:
+        reader_instance = reader_cls(lazy=lazy)
+    else:
+        reader_instance = reader_cls(lazy=lazy, name=name)
 
-    datasets = []
-
-    if data_files:
-        assert isinstance(data_files, str) or (
-            isinstance(data_files, list) and isinstance(data_files[0], str)
-        ) or (
-            isinstance(data_files, tuple) and isinstance(data_files[0], str)
-        ), "`data_files` should be a string or list of string or a tuple of string."
-        datasets += reader_instance.read_datasets(data_files)
-
-    if splits:
-        assert isinstance(splits, str) or (
-            isinstance(splits, list) and isinstance(splits[0], str)
-        ) or (
-            isinstance(splits, tuple) and isinstance(splits[0], str)
-        ), "`splits` should be a string or list of string or a tuple of string."
-        datasets += reader_instance.read_datasets(splits)
+    datasets = reader_instance.read_datasets(
+        data_files=data_files, splits=splits)
 
     return datasets
-
-
-@classmethod
-def get_datasets(cls, *args, **kwargs):
-    """
-    Get muitiple datasets like train, valid and test of current dataset.
-
-    Example:
-        .. code-block:: python
-
-            from paddlenlp.datasets import GlueQNLI
-            train_dataset, dev_dataset, test_dataset = GlueQNLI.get_datasets(['train', 'dev', 'test'])
-            train_dataset, dev_dataset, test_dataset = GlueQNLI.get_datasets(mode=['train', 'dev', 'test'])
-            train_dataset = GlueQNLI.get_datasets('train')
-            train_dataset = GlueQNLI.get_datasets(['train'])
-            train_dataset = GlueQNLI.get_datasets(mode='train')
-    """
-    if not args and not kwargs:
-        try:
-            args = cls.SPLITS.keys()
-        except:
-            raise AttributeError(
-                'Dataset must have SPLITS attridute to use get_dataset if configs is None.'
-            )
-
-        datasets = tuple(MapDataset(cls(arg)) for arg in args)
-    else:
-
-        for arg in args:
-            if not isinstance(arg, list):
-                return MapDataset(cls(*args, **kwargs))
-        for value in kwargs.values():
-            if not isinstance(value, list):
-                return MapDataset(cls(*args, **kwargs))
-
-        num_datasets = len(args[0]) if args else len(list(kwargs.values())[0])
-        datasets = tuple(
-            MapDataset(
-                cls(*(args[i] for args in args), **(
-                    {key: value[i]
-                     for key, value in kwargs.items()})))
-            for i in range(num_datasets))
-
-    return datasets if len(datasets) > 1 else datasets[0]
-
-
-Dataset.get_datasets = get_datasets
 
 
 class MapDataset(Dataset):
@@ -335,23 +281,46 @@ class DatasetBuilder:
     """
     lazy = False
 
-    def __init__(self, lazy=None, max_examples: Optional[int]=None):
+    def __init__(self, lazy=None, name=None):
         if lazy is not None:
             self.lazy = lazy
-        self.max_examples = max_examples
+        self.name = name
 
-    def read_datasets(self, path_or_split):
+    def read_datasets(self, splits=None, data_files=None):
         datasets = []
-        for arg in path_or_split:
-            if os.path.exists(arg):
-                datasets.append(self.read(arg))
+        assert splits or data_files, "`data_files` and `splits` can not both be None."
+
+        if data_files:
+            assert isinstance(data_files, str) or isinstance(
+                data_files, dict
+            ), "`data_files` should be a string or a dictionary whose key is split name ande value is a path of data file."
+            if isinstance(data_files, str):
+                split = 'train'
+                datasets.append(self.read(filename=data_files, split=split))
             else:
-                root = self._get_data(arg)
-                datasets.append(self.read(root))
+                datasets += [
+                    self.read(
+                        filename=filename, split=split)
+                    for split, filename in data_files.items()
+                ]
 
-        return datasets
+        if splits:
+            assert isinstance(splits, str) or (
+                isinstance(splits, list) and isinstance(splits[0], str)
+            ) or (
+                isinstance(splits, tuple) and isinstance(splits[0], str)
+            ), "`splits` should be a string or list of string or a tuple of string."
+            if isinstance(splits, str):
+                filename = self._get_data(splits)
+                datasets.append(self.read(filename=filename, split=splits))
+            else:
+                for split in splits:
+                    filename = self._get_data(split)
+                    datasets.append(self.read(filename=filename, split=split))
 
-    def read(self, root):
+        return datasets if len(datasets) > 1 else datasets[0]
+
+    def read(self, filename, split='train'):
         """
         Returns an dataset containing all the examples that can be read from the file path.
         If `self.lazy` is `False`, this eagerly reads all instances from `self._read()`
@@ -361,41 +330,39 @@ class DatasetBuilder:
         In this case your implementation of `_read()` must also be lazy
         (that is, not load all examples into memory at once).
         """
-        if not isinstance(root, str):
-            root = str(root)
 
         if self.lazy:
             label_list = self.get_labels()
 
-            if label_list is not None:
-                label_dict = {}
-                for i, label in enumerate(label_list):
-                    label_dict[label] = i
-
-                def generate_examples():
-                    for example in self._read(root):
-                        if 'labels' not in example.keys():
-                            raise ValueError(
-                                "Keyword 'labels' should be in example if get_label() is specified."
-                            )
-                        else:
+            def generate_examples():
+                generator = self._read(
+                    filename, split
+                ) if self._read.__code__.co_argcount > 2 else self._read(
+                    filename)
+                for example in generator:
+                    if label_list is not None and 'labels' in example.keys(
+                    ) and example['labels']:
+                        label_dict = {}
+                        for i, label in enumerate(label_list):
+                            label_dict[label] = i
+                        if isinstance(example['labels'], list) or isinstance(
+                                example['labels'], tuple):
                             for label_idx in range(len(example['labels'])):
                                 example['labels'][label_idx] = label_dict[
                                     example['labels'][label_idx]]
+                        else:
+                            example['labels'] = label_dict[example['labels']]
 
-                            yield example
-
-                return IterDataset(generate_examples, label_list=label_list)
-            else:
-
-                def generate_examples():
-                    for example in self._read(root):
+                        yield example
+                    else:
                         yield example
 
-                return IterDataset(generate_examples)
-
+            return IterDataset(generate_examples, label_list=label_list)
         else:
-            examples = self._read(root)
+            examples = self._read(
+                filename,
+                split) if self._read.__code__.co_argcount > 2 else self._read(
+                    filename)
 
             # Then some validation.
             if not isinstance(examples, list):
@@ -404,30 +371,28 @@ class DatasetBuilder:
             if not examples:
                 raise ValueError(
                     "No instances were read from the given filepath {}. "
-                    "Is the path correct?".format(root))
+                    "Is the path correct?".format(filename))
 
             label_list = self.get_labels()
             # Convert class label to label ids.
-            if label_list is not None:
-                if 'labels' not in examples[0].keys():
-                    raise ValueError(
-                        "Key 'labels' should be in example if get_label() is specified."
-                    )
-
+            if label_list is not None and 'labels' in examples[0].keys(
+            ) and examples[0]['labels']:
                 label_dict = {}
                 for i, label in enumerate(label_list):
                     label_dict[label] = i
-
                 for idx in range(len(examples)):
-                    for label_idx in range(len(examples[idx]['labels'])):
-                        examples[idx]['labels'][label_idx] = label_dict[
-                            examples[idx]['labels'][label_idx]]
+                    if isinstance(examples[idx]['labels'], list) or isinstance(
+                            examples[idx]['labels'], tuple):
+                        for label_idx in range(len(examples[idx]['labels'])):
+                            examples[idx]['labels'][label_idx] = label_dict[
+                                examples[idx]['labels'][label_idx]]
+                    else:
+                        examples[idx]['labels'] = label_dict[examples[idx][
+                            'labels']]
 
-            return MapDataset(
-                examples,
-                label_list=label_list) if label_list else MapDataset(examples)
+            return MapDataset(examples, label_list=label_list)
 
-    def _read(self, file_path: str):
+    def _read(self, filename: str, *args):
         """
         Reads examples from the given file_path and returns them as an
         `Iterable` (which could be a list or could be a generator).

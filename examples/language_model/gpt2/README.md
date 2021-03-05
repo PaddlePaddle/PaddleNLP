@@ -137,23 +137,32 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
 
 1. WikiText数据集评估
 ```bash
-python run_eval.py --model_name_or_path gpt2-medium-en \
+python run_eval.py --model_name gpt2-medium-en \
     --eval_path ./wikitext-103/wiki.valid.tokens \
     --overlapping_eval 32 \
-    --init_checkpoint_path ./checkpoint_dir/model_state.pdparams \
+    --init_checkpoint_path ./output/model_100000/model_state.pdparams \
     --batch_size 8 \
     --device gpu
 ```
 
 2. LAMBADA数据集评估
 ```bash
-python run_eval.py --model_name_or_path gpt2-medium-en \
+python run_eval.py --model_name gpt2-medium-en \
     --eval_path ./lambada_test.jsonl \
     --cloze_eval \
-    --init_checkpoint_path ./checkpoint_dir/model_state.pdparams \
+    --init_checkpoint_path ./output/model_100000/model_state.pdparams \
     --batch_size 8 \
     --device gpu
 ```
+其中参数释义如下：
+`model_name` 使用的模型名称，如gpt2-samll-en等。
+`eval_path` 数据集地址。
+`init_checkpoint_path` 模型参数地址
+`batch_size` batch size大小。
+`device` 运行设备，cpu，gpu，xpu可选。
+`overlapping_eval` wikitext数据集参数。
+`cloze_eval` lambada数据参数，作为完型填空任务。
+
 其中数据集WikiText采用的是PPL(perplexity)评估指标，LAMBADA采用的是ACC(accuracy)指标。不设置`init_checkpoint_path` 参数时，可以评估默认预训练好的模型参数。
 
 

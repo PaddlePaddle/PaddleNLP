@@ -1,5 +1,4 @@
 import os
-import math
 import collections
 
 from paddle.io import Dataset
@@ -7,9 +6,7 @@ from paddle.io import Dataset
 from paddle.utils.download import get_path_from_url
 from paddle.dataset.common import md5file
 from paddlenlp.utils.env import DATA_HOME
-import paddle.distributed as dist
 from . import DatasetBuilder
-import numpy as np
 
 __all__ = ['PTB']
 
@@ -35,11 +32,10 @@ class PTB(DatasetBuilder):
                                             not md5file(fullname) == data_hash):
 
             get_path_from_url(self.URL, default_root, self.MD5)
-            fullname = os.path.join(default_root, filename)
 
         return fullname
 
-    def _read(self, filename):
+    def _read(self, filename, *args):
         with open(filename, 'r', encoding='utf-8') as f:
             for line in f:
                 line_stripped = line.strip()

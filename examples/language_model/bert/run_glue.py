@@ -310,7 +310,7 @@ def do_train(args):
         train_dataset, batch_size=args.batch_size, shuffle=True)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(),  # length
         Stack(dtype="int64" if train_dataset.get_labels() else "float32")  # label
     ): [data for i, data in enumerate(fn(samples)) if i != 2]
