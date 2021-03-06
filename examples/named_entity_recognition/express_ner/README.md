@@ -35,7 +35,7 @@
 | A4-B | 详细地址起始位置 | A4-I | 详细地址中间位置或结束位置 |
 | O | 无关字符 | | |
 
-注意每个标签的结果只有 B、I、O 三种，这种标签的定义方式叫做 BIO 体系。其中 B 表示一个标签类别的开头，比如 P-B 指的是姓名的开头；相应的，I 表示一个标签的延续。
+数据标注采用**BIO模式**。其中 B(begin) 表示一个标签类别的开头，比如 P-B 指的是姓名的开头；相应的，I(inside) 表示一个标签的延续。O表示Outside无关字符。更多标注模式介绍请参考[Inside–outside–beginning (tagging)](https://en.wikipedia.org/wiki/Inside%E2%80%93outside%E2%80%93beginning_(tagging))
 
 ### 2.3 启动训练
 

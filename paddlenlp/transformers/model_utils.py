@@ -26,6 +26,7 @@ from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
+from .generation_utils import GenerationMixin
 from .utils import InitTrackerMeta, fn_args_to_dict
 
 __all__ = [
@@ -50,7 +51,7 @@ def register_base_model(cls):
 
 
 @six.add_metaclass(InitTrackerMeta)
-class PretrainedModel(Layer):
+class PretrainedModel(Layer, GenerationMixin):
     """
     The base class for all pretrained models. It provides some attributes and
     common methods for all pretrained models, including attributes `init_config`,

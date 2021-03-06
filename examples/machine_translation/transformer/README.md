@@ -132,6 +132,10 @@ python deploy/python/inference.py  --config ./configs/transformer.base.yaml
 
 翻译结果同样将会保存在 `predict.txt` 文件中，可以在配置文件中自定义更改 `output_file` 来指定预测结果写入到的文件的名称。
 
+## 使用 Faster Transformer 实现预测
+
+具体的说明可以参考 `faster_transformer/README.md`。`cd faster_transformer/` 即可查看。
+
 ## 模型评估
 
 预测结果中每行输出是对应行输入的得分最高的翻译，对于使用 BPE 的数据，预测出的翻译结果也将是 BPE 表示的数据，要还原成原始的数据（这里指 tokenize 后的数据）才能进行正确的评估。评估过程具体如下（BLEU 是翻译任务常用的自动评估方法指标）：

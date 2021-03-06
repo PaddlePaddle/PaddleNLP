@@ -117,7 +117,7 @@ def do_train(args):
     batchify_fn = lambda samples, fn=Dict({
         'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        'seq_len': Stack(),
+        'seq_len': Stack(), # seq_len
         'labels': Pad(axis=0, pad_val=ignore_label)  # label
     }): fn(samples)
 
@@ -185,7 +185,7 @@ def do_train(args):
             avg_loss.backward()
             optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             if global_step % args.save_steps == 0 or global_step == last_step:
                 if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
                     evaluate(model, loss_fct, metric, test_data_loader,
