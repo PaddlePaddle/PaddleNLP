@@ -54,12 +54,8 @@ def create_train_loader(args):
 
     key = (lambda x, data_source: len(data_source[x][0]))
 
-    train_ds = train_ds.filter(
-        lambda data: (len(data['source']) > 0 and len(data['target']) > 0)).map(
-            convert_example, lazy=False)
-    dev_ds = dev_ds.filter(
-        lambda data: (len(data['source']) > 0 and len(data['target']) > 0)).map(
-            convert_example, lazy=False)
+    train_ds = train_ds.map(convert_example, lazy=False)
+    dev_ds = dev_ds.map(convert_example, lazy=False)
 
     train_batch_sampler = SamplerHelper(train_ds).shuffle().sort(
         key=key, buffer_size=batch_size * 20).batch(batch_size=batch_size)

@@ -97,7 +97,8 @@ class IWSLT15(DatasetBuilder):
                 for src_line, tgt_line in zip(src_f, tgt_f):
                     src_line = src_line.strip()
                     tgt_line = tgt_line.strip()
-
+                    if not src_line and not tgt_line:
+                        continue
                     yield {"source": src_line, "target": tgt_line}
 
     def get_vocab(self):
