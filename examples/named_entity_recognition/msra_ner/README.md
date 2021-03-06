@@ -16,12 +16,10 @@ PaddleNLP集成的数据集MSRA-NER数据集对文件格式做了调整：每一
 ### 2.1 环境配置
 
 - Python >= 3.6
-
 - paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-
 - paddlenlp >= 2.0.0rc4, 安装方式：`pip install paddlenlp\>=2.0.0rc4`
 
-### 2.2 启动MSRA-NER任务
+### 2.2 模型训练
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -67,7 +65,7 @@ Precision                     | 0.908957    |
 Recall                        | 0.926683    |
 F1                            | 0.917734    |
 
-## 启动评估
+## 3. 模型评估
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -87,7 +85,7 @@ python -u ./eval.py \
 - `use_gpu`: 是否使用GPU。
 - `init_checkpoint_path`: 模型加载路径。
 
-## 启动预测
+## 4. 模型预测
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -100,7 +98,7 @@ python -u ./predict.py \
     --init_checkpoint_path tmp/msra_ner/model_500.pdparams
 ```
 
-## 使用其它预训练模型
+## 5. 使用其它预训练模型
 
 本项目支持[PaadleNLP transformer类预训练模型](../../docs/transformers.md)中除ernie-gen以外的所有模型。若使用非BERT系列模型，需修改脚本导入相应的Task和Tokenizer。例如使用ERNIE系列模型，经查[PaadleNLP transformer类预训练模型](../../docs/transformers.md)，需要加入以下代码：
 ```python

@@ -94,7 +94,7 @@ def load_dict(dict_path):
 def load_dataset(datafiles):
     def read(data_path):
         with open(data_path, 'r', encoding='utf-8') as fp:
-            next(fp)
+            next(fp) # Skip header
             for line in fp.readlines():
                 words, labels = line.strip('\n').split('\t')
                 words = words.split('\002')
@@ -124,16 +124,15 @@ if __name__ == '__main__':
 
     ignore_label = -1
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-        Stack(),
-        Pad(axis=0, pad_val=ignore_label)
+        Pad(axis=0, pad_val=tokenizer.pad_token_id), # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id), # token_type_ids
+        Stack(), # seq_len
+        Pad(axis=0, pad_val=ignore_label) # labels
     ): fn(samples)
 
     train_loader = paddle.io.DataLoader(
         dataset=train_ds,
         batch_size=200,
-        shuffle=False,
         return_list=True,
         collate_fn=batchify_fn)
     dev_loader = paddle.io.DataLoader(
@@ -157,7 +156,7 @@ if __name__ == '__main__':
 
     step = 0
     for epoch in range(10):
-        model.train()
+        model.train() # Switch the model to training mode
         for idx, (input_ids, token_type_ids, length,
                   labels) in enumerate(train_loader):
             logits = model(input_ids, token_type_ids).reshape(
