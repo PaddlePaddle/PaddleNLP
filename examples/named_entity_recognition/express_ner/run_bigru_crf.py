@@ -122,18 +122,18 @@ if __name__ == '__main__':
 
     def convert_example(example):
         tokens, labels = example
-        tokens_ids = convert_tokens_to_ids(tokens, word_vocab, 'OOV')
+        token_ids = convert_tokens_to_ids(tokens, word_vocab, 'OOV')
         label_ids = convert_tokens_to_ids(labels, label_vocab, 'O')
-        return tokens_ids, len(tokens_ids), label_ids
+        return token_ids, len(token_ids), label_ids
 
     train_ds.map(convert_example)
     dev_ds.map(convert_example)
     test_ds.map(convert_example)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=word_vocab.get('OOV')),
-        Stack(),
-        Pad(axis=0, pad_val=label_vocab.get('O'))
+        Pad(axis=0, pad_val=word_vocab.get('OOV')), # token_ids
+        Stack(),                                    # seq_len
+        Pad(axis=0, pad_val=label_vocab.get('O'))   # label_ids
         ): fn(samples)
 
     train_loader = paddle.io.DataLoader(

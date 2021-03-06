@@ -69,7 +69,7 @@ def evaluate(model, metric, data_loader):
         metric.update(correct)
         accu = metric.accumulate()
     print("accu: %f" % (accu))
-    model.train()
+    model.train() # Switch the model to training mode after evaluation
 
 
 @paddle.no_grad()
