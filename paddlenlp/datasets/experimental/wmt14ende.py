@@ -67,6 +67,10 @@ class WMT14ende(DatasetBuilder):
             "a1b1f4c47f487253e1ac88947b68b3b8")
     }
 
+    VOCAB_INFO = (os.path.join("WMT14.en-de", "wmt14_ende_data_bpe",
+                               "vocab_all.bpe.33708"),
+                  "2fc775b7df37368e936a8e1f63846bb0")
+
     def _get_data(self, mode, **kwargs):
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
         src_filename, tgt_filename, src_data_hash, tgt_data_hash = self.SPLITS[
@@ -74,12 +78,18 @@ class WMT14ende(DatasetBuilder):
         src_fullname = os.path.join(default_root, src_filename)
         tgt_fullname = os.path.join(default_root, tgt_filename)
 
+        vocab_filename, vocab_hash = self.VOCAB_INFO
+        vacab_fullname = os.path.join(default_root, vocab_filename)
+
         if (not os.path.exists(src_fullname) or
             (src_data_hash and not md5file(src_fullname) == src_data_hash)) or (
                 not os.path.exists(tgt_fullname) or
-                (tgt_data_hash and not md5file(tgt_fullname) == tgt_data_hash)):
+                (tgt_data_hash and not md5file(tgt_fullname) == tgt_data_hash)
+            ) or (not os.path.exists(vacab_fullname) or
+                  (vocab_hash and not md5file(vacab_fullname) == vocab_hash)):
             get_path_from_url(self.URL, default_root, self.MD5)
 
+        self.vocab_info = vacab_fullname
         return src_fullname, tgt_fullname
 
     def _read(self, filename, *args):
@@ -93,3 +103,6 @@ class WMT14ende(DatasetBuilder):
                         break
 
                     yield {"source": src_line, "target": tgt_line}
+
+    def get_vocab(self):
+        return self.vocab_info
