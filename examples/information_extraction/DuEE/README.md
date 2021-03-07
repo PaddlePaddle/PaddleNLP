@@ -1,4 +1,4 @@
-# LIC2021事件抽取基线
+# LIC2021 DuEE 事件抽取基线
 
 
 信息抽取旨在从非结构化自然语言文本中提取结构化知识，如实体、关系、事件等。事件抽取的目标是对于给定的自然语言句子，根据预先指定的事件类型和论元角色，识别句子中所有目标事件类型的事件，并根据相应的论元角色集合抽取事件所对应的论元。其中目标事件类型 (event_type) 和论元角色 (role) 限定了抽取的范围，例如 (event_type：胜负，role：时间，胜者，败者，赛事名称)、(event_type：夺冠，role：夺冠事件，夺冠赛事，冠军)。
@@ -147,7 +147,6 @@ inputs = tokenizer(text="请输入测试样例", max_seq_len=20)
 ```
 
 
-
 ### 快速复现基线Step4：定义损失函数和优化器，开始训练
 
 在该基线上，我们选择交叉墒作为损失函数，使用[`paddle.optimizer.AdamW`](https://www.paddlepaddle.org.cn/documentation/docs/zh/api/paddle/optimizer/adamw/AdamW_cn.html#adamw)作为优化器。
@@ -241,3 +240,7 @@ from paddlenlp.transformers import RobertaForTokenClassification, RobertaTokeniz
 model = RobertaForTokenClassification.from_pretrained("roberta-wwm-ext-large", num_classes=len(label_map))
 tokenizer = RobertaTokenizer.from_pretrained("roberta-wwm-ext-large")
 ```
+
+## Reference
+
+- [DuEE: A Large-Scale Dataset for Chinese Event Extraction in Real-World Scenarios](https://link.springer.com/chapter/10.1007/978-3-030-60457-8_44)
