@@ -21,6 +21,15 @@ from ..attention_utils import _convert_param_attr_to_list, MultiHeadAttention, \
         AttentionRegistry, Mask, create_bigbird_simulated_attention_mask_list, create_bigbird_rand_mask_idx_list
 from .. import PretrainedModel, register_base_model
 
+__all__ = [
+    'BigBirdModel',
+    'BigBirdPretrainedModel',
+    'BigBirdForPretraining',
+    'BigBirdPretrainingCriterion',
+    'BigBirdForSequenceClassification',
+    'BigBirdPretrainingHeads',
+]
+
 
 class Mask(object):
     def __init__(self,
