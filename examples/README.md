@@ -69,8 +69,10 @@ PaddleNLP 提供了多种成熟的预训练模型技术，适用于自然语言�
 
 文本生成是自然语言处理中一个重要的研究领域，具有广阔的应用前景。国内外已经有诸如Automated Insights、Narrative Science等文本生成系统投入使用，这些系统根据格式化数据或自然语言文本生成新闻、财报或者其他解释性文本。目前比较常见的文本生成任务两大类，文本写作和文本摘要。在这里主要提供百度自研的文本生成模型ERNIE-GEN, ERNIE-GEN是一种Multi-Flow结构的预训练和微调框架。ERNIE-GEN利用更少的参数量和数据，在摘要生成、问题生成、对话和生成式问答4个任务共5个数据集上取得了SOTA效果。我们基于ERNIE-GEN模型提供了一个自动关写诗的示例，来展示ERNIE-GEN的生成效果。
 
-| 模型                                                         | 简介                                                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| 模型        | 简介      |
+| --------- | ------------------ |
+| [Seq2Seq](./text_generation/couplet) | 通过经典的Seq2Seq with Attention的网络结构，在中文对联数据集上完成文本生成的示例任务。更多关于模型细节可参考[Neural Machine Translation by Jointly Learning to Align and Translate](https://arxiv.org/abs/1409.0473) | 
+| [VAE-Seq2Seq](./text_generation/vae-seq2seq) | 在传统的Seq2Seq框架基础上，通过VAE的方案完成文本生成任务。其中关于VAE的技术细节可参考[(Bowman et al., 2015) Generating Sentences from a Continuous Space](https://arxiv.org/pdf/1511.06349.pdf) | 
 | [ERNIE-GEN](./text_generation/ernie-gen) | ERNIE-GEN是百度自研的生成式预训练模型，通过Global-Attention的方式解决训练和预测曝光偏差的问题，同时使用Multi-Flow Attention机制来分别进行Global和Context信息的交互，同时通过片段生成的方式来增加语义相关性。更多技术细节可参考[An Enhanced Multi-Flow Pre-training and Fine-tuning Framework for Natural Language Generation](https://arxiv.org/abs/2001.11314) |
 
 
@@ -95,8 +97,8 @@ PaddleNLP 提供了多种成熟的预训练模型技术，适用于自然语言�
 
 | 任务   | 简介     |
 | ------- | ------- |
-| 事件抽取(./information_extraction/DuEE)| 基于百度开放的大规模中文事件抽取数据集[DuEE](https://link.springer.com/chapter/10.1007/978-3-030-60457-8_44)，结合ERNIE预训练模型与序列标注模型完成高质量的事件抽取。|
-| 关系抽取(./information_extraction/DuIE)| 基于百度开放的业界规模最大的Schema的中文关系抽取数据集[DuIE](http://tcci.ccf.org.cn/conference/2019/papers/EV10.pdf)，结合ERNIE预训练模型与序列标注模型完成文本关系抽取。|
+| [事件抽取](./information_extraction/DuEE)| 基于百度开放的大规模中文事件抽取数据集[DuEE](https://link.springer.com/chapter/10.1007/978-3-030-60457-8_44)，结合ERNIE预训练模型与序列标注模型完成高质量的事件抽取。|
+| [关系抽取](./information_extraction/DuIE)| 基于百度开放的业界规模最大的Schema的中文关系抽取数据集[DuIE](http://tcci.ccf.org.cn/conference/2019/papers/EV10.pdf)，结合ERNIE预训练模型与序列标注模型完成文本关系抽取。|
 
 
 ## NLP系统应用

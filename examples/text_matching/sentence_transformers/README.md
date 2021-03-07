@@ -187,63 +187,9 @@ Data: ['小蝌蚪找妈妈怎么样', '小蝌蚪找妈妈是谁画的']      Lab
 ```
 
 
-## 引用
+## Reference
 
 关于Sentence Transformer更多信息参考[www.SBERT.net](https://www.sbert.net)以及论文：
 - [Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks](https://arxiv.org/abs/1908.10084) (EMNLP 2019)
 - [Making Monolingual Sentence Embeddings Multilingual using Knowledge Distillation](https://arxiv.org/abs/2004.09813) (EMNLP 2020)
 - [Augmented SBERT: Data Augmentation Method for Improving Bi-Encoders for Pairwise Sentence Scoring Tasks](https://arxiv.org/abs/2010.08240) (arXiv 2020)
-
-```
-@inproceedings{reimers-2019-sentence-bert,
-    title = "Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks",
-    author = "Reimers, Nils and Gurevych, Iryna",
-    booktitle = "Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing",
-    month = "11",
-    year = "2019",
-    publisher = "Association for Computational Linguistics",
-    url = "https://arxiv.org/abs/1908.10084",
-}
-```
-
-```
-@inproceedings{reimers-2020-multilingual-sentence-bert,
-    title = "Making Monolingual Sentence Embeddings Multilingual using Knowledge Distillation",
-    author = "Reimers, Nils and Gurevych, Iryna",
-    booktitle = "Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing",
-    month = "11",
-    year = "2020",
-    publisher = "Association for Computational Linguistics",
-    url = "https://arxiv.org/abs/2004.09813",
-}
-```
-
-```
-@article{thakur-2020-AugSBERT,
-    title = "Augmented SBERT: Data Augmentation Method for Improving Bi-Encoders for Pairwise Sentence Scoring Tasks",
-    author = "Thakur, Nandan and Reimers, Nils and Daxenberger, Johannes and  Gurevych, Iryna",
-    journal= "arXiv preprint arXiv:2010.08240",
-    month = "10",
-    year = "2020",
-    url = "https://arxiv.org/abs/2010.08240",
-}
-```
-
-
-## 线上体验教程
-
-- [使用seq2vec模块进行句子情感分类](https://aistudio.baidu.com/aistudio/projectdetail/1283423)
-
-- [如何将预训练模型Fine-tune下游任务](https://aistudio.baidu.com/aistudio/projectdetail/1294333)
-
-- [使用Bi-GRU+CRF完成快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1317771)
-
-- [使用预训练模型ERNIE优化快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1329361)
-
-- [使用Seq2Seq模型完成自动对联模型](https://aistudio.baidu.com/aistudio/projectdetail/1321118)
-
-- [使用预训练模型ERNIE-GEN实现智能写诗](https://aistudio.baidu.com/aistudio/projectdetail/1339888)
-
-- [使用TCN网络完成新冠疫情病例数预测](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
-
-更多教程参见[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
