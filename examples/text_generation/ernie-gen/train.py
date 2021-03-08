@@ -74,13 +74,13 @@ def evaluate(model, data_loader, tokenizer, rouge1, rouge2, attn_id,
     reference_sentences_ids = []
     logger.info("Evaluating...")
     for data in tqdm(data_loader):
-        (src_ids, src_sids, src_pids, _, _, _, _, _, _, _, _,
+        (src_ids, src_tids, src_pids, _, _, _, _, _, _, _, _,
          raw_tgt_labels) = data  # never use target when infer
         # Use greedy_search_infilling or beam_search_infilling to get predictions
         output_ids = beam_search_infilling(
             model,
             src_ids,
-            src_sids,
+            src_tids,
             eos_id=eos_id,
             sos_id=sos_id,
             attn_id=attn_id,
@@ -161,10 +161,10 @@ def train():
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_pids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_sids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # src_tids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_pids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_sids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tgt_tids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # attn_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_labels
     ): after_padding(fn(samples))
@@ -216,7 +216,7 @@ def train():
     tic_train = time.time()
     for epoch in range(args.num_epochs):
         for step, batch in enumerate(train_data_loader, start=1):
-            (src_ids, src_sids, src_pids, tgt_ids, tgt_sids, tgt_pids, attn_ids,
+            (src_ids, src_tids, src_pids, tgt_ids, tgt_tids, tgt_pids, attn_ids,
              mask_src_2_src, mask_tgt_2_srctgt, mask_attn_2_srctgtattn,
              tgt_labels, _) = batch
             # import pdb; pdb.set_trace()
@@ -225,7 +225,7 @@ def train():
                     nn.functional.one_hot(tgt_labels, label_num),
                     epsilon=args.label_smooth)
             tgt_pos = paddle.nonzero(attn_ids == attn_id)
-            loss = train_model(src_ids, src_sids, src_pids, tgt_ids, tgt_sids,
+            loss = train_model(src_ids, src_tids, src_pids, tgt_ids, tgt_tids,
                                tgt_pids, attn_ids, mask_src_2_src,
                                mask_tgt_2_srctgt, mask_attn_2_srctgtattn,
                                tgt_labels, tgt_pos)

@@ -62,8 +62,8 @@ def gen_bias(encoder_inputs, decoder_inputs, step):
 
 @paddle.no_grad()
 def greedy_search_infilling(model,
-                            q_ids,
-                            q_sids,
+                            token_ids,
+                            token_type_ids,
                             sos_id,
                             eos_id,
                             attn_id,
@@ -73,9 +73,9 @@ def greedy_search_infilling(model,
                             max_encode_len=640,
                             max_decode_len=100,
                             tgt_type_id=3):
-    _, logits, info = model(q_ids, q_sids)
-    d_batch, d_seqlen = q_ids.shape
-    seqlen = paddle.sum(paddle.cast(q_ids != 0, 'int64'), 1, keepdim=True)
+    _, logits, info = model(token_ids, token_type_ids)
+    d_batch, d_seqlen = token_ids.shape
+    seqlen = paddle.sum(paddle.cast(token_ids != 0, 'int64'), 1, keepdim=True)
     has_stopped = np.zeros([d_batch], dtype=np.bool)
     gen_seq_len = np.zeros([d_batch], dtype=np.int64)
     output_ids = []
@@ -86,7 +86,7 @@ def greedy_search_infilling(model,
     attn_ids = paddle.ones([d_batch], dtype='int64') * attn_id
     ids = paddle.stack([cls_ids, attn_ids], -1)
     for step in range(max_decode_len):
-        bias = gen_bias(q_ids, ids, step)
+        bias = gen_bias(token_ids, ids, step)
         pos_ids = paddle.to_tensor(
             np.tile(
                 np.array(
@@ -212,8 +212,8 @@ def beam_search_step(state, logits, eos_id, beam_width, is_first_step,
 
 @paddle.no_grad()
 def beam_search_infilling(model,
-                          q_ids,
-                          q_sids,
+                          token_ids,
+                          token_type_ids,
                           sos_id,
                           eos_id,
                           attn_id,
@@ -225,8 +225,8 @@ def beam_search_infilling(model,
                           beam_width=5,
                           tgt_type_id=3,
                           length_penalty=1.0):
-    _, __, info = model(q_ids, q_sids)
-    d_batch, d_seqlen = q_ids.shape
+    _, __, info = model(token_ids, token_type_ids)
+    d_batch, d_seqlen = token_ids.shape
 
     state = BeamSearchState(
         log_probs=paddle.zeros([d_batch, beam_width], 'float32'),
@@ -255,9 +255,9 @@ def beam_search_infilling(model,
     cached_v = [tile_(v, beam_width) for v in cached_v]
     past_cache = (cached_k, cached_v)
 
-    q_ids = tile_(q_ids, beam_width)
-    seqlen = paddle.sum(paddle.cast(q_ids != 0, 'int64'), 1, keepdim=True)
-    #log.debug(q_ids.shape)
+    token_ids = tile_(token_ids, beam_width)
+    seqlen = paddle.sum(paddle.cast(token_ids != 0, 'int64'), 1, keepdim=True)
+    #log.debug(token_ids.shape)
 
     cls_ids = paddle.ones([d_batch * beam_width], dtype='int64') * sos_id
     attn_ids = paddle.ones(
@@ -265,7 +265,7 @@ def beam_search_infilling(model,
     ids = paddle.stack([cls_ids, attn_ids], -1)
     for step in range(max_decode_len):
         #log.debug('decode step %d' % step)
-        bias = gen_bias(q_ids, ids, step)
+        bias = gen_bias(token_ids, ids, step)
         pos_ids = paddle.to_tensor(
             np.tile(
                 np.array(
