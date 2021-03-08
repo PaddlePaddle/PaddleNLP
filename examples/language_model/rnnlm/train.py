@@ -22,6 +22,20 @@ def create_data_loader(batch_size, num_steps, data_path):
     ]
     vocab = Vocab.build_vocab(train_examples, eos_token='</eos>')
 
+    # Because the sentences in PTB dataset might be consecutive, we need to concatenate 
+    # all texts from our dataset and fold them into chunks while the number of rows is 
+    # equal to batch size. For example:
+    #
+    #   Sentence1: we're talking about years ago before anyone heard of asbestos having 
+    #              any questionable properties. 
+    #   Sentence2: there is no asbestos in our products now.
+    #   Batch_size: 5
+    #   Grouped_text: [["we're", "talking", "about", "years"],
+    #                  ["ago", "before", "anyone", "heard"],
+    #                  ["of", "asbestos", "having", "any"],
+    #                  ["questionable", "properties", "there", "is"],
+    #                  ["no", "asbestos", "in", "our"]] 
+    #
     def group_texts(examples):
         concat_examples = []
         for example in examples:
