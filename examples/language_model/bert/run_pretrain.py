@@ -143,7 +143,7 @@ def parse_args():
         "--n_cards",
         default=1,
         type=int,
-        help="Number cards for the training, only support multi cards in the gpu."
+        help="Number cards for the training, only support multi cards in the gpu/xpu."
     )
     parser.add_argument(
         "--select_device",
@@ -432,7 +432,7 @@ def do_train(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.n_cards > 1 and args.select_device == "gpu":
+    if args.n_cards > 1 and (args.select_device == "gpu" or args.select_device == "xpu"):
         paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_cards)
     else:
         do_train(args)
