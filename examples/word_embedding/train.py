@@ -129,6 +129,9 @@ class BoWModel(nn.Layer):
 
 
 if __name__ == '__main__':
+    assert args.select_device in [
+        "cpu", "gpu", "xpu"
+    ], "Invalid device! Available device should be cpu, gpu, or xpu."
     paddle.set_device(args.select_device)
 
     # Loads vocab.

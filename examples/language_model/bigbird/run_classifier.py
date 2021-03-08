@@ -43,7 +43,7 @@ parser.add_argument("--output_dir", type=str, default='checkpoints/', help="Dire
 parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")
 parser.add_argument("--attn_dropout", type=float, default=0.0, help="Attention ffn model dropout.")
 parser.add_argument("--hidden_dropout_prob", type=float, default=0.0, help="The dropout rate for the embedding pooler.")
-parser.add_argument("--device", type=str, default="gpu", help="Select cpu, gpu, xpu devices to train model.")
+parser.add_argument("--select_device", type=str, default="gpu", help="Select cpu, gpu, xpu devices to train model.")
 parser.add_argument("--seed", type=int, default=8, help="Random seed for initialization.")
 # yapf: enable
 args = parser.parse_args()
@@ -103,7 +103,11 @@ def create_dataloader(batch_size, max_encoder_length, tokenizer, pad_val=0):
 
 def main():
     # Initialization for the parallel enviroment
-    paddle.set_device(args.device)
+    assert args.select_device in [
+        "cpu", "gpu", "xpu"
+    ], "Invalid device! Available device should be cpu, gpu, or xpu."
+
+    paddle.set_device(args.select_device)
     set_seed(args)
     # Define the model and metric 
     model = BigBirdForSequenceClassification.from_pretrained(

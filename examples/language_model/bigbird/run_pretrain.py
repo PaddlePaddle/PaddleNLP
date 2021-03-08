@@ -125,12 +125,12 @@ def create_dataloader(input_file, tokenizer, worker_init, batch_size,
 
 
 def do_train(args):
-    assert args.device in [
+    assert args.select_device in [
         "cpu", "gpu", "xpu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
 
     # Initialization for the parallel enviroment
-    paddle.set_device(args.device)
+    paddle.set_device(args.select_device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
