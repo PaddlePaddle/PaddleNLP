@@ -86,18 +86,14 @@ class MapDataset(Dataset):
         self.data = data
         self._transform_pipline = []
         self.new_data = self.data
-        if 'label_list' in kwargs.keys():
-            self.label_list = kwargs['label_list']
+
+        self.label_list = kwargs.pop('label_list', None)
+        self.vocab_info = kwargs.pop('vocab_info', None)
 
     def _transform(self, data):
         for fn in reversed(self._transform_pipline):
             data = fn(data)
         return data
-
-    def __iter__(self):
-        for example in self.new_data:
-            yield self._transform(
-                example) if self._transform_pipline else example
 
     def __getitem__(self, idx):
         return self._transform(self.new_data[
@@ -191,8 +187,9 @@ class IterDataset(IterableDataset):
         self.data = data
         self._transform_pipline = []
         self._filter_pipline = []
-        if 'label_list' in kwargs.keys():
-            self.label_list = kwargs['label_list']
+
+        self.label_list = kwargs.pop('label_list', None)
+        self.vocab_info = kwargs.pop('vocab_info', None)
 
     def _transform(self, data):
         for fn in reversed(self._transform_pipline):
@@ -334,6 +331,7 @@ class DatasetBuilder:
         """
 
         label_list = self.get_labels()
+        vocab_info = self.get_vocab()
 
         if self.lazy:
 
@@ -369,7 +367,8 @@ class DatasetBuilder:
                     else:
                         yield example
 
-            return IterDataset(generate_examples, label_list=label_list)
+            return IterDataset(
+                generate_examples, label_list=label_list, vocab_info=vocab_info)
         else:
             examples = self._read(
                 filename,
@@ -409,7 +408,8 @@ class DatasetBuilder:
                         examples[idx][label_col] = label_dict[examples[idx][
                             label_col]]
 
-            return MapDataset(examples, label_list=label_list)
+            return MapDataset(
+                examples, label_list=label_list, vocab_info=vocab_info)
 
     def _read(self, filename: str, *args):
         """
@@ -427,5 +427,11 @@ class DatasetBuilder:
     def get_labels(self):
         """
         Return list of class labels of the dataset if specified.
+        """
+        return None
+
+    def get_vocab(self):
+        """
+        Return vocab file path of the dataset if specified.
         """
         return None

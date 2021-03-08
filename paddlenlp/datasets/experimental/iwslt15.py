@@ -26,50 +26,49 @@ __all__ = ['IWSLT15']
 
 
 class IWSLT15(DatasetBuilder):
-    BUILDER_CONFIGS = {
-        'en-vi': {
-            'url':
-            "https://paddlenlp.bj.bcebos.com/datasets/iwslt15.en-vi.tar.gz",
-            'md5': 'aca22dc3f90962e42916dbb36d8f3e8e',
-            'splits': {
-                'train': [
-                    os.path.join("iwslt15.en-vi", "train.en"),
-                    os.path.join("iwslt15.en-vi", "train.vi"),
-                    "5b6300f46160ab5a7a995546d2eeb9e6",
-                    "858e884484885af5775068140ae85dab"
-                ],
-                'dev': [
-                    os.path.join("iwslt15.en-vi", "tst2012.en"),
-                    os.path.join("iwslt15.en-vi", "tst2012.vi"),
-                    "c14a0955ed8b8d6929fdabf4606e3875",
-                    "dddf990faa149e980b11a36fca4a8898"
-                ],
-                'test': [
-                    os.path.join("iwslt15.en-vi", "tst2013.en"),
-                    os.path.join("iwslt15.en-vi", "tst2013.vi"),
-                    "c41c43cb6d3b122c093ee89608ba62bd",
-                    "a3185b00264620297901b647a4cacf38"
-                ]
-            },
-            'vocab_info': [
-                os.path.join("iwslt15.en-vi", "vocab.en"),
-                os.path.join("iwslt15.en-vi", "vocab.vi"),
-                "98b5011e1f579936277a273fd7f4e9b4",
-                "e8b05f8c26008a798073c619236712b4"
-            ]
-        }
+
+    URL = "https://paddlenlp.bj.bcebos.com/datasets/iwslt15.en-vi.tar.gz"
+    META_INFO = collections.namedtuple('META_INFO', ('src_file', 'tgt_file',
+                                                     'src_md5', 'tgt_md5'))
+    MD5 = 'aca22dc3f90962e42916dbb36d8f3e8e'
+    SPLITS = {
+        'train': META_INFO(
+            os.path.join("iwslt15.en-vi", "train.en"),
+            os.path.join("iwslt15.en-vi", "train.vi"),
+            "5b6300f46160ab5a7a995546d2eeb9e6",
+            "858e884484885af5775068140ae85dab"),
+        'dev': META_INFO(
+            os.path.join("iwslt15.en-vi", "tst2012.en"),
+            os.path.join("iwslt15.en-vi", "tst2012.vi"),
+            "c14a0955ed8b8d6929fdabf4606e3875",
+            "dddf990faa149e980b11a36fca4a8898"),
+        'test': META_INFO(
+            os.path.join("iwslt15.en-vi", "tst2013.en"),
+            os.path.join("iwslt15.en-vi", "tst2013.vi"),
+            "c41c43cb6d3b122c093ee89608ba62bd",
+            "a3185b00264620297901b647a4cacf38")
+    }
+    VOCAB_INFO = {
+        'vocab_path': {
+            'en': (os.path.join("iwslt15.en-vi", "vocab.en"),
+                   "98b5011e1f579936277a273fd7f4e9b4"),
+            'vi': (os.path.join("iwslt15.en-vi", "vocab.vi"),
+                   "e8b05f8c26008a798073c619236712b4")
+        },
+        'unk_token': '<unk>',
+        'bos_token': '<s>',
+        'eos_token': '</s>'
     }
 
     def _get_data(self, mode, **kwargs):
-        builder_config = self.BUILDER_CONFIGS[self.name]
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
-        src_filename, tgt_filename, src_data_hash, tgt_data_hash = builder_config[
-            'splits'][mode]
+        src_filename, tgt_filename, src_data_hash, tgt_data_hash = self.SPLITS[
+            mode]
         src_fullname = os.path.join(default_root, src_filename)
         tgt_fullname = os.path.join(default_root, tgt_filename)
 
-        src_vocab_filename, tgt_vocab_filename, src_vocab_hash, tgt_vocab_hash = builder_config[
-            'vocab_info']
+        src_vocab_filename, src_vocab_hash = self.VOCAB_INFO['vocab_path']['en']
+        tgt_vocab_filename, tgt_vocab_hash = self.VOCAB_INFO['vocab_path']['vi']
         src_vacab_fullname = os.path.join(default_root, src_vocab_filename)
         tgt_vacab_fullname = os.path.join(default_root, tgt_vocab_filename)
 
@@ -84,10 +83,11 @@ class IWSLT15(DatasetBuilder):
                           not os.path.exists(tgt_vacab_fullname) or
                           (tgt_vocab_hash and
                            not md5file(tgt_vacab_fullname) == tgt_vocab_hash)):
-            get_path_from_url(builder_config['url'], default_root,
-                              builder_config['md5'])
+            get_path_from_url(self.URL, default_root, self.MD5)
 
-        self.vocab_info = (src_vacab_fullname, tgt_vacab_fullname)
+        self.VOCAB_INFO['vocab_path']['en'] = src_vacab_fullname
+        self.VOCAB_INFO['vocab_path']['vi'] = tgt_vacab_fullname
+
         return src_fullname, tgt_fullname
 
     def _read(self, filename, *args):
@@ -99,7 +99,7 @@ class IWSLT15(DatasetBuilder):
                     tgt_line = tgt_line.strip()
                     if not src_line and not tgt_line:
                         continue
-                    yield {"source": src_line, "target": tgt_line}
+                    yield {"en": src_line, "vi": tgt_line}
 
     def get_vocab(self):
-        return self.vocab_info
+        return self.VOCAB_INFO

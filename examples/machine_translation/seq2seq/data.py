@@ -28,17 +28,17 @@ def create_train_loader(args):
     batch_size = args.batch_size
     max_len = args.max_len
 
-    train_ds, dev_ds = load_dataset('iwslt15', 'en-vi', splits=('train', 'dev'))
+    train_ds, dev_ds = load_dataset('iwslt15', splits=('train', 'dev'))
     src_vocab = Vocab.load_vocabulary(
-        filepath=train_ds.vocab_info[0],
-        unk_token="<unk>",
-        bos_token="<s>",
-        eos_token="</s>")
+        filepath=train_ds.vocab_info['vocab_path']['en'],
+        unk_token=train_ds.vocab_info['unk_token'],
+        bos_token=train_ds.vocab_info['bos_token'],
+        eos_token=train_ds.vocab_info['eos_token'])
     tgt_vocab = Vocab.load_vocabulary(
-        filepath=train_ds.vocab_info[1],
-        unk_token="<unk>",
-        bos_token="<s>",
-        eos_token="</s>")
+        filepath=train_ds.vocab_info['vocab_path']['vi'],
+        unk_token=train_ds.vocab_info['unk_token'],
+        bos_token=train_ds.vocab_info['bos_token'],
+        eos_token=train_ds.vocab_info['eos_token'])
     bos_id = src_vocab[src_vocab.bos_token]
     eos_id = src_vocab[src_vocab.eos_token]
     pad_id = eos_id
@@ -82,17 +82,17 @@ def create_infer_loader(args):
     batch_size = args.batch_size
     max_len = args.max_len
 
-    test_ds = load_dataset('iwslt15', 'en-vi', splits='test')
+    test_ds = load_dataset('iwslt15', splits='test')
     src_vocab = Vocab.load_vocabulary(
-        filepath=test_ds.vocab_info[0],
-        unk_token="<unk>",
-        bos_token="<s>",
-        eos_token="</s>")
+        filepath=test_ds.vocab_info['vocab_path']['en'],
+        unk_token=test_ds.vocab_info['unk_token'],
+        bos_token=test_ds.vocab_info['bos_token'],
+        eos_token=test_ds.vocab_info['eos_token'])
     tgt_vocab = Vocab.load_vocabulary(
-        filepath=test_ds.vocab_info[1],
-        unk_token="<unk>",
-        bos_token="<s>",
-        eos_token="</s>")
+        filepath=test_ds.vocab_info['vocab_path']['vi'],
+        unk_token=test_ds.vocab_info['unk_token'],
+        bos_token=test_ds.vocab_info['bos_token'],
+        eos_token=test_ds.vocab_info['eos_token'])
     bos_id = src_vocab[src_vocab.bos_token]
     eos_id = src_vocab[src_vocab.eos_token]
     pad_id = eos_id
