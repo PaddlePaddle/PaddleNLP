@@ -237,6 +237,7 @@ def soft_cross_entropy(inp, target):
     target_prob = F.softmax(target, axis=-1)
     return -1. * paddle.mean(paddle.sum(inp_likelihood * target_prob, axis=-1))
 
+
 def convert_example(example,
                     tokenizer,
                     label_list,
@@ -303,8 +304,7 @@ def do_train(args):
         dev_ds_matched, dev_ds_mismatched = load_dataset(
             'glue', args.task_name, splits=["dev_matched", "dev_mismatched"])
         dev_ds_matched = dev_ds_matched.map(trans_func, lazy=True)
-        dev_ds_mismatched = dev_ds_mismatched.map(trans_func,
-                                                            lazy=True)
+        dev_ds_mismatched = dev_ds_mismatched.map(trans_func, lazy=True)
         dev_batch_sampler_matched = paddle.io.BatchSampler(
             dev_ds_matched, batch_size=args.batch_size, shuffle=False)
         dev_data_loader_matched = DataLoader(
@@ -381,7 +381,7 @@ def do_train(args):
     if args.task_name == "mnli":
         dev_data_loader = (dev_data_loader_matched, dev_data_loader_mismatched)
 
-    # Step6: Calculate the importance of neurons and head, 
+    # Step6: Calculate the importance of neurons and head,
     # and then reorder them according to the importance.
     head_importance, neuron_importance = nlp_utils.compute_neuron_head_importance(
         args.task_name,
@@ -398,15 +398,18 @@ def do_train(args):
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_steps)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
         parameters=ofa_model.model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in ofa_model.model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
 
     global_step = 0
     tic_train = time.time()

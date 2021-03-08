@@ -190,7 +190,7 @@ def train():
     if paddle.distributed.get_world_size() > 1:
         # All 'forward' outputs derived from the module parameters using in DataParallel
         # must participate in the calculation of losses and subsequent gradient calculations.
-        # So we use StackModel here to make the model only output loss in its 'forward' function. 
+        # So we use StackModel here to make the model only output loss in its 'forward' function.
         train_model = paddle.DataParallel(train_model)
 
     max_steps = len(train_data_loader) * args.num_epochs
@@ -198,16 +198,19 @@ def train():
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, max_steps,
                                          args.warmup_proportion)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         grad_clip=nn.ClipGradByGlobalNorm(1.0),
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
 
     rouge1 = Rouge1()
     rouge2 = Rouge2()

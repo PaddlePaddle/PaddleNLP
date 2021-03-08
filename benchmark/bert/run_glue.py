@@ -387,15 +387,18 @@ def do_train(args):
     with paddle.static.program_guard(main_program, startup_program):
         lr_scheduler = LinearDecayWithWarmup(
             args.learning_rate, num_training_steps, args.warmup_steps)
+        # Generate parameter names needed to perform weight decay.
+        # All bias and LayerNorm parameters are excluded.
+        decay_params = [
+            p.name for n, p in model.named_parameters()
+            if not any(nd in n for nd in ["bias", "norm"])
+        ]
         optimizer = paddle.optimizer.AdamW(
             learning_rate=lr_scheduler,
             epsilon=args.adam_epsilon,
             parameters=model.parameters(),
             weight_decay=args.weight_decay,
-            apply_decay_param_fun=lambda x: x in [
-                p.name for n, p in model.named_parameters()
-               if not any(nd in n for nd in ["bias", "norm"])
-        ])
+            apply_decay_param_fun=lambda x: x in decay_params)
         optimizer.minimize(loss)
 
     # Create the metric pass for the validation

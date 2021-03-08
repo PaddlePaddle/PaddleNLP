@@ -104,7 +104,8 @@ def evaluate(model, loss_fct, metric, data_loader):
         print(
             "eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s"
             % (np.average(losses), res[0], res[1], res[2]))
-        final_res = "final:    pearson: %s, spearman: %s, pearson and spearman: %s" % (res[0], res[1], res[2])
+        final_res = "final:    pearson: %s, spearman: %s, pearson and spearman: %s" % (
+            res[0], res[1], res[2])
     else:
         print("eval loss: %f, acc: %s" % (np.average(losses), res))
         final_res = "final:    acc: %s" % res
@@ -137,9 +138,11 @@ def convert_example(example,
             return_attention_mask=True)
 
     if not is_test:
-        return example['input_ids'], example['token_type_ids'], example['attention_mask'], label
+        return example['input_ids'], example['token_type_ids'], example[
+            'attention_mask'], label
     else:
-        return example['input_ids'], example['token_type_ids'], example['attention_mask']
+        return example['input_ids'], example['token_type_ids'], example[
+            'attention_mask']
 
 
 def do_train(args):
@@ -166,11 +169,11 @@ def do_train(args):
         train_ds, batch_size=args.batch_size, shuffle=True)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, pad_right=False),         # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, pad_right=False),    # token_type
-        Pad(axis=0, pad_val=0, pad_right=False),                              # attention_mask
-        Stack(dtype="int64" if train_ds.label_list else "float32"),           # label
-        ): fn(samples)
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, pad_right=False),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, pad_right=False),  # token_type
+        Pad(axis=0, pad_val=0, pad_right=False),  # attention_mask
+        Stack(dtype="int64" if train_ds.label_list else "float32"),  # label
+    ): fn(samples)
 
     train_data_loader = DataLoader(
         dataset=train_ds,
@@ -204,9 +207,7 @@ def do_train(args):
         dev_ds = load_dataset('glue', args.task_name, splits='dev')
         dev_ds = dev_ds.map(trans_func, lazy=True)
         dev_batch_sampler = paddle.io.BatchSampler(
-            dev_ds,
-            batch_size=args.batch_size,
-            shuffle=False)
+            dev_ds, batch_size=args.batch_size, shuffle=False)
 
         dev_data_loader = DataLoader(
             dataset=dev_ds,
@@ -226,9 +227,16 @@ def do_train(args):
         len(train_data_loader) * args.num_train_epochs)
 
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, warmup)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
+                                         warmup)
 
     clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.max_grad_norm)
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "layer_norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         beta1=0.9,
@@ -237,12 +245,10 @@ def do_train(args):
         parameters=model.parameters(),
         grad_clip=clip,
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "layer_norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
 
-    loss_fct = paddle.nn.loss.CrossEntropyLoss() if train_ds.label_list else paddle.nn.loss.MSELoss()
+    loss_fct = paddle.nn.loss.CrossEntropyLoss(
+    ) if train_ds.label_list else paddle.nn.loss.MSELoss()
 
     metric = metric_class()
 
@@ -272,15 +278,16 @@ def do_train(args):
                 tic_eval = time.time()
                 if args.task_name == "mnli":
                     evaluate(model, loss_fct, metric, dev_data_loader_matched)
-                    evaluate(model, loss_fct, metric, dev_data_loader_mismatched)
+                    evaluate(model, loss_fct, metric,
+                             dev_data_loader_mismatched)
                     print("eval done total : %s s" % (time.time() - tic_eval))
                 else:
                     evaluate(model, loss_fct, metric, dev_data_loader)
                     print("eval done total : %s s" % (time.time() - tic_eval))
-                if (not paddle.distributed.get_world_size() > 1) or paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(args.output_dir,
-                                              "%s_ft_model_%d" %
-                                              (args.task_name, global_step))
+                if (not paddle.distributed.get_world_size() > 1
+                    ) or paddle.distributed.get_rank() == 0:
+                    output_dir = os.path.join(args.output_dir, "%s_ft_model_%d"
+                                              % (args.task_name, global_step))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     # Need better way to get inner model of DataParallel
