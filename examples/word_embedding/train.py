@@ -19,55 +19,29 @@ import os.path as osp
 import paddle
 import paddle.nn as nn
 import paddlenlp as nlp
+from paddle.utils.download import get_path_from_url
 from paddlenlp.datasets import ChnSentiCorp
 from paddlenlp.embeddings import TokenEmbedding
 from paddlenlp.data import JiebaTokenizer, Vocab
+from paddlenlp.datasets import load_dataset
+
 import data
 
-parser = argparse.ArgumentParser(__doc__)
-parser.add_argument(
-    "--epochs", type=int, default=5, help="Number of epoches for training.")
-parser.add_argument(
-    '--use_gpu',
-    type=eval,
-    default=True,
-    help="Whether use GPU for training, input should be True or False")
-parser.add_argument(
-    "--lr", type=float, default=5e-4, help="Learning rate used to train.")
-parser.add_argument(
-    "--save_dir",
-    type=str,
-    default='./checkpoints/',
-    help="Directory to save model checkpoint")
-parser.add_argument(
-    "--batch_size",
-    type=int,
-    default=64,
-    help="Total examples' number of a batch for training.")
-parser.add_argument(
-    "--vocab_path",
-    type=str,
-    default="./dict.txt",
-    help="The directory to dataset.")
-parser.add_argument(
-    "--init_from_ckpt",
-    type=str,
-    default=None,
-    help="The path of checkpoint to be loaded.")
-parser.add_argument(
-    "--use_token_embedding",
-    type=eval,
-    default=True,
-    help="Whether use pretrained embedding")
-parser.add_argument(
-    "--embedding_name",
-    type=str,
-    default="w2v.baidu_encyclopedia.target.word-word.dim300",
-    help="The name of pretrained embedding")
-parser.add_argument(
-    "--vdl_dir", type=str, default="vdl_dir/", help="VisualDL log directory")
-
+# yapf: disable
+parser = argparse.ArgumentParser()
+parser.add_argument("--epochs", type=int, default=5, help="Number of epoches for training.")
+parser.add_argument('--use_gpu', type=eval, default=True, help="Whether use GPU for training, input should be True or False")
+parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate used to train.")
+parser.add_argument("--save_dir", type=str, default='./checkpoints/', help="Directory to save model checkpoint")
+parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
+parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
+parser.add_argument("--use_token_embedding", type=eval, default=True, help="Whether use pretrained embedding")
+parser.add_argument("--embedding_name", type=str, default="w2v.baidu_encyclopedia.target.word-word.dim300", help="The name of pretrained embedding")
+parser.add_argument("--vdl_dir", type=str, default="vdl_dir/", help="VisualDL log directory")
 args = parser.parse_args()
+# yapf: enable
+
+WORD_DICT_URL = "https://paddlenlp.bj.bcebos.com/data/dict.txt"
 
 
 def create_dataloader(dataset,
@@ -88,7 +62,7 @@ def create_dataloader(dataset,
         dataloader(obj:`paddle.io.DataLoader`): The dataloader which generates batches.
     """
     if trans_fn:
-        dataset = dataset.apply(trans_fn, lazy=True)
+        dataset = dataset.map(trans_fn, lazy=True)
 
     shuffle = True if mode == 'train' else False
     sampler = paddle.io.BatchSampler(
@@ -161,23 +135,23 @@ if __name__ == '__main__':
     paddle.set_device('gpu') if args.use_gpu else paddle.set_device('cpu')
 
     # Loads vocab.
-    if not os.path.exists(args.vocab_path):
-        raise RuntimeError('The vocab_path  can not be found in the path %s' %
-                           args.vocab_path)
-    vocab = data.load_vocab(args.vocab_path)
+    vocab_path = "./dict.txt"
+    if not os.path.exists(vocab_path):
+        # download in current directory
+        get_path_from_url(WORD_DICT_URL, "./")
+    vocab = data.load_vocab(vocab_path)
 
     if '[PAD]' not in vocab:
         vocab['[PAD]'] = len(vocab)
     # Loads dataset.
-    train_ds, dev_ds, test_ds = ChnSentiCorp.get_datasets(
-        ['train', 'dev', 'test'])
+    train_ds, dev_ds, test_ds = load_dataset(
+        "chnsenticorp", splits=["train", "dev", "test"], lazy=False)
 
     # Constructs the newtork.
-    num_classes = len(train_ds.get_labels())
     model = BoWModel(
         vocab_size=len(vocab),
-        num_classes=num_classes,
-        vocab_path=args.vocab_path,
+        num_classes=len(train_ds.label_list),
+        vocab_path=vocab_path,
         use_token_embedding=args.use_token_embedding)
     if args.use_token_embedding:
         vocab = model.embedder.vocab

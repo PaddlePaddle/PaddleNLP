@@ -168,7 +168,7 @@ def do_train(model, criterion, metric, optimizer, train_data_loader,
                 model_to_save.save_pretrained(output_dir)
 
             if global_steps >= args.max_steps:
-                break
+                return
         metric.reset()
 
 
