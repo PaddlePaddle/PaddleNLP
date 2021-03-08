@@ -117,13 +117,17 @@ def train(args, model, train_data_loader, dev_data_loader, metric, rank):
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, max_train_steps,
                                          args.warmup_proportion)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])],
+        apply_decay_param_fun=lambda x: x in decay_params,
         grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm))
     loss_fn = DGULossFunction(args.task_name)
 
