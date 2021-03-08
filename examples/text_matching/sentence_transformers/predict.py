@@ -60,7 +60,6 @@ def convert_example(example, tokenizer, max_seq_length=512):
         example(obj:`list[str]`): List of input data, containing query, title and label if it have label.
         tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        label_list(obj:`list[str]`): All the labels that the data has.
         max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
             Sequences longer than this will be truncated, sequences shorter will be padded.
 
