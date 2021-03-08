@@ -219,6 +219,8 @@ class DefaultAttention(Attention):
         product = paddle.matmul(x=query_matrix, y=key_matrix, transpose_y=True)
         product = product * (d_head**-0.5)
         product += (1 - paddle.matmul(query_mask, key_mask)) * -1e6
+        if attn_mask is not None:
+            product = product + attn_mask
         weights = F.softmax(product)
         if dropout:
             weights = F.dropout(
