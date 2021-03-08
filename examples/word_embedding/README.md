@@ -31,18 +31,22 @@ PaddleNLP已预置多个公开的预训练Embedding，用户可以通过使用`p
 
 ```shell
 # 使用paddlenlp.embeddings.TokenEmbedding
-python train.py --vocab_path='./dict.txt' --use_gpu=True --lr=5e-4 \
-        --batch_size=64 \
-        --epochs=20 \
-        --use_token_embedding=True \
-        --vdl_dir='./vdl_dir'
+python train.py --vocab_path='./dict.txt' \
+                --use_gpu=True \
+                --lr=5e-4 \
+                --batch_size=64 \
+                --epochs=20 \
+                --use_token_embedding=True \
+                --vdl_dir='./vdl_dir'
 
 # 使用paddle.nn.Embedding
-python train.py --vocab_path='./dict.txt' --use_gpu=True --lr=1e-4 \
-       --batch_size=64 \
-       --epochs=20 \
-       --use_token_embedding=False \
-       --vdl_dir='./vdl_dir'
+python train.py --vocab_path='./dict.txt' \
+                --use_gpu=True \
+                --lr=1e-4 \
+                --batch_size=64 \
+                --epochs=20 \
+                --use_token_embedding=False \
+                --vdl_dir='./vdl_dir'
 ```
 
 以上参数表示：
