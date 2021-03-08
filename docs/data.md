@@ -8,10 +8,11 @@
 | ------------------------------- | :----------------------------------------- |
 | `paddlenlp.data.Stack`          | 堆叠N个具有相同shape的输入数据来构建一个batch |
 | `paddlenlp.data.Pad`            | 堆叠N个输入数据来构建一个batch，每个输入数据将会被padding到N个输入数据中最大的长度 |
-| `paddlenlp.data.Tuple`          | 将多个batchify函数包装在一起 |
-| `paddlenlp.data.SamplerHelper`  | 构建用于`Dataloader`的可迭代sampler |
-| `paddlenlp.data.Vocab`          | 用于文本token和ID之间的映射 |
-| `paddlenlp.data.JiebaTokenizer` | Jieba分词 |
+| `paddlenlp.data.Tuple`          | 将多个batchify函数包装在一起，组成tuple      |
+| `paddlenlp.data.Dict`           | 将多个batchify函数包装在一起，组成dict       |
+| `paddlenlp.data.SamplerHelper`  | 构建用于`Dataloader`的可迭代sampler         |
+| `paddlenlp.data.Vocab`          | 用于文本token和ID之间的映射                  |
+| `paddlenlp.data.JiebaTokenizer` | Jieba分词                                  |
 
 ## API使用方法
 
@@ -21,7 +22,7 @@
 
 `paddlenlp.data.SamplerHelper`用于构建可迭代的`batch_sampler`。
 
-`paddlenlp.data.Stack`、`paddlenlp.data.Pad`和`paddlenlp.data.Tuple`用于构建生成mini-batch的`collate_fn`函数。
+`paddlenlp.data.Stack`、`paddlenlp.data.Pad`、`paddlenlp.data.Tuple`和`paddlenlp.data.Dict`用于构建生成mini-batch的`collate_fn`函数。
 
 ### 构建`dataset`
 
@@ -144,7 +145,7 @@ result = Pad(pad_val=0)([a, b, c])
 
 #### `paddlenlp.data.Tuple`
 
-`paddlenlp.data.Tuple`会将多个组batch的函数包装在一起。
+`paddlenlp.data.Tuple`会将多个组batch的函数包装在一起，组成tuple。
 
 ```python
 from paddlenlp.data import Stack, Pad, Tuple
@@ -164,12 +165,34 @@ label: [[1], [0], [1]]
 """
 ```
 
+#### `paddlenlp.data.Dict`
+
+`paddlenlp.data.Dict`会将多个组batch的函数包装在一起，组成dict。
+
+```python
+from paddlenlp.data import Stack, Pad, Dict
+data = [
+        {'labels':[1], 'token_ids':[1, 2, 3, 4]},
+        {'labels':[0], 'token_ids':[5, 6, 7]},
+        {'labels':[1], 'token_ids':[8, 9]},
+       ]
+batchify_fn = Dict({'token_ids':Pad(pad_val=0), 'labels':Stack()})
+ids, label = batchify_fn(data)
+"""
+ids:
+[[1, 2, 3, 4],
+ [5, 6, 7, 0],
+ [8, 9, 0, 0]]
+label: [[1], [0], [1]]
+"""
+```
+
 ### 综合示例
 
 ```python
 from paddlenlp.data import Vocab, JiebaTokenizer, Stack, Pad, Tuple, SamplerHelper
 from paddlenlp.datasets import ChnSentiCorp
-from paddlenlp.datasets import MapDatasetWrapper
+from paddlenlp.datasets import MapDataset
 from paddle.io import DataLoader
 
 # 词表文件路径，运行示例程序可先下载词表文件
@@ -190,7 +213,7 @@ def convert_example(example):
     return ids, label
 
 dataset = ChnSentiCorp('train')
-dataset = MapDatasetWrapper(dataset).apply(convert_example, lazy=True)
+dataset = MapDataset(dataset).map(convert_example, lazy=True)
 
 pad_id = vocab.token_to_idx[vocab.pad_token]
 batchify_fn = Tuple(
