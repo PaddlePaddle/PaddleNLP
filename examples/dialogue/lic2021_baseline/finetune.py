@@ -63,13 +63,15 @@ def main(args):
 
     lr_scheduler = NoamDecay(1 / (args.warmup_steps * (args.lr**2)),
                              args.warmup_steps)
+    decay_params_list = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])],
+        apply_decay_param_fun=lambda x: x in decay_params_list,
         grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm))
 
     step = 0
