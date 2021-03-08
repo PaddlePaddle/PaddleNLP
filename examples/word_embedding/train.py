@@ -18,9 +18,8 @@ import os.path as osp
 
 import paddle
 import paddle.nn as nn
-import paddlenlp as nlp
-from paddle.utils.download import get_path_from_url
-from paddlenlp.datasets import ChnSentiCorp
+import paddlenlp
+from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.embeddings import TokenEmbedding
 from paddlenlp.data import JiebaTokenizer, Vocab
 from paddlenlp.datasets import load_dataset
@@ -30,7 +29,7 @@ import data
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--epochs", type=int, default=5, help="Number of epoches for training.")
-parser.add_argument('--use_gpu', type=eval, default=True, help="Whether use GPU for training, input should be True or False")
+parser.add_argument("--select_device", type=str, default="gpu", help="Select cpu, gpu, xpu devices to train model.")
 parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate used to train.")
 parser.add_argument("--save_dir", type=str, default='./checkpoints/', help="Directory to save model checkpoint")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
@@ -48,7 +47,6 @@ def create_dataloader(dataset,
                       trans_fn=None,
                       mode='train',
                       batch_size=1,
-                      use_gpu=False,
                       pad_token_id=0):
     """
     Creats dataloader.
@@ -56,7 +54,6 @@ def create_dataloader(dataset,
         dataset(obj:`paddle.io.Dataset`): Dataset instance.
         mode(obj:`str`, optional, defaults to obj:`train`): If mode is 'train', it will shuffle the dataset randomly.
         batch_size(obj:`int`, optional, defaults to 1): The sample number of a mini-batch.
-        use_gpu(obj:`bool`, optional, defaults to obj:`False`): Whether to use gpu to run.
         pad_token_id(obj:`int`, optional, defaults to 0): The pad token index.
     Returns:
         dataloader(obj:`paddle.io.DataLoader`): The dataloader which generates batches.
@@ -107,7 +104,7 @@ class BoWModel(nn.Layer):
             padding_idx = vocab_size - 1
             self.embedder = nn.Embedding(
                 vocab_size, emb_dim, padding_idx=padding_idx)
-        self.bow_encoder = nlp.seq2vec.BoWEncoder(emb_dim)
+        self.bow_encoder = paddlenlp.seq2vec.BoWEncoder(emb_dim)
         self.fc1 = nn.Linear(self.bow_encoder.get_output_dim(), hidden_size)
         self.fc2 = nn.Linear(hidden_size, fc_hidden_size)
         self.dropout = nn.Dropout(p=0.3, axis=1)
@@ -132,7 +129,7 @@ class BoWModel(nn.Layer):
 
 
 if __name__ == '__main__':
-    paddle.set_device('gpu') if args.use_gpu else paddle.set_device('cpu')
+    paddle.set_device(args.select_device)
 
     # Loads vocab.
     vocab_path = "./dict.txt"
