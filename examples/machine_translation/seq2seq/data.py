@@ -29,23 +29,15 @@ def create_train_loader(args):
     max_len = args.max_len
 
     train_ds, dev_ds = load_dataset('iwslt15', splits=('train', 'dev'))
-    src_vocab = Vocab.load_vocabulary(
-        filepath=train_ds.vocab_info['vocab_path']['en'],
-        unk_token=train_ds.vocab_info['unk_token'],
-        bos_token=train_ds.vocab_info['bos_token'],
-        eos_token=train_ds.vocab_info['eos_token'])
-    tgt_vocab = Vocab.load_vocabulary(
-        filepath=train_ds.vocab_info['vocab_path']['vi'],
-        unk_token=train_ds.vocab_info['unk_token'],
-        bos_token=train_ds.vocab_info['bos_token'],
-        eos_token=train_ds.vocab_info['eos_token'])
+    src_vocab = Vocab.load_vocabulary(**train_ds.vocab_info['en'])
+    tgt_vocab = Vocab.load_vocabulary(**train_ds.vocab_info['vi'])
     bos_id = src_vocab[src_vocab.bos_token]
     eos_id = src_vocab[src_vocab.eos_token]
     pad_id = eos_id
 
     def convert_example(example):
-        source = example['source'].split()[:max_len]
-        target = example['target'].split()[:max_len]
+        source = example['en'].split()[:max_len]
+        target = example['vi'].split()[:max_len]
 
         source = src_vocab.to_indices(source)
         target = tgt_vocab.to_indices(target)
@@ -83,23 +75,15 @@ def create_infer_loader(args):
     max_len = args.max_len
 
     test_ds = load_dataset('iwslt15', splits='test')
-    src_vocab = Vocab.load_vocabulary(
-        filepath=test_ds.vocab_info['vocab_path']['en'],
-        unk_token=test_ds.vocab_info['unk_token'],
-        bos_token=test_ds.vocab_info['bos_token'],
-        eos_token=test_ds.vocab_info['eos_token'])
-    tgt_vocab = Vocab.load_vocabulary(
-        filepath=test_ds.vocab_info['vocab_path']['vi'],
-        unk_token=test_ds.vocab_info['unk_token'],
-        bos_token=test_ds.vocab_info['bos_token'],
-        eos_token=test_ds.vocab_info['eos_token'])
+    src_vocab = Vocab.load_vocabulary(**test_ds.vocab_info['en'])
+    tgt_vocab = Vocab.load_vocabulary(**test_ds.vocab_info['vi'])
     bos_id = src_vocab[src_vocab.bos_token]
     eos_id = src_vocab[src_vocab.eos_token]
     pad_id = eos_id
 
     def convert_example(example):
-        source = example['source'].split()
-        target = example['target'].split()
+        source = example['en'].split()
+        target = example['vi'].split()
 
         source = src_vocab.to_indices(source)
         target = tgt_vocab.to_indices(target)

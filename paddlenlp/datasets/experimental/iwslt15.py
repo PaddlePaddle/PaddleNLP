@@ -48,17 +48,12 @@ class IWSLT15(DatasetBuilder):
             "c41c43cb6d3b122c093ee89608ba62bd",
             "a3185b00264620297901b647a4cacf38")
     }
-    VOCAB_INFO = {
-        'vocab_path': {
-            'en': (os.path.join("iwslt15.en-vi", "vocab.en"),
-                   "98b5011e1f579936277a273fd7f4e9b4"),
-            'vi': (os.path.join("iwslt15.en-vi", "vocab.vi"),
-                   "e8b05f8c26008a798073c619236712b4")
-        },
-        'unk_token': '<unk>',
-        'bos_token': '<s>',
-        'eos_token': '</s>'
-    }
+    VOCAB_INFO = (os.path.join("iwslt15.en-vi", "vocab.en"), os.path.join(
+        "iwslt15.en-vi", "vocab.vi"), "98b5011e1f579936277a273fd7f4e9b4",
+                  "e8b05f8c26008a798073c619236712b4")
+    UNK_TOKEN = '<unk>'
+    BOS_TOKEN = '<s>'
+    EOS_TOKEN = '</s>'
 
     def _get_data(self, mode, **kwargs):
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
@@ -67,8 +62,7 @@ class IWSLT15(DatasetBuilder):
         src_fullname = os.path.join(default_root, src_filename)
         tgt_fullname = os.path.join(default_root, tgt_filename)
 
-        src_vocab_filename, src_vocab_hash = self.VOCAB_INFO['vocab_path']['en']
-        tgt_vocab_filename, tgt_vocab_hash = self.VOCAB_INFO['vocab_path']['vi']
+        src_vocab_filename, src_vocab_hash, tgt_vocab_filename, tgt_vocab_hash = self.VOCAB_INFO
         src_vacab_fullname = os.path.join(default_root, src_vocab_filename)
         tgt_vacab_fullname = os.path.join(default_root, tgt_vocab_filename)
 
@@ -85,9 +79,6 @@ class IWSLT15(DatasetBuilder):
                            not md5file(tgt_vacab_fullname) == tgt_vocab_hash)):
             get_path_from_url(self.URL, default_root, self.MD5)
 
-        self.VOCAB_INFO['vocab_path']['en'] = src_vacab_fullname
-        self.VOCAB_INFO['vocab_path']['vi'] = tgt_vacab_fullname
-
         return src_fullname, tgt_fullname
 
     def _read(self, filename, *args):
@@ -102,4 +93,21 @@ class IWSLT15(DatasetBuilder):
                     yield {"en": src_line, "vi": tgt_line}
 
     def get_vocab(self):
-        return self.VOCAB_INFO
+        default_root = os.path.join(DATA_HOME, self.__class__.__name__)
+        en_vacab_fullname = os.path.join(default_root, self.VOCAB_INFO[0])
+        vi_vacab_fullname = os.path.join(default_root, self.VOCAB_INFO[1])
+        vocab_info = {
+            'en': {
+                'filepath': en_vacab_fullname,
+                'unk_token': self.UNK_TOKEN,
+                'bos_token': self.BOS_TOKEN,
+                'eos_token': self.EOS_TOKEN
+            },
+            'vi': {
+                'filepath': vi_vacab_fullname,
+                'unk_token': self.UNK_TOKEN,
+                'bos_token': self.BOS_TOKEN,
+                'eos_token': self.EOS_TOKEN
+            }
+        }
+        return vocab_info
