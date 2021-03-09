@@ -114,6 +114,7 @@ class BiGRUWithCRF(nn.Layer):
 if __name__ == '__main__':
     paddle.set_device('gpu')
 
+    # Create dataset, tokenizer and dataloader.
     train_ds, dev_ds, test_ds = load_dataset(datafiles=(
         './data/train.txt', './data/dev.txt', './data/test.txt'))
 
@@ -131,10 +132,10 @@ if __name__ == '__main__':
     test_ds.map(convert_example)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=word_vocab.get('OOV')), # token_ids
-        Stack(),                                    # seq_len
-        Pad(axis=0, pad_val=label_vocab.get('O'))   # label_ids
-        ): fn(samples)
+        Pad(axis=0, pad_val=word_vocab.get('OOV')),  # token_ids
+        Stack(),  # seq_len
+        Pad(axis=0, pad_val=label_vocab.get('O'))  # label_ids
+    ): fn(samples)
 
     train_loader = paddle.io.DataLoader(
         dataset=train_ds,
@@ -158,9 +159,9 @@ if __name__ == '__main__':
         return_list=True,
         collate_fn=batchify_fn)
 
+    # Define the model netword and its loss
     network = BiGRUWithCRF(300, 300, len(word_vocab), len(label_vocab))
     model = paddle.Model(network)
-
     optimizer = paddle.optimizer.Adam(
         learning_rate=0.001, parameters=model.parameters())
     crf_loss = LinearChainCrfLoss(network.crf)

@@ -167,7 +167,8 @@ class PretrainedTokenizer(object):
                  return_special_tokens_mask=False):
         """
         Main method to tokenize and prepare for the model one or several sequence(s) or one or several pair(s) of
-        sequences.
+        sequences. This method will call `self.encode()` or `self.batch_encode()` depending on input format and  
+        `is_split_into_words` argument.
 
         Args:
             text (:obj:`str`, :obj:`List[str]`, :obj:`List[List[str]]`):

@@ -45,7 +45,7 @@ python train.py \
     --dropout 0.2 \
     --init_scale  0.1 \
     --max_grad_norm 5.0 \
-    --select_device gpu \
+    --device gpu \
     --model_path ./attention_models
 ```
 
@@ -68,7 +68,7 @@ python predict.py \
      --init_from_ckpt attention_models/9 \
      --infer_output_file infer_output.txt \
      --beam_size 10 \
-     --select_device gpu
+     --device gpu
 ```
 
 各参数的具体说明请参阅 `args.py` ，注意预测时所用模型超参数需和训练时一致。
@@ -98,7 +98,7 @@ python export_model.py \
 cd deploy/python
 python infer.py \
     --export_path ../../infer_model/model \
-    --select_device gpu \
+    --device gpu \
     --batch_size 128 \
     --infer_output_file infer_output.txt
 ```

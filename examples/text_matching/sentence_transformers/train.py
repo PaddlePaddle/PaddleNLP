@@ -24,6 +24,7 @@ import paddle.nn.functional as F
 
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 from model import SentenceTransformer
@@ -67,12 +68,12 @@ def evaluate(model, criterion, metric, data_loader):
     metric.reset()
     losses = []
     for batch in data_loader:
-        query_input_ids, query_segment_ids, title_input_ids, title_segment_ids, labels = batch
+        query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids, labels = batch
         probs = model(
             query_input_ids=query_input_ids,
             title_input_ids=title_input_ids,
-            query_token_type_ids=query_segment_ids,
-            title_token_type_ids=title_segment_ids)
+            query_token_type_ids=query_token_type_ids,
+            title_token_type_ids=title_token_type_ids)
         loss = criterion(probs, labels)
         losses.append(loss.numpy())
         correct = metric.compute(probs, labels)
@@ -83,11 +84,7 @@ def evaluate(model, criterion, metric, data_loader):
     metric.reset()
 
 
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_length=512,
-                    is_test=False):
+def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
@@ -110,41 +107,32 @@ def convert_example(example,
         example(obj:`list[str]`): List of input data, containing query, title and label if it have label.
         tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        label_list(obj:`list[str]`): All the labels that the data has.
         max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
             Sequences longer than this will be truncated, sequences shorter will be padded.
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
 
     Returns:
         query_input_ids(obj:`list[int]`): The list of query token ids.
-        query_segment_ids(obj: `list[int]`): List of query sequence pair mask.
+        query_token_type_ids(obj: `list[int]`): List of query sequence pair mask.
         title_input_ids(obj:`list[int]`): The list of title token ids.
-        title_segment_ids(obj: `list[int]`): List of title sequence pair mask.
+        title_token_type_ids(obj: `list[int]`): List of title sequence pair mask.
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
-    query, title = example[0], example[1]
+    query, title = example["query"], example["title"]
 
-    query_encoded_inputs = tokenizer.encode(
-        text=query, max_seq_len=max_seq_length)
+    query_encoded_inputs = tokenizer(text=query, max_seq_len=max_seq_length)
     query_input_ids = query_encoded_inputs["input_ids"]
-    query_segment_ids = query_encoded_inputs["segment_ids"]
+    query_token_type_ids = query_encoded_inputs["token_type_ids"]
 
-    title_encoded_inputs = tokenizer.encode(
-        text=title, max_seq_len=max_seq_length)
+    title_encoded_inputs = tokenizer(text=title, max_seq_len=max_seq_length)
     title_input_ids = title_encoded_inputs["input_ids"]
-    title_segment_ids = title_encoded_inputs["segment_ids"]
+    title_token_type_ids = title_encoded_inputs["token_type_ids"]
 
     if not is_test:
-        # create label maps if classification task
-        label = example[-1]
-        label_map = {}
-        for (i, l) in enumerate(label_list):
-            label_map[l] = i
-        label = label_map[label]
-        label = np.array([label], dtype="int64")
-        return query_input_ids, query_segment_ids, title_input_ids, title_segment_ids, label
+        label = np.array([example["label"]], dtype="int64")
+        return query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids, label
     else:
-        return query_input_ids, query_segment_ids, title_input_ids, title_segment_ids
+        return query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids
 
 
 def create_dataloader(dataset,
@@ -153,7 +141,7 @@ def create_dataloader(dataset,
                       batchify_fn=None,
                       trans_fn=None):
     if trans_fn:
-        dataset = dataset.apply(trans_fn, lazy=True)
+        dataset = dataset.map(trans_fn)
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
@@ -177,11 +165,11 @@ def do_train():
     if world_size > 1:
         paddle.distributed.init_parallel_env()
 
-    train_dataset, dev_dataset, test_dataset = ppnlp.datasets.LCQMC.get_datasets(
-        ['train', 'dev', 'test'])
+    train_ds, dev_ds, test_ds = load_dataset(
+        "lcqmc", splits=["train", "dev", "test"])
 
     # If you wanna use bert/roberta pretrained model,
-    # pretrained_model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese') 
+    # pretrained_model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese')
     # pretrained_model = ppnlp.transformers.RobertaModel.from_pretrained('roberta-wwm-ext')
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         'ernie-tiny')
@@ -196,7 +184,6 @@ def do_train():
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
-        label_list=train_dataset.get_labels(),
         max_seq_length=args.max_seq_length)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -206,19 +193,19 @@ def do_train():
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
     train_data_loader = create_dataloader(
-        train_dataset,
+        train_ds,
         mode='train',
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
     dev_data_loader = create_dataloader(
-        dev_dataset,
+        dev_ds,
         mode='dev',
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
     test_data_loader = create_dataloader(
-        test_dataset,
+        test_ds,
         mode='test',
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
@@ -236,14 +223,17 @@ def do_train():
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
@@ -252,12 +242,12 @@ def do_train():
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
-            query_input_ids, query_segment_ids, title_input_ids, title_segment_ids, labels = batch
+            query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids, labels = batch
             probs = model(
                 query_input_ids=query_input_ids,
                 title_input_ids=title_input_ids,
-                query_token_type_ids=query_segment_ids,
-                title_token_type_ids=title_segment_ids)
+                query_token_type_ids=query_token_type_ids,
+                title_token_type_ids=title_token_type_ids)
             loss = criterion(probs, labels)
             correct = metric.compute(probs, labels)
             metric.update(correct)

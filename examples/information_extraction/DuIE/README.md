@@ -1,4 +1,4 @@
-# LIC2021关系抽取基线
+# LIC2021 DuIE 关系抽取基线
 
 信息抽取旨在从非结构化自然语言文本中提取结构化知识，如实体、关系、事件等。关系抽取的目标是对于给定的自然语言句子，根据预先定义的schema集合，抽取出所有满足schema约束的SPO三元组。schema定义了关系P以及其对应的主体S和客体O的类别。
 本基线系统基于预训练语言模型ERNIE设计了结构化的标注策略，可以实现多条、交叠的SPO抽取。
@@ -155,3 +155,6 @@ model = RobertaForTokenClassification.from_pretrained(
     num_classes=(len(label_map) - 2) * 2 + 2)
 tokenizer = RobertaTokenizer.from_pretrained("roberta-wwm-ext-large")
 ```
+## Reference
+
+- [DuIE: A Large-scale Chinese Dataset for Information Extraction](http://tcci.ccf.org.cn/conference/2019/papers/EV10.pdf)

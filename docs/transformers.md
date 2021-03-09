@@ -26,10 +26,10 @@ PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用�
 
 ```python
 import paddle
-from paddlenlp.datasets import ChnSentiCorp
+from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 
-train_ds, dev_ds, test_ds = ChnSentiCorp.get_datasets(['train', 'dev', 'test'])
+train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
 
 model = BertForSequenceClassification.from_pretrained("bert-wwm-chinese", num_classes=len(train_ds.get_labels()))
 
@@ -67,7 +67,7 @@ for input_ids, token_type_ids, labels in train_dataloader:
 |文本分类<br>SequenceClassification |BertForSequenceClassification <br> ErnieForSequenceClassification <br> RobertaForSequenceClassification <br> ElectraForSequenceClassification <br> XLNetForSequenceClassification | [文本分类](../examples/text_classification/pretrained_models/)、[阅读理解](../examples/machine_reading_comprehension/DuReader-yesno/)等| [见上表](#Transformer预训练模型汇总)|
 |序列标注<br>TokenClassification|BertForTokenClassification <br> ErnieForTokenClassification <br> RobertaForTokenClassification <br> ElectraForTokenClassification <br> XLNetForTokenClassification | [命名实体标注](../examples/named_entity_recognition/)等|[见上表](#Transformer预训练模型汇总)|
 |问答任务<br>QuestionAnswering|BertForQuestionAnswering <br> ErnieForQuestionAnswering <br> RobertaForQuestionAnswering| [阅读理解](../examples/machine_reading_comprehension/SQuAD/)等|[见上表](#Transformer预训练模型汇总)|
-|文本生成<br>TextGeneration | 	ErnieForGeneration <br> GPT2ForGreedyGeneration |[文本生成](../examples/text_generation/ernie-gen)等|[见上表](#Transformer预训练模型汇总)|
+|文本生成<br>TextGeneration | ErnieForGeneration <br> GPT2ForGreedyGeneration |[文本生成](../examples/text_generation/ernie-gen)等|[见上表](#Transformer预训练模型汇总)|
 |机器翻译<br>MachineTranslation| TransformerModel | [机器翻译](../examples/machine_translation/transformer/)|[见上表](#Transformer预训练模型汇总)|
 
 用户可以切换表格中的不同模型，来处理相同类型的任务。如对于[预训练模型使用方法](#预训练模型使用方法)中的文本分类任务，用户可以将`BertForSequenceClassification`换成`ErnieForSequenceClassification`, 来寻找更适合的预训练模型。
@@ -75,4 +75,9 @@ for input_ids, token_type_ids, labels in train_dataloader:
 ## 参考资料：
 - 部分中文预训练模型来自：https://github.com/ymcui/Chinese-BERT-wwm
 - Sun, Yu, et al. "Ernie: Enhanced representation through knowledge integration." arXiv preprint arXiv:1904.09223 (2019).
+- Devlin, Jacob, et al. "Bert: Pre-training of deep bidirectional transformers for language understanding." arXiv preprint arXiv:1810.04805 (2018).
 - Cui, Yiming, et al. "Pre-training with whole word masking for chinese bert." arXiv preprint arXiv:1906.08101 (2019).
+- Vaswani, Ashish, et al. "Attention is all you need." arXiv preprint arXiv:1706.03762 (2017).
+- Yang, Zhilin, et al. "Xlnet: Generalized autoregressive pretraining for language understanding." arXiv preprint arXiv:1906.08237 (2019).
+- Clark, Kevin, et al. "Electra: Pre-training text encoders as discriminators rather than generators." arXiv preprint arXiv:2003.10555 (2020).
+- Radford, Alec, et al. "Language models are unsupervised multitask learners." OpenAI blog 1.8 (2019): 9.

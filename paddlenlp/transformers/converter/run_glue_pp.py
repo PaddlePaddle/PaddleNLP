@@ -29,8 +29,7 @@ from paddlenlp.datasets.dataset import *
 from paddlenlp.datasets.glue import *
 from paddlenlp.data import *
 from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers.model_bert import *
-from paddlenlp.transformers.tokenizer_bert import BertTokenizer
+from paddlenlp.transformers import BertTokenizer, BertForSequenceClassification, BertForPretraining, BertModel
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 TASK_CLASSES = {
@@ -228,7 +227,7 @@ def convert_example(example,
         label = np.array([label], dtype=label_dtype)
 
     # tokenize raw text
-    tokens_raw = [tokenizer(l) for l in example]
+    tokens_raw = [tokenizer.tokenize(l) for l in example]
     # truncate to the truncate_length,
     tokens_trun = _truncate_seqs(tokens_raw, max_seq_length)
     # concate the sequences with special tokens
@@ -302,7 +301,7 @@ def do_train(args):
 
     # model = model_class.from_pretrained(
     #     args.model_name_or_path,) num_classes=len(train_dataset.get_labels()))
-    model = BertForPreTraining(
+    model = BertForPretraining(
         BertModel(**model_class.pretrained_init_configuration[
             args.model_name_or_path]))
     if paddle.distributed.get_world_size() > 1:
@@ -314,15 +313,18 @@ def do_train(args):
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_steps)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
 
     loss_fct = paddle.nn.loss.CrossEntropyLoss() if train_dataset.get_labels(
     ) else paddle.nn.loss.MSELoss()

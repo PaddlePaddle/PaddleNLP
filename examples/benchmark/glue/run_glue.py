@@ -219,7 +219,7 @@ def convert_example(example,
         label = example['labels']
         label = np.array([label], dtype=label_dtype)
     # Convert raw text to feature
-    if len(example) == 2:
+    if (int(is_test) + len(example)) == 2:
         example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
     else:
         example = tokenizer(
@@ -314,6 +314,12 @@ def do_train(args):
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          warmup)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         beta1=0.9,
@@ -321,10 +327,7 @@ def do_train(args):
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
 
     loss_fct = paddle.nn.loss.CrossEntropyLoss(
     ) if train_ds.label_list else paddle.nn.loss.MSELoss()
