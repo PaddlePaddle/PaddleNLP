@@ -142,7 +142,7 @@ def parse_args():
     parser.add_argument(
         "--seed", type=int, default=42, help="Random seed for initialization")
     parser.add_argument(
-        "--select_device",
+        "--device",
         type=str,
         default="gpu",
         help="Device for selecting for the training.")
@@ -235,11 +235,10 @@ def convert_example(example,
         return example['input_ids'], example['token_type_ids']
 
 
-
 def do_train(args):
     # Set the paddle execute enviroment
     paddle.enable_static()
-    place = paddle.set_device(args.select_device)
+    place = paddle.set_device(args.device)
     set_seed(args)
 
     # Create the main_program for the training and dev_program for the validation
@@ -406,7 +405,7 @@ def do_train(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    assert args.select_device in [
+    assert args.device in [
         "cpu", "gpu", "xpu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
 
