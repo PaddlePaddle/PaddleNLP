@@ -143,7 +143,7 @@ def parse_args():
         default=False,
         help="Whether to use pure fp16 training.")
     parser.add_argument(
-        "--select_device",
+        "--device",
         type=str,
         default="gpu",
         help="Device for selecting for the training.")
@@ -269,7 +269,7 @@ class WorkerInitObj(object):
 def do_train(args):
     # Initialize the paddle and paddle fleet execute enviroment
     paddle.enable_static()
-    place = paddle.set_device(args.select_device)
+    place = paddle.set_device(args.device)
     fleet.init(is_collective=True)
 
     worker_num = fleet.worker_num()
@@ -366,8 +366,8 @@ def do_train(args):
     while True:
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if os.path.isfile(os.path.join(args.input_dir, f)) and "training" in
-            f
+            if os.path.isfile(os.path.join(args.input_dir, f)) and
+            "training" in f
         ]
         files.sort()
         num_files = len(files)
