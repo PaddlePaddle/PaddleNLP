@@ -251,7 +251,7 @@ def convert_example(example,
         label = example['labels']
         label = np.array([label], dtype=label_dtype)
     # Convert raw text to feature
-    if len(example) == 2:
+    if (int(is_test) + len(example)) == 2:
         example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
     else:
         example = tokenizer(
