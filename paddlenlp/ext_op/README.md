@@ -29,6 +29,9 @@
 首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 Faster Transformer 相关 lib，需要克隆一个 PaddleNLP，并重新编译:
 ``` sh
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
+# 新建一个 python 的虚拟环境
+python3.7 -m virtualenv faster-transformer
+source faster-transformer/bin/activate
 ```
 
 其次，配置环境变量，让我们可以使用当前 clone 的 paddlenlp，并进入到自定义 OP 的路径，准备后续的编译操作：
