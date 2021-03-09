@@ -40,7 +40,7 @@ MODEL_CLASSES = {
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--select_device",
+        "--device",
         default="gpu",
         type=str,
         help="The device that selecting for the training, must be gpu/xpu.")
@@ -152,7 +152,7 @@ def parse_args():
 
 
 def build_compiled_program(args, main_program, loss):
-    if args.select_device == "xpu":
+    if args.device == "xpu":
         return main_program
     exec_strategy = paddle.static.ExecutionStrategy()
     exec_strategy.num_threads = 1
@@ -191,7 +191,7 @@ def set_seed(seed):
 def do_train(args):
     # Initialize the paddle execute enviroment
     paddle.enable_static()
-    place = paddle.set_device(args.select_device)
+    place = paddle.set_device(args.device)
 
     # Set the random seed
     set_seed(args.seed)
@@ -274,8 +274,8 @@ def do_train(args):
     while True:
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if os.path.isfile(os.path.join(args.input_dir, f)) and "training" in
-            f
+            if os.path.isfile(os.path.join(args.input_dir, f)) and
+            "training" in f
         ]
         files.sort()
         random.Random(args.seed + epoch).shuffle(files)

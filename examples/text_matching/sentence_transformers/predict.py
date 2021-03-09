@@ -37,11 +37,7 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_length=512,
-                    is_test=False):
+def convert_example(example, tokenizer, max_seq_length=512):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
@@ -64,41 +60,27 @@ def convert_example(example,
         example(obj:`list[str]`): List of input data, containing query, title and label if it have label.
         tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        label_list(obj:`list[str]`): All the labels that the data has.
         max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
             Sequences longer than this will be truncated, sequences shorter will be padded.
-        is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
 
     Returns:
         query_input_ids(obj:`list[int]`): The list of query token ids.
-        query_segment_ids(obj: `list[int]`): List of query sequence pair mask.
+        query_token_type_ids(obj: `list[int]`): List of query sequence pair mask.
         title_input_ids(obj:`list[int]`): The list of title token ids.
-        title_segment_ids(obj: `list[int]`): List of title sequence pair mask.
+        title_token_type_ids(obj: `list[int]`): List of title sequence pair mask.
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
     query, title = example[0], example[1]
 
-    query_encoded_inputs = tokenizer.encode(
-        text=query, max_seq_len=max_seq_length)
+    query_encoded_inputs = tokenizer(text=query, max_seq_len=max_seq_length)
     query_input_ids = query_encoded_inputs["input_ids"]
-    query_segment_ids = query_encoded_inputs["segment_ids"]
+    query_token_type_ids = query_encoded_inputs["token_type_ids"]
 
-    title_encoded_inputs = tokenizer.encode(
-        text=title, max_seq_len=max_seq_length)
+    title_encoded_inputs = tokenizer(text=title, max_seq_len=max_seq_length)
     title_input_ids = title_encoded_inputs["input_ids"]
-    title_segment_ids = title_encoded_inputs["segment_ids"]
+    title_token_type_ids = title_encoded_inputs["token_type_ids"]
 
-    if not is_test:
-        # create label maps if classification task
-        label = example[-1]
-        label_map = {}
-        for (i, l) in enumerate(label_list):
-            label_map[l] = i
-        label = label_map[label]
-        label = np.array([label], dtype="int64")
-        return query_input_ids, query_segment_ids, title_input_ids, title_segment_ids, label
-    else:
-        return query_input_ids, query_segment_ids, title_input_ids, title_segment_ids
+    return query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids
 
 
 def predict(model, data, tokenizer, label_map, batch_size=1):
@@ -119,14 +101,10 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
     """
     examples = []
     for text_pair in data:
-        query_input_ids, query_segment_ids, title_input_ids, title_segment_ids = convert_example(
-            text_pair,
-            tokenizer,
-            label_list=label_map.values(),
-            max_seq_length=args.max_seq_length,
-            is_test=True)
-        examples.append((query_input_ids, query_segment_ids, title_input_ids,
-                         title_segment_ids))
+        query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = convert_example(
+            text_pair, tokenizer, max_seq_length=args.max_seq_length)
+        examples.append((query_input_ids, query_token_type_ids, title_input_ids,
+                         title_token_type_ids))
 
     # Seperates data into some batches.
     batches = [
@@ -143,19 +121,19 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
     results = []
     model.eval()
     for batch in batches:
-        query_input_ids, query_segment_ids, title_input_ids, title_segment_ids = batchify_fn(
+        query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batchify_fn(
             batch)
 
         query_input_ids = paddle.to_tensor(query_input_ids)
-        query_segment_ids = paddle.to_tensor(query_segment_ids)
+        query_token_type_ids = paddle.to_tensor(query_token_type_ids)
         title_input_ids = paddle.to_tensor(title_input_ids)
-        title_segment_ids = paddle.to_tensor(title_segment_ids)
+        title_token_type_ids = paddle.to_tensor(title_token_type_ids)
 
         probs = model(
             query_input_ids,
             title_input_ids,
-            query_token_type_ids=query_segment_ids,
-            title_token_type_ids=title_segment_ids)
+            query_token_type_ids=query_token_type_ids,
+            title_token_type_ids=title_token_type_ids)
         idx = paddle.argmax(probs, axis=1).numpy()
         idx = idx.tolist()
         labels = [label_map[i] for i in idx]

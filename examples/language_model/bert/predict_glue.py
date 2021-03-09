@@ -18,9 +18,10 @@ from functools import partial
 
 import paddle
 from paddle import inference
+from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 
-from run_glue import convert_example, TASK_CLASSES, MODEL_CLASSES
+from run_glue import convert_example, METRIC_CLASSES, MODEL_CLASSES
 
 
 def parse_args():
@@ -33,7 +34,7 @@ def parse_args():
         type=str,
         required=True,
         help="The name of the task to perform predict, selected in the list: " +
-        ", ".join(TASK_CLASSES.keys()), )
+        ", ".join(METRIC_CLASSES.keys()), )
     parser.add_argument(
         "--model_type",
         default=None,
@@ -48,7 +49,7 @@ def parse_args():
         required=True,
         help="The path prefix of inference model to be used.", )
     parser.add_argument(
-        "--select_device",
+        "--device",
         default="gpu",
         choices=["gpu", "cpu", "xpu"],
         help="Device selected for inference.", )
@@ -77,14 +78,14 @@ class Predictor(object):
     def create_predictor(cls, args):
         config = paddle.inference.Config(args.model_path + ".pdmodel",
                                          args.model_path + ".pdiparams")
-        if args.select_device == "gpu":
+        if args.device == "gpu":
             # set GPU configs accordingly
             config.enable_use_gpu(100, 0)
-        elif args.select_device == "cpu":
+        elif args.device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             config.disable_gpu()
-        elif args.select_device == "xpu":
+        elif args.device == "xpu":
             # set XPU configs accordingly
             config.enable_xpu(100)
         config.switch_use_feed_fetch_ops(False)
@@ -131,28 +132,25 @@ def main():
     predictor = Predictor.create_predictor(args)
 
     args.task_name = args.task_name.lower()
-    dataset_class, metric_class = TASK_CLASSES[args.task_name]
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
-    dataset = dataset_class.get_datasets("test")
-    tokenizer = tokenizer_class.from_pretrained(
-        os.path.dirname(args.model_path))
-    transform_fn = partial(
+    test_ds = load_dataset('glue', args.task_name, splits="test")
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+
+    trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
-        label_list=dataset.get_labels(),
+        label_list=test_ds.label_list,
         max_seq_length=args.max_seq_length,
         is_test=True)
+    test_ds = test_ds.map(trans_func)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Stack(),  # length
-    ): [data for i, data in enumerate(fn(samples)) if i != 2]
-    dataset = dataset.apply(transform_fn)
-
+    ): fn(samples)
     predictor.predict(
-        dataset, batch_size=args.batch_size, collate_fn=batchify_fn)
+        test_ds, batch_size=args.batch_size, collate_fn=batchify_fn)
 
 
 if __name__ == "__main__":
