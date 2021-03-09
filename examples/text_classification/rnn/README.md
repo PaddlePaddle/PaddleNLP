@@ -98,14 +98,6 @@ PaddleNLP提供了一系列的文本表示技术，如`seq2vec`模块。
 </p>
 
 
-关于CNN、LSTM、GRU、RNN等更多信息参考：
-
-* https://canvas.stanford.edu/files/1090785/download
-* https://colah.github.io/posts/2015-08-Understanding-LSTMs/
-* https://arxiv.org/abs/1412.3555
-* https://arxiv.org/pdf/1506.00019
-* https://arxiv.org/abs/1404.2188
-
 
 ## 快速开始
 
@@ -156,18 +148,33 @@ train_ds, dev_ds, test_ds = ChnSentiCorp.get_datasets(['train', 'dev', 'test'])
 wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
 ```
 
+**NOTE:** 词表的选择和实际应用数据相关，需根据实际数据选择词表。
+
+
 我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 
 CPU 启动：
 
 ```shell
-python train.py --vocab_path='./senta_word_dict.txt' --use_gpu=False --network=bilstm --lr=5e-4 --batch_size=64 --epochs=10 --save_dir='./checkpoints'
+python train.py --vocab_path='./senta_word_dict.txt' \
+    --select_devices=cpu \
+    --network=bilstm \
+    --lr=5e-4 \
+    --batch_size=64 \
+    --epochs=10 \
+    --save_dir='./checkpoints'
 ```
 
 GPU 启动：
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python train.py --vocab_path='./senta_word_dict.txt' --use_gpu=True --network=bilstm --lr=5e-4 --batch_size=64 --epochs=10 --save_dir='./checkpoints'
+CUDA_VISIBLE_DEVICES=0 python train.py --vocab_path='./senta_word_dict.txt' \
+    --select_devices=gpu \
+    --network=bilstm \
+    --lr=5e-4 \
+    --batch_size=64 \
+    --epochs=10 \
+    --save_dir='./checkpoints'
 ```
 
 以上参数表示：
@@ -213,13 +220,19 @@ python export_model.py --vocab_path=./senta_word_dict.txt --network=bilstm --par
 CPU启动：
 
 ```shell
-python predict.py --vocab_path='./senta_word_dict.txt' --use_gpu=False --network=bilstm --params_path=checkpoints/final.pdparams
+python predict.py --vocab_path='./senta_word_dict.txt' \
+    --select_devices=cpu \
+    --network=bilstm \
+    --params_path=checkpoints/final.pdparams
 ```
 
 GPU启动：
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python predict.py --vocab_path='./senta_word_dict.txt' --use_gpu=True --network=bilstm --params_path='./checkpoints/final.pdparams'
+CUDA_VISIBLE_DEVICES=0 python predict.py --vocab_path='./senta_word_dict.txt' \
+    --select_devices=gpu \
+    --network=bilstm \
+    --params_path='./checkpoints/final.pdparams'
 ```
 
 将待预测数据分词完毕后，如以下示例：
@@ -239,3 +252,13 @@ Data: 这个宾馆比较陈旧了，特价的房间也很一般。总体来说�
 Data: 怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片      Lable: negative
 Data: 作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。      Lable: positive
 ```
+
+## Reference
+
+关于LSTM、GRU、CNN更多信息参考：
+
+- https://canvas.stanford.edu/files/1090785/download
+- https://colah.github.io/posts/2015-08-Understanding-LSTMs/
+- https://arxiv.org/abs/1412.3555
+- https://arxiv.org/pdf/1506.00019
+- https://arxiv.org/abs/1404.2188

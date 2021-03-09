@@ -22,7 +22,7 @@ from utils import preprocess_prediction_data
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
-parser.add_argument("--use_gpu", type=eval, default=False, help="Whether use GPU for training, input should be True or False")
+parser.add_argument('--select_devices', type=str, default="gpu", help="Which device do you wanna use to training, CPU or CPU ?")
 parser.add_argument("--batch_size", type=int, default=1, help="Total examples' number of a batch for training.")
 parser.add_argument("--vocab_path", type=str, default="./senta_word_dict.txt", help="The path to vocabulary.")
 parser.add_argument('--network', type=str, default="bilstm", help="Which network you would like to choose bow, lstm, bilstm, gru, bigru, rnn, birnn, bilstm_attn, cnn and textcnn?")
@@ -72,8 +72,9 @@ def predict(model, data, label_map, batch_size=1, pad_token_id=0):
 
 
 if __name__ == "__main__":
-    paddle.set_device("gpu") if args.use_gpu else paddle.set_device("cpu")
-    # Loads vocab.s
+    paddle.set_device(args.select_devices.lower())
+
+    # Loads vocab.
     vocab = ppnlp.data.Vocab.load_vocabulary(
         args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
     label_map = {0: 'negative', 1: 'positive'}
