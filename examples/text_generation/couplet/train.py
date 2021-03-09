@@ -14,19 +14,18 @@
 
 from args import parse_args
 
-from data import create_train_loader
-from model import Seq2SeqAttnModel, CrossEntropyCriterion
-
 import numpy as np
-
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddlenlp.metrics import Perplexity
 
+from data import create_train_loader
+from model import Seq2SeqAttnModel, CrossEntropyCriterion
+
 
 def do_train(args):
-    device = paddle.set_device("gpu" if args.use_gpu else "cpu")
+    device = paddle.set_device(args.device)
 
     # Define dataloader
     train_loader, vocab_size, pad_id = create_train_loader(args.batch_size)

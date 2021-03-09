@@ -26,9 +26,9 @@ Sequence to Sequence (Seq2Seq)，使用编码器-解码器（Encoder-Decoder）�
 
 ## 数据介绍
 
-本教程使用[couplet数据集](https://paddlenlp.bj.bcebos.com/datasets/couplet.tar.gz)数据集作为训练语料，train_src.tsv及train_tgt.tsv为训练集，dev_src.tsv及dev_tgt.tsv为开发集，test_src.tsv及test_tgt.tsv为测试集。
+本教程使用[couplet数据集](https://paddlenlp.bj.bcebos.com/datasets/couplet.tar.gz)作为训练语料，其中train_src.tsv及train_tgt.tsv为训练集，dev_src.tsv及dev_tgt.tsv为开发集，test_src.tsv及test_tgt.tsv为测试集。
 
-数据集会在`CoupletDataset`初始化时自动下载，如果用户在初始化数据集时没有提供路径，在linux系统下，数据集会自动下载到`~/.paddlenlp/datasets/machine_translation/CoupletDataset/`目录下
+数据集会在`CoupletDataset`初始化时自动下载，如果用户在初始化数据集时没有提供路径，在linux系统下，数据集会自动下载到`~/.paddlenlp/datasets/Couplet/`目录下
 
 
 ## 模型训练
@@ -40,9 +40,10 @@ python train.py \
     --num_layers 2 \
     --hidden_size 512 \
     --batch_size 128 \
-    --use_gpu True \
+    --device gpu \
     --model_path ./couplet_models \
     --max_epoch 20
+
 ```
 
 各参数的具体说明请参阅 `args.py` 。训练程序会在每个epoch训练结束之后，保存一次模型。
@@ -61,7 +62,8 @@ python predict.py \
     --init_from_ckpt couplet_models/19 \
     --infer_output_file infer_output.txt \
     --beam_size 10 \
-    --use_gpu True
+    --device gpu
+
 ```
 
 各参数的具体说明请参阅 `args.py` ，注意预测时所用模型超参数需和训练时一致。
