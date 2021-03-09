@@ -54,12 +54,12 @@ wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
 
 ## 蒸馏实验过程
 ### 训练BERT fine-tuning模型
-训练BERT的fine-tuning模型，可以去本repo下example中的[glue目录](../../glue)下。关于glue的更多详细说明，可见glue目录下的README文档。
+训练BERT的fine-tuning模型，可以去本repo下example中的[glue目录](../../benchmark/glue)下。关于glue的更多详细说明，可见glue目录下的README文档。
 
 以GLUE的SST-2任务为例，调用BERT fine-tune的训练脚本，配置如下的参数，训练SST-2任务：
 
 ```shell
-cd ../../glue
+cd ../../benchmark/glue
 export CUDA_VISIBLE_DEVICES=0
 export TASK_NAME=SST-2
 python -u ./run_glue.py \
@@ -98,6 +98,7 @@ CUDA_VISIBLE_DEVICES=0 python small.py \
     --lr 3e-4 \
     --dropout_prob 0.2 \
     --vocab_path senta_word_dict.txt \
+    --saving_steps 10000 \
     --output_dir small_models/senta/
 
 ```
@@ -111,6 +112,7 @@ CUDA_VISIBLE_DEVICES=0 python small.py \
     --lr 1.0 \
     --dropout_prob 0.4 \
     --output_dir small_models/SST-2 \
+    --saving_steps 10000 \
     --embedding_name w2v.google_news.target.word-word.dim300.en
 
 ```
@@ -124,6 +126,7 @@ CUDA_VISIBLE_DEVICES=0 python small.py \
     --lr 2.0 \
     --dropout_prob 0.4 \
     --output_dir small_models/QQP \
+    --saving_steps 10000 \
     --embedding_name w2v.google_news.target.word-word.dim300.en
 
 ```
@@ -142,7 +145,8 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --model_name bert-wwm-ext-chinese \
     --teacher_path pretrained_models/senta/best_bert_wwm_ext_model_880/model_state.pdparams \
     --vocab_path senta_word_dict.txt \
-    --output_dir distilled_models/senta
+    --output_dir distilled_models/senta \
+    --saving_steps 10000 \
 
 ```
 
@@ -156,9 +160,10 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --dropout_prob 0.2 \
     --batch_size 128 \
     --model_name bert-base-uncased \
-    --embedding_name w2v.google_news.target.word-word.dim300.en \
     --output_dir distilled_models/SST-2 \
-    --teacher_path pretrained_models/SST-2/best_model_610/model_state.pdparams
+    --teacher_path pretrained_models/SST-2/best_model_610/model_state.pdparams \
+    --saving_steps 10000 \
+    --embedding_name w2v.google_news.target.word-word.dim300.en \
 
 ```
 
@@ -171,10 +176,11 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --dropout_prob 0.2 \
     --batch_size 256 \
     --model_name bert-base-uncased \
-    --embedding_name w2v.google_news.target.word-word.dim300.en \
     --n_iter 10 \
     --output_dir distilled_models/QQP \
-    --teacher_path pretrained_models/QQP/best_model_17000/model_state.pdparams
+    --teacher_path pretrained_models/QQP/best_model_17000/model_state.pdparams \
+    --saving_steps 10000 \
+    --embedding_name w2v.google_news.target.word-word.dim300.en \
 
 ```
 

@@ -26,7 +26,6 @@ from paddle.io import DataLoader
 from paddle.metric import Metric, Accuracy, Precision, Recall
 
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertModel, BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup

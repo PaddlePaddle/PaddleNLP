@@ -26,10 +26,10 @@ def convert_small_example(example,
     input_ids = []
     if task_name == 'senta':
         if is_tokenized:
-            example[0] = example[0][:max_seq_length]
-            input_ids = [vocab[token] for token in example[0]]
+            example['sentence'] = example['sentence'][:max_seq_length]
+            input_ids = [vocab[token] for token in example['sentence']]
         else:
-            for i, token in enumerate(jieba.cut(example[0])):
+            for i, token in enumerate(jieba.cut(example['sentence'])):
                 if i == max_seq_length:
                     break
                 token_id = vocab[token]
@@ -37,15 +37,14 @@ def convert_small_example(example,
 
     else:
         if is_tokenized:
-            tokens = example[0][:max_seq_length]
+            tokens = example['sentence'][:max_seq_length]
         else:
-            tokens = vocab.tokenize(example[0])[:max_seq_length]
+            tokens = vocab.tokenize(example['sentence'])[:max_seq_length]
         input_ids = vocab.convert_tokens_to_ids(tokens)
 
     valid_length = np.array(len(input_ids), dtype='int64')
-
     if not is_test:
-        label = np.array(example[-1], dtype="int64")
+        label = np.array(example['labels'], dtype="int64")
         return input_ids, valid_length, label
     return input_ids, valid_length
 
@@ -56,11 +55,15 @@ def convert_pair_example(example,
                          is_tokenized=True,
                          max_seq_length=128,
                          is_test=False):
-    seq1 = convert_small_example([example[0], example[2]], task_name, vocab,
-                                 is_tokenized, max_seq_length, is_test)[:2]
+    seq1 = convert_small_example({
+        "sentence": example['sentence1'],
+        "labels": example['labels']
+    }, task_name, vocab, is_tokenized, max_seq_length, is_test)[:2]
 
-    seq2 = convert_small_example([example[1], example[2]], task_name, vocab,
-                                 is_tokenized, max_seq_length, is_test)
+    seq2 = convert_small_example({
+        "sentence": example['sentence2'],
+        "labels": example['labels']
+    }, task_name, vocab, is_tokenized, max_seq_length, is_test)
     pair_features = seq1 + seq2
 
     return pair_features
@@ -75,20 +78,18 @@ def convert_two_example(example,
                         is_tokenized=True,
                         is_test=False):
     bert_features = convert_example(
-        example[1:] if task_name == 'senta' and is_tokenized else example,
+        example,
         tokenizer=tokenizer,
         label_list=label_list,
         is_tokenized=is_tokenized,
         max_seq_length=max_seq_length,
         is_test=is_test)
-
     if task_name == 'qqp':
         small_features = convert_pair_example(
             example, task_name, vocab, is_tokenized, max_seq_length, is_test)
     else:
         small_features = convert_small_example(
             example, task_name, vocab, is_tokenized, max_seq_length, is_test)
-
     return bert_features[:2] + small_features
 
 
@@ -99,69 +100,26 @@ def convert_example(example,
                     max_seq_length=512,
                     is_test=False):
     """convert a glue example into necessary features"""
-
-    def _truncate_seqs(seqs, max_seq_length):
-        if len(seqs) == 1:  # single sentence
-            # Account for [CLS] and [SEP] with "- 2"
-            seqs[0] = seqs[0][0:(max_seq_length - 2)]
-        else:  # Sentence pair
-            # Account for [CLS], [SEP], [SEP] with "- 3"
-            tokens_a, tokens_b = seqs
-            max_seq_length -= 3
-            while True:  # Truncate with longest_first strategy
-                total_length = len(tokens_a) + len(tokens_b)
-                if total_length <= max_seq_length:
-                    break
-                if len(tokens_a) > len(tokens_b):
-                    tokens_a.pop()
-                else:
-                    tokens_b.pop()
-        return seqs
-
-    def _concat_seqs(seqs, separators, seq_mask=0, separator_mask=1):
-        concat = sum((seq + sep for sep, seq in zip(separators, seqs)), [])
-        segment_ids = sum(
-            ([i] * (len(seq) + len(sep))
-             for i, (sep, seq) in enumerate(zip(separators, seqs))), [])
-        if isinstance(seq_mask, int):
-            seq_mask = [[seq_mask] * len(seq) for seq in seqs]
-        if isinstance(separator_mask, int):
-            separator_mask = [[separator_mask] * len(sep) for sep in separators]
-        p_mask = sum((s_mask + mask
-                      for sep, seq, s_mask, mask in zip(
-                          separators, seqs, seq_mask, separator_mask)), [])
-        return concat, segment_ids, p_mask
-
     if not is_test:
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
         # Get the label
-        label = example[-1]
-        example = example[:-1]
-        # Create label maps if classification task
-        if label_list:
-            label_map = {}
-            for (i, l) in enumerate(label_list):
-                label_map[l] = i
-            label = label_map[label]
+        label = example['labels']
         label = np.array([label], dtype=label_dtype)
-
-    # Tokenize raw text
-    if len(example) == 1:
+    # Convert raw text to feature
+    if len(example) == 2:
         example = tokenizer(
-            example[0],
+            example['sentence'],
             max_seq_len=max_seq_length,
             is_split_into_words=is_tokenized)
     else:
         example = tokenizer(
-            example[0],
-            text_pair=example[1],
+            example['sentence1'],
+            text_pair=example['sentence2'],
             max_seq_len=max_seq_length,
             is_split_into_words=is_tokenized)
 
     if not is_test:
-        return example['input_ids'], example['token_type_ids'], len(example[
-            'input_ids']), label
-
-    return example['input_ids'], example['token_type_ids'], len(example[
-        'input_ids'])
+        return example['input_ids'], example['token_type_ids'], label
+    else:
+        return example['input_ids'], example['token_type_ids']
