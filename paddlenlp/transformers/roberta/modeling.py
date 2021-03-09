@@ -51,7 +51,7 @@ class RobertaEmbeddings(nn.Layer):
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
             ones = paddle.ones_like(input_ids, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=1)
+            seq_length = paddle.cumsum(ones, axis=-1)
             position_ids = seq_length - ones
             position_ids.stop_gradient = True
         if token_type_ids is None:
