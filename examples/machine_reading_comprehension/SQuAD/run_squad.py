@@ -1,3 +1,18 @@
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 The HuggingFace Inc. team.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import random
 import time
@@ -115,7 +130,7 @@ def run(args):
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
         # in one example possible giving several features when a context is long, each of those features having a
         # context that overlaps a bit the context of the previous feature.
-        #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is 
+        #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
         # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
         contexts = [examples[i]['context'] for i in range(len(examples))]
         questions = [examples[i]['question'] for i in range(len(examples))]
@@ -191,7 +206,7 @@ def run(args):
             train_ds = load_dataset('squad', splits='train_v2')
         else:
             train_ds = load_dataset('squad', splits='train_v1')
-        train_ds.map(prepare_train_features, lazy=False)
+        train_ds.map(prepare_train_features, batched=True)
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
         train_batchify_fn = lambda samples, fn=Dict({
@@ -213,15 +228,18 @@ def run(args):
         lr_scheduler = LinearDecayWithWarmup(
             args.learning_rate, num_training_steps, args.warmup_proportion)
 
+        # Generate parameter names needed to perform weight decay.
+        # All bias and LayerNorm parameters are excluded.
+        decay_params = [
+            p.name for n, p in model.named_parameters()
+            if not any(nd in n for nd in ["bias", "norm"])
+        ]
         optimizer = paddle.optimizer.AdamW(
             learning_rate=lr_scheduler,
             epsilon=args.adam_epsilon,
             parameters=model.parameters(),
             weight_decay=args.weight_decay,
-            apply_decay_param_fun=lambda x: x in [
-                p.name for n, p in model.named_parameters()
-                if not any(nd in n for nd in ["bias", "norm"])
-            ])
+            apply_decay_param_fun=lambda x: x in decay_params)
         criterion = CrossEntropyLossForSQuAD()
 
         global_step = 0
@@ -244,7 +262,7 @@ def run(args):
                 loss.backward()
                 optimizer.step()
                 lr_scheduler.step()
-                optimizer.clear_gradients()
+                optimizer.clear_grad()
 
                 if global_step % args.save_steps == 0 or global_step == num_training_steps:
                     if (not args.n_gpu > 1
@@ -264,7 +282,7 @@ def run(args):
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
         # in one example possible giving several features when a context is long, each of those features having a
         # context that overlaps a bit the context of the previous feature.
-        #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is 
+        #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
         # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
         contexts = [examples[i]['context'] for i in range(len(examples))]
         questions = [examples[i]['question'] for i in range(len(examples))]
@@ -301,7 +319,7 @@ def run(args):
         else:
             dev_ds = load_dataset('squad', splits='dev_v1')
 
-        dev_ds.map(prepare_validation_features, lazy=False)
+        dev_ds.map(prepare_validation_features, batched=True)
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.batch_size, shuffle=False)
 

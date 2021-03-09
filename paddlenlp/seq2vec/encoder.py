@@ -660,7 +660,7 @@ class TemporalBlock(nn.Layer):
 
 
 class TCNEncoder(nn.Layer):
-    """
+    r"""
     A `TCNEncoder` takes as input a sequence of vectors and returns a
     single vector, which is the last one time step in the feature map. 
     The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
@@ -720,7 +720,7 @@ class TCNEncoder(nn.Layer):
         return self._output_dim
 
     def forward(self, inputs):
-        """
+        r"""
         TCNEncoder takes as input a sequence of vectors and returns a
         single vector, which is the last one time step in the feature map. 
         The input to this module is of shape `(batch_size, num_tokens, input_size)`, 

@@ -506,16 +506,19 @@ def do_train(args):
                                          args.warmup_steps)
 
     clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=1.0)
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         grad_clip=clip,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=1024)
 
@@ -572,7 +575,7 @@ def do_train(args):
                 t_loss += loss.detach()
                 optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             if global_step % args.logging_steps == 0:
                 local_loss = (t_loss - log_loss) / args.logging_steps
                 if (args.n_gpu > 1):

@@ -140,10 +140,10 @@ def parse_args():
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
-        "--n_cards",
+        "--n_procs",
         default=1,
         type=int,
-        help="Number cards for the training, only support multi cards in the gpu."
+        help="Number procs for the training, only support multi cards in the gpu/xpu."
     )
     parser.add_argument(
         "--select_device",
@@ -312,15 +312,18 @@ def do_train(args):
     lr_scheduler = LinearDecayWithWarmup(
         args.learning_rate, num_training_steps, args.warmup_steps, last_epoch=0)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
 
@@ -330,8 +333,8 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if os.path.isfile(os.path.join(args.input_dir, f)) and
-            "training" in f
+            if os.path.isfile(os.path.join(args.input_dir, f)) and "training" in
+            f
         ]
         files.sort()
         num_files = len(files)
@@ -398,18 +401,16 @@ def do_train(args):
                     loss.backward()
                     optimizer.step()
                 lr_scheduler.step()
-                optimizer.clear_gradients()
+                optimizer.clear_grad()
                 if global_step % args.logging_steps == 0:
-                    if (not args.n_cards > 1
-                        ) or paddle.distributed.get_rank() == 0:
+                    if paddle.distributed.get_rank() == 0:
                         logger.info(
                             "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
                             % (global_step, epoch, step, loss,
                                args.logging_steps / (time.time() - tic_train)))
                     tic_train = time.time()
                 if global_step % args.save_steps == 0:
-                    if (not args.n_cards > 1
-                        ) or paddle.distributed.get_rank() == 0:
+                    if paddle.distributed.get_rank() == 0:
                         output_dir = os.path.join(args.output_dir,
                                                   "model_%d" % global_step)
                         if not os.path.exists(output_dir):
@@ -432,7 +433,11 @@ def do_train(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.n_cards > 1 and args.select_device == "gpu":
-        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_cards)
+    assert args.select_device in [
+        "cpu", "gpu", "xpu"
+    ], "Invalid device! Available device should be cpu, gpu, or xpu."
+
+    if args.n_procs > 1 and args.select_device != "cpu":
+        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_procs)
     else:
         do_train(args)
