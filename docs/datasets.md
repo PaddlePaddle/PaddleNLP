@@ -43,6 +43,12 @@ PaddleNLP提供了
 |  [IWSLT15](https://workshop2015.iwslt.org/) | IWSLT'15 English-Vietnamese data 英语-越南语翻译数据集| `paddlenlp.datasets.IWSLT15`|
 |  [WMT14](http://www.statmt.org/wmt14/translation-task.html) | WMT14 EN-DE 英语-德语翻译数据集| `paddlenlp.datasets.WMT14ende`|
 
+## 文本摘要
+
+| 数据集名称  | 简介 | 调用方法 |
+| ----  | --------- | ------ |
+|  [CNN/DM](https://github.com/harvardnlp/sent-summary) | 美国有线新闻网络与每日邮报新闻文本摘要数据集| `paddlenlp.datasets.CnnDm`|
+
 ## 时序预测
 
 | 数据集名称  | 简介 | 调用方法 |

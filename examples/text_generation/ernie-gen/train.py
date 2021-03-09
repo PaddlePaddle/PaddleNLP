@@ -23,7 +23,8 @@ from tqdm import tqdm
 import paddle.nn as nn
 from paddle.io import DataLoader
 from paddlenlp.transformers import ErnieForGeneration, ErnieTokenizer, ErnieTinyTokenizer, BertTokenizer, ElectraTokenizer, RobertaTokenizer, LinearDecayWithWarmup
-from paddlenlp.datasets import Poetry
+from paddlenlp.datasets import load_dataset
+
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.metrics import Rouge1, Rouge2
 from paddlenlp.utils.log import logger
@@ -141,7 +142,8 @@ def train():
         model_state = paddle.load(args.init_checkpoint)
         model.set_state_dict(model_state)
 
-    train_dataset, dev_dataset = Poetry.get_datasets(['train', 'dev'])
+    train_dataset, dev_dataset = load_dataset(
+        'poetry', splits=('train', 'dev'), lazy=False)
     attn_id = tokenizer.vocab[
         '[ATTN]'] if '[ATTN]' in tokenizer.vocab else tokenizer.vocab['[MASK]']
     tgt_type_id = model.sent_emb.weight.shape[0] - 1
@@ -155,7 +157,7 @@ def train():
         noise_prob=args.noise_prob,
         use_random_noice=args.use_random_noice)
 
-    train_dataset = train_dataset.apply(trans_func, lazy=True)
+    train_dataset = train_dataset.map(trans_func)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_dataset, batch_size=args.batch_size, shuffle=True)
     batchify_fn = lambda samples, fn=Tuple(
@@ -175,12 +177,10 @@ def train():
         num_workers=0,
         return_list=True)
 
-    dev_dataset = dev_dataset.apply(trans_func, lazy=True)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_dataset, batch_size=args.batch_size, shuffle=False)
+    dev_dataset = dev_dataset.map(trans_func)
     dev_data_loader = DataLoader(
         dataset=dev_dataset,
-        batch_sampler=dev_batch_sampler,
+        batch_size=args.batch_size,
         collate_fn=batchify_fn,
         num_workers=0,
         return_list=True)
