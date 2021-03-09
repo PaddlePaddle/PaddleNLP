@@ -24,7 +24,7 @@ def main(args):
 
     test_dataset = DialogueDataset(
         args.test_data_path,
-        args.infer_batch_size,
+        args.batch_size,
         tokenizer.pad_token_id,
         tokenizer.cls_token_id,
         mode='test')
@@ -51,7 +51,12 @@ def infer(model, data_loader, tokenizer):
             max_length=args.max_dec_len,
             min_length=args.min_dec_len,
             decode_strategy=args.decode_strategy,
-            top_k=args.topk,
+            temperature=args.temperature,
+            top_k=args.top_k,
+            top_p=args.top_p,
+            num_beams=args.num_beams,
+            length_penalty=args.length_penalty,
+            early_stopping=args.early_stopping,
             num_return_sequences=args.num_samples)
 
         total_time += (time.time() - start_time)
