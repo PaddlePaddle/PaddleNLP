@@ -39,157 +39,6 @@ class Registry(object):
 AttentionRegistry = Registry()
 
 
-class Mask(object):
-    def __init__(self,
-                 query_length,
-                 key_length,
-                 num_heads,
-                 block_size,
-                 window_size,
-                 num_global_blocks,
-                 num_rand_blocks,
-                 seed=None):
-        for k, v in locals().items():
-            if k != "self":
-                setattr(self, k, v)
-        self.mask = np.zeros_like(
-            np.arange(query_length * key_length * num_heads).reshape((
-                num_heads, query_length, key_length)))
-        self.rand_mask = np.zeros_like(
-            np.arange(query_length * key_length * num_heads).reshape((
-                num_heads, query_length, key_length)))
-        self.rand_mask_idx = [[] for i in range(num_heads)]
-        self.num_query_blocks = self.query_length // self.block_size     \
-                + int(self.query_length % self.block_size != 0)
-        self.num_key_blocks = self.key_length // self.block_size         \
-                + int(self.key_length % self.block_size != 0)
-        self.num_window_blocks = self.window_size // 2
-        if seed:
-            np.random.seed(seed)
-        # create global mask
-        self._create_global_mask()
-        # create window mask
-        self._create_window_mask()
-        # create random mask
-        self._create_random_mask()
-
-    def get_mask(self):
-        return self.mask
-
-    def get_rand_mask_idx(self):
-        return self.rand_mask_idx
-
-    def get_rand_mask(self):
-        return self.rand_mask
-
-    def get_float_mask(self):
-        float_mask = np.array(self.mask, dtype='float32')
-        float_mask[float_mask != 1] = -np.inf
-        float_mask[float_mask == 1.] = 0
-        return float_mask
-
-    def _create_global_mask(self):
-        global_block_length = self.num_global_blocks * self.block_size
-        self.mask[:, 0:global_block_length, :] = 1
-        self.mask[:, :, 0:global_block_length] = 1
-
-    def _create_window_mask(self):
-        for query_block_idx in range(self.num_query_blocks):
-            left_key_block_idx, right_key_block_idx = self._get_window_block_idx(
-                query_block_idx)
-            left_idx = left_key_block_idx * self.block_size
-            right_idx = (right_key_block_idx + 1) * self.block_size
-            query_left_idx = query_block_idx * self.block_size
-            query_right_idx = min((query_block_idx + 1) * self.block_size,
-                                  self.query_length)
-            self.mask[:, query_left_idx:query_right_idx, left_idx:right_idx] = 1
-
-    def _create_random_mask(self):
-        all_key_blocks_idx = np.arange(0, self.num_key_blocks, dtype=np.int32)
-        for query_block_idx in range(self.num_query_blocks):
-            left_key_block_idx, right_key_block_idx = self._get_window_block_idx(
-                query_block_idx)
-            illegal_blocks_idx = [
-                i for i in range(left_key_block_idx, right_key_block_idx + 1)
-            ]
-            illegal_blocks_idx.extend(
-                [i for i in range(self.num_global_blocks)])
-            left_key_block_idx = query_block_idx - self.num_window_blocks
-            right_key_block_idx = query_block_idx + self.num_window_blocks
-            if self.num_global_blocks > left_key_block_idx:
-                num_fill_blocks = self.num_global_blocks - left_key_block_idx
-                illegal_blocks_idx.extend([
-                    i
-                    for i in range(self.num_key_blocks - num_fill_blocks,
-                                   self.num_key_blocks)
-                ])
-            if right_key_block_idx >= self.num_key_blocks:
-                num_fill_blocks = right_key_block_idx - self.num_key_blocks + 1
-                illegal_blocks_idx.extend([
-                    i
-                    for i in range(self.num_global_blocks,
-                                   self.num_global_blocks + num_fill_blocks)
-                ])
-
-            illegal_blocks_idx = set(illegal_blocks_idx)
-
-            query_left_idx = query_block_idx * self.block_size
-            query_right_idx = min((query_block_idx + 1) * self.block_size,
-                                  self.query_length)
-            for i in range(self.num_heads):
-                legal_blocks_idx = []
-                legal_idx = []
-                perm_block = np.random.permutation(all_key_blocks_idx)
-                for j in perm_block:
-                    if j not in illegal_blocks_idx:
-                        legal_blocks_idx.append(j)
-                    if len(legal_blocks_idx) == self.num_rand_blocks:
-                        break
-                for j in legal_blocks_idx:
-                    key_left_idx = j * self.block_size
-                    key_right_idx = min((j + 1) * self.block_size,
-                                        self.key_length)
-                    legal_idx.extend(
-                        [i for i in range(key_left_idx, key_right_idx)])
-                    self.rand_mask[i, query_left_idx:query_right_idx,
-                                   key_left_idx:key_right_idx] = 1
-                self.rand_mask_idx[i].append(legal_blocks_idx)
-        self.rand_mask_idx = np.stack(self.rand_mask_idx, axis=0)
-        self.rand_mask_idx = self.rand_mask_idx[:, self.num_global_blocks:]
-        # transform rand_mask_idx
-        H = self.rand_mask_idx.shape[0]
-        L = self.rand_mask_idx.shape[1]
-        R = self.rand_mask_idx.shape[2]
-        rand_mask_idx = []
-        for i in range(H):
-            for j in range(L):
-                for k in range(R):
-                    rand_mask_idx.append([i, self.rand_mask_idx[i][j][k]])
-        self.rand_mask_idx = rand_mask_idx
-        self.mask = np.maximum(self.rand_mask, self.mask)
-
-    def _get_window_block_idx(self, query_block_idx):
-        left_key_block_idx = max(0, query_block_idx - self.num_window_blocks)
-        right_key_block_idx = min(query_block_idx + self.num_window_blocks,
-                                  self.num_key_blocks - 1)
-        return left_key_block_idx, right_key_block_idx
-
-
-def create_bigbird_simulated_attention_mask_list(
-        num_layers, query_length, key_length, num_heads, block_size,
-        window_size, num_global_blocks, num_rand_blocks, seed):
-    attn_mask_list = []
-    rand_mask_idx_list = []
-    for i in range(num_layers):
-        mask = Mask(query_length, key_length, num_heads, block_size,
-                    window_size, num_global_blocks, num_rand_blocks, seed)
-        attn_mask = paddle.to_tensor(mask.get_float_mask())
-        rand_mask_idx = paddle.to_tensor(mask.get_rand_mask_idx())
-        attn_mask_list.append(attn_mask)
-        rand_mask_idx_list.append(rand_mask_idx)
-    return attn_mask_list, rand_mask_idx_list
-
-
 def create_bigbird_rand_mask_idx(num_layers, query_length, key_length,
                                  num_heads, block_size, window_size,
                                  num_global_blocks, num_rand_blocks, seed):
@@ -261,7 +110,6 @@ def create_bigbird_rand_mask_idx_list(num_layers, query_length, key_length,
         for i in range(num_layers)
     ]
     rand_mask_idx_list = np.stack(rand_mask_idx_list)
-    rand_mask_idx_list = paddle.to_tensor(rand_mask_idx_list)
     return rand_mask_idx_list
 
 
@@ -370,6 +218,7 @@ class DefaultAttention(Attention):
         # scale dot product attention
         product = paddle.matmul(x=query_matrix, y=key_matrix, transpose_y=True)
         product = product * (d_head**-0.5)
+        product += (1 - paddle.matmul(query_mask, key_mask)) * -1e6
         if attn_mask is not None:
             product = product + attn_mask
         weights = F.softmax(product)

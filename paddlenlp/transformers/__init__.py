@@ -14,6 +14,7 @@
 
 from .model_utils import PretrainedModel, register_base_model
 from .tokenizer_utils import PretrainedTokenizer
+from .attention_utils import create_bigbird_rand_mask_idx_list
 
 from .bert.modeling import *
 from .bert.tokenizer import *
