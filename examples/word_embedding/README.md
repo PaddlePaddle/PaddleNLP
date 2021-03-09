@@ -31,7 +31,7 @@ PaddleNLP已预置多个公开的预训练Embedding，用户可以通过使用`p
 
 ```shell
 # 使用paddlenlp.embeddings.TokenEmbedding
-python train.py --select_device='gpu' \
+python train.py --device='gpu' \
                 --lr=5e-4 \
                 --batch_size=64 \
                 --epochs=20 \
@@ -39,7 +39,7 @@ python train.py --select_device='gpu' \
                 --vdl_dir='./vdl_dir'
 
 # 使用paddle.nn.Embedding
-python train.py --select_device='gpu' \
+python train.py --device='gpu' \
                 --lr=1e-4 \
                 --batch_size=64 \
                 --epochs=20 \
@@ -49,7 +49,7 @@ python train.py --select_device='gpu' \
 
 以上参数表示：
 
-* `select_device`: 选择训练设备，目前可选'gpu', 'cpu', 'xpu'。 默认为`gpu`。
+* `device`: 选择训练设备，目前可选'gpu', 'cpu', 'xpu'。 默认为`gpu`。
 * `lr`: 学习率， 默认为5e-4。
 * `batch_size`: 运行一个batch大小，默认为64。
 * `epochs`: 训练轮次，默认为5。

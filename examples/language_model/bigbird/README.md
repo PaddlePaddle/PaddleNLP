@@ -42,7 +42,7 @@
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0"  run_pretrain.py --model_name_or_path bigbird-base-uncased \
+python -m paddle.distributed.launch --gpus "0" --log_dir log  run_pretrain.py --model_name_or_path bigbird-base-uncased \
     --input_dir "./data" \
     --output_dir "output" \
     --batch_size 4 \
@@ -57,6 +57,8 @@ python -m paddle.distributed.launch --gpus "0"  run_pretrain.py --model_name_or_
 
 其中参数释义如下：
 
+- `gpus` paddle.distributed.launch参数，用于指定使用哪张显卡。单卡格式："0"；多卡格式："0,1,2"。
+- `log_dir` paddle.distributed.launch参数，用于指定训练日志输出的目录，默认值为`log`。（注意，如果需要在同一目录多次启动run_pretrain.py，需要设置不同的log_dir，否则日志会重定向到相同的文件中）。
 - `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
 - `output_dir` 指定输出文件。

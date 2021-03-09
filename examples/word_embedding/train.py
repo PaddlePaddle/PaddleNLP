@@ -29,7 +29,7 @@ import data
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--epochs", type=int, default=5, help="Number of epoches for training.")
-parser.add_argument("--select_device", type=str, default="gpu", help="Select cpu, gpu, xpu devices to train model.")
+parser.add_argument("--device", type=str, default="gpu", help="Select cpu, gpu, xpu devices to train model.")
 parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate used to train.")
 parser.add_argument("--save_dir", type=str, default='./checkpoints/', help="Directory to save model checkpoint")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
@@ -129,10 +129,10 @@ class BoWModel(nn.Layer):
 
 
 if __name__ == '__main__':
-    assert args.select_device in [
+    assert args.device in [
         "cpu", "gpu", "xpu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
-    paddle.set_device(args.select_device)
+    paddle.set_device(args.device)
 
     # Loads vocab.
     vocab_path = "./dict.txt"
