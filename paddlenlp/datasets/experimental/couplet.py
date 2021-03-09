@@ -48,8 +48,7 @@ class Couplet(DatasetBuilder):
             "f0a7366dfa0acac884b9f4901aac2cc1",
             "56664bff3f2edfd7a751a55a689f90c2")
     }
-    VOCAB_INFO = (os.path.join("couplet", "vocab.txt"), os.path.join(
-        "couplet", "vocab.txt"), "0bea1445c7c7fb659b856bb07e54a604",
+    VOCAB_INFO = (os.path.join("couplet", "vocab.txt"),
                   "0bea1445c7c7fb659b856bb07e54a604")
     UNK_TOKEN = '<unk>'
     BOS_TOKEN = '<s>'
@@ -62,21 +61,17 @@ class Couplet(DatasetBuilder):
         src_fullname = os.path.join(default_root, src_filename)
         tgt_fullname = os.path.join(default_root, tgt_filename)
 
-        src_vocab_filename, src_vocab_hash, tgt_vocab_filename, tgt_vocab_hash = self.VOCAB_INFO
-        src_vacab_fullname = os.path.join(default_root, src_vocab_filename)
-        tgt_vacab_fullname = os.path.join(default_root, tgt_vocab_filename)
+        vocab_filename, vocab_hash = self.VOCAB_INFO
+        vacab_fullname = os.path.join(default_root, vocab_filename)
 
         if (not os.path.exists(src_fullname) or
             (src_data_hash and not md5file(src_fullname) == src_data_hash)) or (
                 not os.path.exists(tgt_fullname) or
                 (tgt_data_hash and
                  not md5file(tgt_fullname) == tgt_data_hash)) or (
-                     not os.path.exists(src_vacab_fullname) or
-                     (src_vocab_hash and
-                      not md5file(src_vacab_fullname) == src_vocab_hash)) or (
-                          not os.path.exists(tgt_vacab_fullname) or
-                          (tgt_vocab_hash and
-                           not md5file(tgt_vacab_fullname) == tgt_vocab_hash)):
+                     not os.path.exists(vacab_fullname) or
+                     (vocab_hash and
+                      not md5file(vacab_fullname) == vocab_hash)):
             get_path_from_url(self.URL, default_root, self.MD5)
 
         return src_fullname, tgt_fullname
