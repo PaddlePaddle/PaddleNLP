@@ -27,7 +27,11 @@ from paddlenlp.embeddings import TokenEmbedding
 from args import parse_args
 from data import create_data_loader_for_small_model, create_pair_loader_for_small_model
 
-METRIC_CLASSES = {"sst-2": Accuracy, "qqp": AccuracyAndF1, "senta": Accuracy}
+METRIC_CLASSES = {
+    "sst-2": Accuracy,
+    "qqp": AccuracyAndF1,
+    "chnsenticorp": Accuracy
+}
 
 
 class BiLSTM(nn.Layer):

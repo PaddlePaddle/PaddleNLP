@@ -26,7 +26,11 @@ from args import parse_args
 from small import BiLSTM
 from data import create_distill_loader
 
-METRIC_CLASSES = {"sst-2": Accuracy, "qqp": AccuracyAndF1, "senta": Accuracy}
+METRIC_CLASSES = {
+    "sst-2": Accuracy,
+    "qqp": AccuracyAndF1,
+    "chnsenticorp": Accuracy
+}
 
 
 class TeacherModel(object):

@@ -24,17 +24,16 @@ def convert_small_example(example,
                           max_seq_length=128,
                           is_test=False):
     input_ids = []
-    if task_name == 'senta':
+    if task_name == 'chnsenticorp':
         if is_tokenized:
-            example['sentence'] = example['sentence'][:max_seq_length]
-            input_ids = [vocab[token] for token in example['sentence']]
+            example['text'] = example['text'][:max_seq_length]
+            input_ids = [vocab[token] for token in example['text']]
         else:
-            for i, token in enumerate(jieba.cut(example['sentence'])):
+            for i, token in enumerate(jieba.cut(example['text'])):
                 if i == max_seq_length:
                     break
                 token_id = vocab[token]
                 input_ids.append(token_id)
-
     else:
         if is_tokenized:
             tokens = example['sentence'][:max_seq_length]
@@ -44,7 +43,10 @@ def convert_small_example(example,
 
     valid_length = np.array(len(input_ids), dtype='int64')
     if not is_test:
-        label = np.array(example['labels'], dtype="int64")
+        label = np.array(
+            example['label'],
+            dtype="int64") if task_name == 'chnsenticorp' else np.array(
+                example['labels'], dtype="int64")
         return input_ids, valid_length, label
     return input_ids, valid_length
 
@@ -99,23 +101,23 @@ def convert_example(example,
                     is_tokenized=False,
                     max_seq_length=512,
                     is_test=False):
-    """convert a glue example into necessary features"""
+    """convert a example into necessary features"""
     if not is_test:
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
         # Get the label
-        label = example['labels']
+        label = example['labels'] if 'labels' in example else example['label']
         label = np.array([label], dtype=label_dtype)
     # Convert raw text to feature
-    if len(example) == 2:
+    if 'sentence1' in example:
         example = tokenizer(
-            example['sentence'],
+            example['sentence1'],
+            text_pair=example['sentence2'],
             max_seq_len=max_seq_length,
             is_split_into_words=is_tokenized)
     else:
         example = tokenizer(
-            example['sentence1'],
-            text_pair=example['sentence2'],
+            example['sentence'] if 'sentence' in example else example['text'],
             max_seq_len=max_seq_length,
             is_split_into_words=is_tokenized)
 
