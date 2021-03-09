@@ -31,11 +31,27 @@ UnifiedTransformer模型的细节可以[参阅论文](https://arxiv.org/abs/2006
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-# GPU启动，参数`n_gpu`指定训练所用的GPU数量，可以是单卡，也可以多卡，默认是单卡
-python -u finetune.py --model_name_or_path=unified_transformer-12L-cn
+# GPU启动，参数`n_gpus`指定训练所用的GPU数量，可以是单卡，也可以多卡，默认是单卡
+python -u finetune.py \
+    --n_gpus=1 \
+    --model_name_or_path=unified_transformer-12L-cn \
+    --train_data_path=./datasets/train.txt \
+    --valid_data_path=./datasets/valid.txt \
+    --save_dir=./checkpoints \
+    --logging_steps=500 \
+    --save_steps=8000 \
+    --seed=2021 \
+    --epochs=10 \
+    --batch_size=8192 \
+    --lr=1e-5 \
+    --weight_decay=0.01 \
+    --warmup_steps=4000 \
+    --max_grad_norm=0.1 \
+    --sort_pool_size=65536
 ```
 
 其中参数释义如下：
+- `n_gpus` 表示使用的GPU卡数。若希望使用多卡训练，将其设置为指定数目即可,最大数量不能超过环境变量CUDA_VISIBLE_DEVICES配置的GPU个数；若为0，则使用CPU。
 - `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
 
    | PaddleNLP提供的预训练模型        |
@@ -43,7 +59,21 @@ python -u finetune.py --model_name_or_path=unified_transformer-12L-cn
    | unified_transformer-12L-cn      |
    | unified_transformer-12L-cn-luge |
 
-其他可选参数和参数的默认值请参考`args.py`。
+- `train_data_path` 表示训练集文件路径。
+- `valid_data_path` 表示验证集文件路径。
+- `save_dir` 表示模型的保存路径。
+- `logging_steps` 表示日志打印间隔。
+- `save_steps` 表示模型保存及评估间隔。
+- `seed` 表示随机数生成器的种子。
+- `epochs` 表示训练轮数。
+- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `lr` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
+- `weight_decay` 表示AdamW优化器中使用的weight_decay的系数。
+- `warmup_steps` 表示学习率逐渐升高到基础学习率（即上面配置的lr）所需要的迭代数，最早的使用可以参考[这篇论文](https://arxiv.org/pdf/1706.02677.pdf)。
+- `max_grad_norm` 表示梯度裁剪允许的最大梯度值。
+- `sort_pool_size` 表示在构建batch数据时，用来排序的pool size。
+
+参数详情和参数的默认值请参考`args.py`。
 
 程序运行时将会自动进行训练和验证，训练过程中会自动保存模型在指定的`save_dir`中。
 如：
@@ -67,8 +97,40 @@ python -u finetune.py --model_name_or_path=unified_transformer-12L-cn
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 # GPU启动，n_gpu指定训练所用的GPU数量，预测仅支持单卡
-python -u infer.py --model_name_or_path=./checkpoints/model_80000
+python -u infer.py \
+    --model_name_or_path=./checkpoints/model_80000 \
+    --test_data_path=./datasets/test.txt \
+    --output_path=./predict.txt \
+    --logging_steps=500 \
+    --seed=2021 \
+    --batch_size=4 \
+    --min_dec_len=1 \
+    --max_dec_len=64 \
+    --num_samples=20 \
+    --decode_strategy=sampling \
+    --top_k=5
 ```
+
+其中参数释义如下：
+- `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+
+   | PaddleNLP提供的预训练模型        |
+   |---------------------------------|
+   | unified_transformer-12L-cn      |
+   | unified_transformer-12L-cn-luge |
+
+- `test_data_path` 表示预测集文件路径。
+- `output_path` 表示预测结果的保存路径。
+- `logging_steps` 表示日志打印间隔。
+- `seed` 表示随机数生成器的种子。
+- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `min_dec_len` 表示预测生成的句子的最小长度。
+- `max_dec_len` 表示预测生成的句子的最大长度。
+- `num_samples` 表示每条样本生成的句子的数量。对于每条样本，模型会生成`num_samples`个句子，根据每个句子的概率得分进行排序，得分最高的句子作为最终的生成结果。
+- `decode_strategy` 表示预测解码时采取的策略，可选"sampling"、"greedy_search"和"beam_search"之一。
+- `top_k` 表示采用"sampling"解码策略时，token的概率按从大到小排序，生成的token只从前`top_k`个中进行采样。
+
+参数详情和参数的默认值请参考`args.py`。
 
 程序运行结束后会将预测结果保存在`output_path`中。将预测结果准备成比赛官网要求的格式，提交评估即可得评估结果。
 
