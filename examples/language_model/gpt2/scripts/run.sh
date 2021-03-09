@@ -12,4 +12,4 @@ python run_pretrain.py --model_type gpt2\
     --decay_steps 320000\
     --warmup_rate 0.01\
     --batch_size 8\
-    --device gpu
+    --select_devices gpu

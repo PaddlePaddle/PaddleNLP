@@ -23,24 +23,6 @@ import time
 import h5py
 from functools import partial
 
-import numpy as np
-
-import paddle
-import paddle.distributed.fleet as fleet
-from paddle.io import DataLoader, Dataset
-
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import GPT2Model, GPT2ForPretraining, GPT2PretrainingCriterion, GPT2Tokenizer
-from paddlenlp.utils.log import logger
-from data import GPT2Dataset
-import lr
-
-MODEL_CLASSES = {
-    "gpt2-small-en": (GPT2ForPretraining, GPT2Tokenizer),
-    "gpt2-medium-en": (GPT2ForPretraining, GPT2Tokenizer),
-    "gpt2-large-en": (GPT2ForPretraining, GPT2Tokenizer),
-}
-
 os.environ['FLAGS_enable_parallel_graph'] = "0"
 os.environ['FLAGS_fraction_of_gpu_memory_to_use'] = "0.1"
 os.environ['FLAGS_sync_nccl_allreduce'] = "1"
@@ -50,9 +32,48 @@ os.environ['FLAGS_fuse_parameter_groups_size'] = "50"
 os.environ['FLAGS_check_nan_inf'] = "0"
 os.environ['FLAGS_enable_sequential_execution'] = "1"
 
+import numpy as np
+import paddle
+import paddle.distributed.fleet as fleet
+from paddle.io import DataLoader, Dataset
+
+from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.transformers import GPT2Model, GPT2ForPretraining, GPT2PretrainingCriterion, GPT2Tokenizer, GPT2ChineseTokenizer
+from paddlenlp.utils.log import logger
+from args import parse_args
+from data import GPT2Dataset
+import lr
+
+MODEL_CLASSES = {
+    "gpt2": (GPT2ForPretraining, GPT2Tokenizer),
+    "gpt2-cn": (GPT2ForPretraining, GPT2ChineseTokenizer),
+}
+
+# mODEL_CLASSES = {
+#     "gpt2-small-en": (GPT2ForPretraining, GPT2Tokenizer),
+#     "gpt2-medium-en": (GPT2ForPretraining, GPT2Tokenizer),
+#     "gpt2-large-en": (GPT2ForPretraining, GPT2Tokenizer),
+# }
+
+
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Unsupported value encountered.')
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model_type",
+        default=None,
+        type=str,
+        required=True,
+        help="Model type selected in the list: " +
+        ", ".join(MODEL_CLASSES.keys()), )
     parser.add_argument(
         "--model_name_or_path",
         default=None,
@@ -131,26 +152,29 @@ def parse_args():
         default=0.01,
         type=float,
         help="Linear warmup over warmup_steps.")
-
     parser.add_argument(
         "--use_amp",
-        type=bool,
-        default=False,
+        type=str2bool,
+        nargs='?',
+        const=True,
         help="Enable mixed precision training.")
     parser.add_argument(
         "--use_sharding",
-        type=bool,
-        default=False,
+        type=str2bool,
+        nargs='?',
+        const=True,
         help="Spliting the parameters to many cards.")
     parser.add_argument(
         "--use_recompute",
-        type=bool,
-        default=False,
+        type=str2bool,
+        nargs='?',
+        const=True,
         help="Using the recompute to save the memory.")
     parser.add_argument(
         "--enable_addto",
-        type=bool,
-        default=False,
+        type=str2bool,
+        nargs='?',
+        const=True,
         help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training."
     )
     parser.add_argument(
@@ -170,6 +194,11 @@ def parse_args():
         help="Save checkpoint every X updates steps.")
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
+    parser.add_argument(
+        "--select_devices",
+        type=str,
+        default="gpu",
+        help="select cpu, gpu, xpu devices.")
     args = parser.parse_args()
     return args
 
@@ -328,7 +357,10 @@ def trans_param_from_static_to_dygrah(model):
 def do_train(args):
     # Initialize the paddle and paddle fleet execute enviroment
     paddle.enable_static()
-    place = paddle.set_device("gpu")
+    assert args.select_devices in [
+        "cpu", "gpu", "xpu"
+    ], "Invalid device! Available device should be cpu, gpu, or xpu."
+    place = paddle.set_device(args.select_devices)
     fleet.init(is_collective=True)
 
     worker_num = fleet.worker_num()
@@ -344,7 +376,7 @@ def do_train(args):
     data_holders = create_data_holder(args)
     [tokens, loss_mask, attention_mask, position_ids, labels] = data_holders
 
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_name_or_path]
+    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     eod_id = tokenizer.command_name_map["eod"].Id
     config = model_class.pretrained_init_configuration[args.model_name_or_path]

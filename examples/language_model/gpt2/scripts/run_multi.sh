@@ -13,4 +13,4 @@ python -m paddle.distributed.launch --gpus "0,1" run_pretrain.py \
     --decay_steps 320000\
     --warmup_rate 0.01\
     --batch_size 8\
-    --device gpu
+    --select_devices gpu

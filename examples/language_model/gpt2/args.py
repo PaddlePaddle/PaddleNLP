@@ -102,7 +102,6 @@ def parse_args(MODEL_CLASSES):
         default=0.01,
         type=float,
         help="Linear warmup over warmup_steps.")
-
     parser.add_argument(
         "--logging_steps",
         type=int,
@@ -116,7 +115,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
-        "--device",
+        "--select_devices",
         type=str,
         default="gpu",
         help="select cpu, gpu, xpu devices.")

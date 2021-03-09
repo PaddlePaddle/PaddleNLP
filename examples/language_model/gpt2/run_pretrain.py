@@ -76,10 +76,10 @@ def set_seed(args):
 
 
 def do_train(args):
-    assert args.device in [
+    assert args.select_devices in [
         "cpu", "gpu", "xpu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
-    paddle.set_device(args.device)
+    paddle.set_device(args.select_devices)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
