@@ -130,3 +130,8 @@ python -u ./predict.py \
 我们为诗歌文本生成提供了线上教程，欢迎体验：
 
 * [使用PaddleNLP预训练模型ERNIE-GEN生成诗歌](https://aistudio.baidu.com/aistudio/projectdetail/1339888)
+
+
+## 参考
+
+[couplet-clean-dataset数据集](https://github.com/v-zich/couplet-clean-dataset)

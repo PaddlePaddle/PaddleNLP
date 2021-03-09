@@ -27,8 +27,7 @@
 我们提供了少数样本用以示例输入数据格式。执行以下命令，下载并解压示例数据集：
 
 ```bash
-wget https://paddlenlp.bj.bcebos.com/datasets/lexical_analysis_dataset_tiny.tar.gz
-tar xvf lexical_analysis_dataset_tiny.tar.gz
+python download.py --data_dir ./  
 ```
 
 训练使用的数据可以由用户根据实际的应用场景，自己组织数据。除了第一行是 `text_a\tlabel` 固定的开头，后面的每行数据都是由两列组成，以制表符分隔，第一列是 utf-8 编码的中文文本，以 `\002` 分割，第二列是对应每个字的标注，以 `\002` 分隔。我们采用 IOB2 标注体系，即以 X-B 作为类型为 X 的词的开始，以 X-I 作为类型为 X 的词的持续，以 O 表示不关注的字（实际上，在词性、专名联合标注中，不存在 O ）。示例如下：
@@ -79,7 +78,7 @@ python train.py \
 python eval.py --data_dir ./lexical_analysis_dataset_tiny \
         --init_checkpoint ./save_dir/final \
         --batch_size 32 \
-        --use_gpu True
+        --use_gpu
 ```
 
 ### 2.5 模型预测
@@ -90,5 +89,21 @@ python eval.py --data_dir ./lexical_analysis_dataset_tiny \
 python predict.py --data_dir ./lexical_analysis_dataset_tiny \
         --init_checkpoint ./save_dir/final \
         --batch_size 32 \
-        --use_gpu True
+        --use_gpu
 ```
+
+得到类似以下输出：
+
+```txt
+(大学, n)(学籍, n)(证明, n)(怎么, r)(开, v)
+(电车, n)(的, u)(英文, nz)
+(什么, r)(是, v)(司法, n)(鉴定人, vn)
+```
+
+
+## 预训练模型
+
+如果您希望使用已经预训练好了的LAC模型完成词法分析任务，请参考：
+
+[Lexical Analysis of Chinese](https://github.com/baidu/lac)
+[PaddleHub分词模型](https://www.paddlepaddle.org.cn/hubdetail?name=lac&en_category=LexicalAnalysis)

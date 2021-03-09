@@ -146,7 +146,7 @@ def do_train(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    # Define the pretrain model and metric 
+    # Define the pretrain model and metric
     model = BigBirdForPretraining(
         BigBirdModel(**model_class.pretrained_init_configuration[
             args.model_name_or_path]))
@@ -157,21 +157,24 @@ def do_train(args):
     if worker_num > 1:
         model = paddle.DataParallel(model)
 
-    # Define learing_rate scheduler and optimizer 
+    # Define learing_rate scheduler and optimizer
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, args.max_steps,
                                          args.warmup_steps)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
 
-    # Get bigbird config for generate random attention mask 
+    # Get bigbird config for generate random attention mask
     global config
     config = BigBirdModel.pretrained_init_configuration[args.model_name_or_path]
 

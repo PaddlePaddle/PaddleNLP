@@ -103,6 +103,10 @@ def create_dataloader(batch_size, max_encoder_length, tokenizer, pad_val=0):
 
 def main():
     # Initialization for the parallel enviroment
+    assert args.device in [
+        "cpu", "gpu", "xpu"
+    ], "Invalid device! Available device should be cpu, gpu, or xpu."
+
     paddle.set_device(args.device)
     set_seed(args)
     # Define the model and metric 
@@ -168,7 +172,7 @@ def do_train(model, criterion, metric, optimizer, train_data_loader,
                 model_to_save.save_pretrained(output_dir)
 
             if global_steps >= args.max_steps:
-                break
+                return
         metric.reset()
 
 

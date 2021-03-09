@@ -150,7 +150,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--select_device",
+        "--device",
         default="gpu",
         choices=["gpu", "cpu", "xpu"],
         help="Device selected for inference.")

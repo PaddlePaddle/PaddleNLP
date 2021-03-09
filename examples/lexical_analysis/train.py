@@ -48,7 +48,7 @@ parser.add_argument("--do_eval", type=distutils.util.strtobool, default=True, he
 def train(args):
     paddle.set_device("gpu" if args.n_gpu else "cpu")
 
-    # create dataset.
+    # Create dataset.
     train_dataset = LacDataset(args.data_dir, mode='train')
     test_dataset = LacDataset(args.data_dir, mode='test')
 

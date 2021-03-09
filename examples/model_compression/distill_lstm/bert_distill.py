@@ -71,7 +71,7 @@ def evaluate(task_name, model, metric, data_loader):
 
 
 def do_train(agrs):
-    device = paddle.set_device(args.select_device)
+    device = paddle.set_device(args.device)
     train_data_loader, dev_data_loader = create_distill_loader(
         args.task_name,
         model_name=args.model_name,

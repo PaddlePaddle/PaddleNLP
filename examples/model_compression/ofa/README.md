@@ -26,7 +26,7 @@ BERT-base模型是一个迁移能力很强的通用语义表示模型，但是�
 首先需要对Pretrain-Model在实际的下游任务上进行Finetuning，得到需要压缩的模型。
 
 ```shell
-cd ../../glue/
+cd ../../benchmark/glue/
 ```
 
 ```python

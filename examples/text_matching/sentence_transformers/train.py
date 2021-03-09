@@ -181,7 +181,7 @@ def do_train():
         ['train', 'dev', 'test'])
 
     # If you wanna use bert/roberta pretrained model,
-    # pretrained_model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese') 
+    # pretrained_model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese')
     # pretrained_model = ppnlp.transformers.RobertaModel.from_pretrained('roberta-wwm-ext')
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         'ernie-tiny')
@@ -236,14 +236,17 @@ def do_train():
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
