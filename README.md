@@ -79,6 +79,19 @@ electra = ElectraModel.from_pretrained('chinese-electra-small')
 gpt2 = GPT2ForPretraining.from_pretrained('gpt2-base-cn')
 ```
 
+### 便捷获取文本特征
+
+```python
+import paddle
+from paddlenlp.transformers import ErnieTokenizer, ErnieModel
+
+tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+model = ErnieModel.from_pretrained('ernie-1.0')
+
+text = tokenizer('自然语言处理')
+pooled_output, sequence_output = model.forward(input_ids=paddle.to_tensor([text['input_ids']]))
+```
+
 请参考[Transformer API文档](./docs/transformers.md)查看目前支持的预训练模型。
 
 ## 模型库及其应用
