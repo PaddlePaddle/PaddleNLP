@@ -74,7 +74,7 @@ python -u ./run_pretrain.py \
     --logging_steps 1 \
     --save_steps 20000 \
     --max_steps 1000000 \
-    --select_device gpu \
+    --device gpu \
     --n_procs 1 \
     --use_amp False
 ```
@@ -95,7 +95,7 @@ python -u ./run_pretrain.py \
 - `save_steps` 表示模型保存及评估间隔。
 - `max_steps` 表示最大训练步数。若训练`num_train_epochs`轮包含的训练步数大于该值，则达到`max_steps`后就提前结束。
 - `n_procs` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可。
-- `select_device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `use_amp` 指示是否启用自动混合精度训练。
 
 **NOTICE**: 预训练时data目录存放的是经过 `create_pretraining_data.py` 处理后的数据，因此需要通过该数据处理脚本预先处理，否则预训练将会出现报错。
@@ -116,7 +116,7 @@ python -u ./run_glue.py \
     --logging_steps 1 \
     --save_steps 500 \
     --output_dir ./tmp/ \
-    --select_device gpu \
+    --device gpu \
     --n_procs 1 \
     --use_amp False
 ```
@@ -133,7 +133,7 @@ python -u ./run_glue.py \
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
 - `n_procs` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可。
-- `select_device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `use_amp` 指示是否启用自动混合精度训练。
 
 基于`bert-base-uncased`在GLUE各评测任务上Fine-tuning后，在验证集上有如下结果：

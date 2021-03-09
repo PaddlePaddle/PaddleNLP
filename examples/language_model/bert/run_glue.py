@@ -157,9 +157,10 @@ def parse_args():
         "--n_procs",
         default=1,
         type=int,
-        help="Number of cards to use, the cpu just use single core to train and predict.")
+        help="Number of cards to use, the cpu just use single core to train and predict."
+    )
     parser.add_argument(
-        "--select_device",
+        "--device",
         default="gpu",
         type=str,
         help="The device to select to train the model, is must be cpu/gpu/xpu.")
@@ -249,7 +250,7 @@ def convert_example(example,
 
 
 def do_train(args):
-    paddle.set_device(args.select_device)
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -389,16 +390,16 @@ def do_train(args):
                     evaluate(model, loss_fct, metric, dev_data_loader)
                     print("eval done total : %s s" % (time.time() - tic_eval))
                 if paddle.distributed.get_rank() == 0:
-                     output_dir = os.path.join(args.output_dir,
-                                               "%s_ft_model_%d.pdparams" %
-                                               (args.task_name, global_step))
-                     if not os.path.exists(output_dir):
-                         os.makedirs(output_dir)
-                     # Need better way to get inner model of DataParallel
-                     model_to_save = model._layers if isinstance(
-                         model, paddle.DataParallel) else model
-                     model_to_save.save_pretrained(output_dir)
-                     tokenizer.save_pretrained(output_dir)
+                    output_dir = os.path.join(args.output_dir,
+                                              "%s_ft_model_%d.pdparams" %
+                                              (args.task_name, global_step))
+                    if not os.path.exists(output_dir):
+                        os.makedirs(output_dir)
+                    # Need better way to get inner model of DataParallel
+                    model_to_save = model._layers if isinstance(
+                        model, paddle.DataParallel) else model
+                    model_to_save.save_pretrained(output_dir)
+                    tokenizer.save_pretrained(output_dir)
 
 
 def print_arguments(args):
@@ -412,11 +413,11 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    assert args.select_device in [
+    assert args.device in [
         "cpu", "gpu", "xpu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
 
-    if args.n_procs > 1 and args.select_device != "cpu":
+    if args.n_procs > 1 and args.device != "cpu":
         paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_procs)
     else:
         do_train(args)

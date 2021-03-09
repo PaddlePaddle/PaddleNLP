@@ -48,7 +48,7 @@ def parse_args():
         required=True,
         help="The path prefix of inference model to be used.", )
     parser.add_argument(
-        "--select_device",
+        "--device",
         default="gpu",
         choices=["gpu", "cpu", "xpu"],
         help="Device selected for inference.", )
@@ -77,14 +77,14 @@ class Predictor(object):
     def create_predictor(cls, args):
         config = paddle.inference.Config(args.model_path + ".pdmodel",
                                          args.model_path + ".pdiparams")
-        if args.select_device == "gpu":
+        if args.device == "gpu":
             # set GPU configs accordingly
             config.enable_use_gpu(100, 0)
-        elif args.select_device == "cpu":
+        elif args.device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             config.disable_gpu()
-        elif args.select_device == "xpu":
+        elif args.device == "xpu":
             # set XPU configs accordingly
             config.enable_xpu(100)
         config.switch_use_feed_fetch_ops(False)
