@@ -70,7 +70,7 @@ def convert_example(example, vocab, unk_token_id=1, is_test=False):
     valid_length = len(input_ids)
 
     if not is_test:
-        label = np.array(example["labels"], dtype="int64")
+        label = np.array(example["label"], dtype="int64")
         return input_ids, valid_length, label
     else:
         return input_ids, valid_length
