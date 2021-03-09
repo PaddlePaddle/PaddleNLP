@@ -58,7 +58,7 @@ def evaluate(model, loss_fct, metric, data_loader, label_num):
     for batch in data_loader:
         input_ids, token_type_ids, length, labels = batch
         logits = model(input_ids, token_type_ids)
-        loss = loss_fct(logits.reshape([-1, label_num]), labels.reshape([-1]))
+        loss = loss_fct(logits, labels)
         avg_loss = paddle.mean(loss)
         preds = logits.argmax(axis=2)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
@@ -95,6 +95,7 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
+    # Create dataset, tokenizer and dataloader.
     train_ds, test_ds = load_dataset(
         'msra_ner', splits=('train', 'test'), lazy=False)
 
@@ -140,6 +141,7 @@ def do_train(args):
         batch_size=args.batch_size,
         return_list=True)
 
+    # Define the model netword and its loss
     model = BertForTokenClassification.from_pretrained(
         args.model_name_or_path, num_classes=label_num)
     if paddle.distributed.get_world_size() > 1:
@@ -176,8 +178,7 @@ def do_train(args):
             global_step += 1
             input_ids, token_type_ids, _, labels = batch
             logits = model(input_ids, token_type_ids)
-            loss = loss_fct(
-                logits.reshape([-1, label_num]), labels.reshape([-1]))
+            loss = loss_fct(logits, labels)
             avg_loss = paddle.mean(loss)
             if global_step % args.logging_steps == 0:
                 print(
