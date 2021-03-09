@@ -374,7 +374,7 @@ class GPT2Embeddings(nn.Layer):
     def forward(self, input_ids, position_ids=None):
         if position_ids is None:
             ones = paddle.ones_like(input_ids, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=1)
+            seq_length = paddle.cumsum(ones, axis=-1)
             position_ids = seq_length - ones
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
