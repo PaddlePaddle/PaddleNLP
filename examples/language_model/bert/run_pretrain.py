@@ -146,7 +146,7 @@ def parse_args():
         help="Number procs for the training, only support multi cards in the gpu/xpu."
     )
     parser.add_argument(
-        "--select_device",
+        "--device",
         type=str,
         default="gpu",
         help="Device for selecting for the training.")
@@ -283,7 +283,7 @@ class PretrainingDataset(Dataset):
 
 
 def do_train(args):
-    paddle.set_device(args.select_device)
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -333,8 +333,8 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if os.path.isfile(os.path.join(args.input_dir, f)) and "training" in
-            f
+            if os.path.isfile(os.path.join(args.input_dir, f)) and
+            "training" in f
         ]
         files.sort()
         num_files = len(files)
@@ -433,11 +433,11 @@ def do_train(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    assert args.select_device in [
+    assert args.device in [
         "cpu", "gpu", "xpu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
 
-    if args.n_procs > 1 and args.select_device != "cpu":
+    if args.n_procs > 1 and args.device != "cpu":
         paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_procs)
     else:
         do_train(args)

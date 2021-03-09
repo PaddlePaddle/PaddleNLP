@@ -64,13 +64,13 @@ def convert_example(example, vocab, unk_token_id=1, is_test=False):
     """
 
     input_ids = []
-    for token in tokenizer.cut(example[0]):
+    for token in tokenizer.cut(example['text']):
         token_id = vocab.get(token, unk_token_id)
         input_ids.append(token_id)
     valid_length = len(input_ids)
 
     if not is_test:
-        label = np.array(example[-1], dtype="int64")
+        label = np.array(example["labels"], dtype="int64")
         return input_ids, valid_length, label
     else:
         return input_ids, valid_length

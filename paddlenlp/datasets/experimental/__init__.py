@@ -24,4 +24,10 @@ from .ptb import *
 from .squad import *
 from .peoples_daily_ner import *
 from .poetry import *
+from .cmrc2018 import *
+from .drcd import *
+from .dureader_robust import *
+from .glue import *
 from .wmt14ende import *
+from .cnndm import *
+
