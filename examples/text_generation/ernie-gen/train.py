@@ -23,7 +23,8 @@ from tqdm import tqdm
 import paddle.nn as nn
 from paddle.io import DataLoader
 from paddlenlp.transformers import ErnieForGeneration, ErnieTokenizer, ErnieTinyTokenizer, BertTokenizer, ElectraTokenizer, RobertaTokenizer, LinearDecayWithWarmup
-from paddlenlp.datasets import Poetry
+from paddlenlp.datasets import load_dataset
+
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.metrics import Rouge1, Rouge2
 from paddlenlp.utils.log import logger
@@ -74,13 +75,13 @@ def evaluate(model, data_loader, tokenizer, rouge1, rouge2, attn_id,
     reference_sentences_ids = []
     logger.info("Evaluating...")
     for data in tqdm(data_loader):
-        (src_ids, src_sids, src_pids, _, _, _, _, _, _, _, _,
+        (src_ids, src_tids, src_pids, _, _, _, _, _, _, _, _,
          raw_tgt_labels) = data  # never use target when infer
         # Use greedy_search_infilling or beam_search_infilling to get predictions
         output_ids = beam_search_infilling(
             model,
             src_ids,
-            src_sids,
+            src_tids,
             eos_id=eos_id,
             sos_id=sos_id,
             attn_id=attn_id,
@@ -141,7 +142,8 @@ def train():
         model_state = paddle.load(args.init_checkpoint)
         model.set_state_dict(model_state)
 
-    train_dataset, dev_dataset = Poetry.get_datasets(['train', 'dev'])
+    train_dataset, dev_dataset = load_dataset(
+        'poetry', splits=('train', 'dev'), lazy=False)
     attn_id = tokenizer.vocab[
         '[ATTN]'] if '[ATTN]' in tokenizer.vocab else tokenizer.vocab['[MASK]']
     tgt_type_id = model.sent_emb.weight.shape[0] - 1
@@ -155,16 +157,16 @@ def train():
         noise_prob=args.noise_prob,
         use_random_noice=args.use_random_noice)
 
-    train_dataset = train_dataset.apply(trans_func, lazy=True)
+    train_dataset = train_dataset.map(trans_func)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_dataset, batch_size=args.batch_size, shuffle=True)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_pids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_sids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # src_tids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_pids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_sids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tgt_tids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # attn_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_labels
     ): after_padding(fn(samples))
@@ -175,12 +177,10 @@ def train():
         num_workers=0,
         return_list=True)
 
-    dev_dataset = dev_dataset.apply(trans_func, lazy=True)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_dataset, batch_size=args.batch_size, shuffle=False)
+    dev_dataset = dev_dataset.map(trans_func)
     dev_data_loader = DataLoader(
         dataset=dev_dataset,
-        batch_sampler=dev_batch_sampler,
+        batch_size=args.batch_size,
         collate_fn=batchify_fn,
         num_workers=0,
         return_list=True)
@@ -219,7 +219,7 @@ def train():
     tic_train = time.time()
     for epoch in range(args.num_epochs):
         for step, batch in enumerate(train_data_loader, start=1):
-            (src_ids, src_sids, src_pids, tgt_ids, tgt_sids, tgt_pids, attn_ids,
+            (src_ids, src_tids, src_pids, tgt_ids, tgt_tids, tgt_pids, attn_ids,
              mask_src_2_src, mask_tgt_2_srctgt, mask_attn_2_srctgtattn,
              tgt_labels, _) = batch
             # import pdb; pdb.set_trace()
@@ -228,7 +228,7 @@ def train():
                     nn.functional.one_hot(tgt_labels, label_num),
                     epsilon=args.label_smooth)
             tgt_pos = paddle.nonzero(attn_ids == attn_id)
-            loss = train_model(src_ids, src_sids, src_pids, tgt_ids, tgt_sids,
+            loss = train_model(src_ids, src_tids, src_pids, tgt_ids, tgt_tids,
                                tgt_pids, attn_ids, mask_src_2_src,
                                mask_tgt_2_srctgt, mask_attn_2_srctgtattn,
                                tgt_labels, tgt_pos)
