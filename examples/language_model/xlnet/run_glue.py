@@ -42,6 +42,7 @@ METRIC_CLASSES = {
     "mnli": Accuracy,
     "qnli": Accuracy,
     "rte": Accuracy,
+    "wnli": Accuracy,
 }
 
 
