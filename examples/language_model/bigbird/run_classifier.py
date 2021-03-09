@@ -126,7 +126,7 @@ def main():
     optimizer = paddle.optimizer.Adam(
         parameters=model.parameters(),
         learning_rate=args.learning_rate,
-        epsilon=1e-6)
+        epsilon=1e-7)
 
     # Finetune the classification model
     do_train(model, criterion, metric, optimizer, train_data_loader,
