@@ -33,24 +33,22 @@ class LCQMC(DatasetBuilder):
 
     URL = "https://bj.bcebos.com/paddlehub-dataset/lcqmc.tar.gz"
     MD5 = "62a7ba36f786a82ae59bbde0b0a9af0c"
-    META_INFO = collections.namedtuple(
-        'META_INFO', ('file', 'md5', 'field_indices', 'num_discard_samples'))
+    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
         'train': META_INFO(
             os.path.join('lcqmc', 'train.tsv'),
-            '2193c022439b038ac12c0ae918b211a1', (0, 1, 2), 1),
+            '2193c022439b038ac12c0ae918b211a1'),
         'dev': META_INFO(
             os.path.join('lcqmc', 'dev.tsv'),
-            'c5dcba253cb4105d914964fd8b3c0e94', (0, 1, 2), 1),
+            'c5dcba253cb4105d914964fd8b3c0e94'),
         'test': META_INFO(
             os.path.join('lcqmc', 'test.tsv'),
-            '8f4b71e15e67696cc9e112a459ec42bd', (0, 1, 2), 1)
+            '8f4b71e15e67696cc9e112a459ec42bd'),
     }
 
     def _get_data(self, mode, **kwargs):
         default_root = DATA_HOME
-        filename, data_hash, field_indices, num_discard_samples = self.SPLITS[
-            mode]
+        filename, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
@@ -68,7 +66,7 @@ class LCQMC(DatasetBuilder):
                     head = data
                 else:
                     query, title, label = data
-                    yield {"query": query, "title": title, "labels": label}
+                    yield {"query": query, "title": title, "label": label}
 
     def get_labels(self):
         """

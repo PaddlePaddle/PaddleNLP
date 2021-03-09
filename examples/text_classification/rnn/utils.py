@@ -35,7 +35,7 @@ def convert_example(example, tokenizer, is_test=False):
     input_ids = np.array(input_ids, dtype='int64')
 
     if not is_test:
-        label = np.array(example["labels"], dtype="int64")
+        label = np.array(example["label"], dtype="int64")
         return input_ids, valid_length, label
     else:
         return input_ids, valid_length

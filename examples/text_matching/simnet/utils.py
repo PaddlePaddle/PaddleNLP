@@ -39,7 +39,7 @@ def convert_example(example, tokenizer, is_test=False):
     title_seq_len = np.array(len(title_ids), dtype="int64")
 
     if not is_test:
-        label = np.array(example["labels"], dtype="int64")
+        label = np.array(example["label"], dtype="int64")
         return query_ids, title_ids, query_seq_len, title_seq_len, label
     else:
         return query_ids, title_ids, query_seq_len, title_seq_len

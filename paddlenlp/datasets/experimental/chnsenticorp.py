@@ -33,25 +33,23 @@ class ChnSentiCorp(DatasetBuilder):
 
     URL = "https://bj.bcebos.com/paddlehub-dataset/chnsenticorp.tar.gz"
     MD5 = "fbb3217aeac76a2840d2d5cd19688b07"
-    META_INFO = collections.namedtuple(
-        'META_INFO', ('file', 'md5', 'field_indices', 'num_discard_samples'))
+    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
         'train': META_INFO(
             os.path.join('chnsenticorp', 'train.tsv'),
-            '689360c4a4a9ce8d8719ed500ae80907', (1, 0), 1),
+            '689360c4a4a9ce8d8719ed500ae80907'),
         'dev': META_INFO(
             os.path.join('chnsenticorp', 'dev.tsv'),
-            '05e4b02561c2a327833e05bbe8156cec', (1, 0), 1),
+            '05e4b02561c2a327833e05bbe8156cec'),
         'test': META_INFO(
             os.path.join('chnsenticorp', 'test.tsv'),
-            '917dfc6fbce596bb01a91abaa6c86f9e', (1, 0), 1)
+            '917dfc6fbce596bb01a91abaa6c86f9e'),
     }
 
     def _get_data(self, mode, **kwargs):
         """Downloads dataset."""
         default_root = DATA_HOME
-        filename, data_hash, field_indices, num_discard_samples = self.SPLITS[
-            mode]
+        filename, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
@@ -70,7 +68,7 @@ class ChnSentiCorp(DatasetBuilder):
                     head = data
                 else:
                     label, text = data
-                    yield {"text": text, "labels": label}
+                    yield {"text": text, "label": label}
 
     def get_labels(self):
         """

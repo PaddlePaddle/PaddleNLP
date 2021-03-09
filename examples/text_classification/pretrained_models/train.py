@@ -110,15 +110,12 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
         token_type_ids(obj: `list[int]`): List of sequence pair mask.
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
-    encoded_inputs = tokenizer(
-        text=example["text"],
-        max_seq_len=max_seq_length,
-        pad_to_max_seq_len=True)
+    encoded_inputs = tokenizer(text=example["text"], max_seq_len=max_seq_length)
     input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
 
     if not is_test:
-        label = np.array([example["labels"]], dtype="int64")
+        label = np.array([example["label"]], dtype="int64")
         return input_ids, token_type_ids, label
     else:
         return input_ids, token_type_ids
