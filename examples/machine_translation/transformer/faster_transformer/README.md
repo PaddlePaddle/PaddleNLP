@@ -10,6 +10,12 @@
 * gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
 * 推荐使用 Python3
 * [Faster Transformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer/v3.1#setup) 使用必要的环境
+* 环境依赖
+  - attrdict
+  - pyyaml
+  ```shell
+  pip install attrdict pyyaml
+  ```
 
 ## 快速开始
 
