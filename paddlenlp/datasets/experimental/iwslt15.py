@@ -93,9 +93,12 @@ class IWSLT15(DatasetBuilder):
                     yield {"en": src_line, "vi": tgt_line}
 
     def get_vocab(self):
-        default_root = os.path.join(DATA_HOME, self.__class__.__name__)
-        en_vacab_fullname = os.path.join(default_root, self.VOCAB_INFO[0])
-        vi_vacab_fullname = os.path.join(default_root, self.VOCAB_INFO[1])
+        en_vacab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
+                                         self.VOCAB_INFO[0])
+        vi_vacab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
+                                         self.VOCAB_INFO[1])
+
+        # Constract vocab_info to match the form of the input of `Vocab.load_vocabulary()` function
         vocab_info = {
             'en': {
                 'filepath': en_vacab_fullname,

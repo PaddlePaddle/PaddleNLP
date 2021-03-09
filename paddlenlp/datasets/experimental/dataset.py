@@ -37,6 +37,7 @@ def import_main_class(module_path):
     """Import a module at module_path and return its main class.
 
     """
+    module_path = DATASETS_MODULE_PATH + module_path
     module = importlib.import_module(module_path)
     main_cls_type = DatasetBuilder
 
@@ -58,9 +59,8 @@ def load_dataset(path,
                  splits=None,
                  lazy=None,
                  **kwargs):
-    module_path = DATASETS_MODULE_PATH + path
 
-    reader_cls = import_main_class(module_path)
+    reader_cls = import_main_class(path)
     if not name:
         reader_instance = reader_cls(lazy=lazy)
     else:

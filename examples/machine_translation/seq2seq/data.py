@@ -46,6 +46,7 @@ def create_train_loader(args):
 
     key = (lambda x, data_source: len(data_source[x][0]))
 
+    # Truncate and convert example to ids
     train_ds = train_ds.map(convert_example, lazy=False)
     dev_ds = dev_ds.map(convert_example, lazy=False)
 
