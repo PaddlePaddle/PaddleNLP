@@ -29,9 +29,6 @@
 首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 Faster Transformer 相关 lib，需要克隆一个 PaddleNLP，并重新编译:
 ``` sh
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
-# 新建一个 python 的虚拟环境
-python3.7 -m virtualenv faster-transformer
-source faster-transformer/bin/activate
 ```
 
 其次，配置环境变量，让我们可以使用当前 clone 的 paddlenlp，并进入到自定义 OP 的路径，准备后续的编译操作：
@@ -50,12 +47,12 @@ cd PaddleNLP/paddlenlp/ext_op/
 ``` sh
 mkdir build
 cd build/
-cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release
+cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python3.x
 make -j
 cd ../
 ```
 
-注意：`xx` 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)。
+注意：`xx` 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)。若未指定 `-DPY_CMD` 将会默认使用系统命令 `python` 对应的 Python。
 
 最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 Faster Transformer decoding 执行的库。
 

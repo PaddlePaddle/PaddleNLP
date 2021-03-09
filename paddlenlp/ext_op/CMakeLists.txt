@@ -98,7 +98,11 @@ include_directories(
   ${FT_INCLUDE_PATH}
 )
 
-set(PYTHON_PATH "python" CACHE STRING "Python path")
+if(NOT ${PY_CMD})
+  set(PYTHON_PATH "python" CACHE STRING "Python path")
+else()
+  set(PYTHON_PATH ${PY_CMD} CACHE STRING "Python path")
+endif()
 
 execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.sysconfig.get_include())"
                 RESULT_VARIABLE _INC_PYTHON_SUCCESS
