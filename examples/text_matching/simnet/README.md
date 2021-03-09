@@ -32,7 +32,7 @@ SimNet框架在百度各产品上广泛应用，主要包括BOW、CNN、RNN、MM
 ### 安装说明
 
 * PaddlePaddle 安装
-* 
+*
    本项目依赖于 PaddlePaddle 2.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
 
 * PaddleNLP 安装
@@ -87,20 +87,34 @@ query title label
 wget https://paddlenlp.bj.bcebos.com/data/simnet_vocab.txt
 ```
 
+**NOTE:** 词表的选择和实际应用数据相关，需根据实际数据选择词表。
+
 我们以中文文本匹配数据集LCQMC为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 
 CPU启动：
 
 ```shell
 CPU启动
-python train.py --vocab_path='./simnet_vocab.txt' --use_gpu=False --network=lstm --lr=5e-4 --batch_size=64 --epochs=5 --save_dir='./checkpoints'
+python train.py --vocab_path='./simnet_vocab.txt' \
+   --use_gpu=False \
+   --network=lstm \
+   --lr=5e-4 \
+   --batch_size=64 \
+   --epochs=5 \
+   --save_dir='./checkpoints'
 ```
 
 GPU启动：
 
 ```shell
 CUDA_VISIBLE_DEVICES=0
-python train.py --vocab_path='./simnet_vocab.txt' --use_gpu=True --network=lstm --lr=5e-4 --batch_size=64 --epochs=5 --save_dir='./checkpoints'
+python train.py --vocab_path='./simnet_vocab.txt' \
+   --use_gpu=True \
+   --network=lstm \
+   --lr=5e-4 \
+   --batch_size=64 \
+   --epochs=5 \
+   --save_dir='./checkpoints'
 ```
 
 以上参数表示：
@@ -136,13 +150,19 @@ checkpoints/
 CPU启动：
 
 ```shell
-python predict.py --vocab_path='./simnet_vocab.txt' --use_gpu=False --network=lstm --params_path=checkpoints/final.pdparams
+python predict.py --vocab_path='./simnet_vocab.txt' \
+   --use_gpu=False \
+   --network=lstm \
+   --params_path=checkpoints/final.pdparams
 ```
 
 GPU启动：
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python predict.py --vocab_path='./simnet_vocab.txt' --use_gpu=True --network=lstm --params_path='./checkpoints/final.pdparams'
+CUDA_VISIBLE_DEVICES=0 python predict.py --vocab_path='./simnet_vocab.txt' \
+   --use_gpu=True \
+   --network=lstm \
+   --params_path='./checkpoints/final.pdparams'
 ```
 
 将待预测数据分词完毕后，如以下示例：

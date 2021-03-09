@@ -70,13 +70,12 @@ def convert_example(example,
 
     Returns:
         input_ids(obj:`list[int]`): The list of token ids.
-        segment_ids(obj: `list[int]`): List of sequence pair mask.
+        token_type_ids(obj: `list[int]`): List of sequence pair mask.
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
-    text = example
-    encoded_inputs = tokenizer.encode(text=text, max_seq_len=max_seq_length)
+    encoded_inputs = tokenizer(text=example, max_seq_len=max_seq_length)
     input_ids = encoded_inputs["input_ids"]
-    segment_ids = encoded_inputs["segment_ids"]
+    token_type_ids = encoded_inputs["token_type_ids"]
 
     if not is_test:
         # create label maps
@@ -86,9 +85,9 @@ def convert_example(example,
 
         label = label_map[label]
         label = np.array([label], dtype="int64")
-        return input_ids, segment_ids, label
+        return input_ids, token_type_ids, label
     else:
-        return input_ids, segment_ids
+        return input_ids, token_type_ids
 
 
 def predict(model, data, tokenizer, label_map, batch_size=1):
@@ -109,13 +108,13 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
     """
     examples = []
     for text in data:
-        input_ids, segment_ids = convert_example(
+        input_ids, token_type_ids = convert_example(
             text,
             tokenizer,
             label_list=label_map.values(),
             max_seq_length=args.max_seq_length,
             is_test=True)
-        examples.append((input_ids, segment_ids))
+        examples.append((input_ids, token_type_ids))
 
     # Seperates data into some batches.
     batches = [
@@ -130,10 +129,10 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
     results = []
     model.eval()
     for batch in batches:
-        input_ids, segment_ids = batchify_fn(batch)
+        input_ids, token_type_ids = batchify_fn(batch)
         input_ids = paddle.to_tensor(input_ids)
-        segment_ids = paddle.to_tensor(segment_ids)
-        logits = model(input_ids, segment_ids)
+        token_type_ids = paddle.to_tensor(token_type_ids)
+        logits = model(input_ids, token_type_ids)
         probs = F.softmax(logits, axis=1)
         idx = paddle.argmax(probs, axis=1).numpy()
         idx = idx.tolist()
