@@ -166,7 +166,7 @@ def do_train():
         paddle.distributed.init_parallel_env()
 
     train_ds, dev_ds, test_ds = load_dataset(
-        "lcqmc", splits=["train", "dev", "test"], lazy=False)
+        "lcqmc", splits=["train", "dev", "test"])
 
     # If you wanna use bert/roberta pretrained model,
     # pretrained_model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese')

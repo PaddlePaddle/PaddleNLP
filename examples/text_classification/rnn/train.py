@@ -99,7 +99,7 @@ if __name__ == "__main__":
         args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
     # Loads dataset.
     train_ds, dev_ds, test_ds = load_dataset(
-        "chnsenticorp", splits=["train", "dev", "test"], lazy=False)
+        "chnsenticorp", splits=["train", "dev", "test"])
 
     # Constructs the newtork.
     model = ppnlp.models.Senta(

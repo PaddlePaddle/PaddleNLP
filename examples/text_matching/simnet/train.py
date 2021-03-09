@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
     # Loads dataset.
     train_ds, dev_ds, test_ds = load_dataset(
-        "lcqmc", splits=["train", "dev", "test"], lazy=False)
+        "lcqmc", splits=["train", "dev", "test"])
 
     # Constructs the newtork.
     model = ppnlp.models.SimNet(

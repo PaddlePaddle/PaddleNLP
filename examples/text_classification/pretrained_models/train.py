@@ -152,7 +152,7 @@ def do_train():
         paddle.distributed.init_parallel_env()
 
     train_ds, dev_ds, test_ds = load_dataset(
-        "chnsenticorp", splits=["train", "dev", "test"], lazy=False)
+        "chnsenticorp", splits=["train", "dev", "test"])
 
     # If you wanna use bert/roberta/electra pretrained model,
     # model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_class=2)

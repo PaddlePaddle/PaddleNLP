@@ -72,13 +72,11 @@ def convert_example(example, tokenizer, max_seq_length=512):
     """
     query, title = example[0], example[1]
 
-    query_encoded_inputs = tokenizer(
-        text=query, max_seq_len=max_seq_length, pad_to_max_seq_len=True)
+    query_encoded_inputs = tokenizer(text=query, max_seq_len=max_seq_length)
     query_input_ids = query_encoded_inputs["input_ids"]
     query_token_type_ids = query_encoded_inputs["token_type_ids"]
 
-    title_encoded_inputs = tokenizer(
-        text=title, max_seq_len=max_seq_length, pad_to_max_seq_len=True)
+    title_encoded_inputs = tokenizer(text=title, max_seq_len=max_seq_length)
     title_input_ids = title_encoded_inputs["input_ids"]
     title_token_type_ids = title_encoded_inputs["token_type_ids"]
 
