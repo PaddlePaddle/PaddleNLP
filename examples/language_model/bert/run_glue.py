@@ -27,8 +27,9 @@ import paddle
 from paddle.io import DataLoader
 from paddle.metric import Metric, Accuracy, Precision, Recall
 
-from paddlenlp.datasets import GlueCoLA, GlueSST2, GlueMRPC, GlueSTSB, GlueQQP, GlueMNLI, GlueQNLI, GlueRTE
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.datasets import load_dataset
+from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
@@ -39,20 +40,20 @@ FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger(__name__)
 
-TASK_CLASSES = {
-    "cola": (GlueCoLA, Mcc),
-    "sst-2": (GlueSST2, Accuracy),
-    "mrpc": (GlueMRPC, AccuracyAndF1),
-    "sts-b": (GlueSTSB, PearsonAndSpearman),
-    "qqp": (GlueQQP, AccuracyAndF1),
-    "mnli": (GlueMNLI, Accuracy),
-    "qnli": (GlueQNLI, Accuracy),
-    "rte": (GlueRTE, Accuracy),
+METRIC_CLASSES = {
+    "cola": Mcc,
+    "sst-2": Accuracy,
+    "mrpc": AccuracyAndF1,
+    "sts-b": PearsonAndSpearman,
+    "qqp": AccuracyAndF1,
+    "mnli": Accuracy,
+    "qnli": Accuracy,
+    "rte": Accuracy,
 }
 
 MODEL_CLASSES = {
     "bert": (BertForSequenceClassification, BertTokenizer),
-    "ernie": (ErnieForSequenceClassification, ErnieTokenizer)
+    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
 }
 
 
@@ -66,7 +67,7 @@ def parse_args():
         type=str,
         required=True,
         help="The name of the task to train selected in the list: " +
-        ", ".join(TASK_CLASSES.keys()), )
+        ", ".join(METRIC_CLASSES.keys()), )
     parser.add_argument(
         "--model_type",
         default=None,
@@ -136,7 +137,7 @@ def parse_args():
     )
     parser.add_argument(
         "--warmup_proportion",
-        default=0.,
+        default=0.1,
         type=float,
         help="Linear warmup proportion over total steps.")
     parser.add_argument(
@@ -153,16 +154,15 @@ def parse_args():
     parser.add_argument(
         "--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument(
-        "--n_cards",
+        "--n_procs",
         default=1,
         type=int,
-        help="Number cards for the training, only support multi cards in the gpu."
-    )
+        help="Number of cards to use, the cpu just use single core to train and predict.")
     parser.add_argument(
         "--select_device",
-        type=str,
         default="gpu",
-        help="Device for selecting for the training.")
+        type=str,
+        help="The device to select to train the model, is must be cpu/gpu/xpu.")
     parser.add_argument(
         "--use_amp",
         type=distutils.util.strtobool,
@@ -187,6 +187,7 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
+@paddle.no_grad()
 def evaluate(model, loss_fct, metric, data_loader):
     model.eval()
     metric.reset()
@@ -198,17 +199,25 @@ def evaluate(model, loss_fct, metric, data_loader):
         metric.update(correct)
     res = metric.accumulate()
     if isinstance(metric, AccuracyAndF1):
-        logger.info(
-            "eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s."
-            % (loss.numpy(), res[0], res[1], res[2], res[3], res[4]))
+        print(
+            "eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
+            % (
+                loss.numpy(),
+                res[0],
+                res[1],
+                res[2],
+                res[3],
+                res[4], ),
+            end='')
     elif isinstance(metric, Mcc):
-        logger.info("eval loss: %f, mcc: %s." % (loss.numpy(), res[0]))
+        print("eval loss: %f, mcc: %s, " % (loss.numpy(), res[0]), end='')
     elif isinstance(metric, PearsonAndSpearman):
-        logger.info(
-            "eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s."
-            % (loss.numpy(), res[0], res[1], res[2]))
+        print(
+            "eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
+            % (loss.numpy(), res[0], res[1], res[2]),
+            end='')
     else:
-        logger.info("eval loss: %f, acc: %s." % (loss.numpy(), res))
+        print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end='')
     model.train()
 
 
@@ -218,71 +227,25 @@ def convert_example(example,
                     max_seq_length=512,
                     is_test=False):
     """convert a glue example into necessary features"""
-
-    def _truncate_seqs(seqs, max_seq_length):
-        if len(seqs) == 1:  # single sentence
-            # Account for [CLS] and [SEP] with "- 2"
-            seqs[0] = seqs[0][0:(max_seq_length - 2)]
-        else:  # Sentence pair
-            # Account for [CLS], [SEP], [SEP] with "- 3"
-            tokens_a, tokens_b = seqs
-            max_seq_length -= 3
-            while True:  # Truncate with longest_first strategy
-                total_length = len(tokens_a) + len(tokens_b)
-                if total_length <= max_seq_length:
-                    break
-                if len(tokens_a) > len(tokens_b):
-                    tokens_a.pop()
-                else:
-                    tokens_b.pop()
-        return seqs
-
-    def _concat_seqs(seqs, separators, seq_mask=0, separator_mask=1):
-        concat = sum((seq + sep for sep, seq in zip(separators, seqs)), [])
-        segment_ids = sum(
-            ([i] * (len(seq) + len(sep))
-             for i, (sep, seq) in enumerate(zip(separators, seqs))), [])
-        if isinstance(seq_mask, int):
-            seq_mask = [[seq_mask] * len(seq) for seq in seqs]
-        if isinstance(separator_mask, int):
-            separator_mask = [[separator_mask] * len(sep) for sep in separators]
-        p_mask = sum((s_mask + mask
-                      for sep, seq, s_mask, mask in zip(
-                          separators, seqs, seq_mask, separator_mask)), [])
-        return concat, segment_ids, p_mask
-
     if not is_test:
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
         # Get the label
-        label = example[-1]
-        example = example[:-1]
-        # Create label maps if classification task
-        if label_list:
-            label_map = {}
-            for (i, l) in enumerate(label_list):
-                label_map[l] = i
-            label = label_map[label]
+        label = example['labels']
         label = np.array([label], dtype=label_dtype)
-
-    # Tokenize raw text
-    tokens_raw = [tokenizer(l) for l in example]
-    # Truncate to the truncate_length,
-    tokens_trun = _truncate_seqs(tokens_raw, max_seq_length)
-    # Concate the sequences with special tokens
-    tokens_trun[0] = [tokenizer.cls_token] + tokens_trun[0]
-    tokens, segment_ids, _ = _concat_seqs(tokens_trun, [[tokenizer.sep_token]] *
-                                          len(tokens_trun))
-    # Convert the token to ids
-    input_ids = tokenizer.convert_tokens_to_ids(tokens)
-    valid_length = len(input_ids)
-    # The mask has 1 for real tokens and 0 for padding tokens. Only real
-    # tokens are attended to.
-    # input_mask = [1] * len(input_ids)
-    if not is_test:
-        return input_ids, segment_ids, valid_length, label
+    # Convert raw text to feature
+    if len(example) == 2:
+        example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
     else:
-        return input_ids, segment_ids, valid_length
+        example = tokenizer(
+            example['sentence1'],
+            text_pair=example['sentence2'],
+            max_seq_len=max_seq_length)
+
+    if not is_test:
+        return example['input_ids'], example['token_type_ids'], label
+    else:
+        return example['input_ids'], example['token_type_ids']
 
 
 def do_train(args):
@@ -293,69 +256,67 @@ def do_train(args):
     set_seed(args)
 
     args.task_name = args.task_name.lower()
-    dataset_class, metric_class = TASK_CLASSES[args.task_name]
+    metric_class = METRIC_CLASSES[args.task_name]
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
-    train_dataset = dataset_class.get_datasets(["train"])
+    train_ds = load_dataset('glue', args.task_name, splits="train")
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
-        label_list=train_dataset.get_labels(),
+        label_list=train_ds.label_list,
         max_seq_length=args.max_seq_length)
-    train_dataset = train_dataset.apply(trans_func, lazy=True)
+    train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_dataset, batch_size=args.batch_size, shuffle=True)
+        train_ds, batch_size=args.batch_size, shuffle=True)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Stack(),  # length
-        Stack(dtype="int64" if train_dataset.get_labels() else "float32")  # label
-    ): [data for i, data in enumerate(fn(samples)) if i != 2]
+        Stack(dtype="int64" if train_ds.label_list else "float32")  # label
+    ): fn(samples)
     train_data_loader = DataLoader(
-        dataset=train_dataset,
+        dataset=train_ds,
         batch_sampler=train_batch_sampler,
         collate_fn=batchify_fn,
         num_workers=0,
         return_list=True)
     if args.task_name == "mnli":
-        dev_dataset_matched, dev_dataset_mismatched = dataset_class.get_datasets(
-            ["dev_matched", "dev_mismatched"])
-        dev_dataset_matched = dev_dataset_matched.apply(trans_func, lazy=True)
-        dev_dataset_mismatched = dev_dataset_mismatched.apply(
-            trans_func, lazy=True)
+        dev_ds_matched, dev_ds_mismatched = load_dataset(
+            'glue', args.task_name, splits=["dev_matched", "dev_mismatched"])
+
+        dev_ds_matched = dev_ds_matched.map(trans_func, lazy=True)
+        dev_ds_mismatched = dev_ds_mismatched.map(trans_func, lazy=True)
         dev_batch_sampler_matched = paddle.io.BatchSampler(
-            dev_dataset_matched, batch_size=args.batch_size, shuffle=False)
+            dev_ds_matched, batch_size=args.batch_size, shuffle=False)
         dev_data_loader_matched = DataLoader(
-            dataset=dev_dataset_matched,
+            dataset=dev_ds_matched,
             batch_sampler=dev_batch_sampler_matched,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
         dev_batch_sampler_mismatched = paddle.io.BatchSampler(
-            dev_dataset_mismatched, batch_size=args.batch_size, shuffle=False)
+            dev_ds_mismatched, batch_size=args.batch_size, shuffle=False)
         dev_data_loader_mismatched = DataLoader(
-            dataset=dev_dataset_mismatched,
+            dataset=dev_ds_mismatched,
             batch_sampler=dev_batch_sampler_mismatched,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
     else:
-        dev_dataset = dataset_class.get_datasets(["dev"])
-        dev_dataset = dev_dataset.apply(trans_func, lazy=True)
+        dev_ds = load_dataset('glue', args.task_name, splits='dev')
+        dev_ds = dev_ds.map(trans_func, lazy=True)
         dev_batch_sampler = paddle.io.BatchSampler(
-            dev_dataset, batch_size=args.batch_size, shuffle=False)
+            dev_ds, batch_size=args.batch_size, shuffle=False)
         dev_data_loader = DataLoader(
-            dataset=dev_dataset,
+            dataset=dev_ds,
             batch_sampler=dev_batch_sampler,
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
 
-    num_classes = 1 if train_dataset.get_labels() == None else len(
-        train_dataset.get_labels())
+    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
@@ -383,11 +344,10 @@ def do_train(args):
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
 
-    loss_fct = paddle.nn.loss.CrossEntropyLoss() if train_dataset.get_labels(
-    ) else paddle.nn.loss.MSELoss()
+    loss_fct = paddle.nn.loss.CrossEntropyLoss(
+    ) if train_ds.label_list else paddle.nn.loss.MSELoss()
 
     metric = metric_class()
-
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
 
@@ -396,6 +356,7 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
+
             input_ids, segment_ids, labels = batch
             with paddle.amp.auto_cast(
                     args.use_amp,
@@ -411,35 +372,33 @@ def do_train(args):
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % args.logging_steps == 0:
-                logger.info(
+                print(
                     "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
                     % (global_step, num_training_steps, epoch, step,
                        paddle.distributed.get_rank(), loss, optimizer.get_lr(),
                        args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
-            if global_step % args.save_steps == 0:
+            if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
                 if args.task_name == "mnli":
                     evaluate(model, loss_fct, metric, dev_data_loader_matched)
                     evaluate(model, loss_fct, metric,
                              dev_data_loader_mismatched)
-                    logger.info("eval done total : %s s" %
-                                (time.time() - tic_eval))
+                    print("eval done total : %s s" % (time.time() - tic_eval))
                 else:
                     evaluate(model, loss_fct, metric, dev_data_loader)
-                    logger.info("eval done total : %s s" %
-                                (time.time() - tic_eval))
-                if (not args.n_cards > 1) or paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(args.output_dir,
-                                              "%s_ft_model_%d.pdparams" %
-                                              (args.task_name, global_step))
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    # Need better way to get inner model of DataParallel
-                    model_to_save = model._layers if isinstance(
-                        model, paddle.DataParallel) else model
-                    model_to_save.save_pretrained(output_dir)
-                    tokenizer.save_pretrained(output_dir)
+                    print("eval done total : %s s" % (time.time() - tic_eval))
+                if paddle.distributed.get_rank() == 0:
+                     output_dir = os.path.join(args.output_dir,
+                                               "%s_ft_model_%d.pdparams" %
+                                               (args.task_name, global_step))
+                     if not os.path.exists(output_dir):
+                         os.makedirs(output_dir)
+                     # Need better way to get inner model of DataParallel
+                     model_to_save = model._layers if isinstance(
+                         model, paddle.DataParallel) else model
+                     model_to_save.save_pretrained(output_dir)
+                     tokenizer.save_pretrained(output_dir)
 
 
 def print_arguments(args):
@@ -453,7 +412,11 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    if args.n_cards > 1 and args.select_device == "gpu":
-        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_cards)
+    assert args.select_device in [
+        "cpu", "gpu", "xpu"
+    ], "Invalid device! Available device should be cpu, gpu, or xpu."
+
+    if args.n_procs > 1 and args.select_device != "cpu":
+        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_procs)
     else:
         do_train(args)
