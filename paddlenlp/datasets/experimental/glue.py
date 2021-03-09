@@ -296,7 +296,7 @@ class Glue(DatasetBuilder):
                     continue
                 line_stripped = line.strip().split('\t')
                 if not line_stripped:
-                    break
+                    continue
                 example = [line_stripped[indice] for indice in field_indices]
                 if self.name in ['cola', 'sst-2']:
                     yield {
