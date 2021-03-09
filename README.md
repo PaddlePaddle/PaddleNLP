@@ -17,7 +17,7 @@ PaddleNLP 2.0拥有**覆盖多场景的模型库**、**简洁易用的全流程A
 ## 特性
 
 - **覆盖多场景的模型库**
-  - PaddleNLP集成了RNN与Transformer等多种主流模型结构，涵盖从[词向量](./exmaples/word_embedding/)、[词法分析](./examples/lexical_analysis/)、[命名实体识别](./examples/named_entity_recognition/)、[语义表示](./examples/language_model/)等NLP基础技术，到[文本分类](./examples/text_classification/)、[文本匹配](./examples/text_matching/)、[文本生成](./examples/text_generation/)、[文本图学习](./examples/text_graph/erniesage/)等NLP核心技术。同时针对[机器翻译](./examples/machine_translation/)、[通用对话](./examples/dialogue/)、[阅读理解](./exampels/machine_reading_comprehension/)等系统应用提供相应核心组件与预训练模型。更多详细介绍请查看[PaddleNLP应用示例](./examples/)。
+  - PaddleNLP集成了RNN与Transformer等多种主流模型结构，涵盖从[词向量](./exmaples/word_embedding/)、[词法分析](./examples/lexical_analysis/)、[命名实体识别](./examples/information_extraction/msra_ner/)、[语义表示](./examples/language_model/)等NLP基础技术，到[文本分类](./examples/text_classification/)、[文本匹配](./examples/text_matching/)、[文本生成](./examples/text_generation/)、[文本图学习](./examples/text_graph/erniesage/)、[信息抽取](./examples/information_extraction)等NLP核心技术。同时针对[机器翻译](./examples/machine_translation/)、[通用对话](./examples/dialogue/)、[阅读理解](./exampels/machine_reading_comprehension/)等系统应用提供相应核心组件与预训练模型。更多详细介绍请查看[PaddleNLP应用示例](./examples/)。
 
 
 - **简洁易用的全流程API**
@@ -88,12 +88,13 @@ PaddleNLP模型库整体介绍请参考文档[PaddleNLP Model Zoo](./docs/model_
 
 - [词向量](./examples/word_embedding/)
 - [词法分析](./examples/lexical_analysis/)
-- [命名实体识别](./examples/named_entity_recognition/)
+- [命名实体识别](./examples/information_extraction/msra_ner/)
 - [语言模型](./examples/language_model/)
 - [文本分类](./examples/text_classification/)
 - [文本生成](./examples/text_generation/)
 - [语义匹配](./examples/text_matching/)
 - [文本图学习](./examples/text_graph/erniesage/)
+- [信息抽取](./examples/information_extraction/)
 - [通用对话](./examples/dialogue/)
 - [机器翻译](./examples/machine_translation/)
 - [阅读理解](./examples/machine_reading_comprehension/)

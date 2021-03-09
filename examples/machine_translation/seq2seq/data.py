@@ -21,31 +21,35 @@ import numpy as np
 import paddle
 from paddlenlp.data import Vocab, Pad
 from paddlenlp.data import SamplerHelper
-
-from paddlenlp.datasets import IWSLT15
-
-trans_func_tuple = IWSLT15.get_default_transform_func()
+from paddlenlp.datasets import load_dataset
 
 
 def create_train_loader(args):
     batch_size = args.batch_size
     max_len = args.max_len
-    src_vocab, tgt_vocab = IWSLT15.get_vocab()
+
+    train_ds, dev_ds = load_dataset('iwslt15', splits=('train', 'dev'))
+    src_vocab = Vocab.load_vocabulary(**train_ds.vocab_info['en'])
+    tgt_vocab = Vocab.load_vocabulary(**train_ds.vocab_info['vi'])
     bos_id = src_vocab[src_vocab.bos_token]
     eos_id = src_vocab[src_vocab.eos_token]
     pad_id = eos_id
 
-    train_ds, dev_ds = IWSLT15.get_datasets(
-        mode=["train", "dev"],
-        transform_func=[trans_func_tuple, trans_func_tuple])
+    def convert_example(example):
+        source = example['en'].split()[:max_len]
+        target = example['vi'].split()[:max_len]
+
+        source = src_vocab.to_indices(source)
+        target = tgt_vocab.to_indices(target)
+
+        return source, target
 
     key = (lambda x, data_source: len(data_source[x][0]))
-    cut_fn = lambda data: (data[0][:max_len], data[1][:max_len])
 
-    train_ds = train_ds.filter(
-        lambda data: (len(data[0]) > 0 and len(data[1]) > 0)).apply(cut_fn)
-    dev_ds = dev_ds.filter(
-        lambda data: (len(data[0]) > 0 and len(data[1]) > 0)).apply(cut_fn)
+    # Truncate and convert example to ids
+    train_ds = train_ds.map(convert_example, lazy=False)
+    dev_ds = dev_ds.map(convert_example, lazy=False)
+
     train_batch_sampler = SamplerHelper(train_ds).shuffle().sort(
         key=key, buffer_size=batch_size * 20).batch(batch_size=batch_size)
 
@@ -70,14 +74,24 @@ def create_train_loader(args):
 def create_infer_loader(args):
     batch_size = args.batch_size
     max_len = args.max_len
-    trans_func_tuple = IWSLT15.get_default_transform_func()
-    test_ds = IWSLT15.get_datasets(
-        mode=["test"], transform_func=[trans_func_tuple])
-    src_vocab, tgt_vocab = IWSLT15.get_vocab()
+
+    test_ds = load_dataset('iwslt15', splits='test')
+    src_vocab = Vocab.load_vocabulary(**test_ds.vocab_info['en'])
+    tgt_vocab = Vocab.load_vocabulary(**test_ds.vocab_info['vi'])
     bos_id = src_vocab[src_vocab.bos_token]
     eos_id = src_vocab[src_vocab.eos_token]
     pad_id = eos_id
 
+    def convert_example(example):
+        source = example['en'].split()
+        target = example['vi'].split()
+
+        source = src_vocab.to_indices(source)
+        target = tgt_vocab.to_indices(target)
+
+        return source, target
+
+    test_ds.map(convert_example)
     test_batch_sampler = SamplerHelper(test_ds).batch(batch_size=batch_size)
 
     test_loader = paddle.io.DataLoader(

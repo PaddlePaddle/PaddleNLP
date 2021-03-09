@@ -549,7 +549,8 @@ class GenerationMixin(object):
             logits = logits_processors(input_ids, logits)
 
             # greedy
-            probs = F.log_softmax(logits)
+            probs = F.softmax(logits)
+            probs = paddle.log(probs)
             next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
             next_scores = paddle.index_sample(probs, next_tokens)
 
@@ -643,7 +644,8 @@ class GenerationMixin(object):
             logits = logits_processors(input_ids, logits)
 
             # sample
-            origin_probs = F.log_softmax(logits)
+            origin_probs = F.softmax(logits)
+            origin_probs = paddle.log(origin_probs)
             if temperature is not None and temperature != 1.0:
                 logits = logits / temperature
             probs = F.softmax(logits)
@@ -709,7 +711,8 @@ class GenerationMixin(object):
 
             # beam search
             # [batch_size * num_beams, vocab_size]
-            next_scores = F.log_softmax(logits)
+            next_scores = F.softmax(logits)
+            next_scores = paddle.log(next_scores)
 
             next_scores = next_scores + beam_scores.unsqueeze(-1)
             # reshape for beam search

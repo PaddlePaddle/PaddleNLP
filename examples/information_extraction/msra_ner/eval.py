@@ -64,6 +64,7 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
 def do_eval(args):
     paddle.set_device("gpu" if args.use_gpu else "cpu")
 
+    # Create dataset, tokenizer and dataloader.
     train_ds, eval_ds = load_dataset(
         'msra_ner', splits=('train', 'test'), lazy=False)
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
@@ -91,6 +92,7 @@ def do_eval(args):
         batch_size=args.batch_size,
         return_list=True)
 
+    # Define the model netword and its loss
     model = BertForTokenClassification.from_pretrained(
         args.model_name_or_path, num_classes=label_num)
     if args.init_checkpoint_path:
@@ -105,7 +107,7 @@ def do_eval(args):
     for step, batch in enumerate(eval_data_loader):
         input_ids, token_type_ids, length, labels = batch
         logits = model(input_ids, token_type_ids)
-        loss = loss_fct(logits.reshape([-1, label_num]), labels.reshape([-1]))
+        loss = loss_fct(logits, labels)
         avg_loss = paddle.mean(loss)
         preds = logits.argmax(axis=2)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(

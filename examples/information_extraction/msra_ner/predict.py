@@ -92,6 +92,7 @@ def parse_decodes(input_words, id2label, decodes, lens):
 def do_predict(args):
     paddle.set_device("gpu" if args.use_gpu else "cpu")
 
+    # Create dataset, tokenizer and dataloader.
     train_ds, predict_ds = load_dataset(
         'msra_ner', splits=('train', 'test'), lazy=False)
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
@@ -124,6 +125,7 @@ def do_predict(args):
         batch_size=args.batch_size,
         return_list=True)
 
+    # Define the model netword
     model = BertForTokenClassification.from_pretrained(
         args.model_name_or_path, num_classes=label_num)
     if args.init_checkpoint_path:

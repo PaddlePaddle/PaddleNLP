@@ -2,7 +2,7 @@
 
 ## 简介
 
-PaddleNLP已预置多个公开的预训练Embedding，用户可以通过使用`paddlenlp.embeddings.TokenEmbedding`接口加载预训练Embedding，从而提升训练效果。以下通过文本分类训练的例子展示`paddlenlp.embeddings.TokenEmbedding`对训练提升的效果。
+PaddleNLP已预置多个公开的预训练Embedding，用户可以通过使用`paddlenlp.embeddings.TokenEmbedding`接口加载预训练Embedding，从而提升训练效果。以下通过基于开源情感倾向分类数据集ChnSentiCorp的文本分类训练例子展示`paddlenlp.embeddings.TokenEmbedding`对训练提升的效果。更多的`paddlenlp.embeddings.TokenEmbedding`用法，请参考[TokenEmbedding 接口使用指南](../../paddlenlp/embeddings/README.md) 。
 
 
 ## 快速开始
@@ -17,37 +17,39 @@ PaddleNLP已预置多个公开的预训练Embedding，用户可以通过使用`p
 
    - python >= 3.6
    - paddlepaddle >= 2.0.0
-   - paddlenlp >= 2.0.0rc
+   - paddlenlp >= 2.0.0rc8
 
    ```
-   pip install paddlenlp==2.0.0rc
+   pip install paddlenlp==2.0.0rc8
    ```
-
-### 下载词表
-
-下载词汇表文件dict.txt，用于构造词-id映射关系。
-
-```bash
-wget https://paddlenlp.bj.bcebos.com/data/dict.txt
-```
 
 ### 启动训练
 
-我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在验证集（dev.tsv）验证。
+我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在验证集（dev.tsv）验证。训练时会自动下载词表dict.txt，用于对数据集进行切分，构造数据样本。
 
 启动训练：
-```
+
+```shell
 # 使用paddlenlp.embeddings.TokenEmbedding
-python train.py --vocab_path='./dict.txt' --use_gpu=True --lr=5e-4 --batch_size=64 --epochs=20 --use_token_embedding=True --vdl_dir='./vdl_dir'
+python train.py --device='gpu' \
+                --lr=5e-4 \
+                --batch_size=64 \
+                --epochs=20 \
+                --use_token_embedding=True \
+                --vdl_dir='./vdl_dir'
 
 # 使用paddle.nn.Embedding
-python train.py --vocab_path='./dict.txt' --use_gpu=True --lr=1e-4 --batch_size=64 --epochs=20 --use_token_embedding=False --vdl_dir='./vdl_dir'
+python train.py --device='gpu' \
+                --lr=1e-4 \
+                --batch_size=64 \
+                --epochs=20 \
+                --use_token_embedding=False \
+                --vdl_dir='./vdl_dir'
 ```
 
 以上参数表示：
 
-* `vocab_path`: 词汇表文件路径。
-* `use_gpu`: 是否使用GPU进行训练， 默认为`True`。
+* `device`: 选择训练设备，目前可选'gpu', 'cpu', 'xpu'。 默认为`gpu`。
 * `lr`: 学习率， 默认为5e-4。
 * `batch_size`: 运行一个batch大小，默认为64。
 * `epochs`: 训练轮次，默认为5。

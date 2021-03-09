@@ -32,14 +32,14 @@ def convert_example(example, tokenizer, is_test=False):
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
 
-    query, title = example[0], example[1]
+    query, title = example["query"], example["title"]
     query_ids = np.array(tokenizer.encode(query), dtype="int64")
     query_seq_len = np.array(len(query_ids), dtype="int64")
     title_ids = np.array(tokenizer.encode(title), dtype="int64")
     title_seq_len = np.array(len(title_ids), dtype="int64")
 
     if not is_test:
-        label = np.array(example[-1], dtype="int64")
+        label = np.array(example["label"], dtype="int64")
         return query_ids, title_ids, query_seq_len, title_seq_len, label
     else:
         return query_ids, title_ids, query_seq_len, title_seq_len

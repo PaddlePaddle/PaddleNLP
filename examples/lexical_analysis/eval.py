@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import os
-import ast
 import math
 import argparse
 
@@ -33,7 +32,7 @@ parser.add_argument("--data_dir", type=str, default=None, help="The folder where
 parser.add_argument("--init_checkpoint", type=str, default=None, help="Path to init model.")
 parser.add_argument("--batch_size", type=int, default=300, help="The number of sequences contained in a mini-batch.")
 parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
-parser.add_argument("--use_gpu", type=ast.literal_eval, default=True, help="If set, use GPU for training.")
+parser.add_argument('--use_gpu', action='store_true', help='If set, use gpu to excute')
 parser.add_argument("--emb_dim", type=int, default=128, help="The dimension in which a word is embedded.")
 parser.add_argument("--hidden_size", type=int, default=128, help="The number of hidden nodes in the GRU layer.")
 args = parser.parse_args()
