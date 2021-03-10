@@ -76,29 +76,18 @@ class WMT14ende(DatasetBuilder):
         all_vocab_fullname = os.path.join(default_root, all_vocab_filename)
         sub_vocab_fullname = os.path.join(default_root, sub_vocab_filename)
 
-        # For each time, only check the vocab used by model. 
-        if "use_all_vocab" in kwargs and kwargs.get('use_all_vocab'):
-            if (not os.path.exists(src_fullname) or
-                (src_data_hash and
-                 not md5file(src_fullname) == src_data_hash)) or (
-                     not os.path.exists(tgt_fullname) or
-                     (tgt_data_hash and
-                      not md5file(tgt_fullname) == tgt_data_hash)) or (
-                          not os.path.exists(all_vocab_fullname) or
-                          (all_vocab_hash and
-                           not md5file(all_vocab_fullname) == all_vocab_hash)):
-                get_path_from_url(self.URL, default_root, self.MD5)
-        else:
-            if (not os.path.exists(src_fullname) or
-                (src_data_hash and
-                 not md5file(src_fullname) == src_data_hash)) or (
-                     not os.path.exists(tgt_fullname) or
-                     (tgt_data_hash and
-                      not md5file(tgt_fullname) == tgt_data_hash)) or (
+        if (not os.path.exists(src_fullname) or
+            (src_data_hash and not md5file(src_fullname) == src_data_hash)) or (
+                not os.path.exists(tgt_fullname) or
+                (tgt_data_hash and
+                 not md5file(tgt_fullname) == tgt_data_hash)) or (
+                     not os.path.exists(all_vocab_fullname) or
+                     (all_vocab_hash and
+                      not md5file(all_vocab_fullname) == all_vocab_hash)) or (
                           not os.path.exists(sub_vocab_fullname) or
                           (sub_vocab_hash and
                            not md5file(sub_vocab_fullname) == sub_vocab_hash)):
-                get_path_from_url(self.URL, default_root, self.MD5)
+            get_path_from_url(self.URL, default_root, self.MD5)
 
         return src_fullname, tgt_fullname
 
@@ -113,18 +102,20 @@ class WMT14ende(DatasetBuilder):
                         continue
                     yield {"src": src_line, "trg": tgt_line}
 
-    def get_vocab(self, **kwargs):
-        if "use_all_vocab" in kwargs and kwargs.get('use_all_vocab'):
-            vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
+    def get_vocab(self):
+        all_vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
                                           self.VOCAB_INFO[0][0])
-        else:
-            vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
+        sub_vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
                                           self.VOCAB_INFO[1][0])
-
-        # Construct vocab_info to match the form of the input of `Vocab.load_vocabulary()` function
         vocab_info = {
-            'vocab': {
-                'filepath': vocab_fullname,
+            'all': {
+                'filepath': all_vocab_fullname,
+                'unk_token': self.UNK_TOKEN,
+                'bos_token': self.BOS_TOKEN,
+                'eos_token': self.EOS_TOKEN
+            },
+            'benchmark': {
+                'filepath': sub_vocab_fullname,
                 'unk_token': self.UNK_TOKEN,
                 'bos_token': self.BOS_TOKEN,
                 'eos_token': self.EOS_TOKEN

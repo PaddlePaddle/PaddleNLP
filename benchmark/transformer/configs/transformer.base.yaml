@@ -26,7 +26,7 @@ use_gpu: True
 pool_size: 200000
 sort_type: "global"
 batch_size: 4096
-infer_batch_size: 64
+infer_batch_size: 8
 shuffle_batch: True
 # Data shuffle only works when sort_type is pool or none
 shuffle: True

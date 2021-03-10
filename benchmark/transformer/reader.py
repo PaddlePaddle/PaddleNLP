@@ -22,7 +22,6 @@ import numpy as np
 from paddle.io import BatchSampler, DataLoader, Dataset
 import paddle.distributed as dist
 from paddlenlp.data import Pad, Vocab
-# from paddlenlp.datasets import WMT14ende
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data.sampler import SamplerHelper
 
@@ -35,12 +34,21 @@ def min_max_filer(data, max_len, min_len=0):
 
 
 def create_data_loader(args, places=None, use_all_vocab=False):
-    # root is NOT supported MAY cause some problem in benchmark. 
-    root = None if args.root == "None" else args.root
+    data_files = None
+    if args.root != "None" and os.path.exists(args.root):
+        data_files = {
+            'train': (os.path.join(args.root, "train.tok.clean.bpe.33708.en"),
+                      os.path.join(args.root, "train.tok.clean.bpe.33708.de")),
+            'dev': (os.path.join(args.root, "newstest2013.tok.bpe.33708.en"),
+                    os.path.join(args.root, "newstest2013.tok.bpe.33708.de"))
+        }
 
     datasets = load_dataset(
-        'wmt14', splits=('train', 'dev'), use_all_vocab=use_all_vocab)
-    src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["vocab"])
+        'wmt14ende', data_files=data_files, splits=('train', 'dev'))
+    if use_all_vocab:
+        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["all"])
+    else:
+        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["benchmark"])
     trg_vocab = src_vocab
 
     padding_vocab = (
@@ -94,12 +102,18 @@ def create_data_loader(args, places=None, use_all_vocab=False):
 
 
 def create_infer_loader(args, use_all_vocab=False):
-    # root is NOT supported MAY cause some problem in benchmark. 
-    root = None if args.root == "None" else args.root
+    data_files = None
+    if args.root != "None" and os.path.exists(args.root):
+        data_files = {
+            'test': (os.path.join(args.root, "newstest2014.tok.bpe.33708.en"),
+                     os.path.join(args.root, "newstest2014.tok.bpe.33708.de"))
+        }
 
-    dataset = load_dataset(
-        'wmt14', splits=('test'), use_all_vocab=use_all_vocab)
-    src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["vocab"])
+    dataset = load_dataset('wmt14ende', data_files=data_files, splits=('test'))
+    if use_all_vocab:
+        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["all"])
+    else:
+        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
     trg_vocab = src_vocab
 
     padding_vocab = (

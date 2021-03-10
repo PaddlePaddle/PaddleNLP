@@ -67,7 +67,7 @@ def load_dataset(path,
         reader_instance = reader_cls(lazy=lazy, name=name)
 
     datasets = reader_instance.read_datasets(
-        data_files=data_files, splits=splits, **kwargs)
+        data_files=data_files, splits=splits)
 
     return datasets
 
@@ -285,7 +285,7 @@ class DatasetBuilder:
             self.lazy = lazy
         self.name = name
 
-    def read_datasets(self, splits=None, data_files=None, **kwargs):
+    def read_datasets(self, splits=None, data_files=None):
         datasets = []
         assert splits or data_files, "`data_files` and `splits` can not both be None."
 
@@ -310,20 +310,16 @@ class DatasetBuilder:
                 isinstance(splits, tuple) and isinstance(splits[0], str)
             ), "`splits` should be a string or list of string or a tuple of string."
             if isinstance(splits, str):
-                filename = self._get_data(splits, **kwargs)
-                datasets.append(
-                    self.read(
-                        filename=filename, split=splits, **kwargs))
+                filename = self._get_data(splits)
+                datasets.append(self.read(filename=filename, split=splits))
             else:
                 for split in splits:
-                    filename = self._get_data(split, **kwargs)
-                    datasets.append(
-                        self.read(
-                            filename=filename, split=split, **kwargs))
+                    filename = self._get_data(split)
+                    datasets.append(self.read(filename=filename, split=split))
 
         return datasets if len(datasets) > 1 else datasets[0]
 
-    def read(self, filename, split='train', **kwargs):
+    def read(self, filename, split='train'):
         """
         Returns an dataset containing all the examples that can be read from the file path.
         If `self.lazy` is `False`, this eagerly reads all instances from `self._read()`
@@ -335,7 +331,7 @@ class DatasetBuilder:
         """
 
         label_list = self.get_labels()
-        vocab_info = self.get_vocab(**kwargs)
+        vocab_info = self.get_vocab()
 
         if self.lazy:
 

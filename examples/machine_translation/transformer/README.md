@@ -65,10 +65,7 @@ pip install attrdict pyyaml
 同时，我们提供了一份已经处理好的数据集，可以编写如下代码，对应的数据集将会自动下载并且解压到 `~/.paddlenlp/datasets/machine_translation/WMT14ende/`。
 
 ``` python
-# 获取默认的数据处理方式
-transform_func = WMT14ende.get_default_transform_func(root=root)
-# 下载并处理 WMT14.en-de 翻译数据集
-dataset = WMT14ende.get_datasets(mode="train", transform_func=transform_func)
+datasets = load_dataset('wmt14ende', data_files=data_files, splits=('train', 'dev'))
 ```
 
 ## 单机训练
