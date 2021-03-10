@@ -11,11 +11,6 @@ set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 
 list(APPEND CMAKE_MODULE_PATH ${CUDA_PATH}/lib64)
 
-if (${CUDA_VERSION} GREATER_EQUAL 11.0)
-  message(STATUS "Add DCUDA11_MODE")
-  add_definitions("-DCUDA11_MODE")
-endif()
-
 # Setting compiler flags
 set(CMAKE_C_FLAGS    "${CMAKE_C_FLAGS}")    
 set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}")
