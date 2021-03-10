@@ -75,7 +75,7 @@
         --logging_steps 1 \
         --save_steps 500 \
         --output_dir ./tmp/$MODEL/ \
-        --n_gpu 1 \
+        --n_procs 1 \
         --params_pd_path params.pd
    ```
 
