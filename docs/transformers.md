@@ -31,7 +31,7 @@ from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 
 train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
 
-model = BertForSequenceClassification.from_pretrained("bert-wwm-chinese", num_classes=len(train_ds.get_labels()))
+model = BertForSequenceClassification.from_pretrained("bert-wwm-chinese", num_classes=len(train_ds.label_list))
 
 tokenizer = BertTokenizer.from_pretrained("bert-wwm-chinese")
 

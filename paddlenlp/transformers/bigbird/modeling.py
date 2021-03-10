@@ -474,8 +474,9 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
         masked_lm_loss = paddle.transpose(masked_lm_loss, [1, 0])
         masked_lm_loss = paddle.sum(masked_lm_loss * masked_lm_weights) / (
             paddle.sum(masked_lm_weights) + 1e-5)
+        scale = 1.0
         if not self.use_nsp:
-            return masked_lm_loss
+            scale = 0.0
         next_sentence_loss = paddle.nn.functional.softmax_with_cross_entropy(
             seq_relationship_score, next_sentence_labels)
-        return masked_lm_loss + paddle.mean(next_sentence_loss)
+        return masked_lm_loss + paddle.mean(next_sentence_loss) * scale
