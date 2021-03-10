@@ -67,7 +67,7 @@ def load_dataset(path,
         reader_instance = reader_cls(lazy=lazy, name=name)
 
     datasets = reader_instance.read_datasets(
-        data_files=data_files, splits=splits)
+        data_files=data_files, splits=splits, **kwargs)
 
     return datasets
 
@@ -285,7 +285,7 @@ class DatasetBuilder:
             self.lazy = lazy
         self.name = name
 
-    def read_datasets(self, splits=None, data_files=None):
+    def read_datasets(self, splits=None, data_files=None, **kwargs):
         datasets = []
         assert splits or data_files, "`data_files` and `splits` can not both be None."
 
@@ -310,11 +310,11 @@ class DatasetBuilder:
                 isinstance(splits, tuple) and isinstance(splits[0], str)
             ), "`splits` should be a string or list of string or a tuple of string."
             if isinstance(splits, str):
-                filename = self._get_data(splits)
+                filename = self._get_data(splits, **kwargs)
                 datasets.append(self.read(filename=filename, split=splits))
             else:
                 for split in splits:
-                    filename = self._get_data(split)
+                    filename = self._get_data(split, **kwargs)
                     datasets.append(self.read(filename=filename, split=split))
 
         return datasets if len(datasets) > 1 else datasets[0]
