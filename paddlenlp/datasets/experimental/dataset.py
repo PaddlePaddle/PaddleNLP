@@ -311,15 +311,19 @@ class DatasetBuilder:
             ), "`splits` should be a string or list of string or a tuple of string."
             if isinstance(splits, str):
                 filename = self._get_data(splits, **kwargs)
-                datasets.append(self.read(filename=filename, split=splits))
+                datasets.append(
+                    self.read(
+                        filename=filename, split=splits, **kwargs))
             else:
                 for split in splits:
                     filename = self._get_data(split, **kwargs)
-                    datasets.append(self.read(filename=filename, split=split))
+                    datasets.append(
+                        self.read(
+                            filename=filename, split=split, **kwargs))
 
         return datasets if len(datasets) > 1 else datasets[0]
 
-    def read(self, filename, split='train'):
+    def read(self, filename, split='train', **kwargs):
         """
         Returns an dataset containing all the examples that can be read from the file path.
         If `self.lazy` is `False`, this eagerly reads all instances from `self._read()`
@@ -331,7 +335,7 @@ class DatasetBuilder:
         """
 
         label_list = self.get_labels()
-        vocab_info = self.get_vocab()
+        vocab_info = self.get_vocab(**kwargs)
 
         if self.lazy:
 

@@ -113,8 +113,8 @@ class WMT14ende(DatasetBuilder):
                         continue
                     yield {"src": src_line, "trg": tgt_line}
 
-    def get_vocab(self, use_all_vocab):
-        if use_all_vocab:
+    def get_vocab(self, **kwargs):
+        if "use_all_vocab" in kwargs and kwargs.get('use_all_vocab'):
             vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
                                           self.VOCAB_INFO[0][0])
         else:
