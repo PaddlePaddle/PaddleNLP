@@ -106,4 +106,5 @@ python predict.py --data_dir ./lexical_analysis_dataset_tiny \
 如果您希望使用已经预训练好了的LAC模型完成词法分析任务，请参考：
 
 [Lexical Analysis of Chinese](https://github.com/baidu/lac)
+
 [PaddleHub分词模型](https://www.paddlepaddle.org.cn/hubdetail?name=lac&en_category=LexicalAnalysis)
