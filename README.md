@@ -89,7 +89,7 @@ tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 model = ErnieModel.from_pretrained('ernie-1.0')
 
 text = tokenizer('自然语言处理')
-pooled_output, sequence_output = model.forward(input_ids=paddle.to_tensor([text['input_ids']]))
+pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
 ```
 
 请参考[Transformer API文档](./docs/transformers.md)查看目前支持的预训练模型。
