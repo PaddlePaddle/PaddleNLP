@@ -199,6 +199,11 @@ def parse_args():
         type=str,
         default="gpu",
         help="select cpu, gpu, xpu devices.")
+    parser.add_argument(
+        "--init_params_path",
+        type=str,
+        default="./data/gpt2.pdparams",
+        help="select cpu, gpu, xpu devices.")
     args = parser.parse_args()
     return args
 
@@ -354,6 +359,13 @@ def trans_param_from_static_to_dygrah(model):
     exit(0)
 
 
+def init_static_with_params(model, dygraph_params):
+    from paddlenlp.utils.tools import dygraph_params_to_static
+    static_params = dygraph_params_to_static(model, dygraph_params)
+    prog = paddlle.static.default_main_program()
+    paddle.static.set_program_state(prog, static_params)
+
+
 def do_train(args):
     # Initialize the paddle and paddle fleet execute enviroment
     paddle.enable_static()
@@ -438,10 +450,15 @@ def do_train(args):
 
     # trans_param_from_static_to_dygrah(model)
 
-    state_dict = model.state_dict()
     # Use the state dict to update the parameter
+    # state_dict = model.state_dict()
     # reset_state_dict = reset_program_state_dict(model, state_dict)
+    # paddle.static.set_program_state(reset_state_dict)
 
+    # init with Megatron params
+    # init_static_with_params(model, paddle.load('~/init_checkponits/gpt2-init-bs4.pdparams')) 
+
+    test_program = main_program.clone(for_test=True)
     if worker_num == 1:
         # Construct the compiled program
         main_program = build_compiled_program(args, main_program, loss)
@@ -483,6 +500,12 @@ def do_train(args):
                                args.logging_steps / (time.time() - tic_train),
                                lr_return[0]))
                     tic_train = time.time()
+
+                # TODO and eval script
+                # if global_step % args.eval_steps == 0:
+                #     if worker_index == 0:
+                #         for step, batch in enumerate(eval_data_loader):
+                #             loss_return = exe.run(test_program, feed=batch, fetch_list=[loss.name])
 
                 if global_step % args.save_steps == 0:
                     if worker_index == 0:

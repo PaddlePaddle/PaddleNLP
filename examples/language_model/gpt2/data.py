@@ -156,13 +156,13 @@ def _build_shuffle_idx(num_samples, total_size, np_rng):
 
     shuffle_idx_first = np.arange(
         start=0, stop=num_samples, step=1, dtype=dtype_)
-    np_rng.shuffle(shuffle_idx_first)
+    # np_rng.shuffle(shuffle_idx_first)
     if num_samples == total_size:
         return shuffle_idx_first
 
     shuffle_idx_last = np.arange(
         start=num_samples, stop=total_size, step=1, dtype=dtype_)
-    np_rng.shuffle(shuffle_idx_last)
+    # np_rng.shuffle(shuffle_idx_last)
 
     return np.concatenate((shuffle_idx_first, shuffle_idx_last))
 
