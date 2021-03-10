@@ -42,9 +42,11 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 def do_predict(args):
     device = paddle.set_device(args.device)
 
-    test_loader, vocab, pad_id, bos_id, eos_id = create_infer_loader(
-        args.batch_size)
+    test_loader, vocab = create_infer_loader(args.batch_size)
     vocab_size = len(vocab)
+    pad_id = vocab[vocab.eos_token]
+    bos_id = vocab[vocab.bos_token]
+    eos_id = vocab[vocab.eos_token]
     trg_idx2word = vocab.idx_to_token
 
     model = paddle.Model(

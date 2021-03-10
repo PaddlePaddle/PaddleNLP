@@ -25,8 +25,14 @@ from paddlenlp.datasets import load_dataset
 
 
 def convert_example(example, vocab):
-    source = vocab.to_indices(example['first'].split('\x02'))
-    target = vocab.to_indices(example['second'].split('\x02'))
+    pad_id = vocab[vocab.eos_token]
+    bos_id = vocab[vocab.bos_token]
+    eos_id = vocab[vocab.eos_token]
+
+    source = [bos_id] + vocab.to_indices(example['first'].split(
+        '\x02')) + [eos_id]
+    target = [bos_id] + vocab.to_indices(example['second'].split(
+        '\x02')) + [eos_id]
     return source, target
 
 
@@ -34,7 +40,6 @@ def create_train_loader(batch_size=128):
     train_ds = load_dataset('couplet', splits='train')
     vocab = Vocab.load_vocabulary(**train_ds.vocab_info)
     pad_id = vocab[vocab.eos_token]
-
     trans_func = partial(convert_example, vocab=vocab)
     train_ds = train_ds.map(trans_func, lazy=False)
     train_batch_sampler = SamplerHelper(train_ds).shuffle().batch(
@@ -45,15 +50,13 @@ def create_train_loader(batch_size=128):
         batch_sampler=train_batch_sampler,
         collate_fn=partial(
             prepare_input, pad_id=pad_id))
-    return train_loader, len(vocab), pad_id
+    return train_loader, vocab
 
 
 def create_infer_loader(batch_size=128):
     test_ds = load_dataset('couplet', splits='test')
     vocab = Vocab.load_vocabulary(**test_ds.vocab_info)
     pad_id = vocab[vocab.eos_token]
-    bos_id = vocab[vocab.bos_token]
-    eos_id = vocab[vocab.eos_token]
     trans_func = partial(convert_example, vocab=vocab)
     test_ds = test_ds.map(trans_func, lazy=False)
     test_batch_sampler = SamplerHelper(test_ds).batch(batch_size=batch_size)
@@ -63,7 +66,7 @@ def create_infer_loader(batch_size=128):
         batch_sampler=test_batch_sampler,
         collate_fn=partial(
             prepare_input, pad_id=pad_id))
-    return test_loader, vocab, pad_id, bos_id, eos_id
+    return test_loader, vocab
 
 
 def prepare_input(insts, pad_id):
