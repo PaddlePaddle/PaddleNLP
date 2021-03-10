@@ -15,11 +15,12 @@
 import io
 from args import parse_args
 
-from data import create_infer_loader, CoupletDataset
-from model import Seq2SeqAttnInferModel
-
 import numpy as np
 import paddle
+from paddlenlp.data import Vocab
+
+from data import create_infer_loader
+from model import Seq2SeqAttnInferModel
 
 
 def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
@@ -39,11 +40,13 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 
 
 def do_predict(args):
-    device = paddle.set_device("gpu" if args.use_gpu else "cpu")
+    device = paddle.set_device(args.device)
 
-    test_loader, vocab_size, pad_id, bos_id, eos_id = create_infer_loader(
-        args.batch_size)
-    vocab, _ = CoupletDataset.get_vocab()
+    test_loader, vocab = create_infer_loader(args.batch_size)
+    vocab_size = len(vocab)
+    pad_id = vocab[vocab.eos_token]
+    bos_id = vocab[vocab.bos_token]
+    eos_id = vocab[vocab.eos_token]
     trg_idx2word = vocab.idx_to_token
 
     model = paddle.Model(
