@@ -36,8 +36,23 @@ GLUE评测任务所含数据集已在paddlenlp中以API形式提供，无需预�
 以GLUE中的SST-2任务为例，启动Fine-tuning的方式如下：
 
 ```shell
+# 单机单卡运行
 # 设置当前使用设备，如第0号卡
 export CUDA_VISIBLE_DEVICES=0
+python ./run_glue.py \
+    --model_name_or_path xlnet-base-cased \
+    --task_name SST-2 \
+    --max_seq_length 128 \
+    --batch_size 32 \
+    --learning_rate 2e-5 \
+    --num_train_epochs 3 \
+    --logging_steps 100 \
+    --save_steps 500 \
+    --output_dir ./tmp/
+
+# 单机多卡运行
+# 设置当前使用设备，如第0号卡和第1号卡
+export CUDA_VISIBLE_DEVICES=0,1
 python -m paddle.distributed.launch ./run_glue.py \
     --model_name_or_path xlnet-base-cased \
     --task_name SST-2 \
