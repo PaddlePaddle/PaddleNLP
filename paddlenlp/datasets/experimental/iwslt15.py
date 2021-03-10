@@ -63,20 +63,20 @@ class IWSLT15(DatasetBuilder):
         tgt_fullname = os.path.join(default_root, tgt_filename)
 
         src_vocab_filename, src_vocab_hash, tgt_vocab_filename, tgt_vocab_hash = self.VOCAB_INFO
-        src_vacab_fullname = os.path.join(default_root, src_vocab_filename)
-        tgt_vacab_fullname = os.path.join(default_root, tgt_vocab_filename)
+        src_vocab_fullname = os.path.join(default_root, src_vocab_filename)
+        tgt_vocab_fullname = os.path.join(default_root, tgt_vocab_filename)
 
         if (not os.path.exists(src_fullname) or
             (src_data_hash and not md5file(src_fullname) == src_data_hash)) or (
                 not os.path.exists(tgt_fullname) or
                 (tgt_data_hash and
                  not md5file(tgt_fullname) == tgt_data_hash)) or (
-                     not os.path.exists(src_vacab_fullname) or
+                     not os.path.exists(src_vocab_fullname) or
                      (src_vocab_hash and
-                      not md5file(src_vacab_fullname) == src_vocab_hash)) or (
-                          not os.path.exists(tgt_vacab_fullname) or
+                      not md5file(src_vocab_fullname) == src_vocab_hash)) or (
+                          not os.path.exists(tgt_vocab_fullname) or
                           (tgt_vocab_hash and
-                           not md5file(tgt_vacab_fullname) == tgt_vocab_hash)):
+                           not md5file(tgt_vocab_fullname) == tgt_vocab_hash)):
             get_path_from_url(self.URL, default_root, self.MD5)
 
         return src_fullname, tgt_fullname
@@ -93,21 +93,21 @@ class IWSLT15(DatasetBuilder):
                     yield {"en": src_line, "vi": tgt_line}
 
     def get_vocab(self):
-        en_vacab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
+        en_vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
                                          self.VOCAB_INFO[0])
-        vi_vacab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
+        vi_vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
                                          self.VOCAB_INFO[1])
 
         # Construct vocab_info to match the form of the input of `Vocab.load_vocabulary()` function
         vocab_info = {
             'en': {
-                'filepath': en_vacab_fullname,
+                'filepath': en_vocab_fullname,
                 'unk_token': self.UNK_TOKEN,
                 'bos_token': self.BOS_TOKEN,
                 'eos_token': self.EOS_TOKEN
             },
             'vi': {
-                'filepath': vi_vacab_fullname,
+                'filepath': vi_vocab_fullname,
                 'unk_token': self.UNK_TOKEN,
                 'bos_token': self.BOS_TOKEN,
                 'eos_token': self.EOS_TOKEN

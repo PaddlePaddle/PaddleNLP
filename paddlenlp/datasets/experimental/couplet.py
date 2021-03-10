@@ -66,16 +66,16 @@ class Couplet(DatasetBuilder):
         tgt_fullname = os.path.join(default_root, tgt_filename)
 
         vocab_filename, vocab_hash = self.VOCAB_INFO
-        vacab_fullname = os.path.join(default_root, vocab_filename)
+        vocab_fullname = os.path.join(default_root, vocab_filename)
 
         if (not os.path.exists(src_fullname) or
             (src_data_hash and not md5file(src_fullname) == src_data_hash)) or (
                 not os.path.exists(tgt_fullname) or
                 (tgt_data_hash and
                  not md5file(tgt_fullname) == tgt_data_hash)) or (
-                     not os.path.exists(vacab_fullname) or
+                     not os.path.exists(vocab_fullname) or
                      (vocab_hash and
-                      not md5file(vacab_fullname) == vocab_hash)):
+                      not md5file(vocab_fullname) == vocab_hash)):
             get_path_from_url(self.URL, default_root, self.MD5)
 
         return src_fullname, tgt_fullname
@@ -92,12 +92,12 @@ class Couplet(DatasetBuilder):
                     yield {"first": src_line, "second": tgt_line}
 
     def get_vocab(self):
-        vacab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
+        vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
                                       self.VOCAB_INFO[0])
 
         # Construct vocab_info to match the form of the input of `Vocab.load_vocabulary()` function
         vocab_info = {
-            'filepath': vacab_fullname,
+            'filepath': vocab_fullname,
             'unk_token': self.UNK_TOKEN,
             'bos_token': self.BOS_TOKEN,
             'eos_token': self.EOS_TOKEN
