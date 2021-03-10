@@ -23,6 +23,13 @@ Sequence to Sequence (Seq2Seq)，使用编码器-解码器（Encoder-Decoder）�
 
 本模型中，在编码器方面，我们采用了基于LSTM的多层的RNN encoder；在解码器方面，我们使用了带注意力（Attention）机制的RNN decoder，在预测时我们使用Beam Search算法来生对联的下联。
 
+## 环境要求
+运行本目录下的范例模型需要安装PaddlePaddle 2.0及以上版本。如果您的 PaddlePaddle 安装版本低于此要求，请按照[安装文档](https://www.paddlepaddle.org.cn/#quick-start)中的说明更新 PaddlePaddle 安装版本。
+另外，本项目还依赖paddlenlp，可以使用下面的命令进行安装：
+
+```shell
+pip install paddlenlp\>=2.0rc
+```
 
 ## 数据介绍
 
