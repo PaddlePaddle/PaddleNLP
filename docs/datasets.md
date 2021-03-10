@@ -49,6 +49,12 @@ PaddleNLP提供了
 | ----  | --------- | ------ |
 |  [CNN/DM](https://github.com/harvardnlp/sent-summary) | 美国有线新闻网络与每日邮报新闻文本摘要数据集| `paddlenlp.datasets.CnnDm`|
 
+## 文本生成
+
+| 数据集名称  | 简介 | 调用方法 |
+| ----  | --------- | ------ |
+|  [Poetry](https://github.com/chinese-poetry/chinese-poetry) | 中文诗歌古典文集数据| `paddlenlp.datasets.Poetry`|
+
 ## 时序预测
 
 | 数据集名称  | 简介 | 调用方法 |

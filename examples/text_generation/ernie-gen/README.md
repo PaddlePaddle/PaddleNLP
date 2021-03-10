@@ -134,4 +134,4 @@ python -u ./predict.py \
 
 ## 参考
 
-[couplet-clean-dataset数据集](https://github.com/v-zich/couplet-clean-dataset)
+[chinese-poetry数据集](https://github.com/chinese-poetry/chinese-poetry)
