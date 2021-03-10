@@ -34,7 +34,7 @@ PaddleNLP提供了
 |  ----  | --------- | ------ |
 |  [Conll05](https://www.cs.upc.edu/~srlconll/spec.html) | 语义角色标注数据集| `paddle.text.datasets.Conll05st`|
 |  [MSRA_NER](https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra) | MSRA 命名实体识别数据集| `paddlenlp.datasets.MSRA_NER`|
-|  [Express_Ner](https://aistudio.baidu.com/aistudio/projectdetail/131360?channelType=0&channel=-1) | 快递单命名实体识别数据集| [express_ner](../examples/named_entity_recognition/express_ner/data)|
+|  [ExpressNer](https://aistudio.baidu.com/aistudio/projectdetail/131360?channelType=0&channel=-1) | 快递单信息抽取数据集 | [waybill_ie](../examples/information_extraction/waybill_ie/data/)|
 
 ## 机器翻译
 
@@ -53,7 +53,7 @@ PaddleNLP提供了
 
 | 数据集名称  | 简介 | 调用方法 |
 | ----  | --------- | ------ |
-|  [CSSE COVID-19](https://github.com/CSSEGISandData/COVID-19) |约翰·霍普金斯大学系统科学与工程中心新冠病例数据 | [time_series](../examples/time_series)|
+|  [CSSE COVID-19](https://github.com/CSSEGISandData/COVID-19) |约翰·霍普金斯大学系统科学与工程中心新冠病例数据 | [time_series](../examples/time_series/tcn)|
 |  [UCIHousing](https://archive.ics.uci.edu/ml/datasets/Housing) | 波士顿房价预测数据集 | `paddle.text.datasets.UCIHousing`|
 
 ## 语料库

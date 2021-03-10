@@ -1,6 +1,7 @@
 # ELMo
 
 ## 模型简介
+
 ELMo(Embeddings from Language Models)是重要的通用语义表示模型之一，以双向LSTM为网络基本组件，以Language Model为训练目标，通过预训练得到通用的语义表示，ELMo能够学习到复杂的特征，比如语法、语义，并且能够学习在不同上下文情况下的词汇多义性。将ELMo得到的语义表示作为Feature迁移到下游NLP任务中，会显著提升下游任务的模型性能，比如问答、文本蕴含和情感分析等。ELMo模型的细节可以[参阅论文](https://arxiv.org/abs/1802.05365)。
 
 本项目是ELMo在Paddle上的开源实现, 基于1 Billion Word Language Model Benchmark进行预训练，并接入了简单的下游任务作为示例程序。
@@ -117,3 +118,7 @@ python example.py --init_from_ckpt='./checkpoints/10000'
 ```
 
 **NOTE:** 可以通过构建模型时的trainable参数设置ELMo参与或不参与下游任务的训练。另外，预训练的ELMo也可以作为文本词向量编码器单独使用，即输入文本内容，输出每个词对应的词向量。ELMo接入下游任务的具体用法请参考`example.py`中示例`example_of_using_ELMo_as_finetune()`和`example_of_using_ELMo_as_embedder()`。
+
+## Reference
+
+- [Deep contextualized word representations](https://arxiv.org/abs/1802.05365)

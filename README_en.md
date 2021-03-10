@@ -42,9 +42,9 @@ pip install paddlenlp>=2.0.0rc
 ### Quick Dataset Loading
 
 ```python
-from paddlenlp.datasets import ChnSentiCorp
+from paddlenlp.datasets import load_dataset
 
-train_ds, test_ds = ChnSentiCorp.get_datasets(['train','test'])
+train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
 ```
 
 ### Chinese Text Emebdding Loading
@@ -75,19 +75,35 @@ gpt2 = GPT2ForPretraining.from_pretrained('gpt2-base-cn')
 
 For more pretrained model selection, please refer to [Pretrained-Models](./docs/transformers.md)
 
+### 便捷获取文本特征
+
+```python
+import paddle
+from paddlenlp.transformers import ErnieTokenizer, ErnieModel
+
+tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+model = ErnieModel.from_pretrained('ernie-1.0')
+
+text = tokenizer('自然语言处理')
+pooled_output, sequence_output = model.forward(input_ids=paddle.to_tensor([text['input_ids']]))
+```
+
 ## Model Zoo and Applications
 
-- [Word Embedding](./examples/word_embedding/README.md)
-- [Lexical Analysis](./examples/lexical_analysis/README.md)
-- [Language Model](./examples/language_model)
-- [Text Classification](./examples/text_classification/README.md)
-- [Text Generation](./examples/text_generation/README.md)
-- [Semantic Matching](./examples/text_matching/README.md)
-- [Named Entity Recognition](./examples/named_entity_recognition/README.md)
-- [Text Graph](./examples/text_graph/README.md)
-- [General Dialogue](./examples/dialogue)
-- [Machine Translation](./exmaples/machine_translation)
-- [Question Answering](./exmaples/machine_reading_comprehension)
+For model zoo introduction please refer to[PaddleNLP Model Zoo](./docs/model_zoo.md). As for applicaiton senario please refer to [PaddleNLP Examples](./examples/)。
+
+- [Word Embedding](./examples/word_embedding/)
+- [Lexical Analysis](./examples/lexical_analysis/)
+- [Name Entity Recognition](./examples/information_extraction/msra_ner/)
+- [Language Model](./examples/language_model/)
+- [Text Classification](./examples/text_classification/)
+- [Text Gneeration](./examples/text_generation/)
+- [Semantic Maching](./examples/text_matching/)
+- [Text Graph](./examples/text_graph/erniesage/)
+- [Information Extraction](./examples/information_extraction/)
+- [General Dialogue](./examples/dialogue/)
+- [Machine Translation](./examples/machine_translation/)
+- [Machine Readeng Comprehension](./examples/machine_reading_comprehension/)
 
 ## Advanced Application
 
@@ -113,6 +129,8 @@ Please refer to our official AI Studio account for more interactive tutorials: [
 * [Waybill Information Extraction with BiGRU-CRF Model](https://aistudio.baidu.com/aistudio/projectdetail/1317771) shows how to make use of Bi-GRU plus CRF to finish information extraction task.
 
 * [Waybill Information Extraction with ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/1329361) shows how to use ERNIE, the Chinese pre-trained model improve information extraction performance.
+  
+* [Use TCN Model to predict COVID-19 confirmed cases](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
 
 
 ## Community
