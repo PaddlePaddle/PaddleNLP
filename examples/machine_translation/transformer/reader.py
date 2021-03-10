@@ -35,17 +35,7 @@ def min_max_filer(data, max_len, min_len=0):
 
 
 def create_data_loader(args):
-    data_files = None
-    if args.root != "None" and os.path.exists(args.root):
-        data_files = {
-            'train': (os.path.join(args.root, "train.tok.clean.bpe.33708.en"),
-                      os.path.join(args.root, "train.tok.clean.bpe.33708.de")),
-            'dev': (os.path.join(args.root, "newstest2013.tok.bpe.33708.en"),
-                    os.path.join(args.root, "newstest2013.tok.bpe.33708.de"))
-        }
-
-    datasets = load_dataset(
-        'wmt14ende', data_files=data_files, splits=('train', 'dev'))
+    datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
     src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["all"])
     trg_vocab = src_vocab
 
@@ -97,14 +87,7 @@ def create_data_loader(args):
 
 
 def create_infer_loader(args):
-    data_files = None
-    if args.root != "None" and os.path.exists(args.root):
-        data_files = {
-            'test': (os.path.join(args.root, "newstest2014.tok.bpe.33708.en"),
-                     os.path.join(args.root, "newstest2014.tok.bpe.33708.de"))
-        }
-
-    dataset = load_dataset('wmt14ende', data_files=data_files, splits=('test'))
+    dataset = load_dataset('wmt14ende', splits=('test'))
     src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["all"])
     trg_vocab = src_vocab
 
