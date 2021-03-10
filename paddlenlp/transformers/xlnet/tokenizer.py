@@ -14,7 +14,6 @@
 # limitations under the License.
 """ Tokenization classes for XLNet model."""
 
-
 import os
 import unicodedata
 from shutil import copyfile
@@ -43,9 +42,15 @@ class XLNetTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "xlnet-base-cased":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-base-cased-spiece.model",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-base-cased-spiece.model",
             "xlnet-large-cased":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-large-cased-spiece.model",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-large-cased-spiece.model",
+            "chinese-xlnet-base":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-base-spiece.model",
+            "chinese-xlnet-mid":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-mid-spiece.model",
+            "chinese-xlnet-large":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-large-spiece.model",
         }
     }
     pretrained_init_configuration = {
@@ -55,30 +60,41 @@ class XLNetTokenizer(PretrainedTokenizer):
         "xlnet-large-cased": {
             "do_lower_case": False
         },
+        "chinese-xlnet-base": {
+            "do_lower_case": False
+        },
+        "chinese-xlnet-mid": {
+            "do_lower_case": False
+        },
+        "chinese-xlnet-large": {
+            "do_lower_case": False
+        },
     }
     pretrained_positional_embedding_sizes = {
         "xlnet-base-cased": None,
         "xlnet-large-cased": None,
+        "chinese-xlnet-base": None,
+        "chinese-xlnet-mid": None,
+        "chinese-xlnet-large": None,
     }
     max_model_input_sizes = pretrained_positional_embedding_sizes
     padding_side = "left"
     pad_token_type_id = 3
 
     def __init__(
-        self,
-        vocab_file,
-        do_lower_case=False,
-        remove_space=True,
-        keep_accents=False,
-        bos_token="<s>",
-        eos_token="</s>",
-        unk_token="<unk>",
-        sep_token="<sep>",
-        pad_token="<pad>",
-        cls_token="<cls>",
-        mask_token="<mask>",
-        additional_special_tokens=["<eop>", "<eod>"],
-    ):
+            self,
+            vocab_file,
+            do_lower_case=False,
+            remove_space=True,
+            keep_accents=False,
+            bos_token="<s>",
+            eos_token="</s>",
+            unk_token="<unk>",
+            sep_token="<sep>",
+            pad_token="<pad>",
+            cls_token="<cls>",
+            mask_token="<mask>",
+            additional_special_tokens=["<eop>", "<eod>"], ):
 
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
@@ -93,7 +109,10 @@ class XLNetTokenizer(PretrainedTokenizer):
         return len(self.sp_model)
 
     def get_vocab(self):
-        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
+        vocab = {
+            self.convert_ids_to_tokens(i): i
+            for i in range(self.vocab_size)
+        }
         vocab.update(self.added_tokens_encoder)
         return vocab
 
@@ -117,7 +136,8 @@ class XLNetTokenizer(PretrainedTokenizer):
 
         if not self.keep_accents:
             outputs = unicodedata.normalize("NFKD", outputs)
-            outputs = "".join([c for c in outputs if not unicodedata.combining(c)])
+            outputs = "".join(
+                [c for c in outputs if not unicodedata.combining(c)])
         if self.do_lower_case:
             outputs = outputs.lower()
 
@@ -134,8 +154,10 @@ class XLNetTokenizer(PretrainedTokenizer):
         new_pieces = []
         for piece in pieces:
             if len(piece) > 1 and piece[-1] == str(",") and piece[-2].isdigit():
-                cur_pieces = self.sp_model.EncodeAsPieces(piece[:-1].replace(SPIECE_UNDERLINE, ""))
-                if piece[0] != SPIECE_UNDERLINE and cur_pieces[0][0] == SPIECE_UNDERLINE:
+                cur_pieces = self.sp_model.EncodeAsPieces(piece[:-1].replace(
+                    SPIECE_UNDERLINE, ""))
+                if piece[0] != SPIECE_UNDERLINE and cur_pieces[0][
+                        0] == SPIECE_UNDERLINE:
                     if len(cur_pieces[0]) == 1:
                         cur_pieces = cur_pieces[1:]
                     else:
@@ -176,7 +198,10 @@ class XLNetTokenizer(PretrainedTokenizer):
             return self._convert_id_to_token(ids)
         tokens = [self._convert_id_to_token(_id) for _id in ids]
         if skip_special_tokens:
-            return [token for token in tokens if token not in self.all_special_tokens]
+            return [
+                token for token in tokens
+                if token not in self.all_special_tokens
+            ]
         return tokens
 
     def convert_tokens_to_string(self, tokens):
@@ -201,11 +226,13 @@ class XLNetTokenizer(PretrainedTokenizer):
         """
         token_ids_0 = []
         token_ids_1 = []
-        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
+        return len(
+            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
+                                                  if pair else None))
 
     def build_inputs_with_special_tokens(
-        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
-    ) -> List[int]:
+            self, token_ids_0: List[int],
+            token_ids_1: Optional[List[int]]=None) -> List[int]:
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens. An XLNet sequence has the following format:
@@ -251,11 +278,15 @@ class XLNetTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return offset_mapping_0 + [(0, 0)] + [(0, 0)]
 
-        return offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)] + [(0, 0)]
+        return offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)] + [
+            (0, 0)
+        ]
 
     def get_special_tokens_mask(
-        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None, already_has_special_tokens: bool = False
-    ) -> List[int]:
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]]=None,
+            already_has_special_tokens: bool=False) -> List[int]:
         """
         Retrieve sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer ``prepare_for_model`` method.
@@ -278,15 +309,18 @@ class XLNetTokenizer(PretrainedTokenizer):
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
+            return list(
+                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                    token_ids_0))
 
         if token_ids_1 is not None:
-            return ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1, 1]
+            return ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)
+                                                     ) + [1, 1]
         return ([0] * len(token_ids_0)) + [1, 1]
 
     def create_token_type_ids_from_sequences(
-        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
-    ) -> List[int]:
+            self, token_ids_0: List[int],
+            token_ids_1: Optional[List[int]]=None) -> List[int]:
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task. An XLNet
         sequence pair mask has the following format:
@@ -313,7 +347,8 @@ class XLNetTokenizer(PretrainedTokenizer):
 
         if token_ids_1 is None:
             return len(token_ids_0 + sep) * [0] + cls_segment_id
-        return len(token_ids_0 + sep) * [0] + len(token_ids_1 + sep) * [1] + cls_segment_id
+        return len(token_ids_0 + sep) * [0] + len(token_ids_1 +
+                                                  sep) * [1] + cls_segment_id
 
     def save_resources(self, save_directory):
         """

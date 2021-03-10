@@ -136,7 +136,8 @@ def main():
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     test_ds = load_dataset('glue', args.task_name, splits="test")
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(
+        os.path.dirname(args.model_path))
 
     trans_func = partial(
         convert_example,

@@ -32,6 +32,7 @@ PaddleNLP提供了丰富的模型结构，包含经典的RNN类模型结构，�
 | [ERNIESage](../examples/text_graph/erniesage)| ERNIESage(ERNIE SAmple aggreGatE) 通过Graph(图)来构建自身节点和邻居节点的连接关系，将自身节点和邻居节点的关系构建成一个关联样本输入到ERNIE中，ERNIE作为聚合函数 (Aggregators) 来表征自身节点和邻居节点的语义关系，最终强化图中节点的语义表示。|
 | [GPT-2](../examples/language_model/gpt2) |[Language Models are Unsupervised Multitask Learners](https://d4mucfpksywv.cloudfront.net/better-language-models/language-models.pdf)   |
 | [ELECTRA](../examples/language_model/electra/) | [ELECTRA: Pre-training Text Encoders as Discriminators Rather Than Generators](https://arxiv.org/abs/2003.10555)   |
+| [XLNet](../examples/language_model/xlnet/) | [XLNet: Generalized Autoregressive Pretraining for Language Understanding](https://arxiv.org/abs/1906.08237)   |
 | [RoBERTa](../examples/text_classification/pretrained_models) | [RoBERTa: A Robustly Optimized BERT Pretraining Approach](https://arxiv.org/abs/1907.11692)   |
 | [PLATO-2](../examples/dialogue/plato-2) | 百度自研领先的开放域对话预训练模型 [PLATO-2: Towards Building an Open-Domain Chatbot via Curriculum Learning](https://arxiv.org/abs/2006.16779) |
 | [SentenceBERT](../examples/text_matching/sentence_transformers)| [Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks](https://arxiv.org/abs/1908.10084) |

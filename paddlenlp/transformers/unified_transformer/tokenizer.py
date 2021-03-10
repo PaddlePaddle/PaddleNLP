@@ -367,7 +367,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
     @staticmethod
     def read_file(filepath):
         token_to_idx = {}
-        with open(filepath, 'r') as f:
+        with open(filepath, 'r', encoding='utf-8') as f:
             for num, line in enumerate(f):
                 items = convert_to_unicode(line.rstrip()).split("\t")
                 if len(items) > 2:
