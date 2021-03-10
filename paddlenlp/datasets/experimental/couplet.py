@@ -26,7 +26,11 @@ __all__ = ['Couplet']
 
 
 class Couplet(DatasetBuilder):
-
+    """
+    Couplet dataset. The couplet data is from this github repository:
+    https://github.com/v-zich/couplet-clean-dataset, which filters dirty data
+    from the original repository https://github.com/wb14123/couplet-dataset.
+    """
     URL = "https://paddlenlp.bj.bcebos.com/datasets/couplet.tar.gz"
     META_INFO = collections.namedtuple('META_INFO', ('src_file', 'tgt_file',
                                                      'src_md5', 'tgt_md5'))
@@ -91,7 +95,7 @@ class Couplet(DatasetBuilder):
         vacab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
                                       self.VOCAB_INFO[0])
 
-        # Constract vocab_info to match the form of the input of `Vocab.load_vocabulary()` function
+        # Construct vocab_info to match the form of the input of `Vocab.load_vocabulary()` function
         vocab_info = {
             'filepath': vacab_fullname,
             'unk_token': self.UNK_TOKEN,

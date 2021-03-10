@@ -26,7 +26,7 @@ Sequence to Sequence (Seq2Seq)，使用编码器-解码器（Encoder-Decoder）�
 
 ## 数据介绍
 
-本教程使用[couplet数据集](https://paddlenlp.bj.bcebos.com/datasets/couplet.tar.gz)作为训练语料，其中train_src.tsv及train_tgt.tsv为训练集，dev_src.tsv及dev_tgt.tsv为开发集，test_src.tsv及test_tgt.tsv为测试集。
+本教程使用[couplet数据集](https://paddlenlp.bj.bcebos.com/datasets/couplet.tar.gz)作为训练语料，该数据集来源于[这个github repo](https://github.com/v-zich/couplet-clean-dataset)，其中train_src.tsv及train_tgt.tsv为训练集，dev_src.tsv及dev_tgt.tsv为开发集，test_src.tsv及test_tgt.tsv为测试集。
 
 数据集会在`CoupletDataset`初始化时自动下载，如果用户在初始化数据集时没有提供路径，在linux系统下，数据集会自动下载到`~/.paddlenlp/datasets/Couplet/`目录下
 
@@ -87,3 +87,7 @@ python predict.py \
 上联：月半举杯圆月下        下联：花间对酒醉花间
 
 上联：挥笔如剑倚麓山豪气干云揽月去       下联：落笔似龙飞沧海龙吟破浪乘风来
+
+## 参考的开源数据集
+
+我们的数据集采用了开源对联数据集[couplet-clean-dataset](https://github.com/v-zich/couplet-clean-dataset)，地址：https://github.com/v-zich/couplet-clean-dataset ，该数据集过滤了[couplet-dataset](https://github.com/wb14123/couplet-dataset)（地址：https://github.com/wb14123/couplet-dataset ）中的低俗、敏感内容。
