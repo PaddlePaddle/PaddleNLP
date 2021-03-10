@@ -40,7 +40,7 @@ def create_data_loader(args, places=None, use_all_vocab=False):
 
     datasets = load_dataset(
         'wmt14', splits=('train', 'dev'), use_all_vocab=use_all_vocab)
-    src_vocab = Vocab.load_vocabulary(datasets[0].vocab_info["vocab"])
+    src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["vocab"])
     trg_vocab = src_vocab
 
     padding_vocab = (
@@ -99,7 +99,7 @@ def create_infer_loader(args, use_all_vocab=False):
 
     dataset = load_dataset(
         'wmt14', splits=('test'), use_all_vocab=use_all_vocab)
-    src_vocab = Vocab.load_vocabulary(dataset.vocab_info["vocab"])
+    src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["vocab"])
     trg_vocab = src_vocab
 
     padding_vocab = (

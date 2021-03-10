@@ -121,7 +121,7 @@ class WMT14ende(DatasetBuilder):
             vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
                                           self.VOCAB_INFO[1][0])
 
-        # Constract vocab_info to match the form of the input of `Vocab.load_vocabulary()` function
+        # Construct vocab_info to match the form of the input of `Vocab.load_vocabulary()` function
         vocab_info = {
             'vocab': {
                 'filepath': vocab_fullname,
