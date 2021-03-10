@@ -61,7 +61,7 @@ python -u ./train.py \
 ```
 
 参数释义如下：
-- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaadleNLP transformer类预训练模型](https://github.com/PaddlePaddle/models/blob/develop/PaddleNLP/docs/transformers.md)中的所有模型，但只有`ernie-gen-base-en, ernie-gen-large-en, ernie-gen-large-en-430g`三种模型会加载最后输出层的参数，其余模型只会加载transformer参数作热启动。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer类预训练模型](../../../docs/transformers.md)中的所有模型，但只有`ernie-gen-base-en, ernie-gen-large-en, ernie-gen-large-en-430g`三种模型会加载最后输出层的参数，其余模型只会加载transformer参数作热启动。若模型相关内容保存在本地，这里也可以提供相应目录地址。
 - `max_encode_len` 表示最大输入句子长度，超过该长度将被截断。
 - `max_decode_len` 表示最大输出句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
@@ -90,7 +90,7 @@ python -u ./eval.py \
 ```
 
 参数释义如下：
-- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaadleNLP transformer类预训练模型](https://github.com/PaddlePaddle/models/blob/develop/PaddleNLP/docs/transformers.md)中的所有模型，但只有`ernie-gen-base-en, ernie-gen-large-en, ernie-gen-large-en-430g`三种模型会加载最后输出层的参数，其余模型只会加载transformer参数作热启动。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer类预训练模型](../../../docs/transformers.md)中的所有模型，但只有`ernie-gen-base-en, ernie-gen-large-en, ernie-gen-large-en-430g`三种模型会加载最后输出层的参数，其余模型只会加载transformer参数作热启动。若模型相关内容保存在本地，这里也可以提供相应目录地址。
 - `max_encode_len` 表示最大输入句子长度，超过该长度将被截断。
 - `max_decode_len` 表示最大输出句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
@@ -112,7 +112,7 @@ python -u ./predict.py \
 ```
 
 
-## 引用
+## Citation
 
 您可以按下面的格式引用ERNIE-Gen论文:
 
@@ -132,6 +132,6 @@ python -u ./predict.py \
 * [使用PaddleNLP预训练模型ERNIE-GEN生成诗歌](https://aistudio.baidu.com/aistudio/projectdetail/1339888)
 
 
-## 参考
+## Acknowledgement
 
-[couplet-clean-dataset数据集](https://github.com/v-zich/couplet-clean-dataset)
+- 感谢[couplet-clean-dataset数据集](https://github.com/v-zich/couplet-clean-dataset)开放的对联数据集

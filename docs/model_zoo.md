@@ -25,7 +25,7 @@ PaddleNLP提供了丰富的模型结构，包含经典的RNN类模型结构，�
 | ------ | ------ |
 | [Transformer](../examples/machine_translation/transformer/) | [Attention Is All You Need](https://arxiv.org/abs/1706.03762)     |
 | [Transformer-XL](../examples/language_model/transformer-xl/) | [Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context](https://arxiv.org/abs/1901.02860)     |
-| [BERT](../examples/language_model/bert/) |[BERT(Bidirectional Encoder Representation from Transformers)](./examples/language_model/bert)      |
+| [BERT](../examples/language_model/bert/) | [BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding](https://arxiv.org/abs/1810.04805)      |
 | [ERNIE](../examples/text_classification/pretrained_models) | [ERNIE: Enhanced Representation through Knowledge Integration](https://arxiv.org/abs/1904.09223)   |
 | [ERNIE-Tiny](../examples/text_classification/pretrained_models) | 百度自研的小型化ERNIE网络结构，采用浅层Transformer，加宽隐层参数，中文subword粒度词表结合蒸馏的方法使模型相比SOTA Before BERT 提升8.35%， 速度提升4.3倍。 |
 | [ERNIE-GEN](../examples/text_generation/ernie-gen) | [ERNIE-GEN: An Enhanced Multi-Flow Pre-training and Fine-tuning Framework for Natural Language Generation](https://arxiv.org/abs/2001.11314) ERNIE-GEN是百度发布的生成式预训练模型，通过Global-Attention的方式解决训练和预测曝光偏差的问题，同时使用Multi-Flow Attention机制来分别进行Global和Context信息的交互，同时通过片段生成的方式来增加语义相关性。    |

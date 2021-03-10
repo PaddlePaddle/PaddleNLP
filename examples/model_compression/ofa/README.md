@@ -46,7 +46,7 @@ python -u ./run_glue.py \
     --output_dir ./tmp/$TASK_NAME/ \
     --n_gpu 1 \
 ```
-参数详细含义参考[README.md](../../glue)
+参数详细含义参考[README.md](../../benchmark/glue/README.md)
 Fine-tuning 在dev上的结果如压缩结果表格中Result那一列所示。
 
 ### 环境配置

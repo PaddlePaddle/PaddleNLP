@@ -2,7 +2,7 @@
 
 ## 模型简介
 
-[XLNet](https://arxiv.org/abs/1906.08237) （XLNet: Generalized Autoregressive Pretraining for Language Understanding） 是一款无监督的自回归预训练语言模型。 有别于传统的单向自回归模型，XLNet通过最大化输入序列所有排列的期望来进行语言建模，这使得它可以同时关注到上下文的信息。 另外，XLNet在预训练阶段集成了 [Transformer-XL](https://arxiv.org/abs/1901.02860) 模型，Transformer-XL中的片段循环机制(Segment Recurrent Mechanism)和 相对位置编码(Relative Positional Encoding)机制能够支持XLNet接受更长的输入序列，这使得XLNet在长文本序列的语言任务上有着优秀的表现。
+[XLNet: Generalized Autoregressive Pretraining for Language Understanding](https://arxiv.org/abs/1906.08237) 是一款无监督的自回归预训练语言模型。 有别于传统的单向自回归模型，XLNet通过最大化输入序列所有排列的期望来进行语言建模，这使得它可以同时关注到上下文的信息。 另外，XLNet在预训练阶段集成了 [Transformer-XL](https://arxiv.org/abs/1901.02860) 模型，Transformer-XL中的片段循环机制(Segment Recurrent Mechanism)和 相对位置编码(Relative Positional Encoding)机制能够支持XLNet接受更长的输入序列，这使得XLNet在长文本序列的语言任务上有着优秀的表现。
 
 本项目是XLNet在 Paddle 2.0上的开源实现，包含了在 [GLUE评测任务](https://gluebenchmark.com/tasks) 上的微调代码。
 
@@ -73,3 +73,8 @@ python -m paddle.distributed.launch ./run_glue.py \
 | QQP   | Accuracy/F1                  |   90.838/87.644    |          
 | MNLI  | Matched acc/MisMatched acc   |   87.468/86.859    |         
 | RTE   | Accuracy                     |      70.036        |
+
+## Reference
+
+- [XLNet: Generalized Autoregressive Pretraining for Language Understanding](https://arxiv.org/abs/1906.08237) 
+- [zihangdai/xlnet](https://github.com/zihangdai/xlnet)
