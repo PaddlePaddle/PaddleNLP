@@ -73,7 +73,7 @@ for input_ids, token_type_ids, labels in train_dataloader:
 用户可以切换表格中的不同模型，来处理相同类型的任务。如对于[预训练模型使用方法](#预训练模型使用方法)中的文本分类任务，用户可以将`BertForSequenceClassification`换成`ErnieForSequenceClassification`, 来寻找更适合的预训练模型。
 
 ## 参考资料：
-- 部分中文预训练模型来自：https://github.com/ymcui/Chinese-BERT-wwm
+- 部分中文预训练模型来自：https://github.com/ymcui/Chinese-BERT-wwm, https://github.com/ymcui/Chinese-XLNet, https://huggingface.co/clue/xlnet_chinese_large
 - Sun, Yu, et al. "Ernie: Enhanced representation through knowledge integration." arXiv preprint arXiv:1904.09223 (2019).
 - Devlin, Jacob, et al. "Bert: Pre-training of deep bidirectional transformers for language understanding." arXiv preprint arXiv:1810.04805 (2018).
 - Cui, Yiming, et al. "Pre-training with whole word masking for chinese bert." arXiv preprint arXiv:1906.08101 (2019).
