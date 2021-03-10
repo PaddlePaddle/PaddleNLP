@@ -118,7 +118,8 @@ def main():
     # Define the tokenizer and dataloader
     tokenizer = BigBirdTokenizer.from_pretrained(args.model_name_or_path)
     global config
-    config = BigBirdModel.pretrained_init_configuration[args.model_name_or_path]
+    config = getattr(model,
+                     BigBirdForSequenceClassification.base_model_prefix).config
     train_data_loader, test_data_loader = \
             create_dataloader(args.batch_size, args.max_encoder_length, tokenizer)
 
@@ -126,18 +127,16 @@ def main():
     optimizer = paddle.optimizer.Adam(
         parameters=model.parameters(),
         learning_rate=args.learning_rate,
-        epsilon=1e-7)
+        epsilon=1e-6)
 
     # Finetune the classification model
-    do_train(model, criterion, metric, optimizer, train_data_loader,
-             test_data_loader)
+    do_train(model, criterion, metric, optimizer, train_data_loader, tokenizer)
 
     # Evaluate the finetune model
     do_evalute(model, criterion, metric, test_data_loader)
 
 
-def do_train(model, criterion, metric, optimizer, train_data_loader,
-             test_data_loader):
+def do_train(model, criterion, metric, optimizer, train_data_loader, tokenizer):
     model.train()
     global_steps = 0
     tic_train = time.time()
@@ -170,6 +169,7 @@ def do_train(model, criterion, metric, optimizer, train_data_loader,
                 model_to_save = model._layers if isinstance(
                     model, paddle.DataParallel) else model
                 model_to_save.save_pretrained(output_dir)
+                tokenizer.save_pretrained(output_dir)
 
             if global_steps >= args.max_steps:
                 return

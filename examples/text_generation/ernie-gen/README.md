@@ -134,4 +134,5 @@ python -u ./predict.py \
 
 ## Acknowledgement
 
-- 感谢[couplet-clean-dataset数据集](https://github.com/v-zich/couplet-clean-dataset)开放的对联数据集
+- 感谢 [chinese-poetry数据集](https://github.com/chinese-poetry/chinese-poetry) 开放的诗歌数据集
+

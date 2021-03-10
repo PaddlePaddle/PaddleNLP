@@ -147,9 +147,15 @@ def do_train(args):
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     # Define the pretrain model and metric
-    model = BigBirdForPretraining(
-        BigBirdModel(**model_class.pretrained_init_configuration[
-            args.model_name_or_path]))
+    pretrained_models_list = list(
+        model_class.pretrained_init_configuration.keys())
+    if args.model_name_or_path in pretrained_models_list:
+        model = BigBirdForPretraining(
+            BigBirdModel(**model_class.pretrained_init_configuration[
+                args.model_name_or_path]))
+    else:
+        model = BigBirdForPretraining.from_pretrained(args.model_name_or_path)
+
     criterion = BigBirdPretrainingCriterion(
         getattr(model,
                 BigBirdForPretraining.base_model_prefix).config["vocab_size"],
@@ -176,8 +182,7 @@ def do_train(args):
 
     # Get bigbird config for generate random attention mask
     global config
-    config = BigBirdModel.pretrained_init_configuration[args.model_name_or_path]
-
+    config = getattr(model, BigBirdForPretraining.base_model_prefix).config
     global_step = 0
     tic_train = time.time()
     for epoch in range(args.epochs):

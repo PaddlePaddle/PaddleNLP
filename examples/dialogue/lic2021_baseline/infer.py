@@ -70,7 +70,7 @@ def infer(model, data_loader, tokenizer):
 
         start_time = time.time()
 
-    with open(args.output_path, 'w') as fout:
+    with open(args.output_path, 'w', encoding='utf-8') as fout:
         for response in responses:
             fout.write(response + '\n')
     print('\nSave inference result into: %s' % args.output_path)

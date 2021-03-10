@@ -10,17 +10,6 @@ from paddle.io import IterableDataset
 from paddlenlp.transformers.tokenizer_utils import convert_to_unicode
 
 
-@contextmanager
-def open_file(filename):
-    """Open file."""
-    if filename.endswith(".gz"):
-        fp = gzip.open(filename, "rt")
-    else:
-        fp = open(filename)
-    yield fp
-    fp.close()
-
-
 class DialogueDataset(IterableDataset):
     def __init__(self,
                  filepattern,
@@ -48,7 +37,7 @@ class DialogueDataset(IterableDataset):
         assert len(self.file_list) > 0, 'There is no files in %s.' % filepattern
 
     def load_file(self, file_path):
-        with open_file(file_path) as fin:
+        with open(file_path, 'r', encoding='utf-8') as fin:
             for i, line in enumerate(fin):
                 cols = convert_to_unicode(line).strip().split(";")
                 cols = list(map(lambda x: list(map(int, x.split(" "))), cols))

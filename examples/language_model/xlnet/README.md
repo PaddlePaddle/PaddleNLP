@@ -19,7 +19,7 @@
    ```shell
    pip install paddlenlp\>=2.0.0rc
    ```
-  
+
 * SentencePiece 安装
    ```shell
    pip install sentencepiece
@@ -63,16 +63,17 @@ python -m paddle.distributed.launch ./run_glue.py \
 
 基于`xlnet-base-cased`在GLUE各评测任务上Fine-tuning后，在验证集上有如下结果：
 
-| Task  | Metric                       | Result             |     
+| Task  | Metric                       | Result             |  
 |:-----:|:----------------------------:|:------------------:|
-| SST-2 | Accuracy                     |      94.266        |     
-| QNLI  | Accuracy                     |      91.708        |         
-| CoLA  | Mattehew's corr              |      50.264        |      
-| MRPC  | F1/Accuracy                  |   91.071/87.745    |     
-| STS-B | Person/Spearman corr         |   86.243/85.973    |      
-| QQP   | Accuracy/F1                  |   90.838/87.644    |          
-| MNLI  | Matched acc/MisMatched acc   |   87.468/86.859    |         
+| SST-2 | Accuracy                     |      94.266        |  
+| QNLI  | Accuracy                     |      91.708        |  
+| CoLA  | Mattehew's corr              |      50.264        |  
+| MRPC  | F1/Accuracy                  |   91.071/87.745    |  
+| STS-B | Person/Spearman corr         |   86.243/85.973    |  
+| QQP   | Accuracy/F1                  |   90.838/87.644    |  
+| MNLI  | Matched acc/MisMatched acc   |   87.468/86.859    |  
 | RTE   | Accuracy                     |      70.036        |
+| WNLI  | Accuracy                     |      56.338        |
 
 ## Reference
 

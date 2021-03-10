@@ -8,16 +8,10 @@
 
 ## 快速开始
 
-### 安装说明
-
-* PaddlePaddle 安装
-
-   本项目依赖于 PaddlePaddle 2.0rc1 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* PaddleNLP 安装
-
-   ```shell
-   pip install paddlenlp>=2.0.0b
+### 环境配置
+- Python >= 3.6
+- paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
+- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp\>=2.0.0rc`
    ```
 
 ### 数据准备
@@ -123,7 +117,7 @@ python -u ./run_glue.py \
 
 其中参数释义如下：
 - `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
-- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。注：`bert-base-uncased`等对应使用的预训练模型转自[huggingface/transformers](https://github.com/huggingface/transformers)，具体可参考当前目录下converter中的内容。
 - `task_name` 表示Fine-tuning的任务。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。

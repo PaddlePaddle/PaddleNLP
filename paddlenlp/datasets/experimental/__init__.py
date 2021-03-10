@@ -29,3 +29,4 @@ from .drcd import *
 from .dureader_robust import *
 from .glue import *
 from .cnndm import *
+from .couplet import *

@@ -65,7 +65,7 @@ python -m paddle.distributed.launch --gpus "0" --log_dir log  run_pretrain.py --
 
 - `gpus` paddle.distributed.launch参数，用于指定使用哪张显卡。单卡格式："0"；多卡格式："0,1,2"。
 - `log_dir` paddle.distributed.launch参数，用于指定训练日志输出的目录，默认值为`log`。（注意，如果需要在同一目录多次启动run_pretrain.py，需要设置不同的log_dir，否则日志会重定向到相同的文件中）。
-- `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
+- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。目前支持的训练模型配置有："bigbird-base-uncased"，"bigbird-base-uncased-finetune"。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
 - `output_dir` 指定输出文件。
 - `batch_size` 训练的batch大小
@@ -95,7 +95,7 @@ python run_classifier.py --model_name_or_path bigbird-base-uncased-finetune \
 
 其中参数释义如下：
 
-- `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
+- `model_name_or_path` 指示了finetune使用的具体预训练模型以及预训练时使用的tokenizer，目前支持的预训练模型有："bigbird-base-uncased", "bigbird-base-uncased-finetune"。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"。
 - `output_dir` 指定输出文件。
 - `batch_size` 训练的batch大小。
 - `learning_rate` 训练的学习率。
