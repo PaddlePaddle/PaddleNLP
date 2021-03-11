@@ -6,19 +6,15 @@ ERNIE-GEN 是面向生成任务的预训练-微调框架，首次在预训练阶
 
 ![multi-flow-attention](https://github.com/PaddlePaddle/ERNIE/raw/repro/ernie-gen/.meta/multi-flow-attention.png)
 
-## 2. 快速开始
+## 快速开始
 
-### 2.1 环境配置
+### 环境依赖
 
-- Python >= 3.6
+- tqdm
 
-- paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
+安装方式：`pip install tqdm`
 
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp\>=2.0.0rc`
-
-- tqdm，安装方式：`pip install tqdm`
-
-### 2.2 数据准备
+### 数据准备
 
 在本例中，我们提供了古诗词数据集，示例数据如下：
 
@@ -35,7 +31,7 @@ wget --no-check-certificate https://paddlenlp.bj.bcebos.com/datasets/poetry.tar.
 tar xvf poetry.tar.gz
 ```
 
-### 2.3 模型微调
+### 模型微调
 
 模型训练支持 CPU 和 GPU，使用 GPU 之前应指定使用的显卡卡号：
 
@@ -75,7 +71,7 @@ python -u ./train.py \
 
 训练会持续很长的时间，为此我们提供了[微调后的模型](https://paddlenlp.bj.bcebos.com/models/transformers/ernie_gen_finetuned/ernie_1.0_poetry.pdparams)。您可以下载该模型并通过`init_checkpoint`加载其参数进行增量训练、评估或预测。
 
-### 2.4 模型评估
+### 模型评估
 
 通过加载训练保存的模型，可以对验证集数据进行验证，启动方式如下：
 
@@ -97,7 +93,7 @@ python -u ./eval.py \
 - `init_checkpoint` 表示模型加载路径。
 - `use_gpu` 表示使用GPU。
 
-### 2.5 模型预测
+### 模型预测
 
 对无标签数据可以启动模型预测：
 

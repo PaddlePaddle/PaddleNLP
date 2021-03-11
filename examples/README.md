@@ -45,7 +45,7 @@ PaddleNLP 提供了多种成熟的预训练模型技术，适用于自然语言�
 
 | 模型    | 简介     |
 | ------- | ------- |
-| [BERT](./language_model/bert/) |[BERT(Bidirectional Encoder Representation from Transformers)](./examples/language_model/bert)     |
+| [BERT](./language_model/bert/) | [BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding](https://arxiv.org/abs/1810.04805)     |
 | [ERNIE](./text_classification/pretrained_models) | [ERNIE: Enhanced Representation through Knowledge Integration](https://arxiv.org/abs/1904.09223)   |
 | [ERNIE-Tiny](./text_classification/pretrained_models) | 百度自研的小型化ERNIE网络结构，采用浅层Transformer，加宽隐层参数，中文subword粒度词表结合蒸馏的方法使模型相比SOTA Before BERT 提升8.35%， 速度提升4.3倍。 |
 | [ERNIE-GEN](./text_generation/ernie-gen) | [ERNIE-GEN: An Enhanced Multi-Flow Pre-training and Fine-tuning Framework for Natural Language Generation](https://arxiv.org/abs/2001.11314) ERNIE-GEN是百度发布的生成式预训练模型，通过Global-Attention的方式解决训练和预测曝光偏差的问题，同时使用Multi-Flow Attention机制来分别进行Global和Context信息的交互，同时通过片段生成的方式来增加语义相关性。    |

@@ -12,12 +12,11 @@ UnifiedTransformer模型的细节可以[参阅论文](https://arxiv.org/abs/2006
 
 ## 快速开始
 
-### 环境配置
+### 环境依赖
 
-- python >= 3.6
-- paddlepaddle >= 2.0.1, 安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp\>=2.0.0rc`
-- sentencepiece, 安装方式：`pip install sentencepiece`
+- sentencepiece
+
+安装方式：`pip install sentencepiece`
 
 ### 数据准备
 

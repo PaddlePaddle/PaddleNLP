@@ -49,10 +49,10 @@ python -u ./run_glue.py \
 参数详细含义参考[README.md](../../benchmark/glue/README.md)
 Fine-tuning 在dev上的结果如压缩结果表格中Result那一列所示。
 
-### 环境配置
-压缩功能依赖PaddlePaddle 2.0及以上版本，以及最新版本的PaddleNLP和PaddleSlim.
+### 环境依赖
+
+模型压缩功能依赖最新版本的PaddleNLP和PaddleSlim.
 ```shell
-pip install paddlenlp\>=2.0rc
 pip install paddleslim==2.0.0 -i https://pypi.org/simple
 ```
 
