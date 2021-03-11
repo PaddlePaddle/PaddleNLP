@@ -162,9 +162,9 @@ public:
     AddOutput("ParentIds", "The tensor of parent ids. ");
     AddOutput("SequenceLength", "The tensor of sequence length. ");
 
-    AddAttr<std::string>(
-        "decoding_strategy",
-        "Decoding strategies. As for now, only beam search is supported. ")
+    AddAttr<std::string>("decoding_strategy",
+                         "Decoding strategies. As for now, only beam search, "
+                         "topk sampling and topp sampling are supported. ")
         .SetDefault("beam_search");
     AddAttr<int>("beam_size", "The beam size for beam search. ").SetDefault(1);
     AddAttr<int>("topk", "The k of topk for topk sampling. ").SetDefault(1);

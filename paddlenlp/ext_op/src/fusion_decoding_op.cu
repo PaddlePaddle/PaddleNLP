@@ -288,6 +288,9 @@ public:
 
       delete decoding_sampling_;
     } else {
+      PADDLE_THROW(
+          "Only beam_search, topk_sampling and topp_sampling are supported for "
+          "Faster Transformer. ");
     }
     delete[] params;
   }
