@@ -70,7 +70,7 @@ PaddleNLP提供了丰富的预训练模型，并且可以便捷地获取PaddlePa
 
 * 环境依赖
 
-   Python的版本要求 3.6+，其它环境请参考 PaddlePaddle [安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/1.5/beginners_guide/install/index_cn.html) 部分的内容
+   Python的版本要求 3.6+，其它环境请参考 PaddlePaddle [安装说明](http://www.paddlepaddle.org/#quick-start) 部分的内容
 
 ### 代码结构说明
 

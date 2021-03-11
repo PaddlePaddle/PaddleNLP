@@ -145,7 +145,7 @@ if __name__ == '__main__':
         vocab['[PAD]'] = len(vocab)
     # Loads dataset.
     train_ds, dev_ds, test_ds = load_dataset(
-        "chnsenticorp", splits=["train", "dev", "test"], lazy=False)
+        "chnsenticorp", splits=["train", "dev", "test"])
 
     # Constructs the newtork.
     model = BoWModel(

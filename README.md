@@ -17,7 +17,7 @@ PaddleNLP 2.0拥有**覆盖多场景的模型库**、**简洁易用的全流程A
 ## 特性
 
 - **覆盖多场景的模型库**
-  - PaddleNLP集成了RNN与Transformer等多种主流模型结构，涵盖从[词向量](./exmaples/word_embedding/)、[词法分析](./examples/lexical_analysis/)、[命名实体识别](./examples/information_extraction/msra_ner/)、[语义表示](./examples/language_model/)等NLP基础技术，到[文本分类](./examples/text_classification/)、[文本匹配](./examples/text_matching/)、[文本生成](./examples/text_generation/)、[文本图学习](./examples/text_graph/erniesage/)、[信息抽取](./examples/information_extraction)等NLP核心技术。同时针对[机器翻译](./examples/machine_translation/)、[通用对话](./examples/dialogue/)、[阅读理解](./exampels/machine_reading_comprehension/)等系统应用提供相应核心组件与预训练模型。更多详细介绍请查看[PaddleNLP应用示例](./examples/)。
+  - PaddleNLP集成了RNN与Transformer等多种主流模型结构，涵盖从[词向量](./examples/word_embedding/)、[词法分析](./examples/lexical_analysis/)、[命名实体识别](./examples/information_extraction/msra_ner/)、[语义表示](./examples/language_model/)等NLP基础技术，到[文本分类](./examples/text_classification/)、[文本匹配](./examples/text_matching/)、[文本生成](./examples/text_generation/)、[文本图学习](./examples/text_graph/erniesage/)、[信息抽取](./examples/information_extraction)等NLP核心技术。同时针对[机器翻译](./examples/machine_translation/)、[通用对话](./examples/dialogue/)、[阅读理解](./examples/machine_reading_comprehension/)等系统应用提供相应核心组件与预训练模型。更多详细介绍请查看[PaddleNLP应用示例](./examples/)。
 
 
 - **简洁易用的全流程API**
@@ -45,9 +45,9 @@ pip install paddlenlp\>=2.0.0rc
 ### 数据集快速加载
 
 ```python
-from paddlenlp.datasets import ChnSentiCorp
+from paddlenlp.datasets import load_dataset
 
-train_ds, dev_ds, test_ds = ChnSentiCorp.get_datasets(['train', 'dev', 'test'])
+train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
 ```
 
 可参考[Dataset文档](./docs/datasets.md)查看更多数据集。
@@ -77,6 +77,19 @@ bert = BertModel.from_pretrained('bert-wwm-chinese')
 roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
 electra = ElectraModel.from_pretrained('chinese-electra-small')
 gpt2 = GPT2ForPretraining.from_pretrained('gpt2-base-cn')
+```
+
+### 便捷获取文本特征
+
+```python
+import paddle
+from paddlenlp.transformers import ErnieTokenizer, ErnieModel
+
+tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+model = ErnieModel.from_pretrained('ernie-1.0')
+
+text = tokenizer('自然语言处理')
+pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
 ```
 
 请参考[Transformer API文档](./docs/transformers.md)查看目前支持的预训练模型。

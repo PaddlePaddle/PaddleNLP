@@ -26,12 +26,20 @@ Sequence to Sequence (Seq2Seq)，使用编码器-解码器（Encoder-Decoder）�
 
 本模型中，在编码器方面，我们采用了基于LSTM的多层的RNN encoder；在解码器方面，我们使用了带注意力（Attention）机制的RNN decoder，在预测时我们使用柱搜索（beam search）算法来生成翻译的目标语句。
 
+## 环境要求
+运行本目录下的范例模型需要安装PaddlePaddle 2.0及以上版本。如果您的 PaddlePaddle 安装版本低于此要求，请按照[安装文档](https://www.paddlepaddle.org.cn/#quick-start)中的说明更新 PaddlePaddle 安装版本。
+另外，本项目还依赖paddlenlp，可以使用下面的命令进行安装：
+
+```shell
+pip install paddlenlp\>=2.0rc
+```
+
 ## 数据介绍
 
 本教程使用[IWSLT'15 English-Vietnamese data ](https://nlp.stanford.edu/projects/nmt/)数据集中的英语到越南语的数据作为训练语料，tst2012的数据作为开发集，tst2013的数据作为测试集。
 
 ### 数据获取
-如果用户在初始化数据集时没有提供路径，数据集会自动下载到`paddlenlp.utils.env.DATA_HOME`的`/machine_translation/IWSLT15/`路径下，例如在linux系统下，默认存储路径是`~/.paddlenlp/datasets/machine_translation/IWSLT15`。
+如果用户在初始化数据集时没有提供路径，数据集会自动下载到`paddlenlp.utils.env.DATA_HOME`的`IWSLT15/`路径下，例如在linux系统下，默认存储路径是`~/.paddlenlp/datasets/IWSLT15`。
 
 ## 模型训练
 
@@ -92,7 +100,7 @@ python export_model.py \
 ```
 
 ## 基于预测引擎推理
-然后按照如下的方式对IWSLT15数据集中的测试集（有标注的）进行预测（基于Paddle的[Python预测API](https://www.paddlepaddle.org.cn/documentation/docs/zh/2.0-rc1/guides/05_inference_deployment/inference/python_infer_cn.html)）：
+然后按照如下的方式对IWSLT15数据集中的测试集（有标注的）进行预测（基于Paddle的[Python预测API](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/python_infer_cn.html）：
 
 ```shell
 cd deploy/python

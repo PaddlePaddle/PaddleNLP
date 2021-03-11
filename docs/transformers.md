@@ -5,7 +5,7 @@
 
 ## Transformer预训练模型汇总
 
-下表汇总了目前PaddleNLP支持的各类预训练模型。用户可以使用PaddleNLP提供的模型，完成问答、文本分类、序列标注、文本生成等任务。同时我们提供了29种预训练的参数权重供用户使用，其中包含了12种中文语言模型的预训练权重。
+下表汇总了目前PaddleNLP支持的各类预训练模型。用户可以使用PaddleNLP提供的模型，完成问答、文本分类、序列标注、文本生成等任务。同时我们提供了34种预训练的参数权重供用户使用，其中包含了17种中文语言模型的预训练权重。
 
 | Model | Tokenizer | Supported Task | Pretrained Weight|
 |---|---|---|---|
@@ -15,10 +15,11 @@
 |[GPT-2](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)| GPT2Tokenizer<br> GPT2ChineseTokenizer| GPT2ForGreedyGeneration| `gpt2-base-cn` <br> `gpt2-medium-en`|
 |[RoBERTa](https://arxiv.org/abs/1907.11692)|RobertaTokenizer| RobertaModel<br>RobertaForQuestionAnswering<br>RobertaForSequenceClassification<br>RobertaForTokenClassification| `roberta-wwm-ext`<br> `roberta-wwm-ext-large`<br> `rbt3`<br> `rbtl3`|
 |[ELECTRA](https://arxiv.org/abs/2003.10555) | ElectraTokenizer| ElectraModel<br>ElectraForSequenceClassification<br>ElectraForTokenClassification<br>|`electra-small`<br> `electra-base`<br> `electra-large`<br> `chinese-electra-small`<br> `chinese-electra-base`<br>|
-|[XLNet](https://arxiv.org/abs/1906.08237)| XLNetTokenizer| XLNetModel<br> XLNetForSequenceClassification<br> XLNetForTokenClassification |`xlnet-base-cased`<br> `xlnet-large-cased`|
+|[XLNet](https://arxiv.org/abs/1906.08237)| XLNetTokenizer| XLNetModel<br> XLNetForSequenceClassification<br> XLNetForTokenClassification |`xlnet-base-cased`<br> `xlnet-large-cased`<br> `chinese-xlnet-base`<br> `chinese-xlnet-mid`<br> `chinese-xlnet-large`|
+|[UnifiedTransformer](https://arxiv.org/abs/2006.16779)| UnifiedTransformerTokenizer| UnifiedTransformerModel<br> UnifiedTransformerLMHeadModel |`unified_transformer-12L-cn`<br> `unified_transformer-12L-cn-luge` |
 |[Transformer](https://arxiv.org/abs/1706.03762) |- | TransformerModel | - |
 
-**NOTE**：其中中文的预训练模型有`bert-base-chinese, bert-wwm-chinese, bert-wwm-ext-chinese, ernie-1.0, ernie-tiny, gpt2-base-cn, roberta-wwm-ext, roberta-wwm-ext-large, rbt3, rbtl3, chinese-electra-base, chinese-electra-small`。
+**NOTE**：其中中文的预训练模型有`bert-base-chinese, bert-wwm-chinese, bert-wwm-ext-chinese, ernie-1.0, ernie-tiny, gpt2-base-cn, roberta-wwm-ext, roberta-wwm-ext-large, rbt3, rbtl3, chinese-electra-base, chinese-electra-small, chinese-xlnet-base, chinese-xlnet-mid, chinese-xlnet-large, unified_transformer-12L-cn, unified_transformer-12L-cn-luge`。
 
 ## 预训练模型使用方法
 
@@ -31,7 +32,7 @@ from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 
 train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
 
-model = BertForSequenceClassification.from_pretrained("bert-wwm-chinese", num_classes=len(train_ds.get_labels()))
+model = BertForSequenceClassification.from_pretrained("bert-wwm-chinese", num_classes=len(train_ds.label_list))
 
 tokenizer = BertTokenizer.from_pretrained("bert-wwm-chinese")
 
@@ -65,15 +66,16 @@ for input_ids, token_type_ids, labels in train_dataloader:
 |任务|模型|应用场景|预训练权重|
 |---|---|---|---|
 |文本分类<br>SequenceClassification |BertForSequenceClassification <br> ErnieForSequenceClassification <br> RobertaForSequenceClassification <br> ElectraForSequenceClassification <br> XLNetForSequenceClassification | [文本分类](../examples/text_classification/pretrained_models/)、[阅读理解](../examples/machine_reading_comprehension/DuReader-yesno/)等| [见上表](#Transformer预训练模型汇总)|
-|序列标注<br>TokenClassification|BertForTokenClassification <br> ErnieForTokenClassification <br> RobertaForTokenClassification <br> ElectraForTokenClassification <br> XLNetForTokenClassification | [命名实体标注](../examples/named_entity_recognition/)等|[见上表](#Transformer预训练模型汇总)|
+|序列标注<br>TokenClassification|BertForTokenClassification <br> ErnieForTokenClassification <br> RobertaForTokenClassification <br> ElectraForTokenClassification <br> XLNetForTokenClassification | [命名实体标注](../examples/information_extraction/msra_ner/)等|[见上表](#Transformer预训练模型汇总)|
 |问答任务<br>QuestionAnswering|BertForQuestionAnswering <br> ErnieForQuestionAnswering <br> RobertaForQuestionAnswering| [阅读理解](../examples/machine_reading_comprehension/SQuAD/)等|[见上表](#Transformer预训练模型汇总)|
 |文本生成<br>TextGeneration | ErnieForGeneration <br> GPT2ForGreedyGeneration |[文本生成](../examples/text_generation/ernie-gen)等|[见上表](#Transformer预训练模型汇总)|
 |机器翻译<br>MachineTranslation| TransformerModel | [机器翻译](../examples/machine_translation/transformer/)|[见上表](#Transformer预训练模型汇总)|
 
 用户可以切换表格中的不同模型，来处理相同类型的任务。如对于[预训练模型使用方法](#预训练模型使用方法)中的文本分类任务，用户可以将`BertForSequenceClassification`换成`ErnieForSequenceClassification`, 来寻找更适合的预训练模型。
 
-## 参考资料：
-- 部分中文预训练模型来自：https://github.com/ymcui/Chinese-BERT-wwm
+
+## Reference
+- 部分中文预训练模型来自：[ymcui/Chinese-BERT-wwm](https://github.com/ymcui/Chinese-BERT-wwm), [ymcui/Chinese-XLNet](https://github.com/ymcui/Chinese-XLNet), [huggingface/xlnet_chinese_large](https://huggingface.co/clue/xlnet_chinese_large), [Knover/luge-dialogue](https://github.com/PaddlePaddle/Knover/tree/luge-dialogue/luge-dialogue)
 - Sun, Yu, et al. "Ernie: Enhanced representation through knowledge integration." arXiv preprint arXiv:1904.09223 (2019).
 - Devlin, Jacob, et al. "Bert: Pre-training of deep bidirectional transformers for language understanding." arXiv preprint arXiv:1810.04805 (2018).
 - Cui, Yiming, et al. "Pre-training with whole word masking for chinese bert." arXiv preprint arXiv:1906.08101 (2019).

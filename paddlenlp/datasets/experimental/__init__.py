@@ -30,4 +30,4 @@ from .dureader_robust import *
 from .glue import *
 from .wmt14ende import *
 from .cnndm import *
-
+from .couplet import *

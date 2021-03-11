@@ -12,7 +12,7 @@ batch_size=8
 epoch=12
 
 echo -e "check and create directory"
-dir_list=(../ckpt ${ckpt_dir} ../submit)
+dir_list=(./ckpt ${ckpt_dir} ./submit)
 for item in ${dir_list[*]}
 do
     if [ ! -d ${item} ]; then
