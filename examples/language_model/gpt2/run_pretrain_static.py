@@ -31,6 +31,9 @@ os.environ['FLAGS_fuse_parameter_memory_size'] = "32"
 os.environ['FLAGS_fuse_parameter_groups_size'] = "50"
 os.environ['FLAGS_check_nan_inf'] = "0"
 os.environ['FLAGS_enable_sequential_execution'] = "1"
+os.environ['HOME']
+os.path.expandvars('$HOME')
+os.path.expanduser('~')
 
 import numpy as np
 import paddle
@@ -457,11 +460,19 @@ def do_train(args):
 
     # init with Megatron params
     if args.batch_size == 4:
+        print("Loading bs4 init params.")
         init_static_with_params(
-            model, paddle.load('~/init_checkponits/gpt2-init-bs4.pdparams'))
+            model,
+            paddle.load(
+                os.path.join(os.environ['HOME'],
+                             './init_checkponits/gpt2-init-bs4.pdparams')))
     elif args.batch_size == 32:
+        print("Loading bs32 init params.")
         init_static_with_params(
-            model, paddle.load('~/init_checkponits/gpt2-init-bs32.pdparams'))
+            model,
+            paddle.load(
+                os.path.join(os.environ['HOME'],
+                             './init_checkponits/gpt2-init-bs32.pdparams')))
 
     test_program = main_program.clone(for_test=True)
     if worker_num == 1:
