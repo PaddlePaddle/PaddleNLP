@@ -47,7 +47,7 @@ from paddlenlp.datasets import load_dataset
 train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
 ```
 
-### Chinese Text Emebdding Loading
+### Chinese Text Embedding Loading
 
 ```python
 
@@ -60,7 +60,7 @@ wordemb.cosine_sim("艺术", "火车")
 >>> 0.14792643
 ```
 
-### Rich Chinsese Pre-trained Models
+### Rich Chinese Pre-trained Models
 
 
 ```python
@@ -129,7 +129,7 @@ Please refer to our official AI Studio account for more interactive tutorials: [
 * [Waybill Information Extraction with BiGRU-CRF Model](https://aistudio.baidu.com/aistudio/projectdetail/1317771) shows how to make use of Bi-GRU plus CRF to finish information extraction task.
 
 * [Waybill Information Extraction with ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/1329361) shows how to use ERNIE, the Chinese pre-trained model improve information extraction performance.
-  
+
 * [Use TCN Model to predict COVID-19 confirmed cases](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
 
 
