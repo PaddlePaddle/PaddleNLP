@@ -46,7 +46,7 @@ def create_data_loader(args, places=None, use_all_vocab=False):
     datasets = load_dataset(
         'wmt14ende', data_files=data_files, splits=('train', 'dev'))
     if use_all_vocab:
-        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["all"])
+        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
     else:
         src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["benchmark"])
     trg_vocab = src_vocab
@@ -111,7 +111,7 @@ def create_infer_loader(args, use_all_vocab=False):
 
     dataset = load_dataset('wmt14ende', data_files=data_files, splits=('test'))
     if use_all_vocab:
-        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["all"])
+        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
     else:
         src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
     trg_vocab = src_vocab

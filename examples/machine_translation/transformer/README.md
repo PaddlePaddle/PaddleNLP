@@ -65,7 +65,7 @@ pip install attrdict pyyaml
 同时，我们提供了一份已经处理好的数据集，可以编写如下代码，对应的数据集将会自动下载并且解压到 `~/.paddlenlp/datasets/machine_translation/WMT14ende/`。
 
 ``` python
-datasets = load_dataset('wmt14ende', data_files=data_files, splits=('train', 'dev'))
+datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
 ```
 
 ## 单机训练
