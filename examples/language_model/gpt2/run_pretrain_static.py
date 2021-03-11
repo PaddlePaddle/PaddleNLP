@@ -365,7 +365,7 @@ def trans_param_from_static_to_dygrah(model):
 def init_static_with_params(model, dygraph_params):
     from paddlenlp.utils.tools import dygraph_params_to_static
     static_params = dygraph_params_to_static(model, dygraph_params)
-    prog = paddlle.static.default_main_program()
+    prog = paddle.static.default_main_program()
     paddle.static.set_program_state(prog, static_params)
 
 
