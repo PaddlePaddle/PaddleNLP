@@ -168,7 +168,7 @@ python train.py --vocab_path='./senta_word_dict.txt' \
 GPU 启动：
 
 ```shell
-CUDA_VISIBLE_DEVICES=1 python train.py --vocab_path='./senta_word_dict.txt' \
+CUDA_VISIBLE_DEVICES=0 python train.py --vocab_path='./senta_word_dict.txt' \
     --select_devices=gpu \
     --network=bilstm \
     --lr=5e-4 \
