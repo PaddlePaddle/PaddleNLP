@@ -456,7 +456,12 @@ def do_train(args):
     # paddle.static.set_program_state(reset_state_dict)
 
     # init with Megatron params
-    # init_static_with_params(model, paddle.load('~/init_checkponits/gpt2-init-bs4.pdparams')) 
+    if args.batch_size == 4:
+        init_static_with_params(
+            model, paddle.load('~/init_checkponits/gpt2-init-bs4.pdparams'))
+    elif args.batch_size == 32:
+        init_static_with_params(
+            model, paddle.load('~/init_checkponits/gpt2-init-bs32.pdparams'))
 
     test_program = main_program.clone(for_test=True)
     if worker_num == 1:
