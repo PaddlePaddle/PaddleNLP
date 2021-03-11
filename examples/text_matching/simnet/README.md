@@ -43,7 +43,7 @@ SimNet框架在百度各产品上广泛应用，主要包括BOW、CNN、RNN、MM
 
 * 环境依赖
    - 本项目依赖于jieba分词，请在运行本项目之前，安装jieba，如`pip install -U jieba`
-   - Python的版本要求 3.6+，其它环境请参考 PaddlePaddle [安装说明](https://www.paddlepaddle.org.cn/install/quick/zh/2.0rc-linux-docker) 部分的内容
+   - Python的版本要求 3.6+，其它环境请参考 PaddlePaddle [安装说明](http://www.paddlepaddle.org/#quick-start) 部分的内容
 
 ### 代码结构说明
 
