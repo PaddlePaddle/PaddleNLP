@@ -365,7 +365,19 @@ class PretrainedTokenizer(object):
         # Merge resolved_vocab_files arguments in init_kwargs if not including.
         # Maybe need more ways to load resources.
         for args_name, file_path in resolved_vocab_files.items():
+            # when `pretrained_model_name_or_path` is a pretrained model name,
+            # use pretrained_init_configuration as `init_kwargs` to init which
+            # does not include the vocab file in it, thus add vocab file into
+            # args.
             if args_name not in init_kwargs:
+                init_kwargs[args_name] = file_path
+            # when `pretrained_model_name_or_path` is a pretrained model dir,
+            # use tokenizer_config_file.json as `init_kwargs` to init which
+            # does include a vocab file path in it. However, if the vocab file
+            # path included in json does not exist, such as was deleted, to make
+            # it still work, use the vocab file under this dir.
+            elif not os.path.isfile(init_kwargs[args_name]) and os.path.isfile(
+                    file_path):
                 init_kwargs[args_name] = file_path
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)
