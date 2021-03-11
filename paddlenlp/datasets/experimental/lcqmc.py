@@ -52,6 +52,7 @@ class LCQMC(DatasetBuilder):
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
+            path = get_path_from_url(self.URL, default_root, self.MD5)
             fullname = os.path.join(default_root, filename)
 
         return fullname
