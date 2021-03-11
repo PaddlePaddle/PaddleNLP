@@ -332,11 +332,12 @@ class BigBirdModel(BigBirdPretrainedModel):
 
 
 class BigBirdForSequenceClassification(BigBirdPretrainedModel):
-    def __init__(self, bigbird):
+    def __init__(self, bigbird, num_classes=None):
         super(BigBirdForSequenceClassification, self).__init__()
         self.bigbird = bigbird
-        self.linear = nn.Linear(self.bigbird.config["hidden_size"],
-                                self.bigbird.config["num_labels"])
+        if num_classes is None:
+            num_classes = self.bigbird.config["num_labels"]
+        self.linear = nn.Linear(self.bigbird.config["hidden_size"], num_classes)
         self.dropout = nn.Dropout(
             self.bigbird.config['hidden_dropout_prob'], mode="upscale_in_train")
         self.apply(self.init_weights)
