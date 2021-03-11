@@ -148,7 +148,7 @@ def do_train(model, criterion, metric, optimizer, train_data_loader, tokenizer):
             input_ids, labels = batch[:2]
             rand_mask_idx_list = batch[2:]
 
-            output = model(input_ids, None, rand_mask_idx_list)
+            output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
             loss = criterion(output, labels)
             loss.backward()
             optimizer.step()

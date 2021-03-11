@@ -344,11 +344,12 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
 
     def forward(self,
                 input_ids,
+                token_type_ids=None,
                 attention_mask_list=None,
                 rand_mask_idx_list=None):
         _, pooled_output = self.bigbird(
             input_ids,
-            None,
+            token_type_ids,
             attention_mask_list=attention_mask_list,
             rand_mask_idx_list=rand_mask_idx_list)
         output = self.dropout(pooled_output)
