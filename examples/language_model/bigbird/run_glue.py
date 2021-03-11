@@ -258,6 +258,41 @@ def collect_data(samples, dataset):
     return out
 
 
+@paddle.no_grad()
+def evaluate(model, loss_fct, metric, data_loader):
+    model.eval()
+    metric.reset()
+    for batch in data_loader:
+        input_ids, segment_ids, labels = batch[:3]
+        rand_mask_idx_list = batch[3:]
+        # run forward
+        logits = model(
+            input_ids, segment_ids, rand_mask_idx_list=rand_mask_idx_list)
+        loss = loss_fct(logits, labels)
+        correct = metric.compute(logits, labels)
+        metric.update(correct)
+    res = metric.accumulate()
+    if isinstance(metric, AccuracyAndF1):
+        logger.info(
+            "eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
+            % (
+                loss.numpy(),
+                res[0],
+                res[1],
+                res[2],
+                res[3],
+                res[4], ))
+    elif isinstance(metric, Mcc):
+        logger.info("eval loss: %f, mcc: %s, " % (loss.numpy(), res[0]))
+    elif isinstance(metric, PearsonAndSpearman):
+        logger.info(
+            "eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
+            % (loss.numpy(), res[0], res[1], res[2]))
+    else:
+        logger.info("eval loss: %f, acc: %s, " % (loss.numpy(), res))
+    model.train()
+
+
 def do_train(args):
     paddle.set_device(args.device)
     worker_num = paddle.distributed.get_world_size()
@@ -358,12 +393,54 @@ def do_train(args):
     global config
     config = getattr(model, model_class.base_model_prefix).config
 
+    metric = metric_class()
     global_step = 0
     tic_train = time.time()
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
-            input_ids, token_type_ids, labels = batch[:3]
+            global_step += 1
+            input_ids, segment_ids, labels = batch[:3]
             rand_mask_idx_list = batch[3:]
+            # run forward
+            logits = model(
+                input_ids, segment_ids, rand_mask_idx_list=rand_mask_idx_list)
+            loss = loss_fct(logits, labels)
+            # run backward and update params
+            loss.backward()
+            optimizer.step()
+            lr_scheduler.step()
+            optimizer.clear_grad()
+
+            if global_step % args.logging_steps == 0:
+                logger.info(
+                    "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
+                    % (global_step, num_training_steps, epoch, step,
+                       paddle.distributed.get_rank(), loss, optimizer.get_lr(),
+                       args.logging_steps / (time.time() - tic_train)))
+                tic_train = time.time()
+            if global_step % args.save_steps == 0 or global_step == num_training_steps:
+                tic_eval = time.time()
+                if args.task_name == "mnli":
+                    evaluate(model, loss_fct, metric, dev_data_loader_matched)
+                    evaluate(model, loss_fct, metric,
+                             dev_data_loader_mismatched)
+                    logger.info("eval done total : %s s" %
+                                (time.time() - tic_eval))
+                else:
+                    evaluate(model, loss_fct, metric, dev_data_loader)
+                    logger.info("eval done total : %s s" %
+                                (time.time() - tic_eval))
+                if paddle.distributed.get_rank() == 0:
+                    output_dir = os.path.join(args.output_dir,
+                                              "%s_ft_model_%d.pdparams" %
+                                              (args.task_name, global_step))
+                    if not os.path.exists(output_dir):
+                        os.makedirs(output_dir)
+                    # Need better way to get inner model of DataParallel
+                    model_to_save = model._layers if isinstance(
+                        model, paddle.DataParallel) else model
+                    model_to_save.save_pretrained(output_dir)
+                    tokenizer.save_pretrained(output_dir)
 
 
 def print_arguments(args):
