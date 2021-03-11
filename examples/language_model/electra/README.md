@@ -9,35 +9,33 @@
 
 本项目是 ELECTRA 在 Paddle 2.0上的开源实现。
 
-## 1. 安装说明
-- Python >= 3.6
-- paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp\>=2.0rc`
+## 环境依赖
+
 - jieba, 安装方式：`pip install jieba`
 - colorlog, 安装方式：`pip install colorlog`
 - colorama, 安装方式：`pip install colorama`
 - seqeval, 安装方式：`pip install seqeval`
 
-## 2. 数据准备
-### 2.1 建议的预训练数据
+## 数据准备
+### 建议的预训练数据
 论文中提到预训练需要两部分数据：Book Corpus数据 和 Wikipedia Corpus数据，均为英文文本，utf-8编码。但是当前BookCorpus数据已不再开源，可以使用其它数据替代，只要是纯英文文本数据，utf-8编码即可。
 例如[Gutenberg Dataset](https://web.eecs.umich.edu/~lahiri/gutenberg_dataset.html)
 。另外，Wikipedia Corpus数据建议从[官方获取](https://www.english-corpora.org/wiki/)，下面例子假设这些数据都已获取并都放在./BookCorpus/train.data 文件中，每行一句英文文本
 
-### 2.2 自定义预训练数据
+### 自定义预训练数据
 支持用户自定义数据进行训练，自定义数据为文本形式，每行一句英文文本，utf-8编码，下面例子假设数据在./BookCorpus/train.data
 
-### 2.3 Fine-tuning数据
+### Fine-tuning数据
 Fine-tuning 使用GLUE数据，这部分Paddle已提供，在执行第4章 Fine-tuning 命令时会自动下载并加载
 
-### 2.4 推理数据
+### 推理数据
 可以使用GLUE test数据集（Paddle已提供，在Fine-tuning时会自动下载），或者也可以自定义，格式要求和2.2 自定义预训练数据一样，每行一句英文文本，utf-8编码
 
-## 3. 模型预训练
-如下所有命令均假设在 **PaddleNLP/examples/language_model/electra/** 下执行，包括预训练、Fine-tuning 和 推理部署的命令
+## 模型预训练
 
-**特别注意**：预训练模型如果想要达到较好的效果，需要训练几乎全量的Book Corpus数据 和 Wikipedia Corpus数据，原始文本接近20G，使用CPU训练时间很长，建议用GPU进行预训练，最好4片GPU以上。如果资源较少，Paddle提供已经预训练好的模型进行Fine-tuning，可以直接跳转到下面 4.2.1 一节：使用Paddle提供的预训练模型运行 Fine-tuning
-### 3.1 单机单卡
+**特别注意**：预训练模型如果想要达到较好的效果，需要训练几乎全量的Book Corpus数据 和 Wikipedia Corpus数据，原始文本接近20G，建议用GPU进行预训练，最好4片GPU以上。如果资源较少，Paddle提供已经预训练好的模型进行Fine-tuning，可以直接跳转到下面 4.2.1 一节：使用Paddle提供的预训练模型运行 Fine-tuning
+
+### 单机单卡
 ```shell
 export CUDA_VISIBLE_DEVICES="0"
 export DATA_DIR=./BookCorpus/
@@ -133,8 +131,8 @@ python -u ./run_pretrain.py \
 - 环境变量CUDA_VISIBLE_DEVICES可配置多个GPU-id，配置后预训练程序只能使用配置中的GPU，不会使用未配置的GPU
 - 参数`n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可，最大数量不能超过环境变量CUDA_VISIBLE_DEVICES配置的GPU个数；若配置为0，则使用CPU。
 
-## 4. 模型Fine-tuning和预测评估
-### 4.1 从预训练模型得到Fine-tuning所需模型
+## Fine-tuning和预测评估
+### 从预训练模型得到Fine-tuning所需模型
 由第一段简介得知，Electra Fine-tuning时只需要Discriminator部分，所以通过如下命令从预训练模型中提取出Discriminator，得到Fine-tuning所需模型
 ```shell
 python -u ./get_ft_model.py \
@@ -147,9 +145,9 @@ python -u ./get_ft_model.py \
 
 **特别注意**：如果使用windows系统执行此命令，需使用**管理员**权限运行，否则会出错。Linux无此限制
 
-### 4.2 运行Fine-tuning
+### 运行Fine-tuning
 使用./run_glue.py运行，有两种方式：
-#### 4.2.1 使用Paddle提供的预训练模型运行 Fine-tuning
+#### 使用Paddle提供的预训练模型运行 Fine-tuning
 此方式无需在本地进行预训练，即可以跳过上面第3章和4.1，直接运行Fine-tuning。
 
 以 GLUE/SST-2 任务为例，启动 Fine-tuning 的方式如下：
@@ -183,7 +181,7 @@ python -u ./run_glue.py \
 - `output_dir` 表示模型保存路径。
 - `n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可,最大数量不能超过环境变量CUDA_VISIBLE_DEVICES配置的GPU个数；若为0，则使用CPU。
 
-#### 4.2.2 使用本地预训练模型运行 Fine-tuning
+#### 使用本地预训练模型运行 Fine-tuning
 按照上面第3章在本地运行 ELECTRA 模型的预训练后，执行4.1的命令得到Fine-tuning所需模型，然后运行 Fine-tuning。
 
 以 GLUE/SST-2 任务为例，启动 Fine-tuning 的方式如下：
@@ -237,10 +235,10 @@ eval loss: 0.732358, acc: 0.8704128440366973, eval done total : 1.97493219375610
 注：acc.是Accuracy的简称，表中Metric字段名词取自[GLUE论文](https://openreview.net/pdf?id=rJ4km2R5t7)
 
 
-## 5. 推理部署
+## 推理部署
 运行某个GLUE任务后（还是继续以GLUE/SST-2 情感分类任务为例），想要将Fine-tuning模型导出以加速类似场景更多数据的推理，可以按照如下步骤完成推理部署
 
-### 5.1 导出推理模型
+### 导出推理模型
 ```shell
 python -u ./export_model.py \
     --input_model_dir ./SST-2/sst-2_ft_model_6000.pdparams/ \
@@ -259,9 +257,10 @@ python -u ./export_model.py \
 | electra-deploy.pdiparams.info | 模型权重信息文件                         |
 | electra-deploy.pdmodel        | 模型结构文件，供推理时加载使用            |
 
-### 5.2 用导出的推理模型进行推理（推理使用paddle inference python api）
+### 使用Paddle Inference API进行推理
 有如下两种方法
-#### 5.2.1 从命令行读取输入数据进行推理
+
+#### 从命令行读取输入数据进行推理
 ```shell
 python -u ./deploy/python/predict.py \
     --model_file ./electra-deploy.pdmodel \
@@ -283,7 +282,7 @@ python -u ./deploy/python/predict.py \
 - `use_gpu` 表示是否使用GPU进行推理，默认不开启。如果在命令中加上了--use_gpu，则使用GPU进行推理。
 - `use_trt` 表示是否使用TensorRT进行推理，默认不开启。如果在命令中加上了--use_trt，且配置了--use_gpu，则使用TensorRT进行推理。前提条件：1）需提前安装TensorRT或使用[Paddle提供的TensorRT docker镜像](https://github.com/PaddlePaddle/Serving/blob/v0.5.0/doc/DOCKER_IMAGES_CN.md)。2）需根据cuda、cudnn、tensorRT和python的版本，安装[匹配版本的Paddle包](https://www.paddlepaddle.org.cn/documentation/docs/zh/install/Tables.html)
 
-#### 5.2.2 从文件读取输入数据进行推理
+#### 从文件读取输入数据进行推理
 ```shell
 python -u ./deploy/python/predict.py \
     --model_file ./electra-deploy.pdmodel \
@@ -308,10 +307,6 @@ inference total 1 sentences done, total time : 0.0849156379699707 s
 ```
 此推理结果表示：第1句话是负向情感，第2句话是正向情感。
 
-## 6. FAQ
 
-## 7. 更新说明
-2021.2.23 新增本文档
-
-## 8. 参考文献
+## Reference
 [ELECTRA论文](https://openreview.net/pdf?id=r1xMH1BtvB)

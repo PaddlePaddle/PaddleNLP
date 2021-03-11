@@ -21,26 +21,12 @@
 
 ## 快速开始
 
-### 安装说明
+### 环境依赖
 
- * PaddlePaddle安装
+- attrdict
+- pyyaml
 
-    本项目依赖于 PaddlePaddle 2.0.0 及以上版本或适当的develop版本，请参考 [安装指南](https://www.paddlepaddle.org.cn/install/quick) 进行安装
-
- * PaddleNLP安装
-
-```sh
-pip install paddlenlp==2.0.0rc
-```
-
- * 环境依赖
-   - attrdict
-   - pyyaml
-
-``` sh
-pip install attrdict pyyaml
-```
-
+安装命令 `pip install attrdict pyyaml`
 
 ### 数据准备
 
@@ -52,10 +38,9 @@ bash gen_data.sh
 
 会在当前路径下的 ./gen_data/ 路径下生成我们需要的数据。
 
-
 ### 单机训练
 
-### 单机单卡
+#### 单机单卡
 
 以提供的 enwik8 数据为例，可以执行以下命令进行模型训练：
 

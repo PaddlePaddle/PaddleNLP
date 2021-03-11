@@ -12,7 +12,7 @@
 ```
 
 ## 简介
-本目录下的实验是将特定任务下BERT模型的知识蒸馏到基于Bi-LSTM的小模型中，主要参考论文[《Distilling Task-Specific Knowledge from BERT into Simple Neural Networks》](https://arxiv.org/abs/1903.12136)实现。
+本目录下的实验是将特定任务下BERT模型的知识蒸馏到基于Bi-LSTM的小模型中，主要参考论文 [Distilling Task-Specific Knowledge from BERT into Simple Neural Networks](https://arxiv.org/abs/1903.12136)实现。
 
 在模型蒸馏中，较大的模型（在本例中是BERT）通常被称为教师模型，较小的模型（在本例中是Bi-LSTM）通常被称为学生模型。知识的蒸馏通常是通过模型学习蒸馏相关的损失函数实现，在本实验中，损失函数是均方误差损失函数，传入函数的两个参数分别是学生模型的输出和教师模型的输出。
 
@@ -28,14 +28,6 @@
 在英文数据集任务上，本文使用了Google News语料[预训练的Word Embedding](https://code.google.com/archive/p/word2vec/)初始化小模型的Embedding层。
 
 本实验分为三个训练过程：在特定任务上对BERT的fine-tuning、在特定任务上对基于Bi-LSTM的小模型的训练（用于评价蒸馏效果）、将BERT模型的知识蒸馏到基于Bi-LSTM的小模型上。
-
-## 环境要求
-运行本目录下的范例模型需要安装PaddlePaddle 2.0及以上版本。如果您的 PaddlePaddle 安装版本低于此要求，请按照[安装文档](https://www.paddlepaddle.org.cn/#quick-start)中的说明更新 PaddlePaddle 安装版本。
-另外，本项目还依赖paddlenlp，可以使用下面的命令进行安装：
-
-```shell
-pip install paddlenlp\>=2.0rc
-```
 
 ## 数据、预训练模型介绍及获取
 
@@ -54,12 +46,12 @@ wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
 
 ## 蒸馏实验过程
 ### 训练BERT fine-tuning模型
-训练BERT的fine-tuning模型，可以去本repo下example中的[glue目录](../../glue)下。关于glue的更多详细说明，可见glue目录下的README文档。
+训练BERT的fine-tuning模型，可以去本repo下example中的[glue目录](../../benchmark/glue)下。关于glue的更多详细说明，可见glue目录下的README文档。
 
 以GLUE的SST-2任务为例，调用BERT fine-tune的训练脚本，配置如下的参数，训练SST-2任务：
 
 ```shell
-cd ../../glue
+cd ../../benchmark/glue
 export CUDA_VISIBLE_DEVICES=0
 export TASK_NAME=SST-2
 python -u ./run_glue.py \
