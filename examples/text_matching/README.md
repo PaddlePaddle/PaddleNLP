@@ -15,7 +15,7 @@
 文本匹配任务数据每一个样本通常由两个文本组成（query，title）。类别形式为0或1，0表示query与title不匹配； 1表示匹配。
 
 
-该项目展示了使用传统的[SimNet](./simnet) 和 [SentenceBert](./sentence_bert)两种方法完成本匹配任务。
+该项目展示了使用传统的[SimNet](./simnet) 和 [Sentence Transformers](./sentence_transformers)两种方法完成本匹配任务。
 
 ## SimNet
 
