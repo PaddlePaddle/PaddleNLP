@@ -55,8 +55,8 @@ def flatten(list_of_list):
     return final_list
 
 
-def apply_data_augmentation(task_name,
-                            train_dataset,
+def apply_data_augmentation(data,
+                            task_name,
                             tokenizer,
                             n_iter=20,
                             p_mask=0.1,
@@ -91,49 +91,50 @@ def apply_data_augmentation(task_name,
 
     np.random.seed(seed)
     used_texts, new_data = [], []
-    for data in train_dataset:
+    for example in data:
         if task_name == 'qqp':
-            data_list = tokenizer.tokenize(data['sentence1'])
-            data_list_2 = tokenizer.tokenize(data['sentence2'])
+            data_list = tokenizer.tokenize(example['sentence1'])
+            data_list_2 = tokenizer.tokenize(example['sentence2'])
             new_data.append({
                 "sentence1": data_list,
                 "sentence2": data_list_2,
-                "labels": data['labels']
+                "labels": example['labels']
             })
             used_texts.append(" ".join(data_list_2))
         else:
-            data_list = tokenizer.tokenize(data['sentence'])
-            new_data.append({"sentence": data_list, "labels": data['labels']})
+            data_list = tokenizer.tokenize(example['sentence'])
+            new_data.append({
+                "sentence": data_list,
+                "labels": example['labels']
+            })
 
         used_texts.append(" ".join(data_list))
     used_texts = set(used_texts)
 
-    for data in train_dataset:
+    for example in data:
         for _ in range(n_iter):
             if task_name == 'qqp':
-                words, new_text = _data_augmentation(data['sentence1'])
-                words_2, new_text_2 = _data_augmentation(data['sentence2'])
+                words, new_text = _data_augmentation(example['sentence1'])
+                words_2, new_text_2 = _data_augmentation(example['sentence2'])
                 if new_text not in used_texts or new_text_2 not in used_texts:
                     new_data.append({
                         "sentence1": words,
                         "sentence2": words_2,
-                        "labels": data['labels']
+                        "labels": example['labels']
                     })
                     used_texts.add(new_text_2)
             else:
-                words, new_text = _data_augmentation(data['sentence'])
+                words, new_text = _data_augmentation(example['sentence'])
                 if new_text not in used_texts:
                     new_data.append({
                         "sentence": words,
-                        "labels": data['labels']
+                        "labels": example['labels']
                     })
             used_texts.add(new_text)
-    train_dataset.new_data = new_data
-
-    return train_dataset
+    return new_data
 
 
-def apply_data_augmentation_for_cn(train_dataset,
+def apply_data_augmentation_for_cn(data,
                                    tokenizer,
                                    vocab,
                                    n_iter=20,
@@ -143,29 +144,29 @@ def apply_data_augmentation_for_cn(train_dataset,
                                    seed=0):
     """
     Because BERT and jieba have different `tokenize` function, it returns
-     `[jieba_tokenizer(data['text'], bert_tokenizer(data['text']), data['label])]`
-    for each data in dataset.
+    jieba_tokenizer(example['text'], bert_tokenizer(example['text']) and
+    example['label]) for each example in data.
     jieba tokenization and Masking are performed at the same time, so that the
     masked token can be directly replaced by `mask_token`, and other tokens
-    could be stored or tokenized by BERT's tokenizer, from which tokenized
-    data for student model and teacher model would get at the same time.
+    could be tokenized by BERT's tokenizer, from which tokenized example for
+    student model and teacher model would get at the same time.
     """
     np.random.seed(seed)
-    used_texts = [data['text'] for data in train_dataset]
+    used_texts = [example['text'] for example in data]
     used_texts = set(used_texts)
     new_data = []
-    for data in train_dataset:
-        words = [word for word in jieba.cut(data['text'])]
-        words_bert = tokenizer.tokenize(data['text'])
+    for example in data:
+        words = [word for word in jieba.cut(example['text'])]
+        words_bert = tokenizer.tokenize(example['text'])
         new_data.append({
             "text": words,
             "sentence": words_bert,
-            "label": data['label']
+            "label": example['label']
         })
         for _ in range(n_iter):
             # 1. Masking
             words, words_bert = [], []
-            for word in jieba.cut(data['text']):
+            for word in jieba.cut(example['text']):
                 if np.random.rand() < p_mask:
                     words.append([vocab.unk_token])
                     words_bert.append([tokenizer.unk_token])
@@ -181,12 +182,10 @@ def apply_data_augmentation_for_cn(train_dataset,
                 new_data.append({
                     "text": words,
                     "sentence": words_bert,
-                    "label": data['label']
+                    "label": example['label']
                 })
                 used_texts.add(new_text)
-
-    train_dataset.new_data = new_data
-    return train_dataset
+    return new_data
 
 
 def create_data_loader_for_small_model(task_name,
@@ -249,14 +248,9 @@ def create_distill_loader(task_name,
     Returns batch data for bert and small model.
     Bert and small model have different input representations.
     """
+    tokenizer = BertTokenizer.from_pretrained(model_name)
     if task_name == 'chnsenticorp':
         train_ds, dev_ds = load_dataset(task_name, splits=["train", "dev"])
-    else:
-        train_ds, dev_ds = load_dataset(
-            'glue', task_name, splits=["train", "dev"])
-    tokenizer = BertTokenizer.from_pretrained(model_name)
-
-    if task_name == 'chnsenticorp':
         vocab = Vocab.load_vocabulary(
             vocab_path,
             unk_token='[UNK]',
@@ -264,21 +258,25 @@ def create_distill_loader(task_name,
             bos_token=None,
             eos_token=None, )
         pad_val = vocab['[PAD]']
+        data_aug_fn = partial(
+            apply_data_augmentation_for_cn,
+            tokenizer=tokenizer,
+            vocab=vocab,
+            n_iter=n_iter,
+            seed=seed)
     else:
+        train_ds, dev_ds = load_dataset(
+            'glue', task_name, splits=["train", "dev"])
         vocab = tokenizer
         pad_val = tokenizer.pad_token_id
-
-    if task_name == 'chnsenticorp':
-        train_ds = apply_data_augmentation_for_cn(
-            train_ds, tokenizer, vocab, n_iter=n_iter, seed=seed)
-    else:
-        train_ds = apply_data_augmentation(
-            task_name,
-            train_ds,
-            tokenizer,
+        data_aug_fn = partial(
+            apply_data_augmentation,
+            task_name=task_name,
+            tokenizer=tokenizer,
             n_iter=n_iter,
             whole_word_mask=whole_word_mask,
             seed=seed)
+    train_ds = train_ds.map(data_aug_fn, batched=True)
     print("Data augmentation has been applied.")
 
     trans_fn = partial(
