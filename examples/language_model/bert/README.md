@@ -8,12 +8,6 @@
 
 ## 快速开始
 
-### 环境配置
-- Python >= 3.6
-- paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp\>=2.0.0rc`
-   ```
-
 ### 数据准备
 
 #### Pre-training数据准备

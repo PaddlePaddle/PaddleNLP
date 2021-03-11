@@ -8,28 +8,15 @@
 
 ## 快速开始
 
-### 安装说明
+### 环境依赖
 
-* PaddlePaddle 安装
+- sentencepiece
 
-   本项目依赖于 PaddlePaddle 2.0.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* PaddleNLP 安装
-
-   ```shell
-   pip install paddlenlp\>=2.0.0rc
-   ```
-
-* SentencePiece 安装
-   ```shell
-   pip install sentencepiece
-   ```
+安装命令：`pip install sentencepiece`
 
 ### 数据准备
 
-##### GLUE评测任务数据
-
-GLUE评测任务所含数据集已在paddlenlp中以API形式提供，无需预先准备，使用`run_glue.py`执行微调时将会自动下载。
+GLUE评测任务所含数据集已在paddlenlp中以API形式提供，无需预先准备，使用`run_glue.py`执行时将会自动下载。
 
 ### 执行Fine-tuning
 

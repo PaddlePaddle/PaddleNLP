@@ -1,23 +1,13 @@
-# GLUE with PaddleNLP
+# GLUE Benchmark
 
 [GLUE](https://gluebenchmark.com/)是当今使用最为普遍的自然语言理解评测基准数据集，评测数据涵盖新闻、电影、百科等许多领域，其中有简单的句子，也有困难的句子。其目的是通过公开的得分榜，促进自然语言理解系统的发展。详细可参考 [GLUE论文](https://openreview.net/pdf?id=rJ4km2R5t7)
 
 本项目是 GLUE评测任务 在 Paddle 2.0上的开源实现。
 
-## 1. 发布要点
+## 快速开始
 
-1. 支持CoLA、SST-2、MRPC、STS-B、QQP、MNLI、QNLI、RTE 8个GLUE评测任务的Fine-tuning。
-2. 支持 ernie、bert、electra 等预训练模型运行这些GLUE评测任务。
-
-## 2. 快速开始
-
-### 2.1 环境配置
-- Python >= 3.6
-- paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp\>=2.0.0rc`
-
-### 2.2 启动GLUE任务
-以 GLUE/SST-2 任务为例，启动GLUE任务进行Fine-tuning 的方式如下：
+### 启动GLUE任务
+以 GLUE/SST-2 任务为例，启动GLUE任务进行Fine-tuning的方式如下：
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0

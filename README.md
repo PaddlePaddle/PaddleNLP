@@ -32,13 +32,15 @@ PaddleNLP 2.0拥有**覆盖多场景的模型库**、**简洁易用的全流程A
 ### 环境依赖
 
 - python >= 3.6
-- paddlepaddle >= 2.0.0
+- paddlepaddle >= 2.0.1
 
 ### pip安装
 
 ```
-pip install paddlenlp\>=2.0.0rc
+pip install --upgrade paddlenlp -i https://pypi.org/simple 
 ```
+
+更多关于PaddlePaddle的安装和PaddleNLP安装详细教程请查看[Installation](./docs/get_started/installation.rst)
 
 ## 快速开始
 
@@ -52,7 +54,7 @@ train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev",
 
 可参考[Dataset文档](./docs/datasets.md)查看更多数据集。
 
-### 一键加载中文词向量
+### 一键加载预训练中文词向量
 
 ```python
 from paddlenlp.embeddings import TokenEmbedding

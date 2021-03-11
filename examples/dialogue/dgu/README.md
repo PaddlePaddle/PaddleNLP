@@ -35,12 +35,6 @@ DGU模型中的6个任务，分别采用不同的评估指标在test集上进行
 
 ## 快速开始
 
-### 环境配置
-
-- python >= 3.6
-- paddlepaddle >= 2.0.0, 安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp==2.0.0rc`
-
 ### 数据准备
 
 下载数据集压缩包并解压后，DGU_datasets目录下共存在6个目录，分别对应每个任务的训练集train.txt、评估集dev.txt和测试集test.txt。
