@@ -28,5 +28,6 @@ from .cmrc2018 import *
 from .drcd import *
 from .dureader_robust import *
 from .glue import *
+from .wmt14ende import *
 from .cnndm import *
 from .couplet import *
