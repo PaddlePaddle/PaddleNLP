@@ -100,7 +100,7 @@ class WMT14ende(DatasetBuilder):
                     tgt_line = tgt_line.strip()
                     if not src_line and not tgt_line:
                         continue
-                    yield {"source": src_line, "target": tgt_line}
+                    yield {"en": src_line, "de": tgt_line}
 
     def get_vocab(self):
         bpe_vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
