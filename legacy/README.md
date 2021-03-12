@@ -54,8 +54,6 @@ cd legacy/sentiment_classification
 |                    **阅读理解**                    | [machine_reading_comprehension](https://github.com/PaddlePaddle/models/tree/release/1.7/PaddleNLP/machine_reading_comprehension) | Paddle Machine Reading Comprehension，集合了百度在阅读理解领域相关的模型，工具，开源数据等一系列工作。包括DuReader (百度开源的基于真实搜索用户行为的中文大规模阅读理解数据集)，KT-Net (结合知识的阅读理解模型，SQuAD以及ReCoRD曾排名第一), D-Net (预训练-微调框架，在EMNLP2019 MRQA国际阅读理解评测获得第一)，等。 |
 |                    **对话系统**                    | [dialogue_system](https://github.com/PaddlePaddle/models/tree/release/1.7/PaddleNLP/dialogue_system) | 包括：1）DGU（Dialogue General Understanding，通用对话理解模型）覆盖了包括**检索式聊天系统**中context-response matching任务和**任务完成型对话系统**中**意图识别**，**槽位解析**，**状态追踪**等常见对话系统任务，在6项国际公开数据集中都获得了最佳效果。<br/> 2) knowledge-driven dialogue：百度开源的知识驱动的开放领域对话数据集，发表于ACL2019。<br/>3）ADEM（Auto Dialogue Evaluation Model）：对话自动评估模型，可用于自动评估不同对话生成模型的回复质量。 |
 |                    **机器翻译**                    | [machine_translation](https://github.com/PaddlePaddle/models/tree/release/1.7/PaddleNLP/machine_translation) | 全称为Paddle Machine Translation，基于Transformer的经典机器翻译模型。 |
-|                  **其他前沿工作**                  | [Research](https://github.com/PaddlePaddle/models/tree/release/1.7/PaddleNLP/Research) |                    百度最新前沿工作开源。                    |
-
 
 
 目录结构
