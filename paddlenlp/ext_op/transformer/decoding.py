@@ -271,10 +271,11 @@ class InferTransformerDecoding(nn.Layer):
         self.linear_bias = [linear.bias]
 
     def forward(self, enc_output, memory_seq_lens):
-        enc_output = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
-            enc_output, self._beam_size)
-        memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
-            memory_seq_lens, self._beam_size)
+        if "beam_search" == self._decoding_strategy:
+            enc_output = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
+                enc_output, self._beam_size)
+            memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
+                memory_seq_lens, self._beam_size)
 
         output_ids, parent_ids, sequence_length = infer_transformer_decoder(
             [enc_output], [memory_seq_lens],

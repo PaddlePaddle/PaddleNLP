@@ -103,7 +103,9 @@ public:
     typedef typename traits_::DataType DataType_;
 
     auto input_dims = input->dims();
-    int batch_size_ = input_dims[0] / beam_width_;
+    int batch_size_ = (decoding_strategy == "beam_search")
+                          ? input_dims[0] / beam_width_
+                          : input_dims[0];
     const int memory_max_seq_len = input_dims[1];
     const int memory_hidden_dim = input_dims[2];
     const int vocab_size = word_emb->dims()[0];

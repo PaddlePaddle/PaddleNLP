@@ -21,10 +21,11 @@ public:
     auto decoding_strategy = ctx->Attrs().Get<std::string>("decoding_strategy");
     auto beam_size = ctx->Attrs().Get<int>("beam_size");
     auto max_len = ctx->Attrs().Get<int64_t>("max_len");
-    int batch_size = input_dims[0] / beam_size;
+    int batch_size = input_dims[0];
 
     framework::DDim output_dims;
     if ("beam_search" == decoding_strategy) {
+      batch_size /= beam_size;
       output_dims = framework::make_ddim({max_len, batch_size, beam_size});
       ctx->SetOutputDim("ParentIds", output_dims);
       ctx->SetOutputDim("SequenceLength",
