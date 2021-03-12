@@ -292,10 +292,19 @@ class DatasetBuilder:
         if data_files:
             assert isinstance(data_files, str) or isinstance(
                 data_files, dict
-            ), "`data_files` should be a string or a dictionary whose key is split name ande value is a path of data file."
+            ) or isinstance(data_files, tuple) or isinstance(
+                data_files, tuple
+            ), "`data_files` should be a string or tuple or list or a dictionary whose key is split name ande value is a path of data file."
             if isinstance(data_files, str):
                 split = 'train'
                 datasets.append(self.read(filename=data_files, split=split))
+            elif isinstance(data_files, tuple) or isinstance(data_files, list):
+                split = 'train'
+                datasets += [
+                    self.read(
+                        filename=filename, split=split)
+                    for filename in data_files
+                ]
             else:
                 datasets += [
                     self.read(
