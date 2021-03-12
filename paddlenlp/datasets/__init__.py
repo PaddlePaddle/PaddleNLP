@@ -23,7 +23,7 @@ from .ptb import *
 from .squad import *
 from .translation import *
 from .dureader import *
-from .cnndm import *
+from .cnn_dailymail import *
 from .poetry import *
 from .couplet import *
 from .experimental import load_dataset, DatasetBuilder, MapDataset, IterDataset
