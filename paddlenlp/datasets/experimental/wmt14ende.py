@@ -71,9 +71,9 @@ class WMT14ende(DatasetBuilder):
         src_fullname = os.path.join(default_root, src_filename)
         tgt_fullname = os.path.join(default_root, tgt_filename)
 
-        (all_vocab_filename, all_vocab_hash), (sub_vocab_filename,
+        (bpe_vocab_filename, bpe_vocab_hash), (sub_vocab_filename,
                                                sub_vocab_hash) = self.VOCAB_INFO
-        all_vocab_fullname = os.path.join(default_root, all_vocab_filename)
+        bpe_vocab_fullname = os.path.join(default_root, bpe_vocab_filename)
         sub_vocab_fullname = os.path.join(default_root, sub_vocab_filename)
 
         if (not os.path.exists(src_fullname) or
@@ -81,9 +81,9 @@ class WMT14ende(DatasetBuilder):
                 not os.path.exists(tgt_fullname) or
                 (tgt_data_hash and
                  not md5file(tgt_fullname) == tgt_data_hash)) or (
-                     not os.path.exists(all_vocab_fullname) or
-                     (all_vocab_hash and
-                      not md5file(all_vocab_fullname) == all_vocab_hash)) or (
+                     not os.path.exists(bpe_vocab_fullname) or
+                     (bpe_vocab_hash and
+                      not md5file(bpe_vocab_fullname) == bpe_vocab_hash)) or (
                           not os.path.exists(sub_vocab_fullname) or
                           (sub_vocab_hash and
                            not md5file(sub_vocab_fullname) == sub_vocab_hash)):
@@ -100,16 +100,16 @@ class WMT14ende(DatasetBuilder):
                     tgt_line = tgt_line.strip()
                     if not src_line and not tgt_line:
                         continue
-                    yield {"src": src_line, "trg": tgt_line}
+                    yield {"source": src_line, "target": tgt_line}
 
     def get_vocab(self):
-        all_vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
+        bpe_vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
                                           self.VOCAB_INFO[0][0])
         sub_vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__,
                                           self.VOCAB_INFO[1][0])
         vocab_info = {
-            'all': {
-                'filepath': all_vocab_fullname,
+            'bpe': {
+                'filepath': bpe_vocab_fullname,
                 'unk_token': self.UNK_TOKEN,
                 'bos_token': self.BOS_TOKEN,
                 'eos_token': self.EOS_TOKEN
