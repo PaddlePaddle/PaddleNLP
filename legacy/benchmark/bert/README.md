@@ -8,7 +8,7 @@
 
 * 环境依赖  
 
-PYTHONPATH依赖于具体的使用环境，可参考如下设置
+PYTHONPATH依赖于具体的使用环境，可参考如下设置：
 
 ```shell
    export PYTHONPATH=${HOME}/PaddleNLP
@@ -16,7 +16,7 @@ PYTHONPATH依赖于具体的使用环境，可参考如下设置
 
 * 设置预训练的数据地址环境变量
 
-DATA_DIR依赖于具体的使用环境，可参考如下配置
+DATA_DIR依赖于具体的使用环境，可参考如下设置：
 
 ```shell
    export DATA_DIR=${HOME}/bert_data/wikicorpus_en
