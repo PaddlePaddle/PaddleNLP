@@ -57,11 +57,9 @@ def create_data_loader(args, places=None, use_all_vocab=False):
     args.src_vocab_size = padding_vocab(len(src_vocab))
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
 
-    lang = args.task.split("-")
-
     def convert_samples(sample):
-        source = sample[lang[0]].split()
-        target = sample[lang[1]].split()
+        source = sample[args.src_lang].split()
+        target = sample[args.trg_lang].split()
 
         source = src_vocab.to_indices(source)
         target = trg_vocab.to_indices(target)
@@ -124,11 +122,9 @@ def create_infer_loader(args, use_all_vocab=False):
     args.src_vocab_size = padding_vocab(len(src_vocab))
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
 
-    lang = args.task.split("-")
-
     def convert_samples(sample):
-        source = sample[lang[0]].split()
-        target = sample[lang[1]].split()
+        source = sample[args.src_lang].split()
+        target = sample[args.trg_lang].split()
 
         source = src_vocab.to_indices(source)
         target = trg_vocab.to_indices(target)
