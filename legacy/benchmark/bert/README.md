@@ -1,8 +1,26 @@
 # BERT Benchmark with Fleet API
 
-先配置运行环境
-export PYTHONPATH=/home/fangzeyang/PaddleNLP
-export DATA_DIR=/home/fangzeyang/bert_data/wikicorpus_en
+## Pre-training任务训练
+### 环境变量设置
+* PaddlePaddle 安装
+
+   本项目依赖于 PaddlePaddle 2.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
+
+* 环境依赖  
+
+PYTHONPATH依赖于具体的使用环境，可参考如下设置
+
+```shell
+   export PYTHONPATH=${HOME}/PaddleNLP
+```
+
+* 设置预训练的数据地址环境变量
+
+DATA_DIR依赖于具体的使用环境，可参考如下配置
+
+```shell
+   export DATA_DIR=${HOME}/bert_data/wikicorpus_en
+```
 
 ## NLP 任务中的Pretraining
 
