@@ -185,7 +185,7 @@ def evaluate(model, criterion, metric, data_loader, width_mult=1.0):
     res = metric.accumulate()
     if isinstance(metric, AccuracyAndF1):
         print(
-            "width_mult: %f, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
+            "width_mult: %s, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
             % (
                 width_mult,
                 loss.numpy(),
@@ -196,14 +196,14 @@ def evaluate(model, criterion, metric, data_loader, width_mult=1.0):
                 res[4], ),
             end='')
     elif isinstance(metric, Mcc):
-        print("width_mult: %f, eval loss: %f, mcc: %s, " % (width_mult, loss.numpy(), res[0]), end='')
+        print("width_mult: %s, eval loss: %f, mcc: %s, " % (str(width_mult), loss.numpy(), res[0]), end='')
     elif isinstance(metric, PearsonAndSpearman):
         print(
-            "width_mult: eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
-            % (width_mult, loss.numpy(), res[0], res[1], res[2]),
+            "width_mult: %s, eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
+            % (str(width_mult), loss.numpy(), res[0], res[1], res[2]),
             end='')
     else:
-        print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end='')
+        print("width_mult: %s, eval loss: %f, acc: %s, " % (str(width_mult), loss.numpy(), res), end='')
     model.train()
 
 ### monkey patch for bert forward to accept [attention_mask, head_mask] as  attention_mask
