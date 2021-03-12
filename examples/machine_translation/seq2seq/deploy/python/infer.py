@@ -23,12 +23,13 @@ import numpy as np
 
 import paddle
 from paddle import inference
-from paddlenlp.datasets import IWSLT15
+from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import BLEU
 
 from args import parse_args
 from data import create_infer_loader
 from predict import post_process_seq
+from paddlenlp.data import Vocab
 
 
 class Predictor(object):
@@ -91,10 +92,10 @@ class Predictor(object):
                         cand_list.append(word_list)
                         break
 
-        test_ds = IWSLT15.get_datasets(["test"])
+        test_ds = load_dataset('iwslt15', splits='test')
         bleu = BLEU()
         for i, data in enumerate(test_ds):
-            ref = data[1].split()
+            ref = data['vi'].split()
             bleu.add_inst(cand_list[i], [ref])
         print("BLEU score is %s." % bleu.score())
 
@@ -105,8 +106,8 @@ def main():
     predictor = Predictor.create_predictor(args)
     test_loader, src_vocab_size, tgt_vocab_size, bos_id, eos_id = create_infer_loader(
         args)
-    _, vocab = IWSLT15.get_vocab()
-    trg_idx2word = vocab.idx_to_token
+    tgt_vocab = Vocab.load_vocabulary(**test_loader.dataset.vocab_info['vi'])
+    trg_idx2word = tgt_vocab.idx_to_token
 
     predictor.predict(test_loader, args.infer_output_file, trg_idx2word, bos_id,
                       eos_id)

@@ -25,7 +25,6 @@ from paddle.io import DataLoader
 from paddlenlp.datasets import load_dataset
 
 from paddle.metric import Accuracy
-from paddlenlp.datasets import GlueCoLA, GlueSST2, GlueMRPC, GlueSTSB, GlueMNLI, GlueQNLI, GlueRTE
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
