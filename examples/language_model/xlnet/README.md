@@ -23,9 +23,8 @@ GLUE评测任务所含数据集已在paddlenlp中以API形式提供，无需预�
 以GLUE中的SST-2任务为例，启动Fine-tuning的方式如下：
 
 ```shell
-# 设置当前使用设备，如第0号卡
-export CUDA_VISIBLE_DEVICES=0
-python -m paddle.distributed.launch ./run_glue.py \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" ./run_glue.py \
     --model_name_or_path xlnet-base-cased \
     --task_name SST-2 \
     --max_seq_length 128 \
@@ -64,5 +63,5 @@ python -m paddle.distributed.launch ./run_glue.py \
 
 ## Reference
 
-- [XLNet: Generalized Autoregressive Pretraining for Language Understanding](https://arxiv.org/abs/1906.08237) 
+- [XLNet: Generalized Autoregressive Pretraining for Language Understanding](https://arxiv.org/abs/1906.08237)
 - [zihangdai/xlnet](https://github.com/zihangdai/xlnet)
