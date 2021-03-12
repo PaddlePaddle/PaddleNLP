@@ -21,17 +21,16 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.nn.initializer as I
 from paddle.metric import Metric, Accuracy, Precision, Recall
-from paddlenlp.datasets import GlueSST2, GlueQQP, ChnSentiCorp
 from paddlenlp.metrics import AccuracyAndF1
 from paddlenlp.embeddings import TokenEmbedding
 
 from args import parse_args
 from data import create_data_loader_for_small_model, create_pair_loader_for_small_model
 
-TASK_CLASSES = {
-    "sst-2": (GlueSST2, Accuracy),
-    "qqp": (GlueQQP, AccuracyAndF1),
-    "senta": (ChnSentiCorp, Accuracy),
+METRIC_CLASSES = {
+    "sst-2": Accuracy,
+    "qqp": AccuracyAndF1,
+    "chnsenticorp": Accuracy
 }
 
 
@@ -136,8 +135,8 @@ def evaluate(task_name, model, loss_fct, metric, data_loader):
 
 
 def do_train(args):
-    device = paddle.set_device(args.device)
-    metric_class = TASK_CLASSES[args.task_name][1]
+    device = paddle.set_device(args.select_device)
+    metric_class = METRIC_CLASSES[args.task_name]
     metric = metric_class()
     if args.task_name == 'qqp':
         train_data_loader, dev_data_loader = create_pair_loader_for_small_model(

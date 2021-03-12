@@ -64,7 +64,7 @@ python -u ./run_glue.py \
     --num_train_epochs 3 \
     --logging_steps 10 \
     --save_steps 10 \
-    --output_dir ../model_compression/distill_lstm/pretrained_modelss/$TASK_NAME/ \
+    --output_dir ../model_compression/distill_lstm/pretrained_models/$TASK_NAME/ \
     --n_gpu 1 \
 
 ```
@@ -81,7 +81,7 @@ python -u ./run_glue.py \
 
 ```shell
 CUDA_VISIBLE_DEVICES=0 python small.py \
-    --task_name senta \
+    --task_name chnsenticorp \
     --max_epoch 20 \
     --vocab_size 1256608 \
     --batch_size 64 \
@@ -90,7 +90,8 @@ CUDA_VISIBLE_DEVICES=0 python small.py \
     --lr 3e-4 \
     --dropout_prob 0.2 \
     --vocab_path senta_word_dict.txt \
-    --output_dir small_models/senta/
+    --save_steps 10000 \
+    --output_dir small_models/chnsenticorp/
 
 ```
 
@@ -103,6 +104,7 @@ CUDA_VISIBLE_DEVICES=0 python small.py \
     --lr 1.0 \
     --dropout_prob 0.4 \
     --output_dir small_models/SST-2 \
+    --save_steps 10000 \
     --embedding_name w2v.google_news.target.word-word.dim300.en
 
 ```
@@ -116,6 +118,7 @@ CUDA_VISIBLE_DEVICES=0 python small.py \
     --lr 2.0 \
     --dropout_prob 0.4 \
     --output_dir small_models/QQP \
+    --save_steps 10000 \
     --embedding_name w2v.google_news.target.word-word.dim300.en
 
 ```
@@ -125,16 +128,17 @@ CUDA_VISIBLE_DEVICES=0 python small.py \
 
 ```shell
 CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
-    --task_name senta \
+    --task_name chnsenticorp \
     --vocab_size 1256608 \
     --max_epoch 6 \
     --lr 1.0 \
     --dropout_prob 0.1 \
     --batch_size 64 \
     --model_name bert-wwm-ext-chinese \
-    --teacher_path pretrained_models/senta/best_bert_wwm_ext_model_880/model_state.pdparams \
+    --teacher_path pretrained_models/chnsenticorp/best_bert_wwm_ext_model_880/model_state.pdparams \
     --vocab_path senta_word_dict.txt \
-    --output_dir distilled_models/senta
+    --output_dir distilled_models/chnsenticorp \
+    --save_steps 10000 \
 
 ```
 
@@ -148,9 +152,10 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --dropout_prob 0.2 \
     --batch_size 128 \
     --model_name bert-base-uncased \
-    --embedding_name w2v.google_news.target.word-word.dim300.en \
     --output_dir distilled_models/SST-2 \
-    --teacher_path pretrained_models/SST-2/best_model_610/model_state.pdparams
+    --teacher_path pretrained_models/SST-2/best_model_610/model_state.pdparams \
+    --save_steps 10000 \
+    --embedding_name w2v.google_news.target.word-word.dim300.en \
 
 ```
 
@@ -163,10 +168,11 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --dropout_prob 0.2 \
     --batch_size 256 \
     --model_name bert-base-uncased \
-    --embedding_name w2v.google_news.target.word-word.dim300.en \
     --n_iter 10 \
     --output_dir distilled_models/QQP \
-    --teacher_path pretrained_models/QQP/best_model_17000/model_state.pdparams
+    --teacher_path pretrained_models/QQP/best_model_17000/model_state.pdparams \
+    --save_steps 10000 \
+    --embedding_name w2v.google_news.target.word-word.dim300.en \
 
 ```
 
@@ -174,7 +180,7 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
 
 
 ## 蒸馏实验结果
-本蒸馏实验基于GLUE的SST-2、QQP、中文情感分类ChnSentiCorp数据集。实验效果均使用每个数据集的验证集（dev）进行评价，评价指标是准确率（acc），其中QQP中包含f1值。利用基于BERT的教师模型去蒸馏基于Bi-LSTM的学生模型，对比Bi-LSTM小模型单独训练，在SST-2、QQP、senta(中文情感分类)任务上分别有3.3%、1.9%、1.4%的提升。
+本蒸馏实验基于GLUE的SST-2、QQP、中文情感分类ChnSentiCorp数据集。实验效果均使用每个数据集的验证集（dev）进行评价，评价指标是准确率（acc），其中QQP中包含f1值。利用基于BERT的教师模型去蒸馏基于Bi-LSTM的学生模型，对比Bi-LSTM小模型单独训练，在SST-2、QQP、ChnSentiCorp(中文情感分类)任务上分别有3.3%、1.9%、1.4%的提升。
 
 | Model             | SST-2(dev acc)    | QQP(dev acc/f1)            | ChnSentiCorp(dev acc) | ChnSentiCorp(dev acc) |
 | ----------------- | ----------------- | -------------------------- | --------------------- | --------------------- |
