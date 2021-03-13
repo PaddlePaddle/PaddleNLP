@@ -48,7 +48,7 @@ PaddleNLP提供了以下数据集的快速读取API：
 
 | 数据集名称  | 简介 | 调用方法 |
 | ----  | --------- | ------ |
-|  [CNN/DM](https://github.com/harvardnlp/sent-summary) | 美国有线新闻网络与每日邮报新闻文本摘要数据集| `paddlenlp.datasets.load_dataset('cnndm')`|
+|  [CNN/DM](https://github.com/harvardnlp/sent-summary) | 美国有线新闻网络与每日邮报新闻文本摘要数据集| `paddlenlp.datasets.load_dataset('cnn_dailymail')`|
 
 ## 文本生成
 
