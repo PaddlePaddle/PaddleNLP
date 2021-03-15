@@ -89,14 +89,6 @@ def create_data_loader(args):
         train_ds)
 
 
-def prepare_infer_input(insts, bos_id, eos_id, pad_id):
-    insts = [([bos_id] + inst[0] + [eos_id], [bos_id] + inst[1] + [eos_id])
-             for inst in insts]
-    src, src_length = Pad(pad_val=pad_id, ret_length=True)(
-        [inst[0] for inst in insts])
-    return src, src_length
-
-
 def prepare_train_input(insts, bos_id, eos_id, pad_id):
     # Add eos token id and bos token id.
     src = [[bos_id] + inst + [eos_id] for inst in insts]
