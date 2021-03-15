@@ -7,22 +7,6 @@ PaddleNLP已预置多个公开的预训练Embedding，用户可以通过使用`p
 
 ## 快速开始
 
-### 安装说明
-
-* PaddlePaddle 安装
-
-   本项目依赖于 PaddlePaddle 2.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* 环境依赖
-
-   - python >= 3.6
-   - paddlepaddle >= 2.0.0
-   - paddlenlp >= 2.0.0rc8
-
-   ```
-   pip install paddlenlp==2.0.0rc8
-   ```
-
 ### 启动训练
 
 我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在验证集（dev.tsv）验证。训练时会自动下载词表dict.txt，用于对数据集进行切分，构造数据样本。

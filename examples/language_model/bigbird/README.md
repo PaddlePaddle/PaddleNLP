@@ -15,29 +15,6 @@
 ```
 ## 快速开始
 
-### 安装说明
-
-* PaddlePaddle安装
-
-    本项目依赖于 PaddlePaddle 2.0.1 及以上版本或适当的develop版本，请参考 [安装指南](https://www.paddlepaddle.org.cn/install/quick) 进行安装。
-
-* Sentencepiece 安装
-
-   ```shell
-   pip install sentencepiece
-   ```
-
-* PaddleNLP 安装
-
-   ```shell
-   pip install paddlenlp\>=2.0.0rc5
-   ```
-
-* 下载代码
-
-    克隆代码库到本地
-
-
 ### 数据准备
 根据论文中的信息，目前 Big Bird 的预训练数据是主要是由 Books，CC-News，Stories, Wikipedia 4种预训练数据来构造，用户可以根据自己的需要来下载和清洗相应的数据。目前已提供一份示例数据在 data 目录。
 
