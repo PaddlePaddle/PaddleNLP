@@ -1,6 +1,6 @@
 # PaddleNLP Datasets API
 
-PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据需要添加splits信息：
+PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据需要**添加splits信息**：
 
 ## 阅读理解
 
@@ -62,3 +62,4 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 | 数据集名称  | 简介 | 调用方法 |
 | ----  | --------- | ------ |
 |  [PTB](http://www.fit.vutbr.cz/~imikolov/rnnlm/) | Penn Treebank Dataset | `paddlenlp.datasets.load_dataset('ptb')`|
+|  [Yahoo Answer 100k](https://arxiv.org/pdf/1702.08139.pdf)  | 从Yahoo Answer采样100K| `paddlenlp.datasets.load_dataset('yahoo_answer_100k')`|
