@@ -35,55 +35,31 @@ class Imdb(DatasetBuilder):
     """
     URL = 'https://dataset.bj.bcebos.com/imdb%2FaclImdb_v1.tar.gz'
     MD5 = '7c2ac02c03563afcf9b574c7e56c153a'
-    META_INFO = collections.namedtuple('META_INFO', ('file_dir', 'md5'))
-
-    SPLITS = {
-        'train': META_INFO(
-            os.path.join('aclImdb', 'train'),
-            '7c2ac02c03563afcf9b574c7e56c153a'),
-        'test': META_INFO(
-            os.path.join('aclImdb', 'test'),
-            '7c2ac02c03563afcf9b574c7e56c153a'),
-    }
 
     def _get_data(self, mode, **kwargs):
         """Downloads dataset."""
         default_root = DATA_HOME
-        data_dir, data_hash = self.SPLITS[mode]
-        data_dir = os.path.join(default_root, data_dir)
-        tar_file = os.path.join(default_root, "imdb%2FaclImdb_v1.tar.gz")
-        if not os.path.exists(tar_file) or (data_hash and
-                                            not md5file(tar_file) == data_hash):
+        imdb_dir = os.path.join(default_root, "aclImdb")
+        if not os.path.exists(imdb_dir):
             path = get_path_from_url(self.URL, default_root, self.MD5)
-
+        data_dir = os.path.join(imdb_dir, mode)
         return data_dir
 
     def _read(self, data_dir):
         translator = str.maketrans('', '', string.punctuation)
 
-        def _load_data(label):
+        for label in ["pos", "neg"]:
             root = os.path.join(data_dir, label)
             data_files = os.listdir(root)
-
             if label == "pos":
                 label_id = "1"
             elif label == "neg":
                 label_id = "0"
-
-            all_samples = []
             for f in data_files:
                 f = os.path.join(root, f)
                 data = io.open(f, 'r', encoding='utf8').readlines()
                 data = data[0].translate(translator)
-                all_samples.append((data, label_id))
-
-            return all_samples
-
-        data_set = _load_data("pos")
-        data_set.extend(_load_data("neg"))
-        np.random.shuffle(data_set)
-        for data in data_set:
-            yield {"text": data[0], "label": data[1]}
+                yield {"text": data, "label": label_id}
 
     def get_labels(self):
         """
