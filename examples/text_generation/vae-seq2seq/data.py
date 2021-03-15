@@ -37,10 +37,6 @@ def create_data_loader(args):
         examples = [
             train_ds[i]['sentence'].split() for i in range(len(train_ds))
         ]
-        examples += [dev_ds[i]['sentence'].split() for i in range(len(dev_ds))]
-        examples += [
-            test_ds[i]['sentence'].split() for i in range(len(test_ds))
-        ]
         vocab = Vocab.build_vocab(examples)
 
     vocab_size = len(vocab)
