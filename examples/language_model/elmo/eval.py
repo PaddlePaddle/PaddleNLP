@@ -55,19 +55,12 @@ def eval():
         shuffle=False,
         seed=args.random_seed)
 
-    # FIXME(xiemoyuan): When DataLoader support setting batch_size to None, 
-    #                   setting batch_size to None.
-    dev_dataloader = DataLoader(dev_dataset, return_list=True, batch_size=1)
+    dev_dataloader = DataLoader(dev_dataset, return_list=True, batch_size=None)
 
     total_step = total_loss = 0
     total_time = 0.0
     batch_start_time = time.time()
     for step, inputs in enumerate(dev_dataloader, start=1):
-        # FIXME(xiemoyuan): When DataLoader support setting batch_size to None, 
-        #                   deleting the operation of squeeze.
-        for j in range(len(inputs)):
-            inputs[j] = paddle.squeeze(inputs[j], axis=0)
-
         ids, next_ids, ids_reverse, next_ids_reverse = inputs
         outputs = elmo([ids, ids_reverse])
         loss = elmo_loss(outputs, [next_ids, next_ids_reverse])
