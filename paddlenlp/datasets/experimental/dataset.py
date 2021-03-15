@@ -293,7 +293,7 @@ class DatasetBuilder:
             assert isinstance(data_files, str) or isinstance(
                 data_files, dict
             ) or isinstance(data_files, tuple) or isinstance(
-                data_files, tuple
+                data_files, list
             ), "`data_files` should be a string or tuple or list or a dictionary whose key is split name ande value is a path of data file."
             if isinstance(data_files, str):
                 split = 'train'
