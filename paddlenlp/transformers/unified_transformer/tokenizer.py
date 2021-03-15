@@ -247,7 +247,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         An UnifiedTransformer sequence has the following format:
         ::
             - single sequence: ``[CLS] X [SEP]``
-            - pair of sequences: ``[CLS] A [SEP] [CLS] B [SEP]``
+            - pair of sequences: ``[CLS] A [SEP] B [SEP]``
         Args:
             token_ids_0 (list): List of IDs to which the special tokens will be 
                 added.
