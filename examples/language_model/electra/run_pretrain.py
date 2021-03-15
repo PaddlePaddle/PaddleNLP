@@ -640,6 +640,8 @@ def do_train(args):
                             for log in log_list:
                                 if len(log.strip()) > 0:
                                     f.write(log.strip() + '\n')
+            if global_step >= num_training_steps:
+                break
 
 
 def print_arguments(args):

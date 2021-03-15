@@ -21,16 +21,17 @@ from args import parse_args
 from data import create_data_loader
 
 
-def train():
-    device = paddle.set_device("gpu" if args.use_gpu else "cpu")
-    train_loader, valid_loader, test_loader, train_data_len = create_data_loader(
-        args.dataset, args.batch_size, sort_cache=True)
+def train(args):
+    print(args)
+    device = paddle.set_device(args.device)
+    train_loader, dev_loader, test_loader, vocab, bos_id, pad_id, train_data_len = create_data_loader(
+        args)
 
     net = VAESeq2SeqModel(
         embed_dim=args.embed_dim,
         hidden_size=args.hidden_size,
         latent_size=args.latent_size,
-        vocab_size=train_loader.dataset.vocab_size,
+        vocab_size=len(vocab) + 2,
         num_layers=args.num_layers,
         init_scale=args.init_scale,
         enc_dropout=args.enc_dropout,
@@ -48,7 +49,6 @@ def train():
         parameters=model.parameters(),
         grad_clip=gloabl_norm_clip)
 
-    print(args)
     if args.init_from_ckpt:
         model.load(args.init_from_ckpt)
         print("Loaded checkpoint from %s" % args.init_from_ckpt)
@@ -62,7 +62,7 @@ def train():
         metrics=[ppl_metric, nll_metric])
 
     model.fit(train_data=train_loader,
-              eval_data=valid_loader,
+              eval_data=dev_loader,
               epochs=args.max_epoch,
               save_dir=args.model_path,
               shuffle=False,
@@ -76,4 +76,4 @@ def train():
 
 if __name__ == '__main__':
     args = parse_args()
-    train()
+    train(args)
