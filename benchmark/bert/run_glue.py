@@ -400,6 +400,8 @@ def do_train(args):
                     os.makedirs(output_dir)
                 paddle.fluid.io.save_params(exe, output_dir)
                 tokenizer.save_pretrained(output_dir)
+            if global_step >= num_training_steps:
+                break
 
 
 if __name__ == "__main__":
