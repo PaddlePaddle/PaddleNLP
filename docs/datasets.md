@@ -1,6 +1,6 @@
 # PaddleNLP Datasets API
 
-PaddleNLP提供了以下数据集的快速读取API：
+PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据需要添加splits信息：
 
 ## 阅读理解
 
