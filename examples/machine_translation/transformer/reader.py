@@ -23,7 +23,6 @@ from paddle.io import BatchSampler, DataLoader, Dataset
 import paddle.distributed as dist
 from paddlenlp.data import Pad, Vocab
 from paddlenlp.datasets import load_dataset
-from paddlenlp.datasets import WMT14ende
 from paddlenlp.data.sampler import SamplerHelper
 
 
@@ -125,12 +124,13 @@ def create_infer_loader(args):
 
 
 def adapt_vocab_size(args):
-    root = None if args.root == "None" else args.root
-    (src_vocab, trg_vocab) = WMT14ende.get_vocab(root=root)
+    dataset = load_dataset('wmt14ende', splits=('test'))
+    src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
+    trg_vocab = src_vocab
+
     padding_vocab = (
         lambda x: (x + args.pad_factor - 1) // args.pad_factor * args.pad_factor
     )
-
     args.src_vocab_size = padding_vocab(len(src_vocab))
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
 
