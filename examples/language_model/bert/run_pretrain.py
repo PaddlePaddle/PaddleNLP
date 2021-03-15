@@ -140,12 +140,6 @@ def parse_args():
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
-        "--n_procs",
-        default=1,
-        type=int,
-        help="Number procs for the training, only support multi cards in the gpu/xpu."
-    )
-    parser.add_argument(
         "--device",
         type=str,
         default="gpu",
@@ -437,7 +431,4 @@ if __name__ == "__main__":
         "cpu", "gpu", "xpu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
 
-    if args.n_procs > 1 and args.device != "cpu":
-        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_procs)
-    else:
-        do_train(args)
+    do_train(args)
