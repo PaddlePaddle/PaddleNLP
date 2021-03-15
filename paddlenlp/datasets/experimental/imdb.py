@@ -38,14 +38,13 @@ class Imdb(DatasetBuilder):
 
     def _get_data(self, mode, **kwargs):
         """Downloads dataset."""
-        default_root = DATA_HOME
-        imdb_dir = os.path.join(default_root, "aclImdb")
-        if not os.path.exists(imdb_dir):
+        default_root = os.path.join(DATA_HOME, self.__class__.__name__)
+        data_dir = os.path.join(default_root, "aclImdb", mode)
+        if not os.path.exists(data_dir):
             path = get_path_from_url(self.URL, default_root, self.MD5)
-        data_dir = os.path.join(imdb_dir, mode)
         return data_dir
 
-    def _read(self, data_dir):
+    def _read(self, data_dir, *args):
         translator = str.maketrans('', '', string.punctuation)
 
         for label in ["pos", "neg"]:
