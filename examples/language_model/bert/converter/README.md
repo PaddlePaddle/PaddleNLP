@@ -64,7 +64,9 @@
    ```shell
    export PDNLP= PaddleNLP repo的本地地址
    export PYTHONPATH=$PYTHONPATH:$PDNLP
-   python -u $CONVERT_MODEL/run_glue_pp.py \
+   unset CUDA_VISIBLE_DEVICES
+
+   python -m paddle.distributed.launch --gpus "0"  $CONVERT_MODEL/run_glue_pp.py \
         --model_type bert \
         --model_name_or_path $MODEL \
         --task_name QNLI \
@@ -75,7 +77,6 @@
         --logging_steps 1 \
         --save_steps 500 \
         --output_dir ./tmp/$MODEL/ \
-        --n_procs 1 \
         --params_pd_path params.pd
    ```
 
