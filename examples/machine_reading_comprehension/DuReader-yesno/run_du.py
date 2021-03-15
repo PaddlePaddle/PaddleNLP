@@ -16,6 +16,7 @@ import collections
 import os
 import random
 import time
+import math
 
 from functools import partial
 import numpy as np
@@ -150,6 +151,7 @@ def do_train(args):
 
     num_training_steps = args.max_steps if args.max_steps > 0 else len(
         train_data_loader) * args.num_train_epochs
+    num_train_epochs = math.ceil(num_training_steps / len(train_data_loader))
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
@@ -170,7 +172,7 @@ def do_train(args):
 
     global_step = 0
     tic_train = time.time()
-    for epoch in range(args.num_train_epochs):
+    for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
             input_ids, segment_ids, label = batch
@@ -181,7 +183,7 @@ def do_train(args):
             if global_step % args.logging_steps == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss,
+                    % (global_step, epoch + 1, step + 1, loss,
                        args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
             loss.backward()
@@ -202,6 +204,8 @@ def do_train(args):
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
                     print('Saving checkpoint to:', output_dir)
+                if global_step == num_training_steps:
+                    break
 
     if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
         predictions = predict(model, test_data_loader)
