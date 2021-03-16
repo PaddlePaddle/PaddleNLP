@@ -33,8 +33,10 @@ PaddleNLP aims to accelerate NLP applications through powerful model zoo, easy-t
 * python >= 3.6
 * paddlepaddle >= 2.0.0
 
+### pip Installation
+
 ```
-pip install paddlenlp>=2.0.0rc
+pip install --upgrade paddlenlp -i https://pypi.org/simple
 ```
 
 ## Quick Start
@@ -54,9 +56,9 @@ train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev",
 from paddlenlp.embeddings import TokenEmbedding
 
 wordemb = TokenEmbedding("w2v.baidu_encyclopedia.target.word-word.dim300")
-print(wordemb.cosine_sim("国王", "王后"))
+print(wordemb.cosine_sim("king", "queen"))
 >>> 0.63395125
-wordemb.cosine_sim("艺术", "火车")
+wordemb.cosine_sim("arts", "train")
 >>> 0.14792643
 ```
 
@@ -84,7 +86,7 @@ from paddlenlp.transformers import ErnieTokenizer, ErnieModel
 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 model = ErnieModel.from_pretrained('ernie-1.0')
 
-text = tokenizer('自然语言处理')
+text = tokenizer('natural language processing')
 pooled_output, sequence_output = model.forward(input_ids=paddle.to_tensor([text['input_ids']]))
 ```
 
