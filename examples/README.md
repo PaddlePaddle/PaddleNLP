@@ -1,6 +1,6 @@
 # PaddleNLP 应用示例
 
-[**PaddleNLP**](https://github.com/PaddlePaddle/models/tree/develop/PaddleNLP) 是基于 PaddlePaddle 深度学习框架开发的自然语言处理 (NLP) 工具，算法，模型和数据的开源项目。百度在 NLP 领域十几年的深厚积淀为 PaddleNLP 提供了强大的核心动力。PaddleNLP 提供较为丰富的模型库，基本涵盖了主流的NLP任务，因为模型库中使用了PaddleNLP提供的基础NLP工具，例如数据集处理，高层API，使得模型库的算法简洁易懂。
+[**PaddleNLP**](https://github.com/PaddlePaddle/PaddleNLP) 是基于 PaddlePaddle 深度学习框架开发的自然语言处理 (NLP) 工具，算法，模型和数据的开源项目。百度在 NLP 领域十几年的深厚积淀为 PaddleNLP 提供了强大的核心动力。PaddleNLP 提供较为丰富的模型库，基本涵盖了主流的NLP任务，因为模型库中使用了PaddleNLP提供的基础NLP工具，例如数据集处理，高层API，使得模型库的算法简洁易懂。
 
 下面是 PaddleNLP 支持任务的具体信息，涵盖了 [**NLP基础技术**](#nlp基础技术)，[**NLP核心技术**](#nlp核心技术)， [**NLP系统应用**](#nlp系统应用)三大领域。同时随着NLP序列建模技术的成熟，我们还提供了更多的基于NLP序列建模技术的应用场景如[蛋白质二级结构预测](#蛋白质二级结构预测-protein-secondary-structure-prediction)以及进阶的[模型压缩](#模型压缩-model-compression)应用示例。
 
@@ -45,7 +45,7 @@ PaddleNLP 提供了多种成熟的预训练模型技术，适用于自然语言�
 
 | 模型    | 简介     |
 | ------- | ------- |
-| [BERT](./language_model/bert/) |[BERT(Bidirectional Encoder Representation from Transformers)](./examples/language_model/bert)     |
+| [BERT](./language_model/bert/) | [BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding](https://arxiv.org/abs/1810.04805)     |
 | [ERNIE](./text_classification/pretrained_models) | [ERNIE: Enhanced Representation through Knowledge Integration](https://arxiv.org/abs/1904.09223)   |
 | [ERNIE-Tiny](./text_classification/pretrained_models) | 百度自研的小型化ERNIE网络结构，采用浅层Transformer，加宽隐层参数，中文subword粒度词表结合蒸馏的方法使模型相比SOTA Before BERT 提升8.35%， 速度提升4.3倍。 |
 | [ERNIE-GEN](./text_generation/ernie-gen) | [ERNIE-GEN: An Enhanced Multi-Flow Pre-training and Fine-tuning Framework for Natural Language Generation](https://arxiv.org/abs/2001.11314) ERNIE-GEN是百度发布的生成式预训练模型，通过Global-Attention的方式解决训练和预测曝光偏差的问题，同时使用Multi-Flow Attention机制来分别进行Global和Context信息的交互，同时通过片段生成的方式来增加语义相关性。    |

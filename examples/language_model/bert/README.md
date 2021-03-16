@@ -8,18 +8,6 @@
 
 ## 快速开始
 
-### 安装说明
-
-* PaddlePaddle 安装
-
-   本项目依赖于 PaddlePaddle 2.0rc1 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* PaddleNLP 安装
-
-   ```shell
-   pip install paddlenlp>=2.0.0b
-   ```
-
 ### 数据准备
 
 #### Pre-training数据准备
@@ -58,8 +46,10 @@ GLUE评测任务所含数据集已在paddlenlp中以API形式提供，无需预�
 
 ### 执行Pre-training
 
+#### GPU训练
 ```shell
-python -u ./run_pretrain.py \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" run_pretrain.py \
     --model_type bert \
     --model_name_or_path bert-base-uncased \
     --max_predictions_per_seq 20 \
@@ -75,10 +65,30 @@ python -u ./run_pretrain.py \
     --save_steps 20000 \
     --max_steps 1000000 \
     --device gpu \
-    --n_procs 1 \
     --use_amp False
 ```
 
+#### XPU训练
+```shell
+unset FLAGS_selected_xpus
+python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
+    --model_type bert \
+    --model_name_or_path bert-base-uncased \
+    --max_predictions_per_seq 20 \
+    --batch_size 32   \
+    --learning_rate 1e-4 \
+    --weight_decay 1e-2 \
+    --adam_epsilon 1e-6 \
+    --warmup_steps 10000 \
+    --num_train_epochs 3 \
+    --input_dir data/ \
+    --output_dir pretrained_models/ \
+    --logging_steps 1 \
+    --save_steps 20000 \
+    --max_steps 1000000 \
+    --device xpu \
+    --use_amp False
+```
 其中参数释义如下：
 - `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
 - `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
@@ -94,7 +104,6 @@ python -u ./run_pretrain.py \
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `max_steps` 表示最大训练步数。若训练`num_train_epochs`轮包含的训练步数大于该值，则达到`max_steps`后就提前结束。
-- `n_procs` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可。
 - `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `use_amp` 指示是否启用自动混合精度训练。
 
@@ -105,7 +114,8 @@ python -u ./run_pretrain.py \
 以GLUE中的SST-2任务为例，启动Fine-tuning的方式如下：
 
 ```shell
-python -u ./run_glue.py \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" run_glue.py \
     --model_type bert \
     --model_name_or_path bert-base-uncased \
     --task_name SST-2 \
@@ -117,13 +127,12 @@ python -u ./run_glue.py \
     --save_steps 500 \
     --output_dir ./tmp/ \
     --device gpu \
-    --n_procs 1 \
     --use_amp False
 ```
 
 其中参数释义如下：
 - `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
-- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。注：`bert-base-uncased`等对应使用的预训练模型转自[huggingface/transformers](https://github.com/huggingface/transformers)，具体可参考当前目录下converter中的内容。
 - `task_name` 表示Fine-tuning的任务。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
@@ -132,7 +141,6 @@ python -u ./run_glue.py \
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
-- `n_procs` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可。
 - `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `use_amp` 指示是否启用自动混合精度训练。
 

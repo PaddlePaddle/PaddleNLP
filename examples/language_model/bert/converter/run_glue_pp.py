@@ -30,7 +30,7 @@ from paddle.metric import Metric, Accuracy, Precision, Recall
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
+from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer, BertForPretraining, BertModel
 from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -168,6 +168,11 @@ def parse_args():
         type=float,
         default=2**15,
         help="The value of scale_loss for fp16.")
+    parser.add_argument(
+        "--params_pd_path",
+        type=str,
+        default=None,
+        help="The path of dumped weights.")
     args = parser.parse_args()
     return args
 
@@ -265,7 +270,8 @@ def do_train(args):
         max_seq_length=args.max_seq_length)
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_ds, batch_size=args.batch_size, shuffle=True)
+        train_ds, batch_size=args.batch_size,
+        shuffle=False)  # for same data when converting
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
@@ -312,8 +318,11 @@ def do_train(args):
             return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
-    model = model_class.from_pretrained(
-        args.model_name_or_path, num_classes=num_classes)
+    # model = model_class.from_pretrained(
+    #     args.model_name_or_path, num_classes=num_classes)
+    model = BertForPretraining(
+        BertModel(**model_class.pretrained_init_configuration[
+            args.model_name_or_path]))
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -345,6 +354,18 @@ def do_train(args):
     metric = metric_class()
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
+
+    # load converted model and run once to compare
+    model.eval()
+    param_names = list(model.state_dict().keys())
+    import pickle
+    with open(args.params_pd_path, "rb") as f:
+        np_params = pickle.load(f)
+    model.set_state_dict(dict(zip(param_names, np_params)))
+    paddle.save(model.state_dict(), "%s.pdparams" % args.model_name_or_path)
+    for data in train_data_loader():
+        print(model(*data[:-1]))
+        exit(0)
 
     global_step = 0
     tic_train = time.time()
@@ -394,8 +415,6 @@ def do_train(args):
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
-            if global_step >= num_training_steps:
-                return
 
 
 def print_arguments(args):

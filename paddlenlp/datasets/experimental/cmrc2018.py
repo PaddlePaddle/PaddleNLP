@@ -59,10 +59,12 @@ class CMRC2018(DatasetBuilder):
                     qas_id = qa["id"]
                     question = qa["question"].strip()
                     answer_starts = [
-                        answer["answer_start"] for answer in qa["answers"]
+                        answer["answer_start"]
+                        for answer in qa.get("answers", [])
                     ]
                     answers = [
-                        answer["text"].strip() for answer in qa["answers"]
+                        answer["text"].strip()
+                        for answer in qa.get("answers", [])
                     ]
 
                     yield {

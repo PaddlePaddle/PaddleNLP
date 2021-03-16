@@ -12,17 +12,9 @@
 4. CRF 以 GRU 学习到的特征为输入，以标记序列为监督信号，实现序列标注。
 
 
-## 2. 快速开始
+## 快速开始
 
-### 2.1 环境配置
-
-- Python >= 3.6
-
-- paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp\>=2.0.0rc`
-
-### 2.2 数据准备
+### 数据准备
 
 我们提供了少数样本用以示例输入数据格式。执行以下命令，下载并解压示例数据集：
 
@@ -48,7 +40,7 @@ python download.py --data_dir ./
 | c    | 连词     | u    | 助词     | xc   | 其他虚词 | w    | 标点符号 |
 | PER  | 人名     | LOC  | 地名     | ORG  | 机构名   | TIME | 时间     |
 
-### 2.3 模型训练
+### 模型训练
 
 模型训练支持 CPU 和 GPU，使用 GPU 之前应指定使用的显卡卡号：
 
@@ -70,7 +62,7 @@ python train.py \
 
 其中 data_dir 是数据集所在文件夹路径，init_checkpoint 是模型加载路径，通过设置init_checkpoint可以启动增量训练。
 
-### 2.4 模型评估
+### 模型评估
 
 通过加载训练保存的模型，可以对测试集数据进行验证，启动方式如下：
 
@@ -81,7 +73,7 @@ python eval.py --data_dir ./lexical_analysis_dataset_tiny \
         --use_gpu
 ```
 
-### 2.5 模型预测
+### 模型预测
 
 对无标签数据可以启动模型预测：
 
@@ -106,4 +98,5 @@ python predict.py --data_dir ./lexical_analysis_dataset_tiny \
 如果您希望使用已经预训练好了的LAC模型完成词法分析任务，请参考：
 
 [Lexical Analysis of Chinese](https://github.com/baidu/lac)
+
 [PaddleHub分词模型](https://www.paddlepaddle.org.cn/hubdetail?name=lac&en_category=LexicalAnalysis)

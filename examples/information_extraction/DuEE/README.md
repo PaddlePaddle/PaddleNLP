@@ -12,29 +12,12 @@
 同时，我们提供了该示例在线运行展示教程：
 [PaddleNLP实战——LIC2021事件抽取任务基线](https://aistudio.baidu.com/aistudio/projectdetail/1605425)
 
-
-## 环境依赖
-
-* PaddlePaddle 安装
-
-   本项目依赖于 PaddlePaddle 2.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* PaddleNLP 安装
-
-   ```shell
-   pip install --upgrade paddlenlp\>=2.0.0rc5
-   ```
-
-* 环境依赖
-
-   Python的版本要求 3.6+，其它环境请参考 PaddlePaddle [安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/1.5/beginners_guide/install/index_cn.html) 部分的内容
-
 ## 目录结构
 
 以下是本项目主要目录结构及说明：
 
 ```text
-event_extraction/
+DuEE/
 ├── classifier.py # 文本分类训练脚本
 ├── duee_1_data_prepare.py # 句子级事件抽取数据预处理
 ├── duee_1_postprocess.py # 句子级事件抽取数据后处理

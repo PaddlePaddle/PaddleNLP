@@ -2,7 +2,7 @@
 
 This project is the implementation of [XLNet](https://github.com/zihangdai/xlnet) on Paddle Fluid, currently supporting the fine-tuning on all downstream tasks, including natural language inference, question answering (SQuAD) etc.
 
-There are a lot differences between XLNet and [BERT](../BERT). XLNet takes adavangtage of a new novel model [Transformer-XL](https://arxiv.org/abs/1901.02860) as the backbone of language representation, and the permutation language modeling as the optimizing objective. Also XLNet involed much more data in the pre-training stage. Finally, XLNet achieved SOTA results on several NLP tasks.
+There are a lot differences between XLNet and [BERT](../../../examples/language_model/bert). XLNet takes adavangtage of a new novel model [Transformer-XL](https://arxiv.org/abs/1901.02860) as the backbone of language representation, and the permutation language modeling as the optimizing objective. Also XLNet involed much more data in the pre-training stage. Finally, XLNet achieved SOTA results on several NLP tasks.
 
 For more details, please refer to the research paper
 

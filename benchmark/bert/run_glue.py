@@ -25,7 +25,6 @@ from paddle.io import DataLoader
 from paddlenlp.datasets import load_dataset
 
 from paddle.metric import Accuracy
-from paddlenlp.datasets import GlueCoLA, GlueSST2, GlueMRPC, GlueSTSB, GlueMNLI, GlueQNLI, GlueRTE
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
@@ -401,6 +400,8 @@ def do_train(args):
                     os.makedirs(output_dir)
                 paddle.fluid.io.save_params(exe, output_dir)
                 tokenizer.save_pretrained(output_dir)
+            if global_step >= num_training_steps:
+                return
 
 
 if __name__ == "__main__":

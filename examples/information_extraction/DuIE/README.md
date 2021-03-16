@@ -9,30 +9,12 @@
 [PaddleNLP实战——LIC2021关系抽取任务基线](https://aistudio.baidu.com/aistudio/projectdetail/1611211)
 
 
-## 环境依赖
-
-* PaddlePaddle 安装
-
-   本项目依赖于 PaddlePaddle 2.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* PaddleNLP 安装
-
-   ```shell
-   pip install --upgrade paddlenlp\>=2.0.0rc5
-   ```
-
-* 环境依赖
-
-   Python的版本要求 3.6+，其它环境请参考 PaddlePaddle [安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/1.5/beginners_guide/install/index_cn.html) 部分的内容
-
-
 ## 目录结构
-
 
 以下是本项目主要目录结构及说明：
 
 ```text
-event_extraction/
+DuIE/
 ├── data_loader.py # 加载数据
 ├── extract_chinese_and_punct.py # 文本数据预处理
 ├── README.md # 文档说明
