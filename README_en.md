@@ -7,9 +7,10 @@ English | [简体中文](./README.md)
 ---------------------------------------------------------------------------------
 
 [![PyPI - PaddleNLP Version](https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white)](https://pypi.org/project/paddlenlp/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/paddlenlp)](https://pypi.org/project/paddlenlp/)
+[![PyPI Status](https://pepy.tech/badge/paddlenlp)](https://pepy.tech/project/paddlenlp)
 ![python version](https://img.shields.io/badge/python-3.6+-orange.svg)
 ![support os](https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg)
-[![Downloads](https://pepy.tech/badge/paddlenlp/month)](https://pepy.tech/project/paddlenlp)
 ![GitHub](https://img.shields.io/github/license/maiot-io/paddlenlp)
 
 ## Introduction
