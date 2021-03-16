@@ -6,9 +6,11 @@ English | [简体中文](./README.md)
 
 ---------------------------------------------------------------------------------
 
-![License](https://img.shields.io/badge/license-Apache%202-red.svg)
+[![PyPI - PaddleNLP Version](https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white)](https://pypi.org/project/paddlenlp/)
 ![python version](https://img.shields.io/badge/python-3.6+-orange.svg)
 ![support os](https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg)
+[![Downloads](https://pepy.tech/badge/paddlenlp/month)](https://pepy.tech/project/paddlenlp)
+![GitHub](https://img.shields.io/github/license/maiot-io/paddlenlp)
 
 ## Introduction
 
@@ -137,6 +139,14 @@ Please refer to our official AI Studio account for more interactive tutorials: [
 
 ## Community
 
+### Special Interest Group(SIG)
+
+Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for contribution, eg. Dataset, Models and Toolkit.
+
+### Slack
+To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
+
+### QQ
 Join our QQ Technical Group for technical exchange right now! ⬇️
 
 <div align="center">

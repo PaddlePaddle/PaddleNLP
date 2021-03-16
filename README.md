@@ -5,10 +5,11 @@
 </p>
 
 ------------------------------------------------------------------------------------------
-
-![License](https://img.shields.io/badge/license-Apache%202-red.svg)
+[![PyPI - PaddleNLP Version](https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white)](https://pypi.org/project/paddlenlp/)
 ![python version](https://img.shields.io/badge/python-3.6+-orange.svg)
 ![support os](https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg)
+[![Downloads](https://pepy.tech/badge/paddlenlp/month)](https://pepy.tech/project/paddlenlp)
+![GitHub](https://img.shields.io/github/license/maiot-io/paddlenlp)
 
 ## 简介
 
@@ -37,7 +38,7 @@ PaddleNLP 2.0拥有**覆盖多场景的模型库**、**简洁易用的全流程A
 ### pip安装
 
 ```
-pip install --upgrade paddlenlp -i https://pypi.org/simple 
+pip install --upgrade paddlenlp -i https://pypi.org/simple
 ```
 
 更多关于PaddlePaddle的安装和PaddleNLP安装详细教程请查看[Installation](./docs/get_started/installation.rst)
@@ -147,13 +148,18 @@ PaddleNLP模型库整体介绍请参考文档[PaddleNLP Model Zoo](./docs/model_
 
 ## 社区贡献与技术交流
 
+### 特殊兴趣小组
 - 欢迎您加入PaddleNLP的SIG社区，贡献优秀的模型实现、公开数据集、教程与案例、外围小工具。
+
+### QQ
 - 现在就加入PaddleNLP的QQ技术交流群，一起交流NLP技术吧！⬇️
 
 <div align="center">
   <img src="./docs/imgs/qq.png" width="200" height="200" />
 </div>  
 
+### Slack
+- 欢迎加入[PaddleNLP Slack channel](https://paddlenlp.slack.com/)与我们的开发者进行技术交流。
 
 ## License
 
