@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
-import sys
 import numpy as np
-from collections import defaultdict
-
 import paddle
 
 __all__ = ['Distinct']
