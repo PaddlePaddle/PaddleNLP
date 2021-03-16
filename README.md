@@ -6,9 +6,12 @@
 
 ------------------------------------------------------------------------------------------
 
-![License](https://img.shields.io/badge/license-Apache%202-red.svg)
+[![PyPI - PaddleNLP Version](https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white)](https://pypi.org/project/paddlenlp/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/paddlenlp)](https://pypi.org/project/paddlenlp/)
+[![PyPI Status](https://pepy.tech/badge/paddlenlp/month)](https://pepy.tech/project/paddlenlp)
 ![python version](https://img.shields.io/badge/python-3.6+-orange.svg)
 ![support os](https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg)
+![GitHub](https://img.shields.io/github/license/paddlepaddle/paddlenlp)
 
 ## 简介
 
@@ -17,7 +20,7 @@ PaddleNLP 2.0拥有**覆盖多场景的模型库**、**简洁易用的全流程A
 ## 特性
 
 - **覆盖多场景的模型库**
-  - PaddleNLP集成了RNN与Transformer等多种主流模型结构，涵盖从[词向量](./exmaples/word_embedding/)、[词法分析](./examples/lexical_analysis/)、[命名实体识别](./examples/information_extraction/msra_ner/)、[语义表示](./examples/language_model/)等NLP基础技术，到[文本分类](./examples/text_classification/)、[文本匹配](./examples/text_matching/)、[文本生成](./examples/text_generation/)、[文本图学习](./examples/text_graph/erniesage/)、[信息抽取](./examples/information_extraction)等NLP核心技术。同时针对[机器翻译](./examples/machine_translation/)、[通用对话](./examples/dialogue/)、[阅读理解](./exampels/machine_reading_comprehension/)等系统应用提供相应核心组件与预训练模型。更多详细介绍请查看[PaddleNLP应用示例](./examples/)。
+  - PaddleNLP集成了RNN与Transformer等多种主流模型结构，涵盖从[词向量](./examples/word_embedding/)、[词法分析](./examples/lexical_analysis/)、[命名实体识别](./examples/information_extraction/msra_ner/)、[语义表示](./examples/language_model/)等NLP基础技术，到[文本分类](./examples/text_classification/)、[文本匹配](./examples/text_matching/)、[文本生成](./examples/text_generation/)、[文本图学习](./examples/text_graph/erniesage/)、[信息抽取](./examples/information_extraction)等NLP核心技术。同时针对[机器翻译](./examples/machine_translation/)、[通用对话](./examples/dialogue/)、[阅读理解](./examples/machine_reading_comprehension/)等系统应用提供相应核心组件与预训练模型。更多详细介绍请查看[PaddleNLP应用示例](./examples/)。
 
 
 - **简洁易用的全流程API**
@@ -32,27 +35,29 @@ PaddleNLP 2.0拥有**覆盖多场景的模型库**、**简洁易用的全流程A
 ### 环境依赖
 
 - python >= 3.6
-- paddlepaddle >= 2.0.0
+- paddlepaddle >= 2.0.1
 
 ### pip安装
 
 ```
-pip install paddlenlp\>=2.0.0rc
+pip install --upgrade paddlenlp -i https://pypi.org/simple
 ```
+
+更多关于PaddlePaddle的安装和PaddleNLP安装详细教程请查看[Installation](./docs/get_started/installation.rst)
 
 ## 快速开始
 
 ### 数据集快速加载
 
 ```python
-from paddlenlp.datasets import ChnSentiCorp
+from paddlenlp.datasets import load_dataset
 
-train_ds, dev_ds, test_ds = ChnSentiCorp.get_datasets(['train', 'dev', 'test'])
+train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
 ```
 
 可参考[Dataset文档](./docs/datasets.md)查看更多数据集。
 
-### 一键加载中文词向量
+### 一键加载预训练中文词向量
 
 ```python
 from paddlenlp.embeddings import TokenEmbedding
@@ -77,6 +82,19 @@ bert = BertModel.from_pretrained('bert-wwm-chinese')
 roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
 electra = ElectraModel.from_pretrained('chinese-electra-small')
 gpt2 = GPT2ForPretraining.from_pretrained('gpt2-base-cn')
+```
+
+### 便捷获取文本特征
+
+```python
+import paddle
+from paddlenlp.transformers import ErnieTokenizer, ErnieModel
+
+tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+model = ErnieModel.from_pretrained('ernie-1.0')
+
+text = tokenizer('自然语言处理')
+pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
 ```
 
 请参考[Transformer API文档](./docs/transformers.md)查看目前支持的预训练模型。
@@ -132,13 +150,18 @@ PaddleNLP模型库整体介绍请参考文档[PaddleNLP Model Zoo](./docs/model_
 
 ## 社区贡献与技术交流
 
+### 特殊兴趣小组
 - 欢迎您加入PaddleNLP的SIG社区，贡献优秀的模型实现、公开数据集、教程与案例、外围小工具。
+
+### QQ
 - 现在就加入PaddleNLP的QQ技术交流群，一起交流NLP技术吧！⬇️
 
 <div align="center">
   <img src="./docs/imgs/qq.png" width="200" height="200" />
 </div>  
 
+### Slack
+- 欢迎加入[PaddleNLP Slack channel](https://paddlenlp.slack.com/)与我们的开发者进行技术交流。
 
 ## License
 

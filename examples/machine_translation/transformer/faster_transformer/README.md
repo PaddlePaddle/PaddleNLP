@@ -6,7 +6,7 @@
 
 * 本项目依赖于 PaddlePaddle 2.0.1 及以上版本或适当的 develop 版本
 * CMake >= 3.10
-* CUDA 10.1 或是更新的版本（需要 PaddlePaddle 框架一致）
+* CUDA 10.1（需要 PaddlePaddle 框架一致）
 * gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
 * 推荐使用 Python3
 * [Faster Transformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer/v3.1#setup) 使用必要的环境
@@ -92,10 +92,7 @@ transformer = FasterTransformer(
 同时，我们提供了一份已经处理好的数据集，可以编写如下代码，对应的数据集将会自动下载并且解压到 `~/.paddlenlp/datasets/machine_translation/WMT14ende/`。
 
 ``` python
-# 获取默认的数据处理方式
-transform_func = WMT14ende.get_default_transform_func(root=root)
-# 下载并处理 WMT14.en-de 翻译数据集
-dataset = WMT14ende.get_datasets(mode="train", transform_func=transform_func)
+datasets = load_dataset('wmt14ende', splits=('test'))
 ```
 
 

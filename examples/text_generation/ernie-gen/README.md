@@ -6,19 +6,15 @@ ERNIE-GEN 是面向生成任务的预训练-微调框架，首次在预训练阶
 
 ![multi-flow-attention](https://github.com/PaddlePaddle/ERNIE/raw/repro/ernie-gen/.meta/multi-flow-attention.png)
 
-## 2. 快速开始
+## 快速开始
 
-### 2.1 环境配置
+### 环境依赖
 
-- Python >= 3.6
+- tqdm
 
-- paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
+安装方式：`pip install tqdm`
 
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp\>=2.0.0rc`
-
-- tqdm，安装方式：`pip install tqdm`
-
-### 2.2 数据准备
+### 数据准备
 
 在本例中，我们提供了古诗词数据集，示例数据如下：
 
@@ -35,7 +31,7 @@ wget --no-check-certificate https://paddlenlp.bj.bcebos.com/datasets/poetry.tar.
 tar xvf poetry.tar.gz
 ```
 
-### 2.3 模型微调
+### 模型微调
 
 模型训练支持 CPU 和 GPU，使用 GPU 之前应指定使用的显卡卡号：
 
@@ -61,7 +57,7 @@ python -u ./train.py \
 ```
 
 参数释义如下：
-- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaadleNLP transformer类预训练模型](https://github.com/PaddlePaddle/models/blob/develop/PaddleNLP/docs/transformers.md)中的所有模型，但只有`ernie-gen-base-en, ernie-gen-large-en, ernie-gen-large-en-430g`三种模型会加载最后输出层的参数，其余模型只会加载transformer参数作热启动。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer类预训练模型](../../../docs/transformers.md)中的所有模型，但只有`ernie-gen-base-en, ernie-gen-large-en, ernie-gen-large-en-430g`三种模型会加载最后输出层的参数，其余模型只会加载transformer参数作热启动。若模型相关内容保存在本地，这里也可以提供相应目录地址。
 - `max_encode_len` 表示最大输入句子长度，超过该长度将被截断。
 - `max_decode_len` 表示最大输出句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
@@ -75,7 +71,7 @@ python -u ./train.py \
 
 训练会持续很长的时间，为此我们提供了[微调后的模型](https://paddlenlp.bj.bcebos.com/models/transformers/ernie_gen_finetuned/ernie_1.0_poetry.pdparams)。您可以下载该模型并通过`init_checkpoint`加载其参数进行增量训练、评估或预测。
 
-### 2.4 模型评估
+### 模型评估
 
 通过加载训练保存的模型，可以对验证集数据进行验证，启动方式如下：
 
@@ -90,14 +86,14 @@ python -u ./eval.py \
 ```
 
 参数释义如下：
-- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaadleNLP transformer类预训练模型](https://github.com/PaddlePaddle/models/blob/develop/PaddleNLP/docs/transformers.md)中的所有模型，但只有`ernie-gen-base-en, ernie-gen-large-en, ernie-gen-large-en-430g`三种模型会加载最后输出层的参数，其余模型只会加载transformer参数作热启动。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer类预训练模型](../../../docs/transformers.md)中的所有模型，但只有`ernie-gen-base-en, ernie-gen-large-en, ernie-gen-large-en-430g`三种模型会加载最后输出层的参数，其余模型只会加载transformer参数作热启动。若模型相关内容保存在本地，这里也可以提供相应目录地址。
 - `max_encode_len` 表示最大输入句子长度，超过该长度将被截断。
 - `max_decode_len` 表示最大输出句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
 - `init_checkpoint` 表示模型加载路径。
 - `use_gpu` 表示使用GPU。
 
-### 2.5 模型预测
+### 模型预测
 
 对无标签数据可以启动模型预测：
 
@@ -112,7 +108,7 @@ python -u ./predict.py \
 ```
 
 
-## 引用
+## Citation
 
 您可以按下面的格式引用ERNIE-Gen论文:
 
@@ -132,6 +128,7 @@ python -u ./predict.py \
 * [使用PaddleNLP预训练模型ERNIE-GEN生成诗歌](https://aistudio.baidu.com/aistudio/projectdetail/1339888)
 
 
-## 参考
+## Acknowledgement
 
-[couplet-clean-dataset数据集](https://github.com/v-zich/couplet-clean-dataset)
+- 感谢 [chinese-poetry数据集](https://github.com/chinese-poetry/chinese-poetry) 开放的诗歌数据集
+

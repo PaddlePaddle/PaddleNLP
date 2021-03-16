@@ -21,8 +21,8 @@ from functools import partial
 import numpy as np
 from paddle.io import BatchSampler, DataLoader, Dataset
 import paddle.distributed as dist
-from paddlenlp.data import Pad
-from paddlenlp.datasets import WMT14ende
+from paddlenlp.data import Pad, Vocab
+from paddlenlp.datasets import load_dataset
 from paddlenlp.data.sampler import SamplerHelper
 
 
@@ -34,23 +34,28 @@ def min_max_filer(data, max_len, min_len=0):
 
 
 def create_data_loader(args):
-    root = None if args.root == "None" else args.root
-    (src_vocab, trg_vocab) = WMT14ende.get_vocab(root=root)
+    datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
+    src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
+    trg_vocab = src_vocab
+
     padding_vocab = (
         lambda x: (x + args.pad_factor - 1) // args.pad_factor * args.pad_factor
     )
     args.src_vocab_size = padding_vocab(len(src_vocab))
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
-    transform_func = WMT14ende.get_default_transform_func(root=root)
-    datasets = [
-        WMT14ende.get_datasets(
-            mode=m, root=root, transform_func=transform_func)
-        for m in ["train", "dev"]
-    ]
+
+    def convert_samples(sample):
+        source = sample[args.src_lang].split()
+        target = sample[args.trg_lang].split()
+
+        source = src_vocab.to_indices(source)
+        target = trg_vocab.to_indices(target)
+
+        return source, target
 
     data_loaders = [(None)] * 2
     for i, dataset in enumerate(datasets):
-        dataset = dataset.filter(
+        dataset = dataset.map(convert_samples, lazy=False).filter(
             partial(
                 min_max_filer, max_len=args.max_length))
         batch_sampler = TransformerBatchSampler(
@@ -81,18 +86,26 @@ def create_data_loader(args):
 
 
 def create_infer_loader(args):
-    root = None if args.root == "None" else args.root
-    (src_vocab, trg_vocab) = WMT14ende.get_vocab(root=root)
+    dataset = load_dataset('wmt14ende', splits=('test'))
+    src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
+    trg_vocab = src_vocab
+
     padding_vocab = (
         lambda x: (x + args.pad_factor - 1) // args.pad_factor * args.pad_factor
     )
     args.src_vocab_size = padding_vocab(len(src_vocab))
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
-    transform_func = WMT14ende.get_default_transform_func(root=root)
-    dataset = WMT14ende.get_datasets(
-        mode="test", root=root, transform_func=transform_func).filter(
-            partial(
-                min_max_filer, max_len=args.max_length))
+
+    def convert_samples(sample):
+        source = sample[args.src_lang].split()
+        target = sample[args.trg_lang].split()
+
+        source = src_vocab.to_indices(source)
+        target = trg_vocab.to_indices(target)
+
+        return source, target
+
+    dataset = dataset.map(convert_samples, lazy=False)
 
     batch_sampler = SamplerHelper(dataset).batch(
         batch_size=args.infer_batch_size, drop_last=False)
@@ -111,12 +124,13 @@ def create_infer_loader(args):
 
 
 def adapt_vocab_size(args):
-    root = None if args.root == "None" else args.root
-    (src_vocab, trg_vocab) = WMT14ende.get_vocab(root=root)
+    dataset = load_dataset('wmt14ende', splits=('test'))
+    src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
+    trg_vocab = src_vocab
+
     padding_vocab = (
         lambda x: (x + args.pad_factor - 1) // args.pad_factor * args.pad_factor
     )
-
     args.src_vocab_size = padding_vocab(len(src_vocab))
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
 

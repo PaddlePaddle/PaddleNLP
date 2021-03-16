@@ -24,8 +24,6 @@ PaddleNLP提供了一系列的文本表示技术，如`seq2vec`模块。
 
 ## 模型简介
 
-
-
 本项目通过调用[seq2vec](../../../paddlenlp/seq2vec/)中内置的模型进行序列建模，完成句子的向量表示。包含最简单的词袋模型和一系列经典的RNN类模型。
 
 `seq2vec`模块
@@ -101,22 +99,6 @@ PaddleNLP提供了一系列的文本表示技术，如`seq2vec`模块。
 
 ## 快速开始
 
-### 环境依赖
-
-* PaddlePaddle 安装
-
-   本项目依赖于 PaddlePaddle 2.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* PaddleNLP 安装
-
-   ```shell
-   pip install paddlenlp\>=2.0.0rc
-   ```
-
-* 环境依赖
-
-   Python的版本要求 3.6+，其它环境请参考 PaddlePaddle [安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/1.5/beginners_guide/install/index_cn.html) 部分的内容
-
 ### 代码结构说明
 
 以下是本项目主要代码结构及说明：
@@ -135,10 +117,11 @@ rnn/
 #### 使用PaddleNLP内置数据集
 
 ```python
-from paddlenlp.datasets import ChnSentiCorp
+from paddlenlp.datasets import load_dataset
 
-train_ds, dev_ds, test_ds = ChnSentiCorp.get_datasets(['train', 'dev', 'test'])
+train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
 ```
+
 
 ### 模型训练
 

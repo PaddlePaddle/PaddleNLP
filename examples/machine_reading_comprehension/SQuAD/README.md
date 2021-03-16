@@ -1,11 +1,11 @@
 # 阅读理解 SQuAD
 
-# 简介
+## 简介
 
-## 1. 任务说明
+### 任务说明
 本文主要介绍基于Bert预训练模型的SQuAD（Stanford Question Answering Dataset）数据集的阅读理解任务，给定一篇文章和一个问题，计算答案在文章中的起始位置和结束位置。对于SQuAD2.0数据集，还可以返回答案在文章中不存在的概率。
 
-## 2. 数据集
+### 数据集
 
 此任务的数据集包括以下数据集：
 
@@ -18,31 +18,11 @@ SQuAD v2.0
 - [dev-v2.0.json](https://rajpurkar.github.io/SQuAD-explorer/dataset/dev-v2.0.json)
 
 
-# 快速开始
-
-
-## 1. 开始第一次模型调用
-
-### 安装说明
-
-* PaddlePaddle 安装
-
-   本项目依赖于 PaddlePaddle 2.0.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* PaddleNLP 安装
-
-   ```shell
-   pip install paddlenlp\>=2.0.0rc
-   ```
-
-* 环境依赖
-
-    Python的版本要求 3.6+
-
+## 快速开始
 
 ### 数据准备
-为了方便开发者进行测试，我们内置了数据下载脚本，用户可以通过命令行传入`--version_2_with_negative`控制所需要的SQuAD数据集版本，也可以通过`--train_file`和`--predict_file`传入本地数据集的位置，数据集需保证与SQuAD数据集格式一致。
 
+为了方便开发者进行测试，我们内置了数据下载脚本，用户可以通过命令行传入`--version_2_with_negative`控制所需要的SQuAD数据集版本，也可以通过`--train_file`和`--predict_file`传入本地数据集的位置，数据集需保证与SQuAD数据集格式一致。
 
 ### Fine-tune
 
@@ -132,18 +112,3 @@ python -u ./run_squad.py \
 训练方法与前面大体相同，只需要设定 `--null_score_diff_threshold` 参数的值为测评时输出的 `best_f1_thresh` ，通常这个值在 -1.0 到 -5.0 之间。
 
 **NOTE:** 如需恢复模型训练，则model_name_or_path只需指定到文件夹名即可。如`--model_name_or_path=./tmp/squad/model_19000/`，程序会自动加载模型参数`/model_state.pdparams`，也会自动加载词表，模型config和tokenizer的config。
-
-## 2. 目录结构
-
-```text
-.
-├── README.md           # 文档
-├── run_squad.py        # 训练代码  
-├── args.py             # 参数读取
-```
-
-# 其他
-
-## 如何贡献代码
-
-如果你可以修复某个issue或者增加一个新功能，欢迎给我们提交PR。如果对应的PR被接受了，我们将根据贡献的质量和难度进行打分（0-5分，越高越好）。如果你累计获得了10分，可以联系我们获得面试机会或者为你写推荐信。

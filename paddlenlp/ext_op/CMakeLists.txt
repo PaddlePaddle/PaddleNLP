@@ -11,11 +11,6 @@ set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 
 list(APPEND CMAKE_MODULE_PATH ${CUDA_PATH}/lib64)
 
-if (${CUDA_VERSION} GREATER_EQUAL 11.0)
-  message(STATUS "Add DCUDA11_MODE")
-  add_definitions("-DCUDA11_MODE")
-endif()
-
 # Setting compiler flags
 set(CMAKE_C_FLAGS    "${CMAKE_C_FLAGS}")    
 set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}")
@@ -98,7 +93,7 @@ include_directories(
   ${FT_INCLUDE_PATH}
 )
 
-if(NOT ${PY_CMD})
+if(NOT PY_CMD)
   set(PYTHON_PATH "python" CACHE STRING "Python path")
 else()
   set(PYTHON_PATH ${PY_CMD} CACHE STRING "Python path")
@@ -113,7 +108,6 @@ endif()
 string(REGEX REPLACE ";" "\\\\;" _INC_PYTHON_VALUES ${_INC_PYTHON_VALUES})
 string(REGEX REPLACE "\n" ";" _INC_PYTHON_VALUES ${_INC_PYTHON_VALUES})
 list(GET _INC_PYTHON_VALUES 0 PY_INCLUDE_DIR)
-list(GET _INC_PYTHON_VALUES 1 PY_SUFFIX)
 
 list(APPEND COMMON_HEADER_DIRS ${PY_INCLUDE_DIR})
 list(APPEND COMMON_HEADER_DIRS ${PY_INCLUDE_DIR}/third_party)
@@ -131,7 +125,6 @@ endif()
 string(REGEX REPLACE ";" "\\\\;" _LIB_PYTHON_VALUES ${_LIB_PYTHON_VALUES})
 string(REGEX REPLACE "\n" ";" _LIB_PYTHON_VALUES ${_LIB_PYTHON_VALUES})
 list(GET _LIB_PYTHON_VALUES 0 PY_LIB_DIR)
-list(GET _LIB_PYTHON_VALUES 1 PY_SUFFIX)
 list(APPEND COMMON_LIB_DIRS ${PY_LIB_DIR})
 
 link_directories(

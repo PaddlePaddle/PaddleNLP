@@ -26,7 +26,6 @@ from paddle.io import DataLoader
 from paddle.metric import Metric, Accuracy, Precision, Recall
 
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertModel, BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -171,26 +170,41 @@ def set_seed(args):
     # `paddle.seed(args.seed + paddle.distributed.get_rank())`
     paddle.seed(args.seed)
 
-
+@paddle.no_grad()
 def evaluate(model, criterion, metric, data_loader, width_mult=1.0):
-    with paddle.no_grad():
-        model.eval()
-        metric.reset()
-        for batch in data_loader:
-            input_ids, segment_ids, labels = batch
-            logits = model(input_ids, segment_ids, attention_mask=[None, None])
-            if isinstance(logits, tuple):
-                logits = logits[0]
-            loss = criterion(logits, labels)
-            correct = metric.compute(logits, labels)
-            metric.update(correct)
-        results = metric.accumulate()
+    model.eval()
+    metric.reset()
+    for batch in data_loader:
+        input_ids, segment_ids, labels = batch
+        logits = model(input_ids, segment_ids, attention_mask=[None, None])
+        if isinstance(logits, tuple):
+            logits = logits[0]
+        loss = criterion(logits, labels)
+        correct = metric.compute(logits, labels)
+        metric.update(correct)
+    res = metric.accumulate()
+    if isinstance(metric, AccuracyAndF1):
         print(
-            "width_mult: %f, eval loss: %f, %s: %s\n" %
-            (width_mult, loss.numpy(), metric.name(), results),
+            "width_mult: %s, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
+            % (
+                width_mult,
+                loss.numpy(),
+                res[0],
+                res[1],
+                res[2],
+                res[3],
+                res[4], ),
             end='')
-        model.train()
-
+    elif isinstance(metric, Mcc):
+        print("width_mult: %s, eval loss: %f, mcc: %s, " % (str(width_mult), loss.numpy(), res[0]), end='')
+    elif isinstance(metric, PearsonAndSpearman):
+        print(
+            "width_mult: %s, eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
+            % (str(width_mult), loss.numpy(), res[0], res[1], res[2]),
+            end='')
+    else:
+        print("width_mult: %s, eval loss: %f, acc: %s, " % (str(width_mult), loss.numpy(), res), end='')
+    model.train()
 
 ### monkey patch for bert forward to accept [attention_mask, head_mask] as  attention_mask
 def bert_forward(self,
@@ -450,6 +464,7 @@ def do_train(args):
                 tic_train = time.time()
 
             if global_step % args.save_steps == 0:
+                tic_eval = time.time()
                 if args.task_name == "mnli":
                     evaluate(
                         teacher_model,
@@ -470,6 +485,8 @@ def do_train(args):
                         metric,
                         dev_data_loader,
                         width_mult=100)
+                print("eval done total : %s s" %
+                      (time.time() - tic_eval))
                 for idx, width_mult in enumerate(args.width_mult_list):
                     net_config = utils.dynabert_config(ofa_model, width_mult)
                     ofa_model.set_net_config(net_config)

@@ -247,7 +247,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         An UnifiedTransformer sequence has the following format:
         ::
             - single sequence: ``[CLS] X [SEP]``
-            - pair of sequences: ``[CLS] A [SEP] [CLS] B [SEP]``
+            - pair of sequences: ``[CLS] A [SEP] B [SEP]``
         Args:
             token_ids_0 (list): List of IDs to which the special tokens will be 
                 added.
@@ -367,7 +367,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
     @staticmethod
     def read_file(filepath):
         token_to_idx = {}
-        with open(filepath, 'r') as f:
+        with open(filepath, 'r', encoding='utf-8') as f:
             for num, line in enumerate(f):
                 items = convert_to_unicode(line.rstrip()).split("\t")
                 if len(items) > 2:

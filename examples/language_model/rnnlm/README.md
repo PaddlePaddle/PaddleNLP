@@ -22,30 +22,10 @@
 
 # 快速开始
 
-
-## 1. 开始第一次模型调用
-
-### 安装说明
-
-* PaddlePaddle 安装
-
-   本项目依赖于 PaddlePaddle 2.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* PaddleNLP 安装
-
-   ```shell
-   pip install paddlenlp\>=2.0.0rc
-   ```
-
-* 环境依赖
-
-    Python的版本要求 3.6+
-
 ### 数据准备
 为了方便开发者进行测试，我们内置了数据下载脚本，默认自动下载PTB数据集。
 
-
-### 训练或fine-tune
+### 训练或Fine-tune
 
 任务训练启动命令如下：
 
@@ -59,16 +39,17 @@ python train.py
 **NOTE:** 如需恢复模型训练，则init_from_ckpt只需指定到文件名即可，不需要添加文件尾缀。如`--init_from_ckpt=checkpoints/test`即可，程序会自动加载模型参数`checkpoints/test.pdparams`，也会自动加载优化器状态`checkpoints/test.pdopt`。
 
 # 进阶使用
-## 1. 任务定义与建模
+
+## 任务定义与建模
 此任务目的是给定一个输入的词序列，预测下一个词出现的概率。
 
-## 2. 模型原理介绍
+## 模型原理介绍
 此任务采用了序列任务常用的rnn网络，实现了一个两层的lstm网络，然后lstm的结果去预测下一个词出现的概率。
 
 由于数据的特殊性，每一个batch的last hidden和last cell会被作为下一个batch 的init hidden 和 init cell。
 
 
-## 3. 数据格式说明
+## 数据格式说明
 此任务的数据格式比较简单，每一行为一个已经分好词（英文的tokenize）的词序列。
 
 目前的句子示例如下图所示:
@@ -81,6 +62,6 @@ mr. <unk> is chairman of <unk> n.v. the dutch publishing group
 特殊说明：ptb的数据比较特殊，ptb的数据来源于一些文章，相邻的句子可能来源于一个段落或者相邻的段落，ptb 数据不能做shuffle。
 
 
-## 4. 如何组建自己的模型
+## 如何组建自己的模型
 + **自定义数据：** 关于数据，如果可以把自己的数据先进行分词（或者tokenize），通过`--data_path`来指定本地数据集所在文件夹，并需要在`train.py`中修改对应的文件名称。
 + **网络结构更改：** 网络只实现了基于lstm的语言模型，用户可以自己的需求更换为gru等网络结构，这些实现都是在`model.py`中定义。

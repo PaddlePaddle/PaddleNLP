@@ -14,12 +14,12 @@ PLATO-2的训练过程及其他细节详见 [Knover](https://github.com/PaddlePa
 
 ## 快速开始
 
-### 环境配置
+### 环境依赖
 
-- python >= 3.6
-- paddlepaddle >= 2.0.0, 安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp==2.0.0rc`
-- sentencepiece, termcolor, 安装方式：`pip install sentencepiece termcolor`
+- sentencepiece
+- termcolor  
+
+安装方式：`pip install sentencepiece termcolor`
 
 ### 数据准备
 

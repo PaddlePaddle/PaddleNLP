@@ -21,16 +21,15 @@ from paddle.metric import Accuracy
 
 from paddlenlp.transformers import BertForSequenceClassification
 from paddlenlp.metrics import AccuracyAndF1
-from paddlenlp.datasets import GlueSST2, GlueQQP, ChnSentiCorp
 
 from args import parse_args
 from small import BiLSTM
 from data import create_distill_loader
 
-TASK_CLASSES = {
-    "sst-2": (GlueSST2, Accuracy),
-    "qqp": (GlueQQP, AccuracyAndF1),
-    "senta": (ChnSentiCorp, Accuracy),
+METRIC_CLASSES = {
+    "sst-2": Accuracy,
+    "qqp": AccuracyAndF1,
+    "chnsenticorp": Accuracy
 }
 
 
@@ -98,7 +97,7 @@ def do_train(agrs):
     mse_loss = nn.MSELoss()
     klloss = nn.KLDivLoss()
 
-    metric_class = TASK_CLASSES[args.task_name][1]
+    metric_class = METRIC_CLASSES[args.task_name]
     metric = metric_class()
 
     teacher = TeacherModel(

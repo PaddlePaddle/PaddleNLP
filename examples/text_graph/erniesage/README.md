@@ -20,9 +20,9 @@
 <img src="https://raw.githubusercontent.com/PaddlePaddle/PGL/static_stable/examples/erniesage/docs/source/_static/ERNIESage_v1_4.png" alt="ERNIESage_v1_4" width="800">
 
 ## 环境依赖
-- paddlepaddle >= 2.0.0
+
 - pgl >= 2.1
-- paddlenlp >= 2.0.0
+安装命令 `pip install pgl>=2.1`
 
 ## 数据准备
 示例数据```data.txt```中使用了NLPCC2016-DBQA的部分数据，格式为每行"query \t answer"。

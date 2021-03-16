@@ -24,7 +24,7 @@
 
 `paddlenlp.data.Stack`、`paddlenlp.data.Pad`、`paddlenlp.data.Tuple`和`paddlenlp.data.Dict`用于构建生成mini-batch的`collate_fn`函数。
 
-### 构建`dataset`
+### 数据预处理
 
 #### `paddlenlp.data.Vocab`
 
@@ -191,8 +191,7 @@ label: [[1], [0], [1]]
 
 ```python
 from paddlenlp.data import Vocab, JiebaTokenizer, Stack, Pad, Tuple, SamplerHelper
-from paddlenlp.datasets import ChnSentiCorp
-from paddlenlp.datasets import MapDataset
+from paddlenlp.datasets import load_dataset
 from paddle.io import DataLoader
 
 # 词表文件路径，运行示例程序可先下载词表文件
@@ -207,13 +206,13 @@ vocab = Vocab.load_vocabulary(
 tokenizer = JiebaTokenizer(vocab)
 
 def convert_example(example):
-    text, label = example
+    text, label = example['text'], example['label']
     ids = tokenizer.encode(text)
     label = [label]
     return ids, label
 
-dataset = ChnSentiCorp('train')
-dataset = MapDataset(dataset).map(convert_example, lazy=True)
+dataset = load_dataset('chnsenticorp', splits='train')
+dataset = dataset.map(convert_example, lazy=True)
 
 pad_id = vocab.token_to_idx[vocab.pad_token]
 batchify_fn = Tuple(

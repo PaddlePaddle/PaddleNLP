@@ -23,12 +23,11 @@ Sequence to Sequence (Seq2Seq)，使用编码器-解码器（Encoder-Decoder）�
 
 本模型中，在编码器方面，我们采用了基于LSTM的多层的RNN encoder；在解码器方面，我们使用了带注意力（Attention）机制的RNN decoder，在预测时我们使用Beam Search算法来生对联的下联。
 
-
 ## 数据介绍
 
-本教程使用[couplet数据集](https://paddlenlp.bj.bcebos.com/datasets/couplet.tar.gz)数据集作为训练语料，train_src.tsv及train_tgt.tsv为训练集，dev_src.tsv及dev_tgt.tsv为开发集，test_src.tsv及test_tgt.tsv为测试集。
+本教程使用[couplet数据集](https://paddlenlp.bj.bcebos.com/datasets/couplet.tar.gz)作为训练语料，该数据集来源于[这个github repo](https://github.com/v-zich/couplet-clean-dataset)，其中train_src.tsv及train_tgt.tsv为训练集，dev_src.tsv及dev_tgt.tsv为开发集，test_src.tsv及test_tgt.tsv为测试集。
 
-数据集会在`CoupletDataset`初始化时自动下载，如果用户在初始化数据集时没有提供路径，在linux系统下，数据集会自动下载到`~/.paddlenlp/datasets/machine_translation/CoupletDataset/`目录下
+数据集会在调用`paddlenlp.datasets.load_dataset`时自动下载，在linux系统下，数据集会自动下载到`~/.paddlenlp/datasets/Couplet/`目录下
 
 
 ## 模型训练
@@ -40,9 +39,10 @@ python train.py \
     --num_layers 2 \
     --hidden_size 512 \
     --batch_size 128 \
-    --use_gpu True \
+    --device gpu \
     --model_path ./couplet_models \
     --max_epoch 20
+
 ```
 
 各参数的具体说明请参阅 `args.py` 。训练程序会在每个epoch训练结束之后，保存一次模型。
@@ -61,7 +61,8 @@ python predict.py \
     --init_from_ckpt couplet_models/19 \
     --infer_output_file infer_output.txt \
     --beam_size 10 \
-    --use_gpu True
+    --device gpu
+
 ```
 
 各参数的具体说明请参阅 `args.py` ，注意预测时所用模型超参数需和训练时一致。
@@ -85,3 +86,7 @@ python predict.py \
 上联：月半举杯圆月下        下联：花间对酒醉花间
 
 上联：挥笔如剑倚麓山豪气干云揽月去       下联：落笔似龙飞沧海龙吟破浪乘风来
+
+## 参考的开源数据集
+
+我们的数据集采用了开源对联数据集[couplet-clean-dataset](https://github.com/v-zich/couplet-clean-dataset)，地址：https://github.com/v-zich/couplet-clean-dataset ，该数据集过滤了[couplet-dataset](https://github.com/wb14123/couplet-dataset)（地址：https://github.com/wb14123/couplet-dataset ）中的低俗、敏感内容。

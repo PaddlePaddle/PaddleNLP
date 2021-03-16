@@ -6,9 +6,11 @@ English | [简体中文](./README.md)
 
 ---------------------------------------------------------------------------------
 
-![License](https://img.shields.io/badge/license-Apache%202-red.svg)
-![python version](https://img.shields.io/badge/python-3.6+-orange.svg)
+[![PyPI - PaddleNLP Version](https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white)](https://pypi.org/project/paddlenlp/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/paddlenlp)](https://pypi.org/project/paddlenlp/)
+[![PyPI Status](https://pepy.tech/badge/paddlenlp/month)](https://pepy.tech/project/paddlenlp)
 ![support os](https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg)
+![GitHub](https://img.shields.io/github/license/paddlepaddle/paddlenlp)
 
 ## Introduction
 
@@ -16,14 +18,14 @@ PaddleNLP aims to accelerate NLP applications through powerful model zoo, easy-t
 
 ## Features
 
-* **Rich and Powerful Model Zoo**
-  - Our Model Zoo covers mainstream NLP applications, including Lexical Analysis, Syntactic Parsing, Machine Translation, Text Classification, Text Generation, Text Matching, General Dialogue and Question Answering etc.
+* **Powerful Model Zoo for Rich Senario**
+  - Our Model Zoo covers mainstream NLP applications, including Lexical Analysis, Text Classification, Text Generation, Text Matching, Text Graph, Information Extraction, Machine Translation, General Dialogue and Question Answering etc.
 
-* **Easy-to-use and End-to-End API**
-  - The API is fully integrated with PaddlePaddle high-level API system. It minimizes the number of user actions required for common use cases like data loading, text pre-processing, training and evaluation. which enables you to deal with text problems more productively.
+* **Easy-to-Use and End-to-End API**
+  - The API is fully integrated with PaddlePaddle 2.0 high-level API system. It minimizes the number of user actions required for common use cases like data loading, text pre-processing, training and evaluation, which enables you to deal with text problems more productively.
 
 * **High Performance and Distributed Training**
--  We provide a highly optimized ditributed training implementation for BERT with Fleet API, bnd based the mixed precision training strategy based on PaddlePaddle 2.0, it can fully utilize GPU clusters for large-scale model pre-training.
+-  We provide a highly optimized ditributed training implementation for BERT with Fleet API, and mixed precision training strategy based on PaddlePaddle 2.0, it can fully utilize GPU clusters for large-scale model pre-training.
 
 
 ## Installation
@@ -31,10 +33,14 @@ PaddleNLP aims to accelerate NLP applications through powerful model zoo, easy-t
 ### Prerequisites
 
 * python >= 3.6
-* paddlepaddle >= 2.0.0
+* paddlepaddle >= 2.0.1
+
+More information about PaddlePaddle installation please refer to [PaddlePaddle Install](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)
+
+### PIP Installation
 
 ```
-pip install paddlenlp>=2.0.0rc
+pip install --upgrade paddlenlp -i https://pypi.org/simple
 ```
 
 ## Quick Start
@@ -42,26 +48,29 @@ pip install paddlenlp>=2.0.0rc
 ### Quick Dataset Loading
 
 ```python
-from paddlenlp.datasets import ChnSentiCorp
+from paddlenlp.datasets import load_dataset
 
-train_ds, test_ds = ChnSentiCorp.get_datasets(['train','test'])
+train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
 ```
 
-### Chinese Text Emebdding Loading
+For more dataset API usage please refer to [Dataset API](./docs/datasets.md).
+
+### Pre-trained Text Embedding Loading
 
 ```python
 
 from paddlenlp.embeddings import TokenEmbedding
 
-wordemb = TokenEmbedding("w2v.baidu_encyclopedia.target.word-word.dim300")
-print(wordemb.cosine_sim("国王", "王后"))
->>> 0.63395125
-wordemb.cosine_sim("艺术", "火车")
->>> 0.14792643
+wordemb = TokenEmbedding("fasttext.wiki-news.target.word-word.dim300.en")
+wordemb.cosine_sim("king", "queen")
+>>> 0.77053076
+wordemb.cosine_sim("apple", "rail")
+>>> 0.29207364
 ```
 
-### Rich Chinsese Pre-trained Models
+For more TokenEmbedding usage, please refer to [Embedding API](./docs/embeddings.md)
 
+### Rich Chinese Pre-trained Models
 
 ```python
 from paddlenlp.transformers import ErnieModel, BertModel, RobertaModel, ElectraModel, GPT2ForPretraining
@@ -73,21 +82,37 @@ electra = ElectraModel.from_pretrained('chinese-electra-small')
 gpt2 = GPT2ForPretraining.from_pretrained('gpt2-base-cn')
 ```
 
-For more pretrained model selection, please refer to [Pretrained-Models](./docs/transformers.md)
+For more pretrained model selection, please refer to [Transformer API](./docs/transformers.md)
+
+### Extract Feature Through Pre-trained Model
+
+```python
+import paddle
+from paddlenlp.transformers import ErnieTokenizer, ErnieModel
+
+tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+model = ErnieModel.from_pretrained('ernie-1.0')
+
+text = tokenizer('自然语言处理')
+pooled_output, sequence_output = model.forward(input_ids=paddle.to_tensor([text['input_ids']]))
+```
 
 ## Model Zoo and Applications
 
-- [Word Embedding](./examples/word_embedding/README.md)
-- [Lexical Analysis](./examples/lexical_analysis/README.md)
-- [Language Model](./examples/language_model)
-- [Text Classification](./examples/text_classification/README.md)
-- [Text Generation](./examples/text_generation/README.md)
-- [Semantic Matching](./examples/text_matching/README.md)
-- [Named Entity Recognition](./examples/named_entity_recognition/README.md)
-- [Text Graph](./examples/text_graph/README.md)
-- [General Dialogue](./examples/dialogue)
-- [Machine Translation](./exmaples/machine_translation)
-- [Question Answering](./exmaples/machine_reading_comprehension)
+For model zoo introduction please refer to[PaddleNLP Model Zoo](./docs/model_zoo.md). As for applicaiton senario please refer to [PaddleNLP Examples](./examples/)。
+
+- [Word Embedding](./examples/word_embedding/)
+- [Lexical Analysis](./examples/lexical_analysis/)
+- [Named Entity Recognition](./examples/information_extraction/msra_ner/)
+- [Language Model](./examples/language_model/)
+- [Text Classification](./examples/text_classification/)
+- [Text Gneeration](./examples/text_generation/)
+- [Semantic Maching](./examples/text_matching/)
+- [Text Graph](./examples/text_graph/erniesage/)
+- [Information Extraction](./examples/information_extraction/)
+- [General Dialogue](./examples/dialogue/)
+- [Machine Translation](./examples/machine_translation/)
+- [Machine Readeng Comprehension](./examples/machine_reading_comprehension/)
 
 ## Advanced Application
 
@@ -114,9 +139,19 @@ Please refer to our official AI Studio account for more interactive tutorials: [
 
 * [Waybill Information Extraction with ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/1329361) shows how to use ERNIE, the Chinese pre-trained model improve information extraction performance.
 
+* [Use TCN Model to predict COVID-19 confirmed cases](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
+
 
 ## Community
 
+### Special Interest Group(SIG)
+
+Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for contribution, eg. Dataset, Models and Toolkit.
+
+### Slack
+To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
+
+### QQ
 Join our QQ Technical Group for technical exchange right now! ⬇️
 
 <div align="center">
