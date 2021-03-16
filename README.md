@@ -11,7 +11,7 @@
 [![PyPI Status](https://pepy.tech/badge/paddlenlp/month)](https://pepy.tech/project/paddlenlp)
 ![python version](https://img.shields.io/badge/python-3.6+-orange.svg)
 ![support os](https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg)
-![GitHub](https://img.shields.io/github/license/maiot-io/paddlenlp)
+![GitHub](https://img.shields.io/github/license/paddlepaddle/paddlenlp)
 
 ## 简介
 
