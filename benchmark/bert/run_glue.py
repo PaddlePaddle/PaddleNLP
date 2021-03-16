@@ -401,7 +401,7 @@ def do_train(args):
                 paddle.fluid.io.save_params(exe, output_dir)
                 tokenizer.save_pretrained(output_dir)
             if global_step >= num_training_steps:
-                break
+                return
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ from paddle.io import DataLoader, Dataset
 from paddlenlp.transformers import BigBirdModel, BigBirdForSequenceClassification, BigBirdTokenizer
 from paddlenlp.transformers import create_bigbird_rand_mask_idx_list
 from paddlenlp.utils.log import logger
-from paddlenlp.datasets import Imdb
+from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack
 
 # yapf: disable
@@ -71,8 +71,8 @@ def create_dataloader(batch_size, max_encoder_length, tokenizer, pad_val=0):
     def _collate_data(data, stack_fn=Stack()):
         num_fields = len(data[0])
         out = [None] * num_fields
-        out[0] = stack_fn([_tokenize(x[0]) for x in data])
-        out[1] = stack_fn([x[1] for x in data])
+        out[0] = stack_fn([_tokenize(x['text']) for x in data])
+        out[1] = stack_fn([x['label'] for x in data])
         seq_len = len(out[0][0])
         # Construct the random attention mask for the random attention
         rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
@@ -84,7 +84,7 @@ def create_dataloader(batch_size, max_encoder_length, tokenizer, pad_val=0):
         return out
 
     def _create_dataloader(mode, tokenizer, max_encoder_length, pad_val=0):
-        dataset = Imdb(mode=mode)
+        dataset = load_dataset("imdb", splits=mode)
         batch_sampler = paddle.io.BatchSampler(
             dataset, batch_size=batch_size, shuffle=(mode == "train"))
         data_loader = paddle.io.DataLoader(
