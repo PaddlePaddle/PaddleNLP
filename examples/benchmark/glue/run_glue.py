@@ -32,6 +32,7 @@ from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.transformers import XLNetForSequenceClassification, XLNetTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 
@@ -54,6 +55,7 @@ MODEL_CLASSES = {
     "bert": (BertForSequenceClassification, BertTokenizer),
     "electra": (ElectraForSequenceClassification, ElectraTokenizer),
     "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
+    "xlnet": (XLNetForSequenceClassification, XLNetTokenizer),
 }
 
 
