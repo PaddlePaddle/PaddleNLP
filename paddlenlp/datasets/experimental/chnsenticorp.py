@@ -48,7 +48,7 @@ class ChnSentiCorp(DatasetBuilder):
 
     def _get_data(self, mode, **kwargs):
         """Downloads dataset."""
-        default_root = os.path.join(DATA_HOME, "ChnSentiCorp")
+        default_root = os.path.join(DATA_HOME, self.__class__.__name__)
         filename, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
