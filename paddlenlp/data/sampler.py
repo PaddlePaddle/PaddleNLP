@@ -243,14 +243,16 @@ class SamplerHelper(object):
             num_replicas = dist.get_world_size()
         if rank is None:
             rank = dist.get_rank()
+        last_sample = [0] * num_replicas
 
         def _impl():
             for i, idx in enumerate(self):
                 if i % num_replicas == rank:
+                    last_sample[rank] = idx
                     yield idx
             if i % num_replicas != num_replicas - 1 and rank > i % num_replicas:
                 # use last samples to make it evenly divisible
-                yield idx
+                yield last_sample[rank]
 
         sampler = type(self)(self.data_source, _impl)
         if self.length is not None:
