@@ -58,7 +58,7 @@
 
         return fullname
 
-:func:`_get_data` 方法根据传入的 :attr:`mode` 和数据集的split信息定位到具体数据集文件。首先进行md5值校验，若校验失败则调用 :func:`paddle.utils.download.get_path_from_url` 方法下载数据集文件，最后返回数据集文件的本地地址。
+:func:`_get_data` 方法根据传入的 :attr:`mode` 和数据集的split信息定位到具体数据集文件。首先进行md5值校验本地文件，若校验失败则调用 :func:`paddle.utils.download.get_path_from_url` 方法下载并校验数据集文件，最后返回数据集文件的本地地址。
 
 :func:`_read` 方法
 -----------------------
@@ -101,11 +101,14 @@
 :func:`get_vocab` 方法
 -----------------------
 
- :func:`get_vocab` 方法会根据 :attr:`VOCAB_INFO` 变量返回一个包含数据集词典信息的 :class:`Dictionary` 对象并作为实例变量传给生成的数据集。用于在训练过程中初始化 :class:`paddlenlp.data.Vocab` 对象。
-该方法的写法请参考 `iwslt15.py  <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/experimental/iwslt15.py>`__ ）。
+如果数据集提供词典文件，则需要加入 :func:`get_vocab` 方法和 :attr:`VOCAB_INFO` 变量。
+
+该方法会根据 :attr:`VOCAB_INFO` 变量返回一个包含数据集词典信息的 :class:`Dictionary` 对象并作为实例变量传给生成的数据集。用于在训练过程中初始化 :class:`paddlenlp.data.Vocab` 对象。
+该方法的写法请参考 `iwslt15.py  <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/experimental/iwslt15.py>`__ 。
 
 .. note::
 
-    贡献数据集时 :func:`get_labels` 和 :func:`get_vocab` 方法是可选的，视具体数据集内容而定。 :func:`_read` 和 :func:`_get_data` 方法是 **必须包含** 的。
+    - 贡献数据集时 :func:`get_labels` 和 :func:`get_vocab` 方法是可选的，视具体数据集内容而定。 :func:`_read` 和 :func:`_get_data` 方法是 **必须包含** 的。
+    - 如果您不希望在数据获取过程中进行md5值校验，可以不用给出相关成员变量和校验代码。
 
 关于 :class:`DatasetBuilder` 类生成数据集的过程和其他方法，请参考DatasetBuilder。
