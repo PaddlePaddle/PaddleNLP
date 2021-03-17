@@ -111,18 +111,17 @@ class BLEU(paddle.metric.Metric):
                 
         .. code-block:: python
 
-            # You could add the code below in seq2seq example
-            # to use BLEU as `paddlenlp.metric.Metric' class.
-            # If you run the following code alone, you may get
-            # an error.
+            # You could add the code below to Seq2Seq example in this repo to
+            # use BLEU as `paddlenlp.metric.Metric' class. If you run the
+            # following code alone, you may get an error.
             # log example:
             # Epoch 1/12
             # step 100/507 - loss: 308.7948 - Perplexity: 541.5600 - bleu: 2.2089e-79 - 923ms/step
             # step 200/507 - loss: 264.2914 - Perplexity: 334.5099 - bleu: 0.0093 - 865ms/step
             # step 300/507 - loss: 236.3913 - Perplexity: 213.2553 - bleu: 0.0244 - 849ms/step
 
-            from paddlenlp.metrics import BLEU
             from paddlenlp.data import Vocab
+            from paddlenlp.metrics import BLEU
 
             bleu_metric = BLEU(vocab=src_vocab.idx_to_token)
             model.prepare(optimizer, CrossEntropyCriterion(), [ppl_metric, bleu_metric])
