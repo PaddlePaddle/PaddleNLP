@@ -375,6 +375,8 @@ def do_train(args):
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
+            if global_step >= num_training_steps:
+                return
 
 
 def print_arguments(args):

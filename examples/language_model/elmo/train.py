@@ -68,9 +68,8 @@ def train():
         shuffle=True,
         seed=args.random_seed)
 
-    # FIXME(xiemoyuan): When DataLoader support setting batch_size to None, 
-    #                   setting batch_size to None.
-    train_dataloader = DataLoader(train_dataset, return_list=True, batch_size=1)
+    train_dataloader = DataLoader(
+        train_dataset, return_list=True, batch_size=None)
 
     n_tokens_per_batch = args.batch_size * args.unroll_steps * n_gpus
     n_steps_per_epoch = int(train_dataset.number_of_tokens / n_tokens_per_batch)
@@ -82,11 +81,6 @@ def train():
     total_time = 0.0
     batch_start_time = time.time()
     for step, inputs in enumerate(train_dataloader, start=1):
-        # FIXME(xiemoyuan): When DataLoader support setting batch_size to None, 
-        #                   deleting the operation of squeeze.
-        for j in range(len(inputs)):
-            inputs[j] = paddle.squeeze(inputs[j], axis=0)
-
         ids, next_ids, ids_reverse, next_ids_reverse = inputs
         outputs = elmo([ids, ids_reverse])
         loss = elmo_loss(outputs, [next_ids, next_ids_reverse])

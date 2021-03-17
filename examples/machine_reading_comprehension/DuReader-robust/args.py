@@ -20,8 +20,7 @@ def parse_args():
         type=str,
         required=False,
         default=None,
-        help="Predict data path.",
-        nargs='+')
+        help="Predict data path.")
     parser.add_argument(
         "--model_type",
         default=None,

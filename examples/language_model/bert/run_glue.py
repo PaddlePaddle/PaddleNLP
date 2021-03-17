@@ -154,12 +154,6 @@ def parse_args():
     parser.add_argument(
         "--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument(
-        "--n_procs",
-        default=1,
-        type=int,
-        help="Number of cards to use, the cpu just use single core to train and predict."
-    )
-    parser.add_argument(
         "--device",
         default="gpu",
         type=str,
@@ -400,6 +394,8 @@ def do_train(args):
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
+            if global_step >= num_training_steps:
+                return
 
 
 def print_arguments(args):
@@ -417,7 +413,4 @@ if __name__ == "__main__":
         "cpu", "gpu", "xpu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
 
-    if args.n_procs > 1 and args.device != "cpu":
-        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_procs)
-    else:
-        do_train(args)
+    do_train(args)
