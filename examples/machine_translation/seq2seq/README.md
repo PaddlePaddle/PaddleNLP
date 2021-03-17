@@ -74,7 +74,7 @@ python predict.py \
 各参数的具体说明请参阅 `args.py` ，注意预测时所用模型超参数需和训练时一致。
 
 ## 预测效果评价
-取第10个epoch的结果，用取beam_size为10的beam search解码，`predict.py`脚本在生成翻译结果之后，会调用`paddlenlp.metrics.BLEU`计算翻译结果的BLEU指标，最终计算出的BLEU分数为0.24074304399683688。
+取第10个epoch的结果，用取beam_size为10的beam search解码，`predict.py`脚本在生成翻译结果之后，会调用`paddlenlp.metrics.BLEU`计算翻译结果的BLEU指标，最终计算出的BLEU分数为0.24329954822714048
 
 ## 保存预测模型
 这里指定的参数`export_path` 表示导出预测模型文件的前缀。保存时会添加后缀（`pdiparams`，`pdiparams.info`，`pdmodel`）。
@@ -92,7 +92,7 @@ python export_model.py \
 ```
 
 ## 基于预测引擎推理
-然后按照如下的方式对IWSLT15数据集中的测试集（有标注的）进行预测（基于Paddle的[Python预测API](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/python_infer_cn.html）：
+然后按照如下的方式对IWSLT15数据集中的测试集（有标注的）进行预测（基于Paddle的[Python预测API](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/python_infer_cn.html)）：
 
 ```shell
 cd deploy/python
