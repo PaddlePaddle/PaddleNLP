@@ -40,7 +40,7 @@
 - :attr:`META_INFO` ：数据集split信息格式。
 - :attr:`SPLITS` ：数据集的split信息，包含数据集解压后的不同文件的具体位置，文件名，md5值等，如果数据集不是压缩包则通常在这里提供下载地址，还可以包含诸如不同文件对应的文件读取参数等信息。
 
-除此之外，不同的数据集可能还需要诸如 :attr:`VOCAB_INFO` 等其他成员变量（参见iwslt15.py）。或者成员变量会有其他格式（参见glue.py）。贡献者可以根据实际情况自行调整。
+除此之外，不同的数据集可能还需要诸如 :attr:`VOCAB_INFO` 等其他成员变量（参见 `iwslt15.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/experimental/iwslt15.py>`__ ）。或者成员变量会有其他格式（参见 `glue.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/experimental/glue.py>`__ ）。贡献者可以根据实际情况自行调整。
 
 :func:`_get_data` 方法
 -----------------------
@@ -101,8 +101,8 @@
 :func:`get_vocab` 方法
 -----------------------
 
-:func:`get_vocab` 方法会根据 :attr:`VOCAB_INFO` 变量返回一个包含数据集词典信息（如果提供的话）的 :class:`Dictionary` 对象并作为实例变量传给生成的数据集。用于在训练过程中初始化 :class:`paddlenlp.data.Vocab` 对象。
-该方法的写法请参考iwslt15.py）。
+ :func:`get_vocab` 方法会根据 :attr:`VOCAB_INFO` 变量返回一个包含数据集词典信息的 :class:`Dictionary` 对象并作为实例变量传给生成的数据集。用于在训练过程中初始化 :class:`paddlenlp.data.Vocab` 对象。
+该方法的写法请参考 `iwslt15.py  <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/experimental/iwslt15.py>`__ ）。
 
 .. note::
 

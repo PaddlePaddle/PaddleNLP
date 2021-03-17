@@ -5,7 +5,7 @@
 快速加载官方数据集
 ---------------------
 
-目前PaddleNLP内置超过20个NLP数据集，包括阅读理解，文本分类，序列标注，机器翻译等多项任务。目前提供的数据集可以在 `数据集列表 <./dataset_list.html>`__ 中找到。
+目前PaddleNLP内置超过20个NLP数据集，包括阅读理解，文本分类，序列标注，机器翻译等多项任务。目前提供的数据集可以在 :doc:`数据集列表 <./dataset_list>` 中找到。
 
 以 **msra_ner** 数据集为例:
 
@@ -14,7 +14,7 @@
     >>> from paddlenlp.datasets import load_dataset
     >>> train_ds,dev_ds = load_dataset("msra_ner", splits=("train", "dev"))
 
-:func:`load_dataset` 方法会从 :obj:`paddlenlp.datasets` 下找到msra_ner数据集对应的数据读取脚本（paddlenlp/datasets/msra_ner.py），并调用脚本中 :class:`DatasetBuilder` 类的相关方法生成数据集。
+:func:`load_dataset` 方法会从 :obj:`paddlenlp.datasets` 下找到msra_ner数据集对应的数据读取脚本（默认路径：paddlenlp/datasets/msra_ner.py），并调用脚本中 :class:`DatasetBuilder` 类的相关方法生成数据集。
 
 目前我们提供 :class:`MapDataset` 和 :class:`IterDataset` 两种类型的数据集，两者分别是对 :class:`paddle.io.Dataset` 和 :class:`paddle.io.IterableDataset` 的功能增强。 :func:`load_dataset` 返回数据集的类型通过 :attr:`lazy` 参数控制。 
 
@@ -40,7 +40,7 @@
 .. code-block::
 
     >>> from paddlenlp.datasets import load_dataset
-    >>> train_ds, dev_ds = load_dataset("glue","cola", splits=("train", "dev"))  
+    >>> train_ds, dev_ds = load_dataset("glue",name="cola", splits=("train", "dev"))  
 
 以官方数据集格式读取本地数据集
 -----------------------------
