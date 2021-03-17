@@ -1,0 +1,6 @@
+lite_model_file ./electra-deploy-lite.nb
+label_file ./sst2_label.txt
+predict_file_bin ./predict_input.bin
+predict_file_txt ./predict_input.txt
+predict_num 10
+predict_length 39
