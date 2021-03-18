@@ -62,6 +62,8 @@ python -m paddle.distributed.launch --gpus "0" --log_dir log  run_pretrain.py --
 
 
 ### 验证任务
+
+#### Imdb分类任务
 通过预训练任务训练完成之后，可以预训练的模型参数，在 Big Bird 的验证任务中通过IMDB数据集来进行最终模型效果的验证，[IMDB数据集](http://ai.stanford.edu/~amaas/data/sentiment/) ，IMDB数据集是关于电影用户评论情感分析的数据集，主要是包含了50000条偏向明显的评论，其中25000条作为训练集，25000作为测试集。label为pos(positive)和neg(negative)，是一个序列文本分类任务，具体的执行脚本如下。
 
 
@@ -93,6 +95,52 @@ python run_classifier.py --model_name_or_path bigbird-base-uncased \
 | Task  | Metric                       | Result            |
 |:-----:|:----------------------------:|:-----------------:|
 | IMDB  | Accuracy                     |      0.9449       |
+
+#### Glue任务
+
+以GLUE中的SST-2任务为例，启动Fine-tuning的方式如下：
+
+```shell
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" run_glue.py \
+    --model_type bigbird \
+    --model_name_or_path bigbird-base-uncased-finetune \
+    --task_name SST-2 \
+    --max_encoder_length 128 \
+    --batch_size 32   \
+    --learning_rate 1e-5 \
+    --epochs 5 \
+    --logging_steps 1 \
+    --save_steps 500 \
+    --output_dir ./tmp/ \
+    --device gpu
+```
+
+其中参数释义如下：
+- `model_type` 指示了模型类型，使用bigbird模型时设置为bigbird即可。
+- `model_name_or_path` 指示了finetune使用的具体预训练模型以及预训练时使用的tokenizer，目前支持的预训练模型有："bigbird-base-uncased", "bigbird-base-uncased-finetune"。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"。
+- `task_name` 表示Fine-tuning的任务。
+- `max_encoder_length` 表示最大句子长度，超过该长度将被截断。
+- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
+- `epochs` 表示训练轮数。
+- `logging_steps` 表示日志打印间隔。
+- `save_steps` 表示模型保存及评估间隔。
+- `output_dir` 表示模型保存路径。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+
+基于`bigbird-base-uncased-finetune`在GLUE各评测任务上Fine-tuning后，在验证集上有如下结果：
+
+| Task  | Metric                       | Result            |
+|:-----:|:----------------------------:|:-----------------:|
+| SST-2 | Accuracy                     |      0.9415       |
+| QNLI  | Accuracy                     |      0.9017       |
+| CoLA  | Mattehew's corr              |      0.5708       |
+| MRPC  | F1/Accuracy                  |  0.9019 / 0.8603  |
+| STS-B | Person/Spearman corr         |  0.8591 / 0.8607  |
+| QQP   | Accuracy/F1                  |  0.9132 / 0.8828  |
+| MNLI  | Matched acc/MisMatched acc   |  0.8615 / 0.8606  |
+| RTE   | Accuracy                     |      0.7004       |
 
 ### 致谢
 

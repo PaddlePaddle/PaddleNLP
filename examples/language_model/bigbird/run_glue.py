@@ -36,6 +36,8 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from paddlenlp.utils.log import logger
 
+import args
+
 METRIC_CLASSES = {
     "cola": Mcc,
     "sst-2": Accuracy,
@@ -50,127 +52,6 @@ METRIC_CLASSES = {
 MODEL_CLASSES = {
     "bigbird": (BigBirdForSequenceClassification, BigBirdTokenizer),
 }
-
-
-def parse_args():
-    parser = argparse.ArgumentParser()
-
-    # Required parameters
-    parser.add_argument(
-        "--task_name",
-        default=None,
-        type=str,
-        required=True,
-        help="The name of the task to train selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()), )
-    parser.add_argument(
-        "--model_type",
-        default=None,
-        type=str,
-        required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
-    parser.add_argument(
-        "--model_name_or_path",
-        default=None,
-        type=str,
-        required=True,
-        help="Path to pre-trained model or shortcut name selected in the list: "
-        + ", ".join(
-            sum([
-                list(classes[-1].pretrained_init_configuration.keys())
-                for classes in MODEL_CLASSES.values()
-            ], [])), )
-    parser.add_argument(
-        "--output_dir",
-        default=None,
-        type=str,
-        required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
-    )
-    parser.add_argument(
-        "--max_seq_length",
-        default=128,
-        type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument(
-        "--learning_rate",
-        default=1e-4,
-        type=float,
-        help="The initial learning rate for Adam.")
-    parser.add_argument(
-        "--num_train_epochs",
-        default=3,
-        type=int,
-        help="Total number of training epochs to perform.", )
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=100,
-        help="Log every X updates steps.")
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=100,
-        help="Save checkpoint every X updates steps.")
-    parser.add_argument(
-        "--batch_size",
-        default=32,
-        type=int,
-        help="Batch size per GPU/CPU for training.", )
-    parser.add_argument(
-        "--weight_decay",
-        default=0.0,
-        type=float,
-        help="Weight decay if we apply some.")
-    parser.add_argument(
-        "--warmup_steps",
-        default=0,
-        type=int,
-        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
-    )
-    parser.add_argument(
-        "--warmup_proportion",
-        default=0.1,
-        type=float,
-        help="Linear warmup proportion over total steps.")
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-6,
-        type=float,
-        help="Epsilon for Adam optimizer.")
-    parser.add_argument(
-        "--max_steps",
-        default=-1,
-        type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
-    )
-    parser.add_argument(
-        "--seed", default=42, type=int, help="random seed for initialization")
-    parser.add_argument(
-        "--n_procs",
-        default=1,
-        type=int,
-        help="Number of cards to use, the cpu just use single core to train and predict."
-    )
-    parser.add_argument(
-        "--device",
-        default="gpu",
-        type=str,
-        help="The device to select to train the model, is must be cpu/gpu/xpu.")
-    parser.add_argument(
-        "--use_amp",
-        type=distutils.util.strtobool,
-        default=False,
-        help="Enable mixed precision training.")
-    parser.add_argument(
-        "--scale_loss",
-        type=float,
-        default=2**15,
-        help="The value of scale_loss for fp16.")
-    args = parser.parse_args()
-    return args
 
 
 def set_seed(args):
@@ -452,7 +333,7 @@ def print_arguments(args):
 
 
 if __name__ == "__main__":
-    args = parse_args()
+    args = args.parse_args()
     print_arguments(args)
     assert args.device in [
         "cpu", "gpu", "xpu"
