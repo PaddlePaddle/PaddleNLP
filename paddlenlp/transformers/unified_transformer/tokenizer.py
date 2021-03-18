@@ -58,6 +58,12 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         },
     }
 
+    TASK_TYPE_TO_SPECIAL_TOKEN = {
+        "chitchat": "[CHAT]",
+        "knowledge": "[KNOW]",
+        "recommend": "[RECO]"
+    }
+
     def __init__(self,
                  vocab_file,
                  sentencepiece_model_file,
@@ -417,3 +423,101 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             idx_to_token[idx] for idx in sorted(idx_to_token.keys())
         ]
         return vocab
+
+    def dialogue_encode(self,
+                        history,
+                        response='',
+                        knowledge='',
+                        task_type='chitchat',
+                        max_seq_len=512,
+                        max_response_len=128,
+                        max_knowledge_len=128,
+                        return_position_ids=False,
+                        return_token_type_ids=True,
+                        return_length=False):
+        """
+        Main method to tokenize and prepare for the model one or several sequence(s) or one or several pair(s) of
+        sequences. This method will call `self.encode()` or `self.batch_encode()` depending on input format and  
+        `is_split_into_words` argument.
+
+        Args:
+            history (str|list|tuple):
+                The sequence or batch of sequences to be encoded. Each sequence can be a string or a list of strings
+                (pretokenized string). If the sequences are provided as list of strings (pretokenized), you must set
+                :obj:`is_split_into_words=True` (to lift the ambiguity with a batch of sequences).
+            text_pair (:obj:`str`, :obj:`List[str]`, :obj:`List[List[str]]`):
+                The sequence or batch of sequences to be encoded. Each sequence can be a string or a list of strings
+                (pretokenized string). If the sequences are provided as list of strings (pretokenized), you must set
+                :obj:`is_split_into_words=True` (to lift the ambiguity with a batch of sequences).
+        """
+        # Input type checking for clearer error
+        assert isinstance(history, str) or (
+            isinstance(history, (list, tuple)) and len(history) != 0 and
+            isinstance(history[0], str)), (
+                "The input `history` must be with type `str` (single context) "
+                "or `List[str]` (multi-turn context).")
+        assert isinstance(response, str), (
+            "The input `response` must of be with type `str`.")
+        assert isinstance(knowledge, str), (
+            "The input `knowledge` must of be with type `str`.")
+        assert task_type in self.TASK_TYPE_TO_SPECIAL_TOKEN, (
+            "The input `task_type` must be one of {}.".format(", ".join(
+                self.TASK_TYPE_TO_SPECIAL_TOKEN.keys())))
+        assert max_seq_len > max_response_len + max_knowledge_len, (
+            "`max_seq_len` must be greater than the sum of `max_response_len` "
+            "and `max_knowledge_len`. But received `max_seq_len` is {}, "
+            "`max_response_len` is {}, `max_knowledge_len` is {}.".format(
+                max_seq_len, max_response_len, max_knowledge_len))
+
+        knowledge_ids = []
+        if knowledge != '':
+            tokens = self._tokenize(knowledge)
+            knowledge_ids = self.convert_tokens_to_ids(tokens)
+            if len(knowledge_ids) > max_knowledge_len - 1:
+                knowledge_ids = knowledge_ids[:max_knowledge_len - 1]
+            knowledge_ids += [self.sep_token_id]
+
+        response_ids = []
+        if response != '':
+            tokens = self._tokenize(response)
+            response_ids = [self.cls_token_id] + self.convert_tokens_to_ids(
+                tokens)
+            if len(response_ids) > max_response_len - 1:
+                response_ids = response_ids[:max_response_len - 1]
+            response_ids += [self.sep_token_id]
+
+        special_token_id = self.vocab[self.TASK_TYPE_TO_SPECIAL_TOKEN[
+            task_type]]
+        knowledge_ids = [self.cls_token_id, special_token_id] + knowledge_ids
+        max_history_len = max_seq_len - len(knowledge_ids) - len(response_ids)
+        if isinstance(history, str):
+            history = [history]
+        history_ids = []
+        idx = len(history) - 1
+        while idx >= 0:
+            tokens = self._tokenize(history[idx])
+            if len(history_ids) + len(tokens) + 1 > max_history_len:
+                if idx == len(history) - 1:
+                    tokens = tokens[:max_history_len - 1]
+                    history_ids += (self.convert_tokens_to_ids(tokens) +
+                                    [self.sep_token_id])
+                break
+            history_ids += (
+                self.convert_tokens_to_ids(tokens) + [self.sep_token_id])
+            idx -= 1
+
+        history_ids = knowledge_ids + history_ids
+        # Build output dictionnary
+        encoded_inputs = {}
+        encoded_inputs["input_ids"] = history_ids + response_ids
+        # Check lengths
+        assert len(encoded_inputs["input_ids"]) <= max_seq_len
+        if return_token_type_ids:
+            encoded_inputs["token_type_ids"] = [0] * len(
+                history_ids) + [1] * len(response_ids)
+        if return_length:
+            encoded_inputs["seq_len"] = len(encoded_inputs["input_ids"])
+        if return_position_ids:
+            encoded_inputs["position_ids"] = list(
+                range(len(encoded_inputs["input_ids"])))
+        return encoded_inputs
