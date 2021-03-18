@@ -21,12 +21,12 @@ import shutil
 from paddle.utils import try_import
 from paddlenlp.utils.env import MODEL_HOME
 
-from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
+from .. import BasicTokenizer, PretrainedTokenizer
 
 __all__ = ['ErnieCtmTokenizer']
 
 
-class ErnieCtmTokenizer(PreTrainedTokenizer):
+class ErnieCtmTokenizer(PretrainedTokenizer):
     r"""
     Construct a ERNIE-CTM tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
@@ -59,7 +59,11 @@ class ErnieCtmTokenizer(PreTrainedTokenizer):
             value for :obj:`lowercase` (as in the original BERT).
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
-    pretrained_resource_files_map = {"vocab_file": {"ernie-ctm": ""}}
+    pretrained_resource_files_map = {
+        "vocab_file": {
+            "ernie-ctm": "http://0.0.0.0:8765/vocab.txt"
+        }
+    }
     pretrained_init_configuration = {"ernie-ctm": {"do_lower_case": True}}
 
     def __init__(self,
@@ -154,8 +158,9 @@ class ErnieCtmTokenizer(PreTrainedTokenizer):
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
 
-    def create_token_type_ids_from_sequences(
-            self, token_ids_0, token_ids_1=None) -> typing.List[int]:
+    def create_token_type_ids_from_sequences(self,
+                                             token_ids_0,
+                                             token_ids_1=None):
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task. A BERT sequence
         pair mask has the following format:
