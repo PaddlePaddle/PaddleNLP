@@ -38,9 +38,11 @@ class Accuracy():
     def __call__(self, logits, target):
         _, pred = logits.topk(self.top_k, 1, True, True)
         pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-        self.correct_k = correct[:self.top_k].view(-1).float().sum(0)
-        self.total = target.size(0)
+        correct = pred.equal(target.reshape([1, -1]).expand_as(pred))
+        # import pdb; pdb.set_trace()
+        self.correct_k = correct[:self.top_k].reshape(
+            [-1]).cast('float32').sum(0)
+        self.total = target.shape[0]
 
     def reset(self):
         self.correct_k = 0
@@ -66,13 +68,14 @@ class SequenceAccuracy():
 
     def __call__(self, logits, target, ignore_index):
         pred = paddle.argmax(logits, 1)
-        active_acc = target.view(-1) != ignore_index
-        active_pred = pred[active_acc]
-        active_labels = target[active_acc]
+        active_acc = target.reshape([-1]) != ignore_index
+        # import pdb; pdb.set_trace()
+        active_pred = pred.masked_select(active_acc)
+        active_labels = target.masked_select(active_acc)
 
-        correct = active_pred.eq(active_labels)
-        self.correct_k = correct.float().sum(0)
-        self.total = active_labels.size(0)
+        correct = active_pred.equal(active_labels)
+        self.correct_k = correct.cast('float32').sum(0)
+        self.total = active_labels.shape[0]
 
     def reset(self):
         self.correct_k = 0
@@ -110,4 +113,5 @@ class AverageMeter(object):
         self.val = val
         self.sum += val * n
         self.count += n
+
         self.avg = float(self.sum) / float(self.count)

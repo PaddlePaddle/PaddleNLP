@@ -115,7 +115,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
             typing.List[int] -- List of `input IDs <../glossary.html#input-ids>`__ with the appropriate special tokens.
         """
         cls_token_ids = [
-            self._convert_token_to_id(self.cls_token_template.format(sid))
+            self.convert_tokens_to_ids(self.cls_token_template.format(sid))
             for sid in range(self.summary_num)
         ]
         if token_ids_1 is None:
