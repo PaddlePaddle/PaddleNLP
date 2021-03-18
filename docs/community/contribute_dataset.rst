@@ -4,12 +4,16 @@
 
 除了使用PaddleNLP内置的数据集以外，我们也鼓励用户向PaddleNLP贡献自己的数据集。
 
-数据集的贡献通过创建一个 :class:`DatasetBuilder` 对象来实现。下面我们以 :obj:`LCQMC` 为例了解一下贡献合格的一个 :class:`DatasetBuilder` 对象通常需要包含哪些方法和参数。
+数据集的贡献通过定义一个 :class:`DatasetBuilder` 的子类来实现。下面我们以 :obj:`LCQMC` 为例了解一下贡献一个合格的 :class:`DatasetBuilder` 通常需要包含哪些方法和参数。
 
 成员变量
 ---------------
 
 .. code-block::
+
+    from paddle.dataset.common import md5file
+    from paddle.utils.download import get_path_from_url
+    from paddlenlp.utils.env import DATA_HOME
 
     class LCQMC(DatasetBuilder):
         """
@@ -17,7 +21,7 @@
         More information please refer to `https://www.aclweb.org/anthology/C18-1166/`
 
         """
-
+        lazy = False
         URL = "https://bj.bcebos.com/paddlehub-dataset/lcqmc.tar.gz"
         MD5 = "62a7ba36f786a82ae59bbde0b0a9af0c"
         META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
@@ -35,6 +39,7 @@
     
 首先贡献的数据集需要继承 :class:`paddlenlp.datasets.DatasetBuilder` 类，之后最好添加一段注释，简要说明数据集的来源等信息。之后需定义以下成员变量：
 
+- :attr:`lazy` ：数据集的默认类型。:obj:`False` 对应 :class:`MapDataset` ，:obj:`True` 对应 :class:`IterDataset` 。
 - :attr:`URL` ：数据集压缩包下载地址，需提供有效并稳定的下载链接。如果数据集不是压缩包，可以不再这里提供。
 - :attr:`MD5` ：数据集压缩包的md5值，用于文件校验，如果数据集文件不是压缩包，可以不再这里提供。
 - :attr:`META_INFO` ：数据集split信息格式。

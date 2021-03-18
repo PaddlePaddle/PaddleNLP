@@ -2,10 +2,10 @@
 加载数据集
 ============
 
-快速加载官方数据集
+快速加载内置数据集
 ---------------------
 
-目前PaddleNLP内置超过20个NLP数据集，包括阅读理解，文本分类，序列标注，机器翻译等多项任务。目前提供的数据集可以在 :doc:`数据集列表 <./dataset_list>` 中找到。
+目前PaddleNLP内置20余个NLP数据集，涵盖阅读理解，文本分类，序列标注，机器翻译等多项任务。目前提供的数据集可以在 :doc:`数据集列表 <./dataset_list>` 中找到。
 
 以 **msra_ner** 数据集为例:
 
@@ -16,7 +16,7 @@
 
 :func:`load_dataset` 方法会从 :obj:`paddlenlp.datasets` 下找到msra_ner数据集对应的数据读取脚本（默认路径：paddlenlp/datasets/msra_ner.py），并调用脚本中 :class:`DatasetBuilder` 类的相关方法生成数据集。
 
-目前我们提供 :class:`MapDataset` 和 :class:`IterDataset` 两种类型的数据集，两者分别是对 :class:`paddle.io.Dataset` 和 :class:`paddle.io.IterableDataset` 的功能增强。 :func:`load_dataset` 返回数据集的类型通过 :attr:`lazy` 参数控制。 
+生成数据集可以以 :class:`MapDataset` 和 :class:`IterDataset` 两种类型返回，分别是对 :class:`paddle.io.Dataset` 和 :class:`paddle.io.IterableDataset` 的扩展，只需在 :func:`load_dataset` 时设置 :attr:`lazy` 参数即可获取相应类型。:obj:`Flase` 对应返回:class:`MapDataset` ，:obj:`True` 对应返回:class:`IterDataset`，默认值为None，对应返回:class:`DatasetBuilder` 默认的数据集类型，大多数为:class:`MapDataset` 。
 
 .. code-block::
 
@@ -40,12 +40,12 @@
 .. code-block::
 
     >>> from paddlenlp.datasets import load_dataset
-    >>> train_ds, dev_ds = load_dataset("glue",name="cola", splits=("train", "dev"))  
+    >>> train_ds, dev_ds = load_dataset("glue", name="cola", splits=("train", "dev"))  
 
-以官方数据集格式读取本地数据集
+以内置数据集格式读取本地数据集
 -----------------------------
 
-有的时候，我们希望使用数据格式与官方数据集相同的本地数据替换某些官方数据集的数据（例如参加SQuAD竞赛，对训练数据进行了数据增强）。 :func:`load_dataset` 方法提供的 :attr:`data_files` 参数可以实现这个功能。以 **SQuAD** 为例。
+有的时候，我们希望使用数据格式与内置数据集相同的本地数据替换某些内置数据集的数据（例如参加SQuAD竞赛，对训练数据进行了数据增强）。 :func:`load_dataset` 方法提供的 :attr:`data_files` 参数可以实现这个功能。以 **SQuAD** 为例。
 
 .. code-block::
 
