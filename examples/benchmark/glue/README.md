@@ -30,21 +30,8 @@ python -u ./run_glue.py \
 
 其中参数释义如下：
 - `model_type` 指示了Fine-tuning使用的预训练模型类型，如：ernie、bert、electra等，因不同类型的预训练模型可能有不同的 Fine-tuning layer 和 tokenizer。
-- `model_name_or_path` 指示了Fine-tuning使用的具体预训练模型，可以是PaddleNLP提供的预训练模型 或者 本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: /home/xx_model/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面某个，但是注意这里选择的模型要和上面配置的模型类型匹配，如：model_type 配置的是bert，则model_name_or_path只能选择bert相关的模型（即下表中包含bert的那些）
-
-   | PaddleNLP提供的预训练模型        |
-   |---------------------------------|
-   | ernie-2.0-en                    |
-   | ernie-2.0-large-en              |
-   | bert-base-uncased               |
-   | bert-large-uncased              |
-   | bert-base-cased                 |
-   | bert-large-cased                |
-   | bert-base-multilingual-uncased  |
-   | bert-base-multilingual-cased    |
-   | electra-small                   |
-   | electra-base                    |
-   | electra-large                   |
+- `model_name_or_path` 指示了Fine-tuning使用的具体预训练模型，可以是PaddleNLP提供的预训练模型 或者 本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: /home/xx_model/，目录中需包含paddle预训练模型model_state.pdparams。
+如果使用PaddleNLP提供的预训练模型，可以选择`model_type`在[Transformer预训练模型汇总](../../../docs/transformers.md#transformer预训练模型汇总)中相对应的英文预训练权重。注意这里选择的模型权重要和上面配置的模型类型匹配，例如model_type 配置的是bert，则model_name_or_path只能选择bert相关的模型。另，glue任务应选择英文预训练权重。
 
 - `task_name` 表示 Fine-tuning 的任务，当前支持CoLA、SST-2、MRPC、STS-B、QQP、MNLI、QNLI、RTE。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
