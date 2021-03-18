@@ -72,9 +72,13 @@ def convert_example(example,
         is_split_into_words=True,
         max_seq_len=max_seq_len)
     # '[CLS]' and '[SEP]' will get label 'O'
+
+    if len(tokenized_input['input_ids']) - 1 - summary_num < len(tags):
+        tags = tags[:len(tokenized_input['input_ids']) - 1 - summary_num]
     tags = ['O'] * (summary_num) + tags + ['O']
+    tags += ['O'] * (len(tokenized_input['input_ids']) - len(tags))
     tokenized_input['tags'] = [tags_to_idx[x] for x in tags]
-    tokenized_input['cls_label'] = labels_to_idx['cls_label']
+    tokenized_input['cls_label'] = labels_to_idx[cls_label]
     return tokenized_input['input_ids'], tokenized_input[
         'token_type_ids'], tokenized_input['seq_len'], tokenized_input[
             'tags'], tokenized_input['cls_label']
@@ -134,7 +138,7 @@ def set_seed(args):
 #             "length": length,
 #         }
 #         outputs = model(**inputs)
-#         cls_acc(logits=outputs[0].view(-1, len(labels_to_idx)), target=labels.view(-1))
+#         cls_acc(logits=outputs[0].reshape(-1, len(labels_to_idx)), target=labels.reshape(-1))
 #         pred_tags = vit(outputs[1], masks)
 #         pred_cls_label = paddle.argmax(outputs[0], dim=-1, keepdim=False)
 #         for i, pred_tag in enumerate(pred_tags):
@@ -214,7 +218,7 @@ def do_train(args):
         model = paddle.DataParallel(model)
 
     num_training_steps = args.max_steps if args.max_steps > 0 else (
-        len(train_data_loader) * args.num_num_train_epochs)
+        len(train_data_loader) * args.num_train_epochs)
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          warmup)
@@ -224,33 +228,18 @@ def do_train(args):
     # if args.local_rank != -1:
     #     num_train_optimization_steps = num_train_optimization_steps // paddle.distributed.get_world_size()
 
-    no_decay = ["bias", "LayerNorm.weight"]
-    optimizer_grouped_parameters = [{
-        "params": [
-            p for n, p in model.named_parameters()
-            if not any(nd in n for nd in no_decay) and "crf" not in n
-        ],
-        "weight_decay": args.weight_decay
-    }, {
-        "params": [
-            p for n, p in model.named_parameters()
-            if any(nd in n for nd in no_decay) and "crf" not in n
-        ],
-        "weight_decay": 0.0
-    }]
-    bert_optimizer = paddle.optimizer.AdamW(
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
+    optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
+        beta1=0.9,
+        beta2=0.999,
         epsilon=args.adam_epsilon,
-        parameters=optimizer_grouped_parameters)
-    crf_parameters = [{
-        "params": [p for n, p in model.named_parameters() if "crf" in n],
-        "weight_decay": args.weight_decay
-    }]
-    #TODO: check crf lr
-    crf_optimizer = paddle.optimizer.AdamW(
-        learning_rate=args.learning_rate * 100,
-        epsilon=args.adam_epsilon,
-        parameters=crf_parameters)
+        parameters=model.parameters(),
+        weight_decay=args.weight_decay,
+        apply_decay_param_fun=lambda x: x in decay_params)
 
     logger.info("Total steps: %s" % num_training_steps)
     logger.info("WarmUp steps: %s" % warmup)
@@ -272,6 +261,7 @@ def do_train(args):
         # model.train()
         start_time = time.time()
 
+        # import pdb; pdb.set_trace()
         for total_step, batch in enumerate(train_data_loader):
             global_step += 1
 
@@ -287,7 +277,7 @@ def do_train(args):
             # total_loss = cls_loss + seq_loss + crf_loss
             # total_score += total_loss.item()
             # if args.n_gpu > 1:
-            #     total_loss = total_loss.mean()
+            total_loss = total_loss.mean()
             # if args.gradient_accumulation_steps > 1:
             #     total_loss = total_loss / args.gradient_accumulation_steps
             total_loss.backward()
@@ -300,19 +290,18 @@ def do_train(args):
             # seq_acc = SequenceAccuracy()
 
             # if (total_step + 1) % args.gradient_accumulation_steps == 0:
-            bert_optimizer.step()
-            crf_optimizer.step()
-            bert_optimizer.clear_grad()
-            crf_optimizer.clear_grad()
+            optimizer.step()
+            optimizer.clear_grad()
             # model.zero_grad()
             lr_scheduler.step()
 
+            # import pdb; pdb.set_trace()
             cls_acc(
-                logits=cls_logits.view(-1, len(labels_to_idx)),
-                target=cls_label.view(-1))
+                logits=cls_logits.reshape([-1, len(labels_to_idx)]),
+                target=cls_label.reshape([-1]))
             seq_acc(
-                logits=seq_logits.view(-1, len(tags_to_idx)),
-                target=tags.view(-1),
+                logits=seq_logits.reshape([-1, len(tags_to_idx)]),
+                target=tags.reshape([-1]),
                 ignore_index=tags_to_idx["O"])
 
             if global_step % args.logging_steps == 0 and global_step != 0:

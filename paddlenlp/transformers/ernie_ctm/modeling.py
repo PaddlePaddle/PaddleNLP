@@ -45,7 +45,7 @@ class ErnieCtmEmbeddings(Layer):
         super().__init__()
         self.word_embeddings = nn.Embedding(
             vocab_size, embedding_size, padding_idx=padding_idx)
-        # self.embedding_hidden_mapping_in = paddle.Linear(embedding_size, hidden_size)
+        # self.embedding_hidden_mapping_in = nn.Linear(embedding_size, hidden_size)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 embedding_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size,
@@ -173,8 +173,8 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             max_position_embeddings=max_position_embeddings,
             type_vocab_size=type_vocab_size,
             padding_idx=pad_token_id)
-        self.embedding_hidden_mapping_in = paddle.Linear(embedding_size,
-                                                         hidden_size)
+        self.embedding_hidden_mapping_in = nn.Linear(embedding_size,
+                                                     hidden_size)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -186,10 +186,11 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
         self.pooler = ErnieCtmPooler(hidden_size)
 
+        self.use_content_summary = use_content_summary
+        self.content_summary_index = content_summary_index
         if use_content_summary is True:
-            self.feature_fuse = paddle.Linear(hidden_size * 2,
-                                              intermediate_size)
-            self.feature_output = paddle.Linear(intermediate_size, hidden_size)
+            self.feature_fuse = nn.Linear(hidden_size * 2, intermediate_size)
+            self.feature_output = nn.Linear(intermediate_size, hidden_size)
 
         self.apply(self.init_weights)
 
@@ -225,16 +226,17 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
                           if self.use_content_summary else None)
 
         if self.use_content_summary is True:
-            if self.content_clone is True:
-                sequence_output = paddle.concat((
-                    sequence_output,
-                    sequence_output[:, self.config.content_summary_index].clone(
-                    ).unsqueeze([1]).repeat(1, sequence_output.size(1), 1)), 2)
-            else:
+            if content_clone is True:
                 sequence_output = paddle.concat(
                     (sequence_output,
-                     sequence_output[:, self.config.content_summary_index]
-                     .unsqueeze([1]).repeat(1, sequence_output.size(1), 1)), 2)
+                     sequence_output[:, self.content_summary_index].clone(
+                     ).unsqueeze([1]).expand_as(sequence_output)), 2)
+            else:
+                # import pdb; pdb.set_trace()
+                sequence_output = paddle.concat(
+                    (sequence_output,
+                     sequence_output[:, self.content_summary_index].unsqueeze(
+                         [1]).expand_as(sequence_output)), 2)
             sequence_output = self.feature_fuse(sequence_output)
             sequence_output = self.feature_output(sequence_output)
 
@@ -252,7 +254,7 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
             num_tag,
             num_cls_label,
             #  dropout=None,
-            crf_lr=0.1,
+            crf_lr=0.01,
             ignore_index=0):
         super(ErnieCtmWordtagModel, self).__init__()
         self.num_tag = num_tag
@@ -263,12 +265,12 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
         self.tag_classifier = nn.Linear(self.ernie_ctm.config["hidden_size"],
                                         self.num_tag)
         self.crf = LinearChainCrf(
-            self.num_tag, crf_lr, with_start_stop_tag=True)
+            self.num_tag, crf_lr, with_start_stop_tag=False)
         self.sent_classifier = nn.Linear(self.ernie_ctm.config["hidden_size"],
                                          self.num_cls_label)
         self.crf_loss = LinearChainCrfLoss(self.crf)
         self.viterbi_decoder = ViterbiDecoder(
-            self.crf.transitions, with_start_stop_tag=True)
+            self.crf.transitions, with_start_stop_tag=False)
         self.ignore_index = ignore_index
 
         self.apply(self.init_weights)
@@ -293,12 +295,14 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
 
         total_loss = None
         if tag_labels is not None and cls_label is not None:
-            loss_fct = paddle.CrossEntropyLoss(ignore_index=self.ignore_index)
+            loss_fct = nn.loss.CrossEntropyLoss(ignore_index=self.ignore_index)
+            # import pdb; pdb.set_trace()
             seq_loss = loss_fct(
-                seq_logits.view(-1, self.num_sequence_label_tags),
-                seq_logits.view(-1))
-            cls_loss = loss_fct(cls_logits.view(-1), seq_logits.view(-1))
-            seq_crf_loss = self.crf(seq_logits, lengths, None, tag_labels)
+                seq_logits.reshape([-1, self.num_tag]),
+                tag_labels.reshape([-1]))
+            # import pdb; pdb.set_trace()
+            cls_loss = loss_fct(cls_logits, cls_label.reshape([-1]))
+            seq_crf_loss = self.crf_loss(seq_logits, lengths, None, tag_labels)
             total_loss = seq_loss + cls_loss + seq_crf_loss
             return total_loss, seq_logits, cls_logits  #, outputs[2:]
         else:
