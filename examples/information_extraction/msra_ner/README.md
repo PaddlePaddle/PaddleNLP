@@ -11,15 +11,9 @@ MSRA-NER 数据集由微软亚研院发布，其目标是识别文本中具有�
 
 PaddleNLP集成的数据集MSRA-NER数据集对文件格式做了调整：每一行文本、标签以特殊字符"\t"进行分隔，每个字之间以特殊字符"\002"分隔。
 
-## 2. 快速开始
+## 快速开始
 
-### 2.1 环境配置
-
-- Python >= 3.6
-- paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-- paddlenlp >= 2.0.0rc10, 安装方式：`pip install paddlenlp\>=2.0.0rc10`
-
-### 2.2 模型训练
+### 模型训练
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -65,7 +59,7 @@ Precision                     | 0.908957    |
 Recall                        | 0.926683    |
 F1                            | 0.917734    |
 
-## 3. 模型评估
+### 模型评估
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -85,7 +79,7 @@ python -u ./eval.py \
 - `use_gpu`: 是否使用GPU。
 - `init_checkpoint_path`: 模型加载路径。
 
-## 4. 模型预测
+### 模型预测
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -98,7 +92,7 @@ python -u ./predict.py \
     --init_checkpoint_path tmp/msra_ner/model_500.pdparams
 ```
 
-## 5. 使用其它预训练模型
+### 使用其它预训练模型
 
 请参考[Transformer API文档](../../../docs/transformers.md)了解更多PaddleNLP支持的预训练模型信息，并更换`--model_name_or_path`参数即可对比其他预训练模型的效果。
 

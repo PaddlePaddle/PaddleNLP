@@ -8,37 +8,23 @@
 
 ## 快速开始
 
-### 安装说明
+### 环境依赖
 
-* PaddlePaddle 安装
+- sentencepiece
 
-   本项目依赖于 PaddlePaddle 2.0.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* PaddleNLP 安装
-
-   ```shell
-   pip install paddlenlp\>=2.0.0rc
-   ```
-
-* SentencePiece 安装
-   ```shell
-   pip install sentencepiece
-   ```
+安装命令：`pip install sentencepiece`
 
 ### 数据准备
 
-##### GLUE评测任务数据
-
-GLUE评测任务所含数据集已在paddlenlp中以API形式提供，无需预先准备，使用`run_glue.py`执行微调时将会自动下载。
+GLUE评测任务所含数据集已在paddlenlp中以API形式提供，无需预先准备，使用`run_glue.py`执行时将会自动下载。
 
 ### 执行Fine-tuning
 
 以GLUE中的SST-2任务为例，启动Fine-tuning的方式如下：
 
 ```shell
-# 设置当前使用设备，如第0号卡
-export CUDA_VISIBLE_DEVICES=0
-python -m paddle.distributed.launch ./run_glue.py \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" ./run_glue.py \
     --model_name_or_path xlnet-base-cased \
     --task_name SST-2 \
     --max_seq_length 128 \
@@ -77,5 +63,5 @@ python -m paddle.distributed.launch ./run_glue.py \
 
 ## Reference
 
-- [XLNet: Generalized Autoregressive Pretraining for Language Understanding](https://arxiv.org/abs/1906.08237) 
+- [XLNet: Generalized Autoregressive Pretraining for Language Understanding](https://arxiv.org/abs/1906.08237)
 - [zihangdai/xlnet](https://github.com/zihangdai/xlnet)

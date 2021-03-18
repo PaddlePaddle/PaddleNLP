@@ -25,6 +25,10 @@ root: None
 use_gpu: True
 
 # Args for reader, see reader.py for details
+# The translation task to process.
+task_name: "de-en"
+src_lang: "en"
+trg_lang: "de"
 pool_size: 200000
 sort_type: "global"
 batch_size: 4096

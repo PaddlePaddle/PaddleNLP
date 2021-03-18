@@ -21,18 +21,11 @@
 
 ## 快速开始
 
-### 安装说明
-
-* PaddlePaddle 安装
-
-    本项目依赖于 PaddlePaddle 2.0及以上版本或适当的develop版本，请参考 [安装指南](https://www.paddlepaddle.org.cn/install/quick) 进行安装
-
-* PaddleNLP 以及其他依赖安装
-
-    ```shell
-    pip install paddlenlp==2.0.0rc
-    pip install regex sentencepiece tqdm
-    ```
+### 环境依赖
+- regex
+- sentencepiece
+- tqdm
+安装命令 `pip install regex sentencepiece tqdm`
 
 ### 数据准备
 

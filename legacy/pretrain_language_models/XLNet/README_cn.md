@@ -2,7 +2,7 @@
 
 该项目是 [XLNet](https://github.com/zihangdai/xlnet) 基于 Paddle Fluid 的实现，目前支持该项目支持所有下游任务的 fine-tuning, 包括自然语言推断任务和阅读理解任务 （SQuAD2.0）等。
 
-XLNet 与 [BERT](https://github.com/PaddlePaddle/models/tree/develop/PaddleNLP/PaddleLARK/BERT) 有着许多的不同，XLNet 利用一个全新的模型 [Transformer-XL](https://arxiv.org/abs/1901.02860) 作为语义表示的骨架， 将置换语言模型的建模作为优化目标，同时在预训练阶段也利用了更多的数据。 最终，XLNet 在多个 NLP 任务上达到了 SOTA 的效果。
+XLNet 与 [BERT](../../../examples/language_model/bert)有着许多的不同，XLNet 利用一个全新的模型 [Transformer-XL](https://arxiv.org/abs/1901.02860) 作为语义表示的骨架， 将置换语言模型的建模作为优化目标，同时在预训练阶段也利用了更多的数据。 最终，XLNet 在多个 NLP 任务上达到了 SOTA 的效果。
 
 更多的细节，请参考学术论文
 
