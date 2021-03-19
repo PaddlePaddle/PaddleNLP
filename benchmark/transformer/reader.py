@@ -102,7 +102,7 @@ def create_data_loader(args, places=None, use_all_vocab=False):
             key=_key)
 
         if args.shuffle_batch:
-            batch_sampler.shuffle(seed=args.shuffle_seed)
+            batch_sampler = batch_sampler.shuffle(seed=args.shuffle_seed)
 
         if i == 0:
             batch_sampler = batch_sampler.shard()
