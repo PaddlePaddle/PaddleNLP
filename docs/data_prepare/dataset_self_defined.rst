@@ -19,7 +19,7 @@
                 words, labels = line.strip('\n').split('\t')
                 words = words.split('\002')
                 labels = labels.split('\002')
-                yield words, labels
+                yield {'tokens': words, 'labels': labels}
     
     map_ds = MapDataset(list(read(data_path))) # 创建为Map-style Dataset
     iter_ds = IterDataset(read(data_path))     # 创建为Iterable Dataset
