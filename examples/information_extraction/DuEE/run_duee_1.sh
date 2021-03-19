@@ -1,7 +1,6 @@
 dataset_name=DuEE1.0
 data_dir=./data/${dataset_name}
 conf_dir=./conf/${dataset_name}
-vocab_path=./conf/vocab.dict
 ckpt_dir=./ckpt/${dataset_name}
 submit_data_path=./submit/test_duee_1.json
 pred_data=${data_dir}/test.json   # 换其他数据，需要修改它
@@ -29,7 +28,7 @@ run_sequence_labeling_model(){
     model=${1}
     is_train=${2}
     pred_save_path=${ckpt_dir}/${model}/test_pred.json
-    sh run_sequence_labeling.sh ${data_dir}/${model} ${conf_dir}/${model}_tag.dict ${vocab_path} ${ckpt_dir}/${model} ${pred_data} ${learning_rate} ${is_train} ${max_seq_len} ${batch_size} ${epoch} ${pred_save_path}
+    sh run_sequence_labeling.sh ${data_dir}/${model} ${conf_dir}/${model}_tag.dict ${ckpt_dir}/${model} ${pred_data} ${learning_rate} ${is_train} ${max_seq_len} ${batch_size} ${epoch} ${pred_save_path}
 }
 
 if [ ${process_name} == data_prepare ]; then
