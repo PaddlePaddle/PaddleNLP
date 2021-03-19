@@ -13,7 +13,7 @@
 # limitations under the License.
 import numpy as np
 
-__all__ = ['get_vocab_list']
+__all__ = ['get_vocab_list', 'stable_softmax', 'cross_entropy']
 
 
 def get_vocab_list(vocab_path):
@@ -22,3 +22,32 @@ def get_vocab_list(vocab_path):
             vocab.rstrip("\n").split("\t")[0] for vocab in f.readlines()
         ]
         return vocab_list
+
+
+def stable_softmax(x):
+    """Compute the softmax of vector x in a numerically stable way."""
+    # clip to shiftx, otherwise, when calc loss with
+    # log(exp(shiftx)), may get log(0)=INF
+    shiftx = (x - np.max(x)).clip(-64.)
+    exps = np.exp(shiftx)
+    return exps / np.sum(exps)
+
+
+def cross_entropy(softmax, label, soft_label, axis, ignore_index=-1):
+    if soft_label:
+        return (-label * np.log(softmax)).sum(axis=axis, keepdims=True)
+
+    shape = softmax.shape
+    axis %= len(shape)
+    n = int(np.prod(shape[:axis]))
+    axis_dim = shape[axis]
+    remain = int(np.prod(shape[axis + 1:]))
+    softmax_reshape = softmax.reshape((n, axis_dim, remain))
+    label_reshape = label.reshape((n, 1, remain))
+    result = np.zeros_like(label_reshape, dtype=softmax.dtype)
+    for i in range(n):
+        for j in range(remain):
+            lbl = label_reshape[i, 0, j]
+            if lbl != ignore_index:
+                result[i, 0, j] -= np.log(softmax_reshape[i, lbl, j])
+    return result.reshape(label.shape)

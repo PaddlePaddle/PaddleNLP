@@ -33,6 +33,12 @@ class TestTokenEmbedding(unittest.TestCase):
         self.config["trainable"] = True
 
 
+class TestTokenEmbeddingTrainable(TestTokenEmbedding):
+    def test_trainable(self):
+        self.assertNotEqual(self.config["trainable"],
+                            self.embedding.weight.stop_gradient)
+
+
 class TestTokenEmbeddingUNK(TestTokenEmbedding):
     def set_config(self):
         super().set_config()
