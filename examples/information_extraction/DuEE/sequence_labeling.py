@@ -37,7 +37,6 @@ parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--num_epoch", type=int, default=3, help="Number of epoches for fine-tuning.")
 parser.add_argument("--learning_rate", type=float, default=5e-5, help="Learning rate used to train with warmup.")
 parser.add_argument("--tag_path", type=str, default=None, help="tag set path")
-parser.add_argument("--vocab_path", type=str, default=None, help="vocab path")
 parser.add_argument("--train_data", type=str, default=None, help="train data")
 parser.add_argument("--dev_data", type=str, default=None, help="dev data")
 parser.add_argument("--test_data", type=str, default=None, help="test data")
@@ -111,8 +110,7 @@ def convert_example_to_feature(example, tokenizer, label_vocab=None, max_seq_len
 
 class DuEventExtraction(paddle.io.Dataset):
     """DuEventExtraction"""
-    def __init__(self, data_path, vocab_path, tag_path):
-        self.word_vocab = load_dict(vocab_path)
+    def __init__(self, data_path, tag_path):
         self.label_vocab = load_dict(tag_path)
         self.word_ids = []
         self.label_ids = []
@@ -125,7 +123,6 @@ class DuEventExtraction(paddle.io.Dataset):
                 labels = labels.split('\002')
                 self.word_ids.append(words)
                 self.label_ids.append(labels)
-        self.word_num = max(self.word_vocab.values()) + 1
         self.label_num = max(self.label_vocab.values()) + 1
 
     def __len__(self):
@@ -153,9 +150,9 @@ def do_train():
     model = paddle.DataParallel(model)
 
     print("============start train==========")
-    train_ds = DuEventExtraction(args.train_data, args.vocab_path, args.tag_path)
-    dev_ds = DuEventExtraction(args.dev_data, args.vocab_path, args.tag_path)
-    test_ds = DuEventExtraction(args.test_data, args.vocab_path, args.tag_path)
+    train_ds = DuEventExtraction(args.train_data, args.tag_path)
+    dev_ds = DuEventExtraction(args.dev_data, args.tag_path)
+    test_ds = DuEventExtraction(args.test_data, args.tag_path)
 
     trans_func = partial(
         convert_example_to_feature,
