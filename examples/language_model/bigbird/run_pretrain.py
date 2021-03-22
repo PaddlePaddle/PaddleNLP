@@ -155,11 +155,10 @@ def do_train(args):
                 args.model_name_or_path]))
     else:
         model = BigBirdForPretraining.from_pretrained(args.model_name_or_path)
-
-    criterion = BigBirdPretrainingCriterion(
-        getattr(model,
-                BigBirdForPretraining.base_model_prefix).config["vocab_size"],
-        args.use_nsp)
+    # Get bigbird config for generate random attention mask
+    global config
+    config = getattr(model, BigBirdForPretraining.base_model_prefix).config
+    criterion = BigBirdPretrainingCriterion(config["vocab_size"], args.use_nsp)
     if worker_num > 1:
         model = paddle.DataParallel(model)
 
@@ -180,9 +179,6 @@ def do_train(args):
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
 
-    # Get bigbird config for generate random attention mask
-    global config
-    config = getattr(model, BigBirdForPretraining.base_model_prefix).config
     global_step = 0
     tic_train = time.time()
     for epoch in range(args.epochs):
