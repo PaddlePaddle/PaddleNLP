@@ -52,7 +52,10 @@ class CommonTest(unittest.TestCase):
             places = self.places
             for place in places:
                 paddle.set_device(place)
-                func(self, *args, **kw)
+                try:
+                    func(self, *args, **kw)
+                except BaseException as ex:
+                    raise Exception("{}, error in {} place.".format(ex, place))
 
         return wrapper
 
