@@ -76,6 +76,7 @@ def do_predict(args):
         weight_sharing=args.weight_sharing,
         bos_id=args.bos_idx,
         eos_id=args.eos_idx,
+        decoding_strategy="beam_search",
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
         decoding_lib=args.decoding_lib,
