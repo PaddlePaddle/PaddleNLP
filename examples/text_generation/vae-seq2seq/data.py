@@ -76,7 +76,7 @@ def create_data_loader(args):
             prepare_train_input, bos_id=bos_id, eos_id=eos_id, pad_id=pad_id))
 
     test_loader = paddle.io.DataLoader(
-        dev_ds,
+        test_ds,
         batch_sampler=dev_batch_sampler,
         collate_fn=partial(
             prepare_train_input, bos_id=bos_id, eos_id=eos_id, pad_id=pad_id))
