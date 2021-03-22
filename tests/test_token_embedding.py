@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import numpy as np
+import os
 import unittest
 import paddle
 from paddlenlp.embeddings import TokenEmbedding
@@ -55,7 +56,7 @@ class TestTokenEmbeddingUNK(TestTokenEmbedding):
 class TestTokenEmbeddingExtendedVocab(TestTokenEmbedding):
     def set_config(self):
         super().set_config()
-        self.config["extended_vocab_path"] = "./data/dict.txt"
+        self.config["extended_vocab_path"] = "./dict.txt"
 
     def test_extended_vocab(self):
         self.embedding = TokenEmbedding(**self.config)
@@ -69,7 +70,7 @@ class TestTokenEmbeddingExtendedVocab(TestTokenEmbedding):
 class TestTokenEmbeddingKeepExtendedVocab(TestTokenEmbedding):
     def set_config(self):
         super().set_config()
-        self.config["extended_vocab_path"] = "./data/dict.txt"
+        self.config["extended_vocab_path"] = "./dict.txt"
         self.config["keep_extended_vocab_only"] = True
 
     def test_extended_vocab(self):
@@ -84,7 +85,7 @@ class TestTokenEmbeddingKeepExtendedVocab(TestTokenEmbedding):
 class TestTokenEmbeddingSimilarity(TestTokenEmbedding):
     def set_config(self):
         super().set_config()
-        self.config["extended_vocab_path"] = "./data/dict.txt"
+        self.config["extended_vocab_path"] = "./dict.txt"
         self.config["keep_extended_vocab_only"] = True
 
     def get_dot(self, vec_a, vec_b):
@@ -118,5 +119,28 @@ class TestTokenEmbeddingSimilarity(TestTokenEmbedding):
         self.check_output_equal(result, expected_result)
 
 
+def create_test_data():
+    test_data_file = "./dict.txt"
+    if not os.path.exists(test_data_file):
+        with open(test_data_file, "w") as f:
+            vocab_list = [
+                '[UNK]', 'AT&T', 'B超', 'c#', 'C#', 'c++', 'C++', 'T恤', 'A座',
+                'A股', 'A型', 'A轮', 'AA制', 'AB型', 'B座', 'B股', 'B型', 'B轮', 'BB机',
+                'BP机', 'C盘', 'C座', 'C语言', 'CD盒', 'CD机', 'CALL机', 'D盘', 'D座',
+                'D版', 'E盘', 'E座', 'E化', 'E通', 'F盘', 'F座', 'G盘', 'H盘', 'H股',
+                'I盘', 'IC卡', 'IP卡', 'IP电话', 'IP地址', 'K党', 'K歌之王', 'N年', 'O型',
+                'PC机', 'PH值', 'SIM卡', 'U盘', 'VISA卡', 'Z盘', 'Q版', 'QQ号', 'RSS订阅',
+                'T盘', 'X光', 'X光线', 'X射线', 'γ射线', 'T恤衫', 'T型台', 'T台', '4S店',
+                '4s店', '江南style', '江南Style', '1号店', '小S', '大S', '阿Q', '一', '一一',
+                '一一二', '一一例', '一一分', '一一列举', '一一对', '一一对应', '一一记', '一一道来', '一丁',
+                '一丁不识', '一丁点', '一丁点儿', '一七', '一七八不', '一万', '一万一千', '一万一千五百二十颗',
+                '一万一千八百八十斤', '一万一千多间', '一万一千零九十五册', '一万七千', '一万七千余', '一万七千多',
+                '一万七千多户', '一万万'
+            ]
+            for vocab in vocab_list:
+                f.write("{}\n".format(vocab))
+
+
 if __name__ == "__main__":
+    create_test_data()
     unittest.main()
