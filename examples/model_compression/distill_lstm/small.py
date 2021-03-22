@@ -135,7 +135,7 @@ def evaluate(task_name, model, loss_fct, metric, data_loader):
 
 
 def do_train(args):
-    device = paddle.set_device(args.select_device)
+    device = paddle.set_device(args.device)
     metric_class = METRIC_CLASSES[args.task_name]
     metric = metric_class()
     if args.task_name == 'qqp':
