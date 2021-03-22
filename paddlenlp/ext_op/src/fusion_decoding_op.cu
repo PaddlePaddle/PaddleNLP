@@ -234,7 +234,7 @@ public:
         reinterpret_cast<const DataType_*>(embedding_weight->data<T>());
     // NOTE: the data type of the embedding bias for logits is different
     // between decoding with beam search and top-k/top-p sampling in
-    // Faster Transformer.
+    // Faster Transformer when using float16.
     if ("beam_search" == decoding_strategy) {
       // for matmul bias
       decoding_params.embedding_bias =
