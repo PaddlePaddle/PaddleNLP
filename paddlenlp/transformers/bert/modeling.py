@@ -225,6 +225,62 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
         },
+        "tinybert-4l-312d": {
+            "vocab_size": 30522,
+            "hidden_size": 312,
+            "num_hidden_layers": 4,
+            "num_attention_heads": 12,
+            "intermediate_size": 1200,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
+        "tinybert-6l-768d": {
+            "vocab_size": 30522,
+            "hidden_size": 768,
+            "num_hidden_layers": 6,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
+        "tinybert-4l-312d-v2": {
+            "vocab_size": 30522,
+            "hidden_size": 312,
+            "num_hidden_layers": 4,
+            "num_attention_heads": 12,
+            "intermediate_size": 1200,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
+        "tinybert-6l-768d-v2": {
+            "vocab_size": 30522,
+            "hidden_size": 768,
+            "num_hidden_layers": 6,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -247,6 +303,14 @@ class BertPretrainedModel(PretrainedModel):
             "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-wwm-chinese.pdparams",
             "bert-wwm-ext-chinese":
             "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-wwm-ext-chinese.pdparams",
+            "tinybert-4l-312d":
+            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-4l-312d.pdparams",
+            "tinybert-6l-768d":
+            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-6l-768d.pdparams",
+            "tinybert-4l-312d-v2":
+            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-4l-312d-v2.pdparams",
+            "tinybert-6l-768d-v2":
+            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-6l-768d-v2.pdparams",
         }
     }
     base_model_prefix = "bert"
