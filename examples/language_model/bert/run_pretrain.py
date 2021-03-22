@@ -290,9 +290,14 @@ def do_train(args):
 
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    model = model_class(
-        base_class(**model_class.pretrained_init_configuration[
-            args.model_name_or_path]))
+    pretrained_models_list = list(
+        model_class.pretrained_init_configuration.keys())
+    if args.model_name_or_path in pretrained_models_list:
+        model = model_class(
+            base_class(**model_class.pretrained_init_configuration[
+                args.model_name_or_path]))
+    else:
+        model = model_class.from_pretrained(args.model_name_or_path)
     criterion = criterion_class(
         getattr(model, model_class.base_model_prefix).config["vocab_size"])
     if paddle.distributed.get_world_size() > 1:
