@@ -22,7 +22,10 @@ class FasterTransformer(TransformerModel):
                  weight_sharing,
                  bos_id=0,
                  eos_id=1,
+                 decoding_strategy="beam_search",
                  beam_size=4,
+                 topk=1,
+                 topp=0.0,
                  max_out_len=256,
                  decoding_lib=None,
                  use_fp16_decoding=False):
@@ -35,7 +38,10 @@ class FasterTransformer(TransformerModel):
         args = dict(locals())
         args.pop("self")
         args.pop("__class__", None)
+        self.decoding_strategy = args.pop("decoding_strategy")
         self.beam_size = args.pop("beam_size")
+        self.topk = args.pop("topk")
+        self.topp = args.pop("topp")
         self.max_out_len = args.pop("max_out_len")
         self.decoding_lib = args.pop("decoding_lib")
         self.use_fp16_decoding = args.pop("use_fp16_decoding")
@@ -61,7 +67,10 @@ class FasterTransformer(TransformerModel):
             d_model=d_model,
             bos_id=bos_id,
             eos_id=eos_id,
+            decoding_strategy=decoding_strategy,
             beam_size=beam_size,
+            topk=topk,
+            topp=topp,
             max_out_len=max_out_len,
             decoding_lib=self.decoding_lib,
             use_fp16_decoding=self.use_fp16_decoding)
@@ -109,12 +118,16 @@ class FasterTransformer(TransformerModel):
         if self.weight_sharing:
             model_dict["decoding_linear.weight"] = np.transpose(model_dict[
                 "trg_word_embedding.word_embedding.weight"])
-            model_dict["decoding_linear.bias"] = np.zeros(
-                [self.trg_vocab_size], dtype="float32")
         else:
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
-            model_dict["decoding_linear.bias"] = np.zeros(
-                [self.trg_vocab_size], dtype="float32")
+        # NOTE: the data type of the embedding bias for logits is different
+        # between decoding with beam search and top-k/top-p sampling in
+        # Faster Transformer when using float16.
+        bias_dtype = "float32"
+        if self.use_fp16_decoding and "beam_search" != self.decoding_strategy:
+            bias_dtype = "float16"
+        model_dict["decoding_linear.bias"] = np.zeros(
+            [self.trg_vocab_size], dtype=bias_dtype)
 
         # To avoid a longer length than training, reset the size of position
         # encoding to max_length
