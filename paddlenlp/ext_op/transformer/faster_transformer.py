@@ -120,6 +120,9 @@ class FasterTransformer(TransformerModel):
                 "trg_word_embedding.word_embedding.weight"])
         else:
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
+        # NOTE: the data type of the embedding bias for logits is different
+        # between decoding with beam search and top-k/top-p sampling in
+        # Faster Transformer when using float16.
         bias_dtype = "float32"
         if self.use_fp16_decoding and "beam_search" != self.decoding_strategy:
             bias_dtype = "float16"
