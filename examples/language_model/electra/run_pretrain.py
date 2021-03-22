@@ -21,6 +21,7 @@ import io
 import random
 import time
 import json
+import copy
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
@@ -612,7 +613,10 @@ def do_train(args):
                         os.makedirs(output_dir)
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
-                    config_to_save = model_to_save.discriminator.electra.config
+                    config_to_save = copy.deepcopy(
+                        model_to_save.discriminator.electra.config)
+                    if 'self' in config_to_save:
+                        del config_to_save['self']
                     run_states = {
                         "model_name": model_name
                         if args.init_from_ckpt else args.model_name_or_path,
@@ -641,7 +645,7 @@ def do_train(args):
                                 if len(log.strip()) > 0:
                                     f.write(log.strip() + '\n')
             if global_step >= num_training_steps:
-                break
+                return
 
 
 def print_arguments(args):
