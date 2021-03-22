@@ -376,7 +376,7 @@ def do_train(args):
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
             if global_step >= num_training_steps:
-                break
+                return
 
 
 def print_arguments(args):
