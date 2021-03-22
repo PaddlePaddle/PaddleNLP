@@ -17,7 +17,7 @@ import paddle
 from paddlenlp.metrics import Perplexity
 
 from utils import stable_softmax, cross_entropy
-paddle.set_device('cpu')
+from common_test import CommonTest
 
 
 class NpPerplexity(object):
@@ -48,10 +48,8 @@ class NpPerplexity(object):
         return np.exp(self.total_ce / self.total_word_num)
 
 
-class TestPerplexity(unittest.TestCase):
+class TestPerplexity(CommonTest):
     def setUp(self):
-        self.config = {}
-        self.set_config()
         self.metrics = Perplexity(**self.config)
         self.np_metrics = NpPerplexity()
 
@@ -71,14 +69,14 @@ class TestPerplexity(unittest.TestCase):
         return label, logits, pred, seq_mask
 
     def test_name(self):
-        self.assertEqual(self.metrics.name(), self.config['name'])
+        self.check_output_equal(self.metrics.name(), self.config['name'])
 
     def test_compute(self):
         label, logits, pred, _ = self.get_random_case()
         expected_result = self.np_metrics.compute(pred, label)
         result = self.metrics.compute(
             paddle.to_tensor(logits), paddle.to_tensor(label))
-        self.assertTrue(np.allclose(expected_result, result.numpy()))
+        self.check_output_equal(expected_result, result.numpy())
 
     def test_compute_with_mask(self):
         label, logits, pred, seq_mask = self.get_random_case()
@@ -86,20 +84,20 @@ class TestPerplexity(unittest.TestCase):
         result = self.metrics.compute(
             paddle.to_tensor(logits),
             paddle.to_tensor(label), paddle.to_tensor(seq_mask))
-        self.assertTrue(np.allclose(expected_result[0], result[0].numpy()))
-        self.assertEqual(expected_result[1], result[1])
+        self.check_output_equal(expected_result[0], result[0].numpy())
+        self.check_output_equal(expected_result[1], result[1])
 
     def test_reset(self):
         label, logits, pred, _ = self.get_random_case()
         result = self.metrics.compute(
             paddle.to_tensor(logits), paddle.to_tensor(label))
         self.metrics.update(result.numpy())
-        self.assertNotEqual(self.metrics.total_ce, 0)
-        self.assertNotEqual(self.metrics.total_word_num, 0)
+        self.check_output_not_equal(self.metrics.total_ce, 0)
+        self.check_output_not_equal(self.metrics.total_word_num, 0)
 
         self.metrics.reset()
-        self.assertEqual(self.metrics.total_ce, 0)
-        self.assertEqual(self.metrics.total_word_num, 0)
+        self.check_output_equal(self.metrics.total_ce, 0)
+        self.check_output_equal(self.metrics.total_word_num, 0)
 
     def test_update_accumulate(self):
         steps = 10
@@ -110,9 +108,8 @@ class TestPerplexity(unittest.TestCase):
                 paddle.to_tensor(logits), paddle.to_tensor(label))
             self.metrics.update(result.numpy())
             self.np_metrics.update(expected_result)
-        self.assertTrue(
-            np.allclose(self.metrics.accumulate(), self.np_metrics.accumulate(
-            )))
+        self.check_output_equal(self.metrics.accumulate(),
+                                self.np_metrics.accumulate())
 
 
 if __name__ == "__main__":

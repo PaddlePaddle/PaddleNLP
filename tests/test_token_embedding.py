@@ -17,17 +17,13 @@ import paddle
 from paddlenlp.embeddings import TokenEmbedding
 from paddlenlp.utils.log import logger
 from utils import get_vocab_list
+
+from common_test import CommonTest
 logger.logger.setLevel('ERROR')
 
 
-class TestTokenEmbedding(unittest.TestCase):
-    def setUp(self):
-        self.config = {}
-        self.set_config()
-        self.embedding = TokenEmbedding(**self.config)
-
+class TestTokenEmbedding(CommonTest):
     def set_config(self):
-        # default config
         self.config[
             "embedding_name"] = "w2v.sikuquanshu.target.word-word.dim300"
         self.config["trainable"] = True
@@ -35,8 +31,9 @@ class TestTokenEmbedding(unittest.TestCase):
 
 class TestTokenEmbeddingTrainable(TestTokenEmbedding):
     def test_trainable(self):
-        self.assertNotEqual(self.config["trainable"],
-                            self.embedding.weight.stop_gradient)
+        self.embedding = TokenEmbedding(**self.config)
+        self.check_output_not_equal(self.config["trainable"],
+                                    self.embedding.weight.stop_gradient)
 
 
 class TestTokenEmbeddingUNK(TestTokenEmbedding):
@@ -47,11 +44,12 @@ class TestTokenEmbeddingUNK(TestTokenEmbedding):
             scale=0.02, size=300).astype(paddle.get_default_dtype())
 
     def test_unk_token(self):
-        self.assertEqual(self.config["unknown_token"],
-                         self.embedding.unknown_token)
-        self.assertTrue(
-            np.allclose(self.config["unknown_token_vector"],
-                        self.embedding.search(self.embedding.unknown_token)))
+        self.embedding = TokenEmbedding(**self.config)
+        self.check_output_equal(self.config["unknown_token"],
+                                self.embedding.unknown_token)
+        self.check_output_equal(
+            self.config["unknown_token_vector"],
+            self.embedding.search(self.embedding.unknown_token))
 
 
 class TestTokenEmbeddingExtendedVocab(TestTokenEmbedding):
@@ -60,10 +58,12 @@ class TestTokenEmbeddingExtendedVocab(TestTokenEmbedding):
         self.config["extended_vocab_path"] = "./data/dict.txt"
 
     def test_extended_vocab(self):
+        self.embedding = TokenEmbedding(**self.config)
         vocab_list = get_vocab_list(self.config["extended_vocab_path"])
         emb_idx = set(self.embedding.get_idx_list_from_words(vocab_list))
         vocab_idx = set([i for i in range(len(vocab_list))])
         self.assertEqual(emb_idx, vocab_idx)
+        self.check_output_equal(emb_idx, vocab_idx)
 
 
 class TestTokenEmbeddingKeepExtendedVocab(TestTokenEmbedding):
@@ -73,10 +73,12 @@ class TestTokenEmbeddingKeepExtendedVocab(TestTokenEmbedding):
         self.config["keep_extended_vocab_only"] = True
 
     def test_extended_vocab(self):
+        self.embedding = TokenEmbedding(**self.config)
         vocab_list = get_vocab_list(self.config["extended_vocab_path"])
         vocab_size = len(vocab_list)
         # +1 means considering [PAD]
-        self.assertEqual(vocab_size + 1, len(self.embedding._word_to_idx))
+        self.check_output_equal(vocab_size + 1,
+                                len(self.embedding._word_to_idx))
 
 
 class TestTokenEmbeddingSimilarity(TestTokenEmbedding):
@@ -100,18 +102,20 @@ class TestTokenEmbeddingSimilarity(TestTokenEmbedding):
         return word_a, word_b, vec_a, vec_b
 
     def test_cosine_sim(self):
+        self.embedding = TokenEmbedding(**self.config)
         vocab_list = get_vocab_list(self.config["extended_vocab_path"])
         word_a, word_b, vec_a, vec_b = self.get_random_word_vec(vocab_list)
         result = self.embedding.cosine_sim(word_a, word_b)
         expected_result = self.get_cosine(vec_a, vec_b)
-        self.assertTrue(np.allclose(result, expected_result))
+        self.check_output_equal(result, expected_result)
 
     def test_dot(self):
+        self.embedding = TokenEmbedding(**self.config)
         vocab_list = get_vocab_list(self.config["extended_vocab_path"])
         word_a, word_b, vec_a, vec_b = self.get_random_word_vec(vocab_list)
         result = self.embedding.dot(word_a, word_b)
         expected_result = self.get_dot(vec_a, vec_b)
-        self.assertTrue(np.allclose(result, expected_result))
+        self.check_output_equal(result, expected_result)
 
 
 if __name__ == "__main__":

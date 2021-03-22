@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import numpy as np
+import unittest
+import paddle
 
 __all__ = ['get_vocab_list', 'stable_softmax', 'cross_entropy']
 
