@@ -161,7 +161,7 @@ def marked_doc_2_sentence(doc):
     step = 3
     batch_sents = [sents[i:i + step] for i in range(0, len(sents), step)]
     if len(title) > 0:
-        batch_sents = [title] + batch_sents
+        batch_sents = [[title]] + batch_sents
     for batch in batch_sents:
         b_sent = " ".join(batch).replace("\n", " ").replace(
             "\r\n", " ").replace("\r", " ").replace("\t", " ")
