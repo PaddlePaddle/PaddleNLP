@@ -16,7 +16,7 @@ import unittest
 import paddle
 from paddlenlp.metrics import Perplexity
 
-from utils import stable_softmax, cross_entropy
+from util import stable_softmax, cross_entropy
 from common_test import CommonTest
 
 

@@ -17,7 +17,7 @@ import unittest
 import paddle
 from paddlenlp.embeddings import TokenEmbedding
 from paddlenlp.utils.log import logger
-from utils import get_vocab_list
+from util import get_vocab_list
 
 from common_test import CommonTest
 logger.logger.setLevel('ERROR')
