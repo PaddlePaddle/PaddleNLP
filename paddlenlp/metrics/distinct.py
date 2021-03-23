@@ -20,8 +20,10 @@ __all__ = ['Distinct']
 
 class Distinct(paddle.metric.Metric):
     """
-    Distinct is an algorithm for evaluating the quality of text which has been 
-    generated. See detail at https://arxiv.org/abs/1510.03055
+    Distinct is an algorithm for evaluating the textual diversity of the 
+    generated text by calculating the number of distinct n-grams. The larger 
+    the value of n-grams, the higher the diversity of the text. See detail at 
+    https://arxiv.org/abs/1510.03055
 
     `Distinct` could be used as `paddle.metric.Metric` class, or an ordinary 
     class. When `Distinct` is used as `paddle.metric.Metric` class. A function is
@@ -86,20 +88,18 @@ class Distinct(paddle.metric.Metric):
         self.n_size = n_size
         self.trans_func = trans_func
 
-    def update(self, logits, *args):
+    def update(self, output, *args):
         """
-        Update the metrics states.
-        
-        Args:
-            probs: The generate token probability, with shape 
-                [batch_size, seq_len, vocab_size].
+        Update the metrics states. This method firstly will use `trans_func` to 
+        process the `output` to get the tokenized candidate sentence list. Then 
+        call `add_inst` to process the candidate list one by one.
         """
-        if isinstance(logits, paddle.Tensor):
-            logits = logits.numpy()
+        if isinstance(output, paddle.Tensor):
+            output = output.numpy()
 
         assert self.trans_func is not None, "The `update` method requires user "\
             "to provide `trans_func` when initializing `Distinct`."
-        cand_list = self.trans_func(logits)
+        cand_list = self.trans_func(output)
 
         for cand in cand_list:
             self.add_inst(cand)
