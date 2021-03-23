@@ -6,7 +6,7 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 
 |  数据集名称   | 简介 | 调用方法 |
 |  ----  | ----- | ------ |
-|  [SQuAD](https://rajpurkar.github.io/SQuAD-explorer/) | 斯坦福问答数据集，包括SQaAD1.1和SQaAD2.0|`paddlenlp.datasets.load_dataset('squad')` |
+|  [SQuAD](https://rajpurkar.github.io/SQuAD-explorer/) | 斯坦福问答数据集，包括SQuAD1.1和SQuAD2.0|`paddlenlp.datasets.load_dataset('squad')` |
 |  [DuReader-yesno](https://aistudio.baidu.com/aistudio/competition/detail/49) | 千言数据集：阅读理解，判断答案极性|`paddlenlp.datasets.load_dataset('dureader_yesno')` |
 |  [DuReader-robust](https://aistudio.baidu.com/aistudio/competition/detail/49) | 千言数据集：阅读理解，答案原文抽取|`paddlenlp.datasets.load_dataset('dureader_robust')` |
 |  [CMRC2018](http://hfl-rc.com/cmrc2018/) | 第二届“讯飞杯”中文机器阅读理解评测数据集|`paddlenlp.datasets.load_dataset('cmrc2018')` |
