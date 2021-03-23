@@ -564,14 +564,14 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
 
         if return_attention_mask:
             length = max_seq_len if pad_length > 0 else sequence_length
-            attention_mask = np.ones((length, length), dtype='float32') * -1
+            attention_mask = np.ones((length, length), dtype='float32') * -1e9
             start = len(history_ids)
             end = sequence_length
             attention_mask[:end, :start] = 0.0
             # Generate the lower triangular matrix using the slice of matrix
             tmp = np.triu(
                 np.ones(
-                    [end - start, end - start], dtype='float32') * -1, 1)
+                    [end - start, end - start], dtype='float32') * -1e9, 1)
             attention_mask[start:end, start:end] = tmp
             encoded_inputs["attention_mask"] = attention_mask.tolist()
 
