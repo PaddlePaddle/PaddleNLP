@@ -50,7 +50,7 @@ class TestTokenEmbeddingUNK(TestTokenEmbedding):
                                 self.embedding.unknown_token)
         self.check_output_equal(
             self.config["unknown_token_vector"],
-            self.embedding.search(self.embedding.unknown_token))
+            self.embedding.search(self.embedding.unknown_token)[0])
 
 
 class TestTokenEmbeddingExtendedVocab(TestTokenEmbedding):

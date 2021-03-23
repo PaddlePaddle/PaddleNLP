@@ -59,7 +59,12 @@ class CommonTest(unittest.TestCase):
 
         return wrapper
 
-    def _check_output_impl(self, result, expected_result, equal=True):
+    def _check_output_impl(self,
+                           result,
+                           expected_result,
+                           rtol,
+                           atol,
+                           equal=True):
         assertForNormalType = self.assertNotEqual
         assertForFloat = self.assertFalse
         if equal:
@@ -69,17 +74,31 @@ class CommonTest(unittest.TestCase):
         result_t = type(result)
         if result_t in [list, tuple]:
             result_t = get_container_tpye(result)
-
-        if result_t in [str, int, bool, set]:
+        if result_t in [
+                str, int, bool, set, np.bool, np.int32, np.int64, np.str
+        ]:
             assertForNormalType(result, expected_result)
-        elif result_t in [float, np.array]:
-            assertForFloat(np.allclose(result, expected_result))
+        elif result_t in [float, np.ndarray, np.float32, np.float64]:
+            assertForFloat(
+                np.allclose(
+                    result, expected_result, rtol=rtol, atol=atol))
+            if result_t == np.ndarray:
+                assertForNormalType(result.shape, expected_result.shape)
 
-    def check_output_equal(self, result, expected_result):
-        self._check_output_impl(result, expected_result)
+    def check_output_equal(self,
+                           result,
+                           expected_result,
+                           rtol=1.e-5,
+                           atol=1.e-8):
+        self._check_output_impl(result, expected_result, rtol, atol)
 
-    def check_output_not_equal(self, result, expected_result):
-        self._check_output_impl(result, expected_result, equal=False)
+    def check_output_not_equal(self,
+                               result,
+                               expected_result,
+                               rtol=1.e-5,
+                               atol=1.e-8):
+        self._check_output_impl(
+            result, expected_result, rtol, atol, equal=False)
 
     def set_config(self):
         '''
