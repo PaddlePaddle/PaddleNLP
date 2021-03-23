@@ -75,7 +75,7 @@ python -m paddle.distributed.launch train.py \
 
 ```
 
-**NOTE:** 如需恢复模型训练，则`init_from_ckpt`只需指定到文件名即可，不需要添加文件尾缀。如`--init_from_ckpt=ptb_model/49`即可，程序会自动加载模型参数`ptb_model/49.pdparams`，也会自动加载优化器状态`ptb_model/49.pdopt`。
+**NOTE:** 如需恢复模型训练，则`init_from_ckpt`只需指定到文件名即可，不需要添加文件尾缀。如`--init_from_ckpt ptb_model/49`即可，程序会自动加载模型参数`ptb_model/49.pdparams`，也会自动加载优化器状态`ptb_model/49.pdopt`。
 
 
 ## 模型预测
