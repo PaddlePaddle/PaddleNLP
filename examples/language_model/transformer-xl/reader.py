@@ -56,12 +56,10 @@ class LMDataset(IterableDataset):
             src = self.data[:, beg_idx:end_idx]
             target = self.data[:, i + 1:i + 1 + seq_len]
 
-            # NOTE: `seq_len` will be transfered to numpy immediately
-            # after returned by DataLoader. Hence, `seq_len` can be
-            # yield as `int`. And the returned tensor `seq_len`'s shape
-            # will be empty [].
+            # NOTE: For now, DataLoader can yield `int`. It's not necessary 
+            # to transfer `seq_len` after DataLoader. 
             # However, if it's necessary to use `seq_len` as input for some
-            # PaddlePaddle op, then it must be returned by `[seq_len]` whose
+            # PaddlePaddle op, then it must be yielded by `[seq_len]` whose
             # shape is [1], cause some op cannot use shape [] as input. 
             yield [
                 src[self.rank * self.batch_size:(self.rank + 1) *
