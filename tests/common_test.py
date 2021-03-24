@@ -14,6 +14,7 @@
 import numpy as np
 import unittest
 import paddle
+import warnings
 
 __all__ = ['CommonTest', 'CpuCommonTest']
 
@@ -36,6 +37,9 @@ class CommonTest(unittest.TestCase):
         self.places = ['cpu']
         if paddle.is_compiled_with_cuda():
             self.places.append('gpu')
+
+    def setUp(self):
+        warnings.simplefilter('ignore', category=ResourceWarning)
 
     @classmethod
     def setUpClass(cls):
