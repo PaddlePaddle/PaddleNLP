@@ -52,53 +52,16 @@ class TestImdbTestSet(CpuCommonTest):
     def test_test_set(self):
         np.random.seed(102)
         expected_text, expected_label = (
-            'Two hardluck but crafty ladies decide to act like HAVANA WIDOWS '\
-            'by sailing to Cuba to meet  blackmail rich gentlemenbr br This '\
-            'was the sort of ephemeral comic frippery which the studios '\
-            'produced quite effortlessly during the 1930s Well made  highly '\
-            'enjoyable Depression audiences couldnt seem to get enough of '\
-            'these popular funny photo dramasbr br Joan Blondell  Glenda '\
-            'Farrell are perfectly cast as the frantic fasttalking females '\
-            'who will go to great lengths to make a little dishonest dough '\
-            'Although Joan gets both top billing and the romantic scenes '\
-            'both gals are as talented  watchable as they are gorgeousbr br '\
-            'Handsome Lyle Talbot plays Joans persistent suitor but hes '\
-            'given relatively little to do Chubby cherubic Guy Kibbee '\
-            'appears as the girls intended target Whether awakening to find '\
-            'himself in the wrong bed or being chased across the roof of a '\
-            'Cuban hacienda in his long johns he is equally hilarious Behind '\
-            'him comes a rank of character actors  Allen Jenkins Frank '\
-            'McHugh Ruth Donnelly Hobart Cavanaugh Maude Eburne Dewey '\
-            'Robinson  all equally adept at pleasing the toughest crowdbr '\
-            'br Movie mavens will recognize an uncredited James Murray as '\
-            'the suspicious bank teller with the forged check This very '\
-            'talented actor was pulled out of complete obscurity to star in '\
-            'King Vidors THE CROWD 1928 one of the silent eras most '\
-            'prestigious films Hopes were high for a great career but his '\
-            'celebrity faded quickly with sound pictures After a long '\
-            'string of tiny roles  bit parts broke  destitute his life '\
-            'ended in the waters of a New York river in 1936 He was only 35 '\
-            'years oldbr br While never stars of the first rank Joan '\
-            'Blondell 19061979  Glenda Farrell 19041971 enlivened scores of '\
-            'films at Warner Bros throughout the 1930s especially the eight '\
-            'in which they appeared together Whether playing gold diggers or working '\
-            'girls reporters or secretaries these blonde  brassy ladies were '\
-            'very nearly always a match for whatever leading man was lucky '\
-            'enough to share equal billing alongside them With a wisecrack '\
-            'or a glance their characters showed they were ready to take on '\
-            'the world  and any man in it Never as wickedly brazen as '\
-            'Paramounts Mae West you always had the feeling that tough as '\
-            'they were Blondell  Farrell used their toughness to defend '\
-            'vulnerable hearts ready to break over the right guy While many '\
-            'performances from seven decades ago can look campy or contrived '\
-            'today these two lovely ladies are still spirited  sassy',
-            1)
+            'An extremely powerful film that certainly isnt appreciated enough '
+            'Its impossible to describe the experience of watching it The '
+            'recent UK television adaptation was shameful  too ordinary and '
+            'bland This original manages to imprint itself in your memory', 1)
         expected_len = 25000
 
         test_ds = Imdb(**self.config)
         self.check_output_equal(len(test_ds), expected_len)
-        self.check_output_equal(expected_text, test_ds[0][0])
-        self.check_output_equal(expected_label, test_ds[0][1])
+        self.check_output_equal(expected_text, test_ds[2][0])
+        self.check_output_equal(expected_label, test_ds[2][1])
 
 
 class TestImdbWrongMode(CpuCommonTest):

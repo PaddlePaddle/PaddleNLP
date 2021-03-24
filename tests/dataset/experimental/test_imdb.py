@@ -24,33 +24,9 @@ from common_test import CpuCommonTest
 def get_examples(mode='train'):
     examples = {
         'train':
-        ('I had mixed feelings for Les Valseuses 1974 written and '
-         'directed by Bertrand Blier when I started watching it but '
-         'I ended up liking it I would not call it vulgar Dumb and'
-         ' Dumber is vulgar The Sweetest Thing is both vulgar and '
-         'unforgivably stupid I would call it shocking and offensive '
-         'I can understand why many viewers especially the females '
-         'would not like or even hate it It is the epitome of misogyny'
-         ' or so it seems and the way two antiheroes treat every woman'
-         ' theyd meet seems unspeakable But the more I think of it the '
-         'more I realize that it somehow comes off as a delightful little '
-         'gem I am fascinated how Blier was able to get away with it The '
-         'movie is very entertaining and highly enjoyable it is well written'
-         ' the acting by all is first  class and the music is sweet and '
-         'melancholic Actually when I think of it two buddies had done something '
-         'good to the women they came across to they prepared a woman in the train '
-         'the lovely docile blonde Brigitte Fossey who started her movie career '
-         'with one of the most impressive debuts in René Cléments Forbidden'
-         ' Games1952 at age 6 for the meeting with her husband whom '
-         'she had not seen for two months they found a man who was '
-         'finally able to get a frigid MarieAnge MiouMiou exited and satisfied'
-         ' they enlightened and educated young and very willing Isabelle Huppert '
-         'in one of her early screen appearances Their encounter with Jeanne Moreau '
-         'elevates this comedy to the tragic level In short I am not '
-         'sure Id like to meet Gérard Depardieus JeanClaude and Patrick '
-         'Dewaeres Pierrot in real life and invite them over for dinner '
-         'but I had a good time watching the movie and two hours almost '
-         'flew  it was never boring', 1),
+        ('GREAT movie and the family will love it If kids are bored one day just '
+         'pop the tape in and youll be so glad you didbr br Rubebr br i luv ravens',
+         1),
         'test':
         ('I have loved this movie since I saw it in the theater in 1991 I was '
          '12 then and Wil Wheaton was my favorite actor and adolescent crush I '
@@ -73,8 +49,8 @@ class TestImdbTrainSet(CpuCommonTest):
         expected_text, expected_label = get_examples(self.config['splits'])
         train_ds = load_dataset(**self.config)
         self.check_output_equal(len(train_ds), expected_len)
-        self.check_output_equal(expected_text, train_ds[0]['text'])
-        self.check_output_equal(expected_label, train_ds[0]['label'])
+        self.check_output_equal(expected_text, train_ds[2]['text'])
+        self.check_output_equal(expected_label, train_ds[2]['label'])
 
 
 class TestImdbTestSet(CpuCommonTest):
@@ -107,8 +83,8 @@ class TestImdbTrainTestSet(CpuCommonTest):
         self.check_output_equal(len(ds[0]), expected_len)
         self.check_output_equal(len(ds[1]), expected_len)
 
-        self.check_output_equal(expected_train_text, ds[0][0]['text'])
-        self.check_output_equal(expected_train_label, ds[0][0]['label'])
+        self.check_output_equal(expected_train_text, ds[0][2]['text'])
+        self.check_output_equal(expected_train_label, ds[0][2]['label'])
         self.check_output_equal(expected_test_text, ds[1][2]['text'])
         self.check_output_equal(expected_test_label, ds[1][2]['label'])
 
