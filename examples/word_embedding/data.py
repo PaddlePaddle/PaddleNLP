@@ -67,8 +67,8 @@ def convert_example(example, vocab, unk_token_id=1, is_test=False):
     for token in tokenizer.cut(example['text']):
         token_id = vocab.get(token, unk_token_id)
         input_ids.append(token_id)
-    valid_length = len(input_ids)
-
+    valid_length = np.array([len(input_ids)])
+    input_ids = np.array(input_ids, dtype="int32")
     if not is_test:
         label = np.array(example["label"], dtype="int64")
         return input_ids, valid_length, label
@@ -94,28 +94,6 @@ def pad_texts_to_max_seq_len(texts, max_seq_len, pad_token_id=0):
         elif seq_len > max_seq_len:
             new_text = text[:max_seq_len]
             texts[index] = new_text
-
-
-def generate_batch(batch, pad_token_id=0, return_label=True):
-    """
-    Generates a batch whose text will be padded to the max sequence length in the batch.
-    Args:
-        batch(obj:`List[Example]`) : One batch, which contains texts, labels and the true sequence lengths.
-        pad_token_id(obj:`int`, optinal, defaults to 0) : The pad token index.
-    Returns:
-        batch(:obj:`Tuple[list]`): The batch data which contains texts, seq_lens and labels.
-    """
-    seq_lens = [entry[1] for entry in batch]
-
-    batch_max_seq_len = max(seq_lens)
-    texts = [entry[0] for entry in batch]
-    pad_texts_to_max_seq_len(texts, batch_max_seq_len, pad_token_id)
-
-    if return_label:
-        labels = [[entry[-1]] for entry in batch]
-        return texts, seq_lens, labels
-    else:
-        return texts, seq_lens
 
 
 def preprocess_prediction_data(data, vocab):
