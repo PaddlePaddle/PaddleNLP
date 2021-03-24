@@ -18,15 +18,25 @@ public:
 
   void InferShape(framework::InferShapeContext* ctx) const override {
     auto input_dims = ctx->GetInputDim("Input");
+    auto decoding_strategy = ctx->Attrs().Get<std::string>("decoding_strategy");
     auto beam_size = ctx->Attrs().Get<int>("beam_size");
     auto max_len = ctx->Attrs().Get<int64_t>("max_len");
-    int batch_size = input_dims[0] / beam_size;
+    int batch_size = input_dims[0];
 
-    auto output_dims = framework::make_ddim({max_len, batch_size, beam_size});
+    framework::DDim output_dims;
+    if ("beam_search" == decoding_strategy) {
+      batch_size /= beam_size;
+      output_dims = framework::make_ddim({max_len, batch_size, beam_size});
+      ctx->SetOutputDim("ParentIds", output_dims);
+      ctx->SetOutputDim("SequenceLength",
+                        framework::make_ddim({batch_size * beam_size}));
+    } else if ("topk_sampling" == decoding_strategy ||
+               "topp_sampling" == decoding_strategy) {
+      output_dims = framework::make_ddim({max_len, batch_size});
+      ctx->SetOutputDim("ParentIds", framework::make_ddim({0}));
+      ctx->SetOutputDim("SequenceLength", framework::make_ddim({batch_size}));
+    }
     ctx->SetOutputDim("OutputIds", output_dims);
-    ctx->SetOutputDim("ParentIds", output_dims);
-    ctx->SetOutputDim("SequenceLength",
-                      framework::make_ddim({batch_size * beam_size}));
   }
 
 protected:
@@ -153,11 +163,14 @@ public:
     AddOutput("ParentIds", "The tensor of parent ids. ");
     AddOutput("SequenceLength", "The tensor of sequence length. ");
 
-    AddAttr<std::string>(
-        "decoding_strategy",
-        "Decoding strategies. As for now, only beam search is supported. ")
+    AddAttr<std::string>("decoding_strategy",
+                         "Decoding strategies. As for now, only beam search, "
+                         "topk sampling and topp sampling are supported. ")
         .SetDefault("beam_search");
     AddAttr<int>("beam_size", "The beam size for beam search. ").SetDefault(1);
+    AddAttr<int>("topk", "The k of topk for topk sampling. ").SetDefault(1);
+    AddAttr<float>("topp", "The probabilty threshold for topp. ")
+        .SetDefault(0.0);
     AddAttr<int>("n_head", "The number of heads. ").SetDefault(8);
     AddAttr<int>("size_per_head", "The size per head. ").SetDefault(64);
     AddAttr<int>("num_layer", "The number of layers. ").SetDefault(6);

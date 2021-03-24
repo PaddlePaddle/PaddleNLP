@@ -26,6 +26,40 @@ enum_role = "环节"
 
 def event_normalization(doc):
     """event_merge"""
+    for event in doc.get("event_list", []):
+        argument_list = []
+        argument_set = set()
+        for arg in event["arguments"]:
+            arg_str = "{}-{}".format(arg["role"], arg["argument"])
+            if arg_str not in argument_set:
+                argument_list.append(arg)
+            argument_set.add(arg_str)
+        event["arguments"] = argument_list
+
+    event_list = sorted(
+        doc.get("event_list", []),
+        key=lambda x: len(x["arguments"]),
+        reverse=True)
+    new_event_list = []
+    for event in event_list:
+        event_type = event["event_type"]
+        event_argument_set = set()
+        for arg in event["arguments"]:
+            event_argument_set.add("{}-{}".format(arg["role"], arg["argument"]))
+        flag = True
+        for new_event in new_event_list:
+            if event_type != new_event["event_type"]:
+                continue
+            new_event_argument_set = set()
+            for arg in new_event["arguments"]:
+                new_event_argument_set.add("{}-{}".format(arg["role"], arg[
+                    "argument"]))
+            if len(event_argument_set & new_event_argument_set) == len(
+                    new_event_argument_set):
+                flag = False
+        if flag:
+            new_event_list.append(event)
+    doc["event_list"] = new_event_list
     return doc
 
 

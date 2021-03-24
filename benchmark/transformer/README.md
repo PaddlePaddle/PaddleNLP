@@ -143,7 +143,7 @@ sed -r 's/(@@ )|(@@ ?$)//g' predict.txt > predict.tok.txt
 # 若无 BLEU 评估工具，需先进行下载
 git clone https://github.com/moses-smt/mosesdecoder.git
 # 以英德翻译 newstest2014 测试数据为例
-perl mosesdecoder/scripts/generic/multi-bleu.perl ~/.paddlenlp/datasets/machine_translation/WMT14ende/WMT14.en-de/wmt14_ende_data/newstest2014.tok.de < predict.tok.txt
+perl mosesdecoder/scripts/generic/multi-bleu.perl ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data/newstest2014.tok.de < predict.tok.txt
 ```
 
 执行上述操作之后，可以看到类似如下的结果，此处结果是 big model 在 newstest2014 上的 BLEU 结果：

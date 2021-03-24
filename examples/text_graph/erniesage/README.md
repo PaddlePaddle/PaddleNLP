@@ -22,7 +22,7 @@
 ## 环境依赖
 
 - pgl >= 2.1
-安装命令 `pip install pgl>=2.1`
+安装命令 `pip install pgl\>=2.1`
 
 ## 数据准备
 示例数据```data.txt```中使用了NLPCC2016-DBQA的部分数据，格式为每行"query \t answer"。
