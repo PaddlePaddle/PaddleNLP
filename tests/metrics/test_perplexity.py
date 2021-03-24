@@ -50,14 +50,12 @@ class NpPerplexity(object):
 
 class TestPerplexity(CommonTest):
     def setUp(self):
-        self.metrics = Perplexity(**self.config)
-        self.np_metrics = NpPerplexity()
-
-    def set_config(self):
         self.config['name'] = 'test_perplexity'
         self.cls_num = 10
         self.shape = (5, 20, self.cls_num)
         self.label_shape = (5, 20)
+        self.metrics = Perplexity(**self.config)
+        self.np_metrics = NpPerplexity()
 
     def get_random_case(self):
         label = np.random.randint(

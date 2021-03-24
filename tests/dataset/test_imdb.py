@@ -23,7 +23,7 @@ from common_test import CpuCommonTest
 
 
 class TestImdbTrainSet(CpuCommonTest):
-    def set_config(self):
+    def setUp(self):
         self.config['mode'] = 'train'
 
     def test_training_set(self):
@@ -46,7 +46,7 @@ class TestImdbTrainSet(CpuCommonTest):
 
 
 class TestImdbTestSet(CpuCommonTest):
-    def set_config(self):
+    def setUp(self):
         self.config['mode'] = 'test'
 
     def test_test_set(self):
@@ -102,7 +102,7 @@ class TestImdbTestSet(CpuCommonTest):
 
 
 class TestImdbWrongMode(CpuCommonTest):
-    def set_config(self):
+    def setUp(self):
         # valid mode is 'train' and 'test', wrong mode would raise an error
         self.config['mode'] = 'wrong'
 

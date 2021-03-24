@@ -63,7 +63,7 @@ def create_bigbird_model(config, filename, test_model):
 
 
 class TestBigBirdForSequenceClassification(CommonTest):
-    def set_config(self):
+    def setUp(self):
         self.config = {
             "num_layers": 2,
             "vocab_size": 1024,
@@ -107,7 +107,7 @@ class TestBigBirdForSequenceClassification(CommonTest):
 
 
 class TestBigBirdForPretraining(CommonTest):
-    def set_config(self):
+    def setUp(self):
         self.config = {
             "num_layers": 2,
             "vocab_size": 1024,
@@ -165,6 +165,10 @@ class TestBigBirdForPretraining(CommonTest):
                                 expected_prediction_scores_abs_sum)
         self.check_output_equal(seq_relationship_score,
                                 expected_seq_relationship_score)
+
+
+class TestBigBirdPretrainingCriterion(CommonTest):
+    pass
 
 
 if __name__ == "__main__":

@@ -33,13 +33,9 @@ class CommonTest(unittest.TestCase):
     def __init__(self, methodName='runTest'):
         super(CommonTest, self).__init__(methodName=methodName)
         self.config = {}
-        self.set_config()
         self.places = ['cpu']
         if paddle.is_compiled_with_cuda():
             self.places.append('gpu')
-
-    def setUp(self):
-        warnings.simplefilter('ignore', category=ResourceWarning)
 
     @classmethod
     def setUpClass(cls):
@@ -50,6 +46,7 @@ class CommonTest(unittest.TestCase):
             if key.startswith('test_'):
                 value = CommonTest._test_places(value)
                 setattr(cls, key, value)
+        warnings.simplefilter('ignore', category=ResourceWarning)
 
     def _test_places(func):
         def wrapper(self, *args, **kw):
@@ -103,12 +100,6 @@ class CommonTest(unittest.TestCase):
                                atol=1.e-8):
         self._check_output_impl(
             result, expected_result, rtol, atol, equal=False)
-
-    def set_config(self):
-        '''
-        Set input arguments for tested api.
-        '''
-        pass
 
 
 class CpuCommonTest(CommonTest):

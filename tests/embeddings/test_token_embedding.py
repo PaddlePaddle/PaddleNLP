@@ -48,7 +48,7 @@ def create_test_data():
 
 
 class TestTokenEmbedding(CommonTest):
-    def set_config(self):
+    def setUp(self):
         self.test_data_file = create_test_data()
         self.config[
             "embedding_name"] = "w2v.sikuquanshu.target.word-word.dim300"
@@ -63,8 +63,8 @@ class TestTokenEmbeddingTrainable(TestTokenEmbedding):
 
 
 class TestTokenEmbeddingUNK(TestTokenEmbedding):
-    def set_config(self):
-        super().set_config()
+    def setUp(self):
+        super().setUp()
         self.config["unknown_token"] = "[unk]"  # default [UNK], change it
         self.config["unknown_token_vector"] = np.random.normal(
             scale=0.02, size=300).astype(paddle.get_default_dtype())
@@ -79,8 +79,8 @@ class TestTokenEmbeddingUNK(TestTokenEmbedding):
 
 
 class TestTokenEmbeddingExtendedVocab(TestTokenEmbedding):
-    def set_config(self):
-        super().set_config()
+    def setUp(self):
+        super().setUp()
         self.config["extended_vocab_path"] = self.test_data_file
 
     def test_extended_vocab(self):
@@ -93,8 +93,8 @@ class TestTokenEmbeddingExtendedVocab(TestTokenEmbedding):
 
 
 class TestTokenEmbeddingKeepExtendedVocab(TestTokenEmbedding):
-    def set_config(self):
-        super().set_config()
+    def setUp(self):
+        super().setUp()
         self.config["extended_vocab_path"] = self.test_data_file
         self.config["keep_extended_vocab_only"] = True
 
@@ -108,8 +108,8 @@ class TestTokenEmbeddingKeepExtendedVocab(TestTokenEmbedding):
 
 
 class TestTokenEmbeddingSimilarity(TestTokenEmbedding):
-    def set_config(self):
-        super().set_config()
+    def setUp(self):
+        super().setUp()
         self.config["extended_vocab_path"] = self.test_data_file
         self.config["keep_extended_vocab_only"] = True
 
