@@ -480,14 +480,18 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         task_type_list = ["chitchat", "knowledge", "recommend"]
         # Input type checking for clearer error
         assert isinstance(history, str) or (
-            isinstance(history, (list, tuple)) and len(history) != 0 and
-            isinstance(history[0], str)), (
-                "The input `history` must be with type `str` (single context) "
-                "or `List[str]` (multi-turn context).")
+            isinstance(history, (list, tuple)) and
+            (len(history) == 0 or len(history) != 0 and
+             isinstance(history[0], str))), (
+                 "The input `history` must be with type `str` (single context) "
+                 "or `List[str]` (multi-turn context). But received: {}".format(
+                     history))
         assert response is None or isinstance(response, str), (
-            "The input `response` must of be with type `str`.")
+            "The input `response` must of be with type `str`. But received: {}".
+            format(response))
         assert knowledge is None or isinstance(knowledge, str), (
-            "The input `knowledge` must of be with type `str`.")
+            "The input `knowledge` must of be with type `str`. But received: {}".
+            format(knowledge))
         assert task_type in task_type_list, (
             "The input `task_type` must be one of {}.".format(", ".join(
                 task_type_list)))
@@ -520,18 +524,16 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         if isinstance(history, str):
             history = [history]
         history_ids = []
-        idx = len(history) - 1
-        while idx >= 0:
-            tokens = self._tokenize(history[idx])
+        for i in range(len(history) - 1, -1, -1):
+            tokens = self._tokenize(history[i])
             if len(history_ids) + len(tokens) + 1 > max_history_len:
-                if idx == len(history) - 1:
-                    tokens = tokens[:max_history_len - 1]
-                    history_ids += (self.convert_tokens_to_ids(tokens) +
-                                    [self.sep_token_id])
+                if i == len(history) - 1:
+                    tokens = tokens[1 - max_history_len:]
+                    history_ids = (self.convert_tokens_to_ids(tokens) +
+                                   [self.sep_token_id])
                 break
-            history_ids += (
-                self.convert_tokens_to_ids(tokens) + [self.sep_token_id])
-            idx -= 1
+            history_ids = (self.convert_tokens_to_ids(tokens) +
+                           [self.sep_token_id]) + history_ids
 
         history_ids = knowledge_ids + history_ids
         # Build output dictionnary
