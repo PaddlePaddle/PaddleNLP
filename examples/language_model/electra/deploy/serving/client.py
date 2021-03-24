@@ -119,8 +119,8 @@ def get_predicted_input(predicted_data, tokenizer, max_seq_length, batch_size):
 def predict(args, sentences=[], paths=[]):
     """
     Args:
-        sentences (list[str]): each string is a sentence. If sentences not paths
-        paths (list[str]): The paths of file which contain sentences. If paths not sentences
+        sentences (list[str]): each string is a sentence. If have sentences then no need paths
+        paths (list[str]): The paths of file which contain sentences. If have paths then no need sentences
     Returns:
         res (list(numpy.ndarray)): The result of sentence, indicate whether each word is replaced, same shape with sentences.
     """

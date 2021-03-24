@@ -157,7 +157,6 @@ def prepare_predict(args, sentences=[], paths=[]):
                 if len(sen.strip()) > 0:
                     f.write(sen.strip() + '\n')
 
-    #import pdb; pdb.set_trace()
     for line in fileinput.input("./deploy/lite/config.txt", inplace=True):
         if "predict_num" in line:
             newline = "predict_num " + str(predict_num)

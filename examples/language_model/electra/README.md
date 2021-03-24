@@ -301,7 +301,7 @@ Input sentence is : [CLS] uneasy mishmash of styles and genres . [SEP]
 Output data is : 0
 Input sentence is : [CLS] director rob marshall went out gunning to make a great one . [SEP]
 Output data is : 1
-inference total 1 sentences done, total time : 0.0849156379699707 s
+inference total 2 sentences done, total time : 0.0849156379699707 s
 ```
 此推理结果表示：第1句话是负向情感，第2句话是正向情感。
 
@@ -313,11 +313,11 @@ inference total 1 sentences done, total time : 0.0849156379699707 s
 
 #### 在服务器端安装相关模块
 ```shell
-pip install paddle-serving-app paddle-serving-client paddle-serving-server
+pip install paddle-serving-app paddle-serving-client paddle-serving-server paddlepaddle
 ```
 如果服务器端可以使用GPU进行推理，则安装server的gpu版本，安装时要注意参考服务器当前CUDA、TensorRT的版本来安装对应的版本：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.5.0)
 ```shell
-pip install paddle-serving-app paddle-serving-client paddle-serving-server-gpu
+pip install paddle-serving-app paddle-serving-client paddle-serving-server-gpu paddlepaddle-gpu
 ```
 
 #### 在客户端安装相关模块
@@ -330,7 +330,8 @@ pip install paddle-serving-app paddle-serving-client
 ```shell
 python -u ./deploy/serving/covert_inference_model_to_serving.py \
     --inference_model_dir ./ \
-    --inference_model_name electra-deploy
+    --model_file ./electra-deploy.pdmodel \
+    --params_file ./electra-deploy.pdiparams
 ```
 其中参数释义如下：
 - `inference_model_dir` 表示Inference推理模型所在目录，这里假设为当前目录。
@@ -371,7 +372,7 @@ python -u ./deploy/serving/client.py \
     --model_name electra-small
 ```
 其中参数释义如下：
-- `client_config_file` 表示客户需要加载的配置文件。
+- `client_config_file` 表示客户端需要加载的配置文件。
 - `server_ip_port` 表示服务器端的ip和port。默认为127.0.0.1:8383。
 - `predict_sentences` 表示用于推理的（句子）数据，可以配置1条或多条。如果此项配置，则predict_file不用配置。
 - `batch_size` 表示每次推理的样本数目。
@@ -380,7 +381,7 @@ python -u ./deploy/serving/client.py \
 
 ##### 从文件读取输入数据发起推理请求
 ```shell
-python -u ./eploy/serving/client.py \
+python -u ./deploy/serving/client.py \
     --client_config_file ./serving_client/serving_client_conf.prototxt \
     --server_ip_port 127.0.0.1:8383 \
     --predict_file "./sst-2.test.tsv.1" "./sst-2.test.tsv.2" \
@@ -405,7 +406,7 @@ inference total 2 sentences done, total time : 4.729415416717529 s
 ### **使用Paddle Lite API进行推理**
 上面介绍的Paddle Inference和Serving主要在服务器上进行推理，而在移动设备（手机、平板等）上需要使用Paddle Lite进行推理。[Paddle Lite](https://github.com/PaddlePaddle/Paddle-Lite)是飞桨轻量化推理引擎，为手机、IOT端提供高效推理能力，并广泛整合跨平台硬件，为端侧部署及应用落地问题提供轻量化的部署方案。下面以Android手机(Armv7或Armv8)为例，使用Paddle Lite进行ELECTRA模型的推理。
 
-#### 准备环境
+#### 准备硬件和系统
 - 电脑。用于保存代码和数据；编译Paddle Lite（看需要）
 - 手机。Android手机(Armv7或Armv8)，手机要能直接连接电脑，或者手机直连某个设备，其能连接到电脑。
 
@@ -425,9 +426,9 @@ cd Paddle-Lite
 git checkout develop
 ./lite/tools/build_android.sh --arch=armv8 --with_extra=ON
 ```
-直接下载预测库并解压后，可以得到`inference_lite_lib.android.armv8/`文件夹，通过编译Paddle-Lite得到的预测库位于`Paddle-Lite/build.lite.android.armv8.gcc/inference_lite_lib.android.armv8/`文件夹。无论使用哪种方法，得到的预测库的文件目录结构都如下，为了方便统一说明，预测库位于${Paddle-Lite-root}/inference_lite_lib.android.armv8/目录中：
+直接下载预测库并解压后，可以得到`inference_lite_lib.android.armv8/`文件夹，通过编译Paddle-Lite得到的预测库位于`Paddle-Lite/build.lite.android.armv8.gcc/inference_lite_lib.android.armv8/`文件夹。无论使用哪种方法，得到的预测库的文件目录结构都如下，为了方便统一说明，预测库位于${Paddle_Lite_root}/inference_lite_lib.android.armv8/目录中：
 ```
-${Paddle-Lite-root}/inference_lite_lib.android.armv8/
+${Paddle_Lite_root}/inference_lite_lib.android.armv8/
 |-- cxx                                        C++ 预测库和头文件
 |   |-- include                                C++ 头文件
 |   |   |-- paddle_api.h
@@ -452,7 +453,7 @@ ${Paddle-Lite-root}/inference_lite_lib.android.armv8/
 ```
 
 #### 准备Paddle Lite模型优化工具
-因为移动设备上对模型的要求很严格，所以需要使用Paddle Lite模型优化工具将Inference模型优化后才能将模型部署到移动设备上进行推理，准备Paddle Lite模型优化工具也有两种方法：
+因为移动设备上对模型的要求很严格，所以需要使用Paddle Lite模型优化工具将Inference模型优化后才能将模型部署到移动设备上进行推理，模型优化的方法包括量化、子图融合、混合调度、Kernel优选等等方法。准备Paddle Lite模型优化工具也有两种方法：
 - 直接下载。
 ```shell
 pip install paddlelite。
@@ -485,7 +486,7 @@ paddle_lite_opt \
 ```
 其中参数释义如下：
 - `model_file` 表示需要优化的模型结构文件。例如上面Inference生成的electra-deploy.pdmodel。
-- `params_file` 表示需要优化的模型权重文件。例如上面Inference生成的electra-deploy.pdiparams。
+- `param_file` 表示需要优化的模型权重文件。例如上面Inference生成的electra-deploy.pdiparams。
 - `optimize_out` 表示输出的Lite模型**名字前缀**。例如配置./electra-deploy-lite，最终得到的Lite模型为./electra-deploy-lite.nb。
 - `optimize_out_type` 表示输出模型类型，目前支持两种类型：protobuf和naive_buffer，其中naive_buffer是一种更轻量级的序列化/反序列化实现。若您需要在mobile端执行模型预测，请将此选项设置为naive_buffer。默认为protobuf。
 - `valid_targets` 表示模型将要运行的硬件类型，默认为arm。目前可支持x86、arm、opencl、npu、xpu，可以同时指定多个backend(以空格分隔)，Model Optimize Tool将会自动选择最佳方式。如果需要支持华为NPU（Kirin 810/990 Soc搭载的达芬奇架构NPU），应当设置为npu, arm。
@@ -496,14 +497,14 @@ paddle_lite_opt \
 #### 预处理输入数据，并和Lite预测库、Lite模型、编译好的C++代码/配置 一起打包。
 ```shell
 python -u ./deploy/lite/prepare.py \
-    --lite_lib_path ${Paddle-Lite-root}/inference_lite_lib.android.armv8/ \
+    --lite_lib_path ${Paddle_Lite_root}/inference_lite_lib.android.armv8/ \
     --lite_model_file ./electra-deploy-lite.nb \
     --predict_file ./test.txt \
     --max_seq_length 128 \
     --model_name electra-small
 
 # 进入lite demo的工作目录
-cd ${Paddle-Lite-root}/inference_lite_lib.android.armv8/demo/cxx/electra/
+cd ${Paddle_Lite_root}/inference_lite_lib.android.armv8/demo/cxx/electra/
 make -j && mv electra_lite debug
 ```
 其中prepare.py的参数释义如下：
@@ -513,17 +514,17 @@ make -j && mv electra_lite debug
 - `max_seq_length` 表示输入的最大句子长度，超过该长度将被截断。
 - `model_name` 表示推理模型的类型，当前支持electra-small（约1400万参数）、electra-base（约1.1亿参数）、electra-large（约3.35亿参数）。
 
-如上命令执行完后，${Paddle-Lite-root}/inference_lite_lib.android.armv8/demo/cxx/electra/文件夹下将有如下文件，只有其中的**debug目录**会传到手机：
-```
+如上命令执行完后，${Paddle_Lite_root}/inference_lite_lib.android.armv8/demo/cxx/electra/文件夹下将有如下文件，只有其中的**debug目录**会传到手机：
+```shell
 demo/cxx/electra/
 |-- debug/
-|   |--config.txt                       推理配置和超参数配置
-|   |--electra-deploy-lite.nb           优化后的Lite模型文件
-|   |--electra_lite                     编译好的在手机上执行推理的可执行文件
-|   |--libpaddle_light_api_shared.so    C++预测库文件
-|   |--predict_input.bin                预处理好的输入数据（二进制）
-|   |--predict_input.txt                输入数据明文
-|   |--sst2_label.txt                   类别说明文件
+|    |--config.txt                       推理配置和超参数配置
+|    |--electra-deploy-lite.nb           优化后的Lite模型文件
+|    |--electra_lite                     编译好的在手机上执行推理的可执行文件
+|    |--libpaddle_light_api_shared.so    C++预测库文件
+|    |--predict_input.bin                预处理好的输入数据（二进制）
+|    |--predict_input.txt                输入数据明文
+|    |--sst2_label.txt                   类别说明文件
 |-- config.txt                              推理配置和超参数配置
 |-- Makefile                                编译文件
 |-- sentiment_classfication.cpp                推理代码文件
@@ -556,4 +557,4 @@ total time : 0.399562 s.
 如果修改了代码，则需要先执行prepare.py，再重新编译并打包push到手机上；如果只修改输入数据，则只需要执行prepare.py并打包push到手机上，不用重新编译。
 
 ## Reference
-[ELECTRA论文](https://openreview.net/pdf?id=r1xMH1BtvB)
+[Kevin Clark, Minh-Thang Luong, Quoc V. Le, Christopher D. Manning. ELECTRA: Pre-training text encoders as discriminators rather than generators. In ICLR 2020](https://openreview.net/pdf?id=r1xMH1BtvB)
