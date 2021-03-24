@@ -7,8 +7,8 @@ pred_data=${data_dir}/test.json   # 换其他数据，需要修改它
 
 learning_rate=5e-5
 max_seq_len=300
-batch_size=8
-epoch=12
+batch_size=16
+epoch=20
 
 echo -e "check and create directory"
 dir_list=(./ckpt ${ckpt_dir} ./submit)
