@@ -24,7 +24,13 @@
     map_ds = MapDataset(list(read(data_path))) # 创建为Map-style Dataset
     iter_ds = IterDataset(read(data_path))     # 创建为Iterable Dataset
 
-我们推荐将数据读取代码写成生成器(generator)的形式，这样可以更好的构建 :class:`MapDataset` 和 :class:`IterDataset` 两种数据集。同时我们也推荐将单条数据写成字典的格式，这样可以更方便的检测数据流向。
+我们推荐将数据读取代码写成生成器(generator)的形式，这样可以更好的构建 :class:`MapDataset` 和 :class:`IterDataset` 两种数据集。同时我们也推荐将单条数据写成字典的格式，这样可以更方便的监测数据流向。
+
+.. note::
+
+    需要注意的是，只有从 :class:`DatasetBuilder` 初始化的数据集具有将数据中的label自动转为id的功能（详细条件参见 :doc:`如何贡献数据集 <../community/contribute_dataset>`）。
+    
+    像上例中的自定义数据集需要在自定义的convert to feature中添加label转id的功能。
 
 从 :class:`paddle.io.Dataset/IterableDataset` 创建数据集 
 -------------------
