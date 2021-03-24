@@ -125,9 +125,6 @@ PaddleNLP内置了多种collate function，可以协助用户简单的完成组b
 
     from paddle.io import DataLoader
 
-    train_data_loader = DataLoader(
-        dataset=train_ds,
-        batch_size=2,
-        collate_fn=train_batchify_fn)
+    train_data_loader = DataLoader(dataset=train_ds, batch_size=2, collate_fn=train_batchify_fn)
 
-关于更多batchify方法，请移步collate。
+到此，一个完整的数据准备流程就完成了。关于更多batchify方法，请移步collate。
