@@ -44,7 +44,7 @@ def data_process(path, model="trigger", is_predict=False):
             else:
                 if model == "trigger":
                     labels = ["O"] * len(text_a)
-                    for event in d_json["event_list"]:
+                    for event in d_json.get(["event_list"], []):
                         event_type = event["event_type"]
                         start = event["trigger_start_index"]
                         trigger = event["trigger"]
@@ -53,7 +53,7 @@ def data_process(path, model="trigger", is_predict=False):
                     output.append("{}\t{}".format('\002'.join(text_a),
                                                   '\002'.join(labels)))
                 elif model == "role":
-                    for event in d_json["event_list"]:
+                    for event in d_json.get(["event_list"], []):
                         labels = ["O"] * len(text_a)
                         for arg in event["arguments"]:
                             role_type = arg["role"]
