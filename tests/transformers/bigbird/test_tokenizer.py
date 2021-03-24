@@ -56,7 +56,6 @@ class TestBigBirdTokenizer(CpuCommonTest):
         result = self.tokenizer.encode(self.text, self.max_seq_len,
                                        self.max_pred_len)
         span_ids, masked_lm_positions, masked_lm_ids, masked_lm_weights = result
-        print(result)
         self.check_output_equal(span_ids, self.expected_span_ids)
         self.check_output_equal(masked_lm_positions,
                                 self.expected_masked_lm_positions)
