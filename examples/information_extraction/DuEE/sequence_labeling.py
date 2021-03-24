@@ -87,15 +87,15 @@ def evaluate(model, criterion, metric, num_label, data_loader):
 def convert_example_to_feature(example, tokenizer, label_vocab=None, max_seq_len=512, no_entity_label="O", ignore_label=-1, is_test=False):
     tokens, labels = example
     tokenized_input = tokenizer(
-        example,
+        tokens,
         return_length=True,
         is_split_into_words=True,
         pad_to_max_seq_len=True,
         max_seq_len=max_seq_len)
 
-    input_ids = tokenized_input[0]['input_ids']
-    token_type_ids = tokenized_input[0]['token_type_ids']
-    seq_len = tokenized_input[0]['seq_len']
+    input_ids = tokenized_input['input_ids']
+    token_type_ids = tokenized_input['token_type_ids']
+    seq_len = tokenized_input['seq_len']
 
     if is_test:
         return input_ids, token_type_ids, seq_len
@@ -241,8 +241,8 @@ def do_predict():
 
     encoded_inputs_list = []
     for sent in sentences:
-        sent = sent["text"]
-        input_ids, token_type_ids, seq_len = convert_example([list(sent), []], tokenizer,
+        sent = sent["text"].replace(" ", "\002")
+        input_ids, token_type_ids, seq_len = convert_example_to_feature([list(sent), []], tokenizer,
                     max_seq_len=args.max_seq_len, is_test=True)
         encoded_inputs_list.append((input_ids, token_type_ids, seq_len))
 
