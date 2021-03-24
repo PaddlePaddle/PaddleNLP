@@ -91,7 +91,7 @@ class MapDataset(Dataset):
         self.vocab_info = kwargs.pop('vocab_info', None)
 
     def _transform(self, data):
-        for fn in reversed(self._transform_pipline):
+        for fn in self._transform_pipline:
             data = fn(data)
         return data
 
@@ -192,7 +192,7 @@ class IterDataset(IterableDataset):
         self.vocab_info = kwargs.pop('vocab_info', None)
 
     def _transform(self, data):
-        for fn in reversed(self._transform_pipline):
+        for fn in self._transform_pipline:
             data = fn(data)
         return data
 
