@@ -53,3 +53,12 @@ def cross_entropy(softmax, label, soft_label, axis, ignore_index=-1):
             if lbl != ignore_index:
                 result[i, 0, j] -= np.log(softmax_reshape[i, lbl, j])
     return result.reshape(label.shape)
+
+
+def softmax_with_cross_entropy(logits,
+                               label,
+                               soft_label=False,
+                               axis=-1,
+                               ignore_index=-1):
+    softmax = np.apply_along_axis(stable_softmax, -1, logits)
+    return cross_entropy(softmax, label, soft_label, axis, ignore_index)

@@ -21,6 +21,7 @@ from paddlenlp.transformers import BigBirdForSequenceClassification, \
 from paddlenlp.transformers import create_bigbird_rand_mask_idx_list
 
 from common_test import CommonTest
+from util import softmax_with_cross_entropy
 
 
 def create_input_data(config):
@@ -60,6 +61,28 @@ def create_bigbird_model(config, filename, test_model):
         model = test_model(bigbird)
         paddle.save(model.state_dict(), model_file)
     return model_file
+
+
+class NpBigBirdPretrainingCriterion(object):
+    def __init__(self, vocab_size, use_nsp=False, ignore_index=0):
+        self.vocab_size = vocab_size
+        self.use_nsp = use_nsp
+        self.ignore_index = ignore_index
+
+    def __call__(self, prediction_scores, seq_relationship_score,
+                 masked_lm_labels, next_sentence_labels, masked_lm_scale,
+                 masked_lm_weights):
+        masked_lm_loss = softmax_with_cross_entropy(
+            prediction_scores, masked_lm_labels, ignore_index=self.ignore_index)
+        masked_lm_loss = np.transpose(masked_lm_loss, [1, 0])
+        masked_lm_loss = np.sum(masked_lm_loss * masked_lm_weights) / (
+            np.sum(masked_lm_weights) + 1e-5)
+        scale = 1.0
+        if not self.use_nsp:
+            scale = 0.0
+        next_sentence_loss = softmax_with_cross_entropy(seq_relationship_score,
+                                                        next_sentence_labels)
+        return masked_lm_loss + np.mean(next_sentence_loss) * scale
 
 
 class TestBigBirdForSequenceClassification(CommonTest):
@@ -167,8 +190,51 @@ class TestBigBirdForPretraining(CommonTest):
                                 expected_seq_relationship_score)
 
 
-class TestBigBirdPretrainingCriterion(CommonTest):
-    pass
+class TestBigBirdPretrainingCriterionUseNSP(CommonTest):
+    def setUp(self):
+        self.config['vocab_size'] = 1024
+        self.criterion = BigBirdPretrainingCriterion(**self.config)
+        self.np_criterion = NpBigBirdPretrainingCriterion(**self.config)
+
+    def _construct_input_data(self, mask_num, vocab_size, batch_size):
+        prediction_scores = np.random.rand(mask_num, vocab_size)
+        seq_relationship_score = np.random.rand(batch_size, 2)
+        masked_lm_labels = np.random.randint(0, vocab_size, (mask_num, 1))
+        next_sentence_labels = np.random.randint(0, 2, (batch_size, 1))
+        masked_lm_scale = 1.0
+        masked_lm_weights = np.random.randint(0, 2,
+                                              (mask_num)).astype('float32')
+        return prediction_scores, seq_relationship_score, masked_lm_labels, \
+            next_sentence_labels, masked_lm_scale, masked_lm_weights
+
+    def test_forward(self):
+        np_prediction_score, np_seq_relationship_score, np_masked_lm_labels, \
+            np_next_sentence_labels, masked_lm_scale, np_masked_lm_weights \
+            = self._construct_input_data(20, self.config['vocab_size'], 4)
+
+        prediction_score = paddle.to_tensor(np_prediction_score)
+        seq_relationship_score = paddle.to_tensor(np_seq_relationship_score)
+        masked_lm_labels = paddle.to_tensor(np_masked_lm_labels)
+        next_sentence_labels = paddle.to_tensor(np_next_sentence_labels)
+        masked_lm_weights = paddle.to_tensor(np_masked_lm_weights)
+
+        np_loss = self.np_criterion(
+            np_prediction_score, np_seq_relationship_score, np_masked_lm_labels,
+            np_next_sentence_labels, masked_lm_scale, np_masked_lm_weights)
+        loss = self.criterion(prediction_score, seq_relationship_score,
+                              masked_lm_labels, next_sentence_labels,
+                              masked_lm_scale, masked_lm_weights)
+
+        self.check_output_equal(np_loss, loss.numpy()[0])
+
+
+class TestBigBirdPretrainingCriterionNotUseNSP(
+        TestBigBirdPretrainingCriterionUseNSP):
+    def setUp(self):
+        self.config['vocab_size'] = 1024
+        self.config['use_nsp'] = False
+        self.criterion = BigBirdPretrainingCriterion(**self.config)
+        self.np_criterion = NpBigBirdPretrainingCriterion(**self.config)
 
 
 if __name__ == "__main__":
