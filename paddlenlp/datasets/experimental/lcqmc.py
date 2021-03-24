@@ -47,13 +47,12 @@ class LCQMC(DatasetBuilder):
     }
 
     def _get_data(self, mode, **kwargs):
-        default_root = DATA_HOME
+        default_root = os.path.join(DATA_HOME, self.__class__.__name__)
         filename, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-            path = get_path_from_url(self.URL, default_root, self.MD5)
-            fullname = os.path.join(default_root, filename)
+            get_path_from_url(self.URL, default_root, self.MD5)
 
         return fullname
 
