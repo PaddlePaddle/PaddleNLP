@@ -50,6 +50,8 @@ class Imdb(DatasetBuilder):
         for label in ["pos", "neg"]:
             root = os.path.join(data_dir, label)
             data_files = os.listdir(root)
+            data_files.sort()
+
             if label == "pos":
                 label_id = "1"
             elif label == "neg":

@@ -57,7 +57,7 @@ class Imdb(Dataset):
         def _load_data(label):
             root = os.path.join(data_dir, mode, label)
             data_files = os.listdir(root)
-
+            data_files.sort()
             if label == "pos":
                 label_id = 1
             elif label == "neg":

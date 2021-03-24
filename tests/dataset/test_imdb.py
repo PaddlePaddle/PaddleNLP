@@ -29,20 +29,17 @@ class TestImdbTrainSet(CpuCommonTest):
     def test_training_set(self):
         np.random.seed(102)
         expected_text, expected_label = (
-            'This is a strange cerebral surreal esoteric film If there is '\
-            'such a thing as intellectual horror cinema this film is it I '\
-            'started to get scared and wish there was someone else watching '\
-            'it with me and it barely has a plot Im going to have to see this '\
-            'film again multiple times before I feel I really understand it '\
-            'If youre the kind of person who likes My Dinner With Andre and '\
-            'films by Godard or if you do a lot of mindaltering drugs you '\
-            'will probably enjoy this film Wow', 1)
+            'Its a good movie maybe I like it because it was filmed here '
+            'in PR The actors did a good performance and not only did the '
+            'girls be girlish but they were good in fighting so it was awsome '
+            'The guy is cute too so its a good match if you want to the guy '
+            'or the girls', 1)
         expected_len = 25000
 
         train_ds = Imdb(**self.config)
         self.check_output_equal(len(train_ds), expected_len)
-        self.check_output_equal(expected_text, train_ds[0][0])
-        self.check_output_equal(expected_label, train_ds[0][1])
+        self.check_output_equal(expected_text, train_ds[14][0])
+        self.check_output_equal(expected_label, train_ds[14][1])
 
 
 class TestImdbTestSet(CpuCommonTest):
@@ -52,10 +49,11 @@ class TestImdbTestSet(CpuCommonTest):
     def test_test_set(self):
         np.random.seed(102)
         expected_text, expected_label = (
-            'An extremely powerful film that certainly isnt appreciated enough '
-            'Its impossible to describe the experience of watching it The '
-            'recent UK television adaptation was shameful  too ordinary and '
-            'bland This original manages to imprint itself in your memory', 1)
+            'This is one of the great ones It works so beautifully that '
+            'you hardly notice the miscasting of then 37 year old Dana '
+            'Andrews as the drugstore soda jerk who goes to war and comes '
+            'back four years later when he would have been at most 25 But '
+            'then who else should have played him', 1)
         expected_len = 25000
 
         test_ds = Imdb(**self.config)

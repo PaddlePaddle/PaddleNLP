@@ -24,17 +24,16 @@ from common_test import CpuCommonTest
 def get_examples(mode='train'):
     examples = {
         'train':
-        ('GREAT movie and the family will love it If kids are bored one day just '
-         'pop the tape in and youll be so glad you didbr br Rubebr br i luv ravens',
-         1),
+        ('I loved this movie since I was 7 and I saw it on the opening day '
+         'It was so touching and beautiful I strongly recommend seeing for '
+         'all Its a movie to watch with your family by farbr br My MPAA rating '
+         'PG13 for thematic elements prolonged scenes of disastor nuditysexuality '
+         'and some language', 1),
         'test':
-        ('I have loved this movie since I saw it in the theater in 1991 I was '
-         '12 then and Wil Wheaton was my favorite actor and adolescent crush I '
-         'am now 23 and I still love this movie The best part about it is '
-         'whoever I am dating loves it too because it is a total machoguy movie '
-         'It is wrought with enough action and mayhem to keep men with the '
-         'shortest attention spans glued to the screen I only wish that it was '
-         'available on DVD', 1)
+        ('Felix in Hollywood is a great film The version I viewed was very well '
+         'restored which is sometimes a problem with these silent era animated films '
+         'It has some of Hollywoods most famous stars making cameo animated '
+         'appearances A must for any silent film or animation enthusiast', 1)
     }
     return examples[mode]
 
@@ -49,8 +48,8 @@ class TestImdbTrainSet(CpuCommonTest):
         expected_text, expected_label = get_examples(self.config['splits'])
         train_ds = load_dataset(**self.config)
         self.check_output_equal(len(train_ds), expected_len)
-        self.check_output_equal(expected_text, train_ds[2]['text'])
-        self.check_output_equal(expected_label, train_ds[2]['label'])
+        self.check_output_equal(expected_text, train_ds[36]['text'])
+        self.check_output_equal(expected_label, train_ds[36]['label'])
 
 
 class TestImdbTestSet(CpuCommonTest):
@@ -63,8 +62,8 @@ class TestImdbTestSet(CpuCommonTest):
         expected_text, expected_label = get_examples(self.config['splits'])
         test_ds = load_dataset(**self.config)
         self.check_output_equal(len(test_ds), expected_len)
-        self.check_output_equal(expected_text, test_ds[2]['text'])
-        self.check_output_equal(expected_label, test_ds[2]['label'])
+        self.check_output_equal(expected_text, test_ds[23]['text'])
+        self.check_output_equal(expected_label, test_ds[23]['label'])
 
 
 class TestImdbTrainTestSet(CpuCommonTest):
@@ -83,10 +82,10 @@ class TestImdbTrainTestSet(CpuCommonTest):
         self.check_output_equal(len(ds[0]), expected_len)
         self.check_output_equal(len(ds[1]), expected_len)
 
-        self.check_output_equal(expected_train_text, ds[0][2]['text'])
-        self.check_output_equal(expected_train_label, ds[0][2]['label'])
-        self.check_output_equal(expected_test_text, ds[1][2]['text'])
-        self.check_output_equal(expected_test_label, ds[1][2]['label'])
+        self.check_output_equal(expected_train_text, ds[0][36]['text'])
+        self.check_output_equal(expected_train_label, ds[0][36]['label'])
+        self.check_output_equal(expected_test_text, ds[1][23]['text'])
+        self.check_output_equal(expected_test_label, ds[1][23]['label'])
 
 
 class TestImdbNoSplitDataFiles(CpuCommonTest):
