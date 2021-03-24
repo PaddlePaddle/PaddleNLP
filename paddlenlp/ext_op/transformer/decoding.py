@@ -6,6 +6,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from paddle.fluid.layer_helper import LayerHelper
+import paddle
 
 
 def infer_transformer_decoder(
@@ -25,32 +26,32 @@ def infer_transformer_decoder(
         'Input': enc_output,
         'MemSeqLen': memory_seq_lens,
         'WordEmbedding': word_emb,
-        'SelfLayernormWeight': slf_ln_weight,
-        'SelfLayernormBias': slf_ln_bias,
-        'SelfQueryWeight': slf_q_weight,
-        'SelfQueryBias': slf_q_bias,
-        'SelfKeyWeight': slf_k_weight,
-        'SelfKeyBias': slf_k_bias,
-        'SelfValueWeight': slf_v_weight,
-        'SelfValueBias': slf_v_bias,
-        'SelfOutWeight': slf_out_weight,
-        'SelfOutBias': slf_out_bias,
-        'CrossLayernormWeight': cross_ln_weight,
-        'CrossLayernormBias': cross_ln_bias,
-        'CrossQueryWeight': cross_q_weight,
-        'CrossQueryBias': cross_q_bias,
-        'CrossKeyWeight': cross_k_weight,
-        'CrossKeyBias': cross_k_bias,
-        'CrossValueWeight': cross_v_weight,
-        'CrossValueBias': cross_v_bias,
-        'CrossOutWeight': cross_out_weight,
-        'CrossOutBias': cross_out_bias,
-        'FFNLayernormWeight': ffn_ln_weight,
-        'FFNLayernormBias': ffn_ln_bias,
-        'FFNInterWeight': ffn_inter_weight,
-        'FFNInterBias': ffn_inter_bias,
-        'FFNOutWeight': ffn_out_weight,
-        'FFNOutBias': ffn_out_bias,
+        'SelfLayernormWeight@VECTOR': slf_ln_weight,
+        'SelfLayernormBias@VECTOR': slf_ln_bias,
+        'SelfQueryWeight@VECTOR': slf_q_weight,
+        'SelfQueryBias@VECTOR': slf_q_bias,
+        'SelfKeyWeight@VECTOR': slf_k_weight,
+        'SelfKeyBias@VECTOR': slf_k_bias,
+        'SelfValueWeight@VECTOR': slf_v_weight,
+        'SelfValueBias@VECTOR': slf_v_bias,
+        'SelfOutWeight@VECTOR': slf_out_weight,
+        'SelfOutBias@VECTOR': slf_out_bias,
+        'CrossLayernormWeight@VECTOR': cross_ln_weight,
+        'CrossLayernormBias@VECTOR': cross_ln_bias,
+        'CrossQueryWeight@VECTOR': cross_q_weight,
+        'CrossQueryBias@VECTOR': cross_q_bias,
+        'CrossKeyWeight@VECTOR': cross_k_weight,
+        'CrossKeyBias@VECTOR': cross_k_bias,
+        'CrossValueWeight@VECTOR': cross_v_weight,
+        'CrossValueBias@VECTOR': cross_v_bias,
+        'CrossOutWeight@VECTOR': cross_out_weight,
+        'CrossOutBias@VECTOR': cross_out_bias,
+        'FFNLayernormWeight@VECTOR': ffn_ln_weight,
+        'FFNLayernormBias@VECTOR': ffn_ln_bias,
+        'FFNInterWeight@VECTOR': ffn_inter_weight,
+        'FFNInterBias@VECTOR': ffn_inter_bias,
+        'FFNOutWeight@VECTOR': ffn_out_weight,
+        'FFNOutBias@VECTOR': ffn_out_bias,
         'DecoderLayernormWeight': decoder_ln_weight,
         'DecoderLayernormBias': decoder_ln_bias,
         'EmbWeight': linear_weight,
@@ -69,9 +70,9 @@ def infer_transformer_decoder(
         'beam_search_diversity_rate': _beam_search_diversity_rate
     }
 
-    output_ids = helper.create_variable_for_type_inference("int32")
-    parent_ids = helper.create_variable_for_type_inference("int32")
-    sequence_length = helper.create_variable_for_type_inference("int32")
+    output_ids = helper.create_variable(dtype="float32")
+    parent_ids = helper.create_variable(dtype="float32")
+    sequence_length = helper.create_variable(dtype="float32")
 
     outputs = {
         'OutputIds': output_ids,
@@ -118,14 +119,15 @@ class InferTransformerDecoding(nn.Layer):
                  beam_search_diversity_rate=0.0,
                  decoding_lib=None,
                  use_fp16_decoding=False):
-        if decoding_lib is None:
-            raise ValueError(
-                "The args decoding_lib must be set to use Faster Transformer. ")
-        elif not os.path.exists(decoding_lib):
-            raise ValueError("The path to decoding lib is not exist.")
+        # if decoding_lib is None:
+        #     raise ValueError(
+        #         "The args decoding_lib must be set to use Faster Transformer. ")
+        # elif not os.path.exists(decoding_lib):
+        #     raise ValueError("The path to decoding lib is not exist.")
 
         super(InferTransformerDecoding, self).__init__()
-        paddle.utils.load_op_library(decoding_lib)
+        # paddle.utils.load_op_library(decoding_lib)
+        paddle.utils.cpp_extension.load_op_meta_info_and_register_op("./build/lib/libdecoding_op.so")
         for arg, value in locals().items():
             if arg not in [
                     "self", "decoder", "word_embedding", "positional_embedding",
@@ -306,7 +308,53 @@ class InferTransformerDecoding(nn.Layer):
             self._eos_id,
             self._max_out_len,
             self._beam_search_diversity_rate)
-
+        '''
+        output_ids, parent_ids, sequence_length = fusion_decoding(
+            [enc_output], [memory_seq_lens],
+            [paddle.cast(
+                self.word_emb[0], dtype="float16")]
+            if self._use_fp16_decoding else self.word_emb,
+            self.slf_ln_weight,
+            self.slf_ln_bias,
+            self.slf_q_weight,
+            self.slf_q_bias,
+            self.slf_k_weight,
+            self.slf_k_bias,
+            self.slf_v_weight,
+            self.slf_v_bias,
+            self.slf_out_weight,
+            self.slf_out_bias,
+            self.cross_ln_weight,
+            self.cross_ln_bias,
+            self.cross_q_weight,
+            self.cross_q_bias,
+            self.cross_k_weight,
+            self.cross_k_bias,
+            self.cross_v_weight,
+            self.cross_v_bias,
+            self.cross_out_weight,
+            self.cross_out_bias,
+            self.ffn_ln_weight,
+            self.ffn_ln_bias,
+            self.ffn_inter_weight,
+            self.ffn_inter_bias,
+            self.ffn_out_weight,
+            self.ffn_out_bias,
+            self.decoder_ln_weight,
+            self.decoder_ln_bias,
+            self.linear_weight,
+            self.linear_bias, [paddle.cast(
+                self.pos_emb[0], dtype="float16")]
+            if self._use_fp16_decoding else self.pos_emb,
+            self._beam_size,
+            self._n_head,
+            int(self._d_model / self._n_head),
+            self._n_layer,
+            self._bos_id,
+            self._eos_id,
+            self._max_out_len,
+            self._beam_search_diversity_rate)
+        '''
         ids = finalize(self._beam_size, output_ids, parent_ids, sequence_length)
 
         return ids

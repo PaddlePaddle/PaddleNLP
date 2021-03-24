@@ -26,11 +26,11 @@ class FasterTransformer(TransformerModel):
                  max_out_len=256,
                  decoding_lib=None,
                  use_fp16_decoding=False):
-        if decoding_lib is None:
-            raise ValueError(
-                "The args decoding_lib must be set to use Faster Transformer. ")
-        elif not os.path.exists(decoding_lib):
-            raise ValueError("The path to decoding lib is not exist.")
+        # if decoding_lib is None:
+        #     raise ValueError(
+        #         "The args decoding_lib must be set to use Faster Transformer. ")
+        # elif not os.path.exists(decoding_lib):
+        #     raise ValueError("The path to decoding lib is not exist.")
 
         args = dict(locals())
         args.pop("self")
