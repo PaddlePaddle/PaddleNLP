@@ -67,7 +67,7 @@ def create_dataloader(dataset,
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=vocab.get('[PAD]', 0)),  # input_ids
-        Stack(dtype="int64"),  # seq len
+        Stack(dtype="int32"),  # seq len
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
 
