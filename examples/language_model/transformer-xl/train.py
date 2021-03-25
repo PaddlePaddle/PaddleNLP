@@ -229,6 +229,7 @@ def do_train(args):
                         eval_cur_loss = seq_len * loss.numpy()
                         total_loss += eval_cur_loss
                         total_len += seq_len
+                        break
                     eval_loss = total_loss / total_len
 
                 logger_info = "Validation, step_idx: %d, validation loss: %f" % \
@@ -242,9 +243,8 @@ def do_train(args):
                 logger.info(logger_info)
 
                 if args.save_model and rank == 0:
-                    model_dir = os.path.join(
-                        args.save_model,
-                        "step_" + str(step_idx) + "_" + str(eval_loss))
+                    model_dir = os.path.join(args.save_model,
+                                             "step_" + str(step_idx))
                     if not os.path.exists(model_dir):
                         os.makedirs(model_dir)
                     paddle.save(
@@ -253,6 +253,10 @@ def do_train(args):
                     paddle.save(
                         optimizer.state_dict(),
                         os.path.join(model_dir, "mem_transformer.pdopt"))
+                    f = open(
+                        os.path.join(args.save_model, "step_" + str(step_idx),
+                                     "evaluation_loss_" + str(eval_loss)), "w")
+                    f.close()
 
                 if args.scheduler == 'dev_perf':
                     scheduler.step(eval_loss)
@@ -271,6 +275,8 @@ def do_train(args):
 
                 mem_transformer.train()
 
+            if step_idx >= args.max_step:
+                return
             step_idx += 1
             batch_id += 1
             if args.scheduler in ['cosine', 'dev_perf']:
@@ -286,8 +292,6 @@ def do_train(args):
                     optimizer.set_lr(curr_lr)
             elif args.scheduler == 'noam':
                 scheduler.step()
-            if step_idx >= args.max_step:
-                return
 
     if args.save_model and rank == 0:
         model_dir = os.path.join(args.save_model, "step_final")
