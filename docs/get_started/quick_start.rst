@@ -58,22 +58,22 @@ Transformer类预训练模型所需的数据处理步骤通常包括将原始输
 
     >>> input_ids = paddle.to_tensor([encoded_text['input_ids']])
     >>> print("input_ids : {}".format(input_ids))
-    >>> segment_ids = paddle.to_tensor([encoded_text['segment_ids']])
-    >>> print("segment_ids : {}".format(segment_ids))
+    >>> token_type_ids = paddle.to_tensor([encoded_text['token_type_ids']])
+    >>> print("token_type_ids : {}".format(token_type_ids))
     input_ids : Tensor(shape=[1, 9], dtype=int64, place=CUDAPlace(0), stop_gradient=True,
        [[1  , 647, 789, 109, 558, 525, 314, 656, 2  ]])
-    segment_ids : Tensor(shape=[1, 9], dtype=int64, place=CUDAPlace(0), stop_gradient=True,
+    token_type_ids : Tensor(shape=[1, 9], dtype=int64, place=CUDAPlace(0), stop_gradient=True,
        [[0, 0, 0, 0, 0, 0, 0, 0, 0]])
 
 input_ids: 表示输入文本的token ID。
 
-segment_ids: 表示对应的token属于输入的第一个句子还是第二个句子。（Transformer类预训练模型支持单句以及句对输入。）
+token_type_ids: 表示对应的token属于输入的第一个句子还是第二个句子。（Transformer类预训练模型支持单句以及句对输入。）
 
 此时即可输入ERNIE模型中得到相应输出。
 
 .. code-block::
 
-    >>> sequence_output, pooled_output = ernie_model(input_ids, segment_ids)
+    >>> sequence_output, pooled_output = ernie_model(input_ids, token_type_ids)
     >>> print("Token wise output: {}, Pooled output: {}".format(
     ...     sequence_output.shape, pooled_output.shape))
     Token wise output: [1, 9, 768], Pooled output: [1, 768]
