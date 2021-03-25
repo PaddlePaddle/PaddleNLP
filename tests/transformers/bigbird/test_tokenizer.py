@@ -38,11 +38,12 @@ class TestBigBirdTokenizer(CpuCommonTest):
         self.expected_masked_lm_weights = np.array([1., 1., 1.])
 
     def setUp(self):
+        np.random.seed(102)
         self.text = 'An extremely powerful film that certainly isnt '\
-            'appreciated enough Its impossible to describe the experience '\
-            'of watching it The recent UK television adaptation was shameful  '\
-            'too ordinary and bland This original manages to imprint itself '\
-            'in your memory'
+                    'appreciated enough Its impossible to describe the experience '\
+                    'of watching it The recent UK television adaptation was shameful  '\
+                    'too ordinary and bland This original manages to imprint itself '\
+                    'in your memory'
         self.tokenizer = BigBirdTokenizer.from_pretrained(
             'bigbird-base-uncased')
         self.set_input()
@@ -52,7 +53,6 @@ class TestBigBirdTokenizer(CpuCommonTest):
         self.check_output_equal(self.tokenizer.vocab_size, 50358)
 
     def test_tokenize(self):
-        np.random.seed(102)
         result = self.tokenizer.encode(self.text, self.max_seq_len,
                                        self.max_pred_len)
         span_ids, masked_lm_positions, masked_lm_ids, masked_lm_weights = result

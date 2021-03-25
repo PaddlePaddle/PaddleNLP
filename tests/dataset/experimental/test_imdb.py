@@ -14,9 +14,7 @@
 import numpy as np
 import os
 import unittest
-import paddle
 from paddlenlp.datasets import load_dataset
-from paddlenlp.utils.log import logger
 
 from common_test import CpuCommonTest
 

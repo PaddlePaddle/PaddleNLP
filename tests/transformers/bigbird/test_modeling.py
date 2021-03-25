@@ -52,13 +52,13 @@ def create_input_data(config):
     return rand_mask_idx_list, input_ids, masked_lm_positions
 
 
-def create_bigbird_model(config, filename, test_model):
+def create_bigbird_model(config, filename, TEST_MODEL_CLASS):
     dir_path = os.path.dirname(os.path.realpath(__file__))
     model_file = os.path.join(dir_path, '{}.pdparams'.format(filename))
     if not os.path.exists(model_file):
         paddle.seed(102)
         bigbird = BigBirdModel(**config)
-        model = test_model(bigbird)
+        model = TEST_MODEL_CLASS(bigbird)
         paddle.save(model.state_dict(), model_file)
     return model_file
 
@@ -87,29 +87,18 @@ class NpBigBirdPretrainingCriterion(object):
 
 class TestBigBirdForSequenceClassification(CommonTest):
     def setUp(self):
-        self.config = {
-            "num_layers": 2,
-            "vocab_size": 1024,
-            "nhead": 12,
-            "attn_dropout": 0.0,
-            "dim_feedforward": 1024,
-            "activation": "gelu",
-            "normalize_before": False,
-            "block_size": 16,
-            "window_size": 3,
-            "num_global_blocks": 2,
-            "num_rand_blocks": 3,
-            "seed": None,
-            "pad_token_id": 0,
-            "hidden_size": 768,
-            "hidden_dropout_prob": 0.0,
-            "max_position_embeddings": 2048,
-            "type_vocab_size": 2,
-            "num_labels": 2,
-            "initializer_range": 0.02,
-            "seq_len": 1024,
-            "batch_size": 2
-        }
+        self.config = BigBirdModel.pretrained_init_configuration[
+            'bigbird-base-uncased']
+        self.config['num_layers'] = 2
+        self.config['vocab_size'] = 1024
+        self.config['vocab_size'] = 1024
+        self.config['attn_dropout'] = 0.0
+        self.config['hidden_dropout_prob'] = 0.0
+        self.config['dim_feedforward'] = 1024
+        self.config['seq_len'] = 1024
+        self.config['batch_size'] = 2
+        self.config['max_position_embeddings'] = 2048
+
         self.model_file = create_bigbird_model(self.config, "test_bigbird_cls",
                                                BigBirdForSequenceClassification)
         self.rand_mask_idx_list, self.input_ids, _ = create_input_data(
@@ -131,29 +120,18 @@ class TestBigBirdForSequenceClassification(CommonTest):
 
 class TestBigBirdForPretraining(CommonTest):
     def setUp(self):
-        self.config = {
-            "num_layers": 2,
-            "vocab_size": 1024,
-            "nhead": 12,
-            "attn_dropout": 0.0,
-            "dim_feedforward": 1024,
-            "activation": "gelu",
-            "normalize_before": False,
-            "block_size": 16,
-            "window_size": 3,
-            "num_global_blocks": 2,
-            "num_rand_blocks": 3,
-            "seed": None,
-            "pad_token_id": 0,
-            "hidden_size": 768,
-            "hidden_dropout_prob": 0.0,
-            "max_position_embeddings": 2048,
-            "type_vocab_size": 2,
-            "num_labels": 2,
-            "initializer_range": 0.02,
-            "seq_len": 1024,
-            "batch_size": 2
-        }
+        self.config = BigBirdModel.pretrained_init_configuration[
+            'bigbird-base-uncased']
+        self.config['num_layers'] = 2
+        self.config['vocab_size'] = 1024
+        self.config['vocab_size'] = 1024
+        self.config['attn_dropout'] = 0.0
+        self.config['hidden_dropout_prob'] = 0.0
+        self.config['dim_feedforward'] = 1024
+        self.config['seq_len'] = 1024
+        self.config['batch_size'] = 2
+        self.config['max_position_embeddings'] = 2048
+
         self.model_file = create_bigbird_model(
             self.config, "test_bigbird_pretrain", BigBirdForPretraining)
         self.rand_mask_idx_list, self.input_ids, self.masked_lm_positions = create_input_data(

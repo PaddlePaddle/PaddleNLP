@@ -15,9 +15,7 @@
 import numpy as np
 import os
 import unittest
-import paddle
 from paddlenlp.datasets import Imdb
-from paddlenlp.utils.log import logger
 
 from common_test import CpuCommonTest
 
@@ -25,9 +23,9 @@ from common_test import CpuCommonTest
 class TestImdbTrainSet(CpuCommonTest):
     def setUp(self):
         self.config['mode'] = 'train'
+        np.random.seed(102)
 
     def test_training_set(self):
-        np.random.seed(102)
         expected_text, expected_label = (
             'Its a good movie maybe I like it because it was filmed here '
             'in PR The actors did a good performance and not only did the '
@@ -45,9 +43,9 @@ class TestImdbTrainSet(CpuCommonTest):
 class TestImdbTestSet(CpuCommonTest):
     def setUp(self):
         self.config['mode'] = 'test'
+        np.random.seed(102)
 
     def test_test_set(self):
-        np.random.seed(102)
         expected_text, expected_label = (
             'This is one of the great ones It works so beautifully that '
             'you hardly notice the miscasting of then 37 year old Dana '
