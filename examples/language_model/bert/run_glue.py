@@ -29,6 +29,7 @@ from paddle.metric import Metric, Accuracy, Precision, Recall
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.utils import checkpoint
 from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
@@ -347,6 +348,9 @@ def do_train(args):
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
 
     global_step = 0
+    # Load the optimizer, lr_scheduler, random checkpoint 
+    global_step = checkpoint.load_checkpoint(
+        args.model_name_or_path, global_step, optimizer, lr_scheduler)
     tic_train = time.time()
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
@@ -389,10 +393,11 @@ def do_train(args):
                                               (args.task_name, global_step))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
-                    # Need better way to get inner model of DataParallel
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
+                    checkpoint.save_checkpoint(output_dir, global_step,
+                                               optimizer, lr_scheduler, args)
                     tokenizer.save_pretrained(output_dir)
             if global_step >= num_training_steps:
                 return

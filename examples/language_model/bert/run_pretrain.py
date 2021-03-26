@@ -31,6 +31,7 @@ import paddle.distributed as dist
 from paddle.io import DataLoader, Dataset
 
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.utils import checkpoint
 from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion
 from paddlenlp.transformers import ErnieForPretraining, ErnieModel, ErniePretrainingCriterion
 from paddlenlp.transformers import BertTokenizer, ErnieTokenizer
@@ -327,7 +328,12 @@ def do_train(args):
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
 
     pool = ThreadPoolExecutor(1)
+
     global_step = 0
+    # Load the optimizer, lr_scheduler, random checkpoint 
+    global_step = checkpoint.load_checkpoint(
+        args.model_name_or_path, global_step, optimizer, lr_scheduler)
+
     tic_train = time.time()
     for epoch in range(args.num_train_epochs):
         files = [
@@ -404,8 +410,9 @@ def do_train(args):
                 if global_step % args.logging_steps == 0:
                     if paddle.distributed.get_rank() == 0:
                         logger.info(
-                            "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                            % (global_step, epoch, step, loss,
+                            "global step %d, epoch: %d, batch: %d, learning_rate:%.10f, loss: %f, speed: %.2f step/s"
+                            % (global_step, epoch, step, optimizer.get_lr(),
+                               loss,
                                args.logging_steps / (time.time() - tic_train)))
                     tic_train = time.time()
                 if global_step % args.save_steps == 0:
@@ -414,14 +421,13 @@ def do_train(args):
                                                   "model_%d" % global_step)
                         if not os.path.exists(output_dir):
                             os.makedirs(output_dir)
-                        # need better way to get inner model of DataParallel
                         model_to_save = model._layers if isinstance(
                             model, paddle.DataParallel) else model
                         model_to_save.save_pretrained(output_dir)
+                        checkpoint.save_checkpoint(output_dir, global_step,
+                                                   optimizer, lr_scheduler,
+                                                   args)
                         tokenizer.save_pretrained(output_dir)
-                        paddle.save(
-                            optimizer.state_dict(),
-                            os.path.join(output_dir, "model_state.pdopt"))
                 if global_step >= args.max_steps:
                     del train_data_loader
                     return
