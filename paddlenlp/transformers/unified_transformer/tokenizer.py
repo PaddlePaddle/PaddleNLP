@@ -472,8 +472,9 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 token_type_ids. Default True.
             return_attention_mask (bool, optional): Whether to return the 
                 attention_mask. Default True.
-            pad_to_max_seq_len (bool, optional): Whether to pad the sequences 
-                will be returned to the `max_seq_len`. Default False.
+            pad_to_max_seq_len (bool, optional): Whether to pad the returned 
+                sequences to the `max_seq_len`. Note that, in this method, 
+                returned sequences will be padded on the left. Default False.
             return_length (bool, optional): Whether to return the length of the
                 encoded sequence. Default False.
         """
@@ -545,15 +546,17 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
 
         pad_length = max_seq_len - sequence_length if pad_to_max_seq_len else 0
         if pad_length > 0:
-            encoded_inputs["input_ids"] = self.pad_sequence(
-                encoded_inputs["input_ids"], pad_length)
+            encoded_inputs["input_ids"] = [
+                self.pad_token_id
+            ] * pad_length + encoded_inputs["input_ids"]
 
         if return_token_type_ids:
             encoded_inputs["token_type_ids"] = [0] * len(
                 history_ids) + [1] * len(response_ids)
             if pad_length > 0:
-                encoded_inputs["token_type_ids"] = self.pad_sequence(
-                    encoded_inputs["token_type_ids"], pad_length)
+                encoded_inputs["token_type_ids"] = [
+                    self.pad_token_id
+                ] * pad_length + encoded_inputs["token_type_ids"]
 
         if return_length:
             encoded_inputs["seq_len"] = sequence_length
@@ -561,12 +564,13 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         if return_position_ids:
             encoded_inputs["position_ids"] = list(range(sequence_length))
             if pad_length > 0:
-                encoded_inputs["position_ids"] = self.pad_sequence(
-                    encoded_inputs["position_ids"], pad_length)
+                encoded_inputs["position_ids"] = [
+                    self.pad_token_id
+                ] * pad_length + encoded_inputs["position_ids"]
 
         if return_attention_mask:
-            length = max_seq_len if pad_length > 0 else sequence_length
-            attention_mask = np.ones((length, length), dtype='float32') * -1e9
+            attention_mask = np.ones(
+                (sequence_length, sequence_length), dtype='float32') * -1e9
             start = len(history_ids)
             end = sequence_length
             attention_mask[:end, :start] = 0.0
@@ -576,12 +580,10 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                     [end - start, end - start], dtype='float32') * -1e9, 1)
             attention_mask[start:end, start:end] = tmp
             encoded_inputs["attention_mask"] = attention_mask
+            if pad_length > 0:
+                new_mask = np.ones(
+                    (max_seq_len, max_seq_len), dtype='float32') * -1e9
+                new_mask[-sequence_length:, -sequence_length:] = attention_mask
+                encoded_inputs["attention_mask"] = new_mask
 
         return encoded_inputs
-
-    def pad_sequence(self, sequence, pad_length):
-        if self.padding_side == 'right':
-            sequence = sequence + [self.pad_token_id] * pad_length
-        elif self.padding_side == 'left':
-            sequence = [self.pad_token_id] * pad_length + sequence
-        return sequence
