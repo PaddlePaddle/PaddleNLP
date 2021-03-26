@@ -54,7 +54,8 @@ python -u ./run_pretrain.py \
     --num_train_epochs 4 \
     --logging_steps 100 \
     --save_steps 10000 \
-    --max_steps -1
+    --max_steps -1 \
+    --device gpu
 ```
 其中参数释义如下：
 - `model_type` 表示模型类型，默认为ELECTRA模型。
@@ -71,6 +72,7 @@ python -u ./run_pretrain.py \
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存间隔。
 - `max_steps` 如果配置且大于0，表示预训练最多执行的迭代数量；如果不配置或配置小于0，则根据输入数据量、train_batch_size和num_train_epochs来确定预训练迭代数量
+- `device` 表示使用的设备类型。默认为GPU，可以配置为CPU、GPU、XPU。若希望使用GPU训练，将其设置为GPU，同时环境变量CUDA_VISIBLE_DEVICES配置要使用的GPU id。
 
 另外还有一些额外参数不在如上命令中：
 - `use_amp` 表示是否开启混合精度(float16)进行训练，默认不开启。如果在命令中加上了--use_amp，则会开启。
@@ -94,6 +96,7 @@ python -u ./run_pretrain.py \
     --logging_steps 100 \
     --save_steps 10000 \
     --max_steps -1 \
+    --device gpu \
     --init_from_ckpt
 ```
 
@@ -125,11 +128,9 @@ python -u ./run_pretrain.py \
     --logging_steps 100 \
     --save_steps 10000 \
     --max_steps -1 \
-    --n_gpu 4
+    --device gpu
 ```
-其中绝大部分和单机单卡一样，这里描述不一样的参数：
-- 环境变量CUDA_VISIBLE_DEVICES可配置多个GPU-id，配置后预训练程序只能使用配置中的GPU，不会使用未配置的GPU
-- 参数`n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可，最大数量不能超过环境变量CUDA_VISIBLE_DEVICES配置的GPU个数；若配置为0，则使用CPU。
+执行命令和单机单卡一样，只有环境变量CUDA_VISIBLE_DEVICES配置多个GPU-id，配置后预训练程序使用配置中的GPU-id，不会使用未配置的GPU-id
 
 ## **Fine-tuning**
 ### 从预训练模型得到Fine-tuning所需模型
@@ -166,7 +167,7 @@ python -u ./run_glue.py \
     --logging_steps 100 \
     --save_steps 100 \
     --output_dir ./$TASK_NAME/ \
-    --n_gpu 1
+    --device gpu
 ```
 其中参数释义如下：
 - `model_type` 指示了模型类型，当前支持BERT、ELECTRA、ERNIE模型。
@@ -179,7 +180,7 @@ python -u ./run_glue.py \
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
-- `n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可,最大数量不能超过环境变量CUDA_VISIBLE_DEVICES配置的GPU个数；若为0，则使用CPU。
+- `device` 表示使用的设备类型。默认为GPU，可以配置为CPU、GPU、XPU。若希望使用多GPU训练，将其设置为GPU，同时环境变量CUDA_VISIBLE_DEVICES配置要使用的GPU id。
 
 #### **使用本地预训练模型运行 Fine-tuning**
 按照上面模型预训练的介绍，在本地运行 ELECTRA 模型的预训练后，执行get_ft_model.py命令得到Fine-tuning所需模型，然后运行 Fine-tuning。

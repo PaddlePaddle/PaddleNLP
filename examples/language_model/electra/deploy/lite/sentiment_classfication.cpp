@@ -94,7 +94,7 @@ std::vector<std::string> split(const std::string &str,
   return res;
 }
 
-std::vector<std::string> ReadDict(std::string path) {
+std::vector<std::string> ReadDict(const std::string &path) {
   std::ifstream in(path);
   std::string filename;
   std::string line;
@@ -109,7 +109,8 @@ std::vector<std::string> ReadDict(std::string path) {
   return m_vec;
 }
 
-std::map<std::string, std::string> LoadConfigTxt(std::string config_path) {
+std::map<std::string, std::string> LoadConfigTxt(
+    const std::string &config_path) {
   auto config = ReadDict(config_path);
 
   std::map<std::string, std::string> dict;
@@ -162,20 +163,16 @@ std::vector<RESULT> RunModel(std::shared_ptr<PaddlePredictor> predictor,
   int64_t predict_data[predict_num][predict_length] = {0};
   ifstream in(predict_file_bin, ios::in | ios::binary);
   in.read((char *)&predict_data, sizeof predict_data);
-  // std::cout << in.gcount() << " bytes read\n";
   in.close();
 
   // Fill input tensor
-  // std::cout << "=== input data ===" << std::endl;
   std::unique_ptr<Tensor> input_tensor(std::move(predictor->GetInput(0)));
   input_tensor->Resize({predict_num, predict_length});
   auto *data = input_tensor->mutable_data<int64_t>();
   for (int i = 0; i < predict_num; i++) {
     for (int j = 0; j < predict_length; j++) {
       data[i * predict_length + j] = predict_data[i][j];
-      // std::cout << data[i*predict_length+j] << " ";
     }
-    // std::cout << std::endl;
   }
 
   auto start = std::chrono::system_clock::now();
@@ -198,16 +195,6 @@ std::vector<RESULT> RunModel(std::shared_ptr<PaddlePredictor> predictor,
     exit(1);
   }
   int predict_class = int(output_tensor->shape()[1]);
-  // debug
-  /*
-  std::cout << "=== output data ===" << std::endl;
-  for(int k=0; k<predict_num; k++){
-    for(int l=0;l<predict_class;l++){
-      std::cout << output_data[k*predict_class+l] << " ";
-    }
-    std::cout << std::endl;
-  }
-  */
 
   auto results =
       PostProcess(output_data, predict_num, predict_class, word_labels);
