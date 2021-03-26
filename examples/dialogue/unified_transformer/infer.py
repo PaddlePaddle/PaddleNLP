@@ -13,24 +13,24 @@ def calc_bleu_and_distinct(preds, targets):
         'The length of pred_responses should be equal to the length of '
         'target_responses. But received {} and {}.'.format(
             len(preds), len(targets)))
+    bleu1 = BLEU(n_size=1)
     bleu2 = BLEU(n_size=2)
-    bleu4 = BLEU(n_size=4)
     distinct1 = Distinct(n_size=1)
     distinct2 = Distinct(n_size=2)
     for pred, target in zip(preds, targets):
         pred_tokens = pred.split()
         target_token = target.split()
 
+        bleu1.add_inst(pred_tokens, [target_token])
         bleu2.add_inst(pred_tokens, [target_token])
-        bleu4.add_inst(pred_tokens, [target_token])
 
         distinct1.add_inst(pred_tokens)
         distinct2.add_inst(pred_tokens)
 
     print('\n' + '*' * 15)
     print('The auto evaluation result is:')
+    print('BLEU-1:', bleu1.score())
     print('BLEU-2:', bleu2.score())
-    print('BLEU-4:', bleu4.score())
     print('DISTINCT-1:', distinct1.score())
     print('DISTINCT-2:', distinct2.score())
 

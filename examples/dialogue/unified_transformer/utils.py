@@ -1,13 +1,13 @@
 import random
 import argparse
-import numpy as np
 from functools import partial
+
+import numpy as np
 
 import paddle
 import paddle.distributed as dist
 from paddle.io import DataLoader, DistributedBatchSampler, BatchSampler
-
-from paddlenlp.data import JiebaTokenizer
+from paddlenlp.data import Pad
 
 
 # yapf: disable
@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=16, help='Batch size per GPU/CPU for training.')
     parser.add_argument('--lr', type=float, default=5e-5, help='The initial learning rate.')
     parser.add_argument('--weight_decay', type=float, default=0.01, help='The weight decay for optimizer.')
-    parser.add_argument('--epochs', type=int, default=10, help='Total number of training epochs to perform.')
+    parser.add_argument('--epochs', type=int, default=3, help='Total number of training epochs to perform.')
     parser.add_argument('--warmup_steps', type=int, default=2500, help='The number of warmup steps.')
     parser.add_argument('--max_grad_norm', type=float, default=0.1, help='The max value of grad norm.')
     parser.add_argument('--max_seq_len', type=int, default=512, help='The maximum sequence length of training.')
@@ -88,103 +88,81 @@ def convert_example(example,
     goal_knowledge = ' '.join([' '.join(lst) for lst in goal + knowledge])
 
     if mode != 'test':
-        return tokenizer.dialogue_encode(
+        output_dic = tokenizer.dialogue_encode(
             example['history'],
             response=example['response'],
             knowledge=goal_knowledge,
             task_type='knowledge',
             max_seq_len=max_seq_len,
             max_response_len=max_response_len,
-            max_knowledge_len=max_knowledge_len)
+            max_knowledge_len=max_knowledge_len,
+            return_length=True)
+        response_start = output_dic['input_ids'].index(tokenizer.cls_token_id,
+                                                       1)
+        response_end = output_dic['seq_len']
+        output_dic['masked_positions'] = list(
+            range(response_start, response_end - 1))
+        output_dic['labels'] = output_dic['input_ids'][response_start + 1:
+                                                       response_end]
+        return output_dic
     else:
         output_dic = tokenizer.dialogue_encode(
             example['history'],
             knowledge=goal_knowledge,
             task_type='knowledge',
             max_seq_len=max_seq_len,
-            max_response_len=max_response_len,
             max_knowledge_len=max_knowledge_len)
+
+        # Add [CLS] as the begining of response
+        output_dic['input_ids'].append(tokenizer.cls_token_id)
+        output_dic['token_type_ids'].append(1)
+        output_dic['position_ids'].append(output_dic['position_ids'][-1] + 1)
+        mask = output_dic['attention_mask']
+        mask = np.pad(mask, ((0, 1), (0, 1)), 'constant', constant_values=-1e9)
+        mask[-1, :] = 0
+        output_dic['attention_mask'] = mask
+
         if 'response' in example:
             output_dic['response'] = example['response']
         return output_dic
 
 
-def batchify_fn(batch_examples, pad_val, cls_token_id, mode):
-    def pad_batch_data(batch, pad_val):
-        """Pad the instances to the max sequence length in batch. """
-        max_len = max(map(len, batch))
-        batch_data = np.array(
-            [list(data) + [pad_val] * (max_len - len(data)) for data in batch],
-            dtype='int64')
-        return batch_data
-
-    def pad_batch_mask(batch_attention_mask):
+def batchify_fn(batch_examples, pad_val, mode):
+    def pad_mask(batch_attention_mask):
         batch_size = len(batch_attention_mask)
         max_len = max(map(len, batch_attention_mask))
         attention_mask = np.ones(
             (batch_size, max_len, max_len), dtype='float32') * -1e9
         for i, mask_data in enumerate(attention_mask):
             seq_len = len(batch_attention_mask[i])
-            mask_data[:seq_len, :seq_len] = np.array(
+            mask_data[-seq_len:, -seq_len:] = np.array(
                 batch_attention_mask[i], dtype='float32')
         attention_mask = np.expand_dims(attention_mask, axis=1)
         return attention_mask
 
-    def prepare_label_for_train(batch_input_ids, cls_token_id):
-        batch_size = len(batch_input_ids)
-        max_len = max(map(len, batch_input_ids))
-        masked_positions = np.array([], dtype='int64')
-        labels = np.array([], dtype='int64')
-        for i, mask_data in enumerate(attention_mask):
-            input_ids = batch_input_ids[i]
-            start = input_ids.index(cls_token_id, 1)
-            end = len(input_ids)
-            masked_positions = np.concatenate((masked_positions, np.array(
-                [i * max_len + j for j in range(start, end - 1)],
-                dtype='int64')))
-            labels = np.concatenate((labels, input_ids[start + 1:end]))
-        return masked_positions, labels
+    pad_func = Pad(pad_val=pad_val, pad_right=False)
 
-    def prepare_inputs_for_test(input_ids, token_type_ids, position_ids,
-                                attention_mask, cls_token_id):
-        # Add [CLS] at the begining of response
-        input_ids = np.pad(input_ids, ((0, 0), (0, 1)),
-                           'constant',
-                           constant_values=cls_token_id)
-        token_type_ids = np.pad(token_type_ids, ((0, 0), (0, 1)),
-                                'constant',
-                                constant_values=1)
-        position_ids = np.pad(position_ids, ((0, 0), (0, 1)), 'maximum')
-        position_ids[:, -1] += 1
-        attention_mask = np.pad(attention_mask, ((0, 0), (0, 0), (0, 1),
-                                                 (0, 1)),
-                                'constant',
-                                constant_values=-1e9)
-        attention_mask[:, :, -1, :] = attention_mask[:, :, 0, :]
-        attention_mask[:, :, -1, -1] = 0.0
-        return input_ids, token_type_ids, position_ids, attention_mask
+    input_ids = pad_func([example['input_ids'] for example in batch_examples])
+    token_type_ids = pad_func(
+        [example['token_type_ids'] for example in batch_examples])
+    position_ids = pad_func(
+        [example['position_ids'] for example in batch_examples])
 
-    batch_input_ids = [example['input_ids'] for example in batch_examples]
-    batch_token_type_ids = [
-        example['token_type_ids'] for example in batch_examples
-    ]
-    batch_position_ids = [example['position_ids'] for example in batch_examples]
-    batch_attention_mask = [
-        example['attention_mask'] for example in batch_examples
-    ]
-
-    input_ids = pad_batch_data(batch_input_ids, pad_val)
-    token_type_ids = pad_batch_data(batch_token_type_ids, pad_val)
-    position_ids = pad_batch_data(batch_position_ids, pad_val)
-    attention_mask = pad_batch_mask(batch_attention_mask)
+    attention_mask = pad_mask(
+        [example['attention_mask'] for example in batch_examples])
 
     if mode != 'test':
-        masked_positions, labels = prepare_label_for_train(batch_input_ids,
-                                                           cls_token_id)
+        max_len = max([example['seq_len'] for example in batch_examples])
+        masked_positions = np.concatenate([
+            np.array(example['masked_positions']) +
+            (max_len - example['seq_len']) + i * max_len
+            for i, example in enumerate(batch_examples)
+        ])
+        labels = np.concatenate(
+            [np.array(example['labels']) for example in batch_examples])
         return input_ids, token_type_ids, position_ids, attention_mask, masked_positions, labels
     else:
-        return prepare_inputs_for_test(input_ids, token_type_ids, position_ids,
-                                       attention_mask, cls_token_id)
+        return input_ids, token_type_ids, position_ids, attention_mask
 
 
 def create_data_loader(dataset, tokenizer, args, mode):
@@ -203,11 +181,7 @@ def create_data_loader(dataset, tokenizer, args, mode):
     else:
         batch_sampler = BatchSampler(
             dataset, batch_size=args.batch_size, shuffle=False)
-    collate_fn = partial(
-        batchify_fn,
-        pad_val=tokenizer.pad_token_id,
-        cls_token_id=tokenizer.cls_token_id,
-        mode=mode)
+    collate_fn = partial(batchify_fn, pad_val=tokenizer.pad_token_id, mode=mode)
     data_loader = DataLoader(
         dataset,
         batch_sampler=batch_sampler,

@@ -92,7 +92,7 @@ def train(args):
                     if ppl < best_ppl:
                         best_ppl = ppl
                         save_ckpt(model, tokenizer, args.save_dir, 'best')
-                        print('Saved step {} as best model.'.format(step))
+                        print('Saved step {} as best model.\n'.format(step))
             batch_start_time = time.time()
     print('\nTraining completed.')
 
@@ -118,7 +118,7 @@ def evaluation(model, data_loader):
     avg_loss = total_loss / total_tokens
     ppl = math.exp(avg_loss)
     avg_speed = (time.time() - start_time) / step
-    print('loss: %.4f - ppl: %.4f - %.3fs/step\n' % (avg_loss, ppl, avg_speed))
+    print('loss: %.4f - ppl: %.4f - %.3fs/step' % (avg_loss, ppl, avg_speed))
     model.train()
     return ppl
 

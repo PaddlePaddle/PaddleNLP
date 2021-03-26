@@ -471,7 +471,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             return_token_type_ids (bool, optional): Whether to return the 
                 token_type_ids. Default True.
             return_attention_mask (bool, optional): Whether to return the 
-                attention_mask. Default False.
+                attention_mask. Default True.
             pad_to_max_seq_len (bool, optional): Whether to pad the sequences 
                 will be returned to the `max_seq_len`. Default False.
             return_length (bool, optional): Whether to return the length of the
@@ -575,7 +575,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 np.ones(
                     [end - start, end - start], dtype='float32') * -1e9, 1)
             attention_mask[start:end, start:end] = tmp
-            encoded_inputs["attention_mask"] = attention_mask.tolist()
+            encoded_inputs["attention_mask"] = attention_mask
 
         return encoded_inputs
 
