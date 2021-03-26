@@ -2,6 +2,7 @@
 
 #include "fastertransformer/common.h"
 #include "fastertransformer/decoding_beamsearch.h"
+#include "fastertransformer/decoding_sampling.h"
 #include "fastertransformer/open_decoder.h"
 
 #include "paddle/fluid/framework/op_registry.h"

@@ -1,6 +1,6 @@
 # Faster Transformer 预测
 
-在这里我们集成了 Nvidia [Faster Transformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer) 用于预测加速。同时集成了 Faster Transformer float32 以及 float16 预测。目前仅集成 beam search 作为解码的策略，并应用在动态图 Transformer 英德翻译的推理预测中。以下是使用 Faster Transformer 的说明。
+在这里我们集成了 Nvidia [Faster Transformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer) 用于预测加速。同时集成了 Faster Transformer float32 以及 float16 预测。以下是使用 Faster Transformer 的说明。
 
 ## 使用环境说明
 
@@ -76,7 +76,10 @@ transformer = FasterTransformer(
     weight_sharing=args.weight_sharing,
     bos_id=args.bos_idx,
     eos_id=args.eos_idx,
+    decoding_strategy=args.decoding_strategy,
     beam_size=args.beam_size,
+    topk=args.topk,
+    topp=args.topp,
     max_out_len=args.max_out_len,
     decoding_lib=args.decoding_lib,
     use_fp16_decoding=args.use_fp16_decoding)
