@@ -61,6 +61,12 @@ def set_seed(seed):
 
 
 def preprocess_examples(examples, mode='train'):
+    """
+    For training set and dev set, treat each utterance of the first speaker as 
+    the response, and concatenate the goal, knowledge and the dialog’s previous 
+    utterances as the history. In this way, multiple history-response pairs 
+    are constructed.
+    """
     if mode == 'test':
         return examples
     new_examples = []
@@ -82,13 +88,13 @@ def convert_example(example,
                     max_response_len=128,
                     max_knowledge_len=256,
                     mode='train'):
-    """convert all examples into necessary features"""
+    """Convert all examples into necessary features."""
     goal = example['goal']
     knowledge = example['knowledge']
     goal_knowledge = ' '.join([' '.join(lst) for lst in goal + knowledge])
 
     if mode != 'test':
-        output_dic = tokenizer.dialogue_encode(
+        tokenized_example = tokenizer.dialogue_encode(
             example['history'],
             response=example['response'],
             knowledge=goal_knowledge,
@@ -97,34 +103,37 @@ def convert_example(example,
             max_response_len=max_response_len,
             max_knowledge_len=max_knowledge_len,
             return_length=True)
-        response_start = output_dic['input_ids'].index(tokenizer.cls_token_id,
-                                                       1)
-        response_end = output_dic['seq_len']
-        output_dic['masked_positions'] = list(
+        response_start = tokenized_example['input_ids'].index(
+            tokenizer.cls_token_id, 1)
+        response_end = tokenized_example['seq_len']
+        # Use to gather the logits corresponding to the labels during training
+        tokenized_example['masked_positions'] = list(
             range(response_start, response_end - 1))
-        output_dic['labels'] = output_dic['input_ids'][response_start + 1:
-                                                       response_end]
-        return output_dic
+        tokenized_example['labels'] = tokenized_example['input_ids'][
+            response_start + 1:response_end]
+        return tokenized_example
     else:
-        output_dic = tokenizer.dialogue_encode(
+        tokenized_example = tokenizer.dialogue_encode(
             example['history'],
             knowledge=goal_knowledge,
             task_type='knowledge',
             max_seq_len=max_seq_len,
             max_knowledge_len=max_knowledge_len)
 
-        # Add [CLS] as the begining of response
-        output_dic['input_ids'].append(tokenizer.cls_token_id)
-        output_dic['token_type_ids'].append(1)
-        output_dic['position_ids'].append(output_dic['position_ids'][-1] + 1)
-        mask = output_dic['attention_mask']
+        # Add [CLS] as the begining of response to force the model to generate 
+        # the response.
+        tokenized_example['input_ids'].append(tokenizer.cls_token_id)
+        tokenized_example['token_type_ids'].append(1)
+        tokenized_example['position_ids'].append(tokenized_example[
+            'position_ids'][-1] + 1)
+        mask = tokenized_example['attention_mask']
         mask = np.pad(mask, ((0, 1), (0, 1)), 'constant', constant_values=-1e9)
         mask[-1, :] = 0
-        output_dic['attention_mask'] = mask
+        tokenized_example['attention_mask'] = mask
 
         if 'response' in example:
-            output_dic['response'] = example['response']
-        return output_dic
+            tokenized_example['response'] = example['response']
+        return tokenized_example
 
 
 def batchify_fn(batch_examples, pad_val, mode):
@@ -137,6 +146,8 @@ def batchify_fn(batch_examples, pad_val, mode):
             seq_len = len(batch_attention_mask[i])
             mask_data[-seq_len:, -seq_len:] = np.array(
                 batch_attention_mask[i], dtype='float32')
+        # In order to ensure the correct broadcasting mechanism, expand one 
+        # dimension to the second dimension (n_head of Transformer).
         attention_mask = np.expand_dims(attention_mask, axis=1)
         return attention_mask
 

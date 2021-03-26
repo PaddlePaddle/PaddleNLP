@@ -544,6 +544,9 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         sequence_length = len(encoded_inputs["input_ids"])
         assert sequence_length <= max_seq_len
 
+        # Considering that the logits at the last time step in the API of 
+        # generative task are taken to generate the next token. In order to 
+        # avoid the last time step being a pad, so take padding on the left.
         pad_length = max_seq_len - sequence_length if pad_to_max_seq_len else 0
         if pad_length > 0:
             encoded_inputs["input_ids"] = [
