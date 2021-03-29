@@ -90,6 +90,6 @@ class TestImdbNoSplitDataFiles(CpuCommonTest):
     def setUp(self):
         self.config['path'] = 'imdb'
 
+    @CpuCommonTest.assert_raises
     def test_no_split_datafiles(self):
-        with self.assertRaises(AssertionError):
-            load_dataset(**self.config)
+        load_dataset(**self.config)

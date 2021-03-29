@@ -37,15 +37,18 @@ class TestBigBirdTokenizer(CpuCommonTest):
         self.expected_masked_lm_ids = np.array([4558, 2757, 15415])
         self.expected_masked_lm_weights = np.array([1., 1., 1.])
 
-    def setUp(self):
-        np.random.seed(102)
+    def set_text(self):
         self.text = 'An extremely powerful film that certainly isnt '\
                     'appreciated enough Its impossible to describe the experience '\
                     'of watching it The recent UK television adaptation was shameful  '\
                     'too ordinary and bland This original manages to imprint itself '\
                     'in your memory'
+
+    def setUp(self):
+        np.random.seed(102)
         self.tokenizer = BigBirdTokenizer.from_pretrained(
             'bigbird-base-uncased')
+        self.set_text()
         self.set_input()
         self.set_output()
 
@@ -82,3 +85,85 @@ class TestBigBirdTokenizerLongMaxPredLen(TestBigBirdTokenizer):
             [4558, 3830, 2375, 2757, 15415, 388, 0, 0])
         self.expected_masked_lm_weights = np.array(
             [1., 1., 1., 1., 1., 1., 0., 0.])
+
+
+class TestBigBirdTokenizerGetInputIdsValueError(TestBigBirdTokenizer):
+    def set_text(self):
+        self.text = dict()
+
+    @CpuCommonTest.assert_raises(ValueError)
+    def test_tokenize(self):
+        super().test_tokenize()
+
+
+class TestBigBirdTokenizerGetInputIdsTextInt(TestBigBirdTokenizer):
+    def set_text(self):
+        self.text = [
+            1153, 4558, 3766, 2747, 427, 3830, 419, 530, 16474, 1677, 6464,
+            5441, 385, 7002, 363, 2099, 387, 5065, 441, 484, 2375, 3583, 5682,
+            16812, 474, 34179, 1266, 8951, 391, 34478, 871, 2757, 15415, 385,
+            29223, 2447, 388, 635, 4189
+        ]
+
+
+class TestBigBirdTokenizerGetInputIdsTextStr(TestBigBirdTokenizer):
+    def set_text(self):
+        self.text = [
+            '▁An', '▁extremely', '▁powerful', '▁film', '▁that', '▁certainly',
+            '▁is', 'nt', '▁appreciated', '▁enough', '▁Its', '▁impossible',
+            '▁to', '▁describe', '▁the', '▁experience', '▁of', '▁watching',
+            '▁it', '▁The', '▁recent', '▁UK', '▁television', '▁adaptation',
+            '▁was', '▁shameful', '▁too', '▁ordinary', '▁and', '▁bland', '▁This',
+            '▁original', '▁manages', '▁to', '▁imprint', '▁itself', '▁in',
+            '▁your', '▁memory'
+        ]
+
+
+class TestBigBirdTokenizerUnusaulText(CpuCommonTest):
+    def setUp(self):
+        self.tokenizer = BigBirdTokenizer.from_pretrained(
+            'bigbird-base-uncased')
+
+    def test_empty_text(self):
+        ids = self.tokenizer('')
+        self.check_output_equal(ids, [])
+
+    def test_bytes(self):
+        byte_text = 'An extremely powerful film that certainly isnt '\
+                'appreciated enough Its impossible to describe the experience '\
+                'of watching it The recent UK television adaptation was shameful  '\
+                'too ordinary and bland This original manages to imprint itself '\
+                'in your memory'.encode()
+        self.expected_tokens = [
+            '▁An', '▁extremely', '▁powerful', '▁film', '▁that', '▁certainly',
+            '▁is', 'nt', '▁appreciated', '▁enough', '▁Its', '▁impossible',
+            '▁to', '▁describe', '▁the', '▁experience', '▁of', '▁watching',
+            '▁it', '▁The', '▁recent', '▁UK', '▁television', '▁adaptation',
+            '▁was', '▁shameful', '▁too', '▁ordinary', '▁and', '▁bland', '▁This',
+            '▁original', '▁manages', '▁to', '▁imprint', '▁itself', '▁in',
+            '▁your', '▁memory'
+        ]
+        tokens = self.tokenizer(byte_text)
+        self.check_output_equal(tokens, self.expected_tokens)
+
+
+class TestBigBirdTokenizerNotExistFile(CpuCommonTest):
+    @CpuCommonTest.assert_raises(ValueError)
+    def test_not_exist_file(self):
+        self.tokenizer = BigBirdTokenizer(sentencepiece_model_file='')
+
+
+class TestBigBirdTokenizerUNK(CpuCommonTest):
+    def setUp(self):
+        self.tokenizer = BigBirdTokenizer.from_pretrained(
+            'bigbird-base-uncased')
+
+    def test_unk(self):
+        self.text = 'An extremely powerful film that certainly isnt '\
+                'appreciated enough Its impossible to describe the experience '\
+                'of watching it The recent UK television adaptation was shameful  '\
+                'too ordinary and bland This original manages to imprint itself '\
+                'in your memory 中'
+        # Chinese words don't exist in the provided vocabs 
+        tokens = self.tokenizer(self.text)
+        self.check_output_equal('<unk>' in tokens, True)

@@ -81,6 +81,18 @@ class CommonTest(unittest.TestCase):
 
         return wrapper
 
+    def assert_raises(Error=AssertionError):
+        error = Error
+
+        def assert_raises_error(func):
+            def wrapper(self, *args, **kwargs):
+                with self.assertRaises(error):
+                    func(self, *args, **kwargs)
+
+            return wrapper
+
+        return assert_raises_error
+
     def _check_output_impl(self,
                            result,
                            expected_result,

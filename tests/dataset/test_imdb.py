@@ -65,6 +65,6 @@ class TestImdbWrongMode(CpuCommonTest):
         # valid mode is 'train' and 'test', wrong mode would raise an error
         self.config['mode'] = 'wrong'
 
+    @CpuCommonTest.assert_raises
     def test_wrong_set(self):
-        with self.assertRaises(AssertionError):
-            Imdb(**self.config)
+        Imdb(**self.config)
