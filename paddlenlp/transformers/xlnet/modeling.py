@@ -874,7 +874,7 @@ class XLNetModel(XLNetPretrainedModel):
             output_attentions=False,
             output_hidden_states=False,
             return_dict=False, ):
-        """
+        r"""
         The XLNetModel forward method, overrides the __call__() special method.
 
         Args:
@@ -981,6 +981,21 @@ class XLNetModel(XLNetPretrainedModel):
              attentions (``List[Tensor]``):
                 Attentions weights after the attention softmax, used to compute the weighted average
                 in the self-attention heads.
+
+        Example::
+
+        >>> from paddlenlp.transformers.xlnet.modeling import XLNetModel
+        >>> from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
+        >>> import paddle
+
+        >>> tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+        >>> model = XLNetModel.from_pretrained('xlnet-base-cased')
+
+        >>> inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+        >>> inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+        >>> outputs = model(**inputs)
+
+        >>> last_hidden_states = outputs[0]
         """
 
         if self.training:
@@ -1266,7 +1281,7 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
             output_attentions=False,
             output_hidden_states=False,
             return_dict=False, ):
-        """
+        r"""
         The XLNetModel forward method, overrides the __call__() special method.
 
         Args:
@@ -1313,7 +1328,23 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
                 See :class:`XLNetModel`.
             attentions (``List[Tensor]``):
                 See :class:`XLNetModel`.
+
+        Example::
+
+            >>> from paddlenlp.transformers.xlnet.modeling import XLNetForSequenceClassification
+            >>> from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
+            >>> import paddle
+
+            >>> tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+            >>> model = XLNetForSequenceClassification.from_pretrained('xlnet-base-cased')
+
+            >>> inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+            >>> inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+            >>> outputs = model(**inputs)
+
+            >>> logits = outputs[0]
         """
+
         transformer_outputs = self.transformer(
             input_ids,
             token_type_ids=token_type_ids,
@@ -1379,7 +1410,7 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
             output_attentions=False,
             output_hidden_states=False,
             return_dict=False, ):
-        """
+        r"""
         The XLNetModel forward method, overrides the __call__() special method.
 
         Args:
@@ -1426,6 +1457,21 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
                 See :class:`XLNetModel`.
             - attentions (``List[Tensor]``):
                 See :class:`XLNetModel`.
+
+        Example::
+
+            >>> from paddlenlp.transformers.xlnet.modeling import XLNetForTokenClassification
+            >>> from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
+            >>> import paddle
+
+            >>> tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+            >>> model = XLNetForTokenClassification.from_pretrained('xlnet-base-cased')
+
+            >>> inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+            >>> inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+            >>> outputs = model(**inputs)
+
+            >>> logits = outputs[0]
         """
         transformer_outputs = self.transformer(
             input_ids,
