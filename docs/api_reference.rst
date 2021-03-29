@@ -1,15 +1,16 @@
-============
-API Reference
-============
+.. automodule:: paddlenlp
+   :members:
+   :inherited-members:
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
+   :caption: paddlenlp
 
-   /api_reference/data.rst
-   /api_reference/layer.rst
-   /api_reference/train_evaluate.rst
-   /api_reference/predict.rst
-   /api_reference/others.rst
-
-
-参考：https://www.paddlepaddle.org.cn/documentation/docs/zh/2.0-rc/api/index_cn.html
+   paddlenlp.data <source/paddlenlp.data>
+   paddlenlp.datasets <source/paddlenlp.datasets>
+   paddlenlp.embeddings <source/paddlenlp.embeddings>
+   paddlenlp.layers <source/paddlenlp.layers>
+   paddlenlp.metrics <source/paddlenlp.metrics>
+   paddlenlp.seq2vec <source/paddlenlp.seq2vec>
+   paddlenlp.transformers <source/paddlenlp.transformers>
+   paddlenlp.utils <source/paddlenlp.utils>
