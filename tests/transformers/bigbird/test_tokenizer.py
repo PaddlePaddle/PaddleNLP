@@ -15,7 +15,6 @@
 import numpy as np
 import os
 import unittest
-import paddle
 from paddlenlp.transformers import BigBirdTokenizer
 
 from common_test import CpuCommonTest
