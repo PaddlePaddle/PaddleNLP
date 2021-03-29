@@ -26,6 +26,7 @@
 #
 import os
 import sys
+autodoc_mock_imports = ['paddlenlp']
 sys.path.insert(0, os.path.abspath('../..'))
 sys.path.insert(0, os.path.abspath('../paddlenlp/'))
 sys.path.insert(0, os.path.abspath('../paddlenlp/data'))
