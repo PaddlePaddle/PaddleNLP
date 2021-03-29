@@ -55,7 +55,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.napoleon',
-    'sphinx_copybutton',
+#     'sphinx_copybutton',
     'sphinx_markdown_tables',
     'sphinx.ext.viewcode',
     'sphinx.ext.coverage',
