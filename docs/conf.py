@@ -26,18 +26,18 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../..'))
-# autodoc_mock_imports = ['paddlenlp']
+# sys.path.insert(0, os.path.abspath('../..'))
+
 sys.path.insert(0, os.path.abspath('../paddlenlp/'))
-sys.path.insert(0, os.path.abspath('../paddlenlp/data'))
-sys.path.insert(0, os.path.abspath('../paddlenlp/datasets'))
-sys.path.insert(0, os.path.abspath('../paddlenlp/embeddings'))
-sys.path.insert(0, os.path.abspath('../paddlenlp/layers'))
-sys.path.insert(0, os.path.abspath('../paddlenlp/metrics'))
-sys.path.insert(0, os.path.abspath('../paddlenlp/models'))
-sys.path.insert(0, os.path.abspath('../paddlenlp/seq2vec'))
-sys.path.insert(0, os.path.abspath('../paddlenlp/transformers'))
-sys.path.insert(0, os.path.abspath('../paddlenlp/utils'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/data'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/datasets'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/embeddings'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/layers'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/metrics'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/models'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/seq2vec'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/transformers'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/utils'))
 
 # -- Project information -----------------------------------------------------
 
