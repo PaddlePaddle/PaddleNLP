@@ -58,9 +58,10 @@ class Imdb(DatasetBuilder):
                 label_id = "0"
             for f in data_files:
                 f = os.path.join(root, f)
-                data = io.open(f, 'r', encoding='utf8').readlines()
-                data = data[0].translate(translator)
-                yield {"text": data, "label": label_id}
+                with io.open(f, 'r', encoding='utf8') as fr:
+                    data = fr.readlines()
+                    data = data[0].translate(translator)
+                    yield {"text": data, "label": label_id}
 
     def get_labels(self):
         """

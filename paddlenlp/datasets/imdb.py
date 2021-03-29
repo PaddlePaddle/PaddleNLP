@@ -66,9 +66,10 @@ class Imdb(Dataset):
             all_samples = []
             for f in data_files:
                 f = os.path.join(root, f)
-                data = io.open(f, 'r', encoding='utf8').readlines()
-                data = data[0].translate(translator)
-                all_samples.append((data, label_id))
+                with io.open(f, 'r', encoding='utf8') as fr:
+                    data = fr.readlines()
+                    data = data[0].translate(translator)
+                    all_samples.append((data, label_id))
 
             return all_samples
 

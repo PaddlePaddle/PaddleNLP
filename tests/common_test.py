@@ -46,8 +46,6 @@ class CommonTest(unittest.TestCase):
             if key.startswith('test'):
                 value = CommonTest._test_places(value)
                 setattr(cls, key, value)
-        warnings.simplefilter('ignore', category=ResourceWarning)
-        warnings.simplefilter('ignore', category=UserWarning)
 
     def _test_places(func):
         def wrapper(self, *args, **kwargs):
