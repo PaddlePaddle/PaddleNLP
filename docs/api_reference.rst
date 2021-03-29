@@ -11,7 +11,6 @@
    paddlenlp.embeddings <source/paddlenlp.embeddings>
    paddlenlp.layers <source/paddlenlp.layers>
    paddlenlp.metrics <source/paddlenlp.metrics>
-   paddlenlp.models <source/paddlenlp.models>
    paddlenlp.seq2vec <source/paddlenlp.seq2vec>
    paddlenlp.transformers <source/paddlenlp.transformers>
    paddlenlp.utils <source/paddlenlp.utils>
