@@ -201,7 +201,7 @@ python -u ./run_glue.py \
     --logging_steps 100 \
     --save_steps 100 \
     --output_dir ./$TASK_NAME/ \
-    --n_gpu 1
+    --device gpu
 ```
 其中绝大部分参数和上节中一样，只有参数model_name_or_path配置了本地预训练模型的路径
 
