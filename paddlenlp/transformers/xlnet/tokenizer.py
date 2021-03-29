@@ -22,6 +22,8 @@ from typing import List, Optional
 from paddle.utils import try_import
 from .. import PretrainedTokenizer
 
+__all__ = ['XLNetTokenizer']
+
 SENTENCEPIECE_UNDERLINE = "▁"
 SPIECE_UNDERLINE = SENTENCEPIECE_UNDERLINE  # Kept for backward compatibility
 
