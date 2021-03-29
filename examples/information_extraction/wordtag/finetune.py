@@ -32,6 +32,8 @@ from paddlenlp.metrics import ChunkEvaluator
 # from .data import load_labels, WordTagDataset
 from metrics import Accuracy, AverageMeter, SequenceAccuracy
 
+paddle.set_printoptions(precision=16)
+
 
 def load_dataset(datafiles):
     def read(data_path):
@@ -71,14 +73,15 @@ def convert_example(example,
         return_length=True,
         is_split_into_words=True,
         max_seq_len=max_seq_len)
-    # '[CLS]' and '[SEP]' will get label 'O'
-
     if len(tokenized_input['input_ids']) - 1 - summary_num < len(tags):
         tags = tags[:len(tokenized_input['input_ids']) - 1 - summary_num]
+    # '[CLS]' and '[SEP]' will get label 'O'
     tags = ['O'] * (summary_num) + tags + ['O']
     tags += ['O'] * (len(tokenized_input['input_ids']) - len(tags))
     tokenized_input['tags'] = [tags_to_idx[x] for x in tags]
     tokenized_input['cls_label'] = labels_to_idx[cls_label]
+    if cls_label in ['编码/引用/列表', '外语句子', '古文/古诗句']:
+        tokenized_input['seq_len'] = summary_num
     return tokenized_input['input_ids'], tokenized_input[
         'token_type_ids'], tokenized_input['seq_len'], tokenized_input[
             'tags'], tokenized_input['cls_label']
@@ -105,10 +108,6 @@ def parse_args():
     parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument("--n_gpu",default=1,type=int,help="number of gpus to use, 0 for cpu.")
     # yapf: enable
-
-    # parser.add_argument("--gradient_accumulation_steps", default=1, type=int)
-    # parser.add_argument("--local_rank", default=-1, type=int)
-    # parser.add_argument("--fp16", action="store_true")
 
     args = parser.parse_args()
     return args
@@ -162,14 +161,6 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
     set_seed(args)
 
-    # output_dir = pathlib.Path(args.output_dir)
-
-    # Loading data.
-
-    # train_ds = WordTagDataset.from_file(pathlib.Path(args.data_dir), "train", tokenizer,
-    #                                          labels_to_idx=labels_to_idx, tags_to_idx=tags_to_idx)
-    # test_ds = WordTagDataset.from_file(pathlib.Path(args.data_dir), "test", tokenizer,
-    #                                         labels_to_idx=labels_to_idx, tags_to_idx=tags_to_idx)
     train_ds, test_ds = load_dataset(datafiles=('./data/train.json',
                                                 './data/test.json'))
     tags_to_idx = load_dict("./data/tags.txt")
@@ -194,7 +185,7 @@ def do_train(args):
     ): fn(samples)
 
     train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)
+        train_ds, batch_size=args.batch_size, shuffle=False, drop_last=True)
     train_data_loader = DataLoader(
         train_ds,
         batch_sampler=train_batch_sampler,
@@ -214,14 +205,15 @@ def do_train(args):
         num_cls_label=len(labels_to_idx),
         num_tag=len(tags_to_idx),
         ignore_index=tags_to_idx["O"])
+
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
     num_training_steps = args.max_steps if args.max_steps > 0 else (
         len(train_data_loader) * args.num_train_epochs)
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         warmup)
+    # lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
+    #                                      warmup)
 
     # num_train_optimization_steps = len(train_ds) / args.batch_size / \
     #     args.gradient_accumulation_steps * args.num_train_epochs
@@ -233,7 +225,7 @@ def do_train(args):
         if not any(nd in n for nd in ["bias", "norm"])
     ]
     optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
+        learning_rate=args.learning_rate,  # lr_scheduler,
         beta1=0.9,
         beta2=0.999,
         epsilon=args.adam_epsilon,
@@ -255,6 +247,7 @@ def do_train(args):
     global_step = 0
 
     train_logs = dict()
+    # model.eval()
     for epoch in range(1, args.num_train_epochs + 1):
         logger.info(f"Epoch {epoch} beginnig")
         total_score = 0.0
@@ -264,14 +257,15 @@ def do_train(args):
         # import pdb; pdb.set_trace()
         for total_step, batch in enumerate(train_data_loader):
             global_step += 1
-
             input_ids, token_type_ids, seq_len, tags, cls_label = batch
+
             outputs = model(
                 input_ids,
                 token_type_ids,
                 lengths=seq_len,
                 tag_labels=tags,
                 cls_label=cls_label)
+            # exit()
             total_loss, seq_logits, cls_logits = outputs[0], outputs[
                 1], outputs[2]
             # total_loss = cls_loss + seq_loss + crf_loss
@@ -281,6 +275,11 @@ def do_train(args):
             # if args.gradient_accumulation_steps > 1:
             #     total_loss = total_loss / args.gradient_accumulation_steps
             total_loss.backward()
+
+            print(total_loss.gradient().sum())
+            import pdb
+            pdb.set_trace()
+
             # crf_loss.backward()
 
             # tr_cls_loss.update(cls_loss.item(), n=1)
@@ -293,7 +292,7 @@ def do_train(args):
             optimizer.step()
             optimizer.clear_grad()
             # model.zero_grad()
-            lr_scheduler.step()
+            # lr_scheduler.step()
 
             # import pdb; pdb.set_trace()
             cls_acc(
