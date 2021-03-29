@@ -106,13 +106,15 @@ class LinearChainCrf(nn.Layer):
             # input_exp: batch_size, num_tags, num_tags
             # alpha_exp: batch_size, num_tags, num_tags
             if i == 0 and not self.with_start_stop_tag:
-                mat = input_exp
+                # mat = input_exp
+                alpha = inputs[:, 0]
             else:
                 alpha_exp = alpha.unsqueeze(1).expand(
                     [batch_size, n_labels, n_labels])
                 # F(n) = logsumexp(F(n-1) + p(y_n) + T(y_{n-1}, y_n))
                 mat = input_exp + trans_exp + alpha_exp
-            alpha = paddle.logsumexp(mat, 2)
+                # import pdb; pdb.set_trace()
+                alpha = paddle.logsumexp(mat, 2)
             all_alpha.append(alpha)
 
         # Get the valid alpha
@@ -141,6 +143,7 @@ class LinearChainCrf(nn.Layer):
         Returns:
             Tensor: The unnormalized sequence scores tensor, with shape `[batch_size]`.
         """
+
         return self._point_score(inputs, labels, lengths) + self._trans_score(
             labels, lengths)
 
