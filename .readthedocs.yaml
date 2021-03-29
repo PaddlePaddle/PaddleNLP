@@ -5,6 +5,10 @@
 # Required
 version: 2
 
+submodules:
+  include: all
+  recursive: true
+
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
    configuration: docs/conf.py
