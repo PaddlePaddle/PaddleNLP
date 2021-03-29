@@ -44,22 +44,24 @@ class CommonTest(unittest.TestCase):
         '''
         for key, value in cls.__dict__.items():
             if key.startswith('test'):
-                value = CommonTest._test_places(value)
-                value = CommonTest._catch_warnings(value)
+                decorator_func_list = ["_test_places", "_catch_warnings"]
+                for decorator_func in decorator_func_list:
+                    decorator_func = getattr(CommonTest, decorator_func)
+                    value = decorator_func(value)
                 setattr(cls, key, value)
 
     def _catch_warnings(func):
         '''
-        Catch the specified warnings and treat them as errors for each test.
+        Catch the warnings and treat them as errors for each test.
         '''
 
         def wrapper(self, *args, **kwargs):
             with warnings.catch_warnings(record=True) as w:
                 warnings.resetwarnings()
-                # ignore all warnings
-                warnings.simplefilter("ignore")
-                # treat ResourceWarning as error
-                warnings.simplefilter("always", ResourceWarning)
+                # ignore specified warnings
+                warning_white_list = [UserWarning]
+                for warning in warning_white_list:
+                    warnings.simplefilter("ignore", warning)
                 func(self, *args, **kwargs)
                 msg = None if len(w) == 0 else w[0].message
                 self.assertFalse(len(w) > 0, msg)

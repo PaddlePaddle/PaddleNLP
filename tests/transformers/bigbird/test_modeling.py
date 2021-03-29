@@ -175,13 +175,15 @@ class TestBigBirdPretrainingCriterionUseNSP(CommonTest):
         self.np_criterion = NpBigBirdPretrainingCriterion(**self.config)
 
     def _construct_input_data(self, mask_num, vocab_size, batch_size):
-        prediction_scores = np.random.rand(mask_num, vocab_size)
-        seq_relationship_score = np.random.rand(batch_size, 2)
+        prediction_scores = np.random.rand(
+            mask_num, vocab_size).astype(paddle.get_default_dtype())
+        seq_relationship_score = np.random.rand(
+            batch_size, 2).astype(paddle.get_default_dtype())
         masked_lm_labels = np.random.randint(0, vocab_size, (mask_num, 1))
         next_sentence_labels = np.random.randint(0, 2, (batch_size, 1))
         masked_lm_scale = 1.0
-        masked_lm_weights = np.random.randint(0, 2,
-                                              (mask_num)).astype('float32')
+        masked_lm_weights = np.random.randint(
+            0, 2, (mask_num)).astype(paddle.get_default_dtype())
         return prediction_scores, seq_relationship_score, masked_lm_labels, \
             next_sentence_labels, masked_lm_scale, masked_lm_weights
 
