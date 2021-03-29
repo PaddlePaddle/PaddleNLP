@@ -270,6 +270,8 @@ class Vocab(object):
         token_to_idx = vocab_dict.get('token_to_idx')
         unk_token = vocab_dict.get('unk_token')
         identifiers_to_tokens = vocab_dict.get('identifiers_to_tokens', dict())
+        if 'unk_token' in identifiers_to_tokens:
+            del identifiers_to_tokens['unk_token']
         vocab = cls(counter=None,
                     token_to_idx=token_to_idx,
                     unk_token=unk_token,
