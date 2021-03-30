@@ -38,6 +38,7 @@ def parse_args():
     parser.add_argument('--num_beams', type=int, default=0, help='The number of beams for beam search.')
     parser.add_argument('--length_penalty', type=float, default=1.0, help='The exponential penalty to the sequence length for beam search.')
     parser.add_argument('--early_stopping', type=eval, default=False, help='Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.')
+    parser.add_argument('--device', type=str, default='gpu', help='The device to select for training the model.')
 
     args = parser.parse_args()
     return args

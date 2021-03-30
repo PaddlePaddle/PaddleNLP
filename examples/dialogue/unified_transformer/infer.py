@@ -37,6 +37,7 @@ def calc_bleu_and_distinct(preds, targets):
 
 @paddle.no_grad()
 def infer(args):
+    paddle.set_device(args.device)
     set_seed(args.seed)
 
     model = UnifiedTransformerLMHeadModel.from_pretrained(

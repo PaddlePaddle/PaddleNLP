@@ -34,7 +34,8 @@ train_ds, dev_ds, test1_ds, test2_ds = load_dataset('duconv', splits=('train', '
 ```shell
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu '1,2'`
-unset CUDA_VISIBLE_DEVICES; python -m paddle.distributed.launch --gpus '0' --log_dir ./log finetune.py \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus '0' --log_dir ./log finetune.py \
     --model_name_or_path=unified_transformer-12L-cn-luge \
     --save_dir=./checkpoints \
     --logging_steps=100 \
@@ -48,7 +49,8 @@ unset CUDA_VISIBLE_DEVICES; python -m paddle.distributed.launch --gpus '0' --log
     --max_grad_norm=0.1 \
     --max_seq_len=512 \
     --max_response_len=128 \
-    --max_knowledge_len=256
+    --max_knowledge_len=256 \
+    --device=gpu
 ```
 
 其中参数释义如下：
@@ -74,6 +76,7 @@ unset CUDA_VISIBLE_DEVICES; python -m paddle.distributed.launch --gpus '0' --log
 - `max_seq_len` 表示输入序列的最大长度。
 - `max_response_len` 表示输入response的最大长度。
 - `max_knowledge_len` 表示输入knowledge序列的最大长度。
+- `device` 表示使用的设备。
 
 程序运行时将会自动进行训练和验证，训练过程中会自动保存模型在指定的`save_dir`中，其中loss最小的模型会被保存在`save_dir/model_best`中。如：
 
@@ -95,7 +98,7 @@ unset CUDA_VISIBLE_DEVICES; python -m paddle.distributed.launch --gpus '0' --log
 ```shell
 # GPU启动，预测仅支持单卡
 export CUDA_VISIBLE_DEVICES=0
-python -u infer.py \
+python infer.py \
     --model_name_or_path=./checkpoints/model_best \
     --output_path=./predict.txt \
     --logging_steps=10 \
@@ -107,7 +110,8 @@ python -u infer.py \
     --max_dec_len=64 \
     --num_samples=20 \
     --decode_strategy=sampling \
-    --top_k=5
+    --top_k=5 \
+    --device=gpu
 ```
 
 其中参数释义如下：
@@ -129,6 +133,7 @@ python -u infer.py \
 - `num_samples` 表示每条样本生成的句子的数量。对于每条样本，模型会生成`num_samples`个句子，根据每个句子的概率得分进行排序，得分最高的句子作为最终的生成结果。
 - `decode_strategy` 表示预测解码时采取的策略，可选"sampling"、"greedy_search"和"beam_search"之一。
 - `top_k` 表示采用"sampling"解码策略时，token的概率按从大到小排序，生成的token只从前`top_k`个中进行采样。
+- `device` 表示使用的设备。
 
 程序运行结束后会将预测生成的response保存在`output_path`中。同时终端中会输出评估结果。
 
