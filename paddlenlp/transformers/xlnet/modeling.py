@@ -966,9 +966,9 @@ class XLNetModel(XLNetPretrainedModel):
 
         Example::
 
+        >>> import paddle
         >>> from paddlenlp.transformers.xlnet.modeling import XLNetModel
         >>> from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
-        >>> import paddle
         >>>
         >>> tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
         >>> model = XLNetModel.from_pretrained('xlnet-base-cased')
@@ -1315,9 +1315,9 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
 
         Example::
 
+            >>> import paddle
             >>> from paddlenlp.transformers.xlnet.modeling import XLNetForSequenceClassification
             >>> from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
-            >>> import paddle
             >>>
             >>> tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
             >>> model = XLNetForSequenceClassification.from_pretrained('xlnet-base-cased')
@@ -1446,9 +1446,9 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
 
         Example::
 
+            >>> import paddle
             >>> from paddlenlp.transformers.xlnet.modeling import XLNetForTokenClassification
             >>> from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
-            >>> import paddle
             >>>
             >>> tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
             >>> model = XLNetForTokenClassification.from_pretrained('xlnet-base-cased')

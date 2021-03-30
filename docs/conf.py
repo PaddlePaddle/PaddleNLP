@@ -31,8 +31,8 @@ sys.path.insert(0, os.path.abspath('../paddlenlp/'))
 # -- Project information -----------------------------------------------------
 
 project = 'PaddleNLP'
-copyright = '2021, nlpers'
-author = 'nlpers'
+copyright = '2021, PaddleNLP'
+author = 'PaddleNLP'
 default_role = 'py:obj'
 
 # -- General configuration ---------------------------------------------------
