@@ -4,7 +4,7 @@
 
 近年来，人机对话系统受到了学术界和产业界的广泛关注并取得了不错的发展。开放域对话系统旨在建立一个开放域的多轮对话系统，使得机器可以流畅自然地与人进行语言交互，既可以进行日常问候类的闲聊，又可以完成特定功能，以使得开放域对话系统具有实际应用价值。具体的说，开放域对话可以继续拆分为支持不同功能的对话形式，例如对话式推荐，知识对话技术等，如何解决并有效融合以上多个技能面临诸多挑战。
 
-[UnifiedTransformer](https://arxiv.org/abs/2006.16779)以[Transformer](https://arxiv.org/abs/1706.03762) 编码器为网络基本组件，使用语言模型任务在大规模无标注文本语料上进行预训练，得到了适用于文本生成任务的语义表示模型。
+[UnifiedTransformer](https://arxiv.org/abs/2006.16779)以[Transformer](https://arxiv.org/abs/1706.03762) 编码器为网络基本组件，采用灵活的注意力机制，十分适合文本生成任务，并在模型输入中加入了标识不同对话技能的special token，使得模型能同时支持闲聊对话、推荐对话和知识对话。
 
 本项目是UnifiedTransformer在 Paddle 2.0上的开源实现，包含了在[DuConv](https://www.aclweb.org/anthology/P19-1369/)数据集上微调和预测的代码。
 
@@ -88,8 +88,6 @@ unset CUDA_VISIBLE_DEVICES; python -m paddle.distributed.launch --gpus '0' --log
 └── ...
 ```
 
-**NOTE:** 如需恢复模型训练，`model_name_or_path`配置本地模型的目录地址即可。
-
 ### 模型预测
 
 运行如下命令即可在测试集上进行测试
@@ -113,7 +111,7 @@ python -u infer.py \
 ```
 
 其中参数释义如下：
-- `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+- `model_name_or_path` 指示了预测使用的模型，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
 
    | PaddleNLP提供的预训练模型        |
    |---------------------------------|
@@ -142,3 +140,9 @@ python -u infer.py \
 |    ./checkpoints/model_best     | 0.2808 / 0.1744 |    0.1124 / 0.2899    |
 
 **NOTE:** `./checkpoints/model_best`是按本项目中的超参在单卡上finetune得到的结果。
+
+## Reference
+
+- [UnifiedTransformer](https://arxiv.org/abs/2006.16779)
+- [Knover/luge-dialogue](https://github.com/PaddlePaddle/Knover/tree/luge-dialogue/luge-dialogue)
+- [DuConv](https://www.aclweb.org/anthology/P19-1369/)

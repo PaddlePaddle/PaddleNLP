@@ -210,8 +210,8 @@ def post_process_response(token_ids, tokenizer):
             break
     token_ids = token_ids[:eos_pos]
     tokens = tokenizer.convert_ids_to_tokens(token_ids)
-    response = tokenizer.merge_subword(tokens)
-    return token_ids, response
+    tokens = tokenizer.merge_subword(tokens)
+    return token_ids, tokens
 
 
 def get_in_turn_repetition(pred, is_cn=False):
