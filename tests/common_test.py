@@ -20,12 +20,12 @@ __all__ = ['CommonTest', 'CpuCommonTest']
 
 
 # Assume all elements has same data type
-def get_container_tpye(container):
+def get_container_type(container):
     container_t = type(container)
     if container_t in [list, tuple]:
         if len(container) == 0:
             return container_t
-        return get_container_tpye(container[0])
+        return get_container_type(container[0])
     return container_t
 
 
