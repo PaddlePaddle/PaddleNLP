@@ -119,7 +119,7 @@ PaddleNLP内置了多种collate function，配合 :class:`paddle.io.BatchSampler
     train_batchify_fn = lambda samples, fn=Dict({
         'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),
         'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-        'labels': Stack(dtype="int64")
+        'label': Stack(dtype="int64")
     }): fn(samples)
 
 之后使用 :class:`paddle.io.BatchSampler` 和 :func:`batchify_fn` 构建 :class:`paddle.io.DataLoader` ：
