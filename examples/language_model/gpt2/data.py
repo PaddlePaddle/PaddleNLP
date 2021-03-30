@@ -17,13 +17,28 @@ import os
 
 import numpy as np
 import paddle
+from paddle.io import DataLoader, Dataset
+from paddlenlp.data import Stack, Tuple, Pad
 
 
 def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
                                        num_samples, seq_length, seed,
                                        worker_index):
+    """
+    documents: document index from 0 to len(docs)
+    sizes: the length list of all docs.
+    num_samples: total step*bs iterations of data.
+    seq_length: the sequence length.
+
+
+    sum(sizes) = tokens_per_epoch
+    data_nums = num_samples *  batch_size
+    num_epochs = (data_nums + 1) // sum(sizes)
+    len(doc_idx) = num_epochs * sum(sizes) 
+    
+    """
     # Number of tokens in each epoch and number of required epochs.
-    tokens_per_epoch = _num_tokens(sizes)
+    tokens_per_epoch = _num_tokens(documents, sizes)
     num_epochs = _num_epochs(tokens_per_epoch, seq_length, num_samples)
     # rng state
     np_rng = np.random.RandomState(seed=seed)
@@ -55,18 +70,23 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
                     'last epoch number of samples exceeded max value.'
                 separate_last_epoch = (
                     last_epoch_num_samples < int(0.80 * num_samples_per_epoch))
+            # len(doc_idx) = num_epochs * len(doc) 
             doc_idx = _build_doc_idx(documents, num_epochs, np_rng,
                                      separate_last_epoch)
             np.save(doc_idx_filename, doc_idx, allow_pickle=True)
-            # sample-idx.
+
+            # sample-idx. pos of each seq_len of data.
             assert doc_idx.dtype == np.int32
             sample_idx = _build_sample_idx(sizes, doc_idx, seq_length,
                                            num_epochs, tokens_per_epoch)
             np.save(sample_idx_filename, sample_idx, allow_pickle=True)
+
             if separate_last_epoch:
                 num_samples_ = num_samples_from_epochs_minus_one
             else:
                 num_samples_ = sample_idx.shape[0] - 1
+
+            # shuffle all seq len data. 
             shuffle_idx = _build_shuffle_idx(num_samples_,
                                              sample_idx.shape[0] - 1, np_rng)
             np.save(shuffle_idx_filename, shuffle_idx, allow_pickle=True)
@@ -87,9 +107,9 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
     return doc_idx, sample_idx, shuffle_idx
 
 
-def _num_tokens(lens):
+def _num_tokens(documents, lens):
     """Total number of tokens in the dataset."""
-    return np.sum(lens)
+    return np.sum(lens[documents])
 
 
 def _num_epochs(tokens_per_epoch, seq_length, num_samples):
@@ -105,14 +125,16 @@ def _num_epochs(tokens_per_epoch, seq_length, num_samples):
 
 
 def _build_doc_idx(documents, num_epochs, np_rng, separate_last_epoch):
-    """Build an array with length = number-of-epochs * number-of-dcuments.
-    Each index is mapped to a corresponding document."""
+    """
+    Build an array with length = number-of-epochs * number-of-documents.
+    Each index is mapped to a corresponding document.
+    """
     if not separate_last_epoch or num_epochs == 1:
         doc_idx = np.mgrid[0:num_epochs, 0:len(documents)][1]
         doc_idx[:] = documents
+        # documents repeat num_epochs times.
         doc_idx = doc_idx.reshape(-1)
         doc_idx = doc_idx.astype(np.int32)
-        # np_rng.shuffle(doc_idx)
         return doc_idx
 
     doc_idx_first = _build_doc_idx(documents, num_epochs - 1, np_rng, False)
@@ -121,6 +143,10 @@ def _build_doc_idx(documents, num_epochs, np_rng, separate_last_epoch):
 
 
 def _build_sample_idx(sizes, doc_idx, seq_length, num_epochs, tokens_per_epoch):
+    """
+    num_samples + 1, pos of bs data
+    the distance between two points for sample idx is bs tokens.
+    """
     num_samples = (num_epochs * tokens_per_epoch - 1) // seq_length
     sample_idx = np.zeros([int(num_samples) + 1, 2], dtype=np.int32)
 
@@ -167,12 +193,68 @@ def _build_shuffle_idx(num_samples, total_size, np_rng):
     return np.concatenate((shuffle_idx_first, shuffle_idx_last))
 
 
+def create_pretrained_dataset(args, input_path, worker_init, worker_index,
+                              worker_num, eod_id, places, data_holders):
+    print("the distributed run, worker_num:{}".format(worker_num))
+
+    process_datas = np.load(input_path, mmap_mode="r+", allow_pickle=True)
+    # all documment ids, extend as 1-D array.
+    sample_ids = process_datas["ids"]
+    # len(sample_lens) num of docs
+    # sum(sample_lens) should equal len(sample_ids)
+    sample_lens = process_datas["lens"]
+
+    splits = [0, 237125, 249618, 249868]
+    assert len(sample_lens) >= splits[
+        -1], "The document nums should larger than max of splits, but %s < %s" % (
+            len(sample_lens), splits[-1])
+
+    def build_dataset(index, name, num_samples):
+        dataset = GPT2Dataset(
+            file_path=input_path,
+            worker_index=worker_index,
+            name="gpt2" + name,
+            num_samples=num_samples,
+            documents=np.arange(splits[index], splits[index + 1]),
+            sample_ids=sample_ids,
+            sample_lens=sample_lens,
+            eod_id=eod_id,
+            seed=args.seed + worker_index)
+
+        batch_sampler = paddle.io.DistributedBatchSampler(
+            dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
+
+        data_loader = DataLoader(
+            dataset=dataset,
+            places=places,
+            feed_list=data_holders,
+            batch_sampler=batch_sampler,
+            num_workers=0,
+            worker_init_fn=worker_init,
+            collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
+            return_list=False)
+        return data_loader
+
+    train_data_loader = build_dataset(0, "train", args.batch_size *
+                                      args.max_steps * worker_num)
+    valid_data_loader = build_dataset(1, "valid", args.batch_size *
+                                      (args.max_steps // args.eval_steps + 1) *
+                                      args.eval_iters)
+    test_data_loader = build_dataset(2, "test",
+                                     args.batch_size * args.test_iters)
+
+    return train_data_loader, valid_data_loader, test_data_loader
+
+
 class GPT2Dataset(paddle.io.Dataset):
     def __init__(self,
                  file_path,
                  worker_index,
                  num_samples,
                  eod_id,
+                 sample_ids,
+                 sample_lens,
+                 documents=None,
                  name="gpt2",
                  max_seq_len=1024,
                  mode="train",
@@ -180,15 +262,19 @@ class GPT2Dataset(paddle.io.Dataset):
         self.file_path = file_path
         self.max_seq_len = max_seq_len
         self.name = name
-        process_datas = np.load(
-            self.file_path, mmap_mode="r+", allow_pickle=True)
-        self.sample_ids = process_datas["ids"]
-        self.sample_lens = process_datas["lens"]
-        document_ids = np.arange(0, self.sample_lens.shape[0])
         self.eod_id = eod_id
+        self.sample_ids = sample_ids
+        self.sample_lens = sample_lens
+
+        if documents is None:
+            document_ids = np.arange(0, self.sample_lens.shape[0])
+        else:
+            document_ids = documents
+
         self.doc_idx, self.sample_idx, self.shuffle_idx = \
             construct_samples_and_shuffle_data(self.name, self.file_path, document_ids,\
                 self.sample_lens, num_samples, max_seq_len, seed, worker_index)
+        # doc cumsum start pos
         self.start_pos = [0] + np.cumsum(self.sample_lens).tolist()
 
     def _construct_sample(self, tokens):
@@ -213,45 +299,40 @@ class GPT2Dataset(paddle.io.Dataset):
 
     def _get_single_sample_from_idx(self, doc_index_f, doc_index_l, offset_f,
                                     offset_l):
+        """
+        doc_index_f: data from the first doc.
+        doc_index_l: data from the last doc.
+        offset_f: offset of the first doc.
+        offset_l: offset of the last doc.
+        """
+        # data from the sample doc. just select the needed ids.
         if doc_index_f == doc_index_l:
-            current_start_pos = self.start_pos[doc_index_f]
+            current_start_pos = self.start_pos[self.doc_idx[doc_index_f]]
             return self.sample_ids[current_start_pos+offset_f:\
                        current_start_pos+offset_l+1].tolist()
-        elif doc_index_f < doc_index_l:
-            current_start_pos = self.start_pos[doc_index_f]
-            next_start_pos = self.start_pos[doc_index_f + 1]
+
+        # data from multi docs.
+        else:
+            current_start_pos = self.start_pos[self.doc_idx[doc_index_f]]
+            next_start_pos = self.start_pos[self.doc_idx[doc_index_f] + 1]
             tokens = self.sample_ids[current_start_pos + offset_f:
                                      next_start_pos].tolist()
             for i in range(doc_index_f + 1, doc_index_l):
-                current_start_pos = self.start_pos[i]
-                next_start_pos = self.start_pos[i + 1]
+                current_start_pos = self.start_pos[self.doc_idx[i]]
+                next_start_pos = self.start_pos[self.doc_idx[i] + 1]
                 tokens.extend(self.sample_ids[current_start_pos:next_start_pos]
                               .tolist())
-            last_start_pos = self.start_pos[doc_index_l]
+            last_start_pos = self.start_pos[self.doc_idx[doc_index_l]]
             tokens.extend(self.sample_ids[last_start_pos:last_start_pos +
                                           offset_l + 1].tolist())
-        else:
-            current_start_pos = self.start_pos[doc_index_f]
-            next_start_pos = self.start_pos[-1]
-            tokens = self.sample_ids[current_start_pos + offset_f:
-                                     next_start_pos].tolist()
-            for i in range(0, doc_index_l):
-                current_start_pos = self.start_pos[i]
-                next_start_pos = self.start_pos[i + 1]
-                tokens.extend(self.sample_ids[current_start_pos:next_start_pos]
-                              .tolist())
-            last_start_pos = self.start_pos[doc_index_l]
-            tokens.extend(self.sample_ids[last_start_pos:last_start_pos +
-                                          offset_l + 1].tolist())
+
         return tokens
 
     def __getitem__(self, index):
         idx = self.shuffle_idx[index]
         # Start and end documents and offsets.
-        doc_index_f_raw = self.sample_idx[idx][0]
-        doc_index_l_raw = self.sample_idx[idx + 1][0]
-        doc_index_f = self.doc_idx[self.sample_idx[idx][0]]
-        doc_index_l = self.doc_idx[self.sample_idx[idx + 1][0]]
+        doc_index_f = self.sample_idx[idx][0]
+        doc_index_l = self.sample_idx[idx + 1][0]
         offset_f = self.sample_idx[idx][1]
         offset_l = self.sample_idx[idx + 1][1]
         tokens = self._get_single_sample_from_idx(doc_index_f, doc_index_l,

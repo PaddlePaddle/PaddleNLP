@@ -11,52 +11,41 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+"""
+Pretrain  GPT-2 in static graph mode.
+"""
 import argparse
 import math
-import collections
-import itertools
-import logging
 import os
 import random
 import time
-import h5py
-from functools import partial
-
-os.environ['FLAGS_enable_parallel_graph'] = "0"
-os.environ['FLAGS_fraction_of_gpu_memory_to_use'] = "0.1"
-os.environ['FLAGS_sync_nccl_allreduce'] = "1"
-os.environ['FLAGS_eager_delete_tensor_gb'] = "0"
-os.environ['FLAGS_fuse_parameter_memory_size'] = "32"
-os.environ['FLAGS_fuse_parameter_groups_size'] = "50"
-os.environ['FLAGS_check_nan_inf'] = "0"
-os.environ['FLAGS_enable_sequential_execution'] = "1"
-os.environ['HOME']
-os.path.expandvars('$HOME')
-os.path.expanduser('~')
 
 import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
-from paddle.io import DataLoader, Dataset
-
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import GPT2Model, GPT2ForPretraining, GPT2PretrainingCriterion, GPT2Tokenizer, GPT2ChineseTokenizer
+from paddlenlp.transformers import GPT2Model, GPT2ForPretraining, GPT2PretrainingCriterion
+from paddlenlp.transformers import GPT2Tokenizer, GPT2ChineseTokenizer
 from paddlenlp.utils.log import logger
-from args import parse_args
-from data import GPT2Dataset
+from tensorboardX import SummaryWriter
+
+from data import create_pretrained_dataset
 import lr
+
+# os.environ['FLAGS_enable_parallel_graph'] = "0"
+# os.environ['FLAGS_fraction_of_gpu_memory_to_use'] = "0.1"
+# os.environ['FLAGS_sync_nccl_allreduce'] = "1"
+# os.environ['FLAGS_eager_delete_tensor_gb'] = "0"
+# os.environ['FLAGS_fuse_parameter_memory_size'] = "32"
+# os.environ['FLAGS_fuse_parameter_groups_size'] = "50"
+# os.environ['FLAGS_check_nan_inf'] = "0"
+# os.environ['FLAGS_enable_sequential_execution'] = "1"
+os.path.expandvars('$HOME')
+os.path.expanduser('~')
 
 MODEL_CLASSES = {
     "gpt2": (GPT2ForPretraining, GPT2Tokenizer),
     "gpt2-cn": (GPT2ForPretraining, GPT2ChineseTokenizer),
 }
-
-# mODEL_CLASSES = {
-#     "gpt2-small-en": (GPT2ForPretraining, GPT2Tokenizer),
-#     "gpt2-medium-en": (GPT2ForPretraining, GPT2Tokenizer),
-#     "gpt2-large-en": (GPT2ForPretraining, GPT2Tokenizer),
-# }
 
 
 def str2bool(v):
@@ -191,6 +180,16 @@ def parse_args():
         default=1,
         help="Log every X updates steps.")
     parser.add_argument(
+        "--eval_steps",
+        type=int,
+        default=500,
+        help="Evaluate for every X updates steps.")
+    parser.add_argument(
+        "--eval_iters",
+        type=int,
+        default=10,
+        help="Evaluate for every X updates steps.")
+    parser.add_argument(
         "--save_steps",
         type=int,
         default=500,
@@ -207,11 +206,11 @@ def parse_args():
         type=str,
         default="./data/gpt2.pdparams",
         help="select cpu, gpu, xpu devices.")
-    args = parser.parse_args()
-    return args
+    config = parser.parse_args()
+    return config
 
 
-class WorkerInitObj(object):
+class WorkerInitObj:
     def __init__(self, seed):
         self.seed = seed
 
@@ -220,7 +219,8 @@ class WorkerInitObj(object):
         random.seed(self.seed + id)
 
 
-def create_data_holder(args):
+def create_data_holder():
+    """creat data holdr"""
     tokens = paddle.static.data(name="tokens", shape=[-1, -1], dtype="int64")
     loss_mask = paddle.static.data(
         name="loss_mask", shape=[-1, -1], dtype="float32")
@@ -230,31 +230,6 @@ def create_data_holder(args):
         name="position_ids", shape=[-1, -1], dtype="int64")
     labels = paddle.static.data(name="labels", shape=[-1, -1], dtype="int64")
     return [tokens, loss_mask, attention_mask, position_ids, labels]
-
-
-def create_pretrained_dataset(args, input_path, worker_init, worker_index,
-                              worker_num, eod_id, places, data_holders):
-    print("the distributed run, worker_num:{}".format(worker_num))
-    train_data = GPT2Dataset(
-        file_path=input_path,
-        worker_index=worker_index,
-        num_samples=args.batch_size * args.max_steps * worker_num,
-        eod_id=eod_id,
-        seed=args.seed + worker_index)
-
-    train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_data, batch_size=args.batch_size, shuffle=True, drop_last=True)
-
-    train_data_loader = DataLoader(
-        dataset=train_data,
-        places=places,
-        feed_list=data_holders,
-        batch_sampler=train_batch_sampler,
-        num_workers=0,
-        worker_init_fn=worker_init,
-        collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
-        return_list=False)
-    return train_data_loader
 
 
 def create_strategy(args):
@@ -296,17 +271,15 @@ def dist_optimizer(args, optimizer, model, worker_num):
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
         }
-        """
-        dist_strategy.amp_configs = {
-            "custom_white_list": ['softmax', 'layer_norm', 'gelu'],
-            "init_loss_scaling": args.scale_loss,
-            "incr_every_n_steps": 10,
-            "decr_every_n_nan_or_inf": 1,
-            "incr_ratio": 2.0,
-            "decr_ratio": 10,
-            "use_dynamic_loss_scaling": True,
-        }
-        """
+        # dist_strategy.amp_configs = {
+        #     "custom_white_list": ['softmax', 'layer_norm', 'gelu'],
+        #     "init_loss_scaling": args.scale_loss,
+        #     "incr_every_n_steps": 10,
+        #     "decr_every_n_nan_or_inf": 1,
+        #     "incr_ratio": 2.0,
+        #     "decr_ratio": 10,
+        #     "use_dynamic_loss_scaling": True,
+        # }
     if args.use_sharding:
         dist_strategy.sharding = True
         if worker_num > 8:
@@ -370,7 +343,8 @@ def init_static_with_params(model, dygraph_params):
 
 
 def do_train(args):
-    # Initialize the paddle and paddle fleet execute enviroment
+    args.test_iters = args.eval_iters * 5
+    # Initialize the paddle and paddle fleet execute environment
     paddle.enable_static()
     assert args.select_devices in [
         "cpu", "gpu", "xpu"
@@ -384,22 +358,30 @@ def do_train(args):
     # Create the random seed for the worker
     set_seed(args, worker_index)
     worker_init = WorkerInitObj(args.seed + worker_index)
+    log_writer_path = os.path.join(
+        args.output_dir, "gpt2_bs={}_amp={}_recompute={}_card={}".format(
+            args.batch_size, args.use_amp, args.use_recompute, worker_num))
+    if os.path.exists(log_writer_path):
+        import shutil
+        shutil.rmtree(log_writer_path)
+    log_writer = SummaryWriter(log_writer_path)
 
     # Define the input data in the static mode
     main_program = paddle.static.default_main_program()
     startup_program = paddle.static.default_startup_program()
-    data_holders = create_data_holder(args)
+    data_holders = create_data_holder()
     [tokens, loss_mask, attention_mask, position_ids, labels] = data_holders
 
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     eod_id = tokenizer.command_name_map["eod"].Id
-    config = model_class.pretrained_init_configuration[args.model_name_or_path]
-    if config["vocab_size"] % 8 != 0:
-        config["vocab_size"] += 8 - (config["vocab_size"] % 8)
+    model_config = model_class.pretrained_init_configuration[
+        args.model_name_or_path]
+    if model_config["vocab_size"] % 8 != 0:
+        model_config["vocab_size"] += 8 - (model_config["vocab_size"] % 8)
 
     # create the model for the gpt model
-    model = GPT2ForPretraining(GPT2Model(**config))
+    model = GPT2ForPretraining(GPT2Model(**model_config))
     criterion = GPT2PretrainingCriterion()
     preds = model(tokens, position_ids, attention_mask)
     loss = criterion(preds, labels, loss_mask)
@@ -429,23 +411,13 @@ def do_train(args):
              if not any(nd in n for nd in ["bias", "norm"])
          ]
     )
+    # Use the fleet api to compile the distributed optimizer
+
     optimizer.apply_optimize = optimizer._apply_optimize
-    if worker_num == 1:
-        if args.use_amp:
-            amp_list = paddle.fluid.contrib.mixed_precision.AutoMixedPrecisionLists(
-                custom_white_list=['softmax', 'gelu'])
-            optimizer = paddle.fluid.contrib.mixed_precision.decorate(
-                optimizer,
-                amp_list,
-                init_loss_scaling=args.scale_loss,
-                use_dynamic_loss_scaling=True)
-        if args.use_recompute:
-            optimizer = paddle.fluid.optimizer.RecomputeOptimizer(optimizer)
-            optimizer._set_checkpoints(model.gpt2.checkpoints)
-    elif worker_num > 1:
-        # Use the fleet api to compile the distributed optimizer
-        optimizer = dist_optimizer(args, optimizer, model, worker_num)
+    optimizer = dist_optimizer(args, optimizer, model, worker_num)
     optimizer.minimize(loss)
+    logger.info("The training meta optimizer is/are %s" %
+                fleet._get_applied_meta_list())
 
     # Define the Executor for running the static model
     exe = paddle.static.Executor(place)
@@ -491,7 +463,7 @@ def do_train(args):
         random.Random(args.seed + epoch).shuffle(files)
         for f_id in range(math.ceil(len(files) / worker_num)):
             data_file = files[(f_id * worker_num + worker_index) % num_files]
-            train_data_loader = create_pretrained_dataset(
+            train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
                 args,
                 data_file,
                 worker_init,
@@ -500,6 +472,7 @@ def do_train(args):
                 eod_id=eod_id,
                 places=paddle.static.cuda_places(),
                 data_holders=data_holders)
+
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
                 loss_return, lr_return = exe.run(
@@ -508,6 +481,7 @@ def do_train(args):
                     fetch_list=[loss.name, 'learning_rate_0'])
                 # In the new 2.0 api, must call this function to change the learning_rate
                 lr_scheduler.step()
+
                 if global_step % args.logging_steps == 0:
                     if worker_index == 0:
                         logger.info(
@@ -515,13 +489,39 @@ def do_train(args):
                             % (global_step, epoch, step, loss_return[0],
                                args.logging_steps / (time.time() - tic_train),
                                lr_return[0]))
+                        log_writer.add_scalar("loss", loss_return[0],
+                                              global_step)
+                        log_writer.add_scalar("learning_rate", lr_return[0],
+                                              global_step)
                     tic_train = time.time()
 
-                # TODO and eval script
-                # if global_step % args.eval_steps == 0:
-                #     if worker_index == 0:
-                #         for step, batch in enumerate(eval_data_loader):
-                #             loss_return = exe.run(test_program, feed=batch, fetch_list=[loss.name])
+                def run_evaluate(data_loader,
+                                 program,
+                                 iter_steps,
+                                 task_name="valid"):
+                    all_loss = []
+                    local_time = time.time()
+                    for eval_step, batch in enumerate(data_loader):
+                        loss_return = exe.run(program,
+                                              feed=batch,
+                                              fetch_list=[loss.name])
+                        all_loss.append(float(loss_return[0]))
+                        if eval_step >= iter_steps:
+                            average_loss = sum(all_loss) / len(all_loss)
+                            logger.info(
+                                "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
+                                % (task_name, global_step, epoch, eval_step,
+                                   average_loss,
+                                   iter_steps / (time.time() - local_time)))
+                            log_writer.add_scalar(task_name + "_loss",
+                                                  loss_return[0], global_step)
+                            break
+
+                if global_step % args.eval_steps == 0:
+                    if worker_index == 0:
+                        run_evaluate(valid_data_loader, test_program,
+                                     args.eval_iters, "valid")
+                        tic_train = time.time()
 
                 if global_step % args.save_steps == 0:
                     if worker_index == 0:
@@ -540,7 +540,11 @@ def do_train(args):
                             ],
                             target_vars=[loss],
                             executor=exe)
+                        tic_train = time.time()
+
                 if global_step >= args.max_steps:
+                    run_evaluate(test_data_loader, test_program,
+                                 args.test_iters, "test")
                     del train_data_loader
                     return
             del train_data_loader
@@ -548,5 +552,5 @@ def do_train(args):
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    do_train(args)
+    config = parse_args()
+    do_train(config)
