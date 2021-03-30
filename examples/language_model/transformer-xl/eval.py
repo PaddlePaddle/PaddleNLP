@@ -40,7 +40,6 @@ def do_eval(args):
                 break
             ret = mem_transformer(src, target, *eval_mems)
             loss, eval_mems = ret[0], ret[1:]
-            seq_len = seq_len.numpy()
             eval_cur_loss = seq_len * loss.numpy()
             total_loss += eval_cur_loss
             total_len += seq_len
