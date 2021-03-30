@@ -1,3 +1,17 @@
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Configuration file for the Sphinx documentation builder.
 #
 # This file only contains a selection of the most common options. For a full
@@ -10,15 +24,25 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
+# sys.path.insert(0, os.path.abspath('../..'))
 
+sys.path.insert(0, os.path.abspath('../paddlenlp/'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/data'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/datasets'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/embeddings'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/layers'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/metrics'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/models'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/seq2vec'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/transformers'))
+# sys.path.insert(0, os.path.abspath('../paddlenlp/utils'))
 
 # -- Project information -----------------------------------------------------
 
 project = 'PaddleNLP'
-copyright = '2020, nlpers'
+copyright = '2021, nlpers'
 author = 'nlpers'
 
 
@@ -28,8 +52,24 @@ author = 'nlpers'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'recommonmark'
+    'sphinx_rtd_theme',
+    'recommonmark',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
+    'sphinx.ext.napoleon',
+    'sphinx_copybutton',
+    'sphinx_markdown_tables',
+    'sphinx.ext.viewcode',
+    'sphinx.ext.coverage',
+    'sphinx.ext.extlinks',
 ]
+
+autodoc_default_options = {
+    'member-order': 'bysource',
+    'undoc-members': False,
+}
+
+autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -39,18 +79,17 @@ templates_path = ['_templates']
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = 'zh_CN'
+language = None
+add_module_names = False
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
 
-
-from recommonmark.parser import CommonMarkParser
-source_parsers = {
-    '.md': CommonMarkParser,
-}
+# source_parsers = {
+#     '.md': recommonmark.parser.CommonMarkParser,
+# }
 source_suffix = ['.rst', '.md']
 
 # -- Options for HTML output -------------------------------------------------
@@ -58,16 +97,13 @@ source_suffix = ['.rst', '.md']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-#html_theme = 'alabaster'
-
-import sphinx_rtd_theme
 html_theme = "sphinx_rtd_theme"
-html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 html_theme_options = {
-    'collapse_navigation': False,
-    'display_version': False,
-    'navigation_depth': 2,
+    'collapse_navigation': True,
+    'display_version': True,
+    'navigation_depth': 5,
+    'navigation_with_keys': True,
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
