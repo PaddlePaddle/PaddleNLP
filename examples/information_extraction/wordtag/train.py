@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,77 +14,20 @@
 
 import os
 import argparse
-import pathlib
 import time
 import random
 from functools import partial
 
 import paddle
 from paddle.io import DataLoader
-import json
 import numpy as np
 from paddlenlp.utils.log import logger
-from paddlenlp.datasets import MapDataset
-from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer, LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
+from paddlenlp.data import Stack, Pad, Tuple
 
-# from .data import load_labels, WordTagDataset
-from metrics import Accuracy, AverageMeter, SequenceAccuracy
-
-paddle.set_printoptions(precision=16)
-
-
-def load_dataset(datafiles):
-    def read(data_path):
-        with open(data_path, 'r', encoding='utf-8') as fp:
-            for i, line in enumerate(fp):
-                example = json.loads(line)
-                words = example["tokens"]
-                tags = example["tags"]
-                cls_label = example["cls_label"]
-                yield words, tags, cls_label
-
-    if isinstance(datafiles, str):
-        return MapDataset(list(read(datafiles)))
-    elif isinstance(datafiles, list) or isinstance(datafiles, tuple):
-        return [MapDataset(list(read(datafile))) for datafile in datafiles]
-
-
-def load_dict(dict_path):
-    vocab = {}
-    i = 0
-    for line in open(dict_path, 'r', encoding='utf-8'):
-        vocab[line.strip()] = i
-        i += 1
-    return vocab
-
-
-def convert_example(example,
-                    tokenizer,
-                    max_seq_len,
-                    tags_to_idx,
-                    labels_to_idx,
-                    summary_num=2):
-    words, tags, cls_label = example
-    tokens = [f"[CLS{i}]" for i in range(1, summary_num)] + words
-    tokenized_input = tokenizer(
-        tokens,
-        return_length=True,
-        is_split_into_words=True,
-        max_seq_len=max_seq_len)
-    if len(tokenized_input['input_ids']) - 1 - summary_num < len(tags):
-        tags = tags[:len(tokenized_input['input_ids']) - 1 - summary_num]
-    # '[CLS]' and '[SEP]' will get label 'O'
-    tags = ['O'] * (summary_num) + tags + ['O']
-    tags += ['O'] * (len(tokenized_input['input_ids']) - len(tags))
-    tokenized_input['tags'] = [tags_to_idx[x] for x in tags]
-    tokenized_input['cls_label'] = labels_to_idx[cls_label]
-    if cls_label in ['编码/引用/列表', '外语句子', '古文/古诗句']:
-        tokenized_input['seq_len'] = summary_num
-    return tokenized_input['input_ids'], tokenized_input[
-        'token_type_ids'], tokenized_input['seq_len'], tokenized_input[
-            'tags'], tokenized_input['cls_label']
+from data import load_dataset, load_dict, convert_example
+from metric import SequenceAccuracy
 
 
 def parse_args():
@@ -113,53 +56,48 @@ def parse_args():
     return args
 
 
-def set_seed(args):
-    # Use the same data seed(for data shuffle) for all procs to guarantee data
-    # consistency after sharding.
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    # Maybe different op seeds(for dropout) for different procs is better. By:
-    # `paddle.seed(args.seed + paddle.distributed.get_rank())`
-    paddle.seed(args.seed)
+@paddle.no_grad()
+def evaluate(model, test_data_loader, labels_to_idx):
+    model.eval()
+    cls_acc = paddle.metric.Accuracy()
+    seq_acc, total_len = 0.0, 0.0
+    for batch in test_data_loader:
+        input_ids, token_type_ids, seq_len, tags, cls_label = batch
+        outputs = model(
+            input_ids,
+            token_type_ids,
+            lengths=seq_len,
+            tag_labels=tags,
+            cls_label=cls_label)
+        loss, seq_logits, cls_logits = outputs[0], outputs[1], outputs[2]
+        correct = cls_acc.compute(
+            pred=cls_logits.reshape([-1, len(labels_to_idx)]),
+            label=cls_label.reshape([-1]))
+        cls_acc.update(correct)
+        scores, pred_tags = model.viterbi_decoder(seq_logits, seq_len)
 
+        pred_cls_label = paddle.argmax(cls_logits, axis=-1, keepdim=False)
+        seq_len_np = seq_len.numpy()
+        for i, pred_tag in enumerate(pred_tags):
+            pred_tag = pred_tag[:int(seq_len_np[i])]
+            if pred_cls_label[i] != labels_to_idx["其他文本"]:
+                continue
+            total_len += float(len(pred_tag))
+            for j, tag in enumerate(pred_tag):
+                if tag == tags[i, j]:
+                    seq_acc += 1.0
 
-# @paddle.no_grad()
-# def evaluate(model, cls_acc, tr_seq_acc, test_data_loader, labels_to_idx, vit):
-#     model.eval()
-#     cls_acc.reset()
-#     seq_acc, total_len = 0.0, 0.0
-#     for batch in test_data_loader:
-#         input_ids, token_type_ids, attention_mask, tags, length, labels = batch
-#         inputs = {
-#             "input_ids": input_ids,
-#             "token_type_ids": token_type_ids,
-#             "attention_mask": attention_mask,
-#             "length": length,
-#         }
-#         outputs = model(**inputs)
-#         cls_acc(logits=outputs[0].reshape(-1, len(labels_to_idx)), target=labels.reshape(-1))
-#         pred_tags = vit(outputs[1], masks)
-#         pred_cls_label = paddle.argmax(outputs[0], dim=-1, keepdim=False)
-#         for i, pred_tag in enumerate(pred_tags):
-#             if pred_cls_label[i] != labels_to_idx["其他文本"]:
-#                 continue
-#             total_len += float(len(pred_tag[0]))
-#             for j, tag in enumerate(pred_tag[0]):
-#                 if tag == tags[i, j]:
-#                     seq_acc += 1.0
-#         tr_seq_acc.update(seq_acc, n=1)
-#         tr_seq_acc.count += total_len - 1
-#     logger.info("Classification Accuracy: %s,  Sequence Labeling Accuracy: %s"%(cls_acc.value(), tr_seq_acc.avg))
-#     tr_seq_acc.reset()
-#     cls_acc.reset()
-#     model.train()
+    logger.info(
+        "[Evaluating] Classification Accuracy: %6f,  Sequence Labeling Accuracy: %6f"
+        % (cls_acc.accumulate(), seq_acc / total_len))
+
+    model.train()
 
 
 def do_train(args):
     paddle.set_device("gpu" if args.n_gpu else "cpu")
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-    set_seed(args)
 
     train_ds, test_ds = load_dataset(datafiles=('./data/train.json',
                                                 './data/test.json'))
@@ -212,20 +150,18 @@ def do_train(args):
     num_training_steps = args.max_steps if args.max_steps > 0 else (
         len(train_data_loader) * args.num_train_epochs)
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
-    # lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-    #                                      warmup)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
+                                         warmup)
 
-    # num_train_optimization_steps = len(train_ds) / args.batch_size / \
-    #     args.gradient_accumulation_steps * args.num_train_epochs
-    # if args.local_rank != -1:
-    #     num_train_optimization_steps = num_train_optimization_steps // paddle.distributed.get_world_size()
+    num_train_optimization_steps = len(
+        train_ds) / args.batch_size * args.num_train_epochs
 
     decay_params = [
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
     optimizer = paddle.optimizer.AdamW(
-        learning_rate=args.learning_rate,  # lr_scheduler,
+        learning_rate=lr_scheduler,
         beta1=0.9,
         beta2=0.999,
         epsilon=args.adam_epsilon,
@@ -236,25 +172,16 @@ def do_train(args):
     logger.info("Total steps: %s" % num_training_steps)
     logger.info("WarmUp steps: %s" % warmup)
 
-    # tr_cls_loss = AverageMeter()
-    # tr_seq_loss = AverageMeter()
-    # tr_seq_acc = AverageMeter()
-    # tr_crf_loss = AverageMeter()
-    tr_loss = AverageMeter()
-    cls_acc = Accuracy(top_k=1)
+    cls_acc = paddle.metric.Accuracy()
     seq_acc = SequenceAccuracy()
+    total_loss = 0
 
     global_step = 0
 
-    train_logs = dict()
-    # model.eval()
     for epoch in range(1, args.num_train_epochs + 1):
         logger.info(f"Epoch {epoch} beginnig")
-        total_score = 0.0
-        # model.train()
         start_time = time.time()
 
-        # import pdb; pdb.set_trace()
         for total_step, batch in enumerate(train_data_loader):
             global_step += 1
             input_ids, token_type_ids, seq_len, tags, cls_label = batch
@@ -265,79 +192,49 @@ def do_train(args):
                 lengths=seq_len,
                 tag_labels=tags,
                 cls_label=cls_label)
-            # exit()
-            total_loss, seq_logits, cls_logits = outputs[0], outputs[
-                1], outputs[2]
-            # total_loss = cls_loss + seq_loss + crf_loss
-            # total_score += total_loss.item()
-            # if args.n_gpu > 1:
-            total_loss = total_loss.mean()
-            # if args.gradient_accumulation_steps > 1:
-            #     total_loss = total_loss / args.gradient_accumulation_steps
-            total_loss.backward()
+            loss, seq_logits, cls_logits = outputs[0], outputs[1], outputs[2]
+            loss = loss.mean()
+            total_loss += loss
+            loss.backward()
 
-            print(total_loss.gradient().sum())
-            import pdb
-            pdb.set_trace()
-
-            # crf_loss.backward()
-
-            # tr_cls_loss.update(cls_loss.item(), n=1)
-            # tr_seq_loss.update(seq_loss.item(), n=1)
-            # tr_crf_loss.update(crf_loss.item(), n=1)
-            tr_loss.update(total_loss.numpy(), n=1)
-            # seq_acc = SequenceAccuracy()
-
-            # if (total_step + 1) % args.gradient_accumulation_steps == 0:
             optimizer.step()
             optimizer.clear_grad()
-            # model.zero_grad()
-            # lr_scheduler.step()
+            lr_scheduler.step()
 
-            # import pdb; pdb.set_trace()
-            cls_acc(
-                logits=cls_logits.reshape([-1, len(labels_to_idx)]),
-                target=cls_label.reshape([-1]))
-            seq_acc(
-                logits=seq_logits.reshape([-1, len(tags_to_idx)]),
-                target=tags.reshape([-1]),
+            cls_correct = cls_acc.compute(
+                pred=cls_logits.reshape([-1, len(labels_to_idx)]),
+                label=cls_label.reshape([-1]))
+            cls_acc.update(cls_correct)
+            seq_correct = seq_acc.compute(
+                pred=seq_logits.reshape([-1, len(tags_to_idx)]),
+                label=tags.reshape([-1]),
                 ignore_index=tags_to_idx["O"])
+            seq_acc.update(seq_correct)
 
             if global_step % args.logging_steps == 0 and global_step != 0:
-                # valid_step = False
                 end_time = time.time()
-                train_logs["loss"] = tr_loss.avg
-                train_logs["Classification Accuracy"] = cls_acc.value()
-                train_logs["Sequence Labeling Accuracy"] = seq_acc.value()
-                # train_logs["Classification loss"] = tr_cls_loss.avg
-                # train_logs["Sequence Labeling loss"] = tr_seq_loss.avg
-                # train_logs["CRF likelihood"] = tr_crf_loss.avg
-                train_logs["speed"] = (float(args.logging_steps) /
-                                       (end_time - start_time))
-                logger.info("[Training]["
-                            "%s/%s][%s/%s]" % (epoch, args.num_train_epochs,
-                                               global_step, num_training_steps)
-                            + " - ".join(f"{key}: {value:g} "
-                                         for key, value in train_logs.items()))
+                speed = float(args.logging_steps) / (end_time - start_time)
+                logger.info(
+                    "[Training]["
+                    "epoch: %s/%s][step: %s/%s] loss: %6f, Classification Accuracy: %6f, Sequence Labeling Accuracy: %6f, speed: %6f"
+                    % (epoch, args.num_train_epochs, global_step,
+                       num_training_steps, total_loss / args.logging_steps,
+                       cls_acc.accumulate(), seq_acc.accumulate(), speed))
                 start_time = time.time()
-                # tr_seq_loss.reset()
-                # tr_cls_loss.reset()
-                tr_loss.reset()
-                # tr_crf_loss.reset()
                 cls_acc.reset()
                 seq_acc.reset()
-                total_score = 0.0
+                total_loss = 0
 
             if (global_step % args.save_steps == 0 or
                     global_step == num_training_steps) and (
                         (not args.n_gpu > 1) or
                         paddle.distributed.get_rank() == 0):
+                evaluate(model, test_data_loader, labels_to_idx)
                 output_dir = os.path.join(args.output_dir,
                                           "ernie_ctm_ft_model_%d.pdparams" %
                                           (global_step))
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
-                # Need better way to get inner model of DataParallel
                 model_to_save = model._layers if isinstance(
                     model, paddle.DataParallel) else model
                 model_to_save.save_pretrained(output_dir)

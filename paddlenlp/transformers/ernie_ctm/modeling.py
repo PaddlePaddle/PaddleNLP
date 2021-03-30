@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ class ErnieCtmEmbeddings(Layer):
 
         embeddings = input_embedings + token_type_embeddings + position_embeddings
 
-        # embeddings = self.layer_norm(embeddings)
+        embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
 
         return embeddings
@@ -96,8 +96,8 @@ class ErnieCtmPretrainedModel(PretrainedModel):
             "num_hidden_layers": 12,
             "num_attention_heads": 12,
             "intermediate_size": 3072,
-            "hidden_dropout_prob": 0,  #0.1,
-            "attention_probs_dropout_prob": 0,  #0.1,
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
             "max_position_embeddings": 512,
             "type_vocab_size": 2,
             "initializer_range": 0.02,
@@ -110,7 +110,7 @@ class ErnieCtmPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-ctm":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bert-base-uncased.pdparams"
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm_base.pdparams"
         }
     }
     base_model_prefix = "ernie_ctm"
@@ -163,7 +163,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             padding_idx=pad_token_id)
         self.embedding_hidden_mapping_in = nn.Linear(embedding_size,
                                                      hidden_size)
-        encoder_layer = nn.TransformerEncoderLayer(  # 对齐以后，重新打开其中的layernorm
+        encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
             intermediate_size,
@@ -241,19 +241,16 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
     """Wordtag task model.
     """
 
-    def __init__(
-            self,
-            ernie_ctm,
-            num_tag,
-            num_cls_label,
-            # classifier_dropout=0.1,
-            crf_lr=100,
-            ignore_index=0):
+    def __init__(self,
+                 ernie_ctm,
+                 num_tag,
+                 num_cls_label,
+                 crf_lr=100,
+                 ignore_index=0):
         super(ErnieCtmWordtagModel, self).__init__()
         self.num_tag = num_tag
         self.num_cls_label = num_cls_label
         self.ernie_ctm = ernie_ctm
-        # self.dropout = classifier_dropout
         self.tag_classifier = nn.Linear(self.ernie_ctm.config["hidden_size"],
                                         self.num_tag)
         self.sent_classifier = nn.Linear(self.ernie_ctm.config["hidden_size"],
@@ -281,23 +278,19 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
             token_type_ids=token_type_ids,
             position_ids=position_ids, )
         sequence_output, pooled_output = outputs[0], outputs[1]
-        self.sequence_output = sequence_output
-        self.pooled_output = pooled_output
+        sequence_output = sequence_output
+        pooled_output = pooled_output
 
-        # sequence_output, pooled_output = self.dropout(sequence_output), self.dropout(pooled_output)
         cls_logits = self.sent_classifier(pooled_output)
 
         seq_logits = self.tag_classifier(sequence_output)
-        self.seq_logits = seq_logits
+        seq_logits = seq_logits
 
         total_loss = None
         if tag_labels is not None and cls_label is not None:
             loss_fct = nn.loss.CrossEntropyLoss(ignore_index=self.ignore_index)
             cls_loss = loss_fct(cls_logits, cls_label.reshape([-1]))
             seq_crf_loss = self.crf_loss(seq_logits, lengths, None, tag_labels)
-            import pdb
-            pdb.set_trace()
-            self.seq_crf_loss = seq_crf_loss
             total_loss = cls_loss + seq_crf_loss
             return total_loss, seq_logits, cls_logits
         else:
