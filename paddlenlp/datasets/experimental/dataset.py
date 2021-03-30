@@ -18,6 +18,7 @@ import math
 import os
 import warnings
 import sys
+import itertools
 
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset
@@ -207,7 +208,8 @@ class IterDataset(IterableDataset):
 
     def __iter__(self):
         num_samples = 0
-        for example in self.data():
+        self.data, data = itertools.tee(self.data)
+        for example in data:
             if (not self._filter_pipline or
                     self._filter(self._filter_pipline)) and self._shard_filter(
                         num_samples=num_samples):
@@ -378,7 +380,9 @@ class DatasetBuilder:
                         yield example
 
             return IterDataset(
-                generate_examples, label_list=label_list, vocab_info=vocab_info)
+                generate_examples(),
+                label_list=label_list,
+                vocab_info=vocab_info)
         else:
             examples = self._read(
                 filename,

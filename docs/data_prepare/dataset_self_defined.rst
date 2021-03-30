@@ -17,14 +17,19 @@
 
     def read(data_path):
         with open(data_path, 'r', encoding='utf-8') as f:
-            for line in f.readlines():
+            # 跳过列名
+            next(f)
+            for line in f():
                 words, labels = line.strip('\n').split('\t')
                 words = words.split('\002')
                 labels = labels.split('\002')
                 yield {'tokens': words, 'labels': labels}
     
-    map_ds = MapDataset(list(read(data_path))) # 创建为Map-style Dataset
-    iter_ds = IterDataset(read(data_path))     # 创建为Iterable Dataset
+    # MapDataset需要__getitem__()方法和__len__()方法，需要将生成器转为list
+    map_ds = MapDataset(list(read(data_path))) 
+
+    # IterDataset需要__iter__()方法，生成器满足需求
+    iter_ds = IterDataset(read(data_path))
 
 我们推荐将数据读取代码写成生成器(generator)的形式，这样可以更好的构建 :class:`MapDataset` 和 :class:`IterDataset` 两种数据集。同时我们也推荐将单条数据写成字典的格式，这样可以更方便的监测数据流向。
 
