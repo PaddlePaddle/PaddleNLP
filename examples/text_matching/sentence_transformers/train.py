@@ -41,7 +41,7 @@ parser.add_argument("--epochs", default=3, type=int, help="Total number of train
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument("--n_gpu", type=int, default=1, help="Number of GPUs to use, 0 for CPU.")
+parser.add_argument("--device", type=str, default="gpu", help="Which device do you wanna use to training, CPU or CPU?")
 args = parser.parse_args()
 # yapf: enable
 
@@ -159,11 +159,11 @@ def create_dataloader(dataset,
 
 
 def do_train():
-    set_seed(args.seed)
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
-    world_size = paddle.distributed.get_world_size()
-    if world_size > 1:
+    paddle.set_device(args.device)
+    if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
+
+    set_seed(args.seed)
 
     train_ds, dev_ds, test_ds = load_dataset(
         "lcqmc", splits=["train", "dev", "test"])
@@ -279,7 +279,4 @@ def do_train():
 
 
 if __name__ == "__main__":
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(do_train, nprocs=args.n_gpu)
-    else:
-        do_train()
+    do_train()

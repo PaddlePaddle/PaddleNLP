@@ -61,7 +61,7 @@ parser.add_argument("--checkpoints", type=str, default=None, help="Directory to 
 parser.add_argument("--init_ckpt", type=str, default=None, help="already pretraining model checkpoint")
 parser.add_argument("--predict_save_path", type=str, default=None, help="predict data save path")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument("--n_gpu", type=int, default=1, help="Number of GPUs to use, 0 for CPU.")
+parser.add_argument("--device", type=str, default="gpu", help="Which device do you wanna use to training, CPU or CPU?")
 args = parser.parse_args()
 # yapf: enable.
 
@@ -178,13 +178,12 @@ def data_2_examples(datas):
 
 
 def do_train():
-    set_seed(args.seed)
-    paddle.set_device("gpu" if args.n_gpu  else "cpu")
-
+    paddle.set_device(args.device)
     world_size = paddle.distributed.get_world_size()
     if world_size > 1:
         paddle.distributed.init_parallel_env()
 
+    set_seed(args.seed)
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
 
@@ -261,7 +260,7 @@ def do_train():
 
 def do_predict():
     set_seed(args.seed)
-    paddle.set_device("gpu" if args.n_gpu  else "cpu")
+    paddle.set_device(args.device)
 
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
@@ -326,9 +325,14 @@ def do_predict():
 
 if __name__ == '__main__':
 
-    if args.n_gpu > 1 and args.do_train:
-        paddle.distributed.spawn(do_train, nprocs=args.n_gpu)
-    elif args.do_train:
+    if args.do_train:
         do_train()
-    elif args.do_predict:
+    elif args.do_predict():
         do_predict()
+
+    # if args.n_gpu > 1 and args.do_train:
+    #     paddle.distributed.spawn(do_train, nprocs=args.n_gpu)
+    # elif args.do_train:
+    #     do_train()
+    # elif args.do_predict:
+    #     do_predict()
