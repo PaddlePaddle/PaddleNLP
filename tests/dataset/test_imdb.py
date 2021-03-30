@@ -18,6 +18,7 @@ import unittest
 from paddlenlp.datasets import Imdb
 
 from common_test import CpuCommonTest
+import util
 
 
 class TestImdbTrainSet(CpuCommonTest):
@@ -65,6 +66,6 @@ class TestImdbWrongMode(CpuCommonTest):
         # valid mode is 'train' and 'test', wrong mode would raise an error
         self.config['mode'] = 'wrong'
 
-    @CpuCommonTest.assert_raises
+    @util.assert_raises
     def test_wrong_set(self):
         Imdb(**self.config)

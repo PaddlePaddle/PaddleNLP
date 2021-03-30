@@ -17,6 +17,7 @@ import unittest
 from paddlenlp.datasets import load_dataset
 
 from common_test import CpuCommonTest
+import util
 
 
 def get_examples(mode='train'):
@@ -90,6 +91,6 @@ class TestImdbNoSplitDataFiles(CpuCommonTest):
     def setUp(self):
         self.config['path'] = 'imdb'
 
-    @CpuCommonTest.assert_raises
+    @util.assert_raises
     def test_no_split_datafiles(self):
         load_dataset(**self.config)

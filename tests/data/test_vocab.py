@@ -18,6 +18,7 @@ import os
 from paddlenlp.data import Vocab
 from common_test import CpuCommonTest
 from collections import Counter
+import util
 
 
 class TestVocab(CpuCommonTest):
@@ -34,33 +35,33 @@ class TestVocab(CpuCommonTest):
     def setUp(self):
         self.create_counter()
 
-    @CpuCommonTest.assert_raises(ValueError)
+    @util.assert_raises(ValueError)
     def test_invalid_specail_token(self):
         Vocab(wrong_kwarg='')
 
-    @CpuCommonTest.assert_raises(ValueError)
+    @util.assert_raises(ValueError)
     def test_invalid_identifier(self):
         Vocab(counter=self.counter, _special_token='')
 
-    @CpuCommonTest.assert_raises(ValueError)
+    @util.assert_raises(ValueError)
     def test_sort_index_value_error1(self):
         token_to_idx = {'一万七千多': 1, '一万七千余': 2, 'IP地址': 3}
         vocab = Vocab(
             counter=self.counter, unk_token='[UNK]', token_to_idx=token_to_idx)
 
-    @CpuCommonTest.assert_raises(ValueError)
+    @util.assert_raises(ValueError)
     def test_sort_index_value_error2(self):
         token_to_idx = {'一万七千多': 1, '一万七千余': 2, '一万七千': 2}
         Vocab(
             counter=self.counter, unk_token='[UNK]', token_to_idx=token_to_idx)
 
-    @CpuCommonTest.assert_raises(ValueError)
+    @util.assert_raises(ValueError)
     def test_sort_index_value_error3(self):
         token_to_idx = {'一万七千多': -1, '一万七千余': 2, '一万七千': 3}
         Vocab(
             counter=self.counter, unk_token='[UNK]', token_to_idx=token_to_idx)
 
-    @CpuCommonTest.assert_raises(ValueError)
+    @util.assert_raises(ValueError)
     def test_to_token_excess_size(self):
         token_to_idx = {'一万七千多': 1, '一万七千余': 2, '一万万': 3}
         vocab = Vocab(

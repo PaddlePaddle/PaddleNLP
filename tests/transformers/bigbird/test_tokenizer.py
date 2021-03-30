@@ -18,6 +18,7 @@ import unittest
 from paddlenlp.transformers import BigBirdTokenizer
 
 from common_test import CpuCommonTest
+import util
 
 
 class TestBigBirdTokenizer(CpuCommonTest):
@@ -90,7 +91,7 @@ class TestBigBirdTokenizerGetInputIdsValueError(TestBigBirdTokenizer):
     def set_text(self):
         self.text = dict()
 
-    @CpuCommonTest.assert_raises(ValueError)
+    @util.assert_raises(ValueError)
     def test_tokenize(self):
         super().test_tokenize()
 
@@ -147,7 +148,7 @@ class TestBigBirdTokenizerUnusaulText(CpuCommonTest):
 
 
 class TestBigBirdTokenizerNotExistFile(CpuCommonTest):
-    @CpuCommonTest.assert_raises(ValueError)
+    @util.assert_raises(ValueError)
     def test_not_exist_file(self):
         self.tokenizer = BigBirdTokenizer(sentencepiece_model_file='')
 

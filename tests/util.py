@@ -62,3 +62,14 @@ def softmax_with_cross_entropy(logits,
                                ignore_index=-1):
     softmax = np.apply_along_axis(stable_softmax, -1, logits)
     return cross_entropy(softmax, label, soft_label, axis, ignore_index)
+
+
+def assert_raises(Error=AssertionError):
+    def assert_raises_error(func):
+        def wrapper(self, *args, **kwargs):
+            with self.assertRaises(Error):
+                func(self, *args, **kwargs)
+
+        return wrapper
+
+    return assert_raises_error

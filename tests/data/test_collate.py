@@ -16,6 +16,7 @@ import numpy as np
 
 from paddlenlp.data import Stack, Pad, Tuple, Dict
 from common_test import CpuCommonTest
+import util
 
 
 class TestStack(CpuCommonTest):
@@ -85,7 +86,7 @@ class TestTuple(CpuCommonTest):
     def test_tuple_list(self):
         self._test_impl(False)
 
-    @CpuCommonTest.assert_raises
+    @util.assert_raises
     def test_empty_fn(self):
         Tuple([Stack()], Pad(axis=0, pad_val=0))
 
