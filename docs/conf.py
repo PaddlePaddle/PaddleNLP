@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.abspath('../paddlenlp/'))
 project = 'PaddleNLP'
 copyright = '2021, nlpers'
 author = 'nlpers'
-
+default_role = 'py:obj'
 
 # -- General configuration ---------------------------------------------------
 
