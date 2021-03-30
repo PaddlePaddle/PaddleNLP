@@ -66,7 +66,9 @@ paddlenlp内置的 :class:`paddlenlp.datasets.MapDataset` 的 :func:`map` 方法
                        #                     0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                        #  'label': [1]}
 
-可以看到，数据集中的文本数据已经被处理成了模型可以接受的 *feature* 。:func:`map` 方法有一个重要的参数 :attr:`batched`，当设置为 :obj:`True` 时（默认为 :obj:`False` ），数据处理函数 :func:`trans_func` 的输入不再是单条数据，而是数据集的所有数据：
+可以看到，数据集中的文本数据已经被处理成了模型可以接受的 *feature* 。
+
+:func:`map` 方法有一个重要的参数 :attr:`batched`，当设置为 :obj:`True` 时（默认为 :obj:`False` ），数据处理函数 :func:`trans_func` 的输入不再是单条数据，而是数据集的所有数据：
 
 .. code-block::
 
@@ -83,7 +85,7 @@ paddlenlp内置的 :class:`paddlenlp.datasets.MapDataset` 的 :func:`map` 方法
     
     from functools import partial
 
-    trans_func = partial(convert_example, tokenizer=tokenizer)
+    trans_func = partial(convert_examples, tokenizer=tokenizer)
     
     train_ds.map(trans_func, batched=True)
     print(train_ds[0]) # {'input_ids': [101, 1599, 3614, 2802, 5074, 4413, 4638, 4511, 4495, 
