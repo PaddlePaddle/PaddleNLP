@@ -2,14 +2,39 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.io import Dataset, DataLoader
+import paddle.distributed as dist
 
+import os
 import re
+import argparse
 import numpy as np
 from typing import List
 from sklearn.model_selection import train_test_split
 
 from dataset import load_vocab
-from elmo import ELMoEmbedder, get_elmo_layer
+from elmo import get_elmo_layer
+
+
+# yapf: disable
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--data_dir", type=str, default="./sentence-polarity-dataset-v1/", help="Specify the data dir.")
+    parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
+    parser.add_argument("--logging_step", type=int, default=10, help="The frequency, in number of steps, the training logs are printed. (default: %(default)d)")
+    parser.add_argument("--epochs", type=int, default=20, help="Total number of training epochs to perform.")
+    parser.add_argument("--batch_size", type=int, default=64, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--dropout", type=float, default=0.5, help="The dropout rate.")
+    parser.add_argument("--lr", type=float, default=0.001, help="The initial learning rate.")
+    parser.add_argument("--weight_decay", type=float, default=0.0001, help="The weight decay for optimizer.")
+    parser.add_argument("--seed", type=int, default=2020, help="Random seed.")
+    parser.add_argument("--max_seq_len", type=int, default=256, help='max grad norm')
+    parser.add_argument("--sent_embedding_dim", type=int, default=64, help="The size of sentence embedding.")
+    parser.add_argument("--num_classes", type=int, default=2, help="The num of classification classes.")
+    parser.add_argument("--device", type=str, default="gpu", help="Device for selecting for the training.")
+
+    args = parser.parse_args()
+    return args
+# yapf: enable
 
 
 def clean_str(string):
@@ -59,14 +84,15 @@ def load_data_and_labels(positive_data_file, negative_data_file):
 
 
 class ELMoBowTextClassification(nn.Layer):
-    def __init__(self, params_file, batch_size, sent_embedding_dim, num_labels):
+    def __init__(self, params_file, batch_size, sent_embedding_dim, dropout,
+                 num_labels):
         super(ELMoBowTextClassification, self).__init__()
 
         self._elmo = get_elmo_layer(params_file, batch_size, trainable=True)
         word_embedding_dim = self._elmo.embedding_dim
         self._fc1 = nn.Linear(word_embedding_dim, sent_embedding_dim)
         self._fc2 = nn.Linear(sent_embedding_dim, num_labels)
-        self._dropout = nn.Dropout(p=0.5)
+        self._dropout = nn.Dropout(p=dropout)
 
     def forward(self, inputs):
         """
@@ -165,53 +191,53 @@ def generate_batch(batch):
     return new_batch_ids, new_batch_ids_reverse, new_batch_label
 
 
-def example_of_using_ELMo_as_finetune(params_file):
-    paddle.disable_static()
+def finetune(args):
+    paddle.set_device(args.device)
+    if dist.get_world_size() > 1:
+        dist.init_parallel_env()
 
-    batch_size = 64
-    max_seq_len = 256
-    epochs = 20
-    lr = 0.001
-    weight_decay = 0.0001
-    sent_embedding_dim = 64
-    num_labels = 2
-
-    pos_file = './sentence-polarity-dataset-v1/rt-polarity.pos'
-    neg_file = './sentence-polarity-dataset-v1/rt-polarity.neg'
+    pos_file = os.path.join(args.data_dir, 'rt-polarity.pos')
+    neg_file = os.path.join(args.data_dir, 'rt-polarity.neg')
     x_text, y = load_data_and_labels(pos_file, neg_file)
     x_train, x_test, y_train, y_test = train_test_split(
-        x_text, y, test_size=0.1, random_state=1)
+        x_text, y, test_size=0.1, random_state=args.seed)
 
-    model = ELMoBowTextClassification(params_file, batch_size,
-                                      sent_embedding_dim, num_labels)
+    if not args.init_from_ckpt:
+        raise ValueError('`init_from_ckpt` should be set.')
+    model = ELMoBowTextClassification(args.init_from_ckpt, args.batch_size,
+                                      args.sent_embedding_dim, args.dropout,
+                                      args.num_classes)
+    if dist.get_world_size() > 1:
+        model = paddle.DataParallel(model)
     model.train()
 
     adam = paddle.optimizer.Adam(
         parameters=model.parameters(),
-        learning_rate=lr,
-        weight_decay=weight_decay)
+        learning_rate=args.lr,
+        weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss()
 
     vocab = load_vocab()
 
     train_dataset = SentencePolarityDatasetV1(x_train, y_train, vocab,
-                                              max_seq_len)
-    test_dataset = SentencePolarityDatasetV1(x_test, y_test, vocab, max_seq_len)
+                                              args.max_seq_len)
+    test_dataset = SentencePolarityDatasetV1(x_test, y_test, vocab,
+                                             args.max_seq_len)
     train_loader = DataLoader(
         train_dataset,
-        batch_size=batch_size,
+        batch_size=args.batch_size,
         return_list=True,
         shuffle=True,
         collate_fn=lambda batch: generate_batch(batch))
     test_loader = DataLoader(
         test_dataset,
-        batch_size=batch_size,
+        batch_size=args.batch_size,
         return_list=True,
         shuffle=False,
         collate_fn=lambda batch: generate_batch(batch))
 
-    for epoch in range(epochs):
-        print('Epoch {}/{}'.format(epoch + 1, epochs))
+    for epoch in range(args.epochs):
+        print('Epoch {}/{}'.format(epoch + 1, args.epochs))
         for step, batch_data in enumerate(train_loader, start=1):
             ids, ids_reverse, label = batch_data
 
@@ -221,51 +247,32 @@ def example_of_using_ELMo_as_finetune(params_file):
             adam.step()
             adam.clear_grad()
 
-            if step % 10 == 0:
+            if step % args.logging_step == 0:
                 print('step {}, loss {}'.format(step, loss.numpy()[0]))
 
     acc = test(model, test_loader)
     print('\ntest acc {}\n'.format(acc))
 
 
+@paddle.no_grad()
 def test(model, test_loader):
     correct = num = 0
     model.eval()
-    with paddle.no_grad():
-        for batch_data in test_loader:
-            ids, ids_reverse, label = batch_data
+    for batch_data in test_loader:
+        ids, ids_reverse, label = batch_data
 
-            # [batch_size, 2]
-            output = model((ids, ids_reverse))
+        # [batch_size, 2]
+        output = model((ids, ids_reverse))
 
-            num += label.shape[0]
-            predict = paddle.argmax(output, axis=1)
-            label = paddle.cast(label, dtype=predict.dtype)
-            correct += paddle.sum(
-                paddle.cast(
-                    predict == label, dtype='int64')).numpy()[0]
+        num += label.shape[0]
+        predict = paddle.argmax(output, axis=1)
+        label = paddle.cast(label, dtype=predict.dtype)
+        correct += paddle.sum(paddle.cast(
+            predict == label, dtype='int64')).numpy()[0]
     model.train()
     return correct * 1.0 / num
 
 
-def example_of_using_ELMo_as_embedder(params_file):
-    embedder = ELMoEmbedder(params_file)
-
-    sentences = [['The', 'first', 'sentence', '.'], ['Second', 'one', '.']]
-
-    embeddings = embedder.encoder(sentences)
-    print(len(embeddings))
-    for i, (text, emb) in enumerate(zip(sentences, embeddings)):
-        print('\ni = ' + str(i))
-        print(text)
-        print(emb.shape)
-
-
 if __name__ == '__main__':
-    from args import parse_args
     args = parse_args()
-    if not args.init_from_ckpt:
-        raise ValueError('init_from_ckpt should be set.')
-
-    #example_of_using_ELMo_as_embedder(args.init_from_ckpt)
-    example_of_using_ELMo_as_finetune(args.init_from_ckpt)
+    finetune(args)
