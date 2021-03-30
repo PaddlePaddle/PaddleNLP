@@ -1,4 +1,4 @@
-data
+paddlenlp.data
 ======================
 
 .. automodule:: paddlenlp.data
