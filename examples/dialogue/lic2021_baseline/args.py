@@ -13,7 +13,6 @@ def parse_args():
     parser.add_argument('--logging_steps', type=int, default=500, help='Log every X updates steps.')
     parser.add_argument('--save_steps', type=int, default=8000, help='Save checkpoint every X updates steps.')
     parser.add_argument('--seed', type=int, default=2021, help='Random seed for initialization.')
-    parser.add_argument('--n_gpus', type=int, default=1, help='The number of gpus to use, 0 for cpu.')
     parser.add_argument('--batch_size', type=int, default=8192, required=True, help='Batch size per GPU/CPU for training.')
     parser.add_argument('--lr', type=float, default=1e-5, help='The initial learning rate.')
     parser.add_argument('--weight_decay', type=float, default=0.01, help='The weight decay for optimizer.')
@@ -31,6 +30,7 @@ def parse_args():
     parser.add_argument('--num_beams', type=int, default=0, help='The number of beams for beam search.')
     parser.add_argument('--length_penalty', type=float, default=1.0, help='The exponential penalty to the sequence length for beam search.')
     parser.add_argument('--early_stopping', type=eval, default=False, help='Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.')
+    parser.add_argument('--device', type=str, default='gpu', help='Device for selecting for the training.')
 
     args = parser.parse_args()
     return args

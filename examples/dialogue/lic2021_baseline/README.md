@@ -21,6 +21,7 @@ UnifiedTransformer模型的细节可以[参阅论文](https://arxiv.org/abs/2006
 ### 数据准备
 
 由于样例数据涉及LIC 2021对话比赛，暂不开放。
+关于数据集及数据集的预处理过程，详见[2021语言与智能技术竞赛：多技能对话](https://aistudio.baidu.com/aistudio/competition/detail/67)及官方提供的基线系统Baselines。
 
 模型的输入由3部分组成：词向量token_ids，句向量token_type_ids和位置向量position_ids。本项目的数据集是样例文本经过数据预处理脚本得到的id化的数据集。数据的每一行由3列组成，以";"作为分割符，格式：token_ids;token_type_ids;position_ids。具体细节请参考`data.py`。
 
@@ -29,10 +30,9 @@ UnifiedTransformer模型的细节可以[参阅论文](https://arxiv.org/abs/2006
 运行如下命令即可在样例训练集上进行finetune，并在样例验证集上进行验证
 
 ```shell
-export CUDA_VISIBLE_DEVICES=0
-# GPU启动，参数`n_gpus`指定训练所用的GPU数量，可以是单卡，也可以多卡，默认是单卡
-python -u finetune.py \
-    --n_gpus=1 \
+# GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" --log_dir ./log finetune.py \
     --model_name_or_path=unified_transformer-12L-cn \
     --train_data_path=./datasets/train.txt \
     --valid_data_path=./datasets/valid.txt \
@@ -46,11 +46,12 @@ python -u finetune.py \
     --weight_decay=0.01 \
     --warmup_steps=4000 \
     --max_grad_norm=0.1 \
-    --sort_pool_size=65536
+    --sort_pool_size=65536 \
+    --device=gpu
 ```
 
 其中参数释义如下：
-- `n_gpus` 表示使用的GPU卡数。若希望使用多卡训练，将其设置为指定数目即可,最大数量不能超过环境变量CUDA_VISIBLE_DEVICES配置的GPU个数；若为0，则使用CPU。
+- `gpus` 指示了训练所用的GPU卡号。
 - `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
 
    | PaddleNLP提供的预训练模型        |
@@ -71,6 +72,7 @@ python -u finetune.py \
 - `warmup_steps` 表示学习率逐渐升高到基础学习率（即上面配置的lr）所需要的迭代数，最早的使用可以参考[这篇论文](https://arxiv.org/pdf/1706.02677.pdf)。
 - `max_grad_norm` 表示梯度裁剪允许的最大梯度值。
 - `sort_pool_size` 表示在构建batch数据时，用来排序的pool size。
+- `device` 表示训练使用的设备。
 
 参数详情和参数的默认值请参考`args.py`。
 
@@ -95,8 +97,8 @@ python -u finetune.py \
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-# GPU启动，n_gpu指定训练所用的GPU数量，预测仅支持单卡
-python -u infer.py \
+# GPU启动，预测仅支持单卡
+python infer.py \
     --model_name_or_path=./checkpoints/model_80000 \
     --test_data_path=./datasets/test.txt \
     --output_path=./predict.txt \
@@ -107,7 +109,8 @@ python -u infer.py \
     --max_dec_len=64 \
     --num_samples=20 \
     --decode_strategy=sampling \
-    --top_k=5
+    --top_k=5 \
+    --device=gpu
 ```
 
 其中参数释义如下：
@@ -128,6 +131,7 @@ python -u infer.py \
 - `num_samples` 表示每条样本生成的句子的数量。对于每条样本，模型会生成`num_samples`个句子，根据每个句子的概率得分进行排序，得分最高的句子作为最终的生成结果。
 - `decode_strategy` 表示预测解码时采取的策略，可选"sampling"、"greedy_search"和"beam_search"之一。
 - `top_k` 表示采用"sampling"解码策略时，token的概率按从大到小排序，生成的token只从前`top_k`个中进行采样。
+- `device` 表示训练使用的设备。
 
 参数详情和参数的默认值请参考`args.py`。
 

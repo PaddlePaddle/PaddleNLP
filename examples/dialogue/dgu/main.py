@@ -106,13 +106,13 @@ def print_logs(args, step, logits, labels, loss, total_time, metric):
               (step, loss, f1_micro, total_time / args.logging_steps))
 
 
-def train(args, model, train_data_loader, dev_data_loader, metric, rank):
-    num_examples = len(train_data_loader) * args.batch_size * args.n_gpu
+def train(args, model, train_data_loader, dev_data_loader, metric, n_procs,
+          rank):
+    num_examples = len(train_data_loader) * args.batch_size * n_procs
     max_train_steps = args.epochs * len(train_data_loader)
-    if rank == 0:
-        print("Num train examples: %d" % num_examples)
-        print("Max train steps: %d" % max_train_steps)
-        print("Warmup proportion: %d" % args.warmup_proportion)
+    print("\nNum train examples: %d" % num_examples)
+    print("Max train steps: %d" % max_train_steps)
+    print("Warmup proportion: %.2f" % args.warmup_proportion)
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, max_train_steps,
                                          args.warmup_proportion)
@@ -137,8 +137,7 @@ def train(args, model, train_data_loader, dev_data_loader, metric, rank):
     best_metric = 0.0
     total_time = 0.0
     for epoch in range(args.epochs):
-        if rank == 0:
-            print('\nEpoch %d/%d' % (epoch + 1, args.epochs))
+        print('\nEpoch %d/%d' % (epoch + 1, args.epochs))
         batch_start_time = time.time()
         for batch in train_data_loader:
             step += 1
@@ -150,21 +149,20 @@ def train(args, model, train_data_loader, dev_data_loader, metric, rank):
             lr_scheduler.step()
             optimizer.clear_grad()
             total_time += (time.time() - batch_start_time)
-            if rank == 0:
-                if step % args.logging_steps == 0:
-                    print_logs(args, step, logits, labels, loss, total_time,
-                               metric)
-                    total_time = 0.0
-                if step % args.save_steps == 0 or step == max_train_steps:
+            if step % args.logging_steps == 0:
+                print_logs(args, step, logits, labels, loss, total_time, metric)
+                total_time = 0.0
+            if step % args.save_steps == 0 or step == max_train_steps:
+                if rank == 0:
                     save_ckpt(model, optimizer, args.output_dir, step)
-                    if args.do_eval:
-                        print('\nEval begin...')
-                        metric_out = evaluation(args, model, dev_data_loader,
-                                                metric)
-                        if metric_out > best_metric:
-                            best_metric = metric_out
-                            save_ckpt(model, optimizer, args.output_dir, 'best')
-                            print('Best model, step: %d\n' % step)
+                if args.do_eval:
+                    print('\nEval begin...')
+                    metric_out = evaluation(args, model, dev_data_loader,
+                                            metric)
+                    if rank == 0 and metric_out > best_metric:
+                        best_metric = metric_out
+                        save_ckpt(model, optimizer, args.output_dir, 'best')
+                        print('Best model, step: %d\n' % step)
             batch_start_time = time.time()
 
 
@@ -216,7 +214,7 @@ def create_data_loader(args, dataset_class, trans_func, batchify_fn, mode):
 
 
 def main(args):
-    paddle.set_device('gpu' if args.n_gpu else 'cpu')
+    paddle.set_device(args.device)
     world_size = dist.get_world_size()
     rank = dist.get_rank()
     if world_size > 1 and args.do_train:
@@ -265,7 +263,8 @@ def main(args):
                 args, dataset_class, test_trans_func, batchify_fn, 'dev')
         else:
             dev_data_loader = None
-        train(args, model, train_data_loader, dev_data_loader, metric, rank)
+        train(args, model, train_data_loader, dev_data_loader, metric,
+              world_size, rank)
 
     if args.do_test:
         if rank == 0:
@@ -297,7 +296,4 @@ if __name__ == '__main__':
     set_default_args(args)
     print_args(args)
 
-    if args.n_gpu > 1:
-        dist.spawn(main, args=(args, ), nprocs=args.n_gpu)
-    else:
-        main(args)
+    main(args)
