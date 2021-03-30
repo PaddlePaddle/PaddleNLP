@@ -2,11 +2,36 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.io import Dataset, DataLoader
+import paddle.distributed as dist
 
+import os
 import re
+import argparse
 import numpy as np
 from sklearn.model_selection import train_test_split
 from gensim.models.keyedvectors import KeyedVectors
+
+
+# yapf: disable
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--data_dir", type=str, default="./sentence-polarity-dataset-v1/", help="Specify the data dir.")
+    parser.add_argument("--pretrained_word2vec_file", type=str, default="./sentence-polarity-dataset-v1/GoogleNews-vectors-negative300.bin", help="Specify the pretrained word2vec model path.")
+    parser.add_argument("--logging_step", type=int, default=10, help="The frequency, in number of steps, the training logs are printed. (default: %(default)d)")
+    parser.add_argument("--epochs", type=int, default=20, help="Total number of training epochs to perform.")
+    parser.add_argument("--batch_size", type=int, default=64, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--dropout", type=float, default=0.5, help="The dropout rate.")
+    parser.add_argument("--lr", type=float, default=0.001, help="The initial learning rate.")
+    parser.add_argument("--weight_decay", type=float, default=0.0001, help="The weight decay for optimizer.")
+    parser.add_argument("--seed", type=int, default=2020, help="Random seed.")
+    parser.add_argument("--max_seq_len", type=int, default=256, help='max grad norm')
+    parser.add_argument("--sent_embedding_dim", type=int, default=64, help="The size of sentence embedding.")
+    parser.add_argument("--num_classes", type=int, default=2, help="The num of classification classes.")
+    parser.add_argument("--device", type=str, default="gpu", help="Device for selecting for the training.")
+
+    args = parser.parse_args()
+    return args
+# yapf: enable
 
 
 def clean_str(string):
@@ -56,13 +81,13 @@ def load_data_and_labels(positive_data_file, negative_data_file):
 
 
 class Word2VecBoWTextClassification(nn.Layer):
-    def __init__(self, batch_size, word_embedding_dim, sent_embedding_dim,
-                 num_labels):
+    def __init__(self, word_embedding_dim, sent_embedding_dim, dropout,
+                 num_classes):
         super(Word2VecBoWTextClassification, self).__init__()
 
         self._fc1 = nn.Linear(word_embedding_dim, sent_embedding_dim)
-        self._fc2 = nn.Linear(sent_embedding_dim, num_labels)
-        self._dropout = nn.Dropout(p=0.5)
+        self._fc2 = nn.Linear(sent_embedding_dim, num_classes)
+        self._dropout = nn.Dropout(p=dropout)
 
     def forward(self, inputs):
         word_emb, seq_lens = inputs
@@ -74,7 +99,7 @@ class Word2VecBoWTextClassification(nn.Layer):
         dense = self._fc1(sent_emb)
         dense = self._dropout(dense)
 
-        # [batch_size, num_labels]
+        # [batch_size, num_classes]
         out = self._fc2(dense)
         return out
 
@@ -141,58 +166,54 @@ def generate_batch(batch):
     return new_batch_ids, new_batch_label, new_batch_seq_len
 
 
-def train_base():
-    paddle.disable_static()
+def train(args):
+    paddle.set_device(args.device)
+    if dist.get_world_size() > 1:
+        dist.init_parallel_env()
 
-    batch_size = 64
-    max_seq_len = 256
-    epochs = 20
-    lr = 0.001
-    weight_decay = 0.0001
-    sent_embedding_dim = 64
-    num_labels = 2
-
-    pos_file = './sentence-polarity-dataset-v1/rt-polarity.pos'
-    neg_file = './sentence-polarity-dataset-v1/rt-polarity.neg'
+    pos_file = os.path.join(args.data_dir, 'rt-polarity.pos')
+    neg_file = os.path.join(args.data_dir, 'rt-polarity.neg')
     x_text, y = load_data_and_labels(pos_file, neg_file)
     x_train, x_test, y_train, y_test = train_test_split(
-        x_text, y, test_size=0.1, random_state=1)
+        x_text, y, test_size=0.1, random_state=args.seed)
 
-    pretrained_word2vec_file = './sentence-polarity-dataset-v1/GoogleNews-vectors-negative300.bin'
-    #gensim_model = KeyedVectors.load_word2vec_format(pretrained_word2vec_file, binary=True, limit=300000)
+    #gensim_model = KeyedVectors.load_word2vec_format(args.pretrained_word2vec_file, binary=True, limit=300000)
     gensim_model = KeyedVectors.load_word2vec_format(
-        pretrained_word2vec_file, binary=True)
-    print('\nLoaded word2vec from %s\n' % pretrained_word2vec_file)
+        args.pretrained_word2vec_file, binary=True)
+    print('\nLoaded word2vec from %s\n' % args.pretrained_word2vec_file)
 
     train_dataset = SentencePolarityDatasetV1(x_train, y_train, gensim_model,
-                                              max_seq_len)
+                                              args.max_seq_len)
     test_dataset = SentencePolarityDatasetV1(x_test, y_test, gensim_model,
-                                             max_seq_len)
+                                             args.max_seq_len)
     train_loader = DataLoader(
         train_dataset,
-        batch_size=batch_size,
+        batch_size=args.batch_size,
         return_list=True,
         shuffle=True,
         collate_fn=lambda batch: generate_batch(batch))
     test_loader = DataLoader(
         test_dataset,
-        batch_size=batch_size,
+        batch_size=args.batch_size,
         return_list=True,
         shuffle=False,
         collate_fn=lambda batch: generate_batch(batch))
 
-    model = Word2VecBoWTextClassification(batch_size, gensim_model.vector_size,
-                                          sent_embedding_dim, num_labels)
+    model = Word2VecBoWTextClassification(gensim_model.vector_size,
+                                          args.sent_embedding_dim, args.dropout,
+                                          args.num_classes)
+    if dist.get_world_size() > 1:
+        model = paddle.DataParallel(model)
     model.train()
 
     adam = paddle.optimizer.Adam(
         parameters=model.parameters(),
-        learning_rate=lr,
-        weight_decay=weight_decay)
+        learning_rate=args.lr,
+        weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss()
 
-    for epoch in range(epochs):
-        print('Epoch %d/%d' % (epoch + 1, epochs))
+    for epoch in range(args.epochs):
+        print('Epoch %d/%d' % (epoch + 1, args.epochs))
         for step, batch_data in enumerate(train_loader, start=1):
             ids, label, seq_lens = batch_data
 
@@ -202,32 +223,32 @@ def train_base():
             adam.step()
             adam.clear_grad()
 
-            if step % 10 == 0:
+            if step % args.logging_step == 0:
                 print('step %d, loss %.4f' % (step, loss.numpy()[0]))
 
     acc = test(model, test_loader)
     print('\ntest acc %.4f\n' % acc)
 
 
+@paddle.no_grad()
 def test(model, test_loader):
     correct = num = 0
     model.eval()
-    with paddle.no_grad():
-        for batch_data in test_loader:
-            ids, label, seq_lens = batch_data
+    for batch_data in test_loader:
+        ids, label, seq_lens = batch_data
 
-            # [batch_size, 2]
-            output = model((ids, seq_lens))
+        # [batch_size, 2]
+        output = model((ids, seq_lens))
 
-            num += label.shape[0]
-            predict = paddle.argmax(output, axis=1)
-            label = paddle.cast(label, dtype=predict.dtype)
-            correct += paddle.sum(
-                paddle.cast(
-                    predict == label, dtype='int64')).numpy()[0]
+        num += label.shape[0]
+        predict = paddle.argmax(output, axis=1)
+        label = paddle.cast(label, dtype=predict.dtype)
+        correct += paddle.sum(paddle.cast(
+            predict == label, dtype='int64')).numpy()[0]
     model.train()
     return correct * 1.0 / num
 
 
 if __name__ == '__main__':
-    train_base()
+    args = parse_args()
+    train(args)
