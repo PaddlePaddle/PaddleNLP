@@ -52,6 +52,7 @@
    paddlenlp.data <source/paddlenlp.data>
    paddlenlp.datasets <source/paddlenlp.datasets>
    paddlenlp.embeddings <source/paddlenlp.embeddings>
+   paddlenlp.ext_op <source/paddlenlp.ext_op>
    paddlenlp.layers <source/paddlenlp.layers>
    paddlenlp.metrics <source/paddlenlp.metrics>
    paddlenlp.seq2vec <source/paddlenlp.seq2vec>
