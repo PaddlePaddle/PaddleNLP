@@ -1,4 +1,4 @@
-embeddings
+paddlenlp.embeddings
 ============================
 
 .. automodule:: paddlenlp.embeddings
