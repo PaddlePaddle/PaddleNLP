@@ -61,7 +61,8 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "ernie-ctm": "http://0.0.0.0:8765/vocab.txt"
+            "ernie-ctm":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt"
         }
     }
     pretrained_init_configuration = {"ernie-ctm": {"do_lower_case": True}}
@@ -86,7 +87,6 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         self.cls_token_template = cls_token_template
         self.summary_num = summary_num
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
-        # self.ids_to_tokens = collections.OrderedDict([(ids, token) for token, ids in self.vocab.items()])
 
     @property
     def vocab_size(self):
