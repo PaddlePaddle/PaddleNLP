@@ -97,7 +97,7 @@
     from paddlenlp.datasets import IterDataset
 
     data_source_1 = ['a', 'b', 'c', 'd']
-    data_source_2 = (for i in range(5))
+    data_source_2 = (i for i in range(5))
 
     list_ds = IterDataset(data_source_1)
     gen_ds = IterDataset(data_source_2)
