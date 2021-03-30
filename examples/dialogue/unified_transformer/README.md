@@ -54,7 +54,7 @@ unset CUDA_VISIBLE_DEVICES; python -m paddle.distributed.launch --gpus '0' --log
 其中参数释义如下：
 - `gpus` 指示了训练所用的GPU
 - `log_dir` 指示了日志保存目录
-- `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+- `model_name_or_path` 指示了finetune使用的预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的模型。如果使用本地的模型，则配置为本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle模型参数model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
 
    | PaddleNLP提供的预训练模型        |
    |---------------------------------|
@@ -111,7 +111,7 @@ python -u infer.py \
 ```
 
 其中参数释义如下：
-- `model_name_or_path` 指示了预测使用的模型，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+- `model_name_or_path` 指示了预测使用的模型，可以是PaddleNLP提供的预训练模型，或者是本地的模型。如果使用本地的模型，则配置为本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle模型参数model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
 
    | PaddleNLP提供的预训练模型        |
    |---------------------------------|
