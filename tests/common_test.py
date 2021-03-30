@@ -96,7 +96,7 @@ class CommonTest(unittest.TestCase):
         result_t = type(result)
         error_msg = 'Output has diff at place:{}. \nExpect: {} \nBut Got: {} in class {}'
         if result_t in [list, tuple]:
-            result_t = get_container_tpye(result)
+            result_t = get_container_type(result)
         if result_t in [
                 str, int, bool, set, np.bool, np.int32, np.int64, np.str
         ]:
