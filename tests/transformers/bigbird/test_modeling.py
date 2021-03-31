@@ -91,7 +91,6 @@ class TestBigBirdForSequenceClassification(CommonTest):
             'bigbird-base-uncased']
         self.config['num_layers'] = 2
         self.config['vocab_size'] = 1024
-        self.config['vocab_size'] = 1024
         self.config['attn_dropout'] = 0.0
         self.config['hidden_dropout_prob'] = 0.0
         self.config['dim_feedforward'] = 1024
@@ -115,7 +114,7 @@ class TestBigBirdForSequenceClassification(CommonTest):
         expected_output = np.array(
             [[0.38314182, -0.13412490], [0.32075390, 0.07187212]])
 
-        self.check_output_equal(output, expected_output)
+        self.check_output_equal(output.numpy(), expected_output)
 
 
 class TestBigBirdForPretraining(CommonTest):
@@ -123,7 +122,6 @@ class TestBigBirdForPretraining(CommonTest):
         self.config = BigBirdModel.pretrained_init_configuration[
             'bigbird-base-uncased']
         self.config['num_layers'] = 2
-        self.config['vocab_size'] = 1024
         self.config['vocab_size'] = 1024
         self.config['attn_dropout'] = 0.0
         self.config['hidden_dropout_prob'] = 0.0

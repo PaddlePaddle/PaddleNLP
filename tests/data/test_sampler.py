@@ -56,7 +56,8 @@ class TestSampler(CpuCommonTest):
     def test_list(self):
         train_batch_sampler = SamplerHelper(self.train_ds)
         list_sampler = train_batch_sampler.list()
-        self.check_output_equal(type(iter(list_sampler)), "listiterator")
+        self.check_output_equal(
+            type(iter(list_sampler)).__name__, "list_iterator")
         for i, sample in enumerate(list_sampler):
             self.check_output_equal(i, sample)
 
