@@ -9,6 +9,7 @@
 ### 启动GLUE任务
 以 GLUE/SST-2 任务为例，启动GLUE任务进行Fine-tuning的方式如下：
 
+#### 单卡训练
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 export TASK_NAME=SST-2
@@ -24,10 +25,29 @@ python -u ./run_glue.py \
     --logging_steps 1 \
     --save_steps 100 \
     --output_dir ./tmp/$TASK_NAME/ \
-    --n_gpu 1 \
+    --device "gpu"
 
 ```
 
+#### 多卡训练
+```shell
+unset CUDA_VISIBLE_DEVICES
+export TASK_NAME=SST-2
+
+python -m paddle.distributed.launch --gpus "0,1" run_glue.py \
+    --model_type bert \
+    --model_name_or_path bert-base-uncased \
+    --task_name $TASK_NAME \
+    --max_seq_length 128 \
+    --batch_size 32   \
+    --learning_rate 1e-4 \
+    --num_train_epochs 3 \
+    --logging_steps 1 \
+    --save_steps 100 \
+    --output_dir ./tmp/$TASK_NAME/ \
+    --device "gpu"
+
+```
 其中参数释义如下：
 - `model_type` 指示了Fine-tuning使用的预训练模型类型，如：ernie、bert、electra等，因不同类型的预训练模型可能有不同的 Fine-tuning layer 和 tokenizer。
 - `model_name_or_path` 指示了Fine-tuning使用的具体预训练模型，可以是PaddleNLP提供的预训练模型 或者 本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: /home/xx_model/，目录中需包含paddle预训练模型model_state.pdparams。
@@ -41,7 +61,7 @@ python -u ./run_glue.py \
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
-- `n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可；若为0，则使用CPU。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 
 Fine-tuning过程将按照 `logging_steps` 和 `save_steps` 的设置打印如下日志：
 
