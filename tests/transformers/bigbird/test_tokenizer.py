@@ -126,7 +126,7 @@ class TestBigBirdTokenizerUnusaulText(CpuCommonTest):
 
     def test_empty_text(self):
         ids = self.tokenizer('')
-        self.check_output_equal(ids, [])
+        self.check_output_equal(ids == [], True)
 
     def test_bytes(self):
         byte_text = 'An extremely powerful film that certainly isnt '\
