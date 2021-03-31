@@ -151,8 +151,8 @@ python train.py --vocab_path='./senta_word_dict.txt' \
 GPU 启动：
 
 ```shell
-$ unset CUDA_VISIBLE_DEVICES
-$ python -m paddle.distributed.launch --gpus "0" train.py \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" train.py \
     --vocab_path='./senta_word_dict.txt' \
     --device=gpu \
     --network=bilstm \
@@ -205,7 +205,7 @@ python export_model.py --vocab_path=./senta_word_dict.txt --network=bilstm --par
 CPU启动：
 
 ```shell
-$ python predict.py --vocab_path='./senta_word_dict.txt' \
+python predict.py --vocab_path='./senta_word_dict.txt' \
     --device=cpu \
     --network=bilstm \
     --params_path=checkpoints/final.pdparams
@@ -214,8 +214,8 @@ $ python predict.py --vocab_path='./senta_word_dict.txt' \
 GPU启动：
 
 ```shell
-$ export CUDA_VISIBLE_DEVICES=0
-$ python predict.py --vocab_path='./senta_word_dict.txt' \
+export CUDA_VISIBLE_DEVICES=0
+python predict.py --vocab_path='./senta_word_dict.txt' \
     --device=gpu \
     --network=bilstm \
     --params_path='./checkpoints/final.pdparams'

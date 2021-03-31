@@ -78,8 +78,7 @@ wget https://paddlenlp.bj.bcebos.com/data/simnet_vocab.txt
 CPU启动：
 
 ```shell
-CPU启动
-$ python train.py --vocab_path='./simnet_vocab.txt' \
+python train.py --vocab_path='./simnet_vocab.txt' \
    --device=cpu \
    --network=lstm \
    --lr=5e-4 \
@@ -91,8 +90,8 @@ $ python train.py --vocab_path='./simnet_vocab.txt' \
 GPU启动：
 
 ```shell
-$ unset CUDA_VISIBLE_DEVICES
-$ python -m paddle.distributed.launch --gpus "0" train.py --vocab_path='./simnet_vocab.txt' \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" train.py --vocab_path='./simnet_vocab.txt' \
    --device=gpu \
    --network=lstm \
    --lr=5e-4 \

@@ -32,7 +32,7 @@ parser.add_argument("--params_path", type=str, default='./checkpoint/model_2700/
 parser.add_argument("--max_seq_length", default=50, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--device", type=str, default="gpu", help="Which device do you wanna use to training, CPU or CPU?")
+parser.add_argument("--device", type=str, default="gpu", help="Which device do you wanna use to train, CPU or GPU?")
 args = parser.parse_args()
 # yapf: enable
 

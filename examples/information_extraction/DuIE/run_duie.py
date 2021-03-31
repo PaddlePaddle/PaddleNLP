@@ -52,7 +52,7 @@ parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight deca
 parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.")
 parser.add_argument("--warmup_ratio", default=0, type=float, help="Linear warmup over warmup_ratio * total_steps.")
 parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
-parser.add_argument("--device", type=str, default="gpu", help="Which device do you wanna use to training, CPU or CPU?")
+parser.add_argument("--device", type=str, default="gpu", help="Which device do you wanna use to train, CPU or GPU?")
 args = parser.parse_args()
 # yapf: enable
 

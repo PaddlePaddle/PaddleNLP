@@ -5,7 +5,7 @@ export LR=2e-5
 export EPOCH=12
 
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "3" run_duie.py \
+python -m paddle.distributed.launch --gpus "0" run_duie.py \
                             --device gpu \
                             --seed 42 \
                             --do_train \

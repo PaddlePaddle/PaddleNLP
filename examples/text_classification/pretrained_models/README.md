@@ -146,8 +146,8 @@ $ python export_model.py --params_path=./checkpoint/model_900/model_state.pdpara
 
 启动预测：
 ```shell
-$ export CUDA_VISIBLE_DEVICES=0
-$ python predict.py --device 'gpu' --params_path checkpoints/model_900/model_state.pdparams
+export CUDA_VISIBLE_DEVICES=0
+python predict.py --device 'gpu' --params_path checkpoints/model_900/model_state.pdparams
 ```
 
 将待预测数据如以下示例：

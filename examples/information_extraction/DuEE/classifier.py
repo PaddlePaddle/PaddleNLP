@@ -61,7 +61,7 @@ parser.add_argument("--checkpoints", type=str, default=None, help="Directory to 
 parser.add_argument("--init_ckpt", type=str, default=None, help="already pretraining model checkpoint")
 parser.add_argument("--predict_save_path", type=str, default=None, help="predict data save path")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument("--device", type=str, default="gpu", help="Which device do you wanna use to training, CPU or CPU?")
+parser.add_argument("--device", type=str, default="gpu", help="Which device do you wanna use to train, CPU or GPU?")
 args = parser.parse_args()
 # yapf: enable.
 
@@ -329,10 +329,3 @@ if __name__ == '__main__':
         do_train()
     elif args.do_predict():
         do_predict()
-
-    # if args.n_gpu > 1 and args.do_train:
-    #     paddle.distributed.spawn(do_train, nprocs=args.n_gpu)
-    # elif args.do_train:
-    #     do_train()
-    # elif args.do_predict:
-    #     do_predict()
