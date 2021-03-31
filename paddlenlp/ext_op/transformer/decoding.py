@@ -73,9 +73,9 @@ def infer_transformer_decoder(
         'beam_search_diversity_rate': _beam_search_diversity_rate
     }
 
-    output_ids = helper.create_variable(dtype="float32")
-    parent_ids = helper.create_variable(dtype="float32")
-    sequence_length = helper.create_variable(dtype="float32")
+    output_ids = helper.create_variable(dtype="int32")
+    parent_ids = helper.create_variable(dtype="int32")
+    sequence_length = helper.create_variable(dtype="int32")
 
     outputs = {
         'OutputIds': output_ids,
@@ -140,7 +140,9 @@ class InferTransformerDecoding(nn.Layer):
 
         super(InferTransformerDecoding, self).__init__()
         # paddle.utils.load_op_library(decoding_lib)
-        paddle.utils.cpp_extension.load_op_meta_info_and_register_op("./build/lib/libdecoding_op.so")
+        paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+            "/paddle/fast_transformer/new/PaddleNLP/paddlenlp/ext_op/source/build/lib/libdecoding_op.so"
+        )
         for arg, value in locals().items():
             if arg not in [
                     "self", "decoder", "word_embedding", "positional_embedding",
@@ -327,54 +329,6 @@ class InferTransformerDecoding(nn.Layer):
             self._eos_id,
             self._max_out_len,
             self._beam_search_diversity_rate)
-
-        '''
-        output_ids, parent_ids, sequence_length = fusion_decoding(
-            [enc_output], [memory_seq_lens],
-            [paddle.cast(
-                self.word_emb[0], dtype="float16")]
-            if self._use_fp16_decoding else self.word_emb,
-            self.slf_ln_weight,
-            self.slf_ln_bias,
-            self.slf_q_weight,
-            self.slf_q_bias,
-            self.slf_k_weight,
-            self.slf_k_bias,
-            self.slf_v_weight,
-            self.slf_v_bias,
-            self.slf_out_weight,
-            self.slf_out_bias,
-            self.cross_ln_weight,
-            self.cross_ln_bias,
-            self.cross_q_weight,
-            self.cross_q_bias,
-            self.cross_k_weight,
-            self.cross_k_bias,
-            self.cross_v_weight,
-            self.cross_v_bias,
-            self.cross_out_weight,
-            self.cross_out_bias,
-            self.ffn_ln_weight,
-            self.ffn_ln_bias,
-            self.ffn_inter_weight,
-            self.ffn_inter_bias,
-            self.ffn_out_weight,
-            self.ffn_out_bias,
-            self.decoder_ln_weight,
-            self.decoder_ln_bias,
-            self.linear_weight,
-            self.linear_bias, [paddle.cast(
-                self.pos_emb[0], dtype="float16")]
-            if self._use_fp16_decoding else self.pos_emb,
-            self._beam_size,
-            self._n_head,
-            int(self._d_model / self._n_head),
-            self._n_layer,
-            self._bos_id,
-            self._eos_id,
-            self._max_out_len,
-            self._beam_search_diversity_rate)
-        '''
 
         ids = finalize(
             self._beam_size,
