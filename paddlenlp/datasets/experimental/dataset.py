@@ -62,9 +62,9 @@ def load_dataset(path,
 
     reader_cls = import_main_class(path)
     if not name:
-        reader_instance = reader_cls(lazy=lazy)
+        reader_instance = reader_cls(lazy=lazy, **kwargs)
     else:
-        reader_instance = reader_cls(lazy=lazy, name=name)
+        reader_instance = reader_cls(lazy=lazy, name=name, **kwargs)
 
     datasets = reader_instance.read_datasets(
         data_files=data_files, splits=splits)
@@ -280,10 +280,11 @@ class DatasetBuilder:
     """
     lazy = False
 
-    def __init__(self, lazy=None, name=None):
+    def __init__(self, lazy=None, name=None, **config):
         if lazy is not None:
             self.lazy = lazy
         self.name = name
+        self.config = config
 
     def read_datasets(self, splits=None, data_files=None):
         datasets = []

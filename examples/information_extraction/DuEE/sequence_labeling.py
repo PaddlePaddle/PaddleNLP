@@ -37,7 +37,6 @@ parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--num_epoch", type=int, default=3, help="Number of epoches for fine-tuning.")
 parser.add_argument("--learning_rate", type=float, default=5e-5, help="Learning rate used to train with warmup.")
 parser.add_argument("--tag_path", type=str, default=None, help="tag set path")
-parser.add_argument("--vocab_path", type=str, default=None, help="vocab path")
 parser.add_argument("--train_data", type=str, default=None, help="train data")
 parser.add_argument("--dev_data", type=str, default=None, help="dev data")
 parser.add_argument("--test_data", type=str, default=None, help="test data")
@@ -88,15 +87,15 @@ def evaluate(model, criterion, metric, num_label, data_loader):
 def convert_example_to_feature(example, tokenizer, label_vocab=None, max_seq_len=512, no_entity_label="O", ignore_label=-1, is_test=False):
     tokens, labels = example
     tokenized_input = tokenizer(
-        example,
+        tokens,
         return_length=True,
         is_split_into_words=True,
         pad_to_max_seq_len=True,
         max_seq_len=max_seq_len)
 
-    input_ids = tokenized_input[0]['input_ids']
-    token_type_ids = tokenized_input[0]['token_type_ids']
-    seq_len = tokenized_input[0]['seq_len']
+    input_ids = tokenized_input['input_ids']
+    token_type_ids = tokenized_input['token_type_ids']
+    seq_len = tokenized_input['seq_len']
 
     if is_test:
         return input_ids, token_type_ids, seq_len
@@ -111,8 +110,7 @@ def convert_example_to_feature(example, tokenizer, label_vocab=None, max_seq_len
 
 class DuEventExtraction(paddle.io.Dataset):
     """DuEventExtraction"""
-    def __init__(self, data_path, vocab_path, tag_path):
-        self.word_vocab = load_dict(vocab_path)
+    def __init__(self, data_path, tag_path):
         self.label_vocab = load_dict(tag_path)
         self.word_ids = []
         self.label_ids = []
@@ -125,7 +123,6 @@ class DuEventExtraction(paddle.io.Dataset):
                 labels = labels.split('\002')
                 self.word_ids.append(words)
                 self.label_ids.append(labels)
-        self.word_num = max(self.word_vocab.values()) + 1
         self.label_num = max(self.label_vocab.values()) + 1
 
     def __len__(self):
@@ -153,9 +150,9 @@ def do_train():
     model = paddle.DataParallel(model)
 
     print("============start train==========")
-    train_ds = DuEventExtraction(args.train_data, args.vocab_path, args.tag_path)
-    dev_ds = DuEventExtraction(args.dev_data, args.vocab_path, args.tag_path)
-    test_ds = DuEventExtraction(args.test_data, args.vocab_path, args.tag_path)
+    train_ds = DuEventExtraction(args.train_data, args.tag_path)
+    dev_ds = DuEventExtraction(args.dev_data, args.tag_path)
+    test_ds = DuEventExtraction(args.test_data, args.tag_path)
 
     trans_func = partial(
         convert_example_to_feature,
@@ -244,8 +241,8 @@ def do_predict():
 
     encoded_inputs_list = []
     for sent in sentences:
-        sent = sent["text"]
-        input_ids, token_type_ids, seq_len = convert_example([list(sent), []], tokenizer,
+        sent = sent["text"].replace(" ", "\002")
+        input_ids, token_type_ids, seq_len = convert_example_to_feature([list(sent), []], tokenizer,
                     max_seq_len=args.max_seq_len, is_test=True)
         encoded_inputs_list.append((input_ids, token_type_ids, seq_len))
 

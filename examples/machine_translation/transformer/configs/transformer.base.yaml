@@ -59,8 +59,13 @@ warmup_steps: 8000
 label_smooth_eps: 0.1
 
 # Hyparams for generation:
+decoding_strategy: "beam_search"
 # The parameters for beam search.
 beam_size: 5
+# The parameters for topk sampling. 
+topk: 4
+# The parameters for topp sampling. 
+topp: 0.0
 max_out_len: 256
 # The number of decoded sentences to output.
 n_best: 1
