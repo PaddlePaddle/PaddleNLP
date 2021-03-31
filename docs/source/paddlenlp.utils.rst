@@ -1,4 +1,4 @@
-utils
+paddlenlp.utils
 =======================
 
 .. automodule:: paddlenlp.utils

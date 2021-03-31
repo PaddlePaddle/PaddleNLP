@@ -1,4 +1,4 @@
-layers
+paddlenlp.layers
 ========================
 
 .. automodule:: paddlenlp.layers

@@ -1,4 +1,4 @@
-datasets
+paddlenlp.datasets
 ==========================
 
 .. automodule:: paddlenlp.datasets

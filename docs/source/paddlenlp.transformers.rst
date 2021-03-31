@@ -1,4 +1,4 @@
-transformers
+paddlenlp.transformers
 ==============================
 
 .. automodule:: paddlenlp.transformers

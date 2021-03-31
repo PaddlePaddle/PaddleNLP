@@ -57,7 +57,7 @@ class Imdb(Dataset):
         def _load_data(label):
             root = os.path.join(data_dir, mode, label)
             data_files = os.listdir(root)
-
+            data_files.sort()
             if label == "pos":
                 label_id = 1
             elif label == "neg":
@@ -66,9 +66,10 @@ class Imdb(Dataset):
             all_samples = []
             for f in data_files:
                 f = os.path.join(root, f)
-                data = io.open(f, 'r', encoding='utf8').readlines()
-                data = data[0].translate(translator)
-                all_samples.append((data, label_id))
+                with io.open(f, 'r', encoding='utf8') as fr:
+                    data = fr.readlines()
+                    data = data[0].translate(translator)
+                    all_samples.append((data, label_id))
 
             return all_samples
 
