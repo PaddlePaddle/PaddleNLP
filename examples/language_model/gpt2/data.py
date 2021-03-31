@@ -41,7 +41,7 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
     tokens_per_epoch = _num_tokens(documents, sizes)
     num_epochs = _num_epochs(tokens_per_epoch, seq_length, num_samples)
     # rng state
-    np_rng = np.random.RandomState(seed=seed)
+    np_rng = np.random.RandomState(seed=1234)
 
     # Filename of the index mappings.
     _filename = data_prefix
@@ -182,13 +182,13 @@ def _build_shuffle_idx(num_samples, total_size, np_rng):
 
     shuffle_idx_first = np.arange(
         start=0, stop=num_samples, step=1, dtype=dtype_)
-    # np_rng.shuffle(shuffle_idx_first)
+    np_rng.shuffle(shuffle_idx_first)
     if num_samples == total_size:
         return shuffle_idx_first
 
     shuffle_idx_last = np.arange(
         start=num_samples, stop=total_size, step=1, dtype=dtype_)
-    # np_rng.shuffle(shuffle_idx_last)
+    np_rng.shuffle(shuffle_idx_last)
 
     return np.concatenate((shuffle_idx_first, shuffle_idx_last))
 
