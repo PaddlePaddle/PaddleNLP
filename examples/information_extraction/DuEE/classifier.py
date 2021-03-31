@@ -327,5 +327,5 @@ if __name__ == '__main__':
 
     if args.do_train:
         do_train()
-    elif args.do_predict():
+    elif args.do_predict:
         do_predict()

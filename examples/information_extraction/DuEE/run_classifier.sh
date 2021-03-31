@@ -12,7 +12,7 @@ epoch=${9}
 pred_save_path=${10}
 
 
-if [ ${is_train} == True ]; then
+if [ "$is_train" = True ]; then
     unset CUDA_VISIBLE_DEVICES
     python -m paddle.distributed.launch --gpus "0"  classifier.py \
                                         --num_epoch ${epoch} \
