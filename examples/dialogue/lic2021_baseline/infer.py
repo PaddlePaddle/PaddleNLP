@@ -14,7 +14,7 @@ from data import DialogueDataset, select_response
 
 
 def main(args):
-    paddle.set_device('gpu' if args.n_gpus else 'cpu')
+    paddle.set_device(args.device)
     paddle.seed(args.seed)
 
     model = UnifiedTransformerLMHeadModel.from_pretrained(

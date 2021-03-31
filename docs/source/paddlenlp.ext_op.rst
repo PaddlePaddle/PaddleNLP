@@ -1,4 +1,4 @@
-ext\_op
+paddlenlp.ext\_op
 =========================
 
 .. automodule:: paddlenlp.ext_op

@@ -1,4 +1,4 @@
-seq2vec
+paddlenlp.seq2vec
 =========================
 
 .. automodule:: paddlenlp.seq2vec
