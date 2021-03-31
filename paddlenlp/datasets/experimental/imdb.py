@@ -50,15 +50,18 @@ class Imdb(DatasetBuilder):
         for label in ["pos", "neg"]:
             root = os.path.join(data_dir, label)
             data_files = os.listdir(root)
+            data_files.sort()
+
             if label == "pos":
                 label_id = "1"
             elif label == "neg":
                 label_id = "0"
             for f in data_files:
                 f = os.path.join(root, f)
-                data = io.open(f, 'r', encoding='utf8').readlines()
-                data = data[0].translate(translator)
-                yield {"text": data, "label": label_id}
+                with io.open(f, 'r', encoding='utf8') as fr:
+                    data = fr.readlines()
+                    data = data[0].translate(translator)
+                    yield {"text": data, "label": label_id}
 
     def get_labels(self):
         """
