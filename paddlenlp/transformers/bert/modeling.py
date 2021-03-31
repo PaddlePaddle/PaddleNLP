@@ -281,6 +281,48 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
         },
+        "distilbert-base-uncased": {
+            "vocab_size": 30522,
+            "hidden_size": 768,
+            "num_hidden_layers": 6,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
+        "distilbert-base-cased": {
+            "vocab_size": 28996,
+            "hidden_size": 768,
+            "num_hidden_layers": 6,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
+        "distilbert-base-multilingual-cased": {
+            "vocab_size": 119547,
+            "hidden_size": 768,
+            "num_hidden_layers": 6,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -311,6 +353,12 @@ class BertPretrainedModel(PretrainedModel):
             "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-4l-312d-v2.pdparams",
             "tinybert-6l-768d-v2":
             "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-6l-768d-v2.pdparams",
+            "distilbert-base-uncased":
+            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/distilbert-base-uncased.pdparams",
+            "distilbert-base-cased":
+            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/distilbert-base-cased.pdparams",
+            "distilbert-base-multilingual-cased":
+            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/distilbert-base-multilingual-cased.pdparams",
         }
     }
     base_model_prefix = "bert"

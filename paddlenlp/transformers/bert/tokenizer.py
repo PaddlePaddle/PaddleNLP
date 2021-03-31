@@ -275,6 +275,12 @@ class BertTokenizer(PretrainedTokenizer):
             "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-4l-312d-v2-vocab.txt",
             "tinybert-6l-768d-v2":
             "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-6l-768d-v2-vocab.txt",
+            "distilbert-base-uncased":
+            "https://paddlenlp.bj.bcebos.com/models/bert/distilbert-base-uncased-vocab.txt",
+            "distilbert-base-cased":
+            "https://paddlenlp.bj.bcebos.com/models/bert/distilbert-base-cased-vocab.txt",
+            "distilbert-base-multilingual-cased":
+            "https://paddlenlp.bj.bcebos.com/models/bert/distilbert-base-multilingual-cased-vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -316,6 +322,15 @@ class BertTokenizer(PretrainedTokenizer):
         },
         "tinybert-6l-768d-v2": {
             "do_lower_case": True
+        },
+        "distilbert-base-uncased": {
+            "do_lower_case": True
+        },
+        "distilbert-base-cased": {
+            "do_lower_case": False
+        },
+        "distilbert-base-multilingual-cased": {
+            "do_lower_case": False
         },
     }
     padding_side = 'right'
