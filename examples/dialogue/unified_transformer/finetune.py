@@ -27,6 +27,7 @@ def save_ckpt(model, tokenizer, save_dir, name):
 
 
 def train(args):
+    paddle.set_device(args.device)
     world_size = dist.get_world_size()
     if world_size > 1:
         dist.init_parallel_env()

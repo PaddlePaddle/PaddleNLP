@@ -18,16 +18,16 @@ class DialogueDataset(IterableDataset):
                  bos_token_id,
                  sort_pool_size=2**16,
                  seed=1,
-                 n_gpus=None,
+                 n_procs=None,
                  rank=None,
                  mode='test'):
         super(DialogueDataset, self).__init__()
 
         self.file_list = glob(filepattern)
         self.sort_pool_size = 0 if mode == 'test' else sort_pool_size
-        self.n_gpus = n_gpus if n_gpus else dist.get_world_size()
+        self.n_procs = n_procs if n_procs else dist.get_world_size()
         self.rank = rank if rank else dist.get_rank()
-        self.batch_size = batch_size * self.n_gpus
+        self.batch_size = batch_size * self.n_procs
         self.shuffle = True if mode == 'train' else False
         self.mode = mode
         self.pad_id = pad_token_id
@@ -154,8 +154,8 @@ class DialogueDataset(IterableDataset):
         for batch_data in self.get_batch:
             # sample [token_ids, type_ids, pos_ids, tgt_start_idx]
             # raw_batch [sample0, sample1, ...]
-            if self.n_gpus > 1:
-                batch_data = batch_data[self.rank::self.n_gpus]
+            if self.n_procs > 1:
+                batch_data = batch_data[self.rank::self.n_procs]
             batch_data = zip(*batch_data)
             token_ids, type_ids, pos_ids, tgt_start_idx = batch_data
 

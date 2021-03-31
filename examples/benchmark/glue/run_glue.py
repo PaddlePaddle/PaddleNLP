@@ -154,10 +154,10 @@ def parse_args():
     parser.add_argument(
         "--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument(
-        "--n_gpu",
-        default=1,
-        type=int,
-        help="number of gpus to use, 0 for cpu.")
+        "--device",
+        default="gpu",
+        type=str,
+        help="The device to select to train the model, is must be cpu/gpu/xpu.")
     args = parser.parse_args()
     return args
 
@@ -234,7 +234,7 @@ def convert_example(example,
 
 
 def do_train(args):
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -364,7 +364,7 @@ def do_train(args):
                 else:
                     evaluate(model, loss_fct, metric, dev_data_loader)
                     print("eval done total : %s s" % (time.time() - tic_eval))
-                if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+                if paddle.distributed.get_rank() == 0:
                     output_dir = os.path.join(args.output_dir,
                                               "%s_ft_model_%d.pdparams" %
                                               (args.task_name, global_step))
@@ -390,7 +390,4 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_gpu)
-    else:
-        do_train(args)
+    do_train(args)
