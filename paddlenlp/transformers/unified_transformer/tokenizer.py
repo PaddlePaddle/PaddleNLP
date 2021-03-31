@@ -436,8 +436,9 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                         return_position_ids=True,
                         return_token_type_ids=True,
                         return_attention_mask=True,
-                        pad_to_max_seq_len=False,
-                        return_length=False):
+                        return_length=False,
+                        add_start_token_as_response=False,
+                        pad_to_max_seq_len=False):
         """
         Main method to encode the single-turn or multi-turn dialogue conversation. 
         It will return a dictionary containing the encoded sequence and other 
@@ -472,11 +473,15 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 token_type_ids. Default True.
             return_attention_mask (bool, optional): Whether to return the 
                 attention_mask. Default True.
+            return_length (bool, optional): Whether to return the length of the
+                encoded sequence. Default False.
+            add_start_token_as_response (bool, optional): Whether to add the 
+                special token [CLS] at the end of sequence as the begining of 
+                the response when running inference to force the model to start 
+                generating response sequence. Default False.
             pad_to_max_seq_len (bool, optional): Whether to pad the returned 
                 sequences to the `max_seq_len`. Note that, in this method, 
                 returned sequences will be padded on the left. Default False.
-            return_length (bool, optional): Whether to return the length of the
-                encoded sequence. Default False.
         """
         task_type_list = ["chitchat", "knowledge", "recommend"]
         # Input type checking for clearer error
@@ -501,6 +506,10 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             "and `max_knowledge_len`. But received `max_seq_len` is {}, "
             "`max_response_len` is {}, `max_knowledge_len` is {}.".format(
                 max_seq_len, max_response_len, max_knowledge_len))
+        assert response is None or not add_start_token_as_response, (
+            "`add_start_token_as_response` only works when `response` is "
+            "`None`. But received `add_start_token_as_response`: `{}`, "
+            "`response`: {}.".format(add_start_token_as_response, response))
 
         knowledge_ids = []
         if knowledge is not None:
@@ -518,6 +527,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             if len(response_ids) > max_response_len - 1:
                 response_ids = response_ids[:max_response_len - 1]
             response_ids += [self.sep_token_id]
+        elif add_start_token_as_response:
+            response_ids = [self.cls_token_id]
 
         special_token_id = getattr(self, task_type + '_token_id')
         knowledge_ids = [self.cls_token_id, special_token_id] + knowledge_ids

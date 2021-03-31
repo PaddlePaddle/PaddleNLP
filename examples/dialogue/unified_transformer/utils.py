@@ -118,18 +118,8 @@ def convert_example(example,
             knowledge=goal_knowledge,
             task_type='knowledge',
             max_seq_len=max_seq_len,
-            max_knowledge_len=max_knowledge_len)
-
-        # Add [CLS] as the begining of response to force the model to generate 
-        # the response.
-        tokenized_example['input_ids'].append(tokenizer.cls_token_id)
-        tokenized_example['token_type_ids'].append(1)
-        tokenized_example['position_ids'].append(tokenized_example[
-            'position_ids'][-1] + 1)
-        mask = tokenized_example['attention_mask']
-        mask = np.pad(mask, ((0, 1), (0, 1)), 'constant', constant_values=-1e9)
-        mask[-1, :] = 0
-        tokenized_example['attention_mask'] = mask
+            max_knowledge_len=max_knowledge_len,
+            add_start_token_as_response=True)
 
         if 'response' in example:
             tokenized_example['response'] = example['response']
