@@ -273,7 +273,7 @@ class OneBillionWordDataset(IterableDataset):
         vocab (Vocabulary): An instance of Vocabulary or UnicodeCharsVocabulary.
         batch_size (int): The batch_size.
         num_steps (int): The sentence length after re-cutting in dataset.
-        n_gpus (int): The number of GPUs.
+        n_procs (int): The number of GPUs.
         mode (str, optional): The dataset mode. It can be "train" and "test". 
             When "test", the dataset iterate through all data once then stop. 
             When "train", it will iterate forever. Default: "test".
@@ -286,23 +286,21 @@ class OneBillionWordDataset(IterableDataset):
                  vocab,
                  batch_size,
                  num_steps,
-                 n_gpus,
-                 rank,
+                 n_procs=1,
+                 rank=0,
                  mode='test',
                  shuffle=False,
                  seed=0):
         super(OneBillionWordDataset, self).__init__()
 
         self._all_files = glob.glob(filepattern)
-        if rank == 0:
-            print('\nFound %d files at %s\n' %
-                  (len(self._all_files), filepattern))
+        print('\nFound %d files at %s\n' % (len(self._all_files), filepattern))
         self._vocab = vocab
         self._max_word_length = vocab.max_word_length
         self._use_char_inputs = hasattr(vocab, 'encode_chars')
         self._batch_size = batch_size
         self._num_steps = num_steps
-        self._n_gpus = n_gpus
+        self._n_procs = n_procs
         self._rank = rank
         self._mode = mode
         self._shuffle = shuffle
@@ -318,14 +316,13 @@ class OneBillionWordDataset(IterableDataset):
         return file_seed
 
     def _load_file(self, file_path):
-        if self._rank == 0:
-            print('\nLoading data from: %s\n' % file_path)
+        print('\nLoading data from: %s\n' % file_path)
         with open(file_path) as f:
             sentences_raw = f.readlines()
         sentences = sentences_raw
 
         if self._shuffle:
-            if self._n_gpus > 1:
+            if self._n_procs > 1:
                 seed = self._file_seed[file_path] * self._seed
                 random.seed(seed)
             random.shuffle(sentences)
@@ -343,7 +340,7 @@ class OneBillionWordDataset(IterableDataset):
             self._seed += 1
             all_files = list(self._all_files)
             if self._shuffle:
-                if self._n_gpus > 1:
+                if self._n_procs > 1:
                     random.seed(self._seed)
                 random.shuffle(all_files)
             for file_path in all_files:
@@ -359,7 +356,7 @@ class OneBillionWordDataset(IterableDataset):
 
     def __iter__(self):
         sentence_generator = self.get_sentence()
-        n_batch_size = self._batch_size * self._n_gpus
+        n_batch_size = self._batch_size * self._n_procs
         cur_stream = [None] * n_batch_size
 
         while True:
@@ -424,7 +421,7 @@ class OneBillionWordDataset(IterableDataset):
                 'tokens_characters_reverse': char_inputs_reverse,
                 'next_token_ids_reverse': targets_reverse
             }
-            if self._n_gpus > 1:
+            if self._n_procs > 1:
                 start = self._rank * self._batch_size
                 end = start + self._batch_size
                 for key in batch_data:

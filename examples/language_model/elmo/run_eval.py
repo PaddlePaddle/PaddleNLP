@@ -6,20 +6,15 @@ import paddle.nn as nn
 from paddle.io import DataLoader
 import paddle.distributed as dist
 
-from args import parse_args
+from args import parse_args, print_args
 from elmo import ELMo, ELMoLoss
 from dataset import load_vocab, OneBillionWordDataset
 
 
-def eval():
-    paddle.disable_static()
-    n_gpus = dist.get_world_size()
-    rank = dist.get_rank()
+@paddle.no_grad()
+def eval(args):
+    paddle.set_device(args.device)
 
-    if n_gpus > 1:
-        dist.init_parallel_env()
-
-    args = parse_args()
     if not args.init_from_ckpt:
         raise ValueError('init_from_ckpt should be set when eval.')
     vocab = load_vocab(args.vocab_file, args.max_characters_per_token)
@@ -33,8 +28,6 @@ def eval():
         num_layers=args.num_layers,
         num_highways=args.num_highways,
         char_vocab_size=vocab.char_size)
-    if n_gpus > 1:
-        elmo = paddle.DataParallel(elmo)
     elmo.eval()
 
     elmo_loss = ELMoLoss()
@@ -49,11 +42,9 @@ def eval():
         vocab,
         args.batch_size,
         args.unroll_steps,
-        n_gpus,
-        rank,
         mode='test',
         shuffle=False,
-        seed=args.random_seed)
+        seed=args.seed)
 
     dev_dataloader = DataLoader(dev_dataset, return_list=True, batch_size=None)
 
@@ -70,21 +61,20 @@ def eval():
         total_step += 1
 
         total_time += (time.time() - batch_start_time)
-        if rank == 0:
-            if step % args.log_freq == 0:
-                print(
-                    "Eval step %d - loss: %.4f - Perplexity: %.4f - %.3fs/step"
-                    % (step, loss.numpy()[0] * args.unroll_steps,
-                       ppl.numpy()[0], total_time / args.log_freq))
-                total_time = 0.0
+        if step % args.log_freq == 0:
+            print("Eval step %d - loss: %.4f - Perplexity: %.4f - %.3fs/step" %
+                  (step, loss.numpy()[0] * args.unroll_steps, ppl.numpy()[0],
+                   total_time / args.log_freq))
+            total_time = 0.0
         batch_start_time = time.time()
 
     avg_loss = total_loss / total_step
     avg_ppl = math.exp(avg_loss)
-    if rank == 0:
-        print("Eval - average loss: %.4f - average Perplexity: %.4f" %
-              (avg_loss * args.unroll_steps, avg_ppl))
+    print("Eval - average loss: %.4f - average Perplexity: %.4f" %
+          (avg_loss * args.unroll_steps, avg_ppl))
 
 
 if __name__ == '__main__':
-    eval()
+    args = parse_args()
+    print_args(args)
+    eval(args)
