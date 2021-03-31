@@ -514,7 +514,7 @@ def do_train(args):
                                    average_loss,
                                    iter_steps / (time.time() - local_time)))
                             log_writer.add_scalar(task_name + "_loss",
-                                                  loss_return[0], global_step)
+                                                  average_loss, global_step)
                             break
 
                 if global_step % args.eval_steps == 0:
