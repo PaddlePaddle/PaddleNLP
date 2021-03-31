@@ -1,4 +1,4 @@
-metrics
+paddlenlp.metrics
 =========================
 
 .. automodule:: paddlenlp.metrics
