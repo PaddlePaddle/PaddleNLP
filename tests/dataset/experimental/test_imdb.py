@@ -18,6 +18,7 @@ from paddlenlp.datasets import load_dataset
 
 from common_test import CpuCommonTest
 import util
+import unittest
 
 
 def get_examples(mode='train'):
@@ -94,3 +95,7 @@ class TestImdbNoSplitDataFiles(CpuCommonTest):
     @util.assert_raises
     def test_no_split_datafiles(self):
         load_dataset(**self.config)
+
+
+if __name__ == "__main__":
+    unittest.main()

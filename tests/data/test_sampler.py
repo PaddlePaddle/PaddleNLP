@@ -20,6 +20,7 @@ from paddlenlp.datasets import load_dataset
 
 from common_test import CpuCommonTest
 import util
+import unittest
 
 
 def cmp(x, y):
@@ -151,3 +152,7 @@ class TestSampler(CpuCommonTest):
         apply_sampler = train_batch_sampler.apply(fn)
         for i, sample in enumerate(apply_sampler):
             self.check_output_equal(i, sample)
+
+
+if __name__ == "__main__":
+    unittest.main()
