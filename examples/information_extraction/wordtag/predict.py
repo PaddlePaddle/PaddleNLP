@@ -112,6 +112,7 @@ def do_predict(args):
             tags = list(map(idx_to_tags.get, pred_tag.numpy()))
             # Drop CLS and SEP
             tags = tags[2:-1]
+            # import pdb; pdb.set_trace()
 
             # Parse the result
             sent_out = []
