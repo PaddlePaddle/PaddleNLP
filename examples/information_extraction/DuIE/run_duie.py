@@ -52,7 +52,7 @@ parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight deca
 parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.")
 parser.add_argument("--warmup_ratio", default=0, type=float, help="Linear warmup over warmup_ratio * total_steps.")
 parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
-parser.add_argument("--device", type=str, default="gpu", help="Which device do you wanna use to train, CPU or GPU?")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -148,6 +148,7 @@ def evaluate(model, criterion, data_loader, file_path, mode):
 
 def do_train():
     paddle.set_device(args.device)
+    rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -228,16 +229,14 @@ def do_train():
             loss_item = loss.numpy().item()
             global_step += 1
 
-            if global_step % logging_steps == 0 and paddle.distributed.get_rank(
-            ) == 0:
+            if global_step % logging_steps == 0 and rank == 0:
                 print(
                     "epoch: %d / %d, steps: %d / %d, loss: %f, speed: %.2f step/s"
                     % (epoch, args.num_train_epochs, step, steps_by_epoch,
                        loss_item, logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
 
-            if global_step % save_steps == 0 and paddle.distributed.get_rank(
-            ) == 0:
+            if global_step % save_steps == 0 and rank == 0:
                 print("\n=====start evaluating ckpt of %d steps=====" %
                       global_step)
                 precision, recall, f1 = evaluate(
@@ -256,7 +255,7 @@ def do_train():
               (tic_epoch // 3600, (tic_epoch % 3600) // 60, tic_epoch % 60))
 
     # Does final evaluation.
-    if paddle.distributed.get_rank() == 0:
+    if rank == 0:
         print("\n=====start evaluating last ckpt of %d steps=====" %
               global_step)
         precision, recall, f1 = evaluate(model, criterion, test_data_loader,

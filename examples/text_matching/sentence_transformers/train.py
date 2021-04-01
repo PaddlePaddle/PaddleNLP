@@ -41,7 +41,7 @@ parser.add_argument("--epochs", default=3, type=int, help="Total number of train
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument("--device", type=str, default="gpu", help="Which device do you wanna use to train, CPU or GPU?")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -160,6 +160,7 @@ def create_dataloader(dataset,
 
 def do_train():
     paddle.set_device(args.device)
+    rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -254,7 +255,7 @@ def do_train():
             acc = metric.accumulate()
 
             global_step += 1
-            if global_step % 10 == 0 and paddle.distributed.get_rank() == 0:
+            if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, step, loss, acc,
@@ -264,7 +265,7 @@ def do_train():
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
-            if global_step % 100 == 0 and paddle.distributed.get_rank() == 0:
+            if global_step % 100 == 0 and rank == 0:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
@@ -273,7 +274,7 @@ def do_train():
                 paddle.save(model.state_dict(), save_param_path)
                 tokenizer.save_pretrained(save_dir)
 
-    if paddle.distributed.get_rank() == 0:
+    if rank == 0:
         print('Evaluating on test data.')
         evaluate(model, criterion, metric, test_data_loader)
 

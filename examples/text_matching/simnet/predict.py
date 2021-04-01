@@ -24,7 +24,7 @@ from utils import preprocess_prediction_data
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
-parser.add_argument("--device", type=str, default="gpu", help="Which device do you wanna use to train, CPU or GPU?")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
 parser.add_argument("--vocab_path", type=str, default="./simnet_vocab.txt", help="The path to vocabulary.")
 parser.add_argument('--network', type=str, default="lstm", help="Which network you would like to choose bow, cnn, lstm or gru ?")
