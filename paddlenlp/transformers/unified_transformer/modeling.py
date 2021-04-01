@@ -266,21 +266,18 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
 
     def prepare_inputs_for_generation(self,
                                       input_ids,
+                                      token_type_ids,
+                                      position_ids,
+                                      attention_mask,
                                       use_cache=False,
                                       cache=None,
                                       **kwargs):
-        token_type_ids = kwargs.get("token_type_ids", None)
-        attention_mask = kwargs.get("attention_mask", None)
-        position_ids = kwargs.get("position_ids", None)
         # only last token for inputs_ids if cache is defined in kwargs
         if cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
-            if token_type_ids is not None:
-                token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
-            if position_ids is not None:
-                position_ids = position_ids[:, -1].unsqueeze(-1)
-            if attention_mask is not None:
-                attention_mask = attention_mask[:, :, -1, :].unsqueeze(2)
+            token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
+            position_ids = position_ids[:, -1].unsqueeze(-1)
+            attention_mask = attention_mask[:, :, -1, :].unsqueeze(2)
 
         return {
             "input_ids": input_ids,

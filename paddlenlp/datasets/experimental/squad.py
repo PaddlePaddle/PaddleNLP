@@ -68,13 +68,12 @@ class SQuAD(DatasetBuilder):
                     if "is_impossible" in qa.keys():
                         is_impossible = qa["is_impossible"]
 
-                    if not is_impossible:
-                        answer_starts = [
-                            answer["answer_start"] for answer in qa["answers"]
-                        ]
-                        answers = [
-                            answer["text"].strip() for answer in qa["answers"]
-                        ]
+                    answer_starts = [
+                        answer["answer_start"] for answer in qa["answers"]
+                    ]
+                    answers = [
+                        answer["text"].strip() for answer in qa["answers"]
+                    ]
 
                     yield {
                         'id': qas_id,

@@ -327,6 +327,13 @@ class GenerationMixin(object):
 
     @staticmethod
     def update_model_kwargs_for_generation(outputs, model_kwargs):
+        """
+        Update the model inputs during generation. 
+        Note that If `token_type_ids` and `attention_mask` in `model_kwargs` 
+        and they contain pad value, the result vectors updated by this method 
+        may be different from expected. In this case, you need to rewrite the 
+        method.
+        """
         # update cache
         if isinstance(outputs, tuple):
             model_kwargs["cache"] = outputs[1]
@@ -341,22 +348,29 @@ class GenerationMixin(object):
         if "position_ids" in model_kwargs:
             position_ids = model_kwargs["position_ids"]
             model_kwargs["position_ids"] = paddle.concat(
-                [position_ids, position_ids[:, -1].unsqueeze(-1) + 1], axis=-1)
+                [
+                    position_ids,
+                    paddle.max(position_ids, axis=-1, keepdim=True) + 1
+                ],
+                axis=-1)
 
         # update attention_mask
         if "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
-            # TODO
+            # nn.Pad2D don't support the data type `bool`
+            if convert_dtype(attention_mask.dtype) == 'bool':
+                attention_mask = paddle.cast(attention_mask, 'int64')
             attention_mask = nn.Pad2D(
                 [0, 0, 0, 1], mode='replicate')(attention_mask)
             attention_mask = nn.Pad2D([0, 1, 0, 0], value=-1e9)(attention_mask)
             dtype = convert_dtype(attention_mask.dtype)
-            if dtype == 'bool':
-                attention_mask[:, :, -1, -1] = True
-            elif 'int' in dtype:
+            if 'int' in dtype:
                 attention_mask[:, :, -1, -1] = 1
-            else:
+            elif 'float' in dtype:
                 attention_mask[:, :, -1, -1] = 0.0
+            else:
+                raise ValueError('The data type of input `attention_mask` must '
+                                 'be bool, int or float')
             model_kwargs["attention_mask"] = attention_mask
 
         return model_kwargs

@@ -17,6 +17,7 @@ import numpy as np
 from paddlenlp.data import Stack, Pad, Tuple, Dict
 from common_test import CpuCommonTest
 import util
+import unittest
 
 
 class TestStack(CpuCommonTest):
