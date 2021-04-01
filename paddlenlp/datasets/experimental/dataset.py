@@ -403,7 +403,9 @@ class DatasetBuilder:
                         yield example
 
             return IterDataset(
-                generate_examples, label_list=label_list, vocab_info=vocab_info)
+                generate_examples(),
+                label_list=label_list,
+                vocab_info=vocab_info)
         else:
             examples = self._read(
                 filename,

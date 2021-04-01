@@ -19,7 +19,7 @@
         with open(data_path, 'r', encoding='utf-8') as f:
             # 跳过列名
             next(f)
-            for line in f.readlines():
+            for line in f:
                 words, labels = line.strip('\n').split('\t')
                 words = words.split('\002')
                 labels = labels.split('\002')

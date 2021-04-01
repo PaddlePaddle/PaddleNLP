@@ -19,6 +19,7 @@ from paddlenlp.data import Vocab
 from common_test import CpuCommonTest
 from collections import Counter
 import util
+import unittest
 
 
 class TestVocab(CpuCommonTest):
@@ -84,3 +85,7 @@ class TestVocab(CpuCommonTest):
         copied_vocab = Vocab.from_json(json_str)
         for key, value in copied_vocab.token_to_idx.items():
             self.check_output_equal(value, vocab[key])
+
+
+if __name__ == "__main__":
+    unittest.main()

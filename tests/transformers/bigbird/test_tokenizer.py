@@ -126,7 +126,7 @@ class TestBigBirdTokenizerUnusaulText(CpuCommonTest):
 
     def test_empty_text(self):
         ids = self.tokenizer('')
-        self.check_output_equal(ids, [])
+        self.check_output_equal(ids == [], True)
 
     def test_bytes(self):
         byte_text = 'An extremely powerful film that certainly isnt '\
@@ -167,3 +167,7 @@ class TestBigBirdTokenizerUNK(CpuCommonTest):
         # Chinese words don't exist in the provided vocabs 
         tokens = self.tokenizer(self.text)
         self.check_output_equal('<unk>' in tokens, True)
+
+
+if __name__ == "__main__":
+    unittest.main()
