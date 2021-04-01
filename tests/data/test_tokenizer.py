@@ -18,6 +18,7 @@ import os
 from paddlenlp.data import JiebaTokenizer, Vocab
 from common_test import CpuCommonTest
 from util import create_test_data
+import unittest
 
 
 class TestJiebaTokenizer(CpuCommonTest):
@@ -42,3 +43,7 @@ class TestJiebaTokenizer(CpuCommonTest):
         idx_arr = self.tokenizer.encode(text)
         self.check_output_equal(self.vocab[self.vocab.unk_token] in idx_arr,
                                 True)
+
+
+if __name__ == "__main__":
+    unittest.main()

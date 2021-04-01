@@ -22,6 +22,7 @@ from paddlenlp.transformers import create_bigbird_rand_mask_idx_list
 
 from common_test import CommonTest
 from util import softmax_with_cross_entropy
+import unittest
 
 
 def create_input_data(config):
