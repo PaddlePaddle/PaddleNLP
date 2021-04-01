@@ -135,6 +135,7 @@ def evaluate(model, loss_fct, metric, data_loader):
 
 
 def do_train(args):
+    paddle.set_device("gpu" if args.n_gpu else "cpu")
     set_seed(args)
 
     teacher_model = BertForSequenceClassification.from_pretrained(
@@ -151,10 +152,10 @@ def do_train(args):
 
     if args.task_name == "mnli":
         train_data_loader, dev_data_loader_matched, dev_data_loader_mismatched = create_glue_data_loader(
-            args.task_name)
+            args.task_name, model_name_or_path=args.model_name_or_path)
     else:
         train_data_loader, dev_data_loader = create_glue_data_loader(
-            args.task_name)
+            args.task_name, model_name_or_path=args.model_name_or_path)
 
     num_training_steps = args.max_steps if args.max_steps > 0 else (
         len(train_data_loader) * args.num_train_epochs)
@@ -190,6 +191,7 @@ def do_train(args):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
             input_ids, segment_ids, labels = batch
+
             student_logits, student_cls_token_hidden_states = student_model(
                 input_ids, segment_ids)
             if args.beta > 1e-7:
