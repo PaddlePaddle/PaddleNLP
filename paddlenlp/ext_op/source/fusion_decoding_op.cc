@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "fusion_decoding_op.h"
+#include "pd_traits.h"
 
 
 std::vector<paddle::Tensor> DecodingForward(
