@@ -20,6 +20,17 @@ import os
 import random
 import time
 
+os.environ['FLAGS_enable_parallel_graph'] = "0"
+os.environ['FLAGS_fraction_of_gpu_memory_to_use'] = "0.1"
+os.environ['FLAGS_sync_nccl_allreduce'] = "1"
+os.environ['FLAGS_eager_delete_tensor_gb'] = "0"
+os.environ['FLAGS_fuse_parameter_memory_size'] = "32"
+os.environ['FLAGS_fuse_parameter_groups_size'] = "50"
+os.environ['FLAGS_check_nan_inf'] = "0"
+os.environ['FLAGS_enable_sequential_execution'] = "1"
+os.path.expandvars('$HOME')
+os.path.expanduser('~')
+
 import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
@@ -30,17 +41,6 @@ from tensorboardX import SummaryWriter
 
 from data import create_pretrained_dataset
 import lr
-
-# os.environ['FLAGS_enable_parallel_graph'] = "0"
-# os.environ['FLAGS_fraction_of_gpu_memory_to_use'] = "0.1"
-# os.environ['FLAGS_sync_nccl_allreduce'] = "1"
-# os.environ['FLAGS_eager_delete_tensor_gb'] = "0"
-# os.environ['FLAGS_fuse_parameter_memory_size'] = "32"
-# os.environ['FLAGS_fuse_parameter_groups_size'] = "50"
-# os.environ['FLAGS_check_nan_inf'] = "0"
-# os.environ['FLAGS_enable_sequential_execution'] = "1"
-os.path.expandvars('$HOME')
-os.path.expanduser('~')
 
 MODEL_CLASSES = {
     "gpt2": (GPT2ForPretraining, GPT2Tokenizer),
