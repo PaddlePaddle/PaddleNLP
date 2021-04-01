@@ -100,12 +100,14 @@ def do_eval(args):
             tag_labels=tags,
             cls_label=cls_label)
         loss, seq_logits, cls_logits = outputs[0], outputs[1], outputs[2]
+
         correct = cls_acc.compute(
             pred=cls_logits.reshape([-1, len(labels_to_idx)]),
             label=cls_label.reshape([-1]))
         cls_acc.update(correct)
+        # import pdb; pdb.set_trace()
         scores, pred_tags = model.viterbi_decoder(seq_logits, seq_len)
-
+        # import pdb; pdb.set_trace()
         pred_cls_label = paddle.argmax(cls_logits, axis=-1, keepdim=False)
         seq_len_np = seq_len.numpy()
         for i, pred_tag in enumerate(pred_tags):
