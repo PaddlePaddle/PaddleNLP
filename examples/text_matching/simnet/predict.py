@@ -24,7 +24,7 @@ from utils import preprocess_prediction_data
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
-parser.add_argument("--use_gpu", type=eval, default=False, help="Whether use GPU for training, input should be True or False")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
 parser.add_argument("--vocab_path", type=str, default="./simnet_vocab.txt", help="The path to vocabulary.")
 parser.add_argument('--network', type=str, default="lstm", help="Which network you would like to choose bow, cnn, lstm or gru ?")
@@ -80,7 +80,7 @@ def predict(model, data, label_map, batch_size=1, pad_token_id=0):
 
 
 if __name__ == "__main__":
-    paddle.set_device("gpu") if args.use_gpu else paddle.set_device("cpu")
+    paddle.set_device(args.device)
     # Loads vocab.
     vocab = Vocab.load_vocabulary(
         args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')

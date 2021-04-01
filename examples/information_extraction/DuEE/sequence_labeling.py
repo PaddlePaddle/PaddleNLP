@@ -53,7 +53,7 @@ parser.add_argument("--checkpoints", type=str, default=None, help="Directory to 
 parser.add_argument("--init_ckpt", type=str, default=None, help="already pretraining model checkpoint")
 parser.add_argument("--predict_save_path", type=str, default=None, help="predict data save path")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument("--n_gpu", type=int, default=1, help="Number of GPUs to use, 0 for CPU.")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable.
 
@@ -133,12 +133,13 @@ class DuEventExtraction(paddle.io.Dataset):
 
 
 def do_train():
-    set_seed(args)
-    paddle.set_device("gpu" if args.n_gpu  else "cpu")
-
+    paddle.set_device(args.device)
     world_size = paddle.distributed.get_world_size()
+    rank = paddle.distributed.get_rank()
     if world_size > 1:
         paddle.distributed.init_parallel_env()
+
+    set_seed(args)
 
     no_entity_label = "O"
     ignore_label = -1
@@ -200,9 +201,9 @@ def do_train():
             optimizer.step()
             optimizer.clear_grad()
             loss_item = loss.numpy().item()
-            if step > 0 and step % args.skip_step == 0 and paddle.distributed.get_rank() == 0:
+            if step > 0 and step % args.skip_step == 0 and rank == 0:
                 print(f'train epoch: {epoch} - step: {step} (total: {num_training_steps}) - loss: {loss_item:.6f}')
-            if step > 0 and step % args.valid_step == 0 and paddle.distributed.get_rank() == 0:
+            if step > 0 and step % args.valid_step == 0 and rank == 0:
                 p, r, f1, avg_loss = evaluate(model, criterion, metric, len(label_map), dev_loader)
                 print(f'dev step: {step} - loss: {avg_loss:.5f}, precision: {p:.5f}, recall: {r:.5f}, ' \
                         f'f1: {f1:.5f} current best {best_f1:.5f}')
@@ -214,11 +215,13 @@ def do_train():
             step += 1
 
     # save the final model
-    if paddle.distributed.get_rank() == 0:
+    if rank == 0:
         paddle.save(model.state_dict(), '{}/final.pdparams'.format(args.checkpoints))
 
 
 def do_predict():
+    paddle.set_device(args.device)
+
     no_entity_label = "O"
     ignore_label = -1
 
@@ -279,9 +282,7 @@ def do_predict():
 
 if __name__ == '__main__':
 
-    if args.n_gpu > 1 and args.do_train:
-        paddle.distributed.spawn(do_train, nprocs=args.n_gpu)
-    elif args.do_train:
+    if args.do_train:
         do_train()
     elif args.do_predict:
         do_predict()
