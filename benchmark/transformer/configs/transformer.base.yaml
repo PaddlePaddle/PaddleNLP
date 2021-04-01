@@ -10,6 +10,8 @@ init_from_pretrain_model: ""
 init_from_params: "./trained_models/step_final/"
 # The directory for saving model
 save_model: "trained_models"
+# The directory for saving inference model 
+inference_model_dir: "infer_model"
 # Set seed for CE or debug
 random_seed: None
 # The file to output the translation results of predict_file to.
