@@ -101,6 +101,8 @@ def finalize(beam_size,
     if "beam_search" == decoding_strategy:
         parent_ids = paddle.slice(parent_ids, [0], [0],
                                   [max_seq_len]) % beam_size
+        print(ids.shape)
+        print(parent_ids.shape)
         ids = paddle.nn.functional.gather_tree(ids, parent_ids)
     return ids
 
@@ -132,17 +134,15 @@ class InferTransformerDecoding(nn.Layer):
                  beam_search_diversity_rate=0.0,
                  decoding_lib=None,
                  use_fp16_decoding=False):
-        # if decoding_lib is None:
-        #     raise ValueError(
-        #         "The args decoding_lib must be set to use Faster Transformer. ")
-        # elif not os.path.exists(decoding_lib):
-        #     raise ValueError("The path to decoding lib is not exist.")
+        if decoding_lib is None:
+            raise ValueError(
+                "The args decoding_lib must be set to use Faster Transformer. ")
+        elif not os.path.exists(decoding_lib):
+            raise ValueError("The path to decoding lib is not exist.")
 
         super(InferTransformerDecoding, self).__init__()
-        # paddle.utils.load_op_library(decoding_lib)
         paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-            "/paddle/fast_transformer/new/PaddleNLP/paddlenlp/ext_op/source/build/lib/libdecoding_op.so"
-        )
+            decoding_lib)
         for arg, value in locals().items():
             if arg not in [
                     "self", "decoder", "word_embedding", "positional_embedding",
@@ -330,6 +330,7 @@ class InferTransformerDecoding(nn.Layer):
             self._max_out_len,
             self._beam_search_diversity_rate)
 
+        print("  ", output_ids.shape)
         ids = finalize(
             self._beam_size,
             output_ids,

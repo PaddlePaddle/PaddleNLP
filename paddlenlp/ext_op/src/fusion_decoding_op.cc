@@ -176,7 +176,9 @@ std::vector<std::vector<int64_t>> DecodingInferShape(
   std::vector<int64_t> output_dims;
   std::vector<int64_t> sequence_length_dims({batch_size});
   if (decoding_strategy == "beam_search") {
-    batch_size /= beam_size;
+    if (batch_size != -1) {
+      batch_size /= beam_size;
+    }
     output_dims = {max_len, batch_size, beam_size};
     return {output_dims, output_dims, sequence_length_dims};
   } else if (decoding_strategy == "topk_sampling" ||
