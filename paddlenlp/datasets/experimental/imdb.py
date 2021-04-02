@@ -21,7 +21,7 @@ import string
 import numpy as np
 
 from paddle.dataset.common import md5file
-from paddle.utils.download import get_path_from_url
+from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
