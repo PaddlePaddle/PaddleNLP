@@ -31,16 +31,17 @@ def load_dict(dict_path):
 def convert_example(example,
                     tokenizer,
                     max_seq_len,
-                    tags_to_idx,
-                    labels_to_idx,
+                    tags_to_idx=None,
+                    labels_to_idx=None,
                     summary_num=2):
     words, tags, cls_label = example
-    tokens = [f"[CLS{i}]" for i in range(1, summary_num)] + words
+    tokens = ["[CLS%i]" % i for i in range(1, summary_num)] + words
     tokenized_input = tokenizer(
         tokens,
         return_length=True,
         is_split_into_words=True,
         max_seq_len=max_seq_len)
+
     if len(tokenized_input['input_ids']) - 1 - summary_num < len(tags):
         tags = tags[:len(tokenized_input['input_ids']) - 1 - summary_num]
     # '[CLS]' and '[SEP]' will get label 'O'

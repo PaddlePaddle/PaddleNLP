@@ -333,31 +333,25 @@ class ViterbiDecoder(nn.Layer):
             alpha = paddle.zeros((batch_size, self.num_tags), dtype='float32')
 
         for i, logit in enumerate(inputs_t):
-            # alpha_exp = alpha.unsqueeze(1).unsqueeze(-1)
-            # alpha_trn_sum[0][0].argmax(0)
-            alpha_exp = alpha.unsqueeze(2)  # alpha_exp 对应 path_scores
-            # alpha_trn_sum: batch_size, n_labels, 1
-            alpha_trn_sum = alpha_exp + trans_exp  # alpha_trn_sum 对应 summed_potentials
-            # 这里trans_exp[0].sum()是对的上transition_matrix[:265, :265].sum()，  -615789.18750000  vs  -615789.1875
-            # alpha_exp[0, 0].sum()对的上path_scores[timestep - 1][0][:265].sum() ， -1056.72094727  vs  -1056.7821
-            # alpha_exp[0]的4.28366852+trans_exp[0]的1.04717815确实=5.33084679
+            # if not with_start_stop_tag, the first label has not antecedent tag.
+            if i == 0 and not self.with_start_stop_tag:
+                alpha = logit
+                all_alpha.append(alpha)
+                continue
+            alpha_exp = alpha.unsqueeze(2)
+            # alpha_trn_sum: batch_size, n_labels, n_labels
+            alpha_trn_sum = alpha_exp + trans_exp
 
             # alpha_max: batch_size, n_labels
             # We don't include the emission scores here because the max does not depend on them (we add them in below)
-            alpha_max = alpha_trn_sum.max(1)  # alpha_max 对应 scores
-            if i == 1:
-                # print(alpha_exp[0,:].sum()) # -1056.72094727, torch: -1056.7821
-                import pdb
-                pdb.set_trace()
-            if i == 0:
-                # if self.with_start_stop_tag, the first antecedent tag must be START, drop it.
-                # else, the first label has not antecedent tag, pass it.
-                pass
-            else:
+            alpha_max = alpha_trn_sum.max(1)
+            # If with_start_stop_tag, the first antecedent tag must be START, else the first label has not antecedent tag. 
+            # So we can record the path from i=1.
+            if i >= 1:
                 alpha_argmax = alpha_trn_sum.argmax(1)
                 historys.append(alpha_argmax)
             # Now add the emission scores
-            alpha = alpha_max + logit if i != 0 else logit
+            alpha = alpha_max + logit
             all_alpha.append(alpha)
 
         # Get the valid alpha
