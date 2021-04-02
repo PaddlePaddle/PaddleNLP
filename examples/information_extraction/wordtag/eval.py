@@ -12,22 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
+import io
+import sys
 import argparse
-import time
-import random
-from functools import partial
 
 import paddle
-from paddle.io import DataLoader
-import numpy as np
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer, LinearDecayWithWarmup
-from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.data import Stack, Pad, Tuple
 
-from data import load_dataset, load_dict, convert_example
-from metric import SequenceAccuracy
+from predictor import WordtagPredictor
+from metric import wordseg_hard_acc, wordtag_hard_acc
 
 
 def parse_args():
@@ -35,7 +27,7 @@ def parse_args():
 
     # yapf: disable
     parser.add_argument("--data_dir", default="./data", type=str, help="The input data dir, should contain [train/test].json and [train/test]_metrics.json")
-    parser.add_argument("--model_dir", default="ernie-ctm", type=str, help="The pre-trained model checkpoint dir.")
+    parser.add_argument("--init_ckpt_dir", default="ernie-ctm", type=str, help="The pre-trained model checkpoint dir.")
     parser.add_argument("--max_seq_len",default=128,type=int,help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.", )
     parser.add_argument("--batch_size",default=32,type=int,help="Batch size per GPU/CPU for training.", )
     parser.add_argument("--n_gpu",default=1,type=int,help="number of gpus to use, 0 for cpu.")
@@ -47,81 +39,34 @@ def parse_args():
 
 def do_eval(args):
     paddle.set_device("gpu" if args.n_gpu else "cpu")
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
+    predictor = WordtagPredictor(args.init_ckpt_dir, "./data/tags.txt")
+    total_real = 0.0
+    total_pred = 0.0
+    seg_acc = 0.0
+    tag_acc = 0.0
+    for line in open("goden_set"):
+        line = line.strip()
+        wl = line.split("\t")
+        text = wl[0]
+        res = predictor.run(text)
+        pred_words = [(r["item"], r["wordtag_label"]) for r in res[0]["items"]]
+        real_words = [item.split("\\") for item in wl[1].split("  ")]
 
-    test_ds = load_dataset(datafiles=('./data/test.json'))
-    tags_to_idx = load_dict("./data/tags.txt")
-    labels_to_idx = load_dict("./data/classifier_labels.txt")
-    tokenizer = ErnieCtmTokenizer.from_pretrained(args.model_dir)
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_len=args.max_seq_len,
-        tags_to_idx=tags_to_idx,
-        labels_to_idx=labels_to_idx)
-    test_ds.map(trans_func)
+        seg_acc += wordseg_hard_acc(pred_words, real_words)
+        tag_acc += wordtag_hard_acc(pred_words, real_words)
+        total_pred += float(len(pred_words))
+        total_real += float(len(real_words))
+    precision = seg_acc / total_pred
+    recall = seg_acc / total_real
+    f1 = 2.0 * precision * recall / (precision + recall)
 
-    ignore_label = tags_to_idx["O"]
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-        Stack(),  # seq_len
-        Pad(axis=0, pad_val=ignore_label),  # tags
-        Stack(),  # cls_label
-    ): fn(samples)
+    print(f"Precision: {precision:g}, Recall: {recall:g}, F1: {f1:g}")
 
-    test_data_loader = DataLoader(
-        test_ds,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        batch_size=args.batch_size,
-        shuffle=False,
-        return_list=True)
+    precision = tag_acc / total_pred
+    recall = tag_acc / total_real
+    f1 = 2.0 * precision * recall / (precision + recall)
 
-    model = ErnieCtmWordtagModel.from_pretrained(
-        args.model_dir,
-        num_cls_label=len(labels_to_idx),
-        num_tag=len(tags_to_idx),
-        ignore_index=tags_to_idx["O"])
-
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
-
-    cls_acc = paddle.metric.Accuracy()
-    seq_acc, total_len = 0.0, 0.0
-    model.eval()
-    for batch in test_data_loader:
-        input_ids, token_type_ids, seq_len, tags, cls_label = batch
-        outputs = model(
-            input_ids,
-            token_type_ids,
-            lengths=seq_len,
-            tag_labels=tags,
-            cls_label=cls_label)
-        loss, seq_logits, cls_logits = outputs[0], outputs[1], outputs[2]
-
-        correct = cls_acc.compute(
-            pred=cls_logits.reshape([-1, len(labels_to_idx)]),
-            label=cls_label.reshape([-1]))
-        cls_acc.update(correct)
-        # import pdb; pdb.set_trace()
-        scores, pred_tags = model.viterbi_decoder(seq_logits, seq_len)
-        # import pdb; pdb.set_trace()
-        pred_cls_label = paddle.argmax(cls_logits, axis=-1, keepdim=False)
-        seq_len_np = seq_len.numpy()
-        for i, pred_tag in enumerate(pred_tags):
-            pred_tag = pred_tag[:int(seq_len_np[i])]
-            if pred_cls_label[i] != labels_to_idx["其他文本"]:
-                continue
-            total_len += float(len(pred_tag))
-            for j, tag in enumerate(pred_tag):
-                if tag == tags[i, j]:
-                    seq_acc += 1.0
-
-    logger.info(
-        "[Evaluating] Classification Accuracy: %6f,  Sequence Labeling Accuracy: %6f"
-        % (cls_acc.accumulate(), seq_acc / total_len))
+    print(f"Precision: {precision:g}, Recall: {recall:g}, F1: {f1:g}")
 
 
 def print_arguments(args):
