@@ -15,6 +15,12 @@
 ```
 ## 快速开始
 
+### 环境依赖
+
+- sentencepiece
+
+安装命令：`pip install sentencepiece`
+
 ### 数据准备
 根据论文中的信息，目前 Big Bird 的预训练数据是主要是由 Books，CC-News，Stories, Wikipedia 4种预训练数据来构造，用户可以根据自己的需要来下载和清洗相应的数据。目前已提供一份示例数据在 data 目录。
 
@@ -82,7 +88,7 @@ python run_classifier.py --model_name_or_path bigbird-base-uncased \
 - `max_encoder_length` MLM任务的最大的token数目。
 
 
-基于`bigbird-base-uncased-finetune`在IMDB评测任务上Fine-tuning后，在验证集上有如下结果：
+基于`bigbird-base-uncased`在IMDB评测任务上Fine-tuning后，在验证集上有如下结果：
 
 | Task  | Metric                       | Result            |
 |:-----:|:----------------------------:|:-----------------:|
