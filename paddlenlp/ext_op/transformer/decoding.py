@@ -101,8 +101,6 @@ def finalize(beam_size,
     if "beam_search" == decoding_strategy:
         parent_ids = paddle.slice(parent_ids, [0], [0],
                                   [max_seq_len]) % beam_size
-        print(ids.shape)
-        print(parent_ids.shape)
         ids = paddle.nn.functional.gather_tree(ids, parent_ids)
     return ids
 
@@ -330,7 +328,6 @@ class InferTransformerDecoding(nn.Layer):
             self._max_out_len,
             self._beam_search_diversity_rate)
 
-        print("  ", output_ids.shape)
         ids = finalize(
             self._beam_size,
             output_ids,
