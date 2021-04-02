@@ -3,7 +3,7 @@ unset CUDA_VISIBLE_DEVICES
 PYTHONPATH=../../../ python -u  -m paddle.distributed.fleet.launch --gpus 3 --log_dir ./log run_pretrain_static.py \
     --model_type gpt2\
     --model_name_or_path gpt2-medium-en \
-    --input_dir "./new_data" \
+    --input_dir "./mega_data" \
     --output_dir "output" \
     --max_lr 0.00015\
     --min_lr 0.00001\
@@ -15,4 +15,4 @@ PYTHONPATH=../../../ python -u  -m paddle.distributed.fleet.launch --gpus 3 --lo
     --use_amp True\
     --warmup_rate .1\
     --batch_size 6\
-    --select_devices gpu
+    --device gpu

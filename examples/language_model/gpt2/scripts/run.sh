@@ -9,7 +9,8 @@ python run_pretrain.py --model_type gpt2\
     --grad_clip 1.0\
     --max_steps 500000\
     --save_steps 100000\
+    --eval_steps 2000\
     --decay_steps 320000\
     --warmup_rate 0.01\
-    --batch_size 8\
-    --select_devices gpu
+    --batch_size 16\
+    --device gpu

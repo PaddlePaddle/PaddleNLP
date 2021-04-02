@@ -197,7 +197,7 @@ def parse_args():
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
-        "--select_devices",
+        "--device",
         type=str,
         default="gpu",
         help="select cpu, gpu, xpu devices.")
@@ -346,10 +346,10 @@ def do_train(args):
     args.test_iters = args.eval_iters * 5
     # Initialize the paddle and paddle fleet execute environment
     paddle.enable_static()
-    assert args.select_devices in [
+    assert args.device in [
         "cpu", "gpu", "xpu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
-    place = paddle.set_device(args.select_devices)
+    place = paddle.set_device(args.device)
     fleet.init(is_collective=True)
 
     worker_num = fleet.worker_num()
@@ -358,6 +358,8 @@ def do_train(args):
     # Create the random seed for the worker
     set_seed(args, worker_index)
     worker_init = WorkerInitObj(args.seed + worker_index)
+
+    # create log write
     log_writer_path = os.path.join(
         args.output_dir, "gpt2_bs={}_amp={}_recompute={}_card={}".format(
             args.batch_size, args.use_amp, args.use_recompute, worker_num))
@@ -523,7 +525,7 @@ def do_train(args):
                                      args.eval_iters, "valid")
                         tic_train = time.time()
 
-                if global_step % args.save_steps == 0:
+                if global_step % args.save_steps == 0 or global_step >= args.max_steps:
                     if worker_index == 0:
                         output_dir = os.path.join(args.output_dir,
                                                   "model_%d" % global_step)

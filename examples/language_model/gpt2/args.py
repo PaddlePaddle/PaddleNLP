@@ -108,6 +108,16 @@ def parse_args(MODEL_CLASSES):
         default=1,
         help="Log every X updates steps.")
     parser.add_argument(
+        "--eval_steps",
+        type=int,
+        default=500,
+        help="Evaluate for every X updates steps.")
+    parser.add_argument(
+        "--eval_iters",
+        type=int,
+        default=10,
+        help="Evaluate for every X updates steps.")
+    parser.add_argument(
         "--save_steps",
         type=int,
         default=500,
@@ -115,9 +125,10 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
-        "--select_devices",
+        "--device",
         type=str,
         default="gpu",
         help="select cpu, gpu, xpu devices.")
     args = parser.parse_args()
+    args.test_iters = args.eval_iters
     return args

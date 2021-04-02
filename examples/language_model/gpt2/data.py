@@ -193,8 +193,14 @@ def _build_shuffle_idx(num_samples, total_size, np_rng):
     return np.concatenate((shuffle_idx_first, shuffle_idx_last))
 
 
-def create_pretrained_dataset(args, input_path, worker_init, worker_index,
-                              worker_num, eod_id, places, data_holders):
+def create_pretrained_dataset(args,
+                              input_path,
+                              worker_init,
+                              worker_index,
+                              worker_num,
+                              eod_id,
+                              places=None,
+                              data_holders=None):
     print("the distributed run, worker_num:{}".format(worker_num))
 
     process_datas = np.load(input_path, mmap_mode="r+", allow_pickle=True)
