@@ -24,8 +24,7 @@ def parse_args():
         help="Path of the config file. ")
     parser.add_argument(
         "--decoding-lib",
-        # default="./build/lib/libdecoding_op.so",
-        default="/paddle/fast_transformer/new/PaddleNLP/paddlenlp/ext_op/src/build/lib/libdecoding_op.so",
+        default="./build/lib/libdecoding_op.so",
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(
