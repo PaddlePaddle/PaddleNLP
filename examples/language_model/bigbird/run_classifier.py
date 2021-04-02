@@ -111,7 +111,8 @@ def main():
     set_seed(args)
     # Define the model and metric 
     model = BigBirdForSequenceClassification.from_pretrained(
-        args.model_name_or_path)
+        args.model_name_or_path, attn_dropout=0.0, hidden_dropout_prob=0.0)
+
     criterion = nn.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
 

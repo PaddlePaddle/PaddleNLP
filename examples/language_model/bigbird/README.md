@@ -61,7 +61,7 @@ python -m paddle.distributed.launch --gpus "0" --log_dir log  run_pretrain.py --
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python run_classifier.py --model_name_or_path bigbird-base-uncased-finetune \
+python run_classifier.py --model_name_or_path bigbird-base-uncased \
     --output_dir "output" \
     --batch_size 2 \
     --learning_rate 1e-5 \
@@ -72,7 +72,7 @@ python run_classifier.py --model_name_or_path bigbird-base-uncased-finetune \
 
 其中参数释义如下：
 
-- `model_name_or_path` 指示了finetune使用的具体预训练模型以及预训练时使用的tokenizer，目前支持的预训练模型有："bigbird-base-uncased", "bigbird-base-uncased-finetune"。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"。
+- `model_name_or_path` 指示了finetune使用的具体预训练模型以及预训练时使用的tokenizer，目前支持的预训练模型有："bigbird-base-uncased"。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"。
 - `output_dir` 指定输出文件。
 - `batch_size` 训练的batch大小。
 - `learning_rate` 训练的学习率。
