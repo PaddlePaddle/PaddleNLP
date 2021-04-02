@@ -203,4 +203,8 @@ PaddleNLP内置了多种collate function，配合 :class:`paddle.io.BatchSampler
         Stack(dtype="int64")  # label
     }): fn(samples)
 
-可以看到，:func:`Dict` 函数是将单条数据中的键值与 :func:`Pad` 等函数进行对应，适用于单条数据是字典的情况。而 :func:`Tuple` 是通过单条数据中不同部分的index进行对应的。所以需要注意的是 :func:`convert_example` 方法和 :func:`batchify_fn` 方法的匹配。 
+可以看到，:func:`Dict` 函数是将单条数据中的键值与 :func:`Pad` 等函数进行对应，适用于单条数据是字典的情况。而 :func:`Tuple` 是通过单条数据中不同部分的index进行对应的。
+
+所以需要 **注意** 的是 :func:`convert_example` 方法和 :func:`batchify_fn` 方法的匹配。
+
+之后的流程与基于预训练模型的数据处理相同。

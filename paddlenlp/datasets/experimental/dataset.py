@@ -18,7 +18,7 @@ import math
 import os
 import warnings
 import sys
-import itertools
+import inspect
 
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset
@@ -54,23 +54,34 @@ def import_main_class(module_path):
     return module_main_cls
 
 
-def load_dataset(path,
+def load_dataset(path_or_read_func,
                  name=None,
                  data_files=None,
                  splits=None,
                  lazy=None,
                  **kwargs):
+    if inspect.isfunction(path_or_read_func):
+        assert lazy is not None, "lazy can not be None in custom mode."
+        kwargs['name'] = name
+        kwargs['data_files'] = data_files
+        kwargs['splits'] = splits
+        custom_kwargs = {}
+        for name in inspect.signature(path_or_read_func).parameters.keys():
+            if name in kwargs.keys():
+                custom_kwargs[name] = kwargs[name]
 
-    reader_cls = import_main_class(path)
-    if not name:
-        reader_instance = reader_cls(lazy=lazy, **kwargs)
+        reader_instance = SimpleBuilder(lazy=lazy, read_func=path_or_read_func)
+        return reader_instance.read(**custom_kwargs)
     else:
-        reader_instance = reader_cls(lazy=lazy, name=name, **kwargs)
+        reader_cls = import_main_class(path_or_read_func)
+        if not name:
+            reader_instance = reader_cls(lazy=lazy, **kwargs)
+        else:
+            reader_instance = reader_cls(lazy=lazy, name=name, **kwargs)
 
-    datasets = reader_instance.read_datasets(
-        data_files=data_files, splits=splits)
-
-    return datasets
+        datasets = reader_instance.read_datasets(
+            data_files=data_files, splits=splits)
+        return datasets
 
 
 class MapDataset(Dataset):
@@ -208,14 +219,26 @@ class IterDataset(IterableDataset):
 
     def __iter__(self):
         num_samples = 0
-        self.data, data = itertools.tee(self.data)
-        for example in data:
-            if (not self._filter_pipline or
-                    self._filter(self._filter_pipline)) and self._shard_filter(
-                        num_samples=num_samples):
-                yield self._transform(
-                    example) if self._transform_pipline else example
-            num_samples += 1
+        if inspect.isfunction(self.data):
+            for example in self.data():
+                if (not self._filter_pipline or
+                        self._filter(self._filter_pipline)
+                    ) and self._shard_filter(num_samples=num_samples):
+                    yield self._transform(
+                        example) if self._transform_pipline else example
+                num_samples += 1
+        else:
+            if inspect.isgenerator(self.data):
+                warnings.warn(
+                    'Reciving generator as data source, data can only be iterated once'
+                )
+            for example in self.data:
+                if (not self._filter_pipline or
+                        self._filter(self._filter_pipline)
+                    ) and self._shard_filter(num_samples=num_samples):
+                    yield self._transform(
+                        example) if self._transform_pipline else example
+                num_samples += 1
 
     def filter(self, fn):
         """
@@ -449,3 +472,26 @@ class DatasetBuilder:
         Return vocab file path of the dataset if specified.
         """
         return None
+
+
+class SimpleBuilder(DatasetBuilder):
+    def __init__(self, lazy, read_func):
+        self._read = read_func
+        self.lazy = lazy
+
+    def read(self, **kwargs):
+        if self.lazy:
+
+            def generate_examples():
+                generator = self._read(**kwargs)
+                for example in generator:
+                    yield example
+
+            return IterDataset(generate_examples)
+        else:
+            examples = self._read(**kwargs)
+            if hasattr(examples, '__len__') and hasattr(examples,
+                                                        '__getitem__'):
+                return MapDataset(examples)
+            else:
+                return MapDataset(list(examples))
