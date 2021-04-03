@@ -40,7 +40,8 @@
 按如下方式启动 Fine-tuning:
 
 ```shell
-python -u ./run_du.py \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" run_du.py \
     --model_type bert \
     --model_name_or_path bert-base-chinese \
     --max_seq_length 384 \
@@ -52,7 +53,7 @@ python -u ./run_du.py \
     --warmup_proportion 0.1 \
     --weight_decay 0.01 \
     --output_dir ./tmp/dureader-yesno/ \
-    --n_gpu 1 \
+    --device gpu \
  ```
 
 * `model_type`: 预训练模型的种类。如bert，ernie，roberta等。
