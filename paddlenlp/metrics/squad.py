@@ -61,11 +61,9 @@ def compute_prediction(examples,
         features), "Number of predictions should be equal to number of features."
 
     # Build a map example to its corresponding features.
-    example_id_to_index = {k['id']: i for i, k in enumerate(examples)}
     features_per_example = collections.defaultdict(list)
     for i, feature in enumerate(features):
-        features_per_example[example_id_to_index[feature["example_id"]]].append(
-            i)
+        features_per_example[feature["example_id"]].append(i)
 
     # The dictionaries we have to fill.
     all_predictions = collections.OrderedDict()
@@ -76,7 +74,7 @@ def compute_prediction(examples,
     # Let's loop over all the examples!
     for example_index, example in enumerate(examples):
         # Those are the indices of the features associated to the current example.
-        feature_indices = features_per_example[example_index]
+        feature_indices = features_per_example[example['id']]
 
         min_null_prediction = None
         prelim_predictions = []

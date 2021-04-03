@@ -31,7 +31,7 @@ parser.add_argument("--params_path", type=str, required=True, help="The path to 
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--n_gpu", type=int, default=1, help="Number of GPUs to use, 0 for CPU.")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -142,7 +142,7 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
 
 
 if __name__ == "__main__":
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
     tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
