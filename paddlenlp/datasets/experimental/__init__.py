@@ -13,6 +13,21 @@
 # limitations under the License.
 
 from .dataset import *
+from .chnsenticorp import *
+from .cmrc2018 import *
+from .drcd import *
+from .dureader_robust import *
+from .glue import *
+from .lcqmc import *
 from .msra_ner import *
 from .ptb import *
 from .squad import *
+from .peoples_daily_ner import *
+from .poetry import *
+from .cmrc2018 import *
+from .drcd import *
+from .dureader_robust import *
+from .glue import *
+from .wmt14ende import *
+from .couplet import *
+from .yahoo_answer_100k import *

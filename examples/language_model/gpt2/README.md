@@ -7,6 +7,7 @@
 
 ```text
 .
+├── args.py                 # 训练参数配置
 ├── data.py                 # 数据处理
 ├── decompress.sh           # 数据集解压脚本
 ├── generate_sample.py      # 生成文本示例demo
@@ -14,23 +15,17 @@
 ├── process_data.py         # 数据预处理脚本
 ├── README.md               # 文档
 ├── run_pretrain.py         # 预训练入口
+├── run_eval.py             # 评估入口
 └── scripts                 # 训练脚本
 ```
 
 ## 快速开始
 
-### 安装说明
-
-* PaddlePaddle 安装
-
-    本项目依赖于 PaddlePaddle 2.0及以上版本或适当的develop版本，请参考 [安装指南](https://www.paddlepaddle.org.cn/install/quick) 进行安装
-
-* PaddleNLP 以及其他依赖安装
-
-    ```shell
-    pip install paddlenlp==2.0.0rc
-    pip install regex sentencepiece
-    ```
+### 环境依赖
+- regex
+- sentencepiece
+- tqdm
+安装命令 `pip install regex sentencepiece tqdm`
 
 ### 数据准备
 
@@ -73,6 +68,7 @@ mkdir data
 mv train.data.json_ids.npz data
 ```
 
+### 模型训练
 
 #### 单卡训练
 
@@ -105,7 +101,7 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
 
 用户也可以使用提供的shell脚本直接训练`sh scripts/run.sh`.
 
-### 单机多卡
+#### 单机多卡
 
 同样，可以执行如下命令实现八卡训练：
 
@@ -128,7 +124,42 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
 
 用户也可以使用提供的shell脚本直接训练`sh scripts/run_multi.sh`.
 
-#### 文本生成
+### 模型评估
+
+我们提供了对[WikiText](https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip)、[LAMBADA](https://raw.githubusercontent.com/cybertronai/bflm/master/lambada_test.jsonl)两种数据集的评估脚本, 使用如下命令启动评估：
+
+1. WikiText数据集评估
+```bash
+python run_eval.py --model_name gpt2-medium-en \
+    --eval_path ./wikitext-103/wiki.valid.tokens \
+    --overlapping_eval 32 \
+    --init_checkpoint_path ./output/model_100000/model_state.pdparams \
+    --batch_size 8 \
+    --device gpu
+```
+
+2. LAMBADA数据集评估
+```bash
+python run_eval.py --model_name gpt2-medium-en \
+    --eval_path ./lambada_test.jsonl \
+    --cloze_eval \
+    --init_checkpoint_path ./output/model_100000/model_state.pdparams \
+    --batch_size 8 \
+    --device gpu
+```
+其中参数释义如下：
+`model_name` 使用的模型名称，如gpt2-samll-en等。
+`eval_path` 数据集地址。
+`init_checkpoint_path` 模型参数地址
+`batch_size` batch size大小。
+`device` 运行设备，cpu，gpu，xpu可选。
+`overlapping_eval` wikitext数据集参数。
+`cloze_eval` lambada数据参数，作为完型填空任务。
+
+其中数据集WikiText采用的是PPL(perplexity)评估指标，LAMBADA采用的是ACC(accuracy)指标。不设置`init_checkpoint_path` 参数时，可以评估默认预训练好的模型参数。
+
+
+### 文本生成
 
 本项目提供了简单的文本生成的demo，供用户测试文本生成效果。
 

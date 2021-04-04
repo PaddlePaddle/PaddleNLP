@@ -86,7 +86,7 @@ def do_train(config):
                 tic_train = time.time()
             loss.backward()
             optimizer.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             if global_step % config.save_per_step == 0:
                 if paddle.distributed.get_rank() == 0:
                     output_dir = os.path.join(config.output_path,

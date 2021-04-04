@@ -19,12 +19,6 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument(
-        '--use_gpu',
-        type=eval,
-        default=False,
-        help='Whether using gpu [True|False]')
-
-    parser.add_argument(
         "--learning_rate",
         type=float,
         default=0.001,
@@ -86,6 +80,12 @@ def parse_args():
 
     parser.add_argument(
         "--beam_size", type=int, default=10, help="file name for inference")
+
+    parser.add_argument(
+        "--device",
+        default="gpu",
+        choices=["gpu", "cpu", "xpu"],
+        help="Device selected for inference.")
 
     args = parser.parse_args()
     return args

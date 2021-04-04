@@ -14,22 +14,23 @@
 
 from args import parse_args
 
-from data import create_train_loader
-from model import Seq2SeqAttnModel, CrossEntropyCriterion
-
 import numpy as np
-
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddlenlp.metrics import Perplexity
 
+from data import create_train_loader
+from model import Seq2SeqAttnModel, CrossEntropyCriterion
+
 
 def do_train(args):
-    device = paddle.set_device("gpu" if args.use_gpu else "cpu")
+    device = paddle.set_device(args.device)
 
     # Define dataloader
-    train_loader, vocab_size, pad_id = create_train_loader(args.batch_size)
+    train_loader, vocab = create_train_loader(args.batch_size)
+    vocab_size = len(vocab)
+    pad_id = vocab[vocab.eos_token]
 
     model = paddle.Model(
         Seq2SeqAttnModel(vocab_size, args.hidden_size, args.hidden_size,
@@ -46,8 +47,7 @@ def do_train(args):
               eval_freq=1,
               save_freq=1,
               save_dir=args.model_path,
-              log_freq=args.log_freq,
-              callbacks=[paddle.callbacks.VisualDL('./log')])
+              log_freq=args.log_freq)
 
 
 if __name__ == "__main__":

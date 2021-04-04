@@ -38,25 +38,11 @@ Transformer 中的 Encoder 由若干相同的 layer 堆叠组成，每个 layer 
 
 Decoder 具有和 Encoder 类似的结构，只是相比于组成 Encoder 的 layer ，在组成 Decoder 的 layer 中还多了一个 Multi-Head Attention 的 sub-layer 来实现对 Encoder 输出的 Attention，这个 Encoder-Decoder Attention 在其他 Seq2Seq 模型中也是存在的。
 
-## 安装说明
-
- * PaddlePaddle安装
-
-    本项目依赖于 PaddlePaddle 2.0.0 及以上版本或适当的develop版本，请参考 [安装指南](https://www.paddlepaddle.org.cn/install/quick) 进行安装
-
-* PaddleNLP安装
-
-```shell
-pip install paddlenlp==2.0.0rc
-```
-
-* 环境依赖
+## 环境依赖
   - attrdict
   - pyyaml
 
-```shell
-pip install attrdict pyyaml
-```
+安装命令：`pip install attrdict pyyaml`
 
 ## 数据准备
 
@@ -65,10 +51,7 @@ pip install attrdict pyyaml
 同时，我们提供了一份已经处理好的数据集，可以编写如下代码，对应的数据集将会自动下载并且解压到 `~/.paddlenlp/datasets/machine_translation/WMT14ende/`。
 
 ``` python
-# 获取默认的数据处理方式
-transform_func = WMT14ende.get_default_transform_func(root=root)
-# 下载并处理 WMT14.en-de 翻译数据集
-dataset = WMT14ende.get_datasets(mode="train", transform_func=transform_func)
+datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
 ```
 
 ## 单机训练
@@ -132,6 +115,10 @@ python deploy/python/inference.py  --config ./configs/transformer.base.yaml
 
 翻译结果同样将会保存在 `predict.txt` 文件中，可以在配置文件中自定义更改 `output_file` 来指定预测结果写入到的文件的名称。
 
+## 使用 Faster Transformer 实现预测
+
+具体的说明可以参考 `faster_transformer/README.md`。`cd faster_transformer/` 即可查看。
+
 ## 模型评估
 
 预测结果中每行输出是对应行输入的得分最高的翻译，对于使用 BPE 的数据，预测出的翻译结果也将是 BPE 表示的数据，要还原成原始的数据（这里指 tokenize 后的数据）才能进行正确的评估。评估过程具体如下（BLEU 是翻译任务常用的自动评估方法指标）：
@@ -142,7 +129,7 @@ sed -r 's/(@@ )|(@@ ?$)//g' predict.txt > predict.tok.txt
 # 若无 BLEU 评估工具，需先进行下载
 git clone https://github.com/moses-smt/mosesdecoder.git
 # 以英德翻译 newstest2014 测试数据为例
-perl mosesdecoder/scripts/generic/multi-bleu.perl ~/.paddlenlp/datasets/machine_translation/WMT14ende/WMT14.en-de/wmt14_ende_data/newstest2014.tok.de < predict.tok.txt
+perl mosesdecoder/scripts/generic/multi-bleu.perl ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data/newstest2014.tok.de < predict.tok.txt
 ```
 
 执行上述操作之后，可以看到类似如下的结果，此处结果是 big model 在 newstest2014 上的 BLEU 结果：

@@ -1,3 +1,17 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from copy import deepcopy
 
 import numpy as np
@@ -13,19 +27,19 @@ def convert_example(tokenizer,
                     use_random_noice=False):
     def warpper(example):
         """convert an example into necessary features"""
-
-        encoded_src = tokenizer.encode(
-            example[0], max_seq_len=max_encode_len, pad_to_max_seq_len=False)
-        src_ids, src_sids = encoded_src["input_ids"], encoded_src["segment_ids"]
+        tokens = example['tokens']
+        labels = example['labels']
+        encoded_src = tokenizer(
+            tokens, max_seq_len=max_encode_len, pad_to_max_seq_len=False)
+        src_ids, src_sids = encoded_src["input_ids"], encoded_src[
+            "token_type_ids"]
         src_pids = np.arange(len(src_ids))
 
         if not is_test:
-            encoded_tgt = tokenizer.encode(
-                example[1],
-                max_seq_len=max_decode_len,
-                pad_to_max_seq_len=False)
+            encoded_tgt = tokenizer(
+                labels, max_seq_len=max_decode_len, pad_to_max_seq_len=False)
             tgt_ids, tgt_sids = encoded_tgt["input_ids"], encoded_tgt[
-                "segment_ids"]
+                "token_type_ids"]
             tgt_ids = np.array(tgt_ids)
             tgt_sids = np.array(tgt_sids) + tgt_type_id
             tgt_pids = np.arange(len(tgt_ids)) + len(src_ids)

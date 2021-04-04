@@ -56,22 +56,6 @@ PaddleNLP提供了丰富的预训练模型，并且可以便捷地获取PaddlePa
 
 ## 快速开始
 
-### 安装说明
-
-* PaddlePaddle 安装
-
-   本项目依赖于 PaddlePaddle 2.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* PaddleNLP 安装
-
-   ```shell
-   pip install paddlenlp >= 2.0.0rc
-   ```
-
-* 环境依赖
-
-   Python的版本要求 3.6+，其它环境请参考 PaddlePaddle [安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/1.5/beginners_guide/install/index_cn.html) 部分的内容
-
 ### 代码结构说明
 
 以下是本项目主要代码结构及说明：
@@ -87,9 +71,8 @@ sentence_transformers/
 
 我们以中文文本匹配公开数据集LCQMC为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 ```shell
-# 设置使用的GPU卡号
-CUDA_VISIBLE_DEVICES=0
-python train.py --save_dir ./checkpoints
+$ unset CUDA_VISIBLE_DEVICES
+$ python -m paddle.distributed.launch --gpus "0" train.py --device "gpu" --save_dir ./checkpoints
 ```
 
 可支持配置的参数：
@@ -103,7 +86,7 @@ python train.py --save_dir ./checkpoints
 * `warmup_proption`：可选，学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.1。
 * `init_from_ckpt`：可选，模型参数路径，热启动模型训练；默认为None。
 * `seed`：可选，随机种子，默认为1000.
-* `n_gpu`：可选，训练过程中使用GPU卡数量，默认为1。若n_gpu=0，则使用CPU训练。
+* `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 
 代码示例中使用的预训练模型是ERNIE，如果想要使用其他预训练模型如BERT，RoBERTa，Electra等，只需更换`model` 和 `tokenizer`即可。
 
@@ -164,8 +147,8 @@ checkpoints/
 
 启动预测：
 ```shell
-CUDA_VISIBLE_DEVICES=0
-python predict.py --params_path checkpoints/model_400/model_state.pdparams
+export CUDA_VISIBLE_DEVICES=0
+python predict.py --device "gpu" --params_path checkpoints/model_400/model_state.pdparams
 ```
 
 将待预测数据如以下示例：
@@ -187,63 +170,9 @@ Data: ['小蝌蚪找妈妈怎么样', '小蝌蚪找妈妈是谁画的']      Lab
 ```
 
 
-## 引用
+## Reference
 
 关于Sentence Transformer更多信息参考[www.SBERT.net](https://www.sbert.net)以及论文：
 - [Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks](https://arxiv.org/abs/1908.10084) (EMNLP 2019)
 - [Making Monolingual Sentence Embeddings Multilingual using Knowledge Distillation](https://arxiv.org/abs/2004.09813) (EMNLP 2020)
 - [Augmented SBERT: Data Augmentation Method for Improving Bi-Encoders for Pairwise Sentence Scoring Tasks](https://arxiv.org/abs/2010.08240) (arXiv 2020)
-
-```
-@inproceedings{reimers-2019-sentence-bert,
-    title = "Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks",
-    author = "Reimers, Nils and Gurevych, Iryna",
-    booktitle = "Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing",
-    month = "11",
-    year = "2019",
-    publisher = "Association for Computational Linguistics",
-    url = "https://arxiv.org/abs/1908.10084",
-}
-```
-
-```
-@inproceedings{reimers-2020-multilingual-sentence-bert,
-    title = "Making Monolingual Sentence Embeddings Multilingual using Knowledge Distillation",
-    author = "Reimers, Nils and Gurevych, Iryna",
-    booktitle = "Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing",
-    month = "11",
-    year = "2020",
-    publisher = "Association for Computational Linguistics",
-    url = "https://arxiv.org/abs/2004.09813",
-}
-```
-
-```
-@article{thakur-2020-AugSBERT,
-    title = "Augmented SBERT: Data Augmentation Method for Improving Bi-Encoders for Pairwise Sentence Scoring Tasks",
-    author = "Thakur, Nandan and Reimers, Nils and Daxenberger, Johannes and  Gurevych, Iryna",
-    journal= "arXiv preprint arXiv:2010.08240",
-    month = "10",
-    year = "2020",
-    url = "https://arxiv.org/abs/2010.08240",
-}
-```
-
-
-## 线上体验教程
-
-- [使用seq2vec模块进行句子情感分类](https://aistudio.baidu.com/aistudio/projectdetail/1283423)
-
-- [如何将预训练模型Fine-tune下游任务](https://aistudio.baidu.com/aistudio/projectdetail/1294333)
-
-- [使用Bi-GRU+CRF完成快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1317771)
-
-- [使用预训练模型ERNIE优化快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1329361)
-
-- [使用Seq2Seq模型完成自动对联模型](https://aistudio.baidu.com/aistudio/projectdetail/1321118)
-
-- [使用预训练模型ERNIE-GEN实现智能写诗](https://aistudio.baidu.com/aistudio/projectdetail/1339888)
-
-- [使用TCN网络完成新冠疫情病例数预测](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
-
-更多教程参见[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。

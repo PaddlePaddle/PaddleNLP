@@ -24,6 +24,7 @@ import paddle.nn.functional as F
 
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 # yapf: disable
@@ -38,7 +39,7 @@ parser.add_argument("--epochs", default=3, type=int, help="Total number of train
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument("--n_gpu", type=int, default=1, help="Number of GPUs to use, 0 for CPU.")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -65,8 +66,8 @@ def evaluate(model, criterion, metric, data_loader):
     metric.reset()
     losses = []
     for batch in data_loader:
-        input_ids, segment_ids, labels = batch
-        logits = model(input_ids, segment_ids)
+        input_ids, token_type_ids, labels = batch
+        logits = model(input_ids, token_type_ids)
         loss = criterion(logits, labels)
         losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
@@ -77,11 +78,7 @@ def evaluate(model, criterion, metric, data_loader):
     metric.reset()
 
 
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_length=512,
-                    is_test=False):
+def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
@@ -104,32 +101,24 @@ def convert_example(example,
         example(obj:`list[str]`): List of input data, containing text and label if it have label.
         tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        label_list(obj:`list[str]`): All the labels that the data has.
         max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
             Sequences longer than this will be truncated, sequences shorter will be padded.
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
 
     Returns:
         input_ids(obj:`list[int]`): The list of token ids.
-        segment_ids(obj: `list[int]`): List of sequence pair mask.
+        token_type_ids(obj: `list[int]`): List of sequence pair mask.
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
-    text, label = example
-    encoded_inputs = tokenizer.encode(text=text, max_seq_len=max_seq_length)
+    encoded_inputs = tokenizer(text=example["text"], max_seq_len=max_seq_length)
     input_ids = encoded_inputs["input_ids"]
-    segment_ids = encoded_inputs["segment_ids"]
+    token_type_ids = encoded_inputs["token_type_ids"]
 
     if not is_test:
-        #create label maps if classification task
-        if label_list:
-            label_map = {}
-            for (i, l) in enumerate(label_list):
-                label_map[l] = i
-            label = label_map[label]
-        label = np.array([label], dtype="int64")
-        return input_ids, segment_ids, label
+        label = np.array([example["label"]], dtype="int64")
+        return input_ids, token_type_ids, label
     else:
-        return input_ids, segment_ids
+        return input_ids, token_type_ids
 
 
 def create_dataloader(dataset,
@@ -138,7 +127,7 @@ def create_dataloader(dataset,
                       batchify_fn=None,
                       trans_fn=None):
     if trans_fn:
-        dataset = dataset.apply(trans_fn, lazy=True)
+        dataset = dataset.map(trans_fn)
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
@@ -156,21 +145,22 @@ def create_dataloader(dataset,
 
 
 def do_train():
-    set_seed(args.seed)
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
-    world_size = paddle.distributed.get_world_size()
-    if world_size > 1:
+    paddle.set_device(args.device)
+    rank = paddle.distributed.get_rank()
+    if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    train_dataset, dev_dataset, test_dataset = ppnlp.datasets.ChnSentiCorp.get_datasets(
-        ['train', 'dev', 'test'])
+    set_seed(args.seed)
+
+    train_ds, dev_ds, test_ds = load_dataset(
+        "chnsenticorp", splits=["train", "dev", "test"])
 
     # If you wanna use bert/roberta/electra pretrained model,
-    # model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_class=2) 
+    # model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_class=2)
     # model = ppnlp.transformers.RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext', num_class=2)
     # model = ppnlp.transformers.ElectraForSequenceClassification.from_pretrained('chinese-electra-small', num_classes=2)
     model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        'ernie-tiny', num_classes=len(train_dataset.get_labels()))
+        'ernie-tiny', num_classes=len(train_ds.label_list))
 
     # If you wanna use bert/roberta/electra pretrained model,
     # tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-chinese')
@@ -183,27 +173,26 @@ def do_train():
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
-        label_list=train_dataset.get_labels(),
         max_seq_length=args.max_seq_length)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
     train_data_loader = create_dataloader(
-        train_dataset,
+        train_ds,
         mode='train',
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
     dev_data_loader = create_dataloader(
-        dev_dataset,
+        dev_ds,
         mode='dev',
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
     test_data_loader = create_dataloader(
-        test_dataset,
+        test_ds,
         mode='test',
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
@@ -219,14 +208,17 @@ def do_train():
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
@@ -235,8 +227,8 @@ def do_train():
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
-            input_ids, segment_ids, labels = batch
-            logits = model(input_ids, segment_ids)
+            input_ids, token_type_ids, labels = batch
+            logits = model(input_ids, token_type_ids)
             loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
             correct = metric.compute(probs, labels)
@@ -244,7 +236,7 @@ def do_train():
             acc = metric.accumulate()
 
             global_step += 1
-            if global_step % 10 == 0 and paddle.distributed.get_rank() == 0:
+            if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, step, loss, acc,
@@ -253,8 +245,8 @@ def do_train():
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
-            if global_step % 100 == 0 and paddle.distributed.get_rank() == 0:
+            optimizer.clear_grad()
+            if global_step % 100 == 0 and rank == 0:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
@@ -262,13 +254,10 @@ def do_train():
                 model._layers.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
 
-    if paddle.distributed.get_rank() == 0:
+    if rank == 0:
         print('Evaluating on test data.')
         evaluate(model, criterion, metric, test_data_loader)
 
 
 if __name__ == "__main__":
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(do_train, nprocs=args.n_gpu)
-    else:
-        do_train()
+    do_train()

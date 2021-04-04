@@ -35,12 +35,6 @@ DGU模型中的6个任务，分别采用不同的评估指标在test集上进行
 
 ## 快速开始
 
-### 环境配置
-
-- python >= 3.6
-- paddlepaddle >= 2.0.0, 安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp==2.0.0rc`
-
 ### 数据准备
 
 下载数据集压缩包并解压后，DGU_datasets目录下共存在6个目录，分别对应每个任务的训练集train.txt、评估集dev.txt和测试集test.txt。
@@ -115,11 +109,11 @@ swda：由多轮对话id、标签label、发言人caller、对话内容conversat
 运行如下命令即可在训练集 (train.tsv) 上进行模型训练，并在开发集 (dev.tsv) 验证，训练结束后会在测试集 (test.txt) 上进行模型评估
 
 ```shell
-export CUDA_VISIBLE_DEVICES=0,1
-# GPU启动，n_gpu指定训练所用的GPU数量，可以是单卡，也可以多卡。默认会进行训练、验证和评估
-python -u main.py --task_name=udc --data_dir=./DGU_datasets/udc --output_dir=./checkpoints/udc --n_gpu=2
+# GPU启动，gpus指定训练所用的GPU卡号，可以是单卡，也可以多卡。默认会进行训练、验证和评估
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" --log_dir ./log main.py --task_name=udc --data_dir=./DGU_datasets/udc --output_dir=./checkpoints/udc --device=gpu
 # 若只需进行评估，do_train设为False，并且必须指定init_from_ckpt
-# python -u main.py --task_name=udc --data_dir=./DGU_datasets/udc --do_train=False --init_from_ckpt=./checkpoints/udc/best
+# python -m paddle.distributed.launch --gpus "0" --log_dir ./log main.py --task_name=udc --data_dir=./DGU_datasets/udc --do_train=False --init_from_ckpt=./checkpoints/udc/best --device=gpu
 ```
 
 以上参数表示：
@@ -127,9 +121,9 @@ python -u main.py --task_name=udc --data_dir=./DGU_datasets/udc --output_dir=./c
 * `task_name`：任务名称，可以为udc、dstc2、atis_slot、atis_intent、mrda或swda。
 * `data_dir`：训练数据路径。
 * `output_dir`：训练保存模型的文件路径。
-* `n_gpu`：训练所使用的GPU卡的数量，默认为1。
 * `do_train：是否进行训练，默认为`True`。
 * `init_from_ckpt`：恢复模型参数的路径。
+* `device`：表示训练使用的设备。
 
 其他可选参数和参数的默认值请参考`args.py`。
 

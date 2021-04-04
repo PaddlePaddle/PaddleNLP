@@ -1,3 +1,17 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import ast
 import time
@@ -8,16 +22,16 @@ import paddle
 from tqdm import tqdm
 import paddle.nn as nn
 from paddle.io import DataLoader
-from paddlenlp.transformers import ErnieForGeneration
-from paddlenlp.transformers import ErnieTokenizer, ErnieTinyTokenizer, BertTokenizer, ElectraTokenizer, RobertaTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.datasets import Poetry
+from paddlenlp.transformers import ErnieForGeneration, ErnieTokenizer, ErnieTinyTokenizer, BertTokenizer, ElectraTokenizer, RobertaTokenizer, LinearDecayWithWarmup
+from paddlenlp.datasets import load_dataset
+
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.metrics import Rouge1, Rouge2
 from paddlenlp.utils.log import logger
 
 from encode import convert_example, after_padding
-from decode import beam_search_infilling, post_process, greedy_search_infilling
+from decode import post_process, beam_search_infilling
+from model import StackModel
 
 # yapf: disable
 parser = argparse.ArgumentParser('seq2seq model with ERNIE-GEN')
@@ -61,13 +75,13 @@ def evaluate(model, data_loader, tokenizer, rouge1, rouge2, attn_id,
     reference_sentences_ids = []
     logger.info("Evaluating...")
     for data in tqdm(data_loader):
-        (src_ids, src_sids, src_pids, _, _, _, _, _, _, _, _,
+        (src_ids, src_tids, src_pids, _, _, _, _, _, _, _, _,
          raw_tgt_labels) = data  # never use target when infer
         # Use greedy_search_infilling or beam_search_infilling to get predictions
         output_ids = beam_search_infilling(
             model,
             src_ids,
-            src_sids,
+            src_tids,
             eos_id=eos_id,
             sos_id=sos_id,
             attn_id=attn_id,
@@ -128,7 +142,8 @@ def train():
         model_state = paddle.load(args.init_checkpoint)
         model.set_state_dict(model_state)
 
-    train_dataset, dev_dataset = Poetry.get_datasets(['train', 'dev'])
+    train_dataset, dev_dataset = load_dataset(
+        'poetry', splits=('train', 'dev'), lazy=False)
     attn_id = tokenizer.vocab[
         '[ATTN]'] if '[ATTN]' in tokenizer.vocab else tokenizer.vocab['[MASK]']
     tgt_type_id = model.sent_emb.weight.shape[0] - 1
@@ -142,16 +157,16 @@ def train():
         noise_prob=args.noise_prob,
         use_random_noice=args.use_random_noice)
 
-    train_dataset = train_dataset.apply(trans_func, lazy=True)
+    train_dataset = train_dataset.map(trans_func)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_dataset, batch_size=args.batch_size, shuffle=True)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_pids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_sids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # src_tids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_pids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_sids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tgt_tids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # attn_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_labels
     ): after_padding(fn(samples))
@@ -162,35 +177,40 @@ def train():
         num_workers=0,
         return_list=True)
 
-    dev_dataset = dev_dataset.apply(trans_func, lazy=True)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_dataset, batch_size=args.batch_size, shuffle=False)
+    dev_dataset = dev_dataset.map(trans_func)
     dev_data_loader = DataLoader(
         dataset=dev_dataset,
-        batch_sampler=dev_batch_sampler,
+        batch_size=args.batch_size,
         collate_fn=batchify_fn,
         num_workers=0,
         return_list=True)
 
     label_num = model.word_emb.weight.shape[0]
+    train_model = StackModel(model)
     if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
+        # All 'forward' outputs derived from the module parameters using in DataParallel
+        # must participate in the calculation of losses and subsequent gradient calculations.
+        # So we use StackModel here to make the model only output loss in its 'forward' function.
+        train_model = paddle.DataParallel(train_model)
 
     max_steps = len(train_data_loader) * args.num_epochs
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, max_steps,
                                          args.warmup_proportion)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         grad_clip=nn.ClipGradByGlobalNorm(1.0),
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
 
     rouge1 = Rouge1()
     rouge2 = Rouge2()
@@ -199,43 +219,19 @@ def train():
     tic_train = time.time()
     for epoch in range(args.num_epochs):
         for step, batch in enumerate(train_data_loader, start=1):
-            (src_ids, src_sids, src_pids, tgt_ids, tgt_sids, tgt_pids, attn_ids,
+            (src_ids, src_tids, src_pids, tgt_ids, tgt_tids, tgt_pids, attn_ids,
              mask_src_2_src, mask_tgt_2_srctgt, mask_attn_2_srctgtattn,
              tgt_labels, _) = batch
             # import pdb; pdb.set_trace()
-            _, __, info = model(
-                src_ids,
-                sent_ids=src_sids,
-                pos_ids=src_pids,
-                attn_bias=mask_src_2_src,
-                encode_only=True)
-            cached_k, cached_v = info['caches']
-            _, __, info = model(
-                tgt_ids,
-                sent_ids=tgt_sids,
-                pos_ids=tgt_pids,
-                attn_bias=mask_tgt_2_srctgt,
-                past_cache=(cached_k, cached_v),
-                encode_only=True)
-            cached_k2, cached_v2 = info['caches']
-            past_cache_k = [
-                paddle.concat([k, k2], 1) for k, k2 in zip(cached_k, cached_k2)
-            ]
-            past_cache_v = [
-                paddle.concat([v, v2], 1) for v, v2 in zip(cached_v, cached_v2)
-            ]
             if args.label_smooth > 0.:
                 tgt_labels = nn.functional.label_smooth(
                     nn.functional.one_hot(tgt_labels, label_num),
                     epsilon=args.label_smooth)
-            loss, _, __ = model(
-                attn_ids,
-                sent_ids=tgt_sids,
-                pos_ids=tgt_pids,
-                attn_bias=mask_attn_2_srctgtattn,
-                past_cache=(past_cache_k, past_cache_v),
-                tgt_labels=tgt_labels,
-                tgt_pos=paddle.nonzero(attn_ids == attn_id))
+            tgt_pos = paddle.nonzero(attn_ids == attn_id)
+            loss = train_model(src_ids, src_tids, src_pids, tgt_ids, tgt_tids,
+                               tgt_pids, attn_ids, mask_src_2_src,
+                               mask_tgt_2_srctgt, mask_attn_2_srctgtattn,
+                               tgt_labels, tgt_pos)
             if global_step % args.logging_steps == 0:
                 if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
                     logger.info(
@@ -247,7 +243,7 @@ def train():
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             if global_step % args.save_steps == 0 and (
                 (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0):
                 evaluate(model, dev_data_loader, tokenizer, rouge1, rouge2,

@@ -1,3 +1,17 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import ast
 import time
@@ -9,7 +23,7 @@ import paddle.nn as nn
 from paddle.io import DataLoader
 from paddlenlp.transformers import ErnieForGeneration
 from paddlenlp.transformers import ErnieTokenizer, ErnieTinyTokenizer, BertTokenizer, ElectraTokenizer, RobertaTokenizer
-from paddlenlp.datasets import Poetry
+from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.metrics import Rouge1, Rouge2
 from paddlenlp.utils.log import logger
@@ -47,7 +61,7 @@ def predict():
     else:
         tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
 
-    dev_dataset = Poetry.get_datasets(['dev'])
+    dev_dataset = load_dataset('poetry', splits=('dev'), lazy=False)
     attn_id = tokenizer.vocab[
         '[ATTN]'] if '[ATTN]' in tokenizer.vocab else tokenizer.vocab['[MASK]']
     tgt_type_id = model.sent_emb.weight.shape[0] - 1
@@ -70,7 +84,7 @@ def predict():
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_labels
     ): after_padding(fn(samples))
 
-    dev_dataset = dev_dataset.apply(trans_func, lazy=True)
+    dev_dataset = dev_dataset.map(trans_func)
     test_batch_sampler = paddle.io.BatchSampler(
         dev_dataset, batch_size=args.batch_size, shuffle=False)
     data_loader = DataLoader(

@@ -23,7 +23,7 @@ from data import create_train_loader
 
 
 def do_train(args):
-    device = paddle.set_device(args.select_device)
+    device = paddle.set_device(args.device)
 
     # Define dataloader
     train_loader, eval_loader, src_vocab_size, tgt_vocab_size, eos_id = create_train_loader(

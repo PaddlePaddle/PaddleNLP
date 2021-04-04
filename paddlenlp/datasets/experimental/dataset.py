@@ -1,5 +1,4 @@
-# coding=utf-8
-# Copyright 2020 The HuggingFace Datasets Authors and the TensorFlow Datasets Authors.
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +18,7 @@ import math
 import os
 import warnings
 import sys
+import inspect
 
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset
@@ -38,6 +38,7 @@ def import_main_class(module_path):
     """Import a module at module_path and return its main class.
 
     """
+    module_path = DATASETS_MODULE_PATH + module_path
     module = importlib.import_module(module_path)
     main_cls_type = DatasetBuilder
 
@@ -53,78 +54,34 @@ def import_main_class(module_path):
     return module_main_cls
 
 
-def load_dataset(name, data_files=None, splits=None, lazy=None):
-    module_path = DATASETS_MODULE_PATH + name
+def load_dataset(path_or_read_func,
+                 name=None,
+                 data_files=None,
+                 splits=None,
+                 lazy=None,
+                 **kwargs):
+    if inspect.isfunction(path_or_read_func):
+        assert lazy is not None, "lazy can not be None in custom mode."
+        kwargs['name'] = name
+        kwargs['data_files'] = data_files
+        kwargs['splits'] = splits
+        custom_kwargs = {}
+        for name in inspect.signature(path_or_read_func).parameters.keys():
+            if name in kwargs.keys():
+                custom_kwargs[name] = kwargs[name]
 
-    reader_cls = import_main_class(module_path)
-    reader_instance = reader_cls(lazy)
-
-    datasets = []
-
-    if data_files:
-        assert isinstance(data_files, str) or (
-            isinstance(data_files, list) and isinstance(data_files[0], str)
-        ) or (
-            isinstance(data_files, tuple) and isinstance(data_files[0], str)
-        ), "`data_files` should be a string or list of string or a tuple of string."
-        datasets += reader_instance.read_datasets(data_files)
-
-    if splits:
-        assert isinstance(splits, str) or (
-            isinstance(splits, list) and isinstance(splits[0], str)
-        ) or (
-            isinstance(splits, tuple) and isinstance(splits[0], str)
-        ), "`splits` should be a string or list of string or a tuple of string."
-        datasets += reader_instance.read_datasets(splits)
-
-    return datasets
-
-
-@classmethod
-def get_datasets(cls, *args, **kwargs):
-    """
-    Get muitiple datasets like train, valid and test of current dataset.
-
-    Example:
-        .. code-block:: python
-
-            from paddlenlp.datasets import GlueQNLI
-            train_dataset, dev_dataset, test_dataset = GlueQNLI.get_datasets(['train', 'dev', 'test'])
-            train_dataset, dev_dataset, test_dataset = GlueQNLI.get_datasets(mode=['train', 'dev', 'test'])
-            train_dataset = GlueQNLI.get_datasets('train')
-            train_dataset = GlueQNLI.get_datasets(['train'])
-            train_dataset = GlueQNLI.get_datasets(mode='train')
-    """
-    if not args and not kwargs:
-        try:
-            args = cls.SPLITS.keys()
-        except:
-            raise AttributeError(
-                'Dataset must have SPLITS attridute to use get_dataset if configs is None.'
-            )
-
-        datasets = tuple(MapDataset(cls(arg)) for arg in args)
+        reader_instance = SimpleBuilder(lazy=lazy, read_func=path_or_read_func)
+        return reader_instance.read(**custom_kwargs)
     else:
+        reader_cls = import_main_class(path_or_read_func)
+        if not name:
+            reader_instance = reader_cls(lazy=lazy, **kwargs)
+        else:
+            reader_instance = reader_cls(lazy=lazy, name=name, **kwargs)
 
-        for arg in args:
-            if not isinstance(arg, list):
-                return MapDataset(cls(*args, **kwargs))
-        for value in kwargs.values():
-            if not isinstance(value, list):
-                return MapDataset(cls(*args, **kwargs))
-
-        num_datasets = len(args[0]) if args else len(list(kwargs.values())[0])
-        datasets = tuple(
-            MapDataset(
-                cls(*(args[i] for args in args), **(
-                    {key: value[i]
-                     for key, value in kwargs.items()})))
-            for i in range(num_datasets))
-
-    return datasets if len(datasets) > 1 else datasets[0]
-
-
-Dataset.get_datasets = get_datasets
+        datasets = reader_instance.read_datasets(
+            data_files=data_files, splits=splits)
+        return datasets
 
 
 class MapDataset(Dataset):
@@ -137,22 +94,18 @@ class MapDataset(Dataset):
             subclass of Dataset.
     """
 
-    def __init__(self, data, **kargs):
+    def __init__(self, data, **kwargs):
         self.data = data
         self._transform_pipline = []
         self.new_data = self.data
-        if 'label_list' in kargs.keys():
-            self.label_list = kargs['label_list']
+
+        self.label_list = kwargs.pop('label_list', None)
+        self.vocab_info = kwargs.pop('vocab_info', None)
 
     def _transform(self, data):
-        for fn in reversed(self._transform_pipline):
+        for fn in self._transform_pipline:
             data = fn(data)
         return data
-
-    def __iter__(self):
-        for example in self.new_data:
-            yield self._transform(
-                example) if self._transform_pipline else example
 
     def __getitem__(self, idx):
         return self._transform(self.new_data[
@@ -193,7 +146,6 @@ class MapDataset(Dataset):
             index = dist.get_rank()
 
         num_samples = int(math.ceil(len(self.new_data) * 1.0 / num_shards))
-        total_size = num_samples * num_shards
         # add extra samples to make it evenly divisible
         self.new_data = [
             self.new_data[idx] for idx in range(len(self.new_data))
@@ -204,21 +156,29 @@ class MapDataset(Dataset):
 
         return self
 
-    def map(self, fn, lazy=True):
+    def map(self, fn, lazy=True, batched=False):
         """
         Performs specific function on the dataset to transform and update every sample.
         Args:
             fn (callable): Transformations to be performed. It receives single
-                sample as argument if lazy is True. Else it receives all examples.
+                sample as argument if batched is False. Else it receives all examples.
             lazy (bool, optional): If True, transformations would be delayed and
                 performed on demand. Otherwise, transforms all samples at once. Note that if `fn` is
                 stochastic, `lazy` should be True or you will get the same
                 result on all epochs. Defalt: False.
+            batched(bool, optional): If True, transformations would take all examples as input and 
+                return a collection of transformed examples. Note that if set True, `lazy` option 
+                would be ignored. 
         """
-        if lazy:
+        if batched:
+            self.new_data = fn(self.new_data)
+        elif lazy:
             self._transform_pipline.append(fn)
         else:
-            self.new_data = fn(self.new_data)
+            self.new_data = [
+                fn(self.new_data[idx]) for idx in range(len(self.new_data))
+            ]
+
         return self
 
     def __getattr__(self, name):
@@ -235,15 +195,16 @@ class IterDataset(IterableDataset):
             subclass of Dataset.
     """
 
-    def __init__(self, data, **kargs):
+    def __init__(self, data, **kwargs):
         self.data = data
         self._transform_pipline = []
         self._filter_pipline = []
-        if 'label_list' in kargs.keys():
-            self.label_list = kargs['label_list']
+
+        self.label_list = kwargs.pop('label_list', None)
+        self.vocab_info = kwargs.pop('vocab_info', None)
 
     def _transform(self, data):
-        for fn in reversed(self._transform_pipline):
+        for fn in self._transform_pipline:
             data = fn(data)
         return data
 
@@ -258,13 +219,26 @@ class IterDataset(IterableDataset):
 
     def __iter__(self):
         num_samples = 0
-        for example in self.data():
-            if (not self._filter_pipline or
-                    self._filter(self._filter_pipline)) and self._shard_filter(
-                        num_samples=num_samples):
-                yield self._transform(
-                    example) if self._transform_pipline else example
-            num_samples += 1
+        if inspect.isfunction(self.data):
+            for example in self.data():
+                if (not self._filter_pipline or
+                        self._filter(self._filter_pipline)
+                    ) and self._shard_filter(num_samples=num_samples):
+                    yield self._transform(
+                        example) if self._transform_pipline else example
+                num_samples += 1
+        else:
+            if inspect.isgenerator(self.data):
+                warnings.warn(
+                    'Reciving generator as data source, data can only be iterated once'
+                )
+            for example in self.data:
+                if (not self._filter_pipline or
+                        self._filter(self._filter_pipline)
+                    ) and self._shard_filter(num_samples=num_samples):
+                    yield self._transform(
+                        example) if self._transform_pipline else example
+                num_samples += 1
 
     def filter(self, fn):
         """
@@ -310,11 +284,7 @@ class IterDataset(IterableDataset):
         Performs specific function on the dataset to transform and update every sample.
         Args:
             fn (callable): Transformations to be performed. It receives single
-                sample as argument if lazy is True. Else it receives all examples.
-            lazy (bool, optional): If True, transformations would be delayed and
-                performed on demand. Otherwise, transforms all samples at once. Note that if `fn` is
-                stochastic, `lazy` should be True or you will get the same
-                result on all epochs. Defalt: False.
+                sample as argument.
         """
 
         self._transform_pipline.append(fn)
@@ -335,23 +305,56 @@ class DatasetBuilder:
     """
     lazy = False
 
-    def __init__(self, lazy=None, max_examples: Optional[int]=None):
+    def __init__(self, lazy=None, name=None, **config):
         if lazy is not None:
             self.lazy = lazy
-        self.max_examples = max_examples
+        self.name = name
+        self.config = config
 
-    def read_datasets(self, path_or_split):
+    def read_datasets(self, splits=None, data_files=None):
         datasets = []
-        for arg in path_or_split:
-            if os.path.exists(arg):
-                datasets.append(self.read(arg))
+        assert splits or data_files, "`data_files` and `splits` can not both be None."
+
+        if data_files:
+            assert isinstance(data_files, str) or isinstance(
+                data_files, dict
+            ) or isinstance(data_files, tuple) or isinstance(
+                data_files, list
+            ), "`data_files` should be a string or tuple or list or a dictionary whose key is split name ande value is a path of data file."
+            if isinstance(data_files, str):
+                split = 'train'
+                datasets.append(self.read(filename=data_files, split=split))
+            elif isinstance(data_files, tuple) or isinstance(data_files, list):
+                split = 'train'
+                datasets += [
+                    self.read(
+                        filename=filename, split=split)
+                    for filename in data_files
+                ]
             else:
-                root = self._get_data(arg)
-                datasets.append(self.read(root))
+                datasets += [
+                    self.read(
+                        filename=filename, split=split)
+                    for split, filename in data_files.items()
+                ]
 
-        return datasets
+        if splits:
+            assert isinstance(splits, str) or (
+                isinstance(splits, list) and isinstance(splits[0], str)
+            ) or (
+                isinstance(splits, tuple) and isinstance(splits[0], str)
+            ), "`splits` should be a string or list of string or a tuple of string."
+            if isinstance(splits, str):
+                filename = self._get_data(splits)
+                datasets.append(self.read(filename=filename, split=splits))
+            else:
+                for split in splits:
+                    filename = self._get_data(split)
+                    datasets.append(self.read(filename=filename, split=split))
 
-    def read(self, root):
+        return datasets if len(datasets) > 1 else datasets[0]
+
+    def read(self, filename, split='train'):
         """
         Returns an dataset containing all the examples that can be read from the file path.
         If `self.lazy` is `False`, this eagerly reads all instances from `self._read()`
@@ -361,41 +364,53 @@ class DatasetBuilder:
         In this case your implementation of `_read()` must also be lazy
         (that is, not load all examples into memory at once).
         """
-        if not isinstance(root, str):
-            root = str(root)
+
+        label_list = self.get_labels()
+        vocab_info = self.get_vocab()
 
         if self.lazy:
-            label_list = self.get_labels()
 
-            if label_list is not None:
-                label_dict = {}
-                for i, label in enumerate(label_list):
-                    label_dict[label] = i
+            def generate_examples():
+                generator = self._read(
+                    filename, split
+                ) if self._read.__code__.co_argcount > 2 else self._read(
+                    filename)
+                for example in generator:
+                    # We need to check if the example contains label column and confirm its name.
+                    # For now we only allow `label` or `labels` to be the name of label column.
+                    if 'labels' in example.keys():
+                        label_col = 'labels'
+                    elif 'label' in example.keys():
+                        label_col = 'label'
+                    else:
+                        label_col = None
 
-                def generate_examples():
-                    for example in self._read(root):
-                        if 'labels' not in example.keys():
-                            raise ValueError(
-                                "Keyword 'labels' should be in example if get_label() is specified."
-                            )
+                    # Convert class label to label ids.
+                    if label_list is not None and example.get(label_col, None):
+                        label_dict = {}
+                        for i, label in enumerate(label_list):
+                            label_dict[label] = i
+                        if isinstance(example[label_col], list) or isinstance(
+                                example[label_col], tuple):
+                            for label_idx in range(len(example[label_col])):
+                                example[label_col][label_idx] = label_dict[
+                                    example[label_col][label_idx]]
                         else:
-                            for label_idx in range(len(example['labels'])):
-                                example['labels'][label_idx] = label_dict[
-                                    example['labels'][label_idx]]
+                            example[label_col] = label_dict[example[label_col]]
 
-                            yield example
-
-                return IterDataset(generate_examples, label_list=label_list)
-            else:
-
-                def generate_examples():
-                    for example in self._read(root):
+                        yield example
+                    else:
                         yield example
 
-                return IterDataset(generate_examples)
-
+            return IterDataset(
+                generate_examples(),
+                label_list=label_list,
+                vocab_info=vocab_info)
         else:
-            examples = self._read(root)
+            examples = self._read(
+                filename,
+                split) if self._read.__code__.co_argcount > 2 else self._read(
+                    filename)
 
             # Then some validation.
             if not isinstance(examples, list):
@@ -404,30 +419,36 @@ class DatasetBuilder:
             if not examples:
                 raise ValueError(
                     "No instances were read from the given filepath {}. "
-                    "Is the path correct?".format(root))
+                    "Is the path correct?".format(filename))
 
-            label_list = self.get_labels()
+            # We need to check if the example contains label column and confirm its name.
+            # For now we only allow `label` or `labels` to be the name of label column.
+            if 'labels' in examples[0].keys():
+                label_col = 'labels'
+            elif 'label' in examples[0].keys():
+                label_col = 'label'
+            else:
+                label_col = None
+
             # Convert class label to label ids.
-            if label_list is not None:
-                if 'labels' not in examples[0].keys():
-                    raise ValueError(
-                        "Key 'labels' should be in example if get_label() is specified."
-                    )
-
+            if label_list is not None and examples[0].get(label_col, None):
                 label_dict = {}
                 for i, label in enumerate(label_list):
                     label_dict[label] = i
-
                 for idx in range(len(examples)):
-                    for label_idx in range(len(examples[idx]['labels'])):
-                        examples[idx]['labels'][label_idx] = label_dict[
-                            examples[idx]['labels'][label_idx]]
+                    if isinstance(examples[idx][label_col], list) or isinstance(
+                            examples[idx][label_col], tuple):
+                        for label_idx in range(len(examples[idx][label_col])):
+                            examples[idx][label_col][label_idx] = label_dict[
+                                examples[idx][label_col][label_idx]]
+                    else:
+                        examples[idx][label_col] = label_dict[examples[idx][
+                            label_col]]
 
             return MapDataset(
-                examples,
-                label_list=label_list) if label_list else MapDataset(examples)
+                examples, label_list=label_list, vocab_info=vocab_info)
 
-    def _read(self, file_path: str):
+    def _read(self, filename: str, *args):
         """
         Reads examples from the given file_path and returns them as an
         `Iterable` (which could be a list or could be a generator).
@@ -445,3 +466,32 @@ class DatasetBuilder:
         Return list of class labels of the dataset if specified.
         """
         return None
+
+    def get_vocab(self):
+        """
+        Return vocab file path of the dataset if specified.
+        """
+        return None
+
+
+class SimpleBuilder(DatasetBuilder):
+    def __init__(self, lazy, read_func):
+        self._read = read_func
+        self.lazy = lazy
+
+    def read(self, **kwargs):
+        if self.lazy:
+
+            def generate_examples():
+                generator = self._read(**kwargs)
+                for example in generator:
+                    yield example
+
+            return IterDataset(generate_examples)
+        else:
+            examples = self._read(**kwargs)
+            if hasattr(examples, '__len__') and hasattr(examples,
+                                                        '__getitem__'):
+                return MapDataset(examples)
+            else:
+                return MapDataset(list(examples))

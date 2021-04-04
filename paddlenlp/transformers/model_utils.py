@@ -21,11 +21,12 @@ import logging
 
 import paddle
 from paddle.nn import Layer
-# TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later 
+# TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
+from .generation_utils import GenerationMixin
 from .utils import InitTrackerMeta, fn_args_to_dict
 
 __all__ = [
@@ -50,7 +51,7 @@ def register_base_model(cls):
 
 
 @six.add_metaclass(InitTrackerMeta)
-class PretrainedModel(Layer):
+class PretrainedModel(Layer, GenerationMixin):
     """
     The base class for all pretrained models. It provides some attributes and
     common methods for all pretrained models, including attributes `init_config`,
@@ -85,7 +86,7 @@ class PretrainedModel(Layer):
         It would be hooked after `__init__` to add a dict including arguments of
         `__init__` as a attribute named `config` of the prtrained model instance.
         """
-        init_dict = fn_args_to_dict(original_init, *args, **kwargs)
+        init_dict = fn_args_to_dict(original_init, *((self, ) + args), **kwargs)
         self.config = init_dict
 
     @property

@@ -46,11 +46,11 @@ class WorkerInitObj(object):
 
 
 def create_pretrained_dataset(args, input_path, worker_init, worker_index,
-                              eod_id):
+                              worker_num, eod_id):
     train_data = GPT2Dataset(
         file_path=input_path,
         worker_index=worker_index,
-        num_samples=args.batch_size * args.max_steps,
+        num_samples=args.batch_size * args.max_steps * worker_num,
         eod_id=eod_id,
         seed=args.seed + worker_index)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
@@ -100,6 +100,12 @@ def do_train(args):
     else:
         model = GPT2ForPretraining.from_pretrained(args.model_name_or_path)
 
+    # creat the critrion for the gpt model
+    criterion = GPT2PretrainingCriterion()
+
+    if paddle.distributed.get_world_size() > 1:
+        model = paddle.DataParallel(model)
+
     if args.decay_steps is None:
         args.decay_steps = args.max_steps
     warmup_step = args.warmup_rate * args.decay_steps
@@ -113,23 +119,23 @@ def do_train(args):
     if args.grad_clip > 0:
         clip = paddle.nn.ClipGradByNorm(clip_norm=args.grad_clip)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         grad_clip=clip,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
     if args.model_name_or_path not in pretrained_models_list:
         opt_dict = paddle.load(
             os.path.join(args.model_name_or_path, "model_state.pdopt"))
         optimizer.set_state_dict(opt_dict)
-
-    # creat the critrion for the gpt model
-    criterion = GPT2PretrainingCriterion()
 
     global_step = 0
     tic_train = time.time()
@@ -144,7 +150,12 @@ def do_train(args):
         for f_id in range(num_files):
             data_file = files[f_id]
             train_data_loader = create_pretrained_dataset(
-                args, data_file, worker_init, worker_index, eod_id=eod_id)
+                args,
+                data_file,
+                worker_init,
+                worker_index,
+                worker_num,
+                eod_id=eod_id)
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
                 tokens, loss_mask, attention_mask, position_ids, labels = batch
@@ -176,6 +187,7 @@ def do_train(args):
                         # need better way to get inner model of DataParallel
                         model_to_save = model._layers if isinstance(
                             model, paddle.DataParallel) else model
+                        logger.info("Save model to %s" % output_dir)
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
                         paddle.save(

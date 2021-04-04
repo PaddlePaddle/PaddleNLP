@@ -143,7 +143,7 @@ def parse_args():
         default=False,
         help="Whether to use pure fp16 training.")
     parser.add_argument(
-        "--select_device",
+        "--device",
         type=str,
         default="gpu",
         help="Device for selecting for the training.")
@@ -269,7 +269,7 @@ class WorkerInitObj(object):
 def do_train(args):
     # Initialize the paddle and paddle fleet execute enviroment
     paddle.enable_static()
-    place = paddle.set_device(args.select_device)
+    place = paddle.set_device(args.device)
     fleet.init(is_collective=True)
 
     worker_num = fleet.worker_num()
@@ -313,15 +313,18 @@ def do_train(args):
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_steps)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ],
+        apply_decay_param_fun=lambda x: x in decay_params,
         multi_precision=args.use_pure_fp16)
     if worker_num == 1 and args.use_amp:
         custom_black_list = (['lookup_table', 'lookup_table_v2']
@@ -363,8 +366,8 @@ def do_train(args):
     while True:
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if os.path.isfile(os.path.join(args.input_dir, f)) and "training" in
-            f
+            if os.path.isfile(os.path.join(args.input_dir, f)) and
+            "training" in f
         ]
         files.sort()
         num_files = len(files)
