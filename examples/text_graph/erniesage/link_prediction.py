@@ -72,6 +72,7 @@ def do_train(config):
     optimizer = paddle.optimizer.Adam(
         learning_rate=config.lr, parameters=model.parameters())
 
+    rank = paddle.distributed.get_rank()
     global_step = 0
     tic_train = time.time()
     for epoch in range(config.epoch):
@@ -88,13 +89,13 @@ def do_train(config):
             optimizer.step()
             optimizer.clear_grad()
             if global_step % config.save_per_step == 0:
-                if paddle.distributed.get_rank() == 0:
+                if rank == 0:
                     output_dir = os.path.join(config.output_path,
                                               "model_%d" % global_step)
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     model._layers.save_pretrained(output_dir)
-    if paddle.distributed.get_rank() == 0:
+    if rank == 0:
         output_dir = os.path.join(config.output_path, "last")
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
