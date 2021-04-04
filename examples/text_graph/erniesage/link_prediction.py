@@ -44,7 +44,7 @@ def load_data(graph_data_path):
 
 
 def do_train(config):
-    paddle.set_device("gpu" if config.n_gpu else "cpu")
+    paddle.set_device(config.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
     set_seed(config)
@@ -88,13 +88,13 @@ def do_train(config):
             optimizer.step()
             optimizer.clear_gradients()
             if global_step % config.save_per_step == 0:
-                if (not config.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+                if paddle.distributed.get_rank() == 0:
                     output_dir = os.path.join(config.output_path,
                                               "model_%d" % global_step)
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     model._layers.save_pretrained(output_dir)
-    if (not config.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+    if paddle.distributed.get_rank() == 0:
         output_dir = os.path.join(config.output_path, "last")
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -107,7 +107,7 @@ def tostr(data_array):
 
 @paddle.no_grad()
 def do_predict(config):
-    paddle.set_device("gpu" if config.n_gpu else "cpu")
+    paddle.set_device(config.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
     set_seed(config)
@@ -136,7 +136,7 @@ def do_predict(config):
         num_workers=config.sample_workers,
         collate_fn=collate_fn)
 
-    trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))
+    trainer_id = paddle.distributed.get_rank()
     id2str = io.open(
         os.path.join(config.graph_work_path, "terms.txt"),
         encoding=config.encoding).readlines()
@@ -172,14 +172,12 @@ if __name__ == "__main__":
     parser.add_argument("--do_predict", action='store_true', default=False)
     args = parser.parse_args()
     config = edict(yaml.load(open(args.conf), Loader=yaml.FullLoader))
+
+    assert config.device in [
+        "gpu", "cpu"
+    ], "Device should be gpu/cpu, but got %s." % config.device
     logger.info(config)
     if args.do_predict:
-        do_func = do_predict
+        do_predict(config)
     else:
-        do_func = do_train
-
-    if config.n_gpu > 1 and paddle.fluid.core.is_compiled_with_cuda(
-    ) and paddle.fluid.core.get_cuda_device_count() > 1:
-        paddle.distributed.spawn(do_func, args=(config, ), nprocs=config.n_gpu)
-    else:
-        do_func(config)
+        do_train(config)
