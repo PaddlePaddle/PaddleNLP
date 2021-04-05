@@ -112,13 +112,13 @@ def run(args):
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-
+    rank = paddle.distributed.get_rank()
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     set_seed(args)
-    if paddle.distributed.get_rank() == 0:
+    if rank == 0:
         if os.path.exists(args.model_name_or_path):
             print("init checkpoint from %s" % args.model_name_or_path)
 
@@ -268,7 +268,7 @@ def run(args):
                 optimizer.clear_grad()
 
                 if global_step % args.save_steps == 0 or global_step == num_training_steps:
-                    if paddle.distributed.get_rank() == 0:
+                    if rank == 0:
                         output_dir = os.path.join(args.output_dir,
                                                   "model_%d" % global_step)
                         if not os.path.exists(output_dir):
@@ -315,7 +315,7 @@ def run(args):
 
         return tokenized_examples
 
-    if args.do_predict:
+    if args.do_predict and rank == 0:
         if args.predict_file:
             dev_ds = load_dataset('sqaud', data_files=args.predict_file)
         elif args.version_2_with_negative:
@@ -338,14 +338,9 @@ def run(args):
             collate_fn=dev_batchify_fn,
             return_list=True)
 
-        if paddle.distributed.get_rank() == 0:
-            evaluate(model, dev_data_loader, args)
+        evaluate(model, dev_data_loader, args)
 
 
 if __name__ == "__main__":
     args = parse_args()
-    assert args.device in [
-        "cpu", "gpu", "xpu"
-    ], "Invalid device! Available device should be cpu, gpu, or xpu."
-
     run(args)
