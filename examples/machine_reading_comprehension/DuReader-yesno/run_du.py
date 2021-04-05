@@ -92,7 +92,7 @@ def do_train(args):
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-
+    rank = paddle.distributed.get_rank()
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
@@ -192,7 +192,7 @@ def do_train(args):
             optimizer.clear_grad()
 
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
-                if paddle.distributed.get_rank() == 0:
+                if rank == 0:
                     evaluate(model, metric, dev_data_loader)
                     output_dir = os.path.join(args.output_dir,
                                               "model_%d" % global_step)
@@ -207,7 +207,7 @@ def do_train(args):
                 if global_step == num_training_steps:
                     break
 
-    if paddle.distributed.get_rank() == 0:
+    if rank == 0:
         predictions = predict(model, test_data_loader)
         with open('prediction.json', "w") as writer:
             writer.write(
@@ -217,8 +217,4 @@ def do_train(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    assert args.device in [
-        "cpu", "gpu", "xpu"
-    ], "Invalid device! Available device should be cpu, gpu, or xpu."
-
     do_train(args)
