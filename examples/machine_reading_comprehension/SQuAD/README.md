@@ -29,21 +29,22 @@ SQuAD v2.0
 对于 SQuAD v1.1,按如下方式启动 Fine-tuning:
 
 ```shell
-python -u ./run_squad.py \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" run_squad.py \
     --model_type bert \
     --model_name_or_path bert-base-uncased \
     --max_seq_length 384 \
     --batch_size 12 \
     --learning_rate 3e-5 \
     --num_train_epochs 2 \
-    --logging_steps 100 \
+    --logging_steps 1000 \
     --save_steps 1000 \
     --warmup_proportion 0.1 \
     --weight_decay 0.01 \
     --output_dir ./tmp/squad/ \
+    --device gpu \
     --do_train \
-    --do_predict \
-    --n_gpu 1
+    --do_predict
  ```
 
 * `model_type`: 预训练模型的种类。如bert，ernie，roberta等。
@@ -68,7 +69,8 @@ python -u ./run_squad.py \
 对于 SQuAD v2.0,按如下方式启动 Fine-tuning:
 
 ```shell
-python -u ./run_squad.py \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" run_squad.py \
     --model_type bert \
     --model_name_or_path bert-base-uncased \
     --max_seq_length 384 \
@@ -80,9 +82,9 @@ python -u ./run_squad.py \
     --warmup_proportion 0.1 \
     --weight_decay 0.01 \
     --output_dir ./tmp/squad/ \
-    --n_gpu 1 \
+    --device gpu \
     --do_train \
-    --do_pred \
+    --do_predict \
     --version_2_with_negative
  ```
 

@@ -2,12 +2,12 @@
 如何自定义数据集
 ============
 
-通过使用PaddleNLP提供的 :class:`MapDataset` 和 :class:`IterDataset` 。任何人都可以方便的定义属于自己的数据集。
+通过使用PaddleNLP提供的 :func:`load_dataset` ， :class:`MapDataset` 和 :class:`IterDataset` 。任何人都可以方便的定义属于自己的数据集。
 
 从本地文件创建数据集
 -------------------
 
-从本地文件创建数据集时，我们 **推荐** 根据本地数据集的格式给出读取function并传入 :func:`load_dataset`中创建数据集。
+从本地文件创建数据集时，我们 **推荐** 根据本地数据集的格式给出读取function并传入 :func:`load_dataset` 中创建数据集。
 
 以 :obj:`waybill_ie` 快递单信息抽取任务中的数据为例：
 
@@ -25,6 +25,7 @@
                 labels = labels.split('\002')
                 yield {'tokens': words, 'labels': labels}
 
+    # data_path为read()方法的参数
     map_ds = load_dataset(read, data_path='train.txt',lazy=False) 
     iter_ds = load_dataset(read, data_path='train.txt',lazy=True) 
 
