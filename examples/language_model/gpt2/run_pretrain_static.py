@@ -442,11 +442,13 @@ def do_train(args):
                              './init_checkponits/gpt2-init-bs4.pdparams')))
     elif args.batch_size == 32:
         print("Loading bs32 init params.")
-        init_static_with_params(
-            model,
-            paddle.load(
-                os.path.join(os.environ['HOME'],
-                             './init_checkponits/gpt2-init-bs32.pdparams')))
+        init_dir = os.path.join(os.environ['HOME'],
+                                './init_checkponits/gpt2-init-bs32.pdparams')
+        if "small" in args.model_name_or_path:
+            init_dir = os.path.join(
+                os.environ['HOME'],
+                './init_checkponits/gpt2-init-small-bs32.pdparams')
+        init_static_with_params(model, paddle.load(init_dir))
 
     test_program = main_program.clone(for_test=True)
     if worker_num == 1:
