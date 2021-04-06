@@ -113,7 +113,6 @@ class LinearChainCrf(nn.Layer):
                     [batch_size, n_labels, n_labels])
                 # F(n) = logsumexp(F(n-1) + p(y_n) + T(y_{n-1}, y_n))
                 mat = input_exp + trans_exp + alpha_exp
-                # import pdb; pdb.set_trace()
                 alpha = paddle.logsumexp(mat, 2)
             all_alpha.append(alpha)
 
@@ -382,7 +381,6 @@ class ViterbiDecoder(nn.Layer):
             path.reverse()
             max_len = max(max_len, len(path))
             # Pad to the max sequence length, so that the ChunkEvaluator can compute it
-            # import pdb; pdb.set_trace()
             batch_path.append(path)
         batch_path = [path + [0] * (max_len - len(path)) for path in batch_path]
         batch_path = paddle.to_tensor(batch_path)

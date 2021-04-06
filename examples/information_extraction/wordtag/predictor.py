@@ -134,6 +134,7 @@ class WordtagPredictor(object):
             batch_results.append(result)
         return batch_results
 
+    @paddle.no_grad()
     def run(self,
             input_texts,
             max_seq_len=128,

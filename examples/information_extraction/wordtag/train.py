@@ -34,73 +34,34 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # yapf: disable
-    parser.add_argument("--data_dir", default="./data", type=str, help="The input data dir, should contain [train/test].json and [train/test]_metrics.json")
+    parser.add_argument("--data_dir", default="./data", type=str, help="The input data dir, should contain train.json.")
     parser.add_argument("--model_dir", default="ernie-ctm", type=str, help="The pre-trained model checkpoint dir.")
-    parser.add_argument("--output_dir",default="./outpout_dir",type=str, help="The output directory where the model predictions and checkpoints will be written.",)
-    parser.add_argument("--max_seq_len",default=128,type=int,help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument("--learning_rate",default=1e-4,type=float,help="The initial learning rate for Adam.")
-    parser.add_argument("--num_train_epochs",default=3,type=int,help="Total number of training epochs to perform.", )
-    parser.add_argument("--logging_steps",type=int,default=100,help="Log every X updates steps.")
-    parser.add_argument("--save_steps",type=int,default=100,help="Save checkpoint every X updates steps.")
-    parser.add_argument("--batch_size",default=32,type=int,help="Batch size per GPU/CPU for training.", )
-    parser.add_argument("--weight_decay",default=0.01,type=float,help="Weight decay if we apply some.")
-    parser.add_argument("--warmup_steps",default=0,type=int,help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion")
-    parser.add_argument("--warmup_proportion",default=0.1,type=float,help="Linear warmup proportion over total steps.")
-    parser.add_argument("--adam_epsilon",default=1e-6,type=float,help="Epsilon for Adam optimizer.")
-    parser.add_argument("--max_steps",default=-1,type=int,help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
+    parser.add_argument("--output_dir", default="./outpout_dir", type=str, help="The output directory where the model predictions and checkpoints will be written.",)
+    parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.", )
+    parser.add_argument("--learning_rate", default=1e-4, type=float, help="The initial learning rate for Adam.")
+    parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.", )
+    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
+    parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
+    parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.", )
+    parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
+    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion")
+    parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over total steps.")
+    parser.add_argument("--adam_epsilon", default=1e-6, type=float, help="Epsilon for Adam optimizer.")
+    parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
     parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
-    parser.add_argument("--n_gpu",default=1,type=int,help="number of gpus to use, 0 for cpu.")
+    parser.add_argument("--device", default="gpu",type=str, help="The device to select to train the model, is must be cpu/gpu/xpu.")
     # yapf: enable
 
     args = parser.parse_args()
     return args
 
 
-@paddle.no_grad()
-def evaluate(model, test_data_loader, labels_to_idx):
-    model.eval()
-    cls_acc = paddle.metric.Accuracy()
-    seq_acc, total_len = 0.0, 0.0
-    for batch in test_data_loader:
-        input_ids, token_type_ids, seq_len, tags, cls_label = batch
-        outputs = model(
-            input_ids,
-            token_type_ids,
-            lengths=seq_len,
-            tag_labels=tags,
-            cls_label=cls_label)
-        loss, seq_logits, cls_logits = outputs[0], outputs[1], outputs[2]
-        correct = cls_acc.compute(
-            pred=cls_logits.reshape([-1, len(labels_to_idx)]),
-            label=cls_label.reshape([-1]))
-        cls_acc.update(correct)
-        scores, pred_tags = model.viterbi_decoder(seq_logits, seq_len)
-
-        pred_cls_label = paddle.argmax(cls_logits, axis=-1, keepdim=False)
-        seq_len_np = seq_len.numpy()
-        for i, pred_tag in enumerate(pred_tags):
-            pred_tag = pred_tag[:int(seq_len_np[i])]
-            if pred_cls_label[i] != labels_to_idx["其他文本"]:
-                continue
-            total_len += float(len(pred_tag))
-            for j, tag in enumerate(pred_tag):
-                if tag == tags[i, j]:
-                    seq_acc += 1.0
-
-    logger.info(
-        "[Evaluating] Classification Accuracy: %6f,  Sequence Labeling Accuracy: %6f"
-        % (cls_acc.accumulate(), seq_acc / total_len))
-
-    model.train()
-
-
 def do_train(args):
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    train_ds, test_ds = load_dataset(datafiles=('./data/train.json',
-                                                './data/test.json'))
+    train_ds = load_dataset(datafiles=('./data/train.json'))
     tags_to_idx = load_dict("./data/tags.txt")
     labels_to_idx = load_dict("./data/classifier_labels.txt")
     tokenizer = ErnieCtmTokenizer.from_pretrained(args.model_dir)
@@ -111,7 +72,6 @@ def do_train(args):
         tags_to_idx=tags_to_idx,
         labels_to_idx=labels_to_idx)
     train_ds.map(trans_func)
-    test_ds.map(trans_func)
 
     ignore_label = tags_to_idx["O"]
     batchify_fn = lambda samples, fn=Tuple(
@@ -129,13 +89,6 @@ def do_train(args):
         batch_sampler=train_batch_sampler,
         num_workers=0,
         collate_fn=batchify_fn,
-        return_list=True)
-    test_data_loader = DataLoader(
-        test_ds,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        batch_size=args.batch_size,
-        shuffle=False,
         return_list=True)
 
     model = ErnieCtmWordtagModel.from_pretrained(
@@ -162,8 +115,6 @@ def do_train(args):
     ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
-        beta1=0.9,
-        beta2=0.999,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
@@ -225,11 +176,8 @@ def do_train(args):
                 seq_acc.reset()
                 total_loss = 0
 
-            if (global_step % args.save_steps == 0 or
-                    global_step == num_training_steps) and (
-                        (not args.n_gpu > 1) or
-                        paddle.distributed.get_rank() == 0):
-                evaluate(model, test_data_loader, labels_to_idx)
+            if (global_step % args.save_steps == 0 or global_step ==
+                    num_training_steps) and paddle.distributed.get_rank() == 0:
                 output_dir = os.path.join(args.output_dir,
                                           "ernie_ctm_ft_model_%d.pdparams" %
                                           (global_step))
@@ -252,7 +200,4 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_gpu)
-    else:
-        do_train(args)
+    do_train(args)
