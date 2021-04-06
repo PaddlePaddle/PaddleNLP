@@ -187,9 +187,10 @@ BLEU = 26.89, 58.4/32.6/20.5/13.4 (BP=1.000, ratio=1.010, hyp_len=65166, ref_len
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
 ```
 
-其次，让我们可以使用当前 clone 的 paddlenlp，并进入到自定义 OP 的路径，准备后续的编译操作：
+其次，配置环境变量，让我们可以使用当前 clone 的 paddlenlp，并进入到自定义 OP 的路径，准备后续的编译操作：
 
 ``` sh
+export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
 cd PaddleNLP/paddlenlp/ext_op/
 ```
 
