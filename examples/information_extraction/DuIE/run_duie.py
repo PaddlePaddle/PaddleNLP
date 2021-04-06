@@ -169,7 +169,7 @@ def do_train():
 
     # Loads dataset.
     train_dataset = DuIEDataset.from_file(
-        os.path.join(args.data_path, 'train_data.json'), tokenizer,
+        os.path.join(args.data_path, 'train.json'), tokenizer,
         args.max_seq_length, True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
@@ -179,7 +179,7 @@ def do_train():
         batch_sampler=train_batch_sampler,
         collate_fn=collator,
         return_list=True)
-    eval_file_path = os.path.join(args.data_path, 'dev_data.json')
+    eval_file_path = os.path.join(args.data_path, 'dev.json')
     test_dataset = DuIEDataset.from_file(eval_file_path, tokenizer,
                                          args.max_seq_length, True)
     test_batch_sampler = paddle.io.BatchSampler(

@@ -1,5 +1,3 @@
-export CUDA_VISIBLE_DEVICES=0
-
 data_dir=${1}
 conf_path=${2}
 ckpt_dir=${3}
@@ -27,7 +25,7 @@ if [ "$is_train" = True ]; then
                                         --max_seq_len ${max_seq_len} \
                                         --batch_size ${batch_size} \
                                         --skip_step 1 \
-                                        --valid_step 1 \
+                                        --valid_step 5 \
                                         --checkpoints ${ckpt_dir} \
                                         --init_ckpt ${ckpt_dir}/best.pdparams \
                                         --predict_save_path ${pred_save_path} \

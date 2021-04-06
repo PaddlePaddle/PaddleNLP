@@ -91,7 +91,7 @@ test_ds = DuEventExtraction(args.test_data, args.vocab_path, args.tag_path)
 ```python
 from paddlenlp.transformers import ErnieForTokenClassification
 
-model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=((len(label_map.keys()) - 2) * 2 + 2))
+model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
 ```
 
 同时，对于枚举分类数据采用的是基于ERNIE的文本分类模型，枚举角色类型为环节。模型原理图如下：
