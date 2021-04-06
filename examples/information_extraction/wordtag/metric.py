@@ -16,7 +16,7 @@ from typing import List, Tuple
 import paddle
 
 
-class SequenceAccuracy():
+class SequenceAccuracy(paddle.metric.Metric):
     """
     Masked language model pre-train task accuracy.
     """

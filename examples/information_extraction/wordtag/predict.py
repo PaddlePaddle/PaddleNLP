@@ -27,9 +27,9 @@ def parse_args():
     # yapf: disable
     parser.add_argument("--data_dir", default="./data", type=str, help="The input data dir, should contain [train/test].json and [train/test]_metrics.json")
     parser.add_argument("--init_ckpt_dir", default="ernie-ctm", type=str, help="The pre-trained model checkpoint dir.")
-    parser.add_argument("--max_seq_len",default=128,type=int,help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument("--batch_size",default=32,type=int,help="Batch size per GPU/CPU for training.", )
-    parser.add_argument("--n_gpu",default=1,type=int,help="number of gpus to use, 0 for cpu.")
+    parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.", )
+    parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.", )
+    parser.add_argument("--device", default="gpu", type=str, help="The device to select to train the model, is must be cpu/gpu/xpu.")
     # yapf: enable
 
     args = parser.parse_args()
@@ -37,7 +37,7 @@ def parse_args():
 
 
 def do_predict(args):
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
     predictor = WordtagPredictor(args.init_ckpt_dir, "./data/tags.txt")
     txts = ['《孤女》是2010年九州出版社出版的小说，作者是余兼羽。', '4分40秒至10分钟只有歌声。']
     res = predictor.run(txts)
@@ -55,7 +55,4 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(do_predict, args=(args, ), nprocs=args.n_gpu)
-    else:
-        do_predict(args)
+    do_predict(args)
