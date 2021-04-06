@@ -67,8 +67,8 @@ def evaluate(args):
     # Define the model network and metric evaluator
     network = BiGruCrf(args.emb_dim, args.hidden_size, test_dataset.vocab_size,
                        test_dataset.num_labels)
-    inputs = InputSpec(shape=(-1, ), dtype="int16", name='inputs')
-    lengths = InputSpec(shape=(-1, ), dtype="int16", name='lengths')
+    inputs = InputSpec(shape=(-1, ), dtype="int64", name='inputs')
+    lengths = InputSpec(shape=(-1, ), dtype="int64", name='lengths')
     model = paddle.Model(network, inputs=[inputs, lengths])
     chunk_evaluator = ChunkEvaluator(
         label_list=test_dataset.label_vocab.keys(), suffix=True)

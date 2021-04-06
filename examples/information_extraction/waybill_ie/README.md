@@ -8,7 +8,13 @@
 
 ### 数据准备
 
-数据集已经保存在data目录中，示例如下
+执行以下命令，下载并解压示例数据集：
+
+```bash
+python download.py --data_dir ./  
+```
+
+数据示例如下：
 
 ```
 1^B6^B6^B2^B0^B2^B0^B0^B0^B7^B7^B宣^B荣^B嗣^B甘^B肃^B省^B白^B银^B市^B会^B宁^B县^B河^B畔^B镇^B十^B字^B街^B金^B海^B超^B市^B西^B行^B5^B0^B米    T-B^BT-I^BT-I^BT-I^BT-I^BT-I^BT-I^BT-I^BT-I^BT-I^BT-I^BP-B^BP-I^BP-I^BA1-B^BA1-I^BA1-I^BA2-B^BA2-I^BA2-I^BA3-B^BA3-I^BA3-I^BA4-B^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I

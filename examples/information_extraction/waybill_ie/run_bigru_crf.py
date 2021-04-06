@@ -60,9 +60,11 @@ def convert_tokens_to_ids(tokens, vocab, oov_token=None):
 
 def load_dict(dict_path):
     vocab = {}
+    i = 0
     for line in open(dict_path, 'r', encoding='utf-8'):
-        value, key = line.strip('\n').split('\t')
-        vocab[key] = int(value)
+        key = line.strip('\n')
+        vocab[key] = i
+        i += 1
     return vocab
 
 
@@ -92,7 +94,7 @@ class BiGRUWithCRF(nn.Layer):
         super(BiGRUWithCRF, self).__init__()
         if use_w2v_emb:
             self.word_emb = TokenEmbedding(
-                extended_vocab_path='./conf/word.dic', unknown_token='OOV')
+                extended_vocab_path='./data/word.dic', unknown_token='OOV')
         else:
             self.word_emb = nn.Embedding(word_num, emb_size)
         self.gru = nn.GRU(emb_size,
@@ -118,8 +120,8 @@ if __name__ == '__main__':
     train_ds, dev_ds, test_ds = load_dataset(datafiles=(
         './data/train.txt', './data/dev.txt', './data/test.txt'))
 
-    label_vocab = load_dict('./conf/tag.dic')
-    word_vocab = load_dict('./conf/word.dic')
+    label_vocab = load_dict('./data/tag.dic')
+    word_vocab = load_dict('./data/word.dic')
 
     def convert_example(example):
         tokens, labels = example
