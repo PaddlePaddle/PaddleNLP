@@ -1,4 +1,3 @@
-export CUDA_VISIBLE_DEVICES=0
 
 data_dir=$1
 conf_path=$2

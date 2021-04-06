@@ -44,7 +44,7 @@ def data_process(path, model="trigger", is_predict=False):
             else:
                 if model == "trigger":
                     labels = ["O"] * len(text_a)
-                    for event in d_json.get(["event_list"], []):
+                    for event in d_json.get("event_list", []):
                         event_type = event["event_type"]
                         start = event["trigger_start_index"]
                         trigger = event["trigger"]
@@ -53,7 +53,7 @@ def data_process(path, model="trigger", is_predict=False):
                     output.append("{}\t{}".format('\002'.join(text_a),
                                                   '\002'.join(labels)))
                 elif model == "role":
-                    for event in d_json.get(["event_list"], []):
+                    for event in d_json.get("event_list", []):
                         labels = ["O"] * len(text_a)
                         for arg in event["arguments"]:
                             role_type = arg["role"]
@@ -118,20 +118,20 @@ if __name__ == "__main__":
         os.makedirs(role_save_dir)
     print("\n----trigger------for dir {} to {}".format(data_dir,
                                                        trigger_save_dir))
-    train_tri = data_process("{}/train.json".format(data_dir), "trigger")
+    train_tri = data_process("{}/duee_train.json".format(data_dir), "trigger")
     write_by_lines("{}/train.tsv".format(trigger_save_dir), train_tri)
-    dev_tri = data_process("{}/dev.json".format(data_dir), "trigger")
+    dev_tri = data_process("{}/duee_dev.json".format(data_dir), "trigger")
     write_by_lines("{}/dev.tsv".format(trigger_save_dir), dev_tri)
-    test_tri = data_process("{}/test.json".format(data_dir), "trigger")
+    test_tri = data_process("{}/duee_test1.json".format(data_dir), "trigger")
     write_by_lines("{}/test.tsv".format(trigger_save_dir), test_tri)
     print("train {} dev {} test {}".format(
         len(train_tri), len(dev_tri), len(test_tri)))
     print("\n----role------for dir {} to {}".format(data_dir, role_save_dir))
-    train_role = data_process("{}/train.json".format(data_dir), "role")
+    train_role = data_process("{}/duee_train.json".format(data_dir), "role")
     write_by_lines("{}/train.tsv".format(role_save_dir), train_role)
-    dev_role = data_process("{}/dev.json".format(data_dir), "role")
+    dev_role = data_process("{}/duee_dev.json".format(data_dir), "role")
     write_by_lines("{}/dev.tsv".format(role_save_dir), dev_role)
-    test_role = data_process("{}/test.json".format(data_dir), "role")
+    test_role = data_process("{}/duee_test1.json".format(data_dir), "role")
     write_by_lines("{}/test.tsv".format(role_save_dir), test_role)
     print("train {} dev {} test {}".format(
         len(train_role), len(dev_role), len(test_role)))
