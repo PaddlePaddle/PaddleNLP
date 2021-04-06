@@ -21,15 +21,9 @@
 using namespace paddle_infer;
 
 
-std::string model_dir =
-    "/paddle/fast_transformer/new/PaddleNLP/examples/machine_translation/"
-    "transformer/faster_transformer/infer_model/";
-std::string dict_dir =
-    "/paddle/cache/.paddlenlp/datasets/WMT14ende/WMT14.en-de/"
-    "wmt14_ende_data_bpe/vocab_all.bpe.33708";
-std::string datapath =
-    "/paddle/cache/.paddlenlp/datasets/WMT14ende/WMT14.en-de/"
-    "wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en";
+std::string model_dir = "";
+std::string dict_dir = "";
+std::string datapath = "";
 
 const int eos_idx = 1;
 const int pad_idx = 0;
@@ -210,14 +204,15 @@ void Main(int batch_size, int gpu_id) {
                       dataresultvec,
                       reader.num2word_dict);
 
+    whole_time += timer.toc();
+    num_batches++;
+
     if (out.is_open()) {
       for (int i = 0; i < dataresultvec.size(); ++i) {
         out << dataresultvec[i].result_q << "\n";
       }
     }
 
-    whole_time += timer.toc();
-    num_batches++;
     source_query_vec.clear();
   }
   SummaryConfig(config, whole_time, num_batches);
