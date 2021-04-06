@@ -476,8 +476,12 @@ def do_train(args):
                 eod_id=eod_id,
                 places=paddle.static.cuda_places(),
                 data_holders=data_holders)
+            # bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
+            # many times. and start a new random dataloader.
+            valid_data_loader = valid_data_loader()
+            test_data_loader = test_data_loader()
 
-            for step, batch in enumerate(train_data_loader):
+            for step, batch in enumerate(train_data_loader()):
                 global_step += 1
                 loss_return, lr_return = exe.run(
                     main_program,
@@ -510,7 +514,7 @@ def do_train(args):
                                               feed=batch,
                                               fetch_list=[loss.name])
                         all_loss.append(float(loss_return[0]))
-                        if eval_step >= iter_steps:
+                        if eval_step >= iter_steps - 1:
                             average_loss = sum(all_loss) / len(all_loss)
                             logger.info(
                                 "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"

@@ -70,7 +70,7 @@ def run_evaluate(data_loader,
         preds = model(tokens, position_ids, attention_mask)
         loss = criterion(preds, labels, loss_mask)
         all_loss.append(float(loss))
-        if eval_step >= iter_steps:
+        if eval_step >= iter_steps - 1:
             break
 
     average_loss = sum(all_loss) / len(all_loss)
@@ -172,10 +172,14 @@ def do_train(args):
                 worker_index,
                 worker_num,
                 eod_id=eod_id)
-            for step, batch in enumerate(train_data_loader):
+            # bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
+            # many times. and start a new random dataloader.
+            valid_data_loader = valid_data_loader()
+            test_data_loader = test_data_loader()
+
+            for step, batch in enumerate(train_data_loader()):
                 global_step += 1
                 tokens, loss_mask, attention_mask, position_ids, labels = batch
-
                 loss_mask.stop_gradient = True
                 attention_mask.stop_gradient = True
 
