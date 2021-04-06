@@ -29,7 +29,7 @@ def parse_args():
     parser.add_argument("--init_ckpt_dir", default="ernie-ctm", type=str, help="The pre-trained model checkpoint dir.")
     parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.", )
     parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.", )
-    parser.add_argument("--device", default="gpu", type=str, help="The device to select to train the model, is must be cpu/gpu/xpu.")
+    parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
     # yapf: enable
 
     args = parser.parse_args()

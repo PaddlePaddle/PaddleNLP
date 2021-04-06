@@ -106,7 +106,6 @@ class LinearChainCrf(nn.Layer):
             # input_exp: batch_size, num_tags, num_tags
             # alpha_exp: batch_size, num_tags, num_tags
             if i == 0 and not self.with_start_stop_tag:
-                # mat = input_exp
                 alpha = inputs[:, 0]
             else:
                 alpha_exp = alpha.unsqueeze(1).expand(
