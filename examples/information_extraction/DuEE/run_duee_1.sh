@@ -3,7 +3,7 @@ data_dir=./data/${dataset_name}
 conf_dir=./conf/${dataset_name}
 ckpt_dir=./ckpt/${dataset_name}
 submit_data_path=./submit/test_duee_1.json
-pred_data=${data_dir}/test.json   # 换其他数据，需要修改它
+pred_data=${data_dir}/duee_test1.json   # 换其他数据，需要修改它
 
 learning_rate=5e-5
 max_seq_len=300
