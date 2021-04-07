@@ -1,0 +1,140 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.embeddings.token_embedding.rst:2
+msgid "token\\_embedding"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.list_embedding_name:1
+msgid "List all names of pretrained embedding models paddlenlp provides."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:1
+msgid "基类：:class:`paddle.nn.layer.common.Embedding`"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:1
+msgid ""
+"A `TokenEmbedding` can load pre-trained embedding model which paddlenlp "
+"provides by specifying embedding name. Furthermore, a `TokenEmbedding` "
+"can load extended vocabulary by specifying extended_vocab_path."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:5
+msgid ""
+"`str`, optional, default to `w2v.baidu_encyclopedia.target.word-"
+"word.dim300`): The pre-trained embedding model name. Use "
+"`paddlenlp.embeddings.list_embedding_name()` to show which embedding "
+"model we have alreaady provide."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:8
+msgid ""
+"`str`, optional, default to `[UNK]`): Specifying unknown token as "
+"unknown_token."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:10
+msgid ""
+"list, optional, default to `None`): To initialize the vector of unknown "
+"token. If it's none, use normal distribution to initialize the vector of "
+"unknown token."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:13
+msgid "`str`, optional, default to `None`): The file path of extended vocabulary."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:15
+msgid ""
+"`bool`, optional, default to True): Whether the weight of embedding can "
+"be trained."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding:17
+msgid ""
+"`bool`, optional, default to True): Whether keep the extended vocabulary "
+"only, will be effective only if provides extended_vocab_path"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.set_trainable:1
+msgid ""
+"Set the weight of embedding can be trained. :param trainable (object: "
+"`bool`, required):"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.set_trainable:3
+msgid "Whether the weight of embedding can be trained."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search:1
+msgid ""
+"Get the vectors of specifying words. :param words (object: `list` or "
+"`str` or `int`, required): The words which need to be searched."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.dot
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.search
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search:4
+msgid "`numpy.array`): The vectors of specifying words."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word:1
+msgid "Get the index of specifying word by searching word_to_idx dict."
+msgstr ""
+
+#: of
+#: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words:1
+msgid "Get the index list of specifying words by searching word_to_idx dict."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.dot:1
+msgid ""
+"Calculate the scalar product of 2 words. :param word_a (object: `str`, "
+"required): The first word string. :param word_b (object: `str`, "
+"required): The second word string."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.dot:5
+msgid "The scalar product of 2 words."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim:1
+msgid ""
+"Calculate the cosine similarity of 2 words. :param word_a (object: `str`,"
+" required): The first word string. :param word_b (object: `str`, "
+"required): The second word string."
+msgstr ""
+
+#: of paddlenlp.embeddings.token_embedding.TokenEmbedding.cosine_sim:5
+msgid "The cosine similarity of 2 words."
+msgstr ""
+
