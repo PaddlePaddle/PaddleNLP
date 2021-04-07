@@ -43,6 +43,7 @@
    数据集列表 <data_prepare/dataset_list>
    加载数据集 <data_prepare/dataset_load>
    自定义数据集 <data_prepare/dataset_self_defined>
+   数据处理 <data_prepare/data_preprocess>
 
 .. toctree::
    :maxdepth: 2
@@ -65,6 +66,12 @@
    模型压缩 <advanced_guide/model_compression/index>
    高性能预测部署 <advanced_guide/deployment>
    大规模分布式训练 <advanced_guide/distributed_training>
+
+.. toctree::
+   :maxdepth: 2
+   :caption: 社区贡献
+
+   如何贡献数据集 <community/contribute_dataset>
 
 .. toctree::
    :maxdepth: 2

@@ -85,9 +85,9 @@ def train(args):
     network = BiGruCrf(args.emb_dim, args.hidden_size, train_dataset.vocab_size,
                        train_dataset.num_labels)
 
-    inputs = InputSpec(shape=(-1, ), dtype="int16", name='inputs')
-    lengths = InputSpec(shape=(-1, ), dtype="int16", name='lengths')
-    labels = InputSpec(shape=(-1, ), dtype="int16", name='labels')
+    inputs = InputSpec(shape=(-1, ), dtype="int64", name='inputs')
+    lengths = InputSpec(shape=(-1, ), dtype="int64", name='lengths')
+    labels = InputSpec(shape=(-1, ), dtype="int64", name='labels')
     model = paddle.Model(network, inputs=[inputs, lengths, labels])
 
     # Prepare optimizer, loss and metric evaluator

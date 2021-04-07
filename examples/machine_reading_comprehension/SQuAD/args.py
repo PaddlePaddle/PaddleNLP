@@ -92,10 +92,10 @@ def parse_args():
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
-        "--n_gpu",
-        type=int,
-        default=1,
-        help="number of gpus to use, 0 for cpu.")
+        '--device',
+        choices=['cpu', 'gpu'],
+        default="gpu",
+        help="Select which device to train model, defaults to gpu.")
     parser.add_argument(
         "--doc_stride",
         type=int,

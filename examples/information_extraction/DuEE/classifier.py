@@ -113,7 +113,6 @@ def convert_example(example, tokenizer, label_map=None, max_seq_len=512, is_test
     tokenized_input = tokenizer(
         text=example.text_a,
         text_pair=text_b,
-        pad_to_max_seq_len=True,
         max_seq_len=max_seq_len)
     input_ids = tokenized_input['input_ids']
     token_type_ids = tokenized_input['token_type_ids']
@@ -223,8 +222,17 @@ def do_train():
     num_training_steps = len(train_loader) * args.num_epoch
     metric = paddle.metric.Accuracy()
     criterion = paddle.nn.loss.CrossEntropyLoss()
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
-        learning_rate=args.learning_rate, parameters=model.parameters())
+        learning_rate=args.learning_rate,
+        parameters=model.parameters(),
+        weight_decay=args.weight_decay,
+        apply_decay_param_fun=lambda x: x in decay_params)
 
     step, best_performerence = 0, 0.0
     model.train()
