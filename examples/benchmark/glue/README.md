@@ -25,7 +25,7 @@ python -u ./run_glue.py \
     --logging_steps 1 \
     --save_steps 100 \
     --output_dir ./tmp/$TASK_NAME/ \
-    --device "gpu"
+    --device gpu
 
 ```
 
@@ -45,7 +45,7 @@ python -m paddle.distributed.launch --gpus "0,1" run_glue.py \
     --logging_steps 1 \
     --save_steps 100 \
     --output_dir ./tmp/$TASK_NAME/ \
-    --device "gpu"
+    --device gpu
 
 ```
 其中参数释义如下：
