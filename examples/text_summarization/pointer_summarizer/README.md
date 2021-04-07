@@ -1,7 +1,7 @@
-This code is the Paddle v2.0 implementation of implementation of *[Get To The Point: Summarization with Pointer-Generator Networks](https://arxiv.org/abs/1704.04368)*.
-The code adapts and aligns with *[a previous Pytorch implmentation](https://github.com/atulkum/pointer_summarizer)*.
+This code is the Paddle v2.0 implementation of *[Get To The Point: Summarization with Pointer-Generator Networks](https://arxiv.org/abs/1704.04368)*.
+The code adapts and aligns with [a previous Pytorch implmentation](https://github.com/atulkum/pointer_summarizer).
 
-To reach the state-of-the-art performance stated in the source paper, please use the default hyper-parameters listed in utils/config.py.  
+To reach the state-of-the-art performance stated in the source paper, please use the default hyper-parameters listed in *utils/config.py*.  
 
 ## Train with pointer generation and coverage loss enabled 
 After training for 100k iterations with coverage loss enabled (batch size 8)
@@ -26,8 +26,8 @@ rouge_l_precision: 0.3467 with confidence interval (0.3442, 0.3493)
 
 
 ## How to run training:
-1) Follow data generation instruction from https://github.com/abisee/cnn-dailymail; place the folder finished_files/ as a sister folder of src/, utils/, log/
-2) You might need to change some path and parameters in utils/config.py
+1) Follow data generation instruction from https://github.com/abisee/cnn-dailymail; place the folder *finished_files/* as a sister folder of *src/*, *utils/*
+2) You might need to change some paths and parameters in *utils/config.py*
 3) You need to setup [pyrouge](https://github.com/andersjo/pyrouge) to get the rouge score; also see [this tutorial](https://poojithansl7.wordpress.com/2018/08/04/setting-up-rouge/) to set up rouge and pyrouge.
 4) 
 * To train the model from start:
@@ -42,7 +42,7 @@ cd src/ && python train.py -m path/to/model/dir/
 ```
 cd src/ && python decode.py path/to/model/dir/
 ```
-* If you already have the summaries generated using src/decode.py and only needs to run rouge evaluation: 
+* If you already have the summaries generated using *src/decode.py* and only needs to run rouge evaluation: 
 ```
 cd src/ && python rouge_eval.py path/to/decoded/dir/
 ```
