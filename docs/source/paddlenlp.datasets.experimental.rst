@@ -3,7 +3,7 @@ experimental
 
 .. automodule:: paddlenlp.datasets.experimental
    :members:
-   :no-undoc-members:
+   :no-no-undoc-members:
    :show-inheritance:
 
 

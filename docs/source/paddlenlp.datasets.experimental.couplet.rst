@@ -3,5 +3,5 @@ couplet
 
 .. automodule:: paddlenlp.datasets.experimental.couplet
    :members:
-   :no-undoc-members:
+   :no-no-undoc-members:
    :show-inheritance:

@@ -3,5 +3,5 @@ ptb
 
 .. automodule:: paddlenlp.datasets.experimental.ptb
    :members:
-   :no-undoc-members:
+   :no-no-undoc-members:
    :show-inheritance:

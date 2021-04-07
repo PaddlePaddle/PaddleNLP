@@ -3,5 +3,5 @@ translation
 
 .. automodule:: paddlenlp.datasets.translation
    :members:
-   :no-undoc-members:
+   :no-no-undoc-members:
    :show-inheritance:
