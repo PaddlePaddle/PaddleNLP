@@ -1,7 +1,7 @@
-ptb
+dureader\_robust
 ==========================================
 
-.. automodule:: paddlenlp.datasets.experimental.ptb
+.. automodule:: paddlenlp.datasets.dureader_robust
    :members:
    :no-undoc-members:
    :show-inheritance:
