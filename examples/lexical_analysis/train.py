@@ -53,9 +53,9 @@ def train(args):
     test_dataset = LacDataset(args.data_dir, mode='test')
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=0),  # word_ids
-        Stack(),  # length
-        Pad(axis=0, pad_val=0),  # label_ids
+        Pad(axis=0, pad_val=0, dtype='int64'),  # word_ids
+        Stack(dtype='int64'),  # length
+        Pad(axis=0, pad_val=0, dtype='int64'),  # label_ids
     ): fn(samples)
 
     # Create sampler for dataloader
