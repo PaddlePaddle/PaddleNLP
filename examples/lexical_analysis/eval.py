@@ -32,7 +32,7 @@ parser.add_argument("--data_dir", type=str, default=None, help="The folder where
 parser.add_argument("--init_checkpoint", type=str, default=None, help="Path to init model.")
 parser.add_argument("--batch_size", type=int, default=300, help="The number of sequences contained in a mini-batch.")
 parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
-parser.add_argument('--use_gpu', action='store_true', help='If set, use gpu to excute')
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
 parser.add_argument("--emb_dim", type=int, default=128, help="The dimension in which a word is embedded.")
 parser.add_argument("--hidden_size", type=int, default=128, help="The number of hidden nodes in the GRU layer.")
 args = parser.parse_args()
@@ -40,8 +40,7 @@ args = parser.parse_args()
 
 
 def evaluate(args):
-    place = paddle.CUDAPlace(0) if args.use_gpu else paddle.CPUPlace()
-    paddle.set_device("gpu" if args.use_gpu else "cpu")
+    paddle.set_device(args.device)
 
     # create dataset.
     test_dataset = LacDataset(args.data_dir, mode='test')
@@ -60,7 +59,6 @@ def evaluate(args):
     test_loader = paddle.io.DataLoader(
         dataset=test_dataset,
         batch_sampler=test_sampler,
-        places=place,
         return_list=True,
         collate_fn=batchify_fn)
 
