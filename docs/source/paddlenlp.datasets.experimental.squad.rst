@@ -3,5 +3,5 @@ squad
 
 .. automodule:: paddlenlp.datasets.experimental.squad
    :members:
-   :no-undoc-members:
+   :no-no-undoc-members:
    :show-inheritance:
