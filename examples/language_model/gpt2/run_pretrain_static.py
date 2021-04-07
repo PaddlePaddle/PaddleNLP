@@ -402,17 +402,24 @@ def do_train(args):
     if args.grad_clip > 0:
         clip = paddle.nn.ClipGradByNorm(clip_norm=args.grad_clip)
 
+    opt_param = []
+    for pa in model.parameters():
+        if "batch_norm" not in pa.name:
+            opt_param.append(pa)
+        else:
+            print(pa.name)
+    decay_param = lambda x: x in [
+             p.name for n, p in model.named_parameters()
+             if not any(nd in n for nd in ["bias", "norm"])]
+
+    # optimizer = paddle.optimizer.AdamW(
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
-        parameters=model.parameters(),
+        parameters=opt_param,  # TODO @ZHUI, no use, please fix. 
         weight_decay=args.weight_decay,
         grad_clip=clip,
-         apply_decay_param_fun=lambda x: x in [
-             p.name for n, p in model.named_parameters()
-             if not any(nd in n for nd in ["bias", "norm"])
-         ]
-    )
+        apply_decay_param_fun=decay_param)
     # Use the fleet api to compile the distributed optimizer
 
     optimizer.apply_optimize = optimizer._apply_optimize

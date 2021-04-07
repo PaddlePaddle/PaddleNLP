@@ -22,6 +22,7 @@ import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
+from paddle.fluid.initializer import Normal, Constant, NumpyArrayInitializer
 
 from .. import PretrainedModel, register_base_model
 
@@ -33,6 +34,50 @@ __all__ = [
     'GPT2ForGreedyGeneration',
     'GPT2ForTopKPGeneration',
 ]
+
+
+class LayerNormByBN(nn.Layer):
+    def __init__(self, dim, epsilon=1e-5):
+        super().__init__()
+        # normalized_shape = np.prod(input_shape[:-1])
+        normalized_shape = 16 * 1024
+        input_shape = [dim if dim != -1 else 1024]
+        print(input_shape)
+        self.batch_norm = paddle.nn.BatchNorm(
+            normalized_shape,
+            epsilon=epsilon,
+            param_attr=paddle.fluid.ParamAttr(),
+            data_layout='NHWC',
+            momentum=0.0,
+            do_model_average_for_mean_and_var=False)
+
+        # self.batch_norm.weight.stop_gradient =True
+        # self.batch_norm.bias.stop_gradient =True
+
+        self.weight = self.create_parameter(
+            shape=[1, input_shape[-1]],
+            dtype=self._dtype,
+            default_initializer=Constant(1.0))
+        self.bias = self.create_parameter(
+            shape=[1, input_shape[-1]],
+            dtype=self._dtype,
+            default_initializer=Constant(0.0))
+
+    def forward(self, input):
+        in_shape = paddle.shape(input)
+        # paddle.fluid.layers.Print(self.batch_norm.bias)
+        # input = input.reshape([1, -1, in_shape[-1]])
+        input = input.reshape([1, 16 * 1024, in_shape[-1]])
+        input_trans = input.transpose([0, 2, 1])
+        out = self.batch_norm(input_trans)
+        out = out.squeeze(axis=0)
+        out = out.transpose([1, 0])
+        out = out * self.weight + self.bias
+        out = out.reshape(in_shape)
+        return out
+
+
+# nn.LayerNorm = LayerNormByBN
 
 
 class MultiHeadAttention(nn.Layer):
@@ -317,6 +362,7 @@ class TransformerDecoderLayer(nn.Layer):
 
     def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None):
         residual = tgt
+
         if self.normalize_before:
             tgt = self.norm1(tgt)
 

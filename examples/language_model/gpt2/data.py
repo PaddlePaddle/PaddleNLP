@@ -228,7 +228,7 @@ def create_pretrained_dataset(args,
             seed=args.seed + worker_index)
 
         batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
+            dataset, batch_size=args.batch_size, shuffle=False, drop_last=True)
 
         data_loader = DataLoader(
             dataset=dataset,
