@@ -75,11 +75,11 @@ def do_train(args):
 
     ignore_label = tags_to_idx["O"]
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-        Stack(),  # seq_len
-        Pad(axis=0, pad_val=ignore_label),  # tags
-        Stack(),  # cls_label
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # token_type_ids
+        Stack(dtype='int64'),  # seq_len
+        Pad(axis=0, pad_val=ignore_label, dtype='int64'),  # tags
+        Stack(dtype='int64'),  # cls_label
     ): fn(samples)
 
     train_batch_sampler = paddle.io.DistributedBatchSampler(
