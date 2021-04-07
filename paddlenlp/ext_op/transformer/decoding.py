@@ -16,9 +16,9 @@ def infer_transformer_decoder(
         cross_k_bias, cross_v_weight, cross_v_bias, cross_out_weight,
         cross_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
         ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
-        decoder_ln_bias, linear_weight, linear_bias, pos_emb, _beam_size,
-        _n_head, _size_per_head, _n_layer, _bos_id, _eos_id, _max_out_len,
-        _beam_search_diversity_rate):
+        decoder_ln_bias, linear_weight, linear_bias, pos_emb,
+        _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
+        _n_layer, _bos_id, _eos_id, _max_out_len, _beam_search_diversity_rate):
     helper = LayerHelper('fusion_decoding', **locals())
 
     inputs = {
@@ -59,7 +59,10 @@ def infer_transformer_decoder(
     }
 
     attrs = {
+        'decoding_strategy': _decoding_strategy,
         'beam_size': _beam_size,
+        'topk': _topk,
+        'topp': _topp,
         'n_head': _n_head,
         'size_per_head': _size_per_head,
         'num_layer': _n_layer,
@@ -85,12 +88,19 @@ def infer_transformer_decoder(
     return output_ids, parent_ids, sequence_length
 
 
-def finalize(beam_size, output_ids, parent_ids, out_seq_lens, max_seq_len=None):
+def finalize(beam_size,
+             output_ids,
+             parent_ids,
+             out_seq_lens,
+             max_seq_len=None,
+             decoding_strategy="beam_search"):
     if max_seq_len is None:
         max_seq_len = paddle.max(out_seq_lens)
-    output_ids = paddle.slice(output_ids, [0], [0], [max_seq_len])
-    parent_ids = paddle.slice(parent_ids, [0], [0], [max_seq_len]) % beam_size
-    ids = paddle.nn.functional.gather_tree(output_ids, parent_ids)
+    ids = paddle.slice(output_ids, [0], [0], [max_seq_len])
+    if "beam_search" == decoding_strategy:
+        parent_ids = paddle.slice(parent_ids, [0], [0],
+                                  [max_seq_len]) % beam_size
+        ids = paddle.nn.functional.gather_tree(ids, parent_ids)
     return ids
 
 
@@ -113,7 +123,10 @@ class InferTransformerDecoding(nn.Layer):
                  d_model,
                  bos_id=0,
                  eos_id=1,
+                 decoding_strategy="beam_search",
                  beam_size=4,
+                 topk=1,
+                 topp=0.0,
                  max_out_len=256,
                  beam_search_diversity_rate=0.0,
                  decoding_lib=None,
@@ -186,6 +199,8 @@ class InferTransformerDecoding(nn.Layer):
             decoder.norm.bias = transfer_param(decoder.norm.bias, is_bias=True)
 
             linear.weight = transfer_param(linear.weight)
+            if "beam_search" != decoding_strategy:
+                linear.bias = transfer_param(linear.bias)
 
         self.slf_ln_weight = []
         self.slf_ln_bias = []
@@ -256,10 +271,11 @@ class InferTransformerDecoding(nn.Layer):
         self.linear_bias = [linear.bias]
 
     def forward(self, enc_output, memory_seq_lens):
-        enc_output = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
-            enc_output, self._beam_size)
-        memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
-            memory_seq_lens, self._beam_size)
+        if "beam_search" == self._decoding_strategy:
+            enc_output = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
+                enc_output, self._beam_size)
+            memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
+                memory_seq_lens, self._beam_size)
 
         output_ids, parent_ids, sequence_length = infer_transformer_decoder(
             [enc_output], [memory_seq_lens],
@@ -298,7 +314,10 @@ class InferTransformerDecoding(nn.Layer):
             self.linear_bias, [paddle.cast(
                 self.pos_emb[0], dtype="float16")]
             if self._use_fp16_decoding else self.pos_emb,
+            self._decoding_strategy,
             self._beam_size,
+            self._topk,
+            self._topp,
             self._n_head,
             int(self._d_model / self._n_head),
             self._n_layer,
@@ -307,6 +326,11 @@ class InferTransformerDecoding(nn.Layer):
             self._max_out_len,
             self._beam_search_diversity_rate)
 
-        ids = finalize(self._beam_size, output_ids, parent_ids, sequence_length)
+        ids = finalize(
+            self._beam_size,
+            output_ids,
+            parent_ids,
+            sequence_length,
+            decoding_strategy=self._decoding_strategy)
 
         return ids

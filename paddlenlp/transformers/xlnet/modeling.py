@@ -24,7 +24,6 @@ from .. import PretrainedModel, register_base_model
 __all__ = [
     "XLNetModel",
     "XLNetPretrainedModel",
-    "XLNetClassificationHead",
     "XLNetForSequenceClassification",
     "XLNetForTokenClassification",
 ]
@@ -64,9 +63,7 @@ ACT2FN = {
 
 
 def einsum4x4(equation, x, y):
-    """
-    Only works for 4D x 4D.
-    """
+    """Only works for 4D x 4D."""
     idx_x, idx_y, idx_z = re.split(",|->", equation)
     # Compute repeated index
     repeated_idx = list(set(idx_x + idx_y) - set(idx_z))
@@ -471,10 +468,10 @@ class XLNetLayer(Layer):
 
 class XLNetPretrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained XLNet models. It provides XLNet related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    An abstract class for pretrained XLNet models. It provides XLNet related ``model_config_file``,
+    ``resource_files_names``, ``pretrained_resource_files_map``, ``pretrained_init_configuration``,
+    ``base_model_prefix`` for downloading and loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -644,6 +641,67 @@ class XLNetPretrainedModel(PretrainedModel):
 
 @register_base_model
 class XLNetModel(XLNetPretrainedModel):
+    """
+    The bare XLNet Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Check the superclass documentation for the generic methods and the library implements for all its model.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (`int`):
+            Vocabulary size of the XLNet model. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling XLNetModel.
+        mem_len (`int` or `None`, optional):
+            The number of tokens to cache. The key/value pairs that have already been pre-computed in a previous
+            forward pass won't be re-computed. Defaults to ``None``.
+        reuse_len (`int` or `None`, optional):
+            The number of tokens in the current batch to be cached and reused in the future. Defaults to ``None``.
+        d_model (`int`, optional):
+            Dimensionality of the encoder layers and the pooler layer. Defaults to ``768``.
+        same_length (`bool`, optional):
+            Whether or not to use the same attention length for each token. Defaults to ``False``.
+        attn_type (`str`, optional):
+            The attention type used by the model. Set `"bi"` for XLNet, `"uni"` for Transformer-XL.
+            Defaults to ``"bi"``.
+        bi_data (`bool`, optional):
+            Whether or not to use bidirectional input pipeline. Usually set to `True` during pretraining and
+            `False` during fine-tuning. Defaults to ``False``.
+        clamp_len (`int`, optional):
+            Clamp all relative distances larger than clamp_len. Setting this attribute to -1 means no clamping.
+            Defaults to ``-1``.
+        n_layer (`int`, optional):
+            Number of hidden layers in the Transformer encoder. Defaults to ``12``.
+        dropout (`float`, optional):
+            The dropout probability for all fully connected layers in the embeddings and encoder.
+            Defaults to ``0.1``.
+        classifier_dropout (`float`, optional):
+            The dropout probability for all fully connected layers in the pooler.
+            Defaults to ``0.1``.
+        n_head (`int`, optional):
+            Number of attention heads for each attention layer in the Transformer encoder.
+            Defaults to ``12``.
+        d_head (`int`, optional):
+            Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
+            Defaults to ``64``.
+        layer_norm_eps (`float`, optional):
+            The epsilon used by the layer normalization layers.
+            Defaults to ``1e-12``.
+        d_inner (`int`, optional):
+            Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
+            Defaults to ``3072``.
+        ff_activation (`str`, optional):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"``, ``"silu"`` and ``"gelu_new"`` are supported.
+            Defaults to ``"gelu"``.
+        initializer_range (`float`, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Defaults to ``0.02``.
+    """
+
     def __init__(
             self,
             vocab_size,
@@ -652,7 +710,7 @@ class XLNetModel(XLNetPretrainedModel):
             d_model=768,
             same_length=False,
             attn_type="bi",
-            bi_data="False",
+            bi_data=False,
             clamp_len=-1,
             n_layer=12,
             dropout=0.1,
@@ -699,24 +757,7 @@ class XLNetModel(XLNetPretrainedModel):
         raise NotImplementedError
 
     def create_mask(self, qlen, mlen):
-        """
-        Creates causal attention mask. Float mask where 1.0 indicates masked, 0.0 indicates not-masked.
-
-        Args:
-            qlen: Sequence length
-            mlen: Mask length
-
-        ::
-
-                  same_length=False:      same_length=True:
-                  <mlen > <  qlen >       <mlen > <  qlen >
-               ^ [0 0 0 0 0 1 1 1 1]     [0 0 0 0 0 1 1 1 1]
-                 [0 0 0 0 0 0 1 1 1]     [1 0 0 0 0 0 1 1 1]
-            qlen [0 0 0 0 0 0 0 1 1]     [1 1 0 0 0 0 0 1 1]
-                 [0 0 0 0 0 0 0 0 1]     [1 1 1 0 0 0 0 0 1]
-               v [0 0 0 0 0 0 0 0 0]     [1 1 1 1 0 0 0 0 0]
-
-        """
+        # Creates causal attention mask. Float mask where 1.0 indicates masked, 0.0 indicates not-masked.
         attn_mask = paddle.ones([qlen, qlen])
         mask_up = paddle.triu(attn_mask, diagonal=1)
         attn_mask_pad = paddle.zeros([qlen, mlen])
@@ -734,7 +775,7 @@ class XLNetModel(XLNetPretrainedModel):
             curr_out = curr_out[:self.reuse_len]
 
         if self.mem_len is None or self.mem_len == 0:
-            # If :obj:`use_mems` is active but no `mem_len` is defined, the model behaves like GPT-2 at inference time
+            # If `use_mems` is active but no `mem_len` is defined, the model behaves like GPT-2 at inference time
             # and returns all of the past and current hidden states.
             cutoff = 0
         else:
@@ -801,7 +842,7 @@ class XLNetModel(XLNetPretrainedModel):
 
     def forward(
             self,
-            input_ids=None,
+            input_ids,
             token_type_ids=None,
             attention_mask=None,
             mems=None,
@@ -815,6 +856,130 @@ class XLNetModel(XLNetPretrainedModel):
             output_attentions=False,
             output_hidden_states=False,
             return_dict=False, ):
+        r"""
+        The XLNetModel forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (`Tensor`):
+                Indices of input sequence tokens in the vocabulary.
+                It's data type should be int64 and it has a shape of [batch_size, sequence_length].
+            token_type_ids (`Tensor`, optional):
+                Segment token indices to indicate first and second portions of the inputs.
+                Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+                It's data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to ``None``, which means we don't add segment embeddings.
+            attention_mask (`Tensor`, optional):
+                Mask to avoid performing attention on padding token indices with values being either 0 or 1:
+
+                - 1 for tokens that are **not masked**,
+                - 0 for tokens that are **masked**.
+
+                It's data type should be `float32` and it has a shape of [batch_size, sequence_length].
+                Defaults to ``None``.
+            mems (`List[Tensor]`, optional):
+                Contains pre-computed hidden-states. Can be used to speed up sequential decoding.
+                It's a list (has a length of n_layers) of Tensors (has a data type of `float32`).
+                `use_mems` has to be set to `True` to make use of `mems`.
+                Defaults to ``None``, and we don't use mems.
+            perm_mask (`Tensor`, optional):
+                Mask to indicate the attention pattern for each input token with values being either 0 or 1.
+
+                - if ``perm_mask[k, i, j] = 0``, i attend to j in batch k;
+                - if ``perm_mask[k, i, j] = 1``, i does not attend to j in batch k.
+
+                Only used during pretraining (to define factorization order) or for sequential decoding (generation).
+                It's data type should be `float32` and it has a shape of [batch_size, sequence_length, sequence_length].
+                Defaults to ``None``, and each token attends to all the others (full bidirectional attention).
+            target_mapping (`Tensor`, optional):
+                Mask to indicate the output tokens to use with values being either 0 or 1.
+                If ``target_mapping[k, i, j] = 1``, the i-th predict in batch k is on the j-th token.
+                Only used during pretraining for partial prediction or for sequential decoding (generation).
+                It's data type should be `float32` and it has a shape of [batch_size, num_predict, sequence_length].
+                Defaults to ``None``.
+            input_mask (`Tensor`, optional):
+                Mask to avoid performing attention on padding token indices.
+                Negative of `attention_mask`, i.e. with 0 for real tokens and 1 for padding.
+                Mask values can either be 0 or 1:
+
+                - 1 for tokens that are **masked**,
+                - 0 for tokens that are **not masked**.
+
+                You can only uses one of `input_mask` and `attention_mask`.
+                It's data type should be `float32` and it has a shape of [batch_size, sequence_length].
+                Defaults to ``None``.
+            head_mask (`Tensor`, optional):
+                Mask to nullify selected heads of the self-attention modules.
+                Mask values can either be 0 or 1:
+
+                - 1 indicates the head is **not masked**,
+                - 0 indicates the head is **masked**.
+
+                It's data type should be `float32` and has a shape of [num_heads] or [num_layers, num_heads].
+                Defaults to ``None``, which means we keep all heads.
+            inputs_embeds (`Tensor`, optional):
+                An embedded representation tensor which is an alternative of `input_ids`.
+                You should only specify one of them to avoid contradiction. It's data type should be `float32`
+                and has a shape of [batch_size, sequence_length, hidden_size].
+                Defaults to ``None``, which means we only specify `input_ids`.
+            use_mems_train (`bool`, optional):
+                Whether or not to use recurrent memory mechanism during training.
+                Defaults to ``False`` and we don't use recurrent memory mechanism in training mode.
+            use_mems_eval (`bool`, optional):
+                Whether or not to use recurrent memory mechanism during evaluation.
+                Defaults to ``False`` and we don't use recurrent memory mechanism in evaluation mode.
+            output_attentions (`bool`, optional):
+                Whether or not to return the attentions tensors of all attention layers.
+                Defaults to ``False`` and we don't return the attentions tensors.
+            output_hidden_states (`bool`, optional):
+                Whether or not to return the hidden states of all layers.
+                Defaults to ``False`` and we don't return the hidden states.
+            return_dict (`bool`, optional):
+                Whether or not to format the output as a `dict`.
+                Defaults to ``False``, and the default output is a `tuple`.
+
+        Returns:
+            A `tuple` or a `dict`: A tuple of shape (``output``, ``new_mems``, ``hidden_states``, ``attentions``)
+            or a dict of shape {"last_hidden_state": ``output``, "mems": ``new_mems``,
+            "hidden_states": ``hidden_states``, "attentions": ``attentions``}.
+
+            With the fields:
+
+            - output (`Tensor`):
+                Sequence of hidden-states at the last layer of the model.
+                It's data type should be float32 and has a shape of [batch_size, num_predict, hidden_size].
+                ``num_predict`` corresponds to ``target_mapping.shape[1]``. If ``target_mapping`` is ``None``,
+                then ``num_predict`` corresponds to ``sequence_length``.
+            - mems (`List[Tensor]`):
+                A Tensor list of length 'n_layers' containing pre-computed hidden-states.
+            - hidden_states (`List[Tensor]`, optional):
+                A Tensor list containing hidden-states of the model at the output of each layer plus
+                the initial embedding outputs. Each Tensor has a data type of `float32` and
+                has a shape of [batch_size, sequence_length, hidden_size].
+            - attentions (`List[Tensor]`, optional):
+                A Tensor list containing attentions weights after the attention softmax, used to compute
+                the weighted average in the self-attention heads. Each Tensor (one for each layer) has a data type
+                of `float32` and has a shape of [batch_size, num_heads, sequence_length, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.xlnet.modeling import XLNetModel
+                from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
+
+                tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+                model = XLNetModel.from_pretrained('xlnet-base-cased')
+
+                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                last_hidden_states = outputs[0]
+        """
 
         if self.training:
             use_mems = use_mems_train
@@ -1066,9 +1231,12 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
     """
     XLNet Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
     for GLUE tasks.
+
     Args:
-        xlnet (XLNetModel): An instance of XLNetModel.
-        num_classes (int, optional): The number of classes. Default 2
+        xlnet (:class:`XLNetModel`):
+            An instance of :class:`XLNetModel`.
+        num_classes (`int`, optional):
+            The number of classes. Defaults to ``2``.
     """
 
     def __init__(self, xlnet, num_classes=2):
@@ -1082,7 +1250,7 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
 
     def forward(
             self,
-            input_ids=None,
+            input_ids,
             token_type_ids=None,
             attention_mask=None,
             mems=None,
@@ -1096,6 +1264,72 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
             output_attentions=False,
             output_hidden_states=False,
             return_dict=False, ):
+        r"""
+        The XLNetForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (`Tensor`):
+                See :class:`XLNetModel`.
+            token_type_ids (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            attention_mask (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            mems (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            perm_mask (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            target_mapping (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            input_mask (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            head_mask (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            inputs_embeds (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            use_mems_train (`bool`, optional):
+                See :class:`XLNetModel`.
+            use_mems_eval (`bool`, optional):
+                See :class:`XLNetModel`.
+            output_attentions (`bool`, optional):
+                See :class:`XLNetModel`.
+            output_hidden_states (`bool`, optional):
+                See :class:`XLNetModel`.
+            return_dict (`bool`, optional):
+                See :class:`XLNetModel`.
+
+        Returns:
+            A `tuple` or a `dict`: A tuple of shape (``output``, ``new_mems``, ``hidden_states``, ``attentions``)
+            or a dict of shape {"last_hidden_state": ``output``, "mems": ``new_mems``,
+            "hidden_states": ``hidden_states``, "attentions": ``attentions``}.
+
+            With the fields:
+
+            output (`Tensor`):
+                Classification scores before SoftMax (also called logits). It's data type should be float32
+                and has a shape of [batch_size, num_classes].
+            mems (`List[Tensor]`):
+                See :class:`XLNetModel`.
+            hidden_states (`List[Tensor]`, optional):
+                See :class:`XLNetModel`.
+            attentions (`List[Tensor]`, optional):
+                See :class:`XLNetModel`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.xlnet.modeling import XLNetForSequenceClassification
+                from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
+
+                tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+                model = XLNetForSequenceClassification.from_pretrained('xlnet-base-cased')
+
+                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
 
         transformer_outputs = self.transformer(
             input_ids,
@@ -1127,11 +1361,14 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
 
 class XLNetForTokenClassification(XLNetPretrainedModel):
     """
-    XLNet Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g. for
-    Named-Entity-Recognition (NER) tasks.
+    XLNet Model with a token classification head on top (a linear layer on top of the hidden-states output)
+    e.g. for Named-Entity-Recognition (NER) tasks.
+
     Args:
-        xlnet (XLNetModel): An instance of XLNetModel.
-        num_classes (int, optional): The number of classes. Default 2
+        xlnet (:class:`XLNetModel`):
+            An instance of :class:`XLNetModel`.
+        num_classes (`int`, optional):
+            The number of classes. Defaults to ``2``.
     """
 
     def __init__(self, xlnet, num_classes=2):
@@ -1145,7 +1382,7 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
 
     def forward(
             self,
-            input_ids=None,
+            input_ids,
             token_type_ids=None,
             attention_mask=None,
             mems=None,
@@ -1159,6 +1396,72 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
             output_attentions=False,
             output_hidden_states=False,
             return_dict=False, ):
+        r"""
+        The XLNetForTokenClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (`Tensor`):
+                See :class:`XLNetModel`.
+            token_type_ids (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            attention_mask (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            mems (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            perm_mask (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            target_mapping (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            input_mask (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            head_mask (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            inputs_embeds (`Tensor`, optional):
+                See :class:`XLNetModel`.
+            use_mems_train (`bool`, optional):
+                See :class:`XLNetModel`.
+            use_mems_eval (`bool`, optional):
+                See :class:`XLNetModel`.
+            output_attentions (`bool`, optional):
+                See :class:`XLNetModel`.
+            output_hidden_states (`bool`, optional):
+                See :class:`XLNetModel`.
+            return_dict (`bool`, optional):
+                See :class:`XLNetModel`.
+
+        Returns:
+            A `tuple` or a `dict`: A tuple of shape (``output``, ``new_mems``, ``hidden_states``, ``attentions``)
+            or a dict of shape {"last_hidden_state": ``output``, "mems": ``new_mems``,
+            "hidden_states": ``hidden_states``, "attentions": ``attentions``}.
+
+            With the fields:
+
+            - output (`Tensor`):
+                Classification scores before SoftMax (also called logits). It's data type should be float32
+                and has a shape of [batch_size, sequence_length, num_classes].
+            - mems (`List[Tensor]`):
+                See :class:`XLNetModel`.
+            - hidden_states (`List[Tensor]`, optional):
+                See :class:`XLNetModel`.
+            - attentions (`List[Tensor]`, optional):
+                See :class:`XLNetModel`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.xlnet.modeling import XLNetForTokenClassification
+                from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
+
+                tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+                model = XLNetForTokenClassification.from_pretrained('xlnet-base-cased')
+
+                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
         transformer_outputs = self.transformer(
             input_ids,
             token_type_ids=token_type_ids,

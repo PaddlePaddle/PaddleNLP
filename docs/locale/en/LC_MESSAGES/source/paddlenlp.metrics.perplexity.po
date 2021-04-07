@@ -1,0 +1,117 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.metrics.perplexity.rst:2
+msgid "perplexity"
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity:1
+msgid "基类：:class:`paddle.metric.metrics.Metric`"
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity:1
+msgid ""
+"Perplexity is calculated using cross entropy. It supports both padding "
+"data and no padding data."
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity:4
+msgid ""
+"If data is not padded, users should provide `seq_len` for `Metric` "
+"initialization. If data is padded, your label should contain `seq_mask`, "
+"which indicates the actual length of samples."
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity:8
+msgid ""
+"This Perplexity requires that the output of your network is prediction, "
+"label and sequence length (opitonal). If the Perplexity here doesn't meet"
+" your needs, you could override the `compute` or `update` method for "
+"caculating Perplexity."
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity:13
+msgid ""
+"Sequence length of each sample, it must be provided while data is not "
+"padded. Default: 20."
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity:16
+msgid "Name of `Metric` instance. Default: 'Perplexity'."
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity.compute:1
+msgid ""
+"This API is advanced usage to accelerate metric calculating, calulations "
+"from outputs of model to the states which should be updated by Metric can"
+" be defined here, where Paddle OPs is also supported. Outputs of this API"
+" will be the inputs of \"Metric.update\"."
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity.compute:6
+msgid ""
+"If :code:`compute` is defined, it will be called with **outputs** of "
+"model and **labels** from data as arguments, all outputs and labels will "
+"be concatenated and flatten and each filed as a separate argument as "
+"follows: :code:`compute(output1, output2, ..., label1, label2,...)`"
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity.compute:12
+msgid ""
+"If :code:`compute` is not defined, default behaviour is to pass input to "
+"output, so output format will be: :code:`return output1, output2, ..., "
+"label1, label2,...`"
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity.compute:16
+msgid "see :code:`Metric.update`"
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity.update:1
+msgid "Update states for metric"
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity.update:3
+msgid ""
+"Inputs of :code:`update` is the outputs of :code:`Metric.compute`, if "
+":code:`compute` is not defined, the inputs of :code:`update` will be "
+"flatten arguments of **output** of mode and **label** from data: "
+":code:`update(output1, output2, ..., label1, label2,...)`"
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity.update:8
+msgid "see :code:`Metric.compute`"
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity.reset:1
+msgid "Reset states and result"
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity.accumulate:1
+msgid "Accumulates statistics, computes and returns the metric value"
+msgstr ""
+
+#: of paddlenlp.metrics.perplexity.Perplexity.name:1
+msgid "Returns metric name"
+msgstr ""
+

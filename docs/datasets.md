@@ -1,12 +1,12 @@
 # PaddleNLP Datasets API
 
-PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据需要添加splits信息：
+PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据需要**添加splits信息**：
 
 ## 阅读理解
 
 |  数据集名称   | 简介 | 调用方法 |
 |  ----  | ----- | ------ |
-|  [SQuAD](https://rajpurkar.github.io/SQuAD-explorer/) | 斯坦福问答数据集，包括SQaAD1.1和SQaAD2.0|`paddlenlp.datasets.load_dataset('squad')` |
+|  [SQuAD](https://rajpurkar.github.io/SQuAD-explorer/) | 斯坦福问答数据集，包括SQuAD1.1和SQuAD2.0|`paddlenlp.datasets.load_dataset('squad')` |
 |  [DuReader-yesno](https://aistudio.baidu.com/aistudio/competition/detail/49) | 千言数据集：阅读理解，判断答案极性|`paddlenlp.datasets.load_dataset('dureader_yesno')` |
 |  [DuReader-robust](https://aistudio.baidu.com/aistudio/competition/detail/49) | 千言数据集：阅读理解，答案原文抽取|`paddlenlp.datasets.load_dataset('dureader_robust')` |
 |  [CMRC2018](http://hfl-rc.com/cmrc2018/) | 第二届“讯飞杯”中文机器阅读理解评测数据集|`paddlenlp.datasets.load_dataset('cmrc2018')` |
@@ -44,11 +44,6 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 |  [IWSLT15](https://workshop2015.iwslt.org/) | IWSLT'15 English-Vietnamese data 英语-越南语翻译数据集| `paddlenlp.datasets.load_dataset('iwslt15')`|
 |  [WMT14ENDE](http://www.statmt.org/wmt14/translation-task.html) | WMT14 EN-DE 经过BPE分词的英语-德语翻译数据集| `paddlenlp.datasets.load_dataset('wmt14ende')`|
 
-## 文本摘要
-
-| 数据集名称  | 简介 | 调用方法 |
-| ----  | --------- | ------ |
-|  [CNN/DM](https://github.com/harvardnlp/sent-summary) | 美国有线新闻网络与每日邮报新闻文本摘要数据集| `paddlenlp.datasets.load_dataset('cnn_dailymail')`|
 
 ## 文本生成
 
@@ -62,3 +57,4 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 | 数据集名称  | 简介 | 调用方法 |
 | ----  | --------- | ------ |
 |  [PTB](http://www.fit.vutbr.cz/~imikolov/rnnlm/) | Penn Treebank Dataset | `paddlenlp.datasets.load_dataset('ptb')`|
+|  [Yahoo Answer 100k](https://arxiv.org/pdf/1702.08139.pdf)  | 从Yahoo Answer采样100K| `paddlenlp.datasets.load_dataset('yahoo_answer_100k')`|

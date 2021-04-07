@@ -27,10 +27,9 @@ def save_ckpt(model, tokenizer, save_dir, name):
 
 
 def main(args):
-    paddle.set_device('gpu' if args.n_gpus else 'cpu')
+    paddle.set_device(args.device)
     paddle.seed(args.seed)
     world_size = dist.get_world_size()
-    rank = dist.get_rank()
     if world_size > 1:
         dist.init_parallel_env()
 
@@ -79,8 +78,7 @@ def main(args):
     step = 0
     total_time = 0.0
     for epoch in range(args.epochs):
-        if rank == 0:
-            print('\nEpoch %d/%d' % (epoch + 1, args.epochs))
+        print('\nEpoch %d/%d' % (epoch + 1, args.epochs))
         batch_start_time = time.time()
         for inputs in train_dataloader:
             step += 1
@@ -95,16 +93,15 @@ def main(args):
             optimizer.clear_grad()
 
             total_time += (time.time() - batch_start_time)
-            if rank == 0:
-                if step % args.logging_steps == 0:
-                    ppl = paddle.exp(loss)
-                    print(
-                        'step %d - loss: %.4f - ppl: %.4f - lr: %.7f - %.3fs/step'
-                        % (step, loss, ppl, optimizer.get_lr(),
-                           total_time / args.logging_steps))
-                    total_time = 0.0
-                if step % args.save_steps == 0:
-                    evaluation(model, valid_dataloader)
+            if step % args.logging_steps == 0:
+                ppl = paddle.exp(loss)
+                print('step %d - loss: %.4f - ppl: %.4f - lr: %.7f - %.3fs/step'
+                      % (step, loss, ppl, optimizer.get_lr(),
+                         total_time / args.logging_steps))
+                total_time = 0.0
+            if step % args.save_steps == 0:
+                evaluation(model, valid_dataloader)
+                if dist.get_rank() == 0:
                     save_ckpt(model, tokenizer, args.save_dir, step)
             batch_start_time = time.time()
 
@@ -138,7 +135,4 @@ if __name__ == '__main__':
     args = parse_args()
     print_args(args)
 
-    if args.n_gpus > 1:
-        dist.spawn(main, args=(args, ), nprocs=args.n_gpus)
-    else:
-        main(args)
+    main(args)
