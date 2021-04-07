@@ -16,16 +16,22 @@ import numpy as np
 import os
 import unittest
 import paddle
+import copy
 
 from paddlenlp.transformers import BertModel, BertForPretraining, BertPretrainingCriterion
 from paddlenlp.transformers import BertForQuestionAnswering, BertForSequenceClassification, BertForTokenClassification
 
 from common_test import CommonTest
-from util import softmax_with_cross_entropy
+from util import softmax_with_cross_entropy, expensive
 
 
-def create_input_data(config):
-    np.random.seed(102)
+def create_input_data(config, seed=None):
+    '''
+    the generated input data will be same if a specified seed is set 
+    '''
+    if seed is not None:
+        np.random.seed(seed)
+
     input_ids = np.random.randint(
         low=0,
         high=config['vocab_size'],
@@ -45,21 +51,7 @@ def create_input_data(config):
                 "seq_len"] + pos
             mask_token_num += 1
     masked_lm_positions = temp_masked_lm_positions
-    del config['seq_len']
-    del config['batch_size']
-
     return input_ids, masked_lm_positions
-
-
-def create_bert_model(config, filename, TEST_MODEL_CLASS):
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    model_file = os.path.join(dir_path, '{}.pdparams'.format(filename))
-    if not os.path.exists(model_file):
-        paddle.seed(102)
-        bert = BertModel(**config)
-        model = TEST_MODEL_CLASS(bert)
-        paddle.save(model.state_dict(), model_file)
-    return model_file
 
 
 class NpBertPretrainingCriterion(object):
@@ -78,45 +70,43 @@ class NpBertPretrainingCriterion(object):
 
 class TestBertForSequenceClassification(CommonTest):
     def set_input(self):
-        self.config = BertModel.pretrained_init_configuration[
-            'bert-base-uncased']
+        self.config = copy.deepcopy(BertModel.pretrained_init_configuration[
+            'bert-base-uncased'])
         self.config['num_hidden_layers'] = 2
-        self.config['vocab_size'] = 1024
+        self.config['vocab_size'] = 512
         self.config['attention_probs_dropout_prob'] = 0.0
         self.config['hidden_dropout_prob'] = 0.0
         self.config['intermediate_size'] = 1024
         self.config['seq_len'] = 64
-        self.config['batch_size'] = 2
+        self.config['batch_size'] = 3
         self.config['max_position_embeddings'] = 512
         self.input_ids, self.masked_lm_positions = create_input_data(
             self.config)
-        self.model_file = create_bert_model(self.config, self.model_name,
-                                            self.TEST_MODEL_CLASS)
 
     def set_output(self):
-        self.expected_output = np.array(
-            [[0.33695394, -0.18878141], [0.33130634, -0.08542377]])
-
-    def set_model_file_name(self):
-        self.model_name = "test_bert_cls"
+        self.expected_shape = (self.config['batch_size'], 2)
 
     def set_model_class(self):
         self.TEST_MODEL_CLASS = BertForSequenceClassification
 
     def setUp(self):
-        self.set_model_file_name()
         self.set_model_class()
         self.set_input()
         self.set_output()
 
+    def check_testcase(self):
+        self.check_output_equal(self.output.numpy().shape, self.expected_shape)
+
     def test_forward(self):
-        bert = BertModel(**self.config)
+        config = copy.deepcopy(self.config)
+        del config['batch_size']
+        del config['seq_len']
+
+        bert = BertModel(**config)
         model = self.TEST_MODEL_CLASS(bert)
-        state_dict = paddle.load(self.model_file)
-        model.set_state_dict(state_dict)
         input_ids = paddle.to_tensor(self.input_ids)
-        output = model(input_ids)
-        self.check_output_equal(output.numpy(), self.expected_output)
+        self.output = model(input_ids)
+        self.check_testcase()
 
 
 class TestBertForTokenClassification(TestBertForSequenceClassification):
@@ -124,45 +114,25 @@ class TestBertForTokenClassification(TestBertForSequenceClassification):
         self.TEST_MODEL_CLASS = BertForTokenClassification
 
     def set_output(self):
-        self.expected_output = np.array([0.14911847])
-
-    def test_forward(self):
-        bert = BertModel(**self.config)
-        model = self.TEST_MODEL_CLASS(bert)
-        state_dict = paddle.load(self.model_file)
-        model.set_state_dict(state_dict)
-        input_ids = paddle.to_tensor(self.input_ids)
-        output = model(input_ids)
-        self.check_output_equal(output.mean().numpy(), self.expected_output)
+        self.expected_shape = (self.config['batch_size'],
+                               self.config['seq_len'], 2)
 
 
 class TestBertForPretraining(TestBertForSequenceClassification):
-    def set_model_file_name(self):
-        self.model_name = "test_bert_pretrain"
-
     def set_model_class(self):
         self.TEST_MODEL_CLASS = BertForPretraining
 
     def set_output(self):
-        self.expected_prediction_scores_mean = np.array([0.00901102])
-        self.expected_seq_relationship_score = np.array(
-            [[-0.26995760, 0.52348071], [-0.13225232, 0.39070851]])
+        self.expected_seq_shape = (self.config['batch_size'],
+                                   self.config['seq_len'],
+                                   self.config['vocab_size'])
+        self.expected_pooled_shape = (self.config['batch_size'], 2)
 
-    def test_forward(self):
-        bert = BertModel(**self.config)
-        model = self.TEST_MODEL_CLASS(bert)
-        state_dict = paddle.load(self.model_file)
-        model.set_state_dict(state_dict)
-        input_ids = paddle.to_tensor(self.input_ids)
-        masked_lm_positions = paddle.to_tensor(self.masked_lm_positions)
-        output = model(input_ids, masked_positions=masked_lm_positions)
-
-        prediction_scores_mean = output[0].mean().numpy()
-        seq_relationship_score = output[1].numpy()
-        self.check_output_equal(prediction_scores_mean,
-                                self.expected_prediction_scores_mean)
-        self.check_output_equal(seq_relationship_score,
-                                self.expected_seq_relationship_score)
+    def check_testcase(self):
+        self.check_output_equal(self.output[0].numpy().shape,
+                                self.expected_seq_shape)
+        self.check_output_equal(self.output[1].numpy().shape,
+                                self.expected_pooled_shape)
 
 
 class TestBertForQuestionAnswering(TestBertForSequenceClassification):
@@ -170,20 +140,16 @@ class TestBertForQuestionAnswering(TestBertForSequenceClassification):
         self.TEST_MODEL_CLASS = BertForQuestionAnswering
 
     def set_output(self):
-        self.expected_start_logit_mean = np.array([0.16729736])
-        self.expected_end_logit_mean = np.array([0.13093957])
+        self.expected_start_logit_shape = (self.config['batch_size'],
+                                           self.config['seq_len'])
+        self.expected_end_logit_shape = (self.config['batch_size'],
+                                         self.config['seq_len'])
 
-    def test_forward(self):
-        bert = BertModel(**self.config)
-        model = self.TEST_MODEL_CLASS(bert)
-        state_dict = paddle.load(self.model_file)
-        model.set_state_dict(state_dict)
-        input_ids = paddle.to_tensor(self.input_ids)
-        output = model(input_ids)
-        self.check_output_equal(output[0].mean().numpy(),
-                                self.expected_start_logit_mean)
-        self.check_output_equal(output[1].mean().numpy(),
-                                self.expected_end_logit_mean)
+    def check_testcase(self):
+        self.check_output_equal(self.output[0].numpy().shape,
+                                self.expected_start_logit_shape)
+        self.check_output_equal(self.output[1].numpy().shape,
+                                self.expected_end_logit_shape)
 
 
 class TestBertPretrainingCriterion(CommonTest):
@@ -223,3 +189,40 @@ class TestBertPretrainingCriterion(CommonTest):
                               masked_lm_labels, next_sentence_labels,
                               masked_lm_scale)
         self.check_output_equal(np_loss, loss.numpy()[0])
+
+
+class TestBertFromPretrain(CommonTest):
+    @expensive
+    def test_bert_base_uncased(self):
+        model = BertModel.from_pretrained(
+            'bert-base-uncased',
+            attention_probs_dropout_prob=0.0,
+            hidden_dropout_prob=0.0)
+        self.config = copy.deepcopy(BertModel.pretrained_init_configuration[
+            'bert-base-uncased'])
+        self.config['seq_len'] = 32
+        self.config['batch_size'] = 3
+
+        input_ids, _ = create_input_data(self.config, 102)
+        input_ids = paddle.to_tensor(input_ids)
+        output = model(input_ids)
+
+        expected_seq_shape = (self.config['batch_size'], self.config['seq_len'],
+                              self.config['hidden_size'])
+        expected_pooled_shape = (self.config['batch_size'],
+                                 self.config['hidden_size'])
+        self.check_output_equal(output[0].numpy().shape, expected_seq_shape)
+        self.check_output_equal(output[1].numpy().shape, expected_pooled_shape)
+        expected_seq_slice = np.array([[0.17383946, 0.09206937, 0.45788339],
+                                       [-0.28287640, 0.06244858, 0.54864359],
+                                       [-0.54589444, 0.04811822, 0.50559914]])
+        # There's output diff about 1e-6 between cpu and gpu
+        self.check_output_equal(
+            output[0].numpy()[0, 0:3, 0:3], expected_seq_slice, atol=1e-6)
+
+        expected_pooled_slice = np.array(
+            [[-0.67418981, -0.07148759, 0.85799801],
+             [-0.62072051, -0.08452632, 0.96691507],
+             [-0.74019802, -0.10187808, 0.95353240]])
+        self.check_output_equal(
+            output[1].numpy()[0:3, 0:3], expected_pooled_slice, atol=1e-6)
