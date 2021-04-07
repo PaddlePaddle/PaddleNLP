@@ -1,0 +1,115 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.transformers.electra.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraDiscriminator:1
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification:1
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification:1
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining:1
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator:1
+#: paddlenlp.transformers.electra.modeling.ElectraModel:1
+msgid "基类：:class:`paddlenlp.transformers.electra.modeling.ElectraPretrainedModel`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward:1
+#: paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward:1
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward:1
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward:1
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:1
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward:1
+#: paddlenlp.transformers.electra.modeling.ElectraModel.forward:1
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward
+#: paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward
+#: paddlenlp.transformers.electra.modeling.ElectraModel.forward
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward
+msgid "参数"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward:4
+#: paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward:4
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward:4
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward:4
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:4
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward:4
+#: paddlenlp.transformers.electra.modeling.ElectraModel.forward:4
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraClassificationHead.forward:6
+#: paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward:6
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward:6
+#: paddlenlp.transformers.electra.modeling.ElectraForTokenClassification.forward:6
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:6
+#: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward:6
+#: paddlenlp.transformers.electra.modeling.ElectraModel.forward:6
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraPretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraPretrainedModel:1
+msgid ""
+"An abstract class to handle weights initialization and a simple interface"
+" for downloading and loading pretrained models."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainedModel.init_weights:1
+msgid "Initializes and tie weights if needed."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainedModel.tie_weights:1
+msgid "Tie the weights between the input embeddings and the output embeddings."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.get_discriminator_inputs:1
+msgid "Sample from the generator to create discriminator input."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:1
+#: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:1
+msgid "Head for sentence-level classification tasks."
+msgstr ""
+
