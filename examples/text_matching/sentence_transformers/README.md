@@ -72,7 +72,7 @@ sentence_transformers/
 我们以中文文本匹配公开数据集LCQMC为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 ```shell
 $ unset CUDA_VISIBLE_DEVICES
-$ python -m paddle.distributed.launch --gpus "0" train.py --device "gpu" --save_dir ./checkpoints
+$ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_dir ./checkpoints
 ```
 
 可支持配置的参数：
@@ -148,7 +148,7 @@ checkpoints/
 启动预测：
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python predict.py --device "gpu" --params_path checkpoints/model_400/model_state.pdparams
+python predict.py --device gpu --params_path checkpoints/model_400/model_state.pdparams
 ```
 
 将待预测数据如以下示例：
