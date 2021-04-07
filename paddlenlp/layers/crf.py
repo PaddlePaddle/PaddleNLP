@@ -181,7 +181,7 @@ class LinearChainCrf(nn.Layer):
                     lengths + 1), 'int32')
             pad_stop = paddle.full(
                 (batch_size, seq_len + 2),
-                dtype='int64',
+                dtype='int32',
                 fill_value=self.stop_idx)
             labels_ext = (1 - mask) * pad_stop + mask * labels_ext
         else:
@@ -213,27 +213,27 @@ class LinearChainCrf(nn.Layer):
         if self._start_tensor is None or self._stop_tensor is None or batch_size != self._start_tensor.shape[
                 0]:
             self._start_tensor = paddle.full(
-                (batch_size, 1), dtype='int64', fill_value=self.start_idx)
+                (batch_size, 1), dtype='int32', fill_value=self.start_idx)
             self._stop_tensor = paddle.full(
-                (batch_size, 1), dtype='int64', fill_value=self.stop_idx)
+                (batch_size, 1), dtype='int32', fill_value=self.stop_idx)
         return self._start_tensor, self._stop_tensor
 
     def _get_batch_index(self, batch_size):
         if self._batch_index is None or batch_size != self._batch_index.shape[
                 0]:
-            self._batch_index = paddle.arange(end=batch_size, dtype="int64")
+            self._batch_index = paddle.arange(end=batch_size, dtype="int32")
         return self._batch_index
 
     def _get_seq_index(self, length):
         if self._seq_index is None or length > self._seq_index.shape[0]:
-            self._seq_index = paddle.arange(end=length, dtype="int64")
+            self._seq_index = paddle.arange(end=length, dtype="int32")
         return self._seq_index[:length]
 
     def _get_batch_seq_index(self, batch_size, length):
         if self._batch_seq_index is None or length + 2 > self._batch_seq_index.shape[
                 1] or batch_size > self._batch_seq_index.shape[0]:
             self._batch_seq_index = paddle.cumsum(
-                paddle.ones([batch_size, length + 2], "int64"), axis=1) - 1
+                paddle.ones([batch_size, length + 2], "int32"), axis=1) - 1
         if self.with_start_stop_tag:
             return self._batch_seq_index[:batch_size, :length + 2]
         else:
@@ -388,5 +388,5 @@ class ViterbiDecoder(nn.Layer):
     def _get_batch_index(self, batch_size):
         if self._batch_index is None or batch_size != self._batch_index.shape[
                 0]:
-            self._batch_index = paddle.arange(end=batch_size, dtype="int64")
+            self._batch_index = paddle.arange(end=batch_size, dtype="int32")
         return self._batch_index
