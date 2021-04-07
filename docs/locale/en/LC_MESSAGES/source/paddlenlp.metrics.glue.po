@@ -1,0 +1,118 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.metrics.glue.rst:2
+msgid "glue"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1:1 paddlenlp.metrics.glue.Mcc:1
+#: paddlenlp.metrics.glue.PearsonAndSpearman:1
+msgid "基类：:class:`paddle.metric.metrics.Metric`"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1:1
+msgid "Encapsulates Accuracy, Precision, Recall and F1 metric logic."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.compute:1
+#: paddlenlp.metrics.glue.Mcc.compute:1
+msgid ""
+"This API is advanced usage to accelerate metric calculating, calulations "
+"from outputs of model to the states which should be updated by Metric can"
+" be defined here, where Paddle OPs is also supported. Outputs of this API"
+" will be the inputs of \"Metric.update\"."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.compute:6
+#: paddlenlp.metrics.glue.Mcc.compute:6
+msgid ""
+"If :code:`compute` is defined, it will be called with **outputs** of "
+"model and **labels** from data as arguments, all outputs and labels will "
+"be concatenated and flatten and each filed as a separate argument as "
+"follows: :code:`compute(output1, output2, ..., label1, label2,...)`"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.compute:12
+#: paddlenlp.metrics.glue.Mcc.compute:12
+msgid ""
+"If :code:`compute` is not defined, default behaviour is to pass input to "
+"output, so output format will be: :code:`return output1, output2, ..., "
+"label1, label2,...`"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.compute:16
+#: paddlenlp.metrics.glue.Mcc.compute:16
+msgid "see :code:`Metric.update`"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.update:1
+#: paddlenlp.metrics.glue.Mcc.update:1
+#: paddlenlp.metrics.glue.PearsonAndSpearman.update:1
+msgid "Update states for metric"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.update:3
+#: paddlenlp.metrics.glue.Mcc.update:3
+#: paddlenlp.metrics.glue.PearsonAndSpearman.update:3
+msgid ""
+"Inputs of :code:`update` is the outputs of :code:`Metric.compute`, if "
+":code:`compute` is not defined, the inputs of :code:`update` will be "
+"flatten arguments of **output** of mode and **label** from data: "
+":code:`update(output1, output2, ..., label1, label2,...)`"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.update:8
+#: paddlenlp.metrics.glue.Mcc.update:8
+#: paddlenlp.metrics.glue.PearsonAndSpearman.update:8
+msgid "see :code:`Metric.compute`"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.accumulate:1
+#: paddlenlp.metrics.glue.Mcc.accumulate:1
+#: paddlenlp.metrics.glue.PearsonAndSpearman.accumulate:1
+msgid "Accumulates statistics, computes and returns the metric value"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.reset:1
+#: paddlenlp.metrics.glue.Mcc.reset:1
+#: paddlenlp.metrics.glue.PearsonAndSpearman.reset:1
+msgid "Reset states and result"
+msgstr ""
+
+#: of paddlenlp.metrics.glue.AccuracyAndF1.name:1
+#: paddlenlp.metrics.glue.Mcc.name:1
+#: paddlenlp.metrics.glue.PearsonAndSpearman.name:1
+msgid "Return name of metric instance."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.Mcc:1
+msgid ""
+"Matthews correlation coefficient "
+"https://en.wikipedia.org/wiki/Matthews_correlation_coefficient."
+msgstr ""
+
+#: of paddlenlp.metrics.glue.PearsonAndSpearman:1
+#, python-format
+msgid ""
+"Pearson correlation coefficient "
+"https://en.wikipedia.org/wiki/Pearson_correlation_coefficient Spearman's "
+"rank correlation coefficient "
+"https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient."
+msgstr ""
+
