@@ -1,0 +1,39 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../get_started.rst:7
+msgid "安装"
+msgstr ""
+
+#: ../../get_started.rst:7
+msgid "10分钟完成高精度中文情感分析"
+msgstr ""
+
+#: ../../get_started.rst:3
+msgid "安装、快速开始"
+msgstr ""
+
+#: ../../get_started.rst:5
+msgid "快速上手PaddleNLP:"
+msgstr ""
+
+#: ../../get_started.rst:13
+msgid "以上简单地介绍了PaddleNLP的使用流程，更多的教程分析见 :doc:`/tutorials`"
+msgstr ""
+

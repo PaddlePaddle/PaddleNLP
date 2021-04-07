@@ -1,0 +1,307 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.transformers.gpt2.tokenizer.rst:2
+msgid "tokenizer"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer:1
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer:1
+msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.set_special_tokens:1
+msgid ""
+"Add a list of additional tokens to the encoder. The additional tokens are"
+" indexed starting from the last index of the current vocabulary in the "
+"order of the `special_tokens` list."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.tokenize:1
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.tokenize:1
+msgid "Tokenize a string."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.convert_tokens_to_ids:1
+msgid "Converts a sequence of tokens into ids using the vocab."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.convert_ids_to_tokens:1
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.convert_ids_to_tokens:1
+msgid ""
+"Converts a single index or a sequence of indices (integers) in a token or"
+" a sequence of tokens (str) by using the vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.convert_ids_to_tokens
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.convert_ids_to_tokens
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode
+msgid "参数"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.convert_ids_to_tokens:4
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.convert_ids_to_tokens:4
+msgid "Don't decode special tokens (self.all_special_tokens). Default: False"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:1
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:1
+msgid ""
+"Returns a dictionary containing the encoded sequence or sequence pair and"
+" additional information: the mask for sequence classification and the "
+"overflowing elements if a ``max_seq_len`` is specified."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:4
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:4
+msgid ""
+"The first sequence to be encoded. This can be a string, a list of strings"
+" (tokenized string using the `tokenize` method) or a list of integers "
+"(tokenized string ids using the `convert_tokens_to_ids` method)"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:8
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:8
+msgid ""
+"Optional second sequence to be encoded. This can be a string, a list of "
+"strings (tokenized string using the `tokenize` method) or a list of "
+"integers (tokenized string ids using the `convert_tokens_to_ids` method)"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:12
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:12
+msgid ""
+"If set to a number, will limit the total sequence returned so that it has"
+" a maximum length. If there are overflowing tokens, those will be added "
+"to the returned dictionary"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:15
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:15
+msgid ""
+"If set to True, the returned sequences will be padded according to the "
+"model's padding side and padding index, up to their max length. If no max"
+" length is specified, the padding is done up to the model's max length."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:19
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:19
+msgid ""
+"String selected in the following options:  - 'longest_first' (default) "
+"Iteratively reduce the inputs sequence until the input is under "
+"max_seq_len   starting from the longest one at each token (when there is "
+"a pair of input sequences) - 'only_first': Only truncate the first "
+"sequence - 'only_second': Only truncate the second sequence - "
+"'do_not_truncate': Does not truncate (raise an error if the input "
+"sequence is longer than max_seq_len)"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:19
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:19
+msgid "String selected in the following options:"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:21
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:21
+msgid ""
+"'longest_first' (default) Iteratively reduce the inputs sequence until "
+"the input is under max_seq_len starting from the longest one at each "
+"token (when there is a pair of input sequences)"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:23
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:23
+msgid "'only_first': Only truncate the first sequence"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:24
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:24
+msgid "'only_second': Only truncate the second sequence"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:25
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:25
+msgid ""
+"'do_not_truncate': Does not truncate (raise an error if the input "
+"sequence is longer than max_seq_len)"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:27
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:27
+msgid "Set to True to return tokens position ids (default True)."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:29
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:29
+msgid "Whether to return token type IDs."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:31
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:31
+msgid "Whether to return the attention mask."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:33
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:33
+msgid ""
+"If set the resulting dictionary will include the length of each encoded "
+"inputs"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:35
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:35
+msgid "Set to True to return overflowing token information (default False)."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:37
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:37
+msgid "Set to True to return special tokens mask information (default False)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.convert_tokens_to_ids
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:40
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:40
+msgid ""
+"A Dictionary of shape::      {         input_ids: list[int],         "
+"position_ids: list[int] if return_position_ids is True         "
+"token_type_ids: list[int] if return_token_type_ids is True (default)"
+"         attention_mask: list[int] if return_attention_mask is True"
+"         seq_len: int if return_length is True         "
+"overflowing_tokens: list[int] if a ``max_seq_len`` is specified and "
+"return_overflowing_tokens is True         num_truncated_tokens: int if a "
+"``max_seq_len`` is specified and return_overflowing_tokens is True"
+"         special_tokens_mask: list[int] if return_special_tokens_mask is "
+"True     }  With the fields:  - ``input_ids``: list of token ids to be "
+"fed to a model - ``position_ids``: list of token position ids to be fed "
+"to a model - ``token_type_ids``: list of token type ids to be fed to a "
+"model - ``attention_mask``: list of indices specifying which tokens "
+"should be attended to by the model - ``length``: the input_ids length - "
+"``overflowing_tokens``: list of overflowing tokens if a max length is "
+"specified. - ``num_truncated_tokens``: number of overflowing tokens a "
+"``max_seq_len`` is specified - ``special_tokens_mask``: list of [0, 1], "
+"with 0 specifying special added   tokens and 1 specifying sequence "
+"tokens."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:42
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:42
+msgid "A Dictionary of shape::"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:55
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:55
+msgid "With the fields:"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:57
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:57
+msgid "``input_ids``: list of token ids to be fed to a model"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:58
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:58
+msgid "``position_ids``: list of token position ids to be fed to a model"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:59
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:59
+msgid "``token_type_ids``: list of token type ids to be fed to a model"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:60
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:60
+msgid ""
+"``attention_mask``: list of indices specifying which tokens should be "
+"attended to by the model"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:61
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:61
+msgid "``length``: the input_ids length"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:62
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:62
+msgid ""
+"``overflowing_tokens``: list of overflowing tokens if a max length is "
+"specified."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:63
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:63
+msgid ""
+"``num_truncated_tokens``: number of overflowing tokens a ``max_seq_len`` "
+"is specified"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.encode:64
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.encode:64
+msgid ""
+"``special_tokens_mask``: list of [0, 1], with 0 specifying special added "
+"tokens and 1 specifying sequence tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.save_resources:1
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2Tokenizer.save_resources:1
+msgid ""
+"Save tokenizer related resources to files under `save_directory`. :param "
+"save_directory: Directory to save files into. :type save_directory: str"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer:1
+msgid ""
+"Constructs a GPT2 Chinese tokenizer. It uses a basic tokenizer to do "
+"punctuation splitting, lower casing and so on, and follows a WordPiece "
+"tokenizer to tokenize as subwords."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.convert_tokens_to_ids:1
+msgid ""
+"Converts a sequence of tokens into ids using the vocab. The tokenizer "
+"should has the `vocab` attribute. Args："
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.convert_tokens_to_ids:4
+msgid "tokens (list(str)): List of tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.convert_tokens_to_ids:5
+msgid "Converted id list."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt2.tokenizer.GPT2ChineseTokenizer.convert_tokens_to_ids
+msgid "返回类型"
+msgstr ""
+
