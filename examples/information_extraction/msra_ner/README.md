@@ -29,7 +29,7 @@ python -u ./train.py \
     --logging_steps 1 \
     --save_steps 500 \
     --output_dir ./tmp/msra_ner/ \
-    --device "gpu"
+    --device gpu
 ```
 
 其中参数释义如下：
@@ -54,7 +54,7 @@ python -m paddle.distributed.launch --gpus "0,1" ./train.py \
     --logging_steps 1 \
     --save_steps 500 \
     --output_dir ./tmp/msra_ner/ \
-    --device "gpu"
+    --device gpu
 ```
 
 
@@ -85,7 +85,7 @@ python -u ./eval.py \
     --model_name_or_path bert-base-multilingual-uncased \
     --max_seq_length 128 \
     --batch_size 32 \
-    --device "gpu" \
+    --device gpu \
     --init_checkpoint_path tmp/msra_ner/model_500.pdparams
 ```
 
@@ -105,7 +105,7 @@ python -u ./predict.py \
     --model_name_or_path bert-base-multilingual-uncased \
     --max_seq_length 128 \
     --batch_size 32 \
-    --device "gpu" \
+    --device gpu \
     --init_checkpoint_path tmp/msra_ner/model_500.pdparams
 ```
 

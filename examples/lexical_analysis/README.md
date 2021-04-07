@@ -52,7 +52,7 @@ python train.py \
         --model_save_dir ./save_dir \
         --epochs 10 \
         --batch_size 32 \
-        --device "gpu" \
+        --device gpu \
         # --init_checkpoint ./save_dir/final
 ```
 
@@ -74,7 +74,7 @@ python -m paddle.distributed.launch --gpus "0,1"  train.py \
         --model_save_dir ./save_dir \
         --epochs 10 \
         --batch_size 32 \
-        --device "gpu" \
+        --device gpu \
         # --init_checkpoint ./save_dir/final
 ```
 
@@ -86,7 +86,7 @@ python -m paddle.distributed.launch --gpus "0,1"  train.py \
 python eval.py --data_dir ./lexical_analysis_dataset_tiny \
         --init_checkpoint ./save_dir/final \
         --batch_size 32 \
-        --device "gpu"
+        --device gpu
 ```
 
 ### 模型预测
@@ -97,7 +97,7 @@ python eval.py --data_dir ./lexical_analysis_dataset_tiny \
 python predict.py --data_dir ./lexical_analysis_dataset_tiny \
         --init_checkpoint ./save_dir/final \
         --batch_size 32 \
-        --device "gpu"
+        --device gpu
 ```
 
 得到类似以下输出：

@@ -48,7 +48,7 @@ python -u ./train.py \
     --logging_steps 1 \
     --save_steps 1000 \
     --output_dir ./tmp/ \
-    --device "gpu" \
+    --device gpu \
     # --init_checkpoint ./tmp/model_10000/model_state.pdparams
 ```
 
@@ -82,7 +82,7 @@ python -m paddle.distributed.launch --gpus "0,1" ./train.py \
     --logging_steps 1 \
     --save_steps 1000 \
     --output_dir ./tmp/ \
-    --device "gpu" \
+    --device gpu \
     # --init_checkpoint ./tmp/model_10000/model_state.pdparams
 ```
 
@@ -97,7 +97,7 @@ python -u ./eval.py \
     --max_decode_len 72 \
     --batch_size 48   \
     --init_checkpoint ./tmp/model_10000/model_state.pdparams \
-    --device "gpu"
+    --device gpu
 ```
 
 参数释义如下：
@@ -119,7 +119,7 @@ python -u ./predict.py \
     --max_decode_len 72 \
     --batch_size 48   \
     --init_checkpoint ./tmp/model_10000/model_state.pdparams \
-    --device "gpu"
+    --device gpu
 ```
 
 
