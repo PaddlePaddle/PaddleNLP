@@ -1,7 +1,7 @@
-poetry
+yahoo\_answer\_100k
 =============================================
 
-.. automodule:: paddlenlp.datasets.experimental.poetry
+.. automodule:: paddlenlp.datasets.yahoo_answer_100k
    :members:
    :no-undoc-members:
    :show-inheritance:
