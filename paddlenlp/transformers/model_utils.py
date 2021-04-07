@@ -120,7 +120,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 this as position argument values for model initialization.
             **kwargs (dict): keyword arguments for `__init__`. If provide, use
                 this to update pre-defined keyword argument values for model
-                initialization.
+                initialization. If the key is in base model `__init__`, update
+                keyword argument of base model; else update keyword argument of
+                derived model.
         Returns:
             PretrainedModel: An instance of PretrainedModel.
         """
