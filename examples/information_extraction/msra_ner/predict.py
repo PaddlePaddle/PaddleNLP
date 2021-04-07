@@ -36,7 +36,7 @@ parser.add_argument("--model_name_or_path", default=None, type=str, required=Tru
 parser.add_argument("--init_checkpoint_path", default=None, type=str, required=True, help="The model checkpoint path.", )
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer " "than this will be truncated, sequences shorter will be padded.", )
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.", )
-parser.add_argument("--use_gpu", type=ast.literal_eval, default=True, help="If set, use GPU for training.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
 # yapf: enable
 
 
@@ -90,7 +90,7 @@ def parse_decodes(input_words, id2label, decodes, lens):
 
 
 def do_predict(args):
-    paddle.set_device("gpu" if args.use_gpu else "cpu")
+    paddle.set_device(args.device)
 
     # Create dataset, tokenizer and dataloader.
     train_ds, predict_ds = load_dataset(

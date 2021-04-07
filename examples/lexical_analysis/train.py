@@ -36,7 +36,7 @@ parser.add_argument("--model_save_dir", type=str, default=None, help="The model 
 parser.add_argument("--epochs", type=int, default=10, help="Corpus iteration num.")
 parser.add_argument("--batch_size", type=int, default=300, help="The number of sequences contained in a mini-batch.")
 parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
-parser.add_argument("--n_gpu", type=int, default=1, help="Number of GPUs to use, 0 for CPU.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
 parser.add_argument("--base_lr", type=float, default=0.001, help="The basic learning rate that affects the entire network.")
 parser.add_argument("--emb_dim", type=int, default=128, help="The dimension in which a word is embedded.")
 parser.add_argument("--hidden_size", type=int, default=128, help="The number of hidden nodes in the GRU layer.")
@@ -46,16 +46,16 @@ parser.add_argument("--do_eval", type=distutils.util.strtobool, default=True, he
 
 
 def train(args):
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
 
     # Create dataset.
     train_dataset = LacDataset(args.data_dir, mode='train')
     test_dataset = LacDataset(args.data_dir, mode='test')
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=0),  # word_ids
-        Stack(),  # length
-        Pad(axis=0, pad_val=0),  # label_ids
+        Pad(axis=0, pad_val=0, dtype='int64'),  # word_ids
+        Stack(dtype='int64'),  # length
+        Pad(axis=0, pad_val=0, dtype='int64'),  # label_ids
     ): fn(samples)
 
     # Create sampler for dataloader
@@ -116,7 +116,4 @@ def train(args):
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(train, args=(args, ), nprocs=args.n_gpu)
-    else:
-        train(args)
+    train(args)
