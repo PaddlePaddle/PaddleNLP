@@ -15,6 +15,12 @@
 ```
 ## 快速开始
 
+### 环境依赖
+
+- sentencepiece
+
+安装命令：`pip install sentencepiece`
+
 ### 数据准备
 根据论文中的信息，目前 Big Bird 的预训练数据是主要是由 Books，CC-News，Stories, Wikipedia 4种预训练数据来构造，用户可以根据自己的需要来下载和清洗相应的数据。目前已提供一份示例数据在 data 目录。
 
@@ -61,7 +67,7 @@ python -m paddle.distributed.launch --gpus "0" --log_dir log  run_pretrain.py --
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python run_classifier.py --model_name_or_path bigbird-base-uncased-finetune \
+python run_classifier.py --model_name_or_path bigbird-base-uncased \
     --output_dir "output" \
     --batch_size 2 \
     --learning_rate 1e-5 \
@@ -72,7 +78,7 @@ python run_classifier.py --model_name_or_path bigbird-base-uncased-finetune \
 
 其中参数释义如下：
 
-- `model_name_or_path` 指示了finetune使用的具体预训练模型以及预训练时使用的tokenizer，目前支持的预训练模型有："bigbird-base-uncased", "bigbird-base-uncased-finetune"。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"。
+- `model_name_or_path` 指示了finetune使用的具体预训练模型以及预训练时使用的tokenizer，目前支持的预训练模型有："bigbird-base-uncased"。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"。
 - `output_dir` 指定输出文件。
 - `batch_size` 训练的batch大小。
 - `learning_rate` 训练的学习率。
@@ -82,7 +88,7 @@ python run_classifier.py --model_name_or_path bigbird-base-uncased-finetune \
 - `max_encoder_length` MLM任务的最大的token数目。
 
 
-基于`bigbird-base-uncased-finetune`在IMDB评测任务上Fine-tuning后，在验证集上有如下结果：
+基于`bigbird-base-uncased`在IMDB评测任务上Fine-tuning后，在验证集上有如下结果：
 
 | Task  | Metric                       | Result            |
 |:-----:|:----------------------------:|:-----------------:|
