@@ -231,34 +231,11 @@ class BigBirdPretrainedModel(PretrainedModel):
             "num_labels": 2,
             "initializer_range": 0.02,
         },
-        "bigbird-base-uncased-finetune": {
-            "num_layers": 12,
-            "vocab_size": 50358,
-            "nhead": 12,
-            "attn_dropout": 0.0,
-            "dim_feedforward": 3072,
-            "activation": "gelu",
-            "normalize_before": False,
-            "block_size": 16,
-            "window_size": 3,
-            "num_global_blocks": 2,
-            "num_rand_blocks": 3,
-            "seed": None,
-            "pad_token_id": 0,
-            "hidden_size": 768,
-            "hidden_dropout_prob": 0.0,
-            "max_position_embeddings": 4096,
-            "type_vocab_size": 2,
-            "num_labels": 2,
-            "initializer_range": 0.02,
-        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "bigbird-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/bigbird-base-uncased.pdparams",
-            "bigbird-base-uncased-finetune":
             "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/bigbird-base-uncased.pdparams",
         }
     }
