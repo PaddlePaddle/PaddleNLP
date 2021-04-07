@@ -123,10 +123,21 @@ class TestBertForPretraining(TestBertForSequenceClassification):
         self.TEST_MODEL_CLASS = BertForPretraining
 
     def set_output(self):
-        self.expected_seq_shape = (self.config['batch_size'],
-                                   self.config['seq_len'],
+        self.expected_seq_shape = (self.masked_lm_positions.shape[0],
                                    self.config['vocab_size'])
         self.expected_pooled_shape = (self.config['batch_size'], 2)
+
+    def test_forward(self):
+        config = copy.deepcopy(self.config)
+        del config['batch_size']
+        del config['seq_len']
+
+        bert = BertModel(**config)
+        model = self.TEST_MODEL_CLASS(bert)
+        input_ids = paddle.to_tensor(self.input_ids)
+        masked_lm_positions = paddle.to_tensor(self.masked_lm_positions)
+        self.output = model(input_ids, masked_positions=masked_lm_positions)
+        self.check_testcase()
 
     def check_testcase(self):
         self.check_output_equal(self.output[0].numpy().shape,
@@ -198,8 +209,7 @@ class TestBertFromPretrain(CommonTest):
             'bert-base-uncased',
             attention_probs_dropout_prob=0.0,
             hidden_dropout_prob=0.0)
-        self.config = copy.deepcopy(BertModel.pretrained_init_configuration[
-            'bert-base-uncased'])
+        self.config = copy.deepcopy(model.config)
         self.config['seq_len'] = 32
         self.config['batch_size'] = 3
 
@@ -226,3 +236,7 @@ class TestBertFromPretrain(CommonTest):
              [-0.74019802, -0.10187808, 0.95353240]])
         self.check_output_equal(
             output[1].numpy()[0:3, 0:3], expected_pooled_slice, atol=1e-6)
+
+
+if __name__ == "__main__":
+    unittest.main()
