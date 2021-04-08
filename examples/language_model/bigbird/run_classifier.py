@@ -112,7 +112,9 @@ def main():
     # Define the model and metric 
     # In finetune task, bigbird performs better when setting dropout to zero.
     model = BigBirdForSequenceClassification.from_pretrained(
-        args.model_name_or_path, attn_dropout=0.0, hidden_dropout_prob=0.0)
+        args.model_name_or_path,
+        attn_dropout=args.attn_dropout,
+        hidden_dropout_prob=args.hidden_dropout_prob)
 
     criterion = nn.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()

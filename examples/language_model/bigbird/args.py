@@ -34,7 +34,6 @@ def parse_args():
         "--input_dir",
         default=None,
         type=str,
-        required=True,
         help="The input directory where the data will be read from.")
 
     parser.add_argument(

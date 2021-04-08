@@ -194,7 +194,7 @@ def do_train(args):
         convert_example,
         tokenizer=tokenizer,
         label_list=train_ds.label_list,
-        max_seq_length=args.max_seq_length)
+        max_seq_length=args.max_encoder_length)
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
@@ -242,13 +242,17 @@ def do_train(args):
             return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
+    # In finetune task, bigbird performs better when setting dropout to zero.
     model = model_class.from_pretrained(
-        args.model_name_or_path, num_classes=num_classes)
+        args.model_name_or_path,
+        num_classes=num_classes,
+        attn_dropout=0.0,
+        hidden_dropout_prob=0.0)
     if worker_num > 1:
         model = paddle.DataParallel(model)
 
     num_training_steps = args.max_steps if args.max_steps > 0 else (
-        len(train_data_loader) * args.num_train_epochs)
+        len(train_data_loader) * args.epochs)
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
@@ -277,7 +281,7 @@ def do_train(args):
     metric = metric_class()
     global_step = 0
     tic_train = time.time()
-    for epoch in range(args.num_train_epochs):
+    for epoch in range(args.epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
             input_ids, segment_ids, labels = batch[:3]
