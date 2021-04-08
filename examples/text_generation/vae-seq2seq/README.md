@@ -6,7 +6,6 @@
 ├── README.md         # 文档
 ├── args.py           # 训练、预测以及模型参数配置程序
 ├── data.py           # 数据读入程序
-├── download.py       # 数据下载程序
 ├── train.py          # 训练主程序
 ├── predict.py        # 预测主程序
 └── model.py          # VAE模型组网部分，以及Metric等
@@ -14,7 +13,7 @@
 
 ## 简介
 
-本目录下此范例模型的实现，旨在展示如何用Paddle构建用于文本生成的VAE示例，其中LSTM作为编码器和解码器。分别对官方PTB数据和yahoo数据集进行训练。
+本目录下此范例模型的实现，旨在展示如何用Paddle构建用于文本生成的VAE示例，其中LSTM作为编码器和解码器。分别对PTB数据集和Yahoo Answer（采样100k）数据集进行训练。
 
 关于VAE的详细介绍参照： [(Bowman et al., 2015) Generating Sentences from a Continuous Space](https://arxiv.org/pdf/1511.06349.pdf)
 
@@ -24,16 +23,8 @@
 
 PTB数据集由华尔街日报的文章组成，包含929k个训练tokens，词汇量为10k。下载地址为: https://dataset.bj.bcebos.com/imikolov%2Fsimple-examples.tgz。
 
-Yahoo数据集来自[(Yang et al., 2017) Improved Variational Autoencoders for Text Modeling using Dilated Convolutions](https://arxiv.org/pdf/1702.08139.pdf)，该数据集从原始Yahoo Answer数据中采样100k个文档，数据集的平均文档长度为78，词汇量为200k。下载地址为：https://paddlenlp.bj.bcebos.com/datasets/yahoo-answer-100k.tar.gz
+Yahoo数据集来自[(Yang et al., 2017) Improved Variational Autoencoders for Text Modeling using Dilated Convolutions](https://arxiv.org/pdf/1702.08139.pdf)，该数据集从原始Yahoo Answer数据中采样100k个文档，数据集的平均文档长度为78，词汇量为200k。下载地址为：https://paddlenlp.bj.bcebos.com/datasets/yahoo-answer-100k.tar.gz，运行本例程序后，数据集会自动下载到`~/.paddlenlp/datasets/YahooAnswer100k`目录下。
 
-### 数据获取
-
-```
-python download.py --task ptb  # 下载ptb数据集
-
-python download.py --task yahoo # 下载yahoo数据集
-
-```
 
 ## 模型训练
 
@@ -47,7 +38,7 @@ python train.py \
         --max_grad_norm 5.0 \
         --dataset ptb \
         --model_path ptb_model\
-        --use_gpu True \
+        --device gpu \
         --max_epoch 50 \
 
 ```
@@ -62,7 +53,7 @@ python -m paddle.distributed.launch train.py \
         --max_grad_norm 5.0 \
         --dataset ptb \
         --model_path ptb_model \
-        --use_gpu True \
+        --device gpu \
         --max_epoch 50 \
 
 ```
@@ -79,12 +70,12 @@ python -m paddle.distributed.launch train.py \
         --max_grad_norm 5.0 \
         --dataset yahoo \
         --model_path yahoo_model \
-        --use_gpu True \
+        --device gpu \
         --max_epoch 50 \
 
 ```
 
-**NOTE:** 如需恢复模型训练，则`init_from_ckpt`只需指定到文件名即可，不需要添加文件尾缀。如`--init_from_ckpt=ptb_model/49`即可，程序会自动加载模型参数`ptb_model/49.pdparams`，也会自动加载优化器状态`ptb_model/49.pdopt`。
+**NOTE:** 如需恢复模型训练，则`init_from_ckpt`只需指定到文件名即可，不需要添加文件尾缀。如`--init_from_ckpt ptb_model/49`即可，程序会自动加载模型参数`ptb_model/49.pdparams`，也会自动加载优化器状态`ptb_model/49.pdopt`。
 
 
 ## 模型预测
@@ -98,7 +89,7 @@ python predict.py \
         --init_scale 0.1 \
         --max_grad_norm 5.0 \
         --dataset ptb \
-        --use_gpu True \
+        --device gpu \
         --infer_output_file infer_output.txt \
         --init_from_ckpt ptb_model/49 \
 
@@ -114,7 +105,7 @@ python predict.py \
         --hidden_size 550 \
         --max_grad_norm 5.0 \
         --dataset yahoo \
-        --use_gpu True \
+        --device gpu \
         --infer_output_file infer_output.txt \
         --init_from_ckpt yahoo_model/49 \
 

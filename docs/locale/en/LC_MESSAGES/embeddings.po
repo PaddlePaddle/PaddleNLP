@@ -1,0 +1,157 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../embeddings.md:1
+msgid "PaddleNLP Embedding API"
+msgstr ""
+
+#: ../../embeddings.md:3
+msgid "介绍"
+msgstr ""
+
+#: ../../embeddings.md:5
+msgid "PaddleNLP提供多个开源的预训练词向量模型，用户仅需在使用paddlenlp.embeddings.TokenEmbedding时，指定预训练模型的名称，即可加载相对应的预训练模型。以下为PaddleNLP所支持的预训练Embedding模型，其名称用作paddlenlp.embeddings.TokenEmbedding的参数。"
+msgstr ""
+
+#: ../../embeddings.md:6
+msgid "命名方式为：${训练模型}.${语料}.${词向量类型}.${co-occurrence type}.dim${维度}。"
+msgstr ""
+
+#: ../../embeddings.md:7
+msgid "模型有三种，分别是Word2Vec(w2v, skip-gram), GloVe(glove)和FastText(fasttext)。"
+msgstr ""
+
+#: ../../embeddings.md:9
+msgid "在使用方式这一节中，将介绍如何通过模型名称使用paddlenlp.embeddings.TokenEmbedding加载预训练模型。"
+msgstr ""
+
+#: ../../embeddings.md:12
+msgid "中文词向量"
+msgstr ""
+
+#: ../../embeddings.md:14
+msgid "以下预训练词向量由Chinese-Word-Vectors提供。"
+msgstr ""
+
+#: ../../embeddings.md:16
+msgid "根据不同类型的上下文为每个语料训练多个目标词向量，第二列开始表示不同类型的上下文。以下为上下文类别："
+msgstr ""
+
+#: ../../embeddings.md:18
+msgid "Word表示训练时目标词预测的上下文是一个Word。"
+msgstr ""
+
+#: ../../embeddings.md:19
+msgid ""
+"Word + "
+"N-gram表示训练时目标词预测的上下文是一个Word或者Ngram，其中bigram表示2-grams，ngram.1-2表示1-gram或者2-grams。"
+msgstr ""
+
+#: ../../embeddings.md:20
+msgid ""
+"Word + Character表示训练时目标词预测的上下文是一个Word或者Character，其中word-"
+"character.char1-2表示上下文是1个或2个Character。"
+msgstr ""
+
+#: ../../embeddings.md:21
+msgid ""
+"Word + Character + Ngram表示训练时目标词预测的上下文是一个Word、Character或者Ngram。bigram-"
+"char表示上下文是2-grams或者1个Character。"
+msgstr ""
+
+#: ../../embeddings.md:107
+msgid "特别地，对于百度百科语料，在不同的 Co-occurrence类型下分别提供了目标词与上下文向量："
+msgstr ""
+
+#: ../../embeddings.md:166
+msgid "英文词向量"
+msgstr ""
+
+#: ../../embeddings.md:168
+msgid "Word2Vec"
+msgstr ""
+
+#: ../../embeddings.md:185
+msgid "GloVe"
+msgstr ""
+
+#: ../../embeddings.md:218
+msgid "FastText"
+msgstr ""
+
+#: ../../embeddings.md:239
+msgid "使用方式"
+msgstr ""
+
+#: ../../embeddings.md:241
+msgid ""
+"以上所述的模型名称可直接以参数形式传入padddlenlp.embeddings.TokenEmbedding，加载相对应的模型。比如要加载语料为Wiki2017，通过FastText训练的预训练模型（fasttext"
+".wiki-news.target.word-word.dim300.en），只需执行以下代码："
+msgstr ""
+
+#: ../../embeddings.md:250
+msgid "模型信息"
+msgstr ""
+
+#: ../../embeddings.md:574
+msgid "致谢"
+msgstr ""
+
+#: ../../embeddings.md:575
+msgid "感谢 Chinese-Word-Vectors提供Word2Vec中文预训练词向量。"
+msgstr ""
+
+#: ../../embeddings.md:576
+msgid "感谢 GloVe Project提供的GloVe英文预训练词向量。"
+msgstr ""
+
+#: ../../embeddings.md:577
+msgid "感谢 FastText Project提供的英文预训练词向量。"
+msgstr ""
+
+#: ../../embeddings.md:579
+msgid "参考论文"
+msgstr ""
+
+#: ../../embeddings.md:580
+msgid ""
+"Li, Shen, et al. \"Analogical reasoning on chinese morphological and "
+"semantic relations.\" arXiv preprint arXiv:1805.06504 (2018)."
+msgstr ""
+
+#: ../../embeddings.md:581
+msgid ""
+"Qiu, Yuanyuan, et al. \"Revisiting correlations between intrinsic and "
+"extrinsic evaluations of word embeddings.\" Chinese Computational "
+"Linguistics and Natural Language Processing Based on Naturally Annotated "
+"Big Data. Springer, Cham, 2018. 209-221."
+msgstr ""
+
+#: ../../embeddings.md:582
+msgid ""
+"Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. "
+"GloVe: Global Vectors for Word Representation."
+msgstr ""
+
+#: ../../embeddings.md:583
+msgid ""
+"T. Mikolov, E. Grave, P. Bojanowski, C. Puhrsch, A. Joulin. Advances in "
+"Pre-Training Distributed Word Representations."
+msgstr ""
+

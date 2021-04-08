@@ -1,12 +1,7 @@
-============
-进阶指南
-============
-
-进阶指南:
-
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
+   :caption: 进阶指南
 
+   /advanced_guide/model_compression/index.rst
    /advanced_guide/deployment.rst
    /advanced_guide/distributed_training.rst
-   /advanced_guide/model_compression.rst

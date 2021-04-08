@@ -21,6 +21,7 @@ import re
 import unicodedata
 from shutil import copyfile
 
+import numpy as np
 from paddle.utils import try_import
 
 from .. import PretrainedTokenizer
@@ -67,6 +68,9 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                  cls_token="[CLS]",
                  sep_token="[SEP]",
                  mask_token="[MASK]",
+                 chitchat_token="[CHAT]",
+                 knowledge_token="[KNOW]",
+                 recommend_token="[RECO]",
                  special_tokens_file=""):
         mod = try_import('sentencepiece')
         self.spm_model = mod.SentencePieceProcessor()
@@ -84,7 +88,10 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             pad_token,
             cls_token,
             sep_token,
-            mask_token=mask_token)
+            mask_token=mask_token,
+            chitchat_token=chitchat_token,
+            knowledge_token=knowledge_token,
+            recommend_token=recommend_token)
 
         # if the sentencepiece_model_file is not exists, just the default sentence-piece model 
         if os.path.isfile(sentencepiece_model_file):
@@ -247,7 +254,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         An UnifiedTransformer sequence has the following format:
         ::
             - single sequence: ``[CLS] X [SEP]``
-            - pair of sequences: ``[CLS] A [SEP] [CLS] B [SEP]``
+            - pair of sequences: ``[CLS] A [SEP] B [SEP]``
         Args:
             token_ids_0 (list): List of IDs to which the special tokens will be 
                 added.
@@ -417,3 +424,180 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             idx_to_token[idx] for idx in sorted(idx_to_token.keys())
         ]
         return vocab
+
+    def dialogue_encode(self,
+                        history,
+                        response=None,
+                        knowledge=None,
+                        task_type='chitchat',
+                        max_seq_len=512,
+                        max_response_len=128,
+                        max_knowledge_len=128,
+                        return_position_ids=True,
+                        return_token_type_ids=True,
+                        return_attention_mask=True,
+                        return_length=False,
+                        add_start_token_as_response=False,
+                        pad_to_max_seq_len=False):
+        """
+        Main method to encode the single-turn or multi-turn dialogue conversation. 
+        It will return a dictionary containing the encoded sequence and other 
+        relative informations which meets the input format requirements of the 
+        UnifiedTransformer model. 
+        See detail at 
+        https://github.com/PaddlePaddle/Knover/tree/luge-dialogue/luge-dialogue
+
+        Args:
+            history (str|list|tuple): The history of dialogue conversation. It 
+                is an utterance or list of utterances to be encoded. Each 
+                utterance is a string. 
+            response (str, optional): The response of dialogue conversation. 
+                It should be set when training the model. It should not be set 
+                when running inference. Default None.
+            knowledge (str, optional): The knowledge information of dialogue 
+                conversation. It should be set if the `task_type` is "knowledge" 
+                or "recommend". Default None.
+            task_type (str, optional): The type of dialogue conversation. It is 
+                one of "chitchat", "knowledge" and "recommend". They represent 
+                the chitchat dialogue, knowledge grounded dialogue and 
+                conversational recommendation respectively. Default "chitchat".
+            max_seq_len (int, optional): The maximum encoded sequence length.
+                Default 512.
+            max_response_len (int, optional): The maximum encoded sequence 
+                length of the input `response`. Default 128.
+            max_knowledge_len (int, optional): The maximum encoded sequence 
+                length of the input `knowledge`. Default 128.
+            return_position_ids (bool, optional): Whether to return the 
+                position_ids. Default True.
+            return_token_type_ids (bool, optional): Whether to return the 
+                token_type_ids. Default True.
+            return_attention_mask (bool, optional): Whether to return the 
+                attention_mask. Default True.
+            return_length (bool, optional): Whether to return the length of the
+                encoded sequence. Default False.
+            add_start_token_as_response (bool, optional): Whether to add the 
+                special token [CLS] at the end of sequence as the begining of 
+                the response when running inference to force the model to start 
+                generating response sequence. Default False.
+            pad_to_max_seq_len (bool, optional): Whether to pad the returned 
+                sequences to the `max_seq_len`. Note that, in this method, 
+                returned sequences will be padded on the left. Default False.
+        """
+        task_type_list = ["chitchat", "knowledge", "recommend"]
+        # Input type checking for clearer error
+        assert isinstance(history, str) or (
+            isinstance(history, (list, tuple)) and
+            (len(history) == 0 or len(history) != 0 and
+             isinstance(history[0], str))), (
+                 "The input `history` must be with type `str` (single context) "
+                 "or `List[str]` (multi-turn context). But received: {}".format(
+                     history))
+        assert response is None or isinstance(response, str), (
+            "The input `response` must of be with type `str`. But received: {}".
+            format(response))
+        assert knowledge is None or isinstance(knowledge, str), (
+            "The input `knowledge` must of be with type `str`. But received: {}".
+            format(knowledge))
+        assert task_type in task_type_list, (
+            "The input `task_type` must be one of {}.".format(", ".join(
+                task_type_list)))
+        assert max_seq_len > max_response_len + max_knowledge_len, (
+            "`max_seq_len` must be greater than the sum of `max_response_len` "
+            "and `max_knowledge_len`. But received `max_seq_len` is {}, "
+            "`max_response_len` is {}, `max_knowledge_len` is {}.".format(
+                max_seq_len, max_response_len, max_knowledge_len))
+        assert response is None or not add_start_token_as_response, (
+            "`add_start_token_as_response` only works when `response` is "
+            "`None`. But received `add_start_token_as_response`: `{}`, "
+            "`response`: {}.".format(add_start_token_as_response, response))
+
+        knowledge_ids = []
+        if knowledge is not None:
+            tokens = self._tokenize(knowledge)
+            knowledge_ids = self.convert_tokens_to_ids(tokens)
+            if len(knowledge_ids) > max_knowledge_len - 1:
+                knowledge_ids = knowledge_ids[:max_knowledge_len - 1]
+            knowledge_ids += [self.sep_token_id]
+
+        response_ids = []
+        if response is not None:
+            tokens = self._tokenize(response)
+            response_ids = [self.cls_token_id] + self.convert_tokens_to_ids(
+                tokens)
+            if len(response_ids) > max_response_len - 1:
+                response_ids = response_ids[:max_response_len - 1]
+            response_ids += [self.sep_token_id]
+        elif add_start_token_as_response:
+            response_ids = [self.cls_token_id]
+
+        special_token_id = getattr(self, task_type + '_token_id')
+        knowledge_ids = [self.cls_token_id, special_token_id] + knowledge_ids
+        max_history_len = max_seq_len - len(knowledge_ids) - len(response_ids)
+        if isinstance(history, str):
+            history = [history]
+        history_ids = []
+        for i in range(len(history) - 1, -1, -1):
+            tokens = self._tokenize(history[i])
+            if len(history_ids) + len(tokens) + 1 > max_history_len:
+                if i == len(history) - 1:
+                    tokens = tokens[1 - max_history_len:]
+                    history_ids = (self.convert_tokens_to_ids(tokens) +
+                                   [self.sep_token_id])
+                break
+            history_ids = (self.convert_tokens_to_ids(tokens) +
+                           [self.sep_token_id]) + history_ids
+
+        history_ids = knowledge_ids + history_ids
+        # Build output dictionnary
+        encoded_inputs = {}
+        encoded_inputs["input_ids"] = history_ids + response_ids
+        # Check lengths
+        sequence_length = len(encoded_inputs["input_ids"])
+        assert sequence_length <= max_seq_len
+
+        # Considering that the logits at the last time step in the API of 
+        # generative task are taken to generate the next token. In order to 
+        # avoid the last time step being a pad, so take padding on the left.
+        pad_length = max_seq_len - sequence_length if pad_to_max_seq_len else 0
+        if pad_length > 0:
+            encoded_inputs["input_ids"] = [
+                self.pad_token_id
+            ] * pad_length + encoded_inputs["input_ids"]
+
+        if return_token_type_ids:
+            encoded_inputs["token_type_ids"] = [0] * len(
+                history_ids) + [1] * len(response_ids)
+            if pad_length > 0:
+                encoded_inputs["token_type_ids"] = [
+                    self.pad_token_id
+                ] * pad_length + encoded_inputs["token_type_ids"]
+
+        if return_length:
+            encoded_inputs["seq_len"] = sequence_length
+
+        if return_position_ids:
+            encoded_inputs["position_ids"] = list(range(sequence_length))
+            if pad_length > 0:
+                encoded_inputs["position_ids"] = [
+                    self.pad_token_id
+                ] * pad_length + encoded_inputs["position_ids"]
+
+        if return_attention_mask:
+            attention_mask = np.ones(
+                (sequence_length, sequence_length), dtype='float32') * -1e9
+            start = len(history_ids)
+            end = sequence_length
+            attention_mask[:end, :start] = 0.0
+            # Generate the lower triangular matrix using the slice of matrix
+            tmp = np.triu(
+                np.ones(
+                    [end - start, end - start], dtype='float32') * -1e9, 1)
+            attention_mask[start:end, start:end] = tmp
+            encoded_inputs["attention_mask"] = attention_mask
+            if pad_length > 0:
+                new_mask = np.ones(
+                    (max_seq_len, max_seq_len), dtype='float32') * -1e9
+                new_mask[-sequence_length:, -sequence_length:] = attention_mask
+                encoded_inputs["attention_mask"] = new_mask
+
+        return encoded_inputs

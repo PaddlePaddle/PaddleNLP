@@ -82,6 +82,14 @@ public:
     std::string decoding_strategy = ctx.Attr<std::string>("decoding_strategy");
     int beam_width_ =
         (decoding_strategy == "beam_search") ? ctx.Attr<int>("beam_size") : 1;
+    int candidate_num_ = (decoding_strategy == "topk_sampling" ||
+                          decoding_strategy == "topp_sampling")
+                             ? ctx.Attr<int>("topk")
+                             : 1;
+    float probability_threshold_ = (decoding_strategy == "topk_sampling" ||
+                                    decoding_strategy == "topp_sampling")
+                                       ? ctx.Attr<float>("topp")
+                                       : 0.0;
     int64_t max_seq_len_ = ctx.Attr<int64_t>("max_len");
     int head_num_ = ctx.Attr<int>("n_head");
     int size_per_head_ = ctx.Attr<int>("size_per_head");
@@ -95,7 +103,9 @@ public:
     typedef typename traits_::DataType DataType_;
 
     auto input_dims = input->dims();
-    int batch_size_ = input_dims[0] / beam_width_;
+    int batch_size_ = (decoding_strategy == "beam_search")
+                          ? input_dims[0] / beam_width_
+                          : input_dims[0];
     const int memory_max_seq_len = input_dims[1];
     const int memory_hidden_dim = input_dims[2];
     const int vocab_size = word_emb->dims()[0];
@@ -109,26 +119,10 @@ public:
         sequence_length->mutable_data<int>(ctx.GetPlace());
 
     typedef DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
-    DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beamsearch_;
     decoding_params.stream = stream;
     int device_id;
     cudaGetDevice(&device_id);
     fastertransformer::Allocator<AllocatorType::CUDA> allocator_(device_id);
-
-    decoding_beamsearch_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
-        allocator_,
-        batch_size_,
-        beam_width_,
-        max_seq_len_,
-        head_num_,
-        size_per_head_,
-        vocab_size,
-        num_layer_,
-        memory_hidden_dim,
-        memory_max_seq_len,
-        start_id_,
-        end_id_,
-        beam_search_diversity_rate_);
 
     decoding_params.memory_tensor =
         reinterpret_cast<const DataType_*>(input->data<T>());
@@ -238,17 +232,71 @@ public:
     // for weight sharing matmul
     decoding_params.embedding_kernel =
         reinterpret_cast<const DataType_*>(embedding_weight->data<T>());
-    // for matmul bias
-    decoding_params.embedding_bias =
-        (embedding_bias)
-            ? reinterpret_cast<const float*>(embedding_bias->data<float>())
-            : nullptr;
+    // NOTE: the data type of the embedding bias for logits is different
+    // between decoding with beam search and top-k/top-p sampling in
+    // Faster Transformer when using float16.
+    if ("beam_search" == decoding_strategy) {
+      // for matmul bias
+      decoding_params.embedding_bias =
+          (embedding_bias)
+              ? reinterpret_cast<const float*>(embedding_bias->data<float>())
+              : nullptr;
+    } else if ("topk_sampling" == decoding_strategy ||
+               "topp_sampling" == decoding_strategy) {
+      decoding_params.embedding_bias_T =
+          (embedding_bias)
+              ? reinterpret_cast<const DataType_*>(embedding_bias->data<T>())
+              : nullptr;
+    }
     decoding_params.position_encoding_table =
         reinterpret_cast<const DataType_*>(position_encoding_table->data<T>());
 
-    decoding_beamsearch_->forward(params, decoding_params);
+    if ("beam_search" == decoding_strategy) {
+      DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beamsearch_;
+      decoding_beamsearch_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
+          allocator_,
+          batch_size_,
+          beam_width_,
+          max_seq_len_,
+          head_num_,
+          size_per_head_,
+          vocab_size,
+          num_layer_,
+          memory_hidden_dim,
+          memory_max_seq_len,
+          start_id_,
+          end_id_,
+          beam_search_diversity_rate_);
 
-    delete decoding_beamsearch_;
+      decoding_beamsearch_->forward(params, decoding_params);
+
+      delete decoding_beamsearch_;
+    } else if ("topk_sampling" == decoding_strategy ||
+               "topp_sampling" == decoding_strategy) {
+      DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
+      decoding_sampling_ =
+          new DecodingSampling<DecodingTraits_::OpType>(allocator_,
+                                                        batch_size_,
+                                                        max_seq_len_,
+                                                        head_num_,
+                                                        size_per_head_,
+                                                        vocab_size,
+                                                        num_layer_,
+                                                        memory_hidden_dim,
+                                                        memory_max_seq_len,
+                                                        start_id_,
+                                                        end_id_,
+                                                        candidate_num_,
+                                                        probability_threshold_);
+
+      decoding_sampling_->forward(params, decoding_params);
+
+      delete decoding_sampling_;
+    } else {
+      PADDLE_THROW(
+          "Only beam_search, topk_sampling and topp_sampling are supported for "
+          "Faster Transformer. ");
+    }
     delete[] params;
   }
 };
