@@ -16,6 +16,7 @@ import os
 import ast
 import math
 import argparse
+from functools import partial
 
 import numpy as np
 import paddle
@@ -25,7 +26,7 @@ from paddlenlp.layers.crf import LinearChainCrfLoss, ViterbiDecoder
 from paddlenlp.metrics import ChunkEvaluator
 import distutils.util
 
-from data import LacDataset
+from data import load_dataset, load_vocab, convert_example
 from model import BiGruCrf, get_loss
 
 # yapf: disable
@@ -49,8 +50,21 @@ def train(args):
     paddle.set_device(args.device)
 
     # Create dataset.
-    train_dataset = LacDataset(args.data_dir, mode='train')
-    test_dataset = LacDataset(args.data_dir, mode='test')
+    train_ds, test_ds = load_dataset(datafiles=(os.path.join(
+        args.data_dir, 'train.tsv'), os.path.join(args.data_dir, 'test.tsv')))
+
+    word_vocab = load_vocab(os.path.join(args.data_dir, 'word.dic'))
+    label_vocab = load_vocab(os.path.join(args.data_dir, 'tag.dic'))
+    token_replace_vocab = load_vocab(os.path.join(args.data_dir, 'q2b.dic'))
+
+    trans_func = partial(
+        convert_example,
+        max_seq_len=args.max_seq_len,
+        word_vocab=word_vocab,
+        label_vocab=label_vocab,
+        token_replace_vocab=token_replace_vocab)
+    train_ds.map(trans_func)
+    test_ds.map(trans_func)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=0, dtype='int64'),  # word_ids
@@ -60,30 +74,30 @@ def train(args):
 
     # Create sampler for dataloader
     train_sampler = paddle.io.DistributedBatchSampler(
-        dataset=train_dataset,
+        dataset=train_ds,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=True)
     train_loader = paddle.io.DataLoader(
-        dataset=train_dataset,
+        dataset=train_ds,
         batch_sampler=train_sampler,
         return_list=True,
         collate_fn=batchify_fn)
 
     test_sampler = paddle.io.BatchSampler(
-        dataset=test_dataset,
+        dataset=test_ds,
         batch_size=args.batch_size,
         shuffle=False,
         drop_last=False)
     test_loader = paddle.io.DataLoader(
-        dataset=test_dataset,
+        dataset=test_ds,
         batch_sampler=test_sampler,
         return_list=True,
         collate_fn=batchify_fn)
 
     # Define the model netword and its loss
-    network = BiGruCrf(args.emb_dim, args.hidden_size, train_dataset.vocab_size,
-                       train_dataset.num_labels)
+    network = BiGruCrf(args.emb_dim, args.hidden_size,
+                       len(word_vocab), len(label_vocab))
 
     inputs = InputSpec(shape=(-1, ), dtype="int64", name='inputs')
     lengths = InputSpec(shape=(-1, ), dtype="int64", name='lengths')
@@ -93,8 +107,7 @@ def train(args):
     # Prepare optimizer, loss and metric evaluator
     optimizer = paddle.optimizer.Adam(
         learning_rate=args.base_lr, parameters=model.parameters())
-    chunk_evaluator = ChunkEvaluator(
-        label_list=train_dataset.label_vocab.keys(), suffix=True)
+    chunk_evaluator = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
     model.prepare(optimizer, get_loss, chunk_evaluator)
     if args.init_checkpoint:
         model.load(args.init_checkpoint)
