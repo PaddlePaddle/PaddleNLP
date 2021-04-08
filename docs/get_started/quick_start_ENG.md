@@ -1,6 +1,9 @@
+ [**中文**](./quick_start.rst)
+
 Finish the High-precision Sentiment Analysis within 10 Minutes
-  ------------------------------
-### 1\. Install PaddleNLP
+  ==============================
+
+## 1\. Install PaddleNLP
 
 If you want to know the installation, or meet with some problems, please refer to [the installation documentation](https://paddlenlp.readthedocs.io/en/latest/gettingstarted/install.html) of PaddleNLP.
 
@@ -8,7 +11,7 @@ If you want to know the installation, or meet with some problems, please refer t
 >>> pip install --upgrade paddlenlp>=2.0.0rc -i https://pypi.org/simple
 ```
 
-### 2\. Load Pre-trained Models with One Click
+## 2\. Load Pre-trained Models with One Click
 
 The essence of sentiment analysis is the task of text classification. PaddleNLP has a lot of built-in pre-trained models like ERNIE, BERT, RoBERTa, Electra. There are also different finetuned nets of pre-trained models, aiming to process various downstream tasks. Users can finish tasks like Q&A, sequence classification, token classification and so forth. If you want to know more details, please refer to [pre-trained models](https://paddlenlp.readthedocs.io/en/latest/modelzoo/transformer.html). We will take ERNIE as an example and introduce how to finetuned nets of the pre-trained models to finish text classification tasks.
 
@@ -26,7 +29,7 @@ Load the fine-tuned net of ERNIE that is specialized for text classification. As
 ...     MODEL_NAME, num_classes=len(label_list))
 ```
 
-### 3\. Call Tokenizer to Process Data
+## 3\. Call Tokenizer to Process Data
 
 We use Tokenizer to change original input texts into acceptable data format. PaddleNLP has built-in Tokenizers aiming to process different pre-trained models. Once you specify one model name, you can load it. 
 
@@ -74,7 +77,7 @@ sequence_output is the semantic feature representation of every input token, and
 
 pooled_output is the semantic feature representation of the whole sentence, and shape is (1, hidden_size). It is always used in the tasks like text classification, information retrieval and so forth.
 
-### 4. Load Datasets
+## 4. Load Datasets
 
 PaddleNLP has several built-in datasets, used for downstream tasks like reading comprehension, sequence tagging, machine translation and so forth. Here, we use ChnSenticorp, the public dataset of Chinese sentiment analysis. There are over 7000 positive or negative remarks of hotels.
 
@@ -108,7 +111,7 @@ The decoration of the hotel was not bad, but it's clean and tidy. The pool was o
 {'text': 'Until today, I know that there is the 6th volume of this book, which is a little depressing. Why does one set of books have two versions? Should Dangdang coordinate with the publisher to publish the 6th volume as a single book? Then our kids will not feel regretful.', 'label': 1}
 ```
 
-### 5\. Model Training and Evaluation
+## 5\. Model Training and Evaluation
 
 When you access the data, please use the inference–`paddle.io.DataLoader`{.interpreted-text role="func"} to load data in the asynchronous multi-threaded way. And then you can set dynamic learning rate, loss function, optimization algorithm, evaluation index of ERNIE.
 
@@ -124,7 +127,7 @@ This example will also be shown on AI Studio, where you can [experience models�
 
 Finally, please save the trained models to infer.
 
-### 6. Model Inference
+## 6. Model Inference
 
 Please save the trained models, and define the function– `predict`{.interpreted-text role="func"}. And then you can start to infer the sentiment tendency of texts.
 
