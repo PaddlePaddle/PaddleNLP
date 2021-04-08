@@ -25,6 +25,7 @@ from paddle.static import InputSpec
 from paddlenlp.data import Pad, Tuple, Stack
 from paddlenlp.layers.crf import LinearChainCrfLoss, ViterbiDecoder
 from paddlenlp.metrics import ChunkEvaluator
+from paddlenlp.utils.log import logger
 import distutils.util
 
 from data import load_dataset, load_vocab, convert_example
@@ -42,15 +43,14 @@ parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", 
 parser.add_argument("--base_lr", type=float, default=0.001, help="The basic learning rate that affects the entire network.")
 parser.add_argument("--emb_dim", type=int, default=128, help="The dimension in which a word is embedded.")
 parser.add_argument("--hidden_size", type=int, default=128, help="The number of hidden nodes in the GRU layer.")
-parser.add_argument("--verbose", type=ast.literal_eval, default=128, help="Print reader and training time in details.")
-parser.add_argument("--do_eval", type=distutils.util.strtobool, default=True, help="To evaluate the model if True.")
+parser.add_argument("--logging_steps", type=int, default=10, help="Log every X updates steps.")
+parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
 # yapf: enable
 
 
 def evaluate(model, metric, data_loader):
     model.eval()
     metric.reset()
-    avg_loss, precision, recall, f1_score = 0, 0, 0, 0
     for batch in data_loader:
         token_ids, length, labels = batch
         preds = model(token_ids, length)
@@ -59,8 +59,8 @@ def evaluate(model, metric, data_loader):
         metric.update(num_infer_chunks.numpy(),
                       num_label_chunks.numpy(), num_correct_chunks.numpy())
         precision, recall, f1_score = metric.accumulate()
-    print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
-          (avg_loss, precision, recall, f1_score))
+    print("eval precision: %f, recall: %f, f1: %f" %
+          (precision, recall, f1_score))
     model.train()
 
 
@@ -122,7 +122,8 @@ def train(args):
     chunk_evaluator = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
 
     if args.init_checkpoint:
-        model.load(args.init_checkpoint)
+        model_dict = paddle.load(args.init_checkpoint)
+        model.load_dict(model_dict)
 
     # Start training
     global_step = 0
@@ -135,10 +136,8 @@ def train(args):
             loss = model(token_ids, length, label_ids)
             avg_loss = paddle.mean(loss)
             if global_step % args.logging_steps == 0:
-                print(
-                    "global step %d / %d, epoch: %d / %d, batch: %d, loss: %f, speed: %.2f step/s"
-                    % (global_step, last_step, epoch, args.epochs, step,
-                       avg_loss,
+                print("global step %d / %d, loss: %f, speed: %.2f step/s" %
+                      (global_step, last_step, avg_loss,
                        args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
             avg_loss.backward()
@@ -148,7 +147,7 @@ def train(args):
                 if paddle.distributed.get_rank() == 0:
                     evaluate(model, chunk_evaluator, test_loader)
                     paddle.save(model.state_dict(),
-                                os.path.join(args.output_dir,
+                                os.path.join(args.model_save_dir,
                                              "model_%d.pdparams" % global_step))
 
 

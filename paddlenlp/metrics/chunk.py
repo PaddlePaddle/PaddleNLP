@@ -2,6 +2,7 @@ from collections import defaultdict
 
 import numpy as np
 import paddle
+from paddlenlp.utils.log import logger
 from seqeval.metrics.sequence_labeling import get_entities
 
 
@@ -45,7 +46,14 @@ class ChunkEvaluator(paddle.metric.Metric):
         self.num_label_chunks = 0
         self.num_correct_chunks = 0
 
-    def compute(self, inputs, lengths, predictions, labels):
+    def compute(self, lengths, predictions, labels, redundant=None):
+        if redundant is not None:
+            redundant, lengths, predictions, labels = lengths, predictions, labels, redundant
+            if not getattr(self, "has_warn", False):
+                logger.warning(
+                    'Compatibility Warning: The params of ChunkEvaluator.compute has been modified. The old version is inputs, lengths, predictions, labels while the current version is lengths, predictions, labels.  Please update the usage.'
+                )
+                self.has_warn = True
         labels = labels.numpy()
         predictions = predictions.numpy()
         unpad_labels = [[

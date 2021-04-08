@@ -94,13 +94,17 @@ def convert_tokens_to_ids(tokens,
     return token_ids
 
 
-def convert_example(example, max_seq_len, word_vocab, label_vocab,
-                    token_replace_vocab):
+def convert_example(example,
+                    max_seq_len,
+                    word_vocab,
+                    label_vocab=None,
+                    token_replace_vocab=None):
     if len(example) == 2:
         tokens, labels = example
     else:
-        tokens, labels = example, None
+        tokens, labels = example[0], None
     tokens = tokens[:max_seq_len]
+
     token_ids = convert_tokens_to_ids(
         tokens,
         word_vocab,
