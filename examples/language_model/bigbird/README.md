@@ -133,7 +133,7 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 
 | Task  | Metric                       | Result            |
 |:-----:|:----------------------------:|:-----------------:|
-| SST-2 | Accuracy                     |      0.9415       |
+| SST-2 | Accuracy                     |      0.9365       |
 | QNLI  | Accuracy                     |      0.9017       |
 | CoLA  | Mattehew's corr              |      0.5708       |
 | MRPC  | F1/Accuracy                  |  0.9019 / 0.8603  |
