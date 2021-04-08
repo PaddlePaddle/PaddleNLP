@@ -13,7 +13,7 @@ If you want to know the installation, or meet with some problems, please refer t
 
 ## 2\. Load Pre-trained Models with One Click
 
-The essence of sentiment analysis is the task of text classification. PaddleNLP has a lot of built-in pre-trained models like ERNIE, BERT, RoBERTa, Electra. There are also different finetuned nets of pre-trained models, aiming to process various downstream tasks. Users can finish tasks like Q&A, sequence classification, token classification and so forth. If you want to know more details, please refer to [pre-trained models](https://paddlenlp.readthedocs.io/en/latest/modelzoo/transformer.html). We will take ERNIE as an example and introduce how to finetuned nets of the pre-trained models to finish text classification tasks.
+The essence of sentiment analysis is the task of text classification. PaddleNLP has a lot of built-in pre-trained models like ERNIE, BERT, RoBERTa, Electra. There are also different finetuned nets of pre-trained models, aiming to process various downstream tasks. You can finish tasks like Q&A, sequence classification, token classification and so forth. If you want to know more details, please refer to [pre-trained models](https://paddlenlp.readthedocs.io/en/latest/modelzoo/transformer.html). We will take ERNIE as an example and introduce how to use the finetuned nets of the pre-trained models to finish text classification tasks.
 
 Load the pre-trained model–ERNIE
 
@@ -22,7 +22,7 @@ Load the pre-trained model–ERNIE
 >>> ernie_model = paddlenlp.transformers.ErnieModel.from_pretrained(MODEL_NAME)
 ```
 
-Load the fine-tuned net of ERNIE that is specialized for text classification. As long as you specify model names and categories of text classification, you will define the nets.
+Load the fine-tuned net of ERNIE that is specialized for text classification. As long as you specify model names and categories of text classification, you can define the nets.
 
 ``` {.}
 >>> model = paddlenlp.transformers.ErnieForSequenceClassification.from_pretrained(
@@ -31,13 +31,13 @@ Load the fine-tuned net of ERNIE that is specialized for text classification. As
 
 ## 3\. Call Tokenizer to Process Data
 
-We use Tokenizer to change original input texts into acceptable data format. PaddleNLP has built-in Tokenizers aiming to process different pre-trained models. Once you specify one model name, you can load it. 
+We use Tokenizer to change original input texts into acceptable data format. PaddleNLP has built-in Tokenizers aiming to process different pre-trained models. Once specifying one model name, you can load it. 
 
 ``` {.}
 >>> tokenizer = paddlenlp.transformers.ErnieTokenizer.from_pretrained(MODEL_NAME)
 ```
 
-The data processing of pre-trained models belonging to Transformer, usually includes text segmentation token; and then you need to map the token into its token id; it is also needed to be sliced with the specialized token, like [CLS] and [SEP]; finally, users are required to change it into the data format required by the framework. For easiness of using, PaddleNLP provides users with high-level APIs. Only one click can make the format suitable. 
+The data processing of pre-trained models belonging to Transformer, usually includes text segmentation token; and then you need to map the token into its token id; it is also needed to be sliced with the specialized token, like [CLS] and [SEP]; finally, you are required to change it into the data format required by the framework. For easiness of using, PaddleNLP provides you with high-level APIs. Only one click can make the format suitable. 
 
 Only one line of codes can finish token segmenting, token ID mapping, and specialized token slicing.
 
@@ -62,7 +62,7 @@ input_ids: It represents the token ID of input texts.
 
 token_type_ids: It represents that the relative token is the first input sentence or the second input sentence. (Pre-trained models of Transformer support the inputs like singe sentence or sentence pairs)
 
-At this time, we can regard the outputs of ERNIE as the input.
+At this time, you can take the outputs of ERNIE as the input.
 
 ``` {.}
 >>> sequence_output, pooled_output = ernie_model(input_ids, token_type_ids)
@@ -142,7 +142,7 @@ Let’s take the self-defined data and data labels as an example:
 >>> label_map = {0: 'negative', 1: 'positive'}
 ```
 
-And we will get the inference result:
+And you will get the inference result:
 
 ``` {.}
 >>> results = predict(
