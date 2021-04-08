@@ -61,7 +61,7 @@ parser.add_argument("--checkpoints", type=str, default=None, help="Directory to 
 parser.add_argument("--init_ckpt", type=str, default=None, help="already pretraining model checkpoint")
 parser.add_argument("--predict_save_path", type=str, default=None, help="predict data save path")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument("--n_gpu", type=int, default=1, help="Number of GPUs to use, 0 for CPU.")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable.
 
@@ -113,7 +113,6 @@ def convert_example(example, tokenizer, label_map=None, max_seq_len=512, is_test
     tokenized_input = tokenizer(
         text=example.text_a,
         text_pair=text_b,
-        pad_to_max_seq_len=True,
         max_seq_len=max_seq_len)
     input_ids = tokenized_input['input_ids']
     token_type_ids = tokenized_input['token_type_ids']
@@ -178,13 +177,13 @@ def data_2_examples(datas):
 
 
 def do_train():
-    set_seed(args.seed)
-    paddle.set_device("gpu" if args.n_gpu  else "cpu")
-
+    paddle.set_device(args.device)
     world_size = paddle.distributed.get_world_size()
+    rank = paddle.distributed.get_rank()
     if world_size > 1:
         paddle.distributed.init_parallel_env()
 
+    set_seed(args.seed)
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
 
@@ -223,8 +222,17 @@ def do_train():
     num_training_steps = len(train_loader) * args.num_epoch
     metric = paddle.metric.Accuracy()
     criterion = paddle.nn.loss.CrossEntropyLoss()
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
-        learning_rate=args.learning_rate, parameters=model.parameters())
+        learning_rate=args.learning_rate,
+        parameters=model.parameters(),
+        weight_decay=args.weight_decay,
+        apply_decay_param_fun=lambda x: x in decay_params)
 
     step, best_performerence = 0, 0.0
     model.train()
@@ -240,10 +248,10 @@ def do_train():
             optimizer.step()
             optimizer.clear_grad()
             loss_item = loss.numpy().item()
-            if step > 0 and step % args.skip_step == 0 and paddle.distributed.get_rank() == 0:
+            if step > 0 and step % args.skip_step == 0 and rank == 0:
                 print(f'train epoch: {epoch} - step: {step} (total: {num_training_steps}) ' \
                     f'- loss: {loss_item:.6f} acc {acc:.5f}')
-            if step > 0 and step % args.valid_step == 0 and paddle.distributed.get_rank() == 0:
+            if step > 0 and step % args.valid_step == 0 and rank == 0:
                 loss_dev, acc_dev = evaluate(model, criterion, metric, dev_loader)
                 print(f'dev step: {step} - loss: {loss_dev:.6f} accuracy: {acc_dev:.5f}, ' \
                         f'current best {best_performerence:.5f}')
@@ -255,13 +263,13 @@ def do_train():
             step += 1
 
     # save the final model
-    if paddle.distributed.get_rank() == 0:
+    if rank == 0:
         paddle.save(model.state_dict(), '{}/final.pdparams'.format(args.checkpoints))
 
 
 def do_predict():
     set_seed(args.seed)
-    paddle.set_device("gpu" if args.n_gpu  else "cpu")
+    paddle.set_device(args.device)
 
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
@@ -326,9 +334,7 @@ def do_predict():
 
 if __name__ == '__main__':
 
-    if args.n_gpu > 1 and args.do_train:
-        paddle.distributed.spawn(do_train, nprocs=args.n_gpu)
-    elif args.do_train:
+    if args.do_train:
         do_train()
     elif args.do_predict:
         do_predict()

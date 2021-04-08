@@ -12,21 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
+import json
 import io
 import os
 import string
 
 import numpy as np
-import paddle
-from paddle.io import Dataset
 
-from paddlenlp.utils.env import DATA_HOME
+from paddle.dataset.common import md5file
 from paddlenlp.utils.downloader import get_path_from_url
+from paddlenlp.utils.env import DATA_HOME
+from . import DatasetBuilder
 
 __all__ = ['Imdb']
 
 
-class Imdb(Dataset):
+class Imdb(DatasetBuilder):
     """
     Implementation of `IMDB <https://www.imdb.com/interfaces/>`_ dataset.
 
@@ -34,55 +36,35 @@ class Imdb(Dataset):
     URL = 'https://dataset.bj.bcebos.com/imdb%2FaclImdb_v1.tar.gz'
     MD5 = '7c2ac02c03563afcf9b574c7e56c153a'
 
-    def __init__(
-            self,
-            root=None,
-            mode='train', ):
-        assert mode in [
-            "train", "test"
-        ], "Unknown mode %s, it should be 'train' or 'test'." % mode
-        if root is None:
-            root = DATA_HOME
-        data_dir = os.path.join(root, "aclImdb")
-
+    def _get_data(self, mode, **kwargs):
+        """Downloads dataset."""
+        default_root = os.path.join(DATA_HOME, self.__class__.__name__)
+        data_dir = os.path.join(default_root, "aclImdb", mode)
         if not os.path.exists(data_dir):
-            data_dir = get_path_from_url(self.URL, root, self.MD5)
+            path = get_path_from_url(self.URL, default_root, self.MD5)
+        return data_dir
 
-        self.examples = self._read_data_file(data_dir, mode)
-
-    def _read_data_file(self, data_dir, mode):
-        # remove punctuations ad-hoc.
+    def _read(self, data_dir, *args):
         translator = str.maketrans('', '', string.punctuation)
 
-        def _load_data(label):
-            root = os.path.join(data_dir, mode, label)
+        for label in ["pos", "neg"]:
+            root = os.path.join(data_dir, label)
             data_files = os.listdir(root)
+            data_files.sort()
 
             if label == "pos":
-                label_id = 1
+                label_id = "1"
             elif label == "neg":
-                label_id = 0
-
-            all_samples = []
+                label_id = "0"
             for f in data_files:
                 f = os.path.join(root, f)
-                data = io.open(f, 'r', encoding='utf8').readlines()
-                data = data[0].translate(translator)
-                all_samples.append((data, label_id))
-
-            return all_samples
-
-        data_set = _load_data("pos")
-        data_set.extend(_load_data("neg"))
-        np.random.shuffle(data_set)
-
-        return data_set
-
-    def __getitem__(self, idx):
-        return self.examples[idx]
-
-    def __len__(self):
-        return len(self.examples)
+                with io.open(f, 'r', encoding='utf8') as fr:
+                    data = fr.readlines()
+                    data = data[0].translate(translator)
+                    yield {"text": data, "label": label_id}
 
     def get_labels(self):
+        """
+        Return labels of the Imdb object.
+        """
         return ["0", "1"]

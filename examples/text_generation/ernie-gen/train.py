@@ -48,7 +48,7 @@ parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion.")
 parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
 parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
-parser.add_argument("--n_gpu", type=int, default=1, help="Number of gpus to use, 0 for cpu.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
 parser.add_argument('--beam_width', type=int, default=1, help="Beam search width")
 parser.add_argument('--noise_prob', type=float, default=0., help='Probability of token be repalced')
 parser.add_argument('--use_random_noice', action='store_true', help='If set, replace target tokens with random token from vocabulary, else replace with `[NOISE]`')
@@ -123,7 +123,7 @@ def evaluate(model, data_loader, tokenizer, rouge1, rouge2, attn_id,
 
 
 def train():
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -233,7 +233,7 @@ def train():
                                mask_tgt_2_srctgt, mask_attn_2_srctgtattn,
                                tgt_labels, tgt_pos)
             if global_step % args.logging_steps == 0:
-                if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+                if paddle.distributed.get_rank() == 0:
                     logger.info(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s, lr: %.3e"
                         % (global_step, epoch, step, loss, args.logging_steps /
@@ -244,8 +244,8 @@ def train():
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
-            if global_step % args.save_steps == 0 and (
-                (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0):
+            if global_step % args.save_steps == 0 and paddle.distributed.get_rank(
+            ) == 0:
                 evaluate(model, dev_data_loader, tokenizer, rouge1, rouge2,
                          attn_id, tgt_type_id, args)
                 output_dir = os.path.join(args.output_dir,
@@ -260,7 +260,4 @@ def train():
 
 
 if __name__ == "__main__":
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(train, nprocs=args.n_gpu)
-    else:
-        train()
+    train()

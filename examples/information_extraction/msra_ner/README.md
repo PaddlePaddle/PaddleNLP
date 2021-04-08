@@ -15,6 +15,8 @@ PaddleNLP集成的数据集MSRA-NER数据集对文件格式做了调整：每一
 
 ### 模型训练
 
+#### 单卡训练
+
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 
@@ -27,7 +29,7 @@ python -u ./train.py \
     --logging_steps 1 \
     --save_steps 500 \
     --output_dir ./tmp/msra_ner/ \
-    --n_gpu 1
+    --device gpu
 ```
 
 其中参数释义如下：
@@ -39,7 +41,22 @@ python -u ./train.py \
 - `logging_steps`: 表示日志打印间隔。
 - `save_steps`: 表示模型保存及评估间隔。
 - `output_dir`: 表示模型保存路径。
-- `n_gpu`: 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可；若为0，则使用CPU。
+- `device`: 训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+
+#### 多卡训练
+```shell
+python -m paddle.distributed.launch --gpus "0,1" ./train.py \
+    --model_name_or_path bert-base-multilingual-uncased \
+    --max_seq_length 128 \
+    --batch_size 32 \
+    --learning_rate 2e-5 \
+    --num_train_epochs 3 \
+    --logging_steps 1 \
+    --save_steps 500 \
+    --output_dir ./tmp/msra_ner/ \
+    --device gpu
+```
+
 
 训练过程将按照 `logging_steps` 和 `save_steps` 的设置打印如下日志：
 
@@ -68,7 +85,7 @@ python -u ./eval.py \
     --model_name_or_path bert-base-multilingual-uncased \
     --max_seq_length 128 \
     --batch_size 32 \
-    --use_gpu True \
+    --device gpu \
     --init_checkpoint_path tmp/msra_ner/model_500.pdparams
 ```
 
@@ -88,7 +105,7 @@ python -u ./predict.py \
     --model_name_or_path bert-base-multilingual-uncased \
     --max_seq_length 128 \
     --batch_size 32 \
-    --use_gpu True \
+    --device gpu \
     --init_checkpoint_path tmp/msra_ner/model_500.pdparams
 ```
 

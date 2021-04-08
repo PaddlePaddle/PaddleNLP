@@ -15,7 +15,7 @@ ELMo(Embeddings from Language Models)是重要的通用语义表示模型之一�
 
 ## 环境依赖
 
-- sklearn 
+- sklearn
 - gensim
 
 安装方式：`pip install sklearn gensim`
@@ -67,9 +67,9 @@ sentence-polarity-dataset-v1目录结构：
 
 基于1-billion-word数据集，可以运行下面的命令，在训练集上进行模型训练
 ```shell
-# GPU启动
-# CUDA_VISIBLE_DEVICES指定想要使用的GPU卡号，可以是单卡，也可以多卡
-CUDA_VISIBLE_DEVICES=0,1,2 python -m paddle.distributed.launch train.py --train_data_path='./1-billion-word/training-tokenized-shuffled/*' --vocab_file='./1-billion-word/vocab-15w.txt' --save_dir='./checkpoints'
+# GPU启动, 支持单卡和多卡
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus '0' run_pretrain.py --train_data_path='./1-billion-word/training-tokenized-shuffled/*' --vocab_file='./1-billion-word/vocab-15w.txt' --save_dir='./checkpoints' --device='gpu'
 ```
 
 其他可选参数和参数的默认值请参考`args.py`。
@@ -93,8 +93,9 @@ checkpoints/
 
 基于1-billion-word数据集，可以运行下面的命令，在评测集上进行模型评估
 ```shell
-# GPU启动
-python eval.py --dev_data_path='./1-billion-word/heldout-tokenized-shuffled/*' --vocab_file='./1-billion-word/vocab-15w.txt' --init_from_ckpt='./checkpoints/10000'
+# GPU启动，仅支持单卡
+export CUDA_VISIBLE_DEVICES=0
+python run_eval.py --dev_data_path='./1-billion-word/heldout-tokenized-shuffled/*' --vocab_file='./1-billion-word/vocab-15w.txt' --init_from_ckpt='./checkpoints/10000' --device='gpu'
 ```
 
 ### 下游任务
@@ -105,17 +106,36 @@ python eval.py --dev_data_path='./1-billion-word/heldout-tokenized-shuffled/*' -
 
 base模型可以运行下面的命令，在训练集上进行模型训练评估
 ```shell
-python base.py
+# GPU启动, 支持单卡和多卡
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus '0' word2vec_base.py --data_dir='./sentence-polarity-dataset-v1/' --pretrained_word2vec_file='./sentence-polarity-dataset-v1/GoogleNews-vectors-negative300.bin' --device='gpu'
 ```
 
 #### ELMo finetune
 
 ELMo finetune可以运行下面的命令，在训练集上进行模型训练评估
 ```shell
-python example.py --init_from_ckpt='./checkpoints/10000'
+# GPU启动, 支持单卡和多卡
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus '0' run_finetune.py --data_dir='./sentence-polarity-dataset-v1/' --init_from_ckpt='./checkpoints/10000' --device='gpu'
 ```
 
-**NOTE:** 可以通过构建模型时的trainable参数设置ELMo参与或不参与下游任务的训练。另外，预训练的ELMo也可以作为文本词向量编码器单独使用，即输入文本内容，输出每个词对应的词向量。ELMo接入下游任务的具体用法请参考`example.py`中示例`example_of_using_ELMo_as_finetune()`和`example_of_using_ELMo_as_embedder()`。
+**NOTE:** 可以通过构建模型时的trainable参数设置ELMo参与或不参与下游任务的训练。ELMo接入下游任务的具体用法请参考`run_finetune.py`。
+
+另外，预训练的ELMo也可以作为文本词向量编码器单独使用，即输入文本内容，输出每个词对应的词向量。用法示例如下：
+
+```python
+from elmo import ELMoEmbedder
+
+embedder = ELMoEmbedder(params_file)
+sentences = [['The', 'first', 'sentence', '.'], ['Second', 'one', '.']]
+
+embeddings = embedder.encode(sentences)
+for i, (text, emb) in enumerate(zip(sentences, embeddings)):
+    print(text)
+    print(emb.shape)
+    print()
+```
 
 ## Reference
 

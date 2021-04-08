@@ -1,0 +1,136 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.transformers.optimization.rst:2
+msgid "optimization"
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:1
+#: paddlenlp.transformers.optimization.CosineDecayWithWarmup:1
+#: paddlenlp.transformers.optimization.LinearDecayWithWarmup:1
+#: paddlenlp.transformers.optimization.PolyDecayWithWarmup:1
+msgid "基类：:class:`paddle.optimizer.lr.LambdaDecay`"
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.LinearDecayWithWarmup:1
+msgid ""
+"Create a learning rate scheduler, which increases learning rate linearly "
+"from 0 to given `learning_rate`, after this warmup period learning rate "
+"would be decreased linearly from the base learning rate to 0."
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup
+#: paddlenlp.transformers.optimization.CosineDecayWithWarmup
+#: paddlenlp.transformers.optimization.LinearDecayWithWarmup
+#: paddlenlp.transformers.optimization.PolyDecayWithWarmup
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:5
+#: paddlenlp.transformers.optimization.CosineDecayWithWarmup:7
+#: paddlenlp.transformers.optimization.LinearDecayWithWarmup:5
+#: paddlenlp.transformers.optimization.PolyDecayWithWarmup:6
+msgid "The base learning rate. It is a python float number."
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.CosineDecayWithWarmup:10
+#: paddlenlp.transformers.optimization.LinearDecayWithWarmup:8
+#: paddlenlp.transformers.optimization.PolyDecayWithWarmup:9
+msgid "The number of training steps."
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:8
+#: paddlenlp.transformers.optimization.CosineDecayWithWarmup:12
+#: paddlenlp.transformers.optimization.LinearDecayWithWarmup:10
+#: paddlenlp.transformers.optimization.PolyDecayWithWarmup:11
+msgid ""
+"If int, it means the number of steps for warmup. If float, it means the "
+"proportion of warmup in total training steps."
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:14
+#: paddlenlp.transformers.optimization.CosineDecayWithWarmup:23
+#: paddlenlp.transformers.optimization.LinearDecayWithWarmup:13
+#: paddlenlp.transformers.optimization.PolyDecayWithWarmup:18
+msgid ""
+"The index of last epoch. It can be set to restart training. If None, it "
+"means initial learning rate. Default: -1."
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.LinearDecayWithWarmup:17
+msgid "If True, prints a message to stdout for each update. Default: False."
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:20
+#: paddlenlp.transformers.optimization.CosineDecayWithWarmup:29
+#: paddlenlp.transformers.optimization.LinearDecayWithWarmup:22
+#: paddlenlp.transformers.optimization.PolyDecayWithWarmup:24
+msgid "实际案例"
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:1
+msgid ""
+"Create a learning rate scheduler, which increases learning rate linearly "
+"from 0 to given `learning_rate` during warmup periods and keeps learning "
+"rate a constant after that."
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:11
+msgid ""
+"The number of training steps. If `warmup` is a float number, "
+"`total_steps` must be provided."
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.CosineDecayWithWarmup:1
+msgid ""
+"Create a learning rate scheduler, which increases learning rate linearly "
+"from 0 to given `learning_rate`, after this warmup period learning rate "
+"would be decreased following the values of the cosine function. If "
+"`with_hard_restarts` is True, the cosine function could have serveral "
+"hard restarts."
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.CosineDecayWithWarmup:15
+msgid "restarts. Default: False."
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.CosineDecayWithWarmup:17
+msgid ""
+"If `with_hard_restarts` is False, it means the number of waves in cosine "
+"scheduler and should be an integer number and defaults to 1. If "
+"`with_hard_restarts` is True, it means the number of hard restarts to use"
+" and should be a float number and defaults to be 0.5. Default: None."
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.PolyDecayWithWarmup:1
+msgid ""
+"Create a learning rate scheduler, which increases learning rate linearly "
+"from 0 to given `lr_init`, after this warmup period learning rate would "
+"be decreased as a polynomial decay from the base learning rate to the end"
+" learning rate `lr_end`."
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.PolyDecayWithWarmup:14
+msgid "The end learning rate. Default: 1e-7."
+msgstr ""
+
+#: of paddlenlp.transformers.optimization.PolyDecayWithWarmup:16
+msgid "Power factor. Default: 1.0."
+msgstr ""
+

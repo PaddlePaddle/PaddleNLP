@@ -22,7 +22,7 @@
 ## 环境依赖
 
 - pgl >= 2.1
-安装命令 `pip install pgl>=2.1`
+安装命令 `pip install pgl\>=2.1`
 
 ## 数据准备
 示例数据```data.txt```中使用了NLPCC2016-DBQA的部分数据，格式为每行"query \t answer"。
@@ -39,9 +39,9 @@ NLPCC2016-DBQA 是由国际自然语言处理和中文计算会议 NLPCC 于 201
 # 数据预处理，建图
 python ./preprocessing/dump_graph.py --conf ./config/erniesage_link_prediction.yaml
 # GPU多卡或单卡模式ErnieSage
-python link_prediction.py --conf ./config/erniesage_link_prediction.yaml
-# 对图节点的的embeding进行预测
-python link_prediction.py --conf ./config/erniesage_link_prediction.yaml --do_predict
+python -m paddle.distributed.launch --gpus "0" link_prediction.py --conf ./config/erniesage_link_prediction.yaml
+# 对图节点的的embeding进行预测, 单卡或多卡
+python -m paddle.distributed.launch --gpus "0" link_prediction.py --conf ./config/erniesage_link_prediction.yaml --do_predict
 ```
 
 ## 超参数设置
