@@ -1,10 +1,4 @@
-import os, sys, inspect
-sys.path.insert(0, '..')
-current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
-
-root_dir = os.path.expanduser("~")
+# Data directories
 train_data_path = "../finished_files/chunked/train_*"
 eval_data_path = "../finished_files/val.bin"
 decode_data_path = "../finished_files/test.bin"
@@ -34,5 +28,4 @@ cov_loss_wt = 1.0
 eps = 1e-12
 max_iterations = 100000
 
-use_gpu = True
 lr_coverage = 0.15

@@ -1,10 +1,8 @@
-import io, os, sys, inspect
+import os
+import sys
 
-# add parent directories to path
-sys.path.insert(0,'..')
-current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
+# Add parent directories to path
+sys.path.append("../")
 
 from utils import config
 from utils.batcher import Batcher
@@ -23,24 +21,22 @@ from paddle.optimizer import Adagrad, Adam, SGD
 
 import tensorflow as tf
 
-# flush out immediately
+# Flush out immediately
 sys.stdout.flush()
 
 
-use_cuda = config.use_gpu and paddle.is_compiled_with_cuda()
-# only use certain GPUS
-if use_cuda:
-    paddle.set_device("gpu:0")
-print("Using cuda? ... ", use_cuda)
-
-
-class Train(object):
+class Trainer(object):
     def __init__(self):
         self.vocab = Vocab(config.vocab_path, config.vocab_size)
-        self.batcher = Batcher(config.train_data_path, self.vocab, mode='train',
-                               batch_size=config.batch_size, single_pass=False)
+        self.batcher = Batcher(
+            config.train_data_path,
+            self.vocab,
+            mode='train',
+            batch_size=config.batch_size,
+            single_pass=False)
 
-        train_dir = os.path.join(config.log_root, 'train_%d' % (int(time.time())))
+        train_dir = os.path.join(config.log_root,
+                                 'train_%d' % (int(time.time())))
         if not os.path.exists(train_dir):
             os.mkdir(train_dir)
 
@@ -58,8 +54,9 @@ class Train(object):
             'optimizer': self.optimizer.state_dict()
         }
         for k in state:
-            model_save_path = os.path.join(self.model_dir,
-                                           'model_%06d_%.8f' % (iter, running_avg_loss), '%s.params' % k)
+            model_save_path = os.path.join(self.model_dir, 'model_%06d_%.8f' %
+                                           (iter, running_avg_loss),
+                                           '%s.params' % k)
             paddle.save(state[k], model_save_path)
         print('Saved state_dicts to: ', model_save_path)
 
@@ -68,27 +65,30 @@ class Train(object):
 
         initial_lr = config.lr_coverage if config.is_coverage else config.lr
         params = list(self.model.encoder.parameters()) + list(self.model.decoder.parameters()) + \
-            list(self.model.reduce_state.parameters())
+                 list(self.model.reduce_state.parameters())
         assert len(params) == 31
         self.optimizer = Adagrad(
-                                parameters=params,
-                                learning_rate=initial_lr,
-                                initial_accumulator_value=config.adagrad_init_acc,
-                                epsilon=1.0e-10,
-                                grad_clip=paddle.nn.ClipGradByGlobalNorm(clip_norm=config.max_grad_norm)
-                              )
+            parameters=params,
+            learning_rate=initial_lr,
+            initial_accumulator_value=config.adagrad_init_acc,
+            epsilon=1.0e-10,
+            grad_clip=paddle.nn.ClipGradByGlobalNorm(
+                clip_norm=config.max_grad_norm))
 
         start_iter, start_loss = 0, 0
 
         if model_file_path is not None:
             start_iter = int(model_file_path.split('_')[-2])
-            start_loss = float(model_file_path.split('_')[-1].replace(os.sep, ''))
+            start_loss = float(
+                model_file_path.split('_')[-1].replace(os.sep, ''))
 
             if not config.is_coverage:
-                self.optimizer.set_state_dict(paddle.load(os.path.join(model_file_path, 'optimizer.params')))
+                self.optimizer.set_state_dict(
+                    paddle.load(
+                        os.path.join(model_file_path, 'optimizer.params')))
 
         return start_iter, start_loss
-    
+
     def customize_clip_consec(self, loss):
         params_grads = self.optimizer.backward(loss)
         encoder_params_grads = params_grads[:10]
@@ -108,25 +108,27 @@ class Train(object):
 
         self.optimizer.clear_gradients()
 
-        encoder_outputs, encoder_feature, encoder_hidden = self.model.encoder(enc_batch, enc_lens)
+        encoder_outputs, encoder_feature, encoder_hidden = self.model.encoder(
+            enc_batch, enc_lens)
         s_t_1 = self.model.reduce_state(encoder_hidden)
 
         step_losses = []
         for di in range(min(max_dec_len, config.max_dec_steps)):
             y_t_1 = dec_batch[:, di]
 
-            final_dist,  s_t_1,  c_t_1, attn_dist, p_gen, next_coverage = \
-                self.model.decoder(y_t_1,  s_t_1, encoder_outputs, encoder_feature, enc_padding_mask,
+            final_dist, s_t_1, c_t_1, attn_dist, p_gen, next_coverage = \
+                self.model.decoder(y_t_1, s_t_1, encoder_outputs, encoder_feature, enc_padding_mask,
                                    c_t_1, extra_zeros, enc_batch_extend_vocab, coverage, di)
 
-            target = target_batch[:, di] 
+            target = target_batch[:, di]
             add_index = paddle.arange(0, target.shape[0])
             new_index = paddle.stack([add_index, target], axis=1)
             gold_probs = paddle.gather_nd(final_dist, new_index).squeeze()
             step_loss = -paddle.log(gold_probs + config.eps)
 
             if config.is_coverage:
-                step_coverage_loss = paddle.sum(paddle.minimum(attn_dist, coverage), 1)
+                step_coverage_loss = paddle.sum(
+                    paddle.minimum(attn_dist, coverage), 1)
                 step_loss = step_loss + config.cov_loss_wt * step_coverage_loss
                 coverage = next_coverage
 
@@ -140,10 +142,10 @@ class Train(object):
 
         loss.backward()
 
-        # default clip in one go
+        # Default clip in one go
         # self.optimizer.minimize(loss)
 
-        # customized clip consec
+        # Customized clip consec
         self.customize_clip_consec(loss)
 
         return loss.numpy()[0]
@@ -155,7 +157,8 @@ class Train(object):
             batch = self.batcher.next_batch()
             loss = self.train_one_batch(batch, iter)
             print('Loss for one batch:  %.8f' % loss, iter)
-            running_avg_loss = calc_running_avg_loss(loss, running_avg_loss, self.summary_writer, iter)
+            running_avg_loss = calc_running_avg_loss(loss, running_avg_loss,
+                                                     self.summary_writer, iter)
 
             iter += 1
 
@@ -163,23 +166,26 @@ class Train(object):
                 self.summary_writer.flush()
             print_interval = 10
             if iter % print_interval == 0:
-                print('iter %d, seconds for %d batch: %.2f , loss: %f\t' % (iter, print_interval,
-                                                                            time.time() - start, loss))
-                print('RUNNING AVG LOSS for ITER %d is: %.4f' % (iter, running_avg_loss))
+                print('iter %d, seconds for %d batch: %.2f , loss: %f\t' %
+                      (iter, print_interval, time.time() - start, loss))
+                print('RUNNING AVG LOSS for ITER %d is: %.4f' %
+                      (iter, running_avg_loss))
                 start = time.time()
             if iter % 5000 == 0 or iter == 1000:
                 self.save_model(running_avg_loss, iter)
-                print('RUNNING AVG LOSS for ITER %d is: %.4f' % (iter, running_avg_loss))
+                print('RUNNING AVG LOSS for ITER %d is: %.4f' %
+                      (iter, running_avg_loss))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Train script")
-    parser.add_argument("-m",
-                        dest="model_file_path",
-                        required=False,
-                        default=None,
-                        help="Model file for retraining (default: None).")
+    parser.add_argument(
+        "-m",
+        dest="model_file_path",
+        required=False,
+        default=None,
+        help="Model file for retraining (default: None).")
     args = parser.parse_args()
 
-    train_processor = Train()
+    train_processor = Trainer()
     train_processor.trainIters(config.max_iterations, args.model_file_path)

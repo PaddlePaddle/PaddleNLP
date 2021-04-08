@@ -25,7 +25,8 @@ def rouge_eval(ref_dir, dec_dir):
     r.system_filename_pattern = '(\d+)_decoded.txt'
     r.model_dir = ref_dir
     r.system_dir = dec_dir
-    logging.getLogger('global').setLevel(logging.WARNING)  # silence pyrouge logging
+    logging.getLogger('global').setLevel(
+        logging.WARNING)  # silence pyrouge logging
     rouge_results = r.convert_and_evaluate()
     return r.output_to_dict(rouge_results)
 
@@ -41,7 +42,8 @@ def rouge_log(results_dict, dir_to_write):
             val = results_dict[key]
             val_cb = results_dict[key_cb]
             val_ce = results_dict[key_ce]
-            log_str += "%s: %.4f with confidence interval (%.4f, %.4f)\n" % (key, val, val_cb, val_ce)
+            log_str += "%s: %.4f with confidence interval (%.4f, %.4f)\n" % (
+                key, val, val_cb, val_ce)
     print(log_str)
     results_file = os.path.join(dir_to_write, "ROUGE_results.txt")
     print(("Writing final ROUGE results to %s..." % results_file))
@@ -49,7 +51,11 @@ def rouge_log(results_dict, dir_to_write):
         f.write(log_str)
 
 
-def calc_running_avg_loss(loss, running_avg_loss, summary_writer, step, decay=0.99):
+def calc_running_avg_loss(loss,
+                          running_avg_loss,
+                          summary_writer,
+                          step,
+                          decay=0.99):
     if running_avg_loss == 0:  # on the first iteration just take the loss
         running_avg_loss = loss
     else:
@@ -62,8 +68,8 @@ def calc_running_avg_loss(loss, running_avg_loss, summary_writer, step, decay=0.
     return running_avg_loss
 
 
-def write_for_rouge(reference_sents, decoded_words, ex_index,
-                    _rouge_ref_dir, _rouge_dec_dir):
+def write_for_rouge(reference_sents, decoded_words, ex_index, _rouge_ref_dir,
+                    _rouge_dec_dir):
     decoded_sents = []
     while len(decoded_words) > 0:
         try:
@@ -74,7 +80,7 @@ def write_for_rouge(reference_sents, decoded_words, ex_index,
         decoded_words = decoded_words[fst_period_idx + 1:]
         decoded_sents.append(' '.join(sent))
 
-    # pyrouge calls a perl script that puts the data into HTML files.
+    # Pyrouge calls a perl script that puts the data into HTML files.
     # Therefore we need to make our output HTML safe.
     decoded_sents = [make_html_safe(w) for w in decoded_sents]
     reference_sents = [make_html_safe(w) for w in reference_sents]
@@ -84,7 +90,9 @@ def write_for_rouge(reference_sents, decoded_words, ex_index,
 
     with open(ref_file, "w") as f:
         for idx, sent in enumerate(reference_sents):
-            f.write(sent) if idx == len(reference_sents) - 1 else f.write(sent + "\n")
+            f.write(sent) if idx == len(reference_sents) - 1 else f.write(sent +
+                                                                          "\n")
     with open(decoded_file, "w") as f:
         for idx, sent in enumerate(decoded_sents):
-            f.write(sent) if idx == len(decoded_sents) - 1 else f.write(sent + "\n")
+            f.write(sent) if idx == len(decoded_sents) - 1 else f.write(sent +
+                                                                        "\n")
