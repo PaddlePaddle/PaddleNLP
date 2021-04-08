@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import time
 import ast
 import math
 import argparse
@@ -27,7 +28,7 @@ from paddlenlp.metrics import ChunkEvaluator
 import distutils.util
 
 from data import load_dataset, load_vocab, convert_example
-from model import BiGruCrf, get_loss
+from model import BiGruCrf
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
@@ -44,6 +45,23 @@ parser.add_argument("--hidden_size", type=int, default=128, help="The number of 
 parser.add_argument("--verbose", type=ast.literal_eval, default=128, help="Print reader and training time in details.")
 parser.add_argument("--do_eval", type=distutils.util.strtobool, default=True, help="To evaluate the model if True.")
 # yapf: enable
+
+
+def evaluate(model, metric, data_loader):
+    model.eval()
+    metric.reset()
+    avg_loss, precision, recall, f1_score = 0, 0, 0, 0
+    for batch in data_loader:
+        token_ids, length, labels = batch
+        preds = model(token_ids, length)
+        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
+            length, preds, labels)
+        metric.update(num_infer_chunks.numpy(),
+                      num_label_chunks.numpy(), num_correct_chunks.numpy())
+        precision, recall, f1_score = metric.accumulate()
+    print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
+          (avg_loss, precision, recall, f1_score))
+    model.train()
 
 
 def train(args):
@@ -96,35 +114,42 @@ def train(args):
         collate_fn=batchify_fn)
 
     # Define the model netword and its loss
-    network = BiGruCrf(args.emb_dim, args.hidden_size,
-                       len(word_vocab), len(label_vocab))
-
-    inputs = InputSpec(shape=(-1, ), dtype="int64", name='inputs')
-    lengths = InputSpec(shape=(-1, ), dtype="int64", name='lengths')
-    labels = InputSpec(shape=(-1, ), dtype="int64", name='labels')
-    model = paddle.Model(network, inputs=[inputs, lengths, labels])
-
+    model = BiGruCrf(args.emb_dim, args.hidden_size,
+                     len(word_vocab), len(label_vocab))
     # Prepare optimizer, loss and metric evaluator
     optimizer = paddle.optimizer.Adam(
         learning_rate=args.base_lr, parameters=model.parameters())
     chunk_evaluator = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
-    model.prepare(optimizer, get_loss, chunk_evaluator)
+
     if args.init_checkpoint:
         model.load(args.init_checkpoint)
 
     # Start training
-    callbacks = paddle.callbacks.ProgBarLogger(
-        log_freq=10, verbose=3) if args.verbose else None
-    model.fit(train_data=train_loader,
-              eval_data=test_loader if args.do_eval else None,
-              batch_size=args.batch_size,
-              epochs=args.epochs,
-              eval_freq=1,
-              log_freq=10,
-              save_dir=args.model_save_dir,
-              save_freq=1,
-              shuffle=True,
-              callbacks=callbacks)
+    global_step = 0
+    last_step = args.epochs * len(train_loader)
+    tic_train = time.time()
+    for epoch in range(args.epochs):
+        for step, batch in enumerate(train_loader):
+            global_step += 1
+            token_ids, length, label_ids = batch
+            loss = model(token_ids, length, label_ids)
+            avg_loss = paddle.mean(loss)
+            if global_step % args.logging_steps == 0:
+                print(
+                    "global step %d / %d, epoch: %d / %d, batch: %d, loss: %f, speed: %.2f step/s"
+                    % (global_step, last_step, epoch, args.epochs, step,
+                       avg_loss,
+                       args.logging_steps / (time.time() - tic_train)))
+                tic_train = time.time()
+            avg_loss.backward()
+            optimizer.step()
+            optimizer.clear_grad()
+            if global_step % args.save_steps == 0 or global_step == last_step:
+                if paddle.distributed.get_rank() == 0:
+                    evaluate(model, chunk_evaluator, test_loader)
+                    paddle.save(model.state_dict(),
+                                os.path.join(args.output_dir,
+                                             "model_%d.pdparams" % global_step))
 
 
 if __name__ == "__main__":
