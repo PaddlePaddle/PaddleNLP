@@ -13,7 +13,7 @@ If you want to know the installation, or meet with some problems, please refer t
 
 ## 2\. Load Pre-trained Models with One Click
 
-The essence of sentiment analysis is the task of text classification. PaddleNLP has a lot of built-in pre-trained models like ERNIE, BERT, RoBERTa, Electra. There are also different finetuned nets of pre-trained models, aiming to process various downstream tasks. You can finish tasks like Q&A, sequence classification, token classification and so forth. If you want to know more details, please refer to [pre-trained models](https://paddlenlp.readthedocs.io/en/latest/modelzoo/transformer.html). We will take ERNIE as an example and introduce how to use the finetuned nets of the pre-trained models to finish text classification tasks.
+The essence of sentiment analysis is text classification. PaddleNLP has a lot of built-in pre-trained models like ERNIE, BERT, RoBERTa, Electra. There are also different finetuned nets of pre-trained models, aiming to process various downstream tasks. You can finish tasks like Q&A, sequence classification, token classification and so forth. If you want to know more details, please refer to [pre-trained models](https://paddlenlp.readthedocs.io/en/latest/modelzoo/transformer.html). We will take ERNIE as an example and introduce how to use the finetuned nets of the pre-trained models to finish text classification tasks.
 
 Load the pre-trained model–ERNIE
 
@@ -37,7 +37,7 @@ We use Tokenizer to change original input texts into acceptable data format. Pad
 >>> tokenizer = paddlenlp.transformers.ErnieTokenizer.from_pretrained(MODEL_NAME)
 ```
 
-The data processing of pre-trained models belonging to Transformer, usually includes text segmentation token; and then you need to map the token into its token id; it is also needed to be sliced with the specialized token, like [CLS] and [SEP]; finally, you are required to change it into the data format required by the framework. For easiness of using, PaddleNLP provides you with high-level APIs. Only one click can make the format suitable. 
+The data processing of pre-trained models based on Transformer, usually includes text segmentation token; and then you need to map the token into its token id; it is also needed to be sliced with the specialized token, like [CLS] and [SEP]; finally, you are required to change it into the data format required by the framework. For easiness of using, PaddleNLP provides you with high-level APIs. Only one click can make the format suitable. 
 
 Only one line of codes can finish token segmenting, token ID mapping, and specialized token slicing.
 
@@ -60,7 +60,7 @@ token_type_ids : Tensor(shape=[1, 9], dtype=int64, place=CUDAPlace(0), stop_grad
 
 input_ids: It represents the token ID of input texts.
 
-token_type_ids: It represents that the relative token is the first input sentence or the second input sentence. (Pre-trained models of Transformer support the inputs like singe sentence or sentence pairs)
+token_type_ids: It represents that the relative token is the first input sentence or the second input sentence. (Pre-trained models based on Transformer support the inputs like singe sentence or sentence pairs)
 
 At this time, you can take the outputs of ERNIE as the input.
 
@@ -135,7 +135,7 @@ Let’s take the self-defined data and data labels as an example:
 
 ``` {.}
 >>> data = [
-...     'This hotel was a little old, and the special promotion room was not bad. Overall, it was not bad',
+...     'This hotel was a little old, and the special promotion room was not bad. Overall, it was just so so',
 ...     'I was excited to show the films. When the film was finished, there was one episode of the cartoon–Mickey Mouse',
 ...     'As the old four-star hotel, its rooms were tidy and clean, which was really good. The collection service from the airport was so nice that you could check-in on the bus and saved the time.',
 ... ]
@@ -149,7 +149,7 @@ And you will get the inference result:
 ...     model, data, tokenizer, label_map, batch_size=batch_size)
 >>> for idx, text in enumerate(data):
 ...     print('Data: {} \t Label: {}'.format(text, results[idx]))
-Data: This hotel was a little old, and the special promotion room was not bad. Overall, it was not bad      Label: negative
+Data: This hotel was a little old, and the special promotion room was not bad. Overall, it was just so so      Label: negative
 Data: I was excited to show the films. When the film was finished, there was one episode of the cartoon–Mickey Mouse    Label: negative
 Data: As the old four-star hotel, its rooms were tidy and clean, which was really good. The collection service from the airport was so nice that you could check-in on the bus and saved the time.   Label: positive
 ```
