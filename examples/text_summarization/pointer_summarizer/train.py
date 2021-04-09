@@ -1,13 +1,9 @@
 import os
 import sys
 
-# Add parent directories to path
-sys.path.append("../")
-
-from utils import config
-from utils.batcher import Batcher
-from utils.data import Vocab
-from utils.utils import calc_running_avg_loss
+import config
+from data import Batcher, Vocab
+from utils import calc_running_avg_loss
 from train_util import get_input_from_batch, get_output_from_batch
 from model import Model
 

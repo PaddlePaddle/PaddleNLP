@@ -1,14 +1,12 @@
 import os
 import sys
 
-sys.path.append("../")
-
 import paddle
 import paddle.nn.initializer as I
 
 import paddle.nn as nn
 import paddle.nn.functional as F
-from utils import config
+import config
 from numpy import random
 
 random.seed(123)

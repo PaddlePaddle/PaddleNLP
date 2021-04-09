@@ -1,6 +1,6 @@
 import numpy as np
 import paddle
-from utils import config
+import config
 
 
 def get_input_from_batch(batch):

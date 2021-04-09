@@ -1,9 +1,9 @@
 # Data directories
-train_data_path = "../finished_files/chunked/train_*"
-eval_data_path = "../finished_files/val.bin"
-decode_data_path = "../finished_files/test.bin"
-vocab_path = "../finished_files/vocab"
-log_root = "../log"
+train_data_path = "./finished_files/chunked/train_*"
+eval_data_path = "./finished_files/val.bin"
+decode_data_path = "./finished_files/test.bin"
+vocab_path = "./finished_files/vocab"
+log_root = "./log"
 
 # Hyperparameters
 hidden_dim = 256

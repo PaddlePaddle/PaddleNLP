@@ -4,20 +4,13 @@ import os
 import sys
 import re
 
-sys.path.append("../")
-
-import imp
-
-imp.reload(sys)
-
 import time
 import paddle
 
-from utils.batcher import Batcher
-from utils.data import Vocab
+from data import Batcher, Vocab
 from utils import data, config
 from model import Model
-from utils.utils import write_for_rouge, rouge_eval, rouge_log
+from utils import write_for_rouge, rouge_eval, rouge_log
 from train_util import get_input_from_batch
 
 

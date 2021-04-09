@@ -1,20 +1,13 @@
 import os, sys, inspect
 
-sys.path.insert(0, '..')
-current_dir = os.path.dirname(
-    os.path.abspath(inspect.getfile(inspect.currentframe())))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
-
 import time
 import tensorflow as tf
 import paddle
 
-from utils import config
-from utils.batcher import Batcher
-from utils.data import Vocab
+import config
+from data import Batcher, Vocab
 
-from utils.utils import calc_running_avg_loss
+from utils import calc_running_avg_loss
 from train_util import get_input_from_batch, get_output_from_batch
 from model import Model
 

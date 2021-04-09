@@ -1,7 +1,5 @@
 import sys
 
-sys.path.append("../")
-
 from utils.utils import write_for_rouge, rouge_eval, rouge_log
 
 decode_dir = sys.argv[1]
