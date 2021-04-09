@@ -75,13 +75,26 @@ class LinearChainCrf(nn.Layer):
     def forward(self, inputs, lengths):
         """
         Computes the normalization in a linear-chain CRF. See http://www.cs.columbia.edu/~mcollins/fb.pdf for reference.
-        $$ F = logZ(x) = log\\sum_y exp(score(x,y)) $$
-        $$ score(x,y) = \\sum_i Emit(x_i,y_i) + Trans(y_{i-1}, y_i) $$
-        mark $$ p(y_i) = Emit(x_i,y_i), T(y_{i-1}, y_i)=Trans(y_{i-1}, y_i) $$
-        then we can get
-        $$ F(1) = log\\sum_{y1} exp(p(y_1) + T([START], y1)) $$
-        $$ F(2) = log\\sum_{y1}\\sum_{y2} exp(p(y_1) + T([START], y1) + p(y_2) + T(y_1,y_2)) =  log\\sum_{y2} exp(F(1) + p(y_2) + T(y_1,y_2)) $$
-        $$ F(...) = ... $$
+
+        .. math::
+            F & = logZ(x) = log\\sum_y exp(score(x,y))
+
+            score(x,y) & = \\sum_i Emit(x_i,y_i) + Trans(y_{i-1}, y_i)
+
+            p(y_i) & = Emit(x_i,y_i), T(y_{i-1}, y_i) = Trans(y_{i-1}, y_i)
+
+        then we can get:
+
+        .. math::
+            F(1) = log\\sum_{y1} exp(p(y_1) + T([START], y1))
+
+        .. math::
+            F(2) & = log\\sum_{y1}\\sum_{y2} exp(p(y_1) + T([START], y1) + p(y_2) + T(y_1,y_2)) \\\\
+            & = log\\sum_{y2} exp(F(1) + p(y_2) + T(y_1,y_2))
+
+        .. math::
+            F(...) = ...
+
         A recursive formula.
 
         Args:
