@@ -158,11 +158,21 @@ class TestBertTokenizer(CpuCommonTest):
     def test_call(self):
         expected_input_ids = [1, 3, 4, 5, 8, 6, 7, 2]
         expected_token_type_ids = [0, 0, 0, 0, 0, 0, 0, 0]
-
-        result = self.tokenizer("This  is a simple text")
+        expected_attention_mask = [1] * len(expected_input_ids)
+        expected_tokens_mask = [1, 0, 0, 0, 0, 0, 0, 1]
+        result = self.tokenizer(
+            "This  is a simple text",
+            return_attention_mask=True,
+            return_length=True,
+            return_special_tokens_mask=True)
         self.check_output_equal(result['input_ids'], expected_input_ids)
         self.check_output_equal(result['token_type_ids'],
                                 expected_token_type_ids)
+        self.check_output_equal(result['seq_len'], len(expected_token_type_ids))
+        self.check_output_equal(result['attention_mask'],
+                                expected_attention_mask)
+        self.check_output_equal(result['special_tokens_mask'],
+                                expected_tokens_mask)
 
     def test_call_pair(self):
         expected_input_ids = [1, 3, 4, 5, 8, 6, 7, 2, 12, 5, 11, 10, 13, 2]
@@ -184,21 +194,65 @@ class TestBertTokenizer(CpuCommonTest):
             self.check_output_equal(result['token_type_ids'],
                                     expected_token_type_ids)
 
-    def test_from_save_pretrained(self):
+    def test_call_truncate_seq(self):
+        expected_input_ids = [1, 3, 2, 3, 2]
+        expected_token_type_ids = [0, 0, 0, 1, 1]
+        results = self.tokenizer("This is a simple text",
+                                 "this Is A    simple text", 5)
+
+        self.check_output_equal(results['input_ids'], expected_input_ids)
+        self.check_output_equal(results['token_type_ids'],
+                                expected_token_type_ids)
+
+    # Test PretrainedTokenizer
+    def test_truncate_only_first(self):
+        ids = [1, 3, 4, 5, 8, 6, 7, 2]
+        pair_ids = [12, 5, 11, 10, 13, 2]
+
+        truncate_ids, truncate_pair_ids, _ = self.tokenizer.truncate_sequences(
+            ids, pair_ids, 3, truncation_strategy='only_first')
+        self.check_output_equal(truncate_ids, ids[:-3])
+        self.check_output_equal(truncate_pair_ids, pair_ids)
+
+    def test_truncate_only_second(self):
+        ids = [1, 3, 4, 5, 8, 6, 7, 2]
+        pair_ids = [12, 5, 11, 10, 13, 2]
+
+        truncate_ids, truncate_pair_ids, _ = self.tokenizer.truncate_sequences(
+            ids, pair_ids, 3, truncation_strategy='only_second')
+        self.check_output_equal(truncate_ids, ids)
+        self.check_output_equal(truncate_pair_ids, pair_ids[:-3])
+
+    @util.assert_raises(ValueError)
+    def test_truncate_do_not_truncate(self):
+        ids = [1, 3, 4, 5, 8, 6, 7, 2]
+        pair_ids = [12, 5, 11, 10, 13, 2]
+        truncate_ids, truncate_pair_ids, _ = self.tokenizer.truncate_sequences(
+            ids, pair_ids, 3, truncation_strategy='do_not_truncate')
+
+    @util.assert_raises(ValueError)
+    def test_truncate_error_strategy(self):
+        ids = [1, 3, 4, 5, 8, 6, 7, 2]
+        pair_ids = [12, 5, 11, 10, 13, 2]
+        truncate_ids, truncate_pair_ids, _ = self.tokenizer.truncate_sequences(
+            ids, pair_ids, 1, truncation_strategy='')
+
+    def test_save_pretrained(self):
         curr_dir = os.path.dirname(os.path.realpath(__file__))
         model_path = os.path.join(curr_dir, "pretrained_model")
         if not os.path.exists(model_path):
             os.mkdir(model_path)
         self.tokenizer.save_pretrained(model_path)
-        tokenizer = BertTokenizer.from_pretrained(model_path)
-        result = tokenizer("This is a simple text",
-                           "which is easy for children")
-        expected_result = self.tokenizer("This is a simple text",
-                                         "which is easy for children")
-        self.check_output_equal(result['input_ids'],
-                                expected_result['input_ids'])
-        self.check_output_equal(result['token_type_ids'],
-                                expected_result['token_type_ids'])
+
+        vocab_path = os.path.join(
+            model_path, self.tokenizer.resource_files_names['vocab_file'])
+        with open(vocab_path, "r") as fr:
+            vocabs = [vocab.strip() for vocab in fr.readlines()]
+        self.check_output_equal(vocabs, self.vocab)
+
+    @util.assert_raises(ValueError)
+    def test_from_pretrained_non_exist(self):
+        BertTokenizer.from_pretrained("")
 
     def test_vocab_size(self):
         self.check_output_equal(self.tokenizer.vocab_size, len(self.vocab))
@@ -233,12 +287,27 @@ class TestBertTokenizerFromPretrained(CpuCommonTest):
         expected_token_type_ids = [
             0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0
         ]
+        expected_attention_mask = [
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0
+        ]
+        expected_special_tokens_mask = [
+            1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1
+        ]
         results = tokenizer(
-            [text1], [text2], 20, stride=1, pad_to_max_seq_len=True)
+            [text1], [text2],
+            20,
+            stride=1,
+            pad_to_max_seq_len=True,
+            return_attention_mask=True,
+            return_special_tokens_mask=True)
+
         self.check_output_equal(results[0]['input_ids'], expected_input_ids)
         self.check_output_equal(results[0]['token_type_ids'],
                                 expected_token_type_ids)
-
+        self.check_output_equal(results[0]['attention_mask'],
+                                expected_attention_mask)
+        self.check_output_equal(results[0]['special_tokens_mask'],
+                                expected_special_tokens_mask)
         # test encode
         results = tokenizer(text1, text2, 20, stride=1, pad_to_max_seq_len=True)
         self.check_output_equal(results['input_ids'], expected_input_ids)
@@ -259,12 +328,27 @@ class TestBertTokenizerFromPretrained(CpuCommonTest):
         expected_token_type_ids = [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1
         ]
+        expected_attention_mask = [
+            0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+        ]
+        expected_special_tokens_mask = [
+            1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1
+        ]
         results = tokenizer(
-            [text1], [text2], 20, stride=1, pad_to_max_seq_len=True)
+            [text1], [text2],
+            20,
+            stride=1,
+            pad_to_max_seq_len=True,
+            return_attention_mask=True,
+            return_special_tokens_mask=True)
+
         self.check_output_equal(results[0]['input_ids'], expected_input_ids)
         self.check_output_equal(results[0]['token_type_ids'],
                                 expected_token_type_ids)
-
+        self.check_output_equal(results[0]['attention_mask'],
+                                expected_attention_mask)
+        self.check_output_equal(results[0]['special_tokens_mask'],
+                                expected_special_tokens_mask)
         # test encode
         results = tokenizer(text1, text2, 20, stride=1, pad_to_max_seq_len=True)
         self.check_output_equal(results['input_ids'], expected_input_ids)

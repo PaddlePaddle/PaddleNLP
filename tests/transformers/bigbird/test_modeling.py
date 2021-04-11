@@ -15,7 +15,6 @@
 import copy
 import numpy as np
 import os
-import unittest
 import paddle
 from paddlenlp.transformers import BigBirdForSequenceClassification, \
     BigBirdPretrainingCriterion, BigBirdForPretraining, BigBirdModel
@@ -23,6 +22,7 @@ from paddlenlp.transformers import create_bigbird_rand_mask_idx_list
 
 from common_test import CommonTest
 from util import softmax_with_cross_entropy, expensive
+import unittest
 
 
 def create_input_data(config, seed=None):
