@@ -203,7 +203,7 @@ cd PaddleNLP/paddlenlp/ext_op/
 ``` sh
 mkdir build
 cd build/
-cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO_NAME=./demo/transformer_e2e.cc -DWITH_STATIC_LIB=OFF -DON_INFER=ON
+cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DWITH_STATIC_LIB=OFF -DON_INFER=ON
 make -j
 cd ../
 ```
@@ -223,7 +223,7 @@ cd ../
     └── threadpool/
   └── version.txt
   ```
-* `-DDEMO_NAME` 说明预测库使用 demo 的位置。
+* `-DDEMO` 说明预测库使用 demo 的位置。
 * **当使用预测库的自定义 op 的时候，请务必开启 `-DON_INFER=ON` 选项，否则，不会得到预测库的可执行文件。**
 
 #### 编译产出
