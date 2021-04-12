@@ -181,7 +181,7 @@ void Main(int batch_size, int gpu_id) {
   config.SetModel(model_dir + "/transformer.pdmodel",
                   model_dir + "/transformer.pdiparams");
 
-  config.EnableUseGpu(2000, gpu_id);
+  config.EnableUseGpu(100, gpu_id);
 
   config.SwitchUseFeedFetchOps(false);
   config.SwitchSpecifyInputNames(true);

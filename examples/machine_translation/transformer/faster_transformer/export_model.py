@@ -40,22 +40,6 @@ def parse_args():
     return args
 
 
-def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
-    """
-    Post-process the decoded sequence.
-    """
-    eos_pos = len(seq) - 1
-    for i, idx in enumerate(seq):
-        if idx == eos_idx:
-            eos_pos = i
-            break
-    seq = [
-        idx for idx in seq[:eos_pos + 1]
-        if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)
-    ]
-    return seq
-
-
 def do_predict(args):
     paddle.enable_static()
     place = "gpu"

@@ -19,9 +19,9 @@
 
 ## 快速开始
 
-## Python 动态图使用自定义 op
-
 我们实现了基于 GPU 的 Faster Transformer 的自定义 op 的接入。接下来，我们将分别介绍基于 Python 动态图和预测库使用 Faster Transformer 自定义 op 的方式，包括 op 的编译与使用。
+
+## Python 动态图使用自定义 op
 
 ### 编译自定义OP
 
@@ -177,7 +177,7 @@ BLEU = 26.89, 58.4/32.6/20.5/13.4 (BP=1.000, ratio=1.010, hyp_len=65166, ref_len
 
 ### 编译自定义OP
 
-在 C++ 预测库使用自定义 OP 需要将实现的 C++、CUDA 代码**以及 C++ 预测的 demo**编译成一个可执行文件。因预测库支持新版自定义 op 方式与 Python 不同，这个过程将不会产生自定义 op 的动态库，将直接得到可执行文件。我们已经提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。并获取执行 demo。
+在 C++ 预测库使用自定义 OP 需要将实现的 C++、CUDA 代码**以及 C++ 预测的 demo**编译成一个可执行文件。因预测库支持自定义 op 方式与 Python 不同，这个过程将不会产生自定义 op 的动态库，将直接得到可执行文件。我们已经提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。并获取执行 demo。
 
 #### 克隆 PaddleNLP
 
@@ -198,7 +198,7 @@ cd PaddleNLP/paddlenlp/ext_op/
 
 编译之前，请确保安装的 PaddlePaddle 预测库的版本是基于最新的 develop 分支的代码编译，并且正常可用。
 
-编译自定义 OP 可以参照一下步骤：
+编译自定义 OP 可以参照以下步骤：
 
 ``` sh
 mkdir build
@@ -240,14 +240,14 @@ cd bin/
 ``` sh
 cd bin/
 ../third-party/build/bin/decoding_gemm 8 5 8 64 38512 256 512 0
-./transformer_e2e 8 0 ./infer_model/ ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
+./transformer_e2e 8 0 ./infer_model/ /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
 其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer/v3.1#execute-the-decoderdecoding-demos)。
 
 #### 导出基于 Faster Transformer 自定义 op 的预测库可使用模型文件
 
-我们提供一个已经训练好的动态图的 base model 的 checkpoint 以供使用，可以通过[tranformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz)下载。
+我们提供一个已经基于动态图训练好的 base model 的 checkpoint 以供使用，当前 checkpoint 是基于 WMT 英德翻译的任务训练。可以通过[tranformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz)下载。
 
 使用 C++ 预测库，首先，我们需要做的是将动态图的 checkpoint 导出成预测库能使用的模型文件和参数文件。可以执行 `export_model.py` 实现这个过程。
 
@@ -266,7 +266,7 @@ python export_model.py --config ../configs/transformer.base.yaml --decoding-lib 
     └── transformer.pdmodel
   ```
 
-#### 执行 decoding on PaddlePaddle
+#### 使用 PaddlePaddle 预测库预测
 
 自定义 op 编译完成后，在 `paddlenlp/ext_op/build/bin/` 路径下将会看到 `transformer_e2e` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
 
@@ -282,7 +282,7 @@ cd bin/
 ``` sh
 cd bin/
 ../third-party/build/bin/decoding_gemm 8 5 8 64 38512 256 512 0
-./transformer_e2e 8 0 ./infer_model/ ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
+./transformer_e2e 8 0 ./infer_model/ /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
 其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer/v3.1#execute-the-decoderdecoding-demos)。

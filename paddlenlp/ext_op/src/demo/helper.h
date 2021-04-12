@@ -30,7 +30,9 @@ class Timer {
 public:
   std::chrono::high_resolution_clock::time_point start;
   std::chrono::high_resolution_clock::time_point startu;
+
   void tic() { start = std::chrono::high_resolution_clock::now(); }
+
   double toc() {
     startu = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> time_span =
@@ -40,6 +42,7 @@ public:
     return used_time_ms;
   }
 };
+
 static void split(const std::string &str,
                   char sep,
                   std::vector<std::string> *pieces) {
@@ -58,16 +61,7 @@ static void split(const std::string &str,
     pieces->push_back(str.substr(pos));
   }
 }
-static void split_to_float(const std::string &str,
-                           char sep,
-                           std::vector<float> *fs) {
-  std::vector<std::string> pieces;
-  split(str, sep, &pieces);
-  std::transform(pieces.begin(),
-                 pieces.end(),
-                 std::back_inserter(*fs),
-                 [](const std::string &v) { return std::stof(v); });
-}
+
 static void split_to_int64(const std::string &str,
                            char sep,
                            std::vector<int64_t> *is) {
@@ -78,6 +72,7 @@ static void split_to_int64(const std::string &str,
                  std::back_inserter(*is),
                  [](const std::string &v) { return std::stoi(v); });
 }
+
 template <typename T>
 std::string to_string(const T other) {
   std::stringstream ss;
@@ -102,42 +97,20 @@ std::string to_string(const std::vector<T> &vec) {
   }
   return ss.str();
 }
+
 template <>
 std::string to_string<std::vector<float>>(
     const std::vector<std::vector<float>> &vec);
+
 template <>
 std::string to_string<std::vector<std::vector<float>>>(
     const std::vector<std::vector<std::vector<float>>> &vec);
+
 template <typename T>
 int VecReduceToInt(const std::vector<T> &v) {
   return std::accumulate(v.begin(), v.end(), 1, [](T a, T b) { return a * b; });
 }
-template <typename T>
-static void TensorAssignData(PaddleTensor *tensor,
-                             const std::vector<std::vector<T>> &data) {
-  // Assign buffer
-  int num_elems = VecReduceToInt(tensor->shape);
-  tensor->data.Resize(sizeof(T) * num_elems);
-  int c = 0;
-  for (const auto &f : data) {
-    for (T v : f) {
-      static_cast<T *>(tensor->data.data())[c++] = v;
-    }
-  }
-}
-template <typename T>
-static int ZeroCopyTensorAssignData(ZeroCopyTensor *tensor,
-                                    const std::vector<std::vector<T>> &data) {
-  int size{0};
-  auto *ptr = tensor->mutable_data<T>(PaddlePlace::kCPU);
-  int c = 0;
-  for (const auto &f : data) {
-    for (T v : f) {
-      ptr[c++] = v;
-    }
-  }
-  return size;
-}
+
 static std::string DescribeTensor(const PaddleTensor &tensor) {
   std::stringstream os;
   os << "Tensor [" << tensor.name << "]\n";
@@ -174,17 +147,6 @@ static std::string DescribeTensor(
     std::vector<T> out_data) {
   std::stringstream os;
   os << "\nTensor [" << tensor->name() << "]\n";
-  // os << " - type: ";
-  // switch (tensor->dtype) {
-  //  case PaddleDType::FLOAT32:
-  //    os << "float32";
-  //    break;
-  //  case PaddleDType::INT64:
-  //    os << "int64";
-  //    break;
-  //  default:
-  //    os << "unset";
-  //}
   os << '\n';
   os << " - shape: " << to_string(tensor->shape()) << '\n';
   os << " - lod: ";
@@ -198,9 +160,6 @@ static std::string DescribeTensor(
       output_shape.begin(), output_shape.end(), 1, std::multiplies<int>());
   out_data.resize(out_num);
   tensor->copy_to_cpu(out_data.data());
-  // int dim = VecReduceToInt(tensor->shape());
-  // out_data.resize(dim);
-  // tensor->copy_to_cpu(out_data.data());
   for (int i = 0; i < out_num; i++) {
     os << out_data[i] << " ";
   }
@@ -224,5 +183,6 @@ static void PrintTime(int batch_size,
               << "ms ======";
   }
 }
+
 }  // namespace inference
 }  // namespace paddle
