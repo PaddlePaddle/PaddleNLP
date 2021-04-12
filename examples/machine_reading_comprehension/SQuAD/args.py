@@ -17,23 +17,20 @@ def parse_args():
         help="Predict data path.")
     parser.add_argument(
         "--model_type",
-        default=None,
+        default="bert",
         type=str,
-        required=True,
         help="Type of pre-trained model.")
     parser.add_argument(
         "--model_name_or_path",
-        default=None,
+        default="bert-base-uncased",
         type=str,
-        required=True,
         help="Path to pre-trained model or shortcut name of model.")
     parser.add_argument(
         "--output_dir",
-        default=None,
+        default="outputs",
         type=str,
-        required=True,
-        help="The output directory where the model predictions and checkpoints will be written."
-    )
+        help="The output directory where the model predictions and checkpoints will be written. "
+        "Default as `outputs`")
     parser.add_argument(
         "--max_seq_length",
         default=128,
@@ -92,10 +89,10 @@ def parse_args():
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
-        "--n_gpu",
-        type=int,
-        default=1,
-        help="number of gpus to use, 0 for cpu.")
+        '--device',
+        choices=['cpu', 'gpu'],
+        default="gpu",
+        help="Select which device to train model, defaults to gpu.")
     parser.add_argument(
         "--doc_stride",
         type=int,

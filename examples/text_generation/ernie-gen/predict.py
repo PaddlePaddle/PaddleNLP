@@ -40,14 +40,14 @@ parser.add_argument("--batch_size", default=50, type=int, help="Batch size per G
 parser.add_argument('--beam_width', type=int, default=3, help="Beam search width")
 parser.add_argument('--length_penalty', type=float, default=1.0, help="The length penalty during decoding")
 parser.add_argument('--init_checkpoint', type=str, default=None, help='Checkpoint to warm start from')
-parser.add_argument('--use_gpu', action='store_true', help='If set, use gpu to excute')
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
 # yapf: enable
 
 args = parser.parse_args()
 
 
 def predict():
-    paddle.set_device("gpu" if args.use_gpu else "cpu")
+    paddle.set_device(args.device)
 
     model = ErnieForGeneration.from_pretrained(args.model_name_or_path)
     if "ernie-tiny" in args.model_name_or_path:

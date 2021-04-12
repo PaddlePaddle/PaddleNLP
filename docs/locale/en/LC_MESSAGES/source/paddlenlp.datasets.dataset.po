@@ -1,0 +1,157 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.datasets.dataset.rst:2
+msgid "dataset"
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.MapDataset:1
+msgid "基类：:class:`paddle.fluid.dataloader.dataset.Dataset`"
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.MapDataset:1
+msgid ""
+"Wraps a dataset-like object as a instance of Dataset, and equips it with "
+"`map` and other utility methods. All non-magic methods of the raw object "
+"also accessible. :param data: A dataset-like object. It can be a list or "
+"a"
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.IterDataset:5
+#: paddlenlp.datasets.dataset.MapDataset:5
+msgid "subclass of Dataset."
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.IterDataset.filter:1
+#: paddlenlp.datasets.dataset.MapDataset.filter:1
+msgid ""
+"Filters samples by the filter function and uses the filtered data to "
+"update this dataset. :param fn: A filter function that takes a sample as "
+"input and"
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.IterDataset.filter:4
+#: paddlenlp.datasets.dataset.MapDataset.filter:4
+msgid "returns a boolean. Samples that return False are discarded."
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.IterDataset.shard:1
+#: paddlenlp.datasets.dataset.MapDataset.shard:1
+msgid ""
+"Use samples whose indices mod `index` equals 0 to update this dataset. "
+":param num_shards: A integer representing the number of"
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.IterDataset.shard:3
+#: paddlenlp.datasets.dataset.MapDataset.shard:3
+msgid ""
+"data shards. If None, `num_shards` would be number of trainers. Default: "
+"None"
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.IterDataset.shard
+#: paddlenlp.datasets.dataset.MapDataset.map
+#: paddlenlp.datasets.dataset.MapDataset.shard
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.IterDataset.shard:6
+#: paddlenlp.datasets.dataset.MapDataset.shard:6
+msgid ""
+"A integer representing the index of the current shard. If None, index` "
+"would be the current trainer rank id. Default: None."
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.IterDataset.map:1
+#: paddlenlp.datasets.dataset.MapDataset.map:1
+msgid ""
+"Performs specific function on the dataset to transform and update every "
+"sample. :param fn: Transformations to be performed. It receives single"
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.MapDataset.map:3
+msgid "sample as argument if batched is False. Else it receives all examples."
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.MapDataset.map:5
+msgid ""
+"If True, transformations would be delayed and performed on demand. "
+"Otherwise, transforms all samples at once. Note that if `fn` is "
+"stochastic, `lazy` should be True or you will get the same result on all "
+"epochs. Defalt: False."
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.MapDataset.map:10
+msgid ""
+"If True, transformations would take all examples as input and return a "
+"collection of transformed examples. Note that if set True, `lazy` option "
+"would be ignored."
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.DatasetBuilder:1
+msgid "基类：:class:`object`"
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.DatasetBuilder:1
+msgid ""
+"A base class for all DatasetBuilder. It provides a `read()` function to "
+"turn a data file into a MapDataset or IterDataset."
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.DatasetBuilder:4
+msgid ""
+"`_get_data()` function and `_read()` function should be implemented to "
+"download data file and read data file into a `Iterable` of the examples."
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.DatasetBuilder.read:1
+msgid ""
+"Returns an dataset containing all the examples that can be read from the "
+"file path. If `self.lazy` is `False`, this eagerly reads all instances "
+"from `self._read()` and returns an `MapDataset`. If `self.lazy` is "
+"`True`, this returns an `IterDataset`, which internally relies on the "
+"generator created from `self._read()` to lazily produce examples. In this"
+" case your implementation of `_read()` must also be lazy (that is, not "
+"load all examples into memory at once)."
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.DatasetBuilder.get_labels:1
+msgid "Return list of class labels of the dataset if specified."
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.DatasetBuilder.get_vocab:1
+msgid "Return vocab file path of the dataset if specified."
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.IterDataset:1
+msgid "基类：:class:`paddle.fluid.dataloader.dataset.IterableDataset`"
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.IterDataset:1
+msgid ""
+"Wraps a dataset-like object as a instance of Dataset, and equips it with "
+"`map` and other utility methods. All non-magic methods of the raw object "
+"also accessible. :param data: A dataset-like object. It can be a Iterable"
+" or a"
+msgstr ""
+
+#: of paddlenlp.datasets.dataset.IterDataset.map:3
+msgid "sample as argument."
+msgstr ""
+

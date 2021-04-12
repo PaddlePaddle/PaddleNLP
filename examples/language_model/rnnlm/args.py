@@ -29,9 +29,9 @@ def parse_args():
         default=None,
         help="The path of checkpoint to be loaded.")
     parser.add_argument(
-        "--n_gpu",
-        type=int,
-        default=1,
-        help="number of gpus to use, 0 for cpu.")
+        '--device',
+        choices=['cpu', 'gpu'],
+        default="gpu",
+        help="Select which device to train model, defaults to gpu.")
     args = parser.parse_args()
     return args

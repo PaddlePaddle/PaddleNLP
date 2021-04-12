@@ -33,11 +33,7 @@ tar xvf poetry.tar.gz
 
 ### 模型微调
 
-模型训练支持 CPU 和 GPU，使用 GPU 之前应指定使用的显卡卡号：
-
-```bash
-export CUDA_VISIBLE_DEVICES=0,1,2 # 支持多卡训练
-```
+#### 单卡训练
 
 训练启动方式如下：
 
@@ -52,7 +48,7 @@ python -u ./train.py \
     --logging_steps 1 \
     --save_steps 1000 \
     --output_dir ./tmp/ \
-    --n_gpu 3 \
+    --device gpu \
     # --init_checkpoint ./tmp/model_10000/model_state.pdparams
 ```
 
@@ -66,10 +62,29 @@ python -u ./train.py \
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
-- `n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可；若为0，则使用CPU。
+- `device`: 训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `init_checkpoint` 表示模型加载路径，通过设置此参数可以开启增量训练。
 
 训练会持续很长的时间，为此我们提供了[微调后的模型](https://paddlenlp.bj.bcebos.com/models/transformers/ernie_gen_finetuned/ernie_1.0_poetry.pdparams)。您可以下载该模型并通过`init_checkpoint`加载其参数进行增量训练、评估或预测。
+
+#### 多卡训练
+
+训练启动方式如下：
+
+```bash
+python -m paddle.distributed.launch --gpus "0,1" ./train.py \
+    --model_name_or_path ernie-1.0 \
+    --max_encode_len 24 \
+    --max_decode_len 72 \
+    --batch_size 48  \
+    --learning_rate 2e-5 \
+    --num_epochs 12 \
+    --logging_steps 1 \
+    --save_steps 1000 \
+    --output_dir ./tmp/ \
+    --device gpu \
+    # --init_checkpoint ./tmp/model_10000/model_state.pdparams
+```
 
 ### 模型评估
 
@@ -82,7 +97,7 @@ python -u ./eval.py \
     --max_decode_len 72 \
     --batch_size 48   \
     --init_checkpoint ./tmp/model_10000/model_state.pdparams \
-    --use_gpu
+    --device gpu
 ```
 
 参数释义如下：
@@ -104,7 +119,7 @@ python -u ./predict.py \
     --max_decode_len 72 \
     --batch_size 48   \
     --init_checkpoint ./tmp/model_10000/model_state.pdparams \
-    --use_gpu
+    --device gpu
 ```
 
 
@@ -131,4 +146,3 @@ python -u ./predict.py \
 ## Acknowledgement
 
 - 感谢 [chinese-poetry数据集](https://github.com/chinese-poetry/chinese-poetry) 开放的诗歌数据集
-
