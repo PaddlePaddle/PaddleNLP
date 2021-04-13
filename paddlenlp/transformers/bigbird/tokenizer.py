@@ -50,17 +50,12 @@ class BigBirdTokenizer(PretrainedTokenizer):
         "sentencepiece_model_file": {
             "bigbird-base-uncased":
             "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/sentencepiece_gpt2.model",
-            "bigbird-base-uncased-finetune":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/sentencepiece_gpt2.model"
         },
     }
     pretrained_init_configuration = {
         "bigbird-base-uncased": {
             "do_lower_case": True
         },
-        "bigbird-base-uncased-finetune": {
-            "do_lower_case": True
-        }
     }
 
     def __init__(self,

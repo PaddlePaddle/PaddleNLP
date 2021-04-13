@@ -1,0 +1,248 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.data.vocab.rst:2
+msgid "vocab"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab:1
+msgid "基类：:class:`object`"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab:1
+msgid ""
+"Vocab is for mapping between text tokens and ids. :param counter: A "
+"Counter intance describes"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab:3
+msgid ""
+"the tokens and their frequencies. Its keys will be indexed accroding to "
+"the order of frequency sorting to construct mapping relationship. If "
+"None, `token_to_idx` must be provided as the mapping relationship. "
+"Default: None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab paddlenlp.data.vocab.Vocab.build_vocab
+#: paddlenlp.data.vocab.Vocab.from_dict
+#: paddlenlp.data.vocab.Vocab.load_vocabulary
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab:8
+msgid "Max size of vocab, not including special tokens. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab:11
+msgid "Ignore tokens whose frequencies are less than `min_freq`. Default: 1."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab:14
+msgid ""
+"A dict specifies the mapping relationship between tokens and indices to "
+"be used. If provided, adjust the tokens and indices mapping according to "
+"it. If None, counter must be provided. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab:19 paddlenlp.data.vocab.Vocab.build_vocab:14
+msgid ""
+"special token for unknow token '<unk>'. If no need, it also could be "
+"None. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab:22 paddlenlp.data.vocab.Vocab.build_vocab:17
+msgid ""
+"special token for padding token '<pad>'. If no need, it also could be "
+"None. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab:25 paddlenlp.data.vocab.Vocab.build_vocab:20
+msgid ""
+"special token for bos token '<bos>'. If no need, it also could be None. "
+"Default: None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab:28 paddlenlp.data.vocab.Vocab.build_vocab:23
+msgid ""
+"special token for eos token '<eos>'. If no need, it also could be None. "
+"Default: None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab:31 paddlenlp.data.vocab.Vocab.build_vocab:26
+#: paddlenlp.data.vocab.Vocab.from_dict:17
+msgid ""
+"Keyword arguments ending with `_token`. It can be used to specify further"
+" special tokens that will be exposed as attribute of the vocabulary and "
+"associated with an index."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.to_tokens:1
+msgid ""
+"Map the input indices to token list. :param indices: input indices for "
+"mapping. :type indices: list|tuple|int"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.build_vocab
+#: paddlenlp.data.vocab.Vocab.from_dict paddlenlp.data.vocab.Vocab.from_json
+#: paddlenlp.data.vocab.Vocab.load_vocabulary
+#: paddlenlp.data.vocab.Vocab.to_indices paddlenlp.data.vocab.Vocab.to_json
+#: paddlenlp.data.vocab.Vocab.to_tokens
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.to_tokens:5
+msgid "obtained token(s)."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.build_vocab
+#: paddlenlp.data.vocab.Vocab.from_dict paddlenlp.data.vocab.Vocab.from_json
+#: paddlenlp.data.vocab.Vocab.load_vocabulary
+#: paddlenlp.data.vocab.Vocab.to_indices paddlenlp.data.vocab.Vocab.to_json
+#: paddlenlp.data.vocab.Vocab.to_tokens
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.to_indices:1
+msgid ""
+"Map the input tokens into indices :param tokens: input tokens for "
+"mapping. :type tokens: list|tuple, optional"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.to_indices:5
+msgid "obationed indice list."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.idx_to_token:1
+msgid "Return index-token dict"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.token_to_idx:1
+msgid "Return token-index dict"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.to_json:1
+msgid ""
+"Summarize some information of vocab as JSON string. If path is gaven, the"
+" JSON string will be saved into files. :param path: the path to save JSON"
+" string. If None, the"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.to_json:4
+msgid "JSON will not be saved. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.to_json:7
+msgid "JSON string."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.from_json:1
+msgid ""
+"Load vocab from JSON string or JSON file. :param json_str: JSON string or"
+" file path of JSON string. :type json_str: str"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.from_json:5
+msgid "vocab generated from information contained in JSON string."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.from_dict:1
+msgid ""
+"Generate vocab from a dict. :param token_to_idx: A dict describes the "
+"mapping relationship between"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.from_dict:3
+msgid "tokens to indices."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.from_dict:5
+msgid ""
+"special token for unknow token. If no need, it also could be None. "
+"Default: None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.from_dict:8
+#: paddlenlp.data.vocab.Vocab.load_vocabulary:9
+msgid ""
+"special token for padding token. If no need, it also could be None. "
+"Default: None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.from_dict:11
+#: paddlenlp.data.vocab.Vocab.load_vocabulary:12
+msgid ""
+"special token for bos token. If no need, it also could be None. Default: "
+"None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.from_dict:14
+#: paddlenlp.data.vocab.Vocab.load_vocabulary:15
+msgid ""
+"special token for eos token. If no need, it also could be None. Default: "
+"None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.from_dict:22
+msgid "vocab generated from the given dict and special tokens."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.build_vocab:1
+msgid ""
+"Building vocab accoring to given iterator and other information. Iterate "
+"over the `iterator` to construct a `Counter` and as `__init__` :param "
+"iterator: Iterator of tokens. Each tokens should be list of token if "
+"wordlevel vocab is needed. :type iterator: collections.Iterable :param "
+"max_size: Max size of vocab, not including special tokens. Default: None."
+" :type max_size: int, optional :param min_freq: Ignore tokens whose "
+"frequencies are less than `min_freq`. Default: 1. :type min_freq: int "
+":param token_to_idx: A dict specifies the mapping relationship"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.build_vocab:10
+msgid ""
+"between tokens and indices to be used. If provided, adjust the tokens and"
+" indices mapping according to it. If None, counter must be provided. "
+"Default: None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.build_vocab:31
+msgid "Generated vocab from given iterator and other informations."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.load_vocabulary:1
+msgid ""
+"Instantiate an instance of `Vocab` from a file reserving all tokens by "
+"using `Vocab.from_dict`. The file contains a token per line, and the line"
+" number would be the index of corresponding token. :param filepath: path "
+"of file to construct vocabulary. :type filepath: str :param unk_token: "
+"special token for unknown token. If no need, it also"
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.load_vocabulary:7
+msgid "could be None. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.load_vocabulary:18
+msgid "keyword arguments for `Vocab.from_dict`."
+msgstr ""
+
+#: of paddlenlp.data.vocab.Vocab.load_vocabulary:21
+msgid "An instance of `Vocab`."
+msgstr ""
+

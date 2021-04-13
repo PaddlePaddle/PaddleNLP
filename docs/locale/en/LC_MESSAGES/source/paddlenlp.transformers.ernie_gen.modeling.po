@@ -1,0 +1,97 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.transformers.ernie_gen.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration:1
+msgid "基类：:class:`paddlenlp.transformers.ernie_gen.modeling.ErnieModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration:1
+msgid "Ernie Model for sequence to sequence generation."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:6
+msgid "Args"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:2
+msgid ""
+"tgt_labels(`Variable` of shape [batch_size, seqlen] or [batch, seqlen, "
+"vocab_size]):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:3
+msgid "ground trouth target sequence id (hard label) or distribution (soft label)"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:4
+msgid "tgt_pos(`Variable` of shape [n_targets, 2]):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:5
+msgid ""
+"index of tgt_labels in `src_ids`, can be obtained from "
+"`fluid.layers.where(src_ids==mask_id)`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:6
+msgid "encoder_only(Bool):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:7
+msgid "if set, will not return loss, logits_2d"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:8
+msgid ""
+"cross entropy loss mean over every target label. if `encode_only`, "
+"returns None. logits(`Variable` of shape [n_targets, vocab_size]):     "
+"logits for every targets. if `encode_only`, returns None. "
+"info(Dictionary): see `ErnieModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:8
+msgid ""
+"cross entropy loss mean over every target label. if `encode_only`, "
+"returns None. logits(`Variable` of shape [n_targets, vocab_size]):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:10
+msgid "logits for every targets. if `encode_only`, returns None."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:11
+msgid "info(Dictionary): see `ErnieModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gen.modeling.ErnieForGeneration.forward:12
+msgid "loss(`Variable` of shape [])"
+msgstr ""
+
