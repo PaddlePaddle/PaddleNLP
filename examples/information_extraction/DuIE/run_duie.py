@@ -307,7 +307,6 @@ def do_predict():
 
 
 if __name__ == "__main__":
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
 
     if args.do_train:
         do_train()
