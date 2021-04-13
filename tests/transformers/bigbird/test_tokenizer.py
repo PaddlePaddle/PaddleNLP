@@ -19,6 +19,7 @@ from paddlenlp.transformers import BigBirdTokenizer
 
 from common_test import CpuCommonTest
 import util
+import unittest
 
 
 class TestBigBirdTokenizer(CpuCommonTest):
@@ -167,3 +168,7 @@ class TestBigBirdTokenizerUNK(CpuCommonTest):
         # Chinese words don't exist in the provided vocabs 
         tokens = self.tokenizer(self.text)
         self.check_output_equal('<unk>' in tokens, True)
+
+
+if __name__ == "__main__":
+    unittest.main()

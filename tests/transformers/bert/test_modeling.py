@@ -23,6 +23,7 @@ from paddlenlp.transformers import BertForQuestionAnswering, BertForSequenceClas
 
 from common_test import CommonTest
 from util import softmax_with_cross_entropy, slow
+import unittest
 
 
 def create_input_data(config, seed=None):

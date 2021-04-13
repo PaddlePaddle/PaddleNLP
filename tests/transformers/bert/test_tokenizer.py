@@ -20,6 +20,7 @@ from paddlenlp.data import Vocab
 
 from common_test import CpuCommonTest
 from util import slow, assert_raises
+import unittest
 
 
 class TestBasicTokenizer(CpuCommonTest):
@@ -354,3 +355,7 @@ class TestBertTokenizerFromPretrained(CpuCommonTest):
         self.check_output_equal(results['input_ids'], expected_input_ids)
         self.check_output_equal(results['token_type_ids'],
                                 expected_token_type_ids)
+
+
+if __name__ == "__main__":
+    unittest.main()
