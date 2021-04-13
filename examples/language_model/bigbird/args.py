@@ -99,6 +99,7 @@ def parse_args():
         "--device",
         type=str,
         default="gpu",
+        choices=["cpu", "gpu"],
         help="Select cpu, gpu, xpu devices to train model.")
 
     parser.add_argument(
