@@ -56,9 +56,9 @@ class ChunkEvaluator(paddle.metric.Metric):
             dummy (tensor, optional): Unnecessary parameter for compatibility with older versions with parameters list `inputs`, `lengths`, `predictions`, `labels`. Defaults to None.
 
         Returns:
-            num_infer_chunks (tensor): [description]
-            num_label_chunks (tensor): [description]
-            num_correct_chunks (tensor): [description]
+            num_infer_chunks (tensor): the number of the inference chunks.
+            num_label_chunks (tensor): the number of the label chunks.
+            num_correct_chunks (tensor): the number of the correct chunks.
         """
         if dummy is not None:
             dummy, lengths, predictions, labels = lengths, predictions, labels, dummy
