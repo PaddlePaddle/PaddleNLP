@@ -15,6 +15,7 @@
 import numpy as np
 import paddle
 import paddle.nn as nn
+from paddlenlp.utils.log import logger
 from paddlenlp.layers import sequence_mask
 
 __all__ = ['LinearChainCrf', 'LinearChainCrfLoss', 'ViterbiDecoder']
@@ -271,9 +272,17 @@ class LinearChainCrfLoss(nn.Layer):
                 "From paddlenlp >= 2.0.0b4, the first param of LinearChainCrfLoss shoule be a LinearChainCrf object. For input parameter 'crf.transitions', you can remove '.transitions' to 'crf'"
             )
 
-    def forward(self, inputs, lengths, predictions, labels):
+    def forward(self, inputs, lengths, labels, old_version_labels=None):
         # Note: When closing to convergence, the loss could be a small negative number. This may caused by underflow when calculating exp in logsumexp.
         #       We add relu here to avoid negative loss. In theory, the crf loss must be greater than or equal to 0, relu will not impact on it.
+        if old_version_labels is not None:
+            # TODO(qiujinxuan): rm compatibility support after lic.
+            labels = old_version_labels
+            if not getattr(self, "has_warn", False):
+                logger.warning(
+                    'Compatibility Warning: The params of LinearChainCrfLoss.forward has been modified. The third param is `labels`, and the fourth is not necessary. Please update the usage.'
+                )
+                self.has_warn = True
         return nn.functional.relu(
             self.crf.forward(inputs, lengths) - self.crf.gold_score(
                 inputs, labels, lengths))

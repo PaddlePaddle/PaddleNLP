@@ -17,8 +17,9 @@ The file_reader converts raw corpus to input.
 
 import os
 
-import paddle
 import numpy as np
+import paddle
+from paddlenlp.datasets import MapDataset
 
 # We use "\002" to separate sentence characters and sequence labels,
 # for example: 除\002了\002他\002续\002任\002十\002二\002届\002政\002协\002委\002员
@@ -26,129 +27,106 @@ import numpy as np
 CHAR_DELIMITER = "\002"
 
 
-class LacDataset(paddle.io.Dataset):
-    """Load the dataset and convert all the texts to ids.
-
-        Args:
-            base_path (str): the path of the dataset directory.
-            word_vocab (str): The path of the word dictionary.
-            label_vocab (str): The path of the label dictionary.
-            word_replace_dict (str): The path of the word replacement Dictionary.
-            mode (str, optional): The load mode, "train", "test" or "infer". Defaults to 'train', meaning load the train dataset.
-        """
-
-    def __init__(self, base_path, mode='train'):
-        self.mode = mode
-        self.base_path = base_path
-        word_dict_path = os.path.join(self.base_path, 'word.dic')
-        label_dict_path = os.path.join(self.base_path, 'tag.dic')
-        word_rep_dict_path = os.path.join(self.base_path, 'q2b.dic')
-        self.word_vocab = self._load_vocab(word_dict_path)
-        self.label_vocab = self._load_vocab(label_dict_path)
-        self.word_replace_dict = self._load_vocab(word_rep_dict_path)
-
-        # Calculate vocab size and labels number, note: vocab value strats from 0.
-        self.vocab_size = len(self.word_vocab)
-        self.num_labels = len(self.label_vocab)
-
-        if self.mode in {"train", "test", "infer"}:
-            self.dataset_path = os.path.join(self.base_path,
-                                             "%s.tsv" % self.mode)
-            self._read_file()
-        else:
-            raise ValueError(
-                'Invalid mode: %s. Only support "train", "test" and "infer"' %
-                self.mode)
-
-    def __len__(self):
-        return self.total
-
-    def __getitem__(self, index):
-        if self.mode == "infer":
-            return [self.word_ids[index], len(self.word_ids[index])]
-        else:
-            return [
-                self.word_ids[index], len(self.word_ids[index]),
-                self.label_ids[index]
-            ]
-
-    def _read_file(self):
-        self.word_ids = []
-        self.label_ids = []
-        self.total = 0
-        with open(self.dataset_path, "r", encoding="utf-8") as fread:
-            if self.mode != "infer":
-                next(fread)
-            for line in fread:
+def load_dataset(datafiles):
+    def read(data_path):
+        with open(data_path, 'r', encoding='utf-8') as fp:
+            if "infer" in data_path:
+                next(fp)
+            for line in fp:
                 line = line.strip()
-                if self.mode == "infer":
+                if "infer" in data_path:
                     words = list(line)
+                    yield [words]
                 else:
                     words, labels = line.split("\t")
                     words = words.split(CHAR_DELIMITER)
+                    labels = labels.split(CHAR_DELIMITER)
+                    assert len(words) == len(
+                        labels), "The word %s is not match with the label %s" % (
+                            words, labels)
+                    yield [words, labels]
 
-                tmp_word_ids = self._convert_tokens_to_ids(
-                    words,
-                    self.word_vocab,
-                    oov_replace="OOV",
-                    token_replace=self.word_replace_dict)
+    if isinstance(datafiles, str):
+        return MapDataset(list(read(datafiles)))
+    elif isinstance(datafiles, list) or isinstance(datafiles, tuple):
+        return [MapDataset(list(read(datafile))) for datafile in datafiles]
 
-                self.word_ids.append(tmp_word_ids)
-                if self.mode != "infer":
-                    tmp_label_ids = self._convert_tokens_to_ids(
-                        labels.split(CHAR_DELIMITER),
-                        self.label_vocab,
-                        oov_replace="O")
-                    self.label_ids.append(tmp_label_ids)
-                    assert len(tmp_word_ids) == len(
-                        tmp_label_ids
-                    ), "The word ids %s is not match with the label ids %s" % (
-                        tmp_word_ids, tmp_label_ids)
 
-                self.total += 1
-
-    def _load_vocab(self, dict_path):
-        """
-        Load vocab from file
-        """
-        vocab = {}
-        reverse = None
-        with open(dict_path, "r", encoding='utf8') as fin:
-            for i, line in enumerate(fin):
-                terms = line.strip("\n").split("\t")
-                if len(terms) == 2:
-                    if reverse == None:
-                        reverse = True if terms[0].isdigit() else False
-                    if reverse:
-                        value, key = terms
-                    else:
-                        key, value = terms
-                elif len(terms) == 1:
-                    key, value = terms[0], i
+def load_vocab(dict_path):
+    """
+    Load vocab from file
+    """
+    vocab = {}
+    reverse = None
+    with open(dict_path, "r", encoding='utf8') as fin:
+        for i, line in enumerate(fin):
+            terms = line.strip("\n").split("\t")
+            if len(terms) == 2:
+                if reverse == None:
+                    reverse = True if terms[0].isdigit() else False
+                if reverse:
+                    value, key = terms
                 else:
-                    raise ValueError("Error line: %s in file: %s" %
-                                     (line, dict_path))
-                vocab[key] = value
-        return vocab
-
-    def _convert_tokens_to_ids(self,
-                               tokens,
-                               vocab,
-                               oov_replace=None,
-                               token_replace=None):
-        """convert tokens to token indexs"""
-        token_ids = []
-        oov_replace_token = vocab.get(oov_replace) if oov_replace else None
-        for token in tokens:
-            if token_replace:
-                token = token_replace.get(token, token)
-            token_id = vocab.get(token, oov_replace_token)
-            token_ids.append(token_id)
-
-        return token_ids
+                    key, value = terms
+            elif len(terms) == 1:
+                key, value = terms[0], i
+            else:
+                raise ValueError("Error line: %s in file: %s" %
+                                 (line, dict_path))
+            vocab[key] = value
+    return vocab
 
 
-def parse_lac_result(words, preds, lengths, word_vocab, label_vocab):
+def normalize_token(token, normlize_vocab):
+    """Normalize text from DBC case to SBC case"""
+    if normlize_vocab:
+        token = normlize_vocab.get(token, token)
+    return token
+
+
+def convert_tokens_to_ids(tokens,
+                          vocab,
+                          oov_replace_token=None,
+                          normlize_vocab=None):
+    """convert tokens to token indexs"""
+    token_ids = []
+    oov_replace_token = vocab.get(
+        oov_replace_token) if oov_replace_token else None
+    for token in tokens:
+        token = normalize_token(token, normlize_vocab)
+        token_id = vocab.get(token, oov_replace_token)
+        token_ids.append(token_id)
+
+    return token_ids
+
+
+def convert_example(example,
+                    max_seq_len,
+                    word_vocab,
+                    label_vocab=None,
+                    normlize_vocab=None):
+    if len(example) == 2:
+        tokens, labels = example
+    else:
+        tokens, labels = example[0], None
+    tokens = tokens[:max_seq_len]
+
+    token_ids = convert_tokens_to_ids(
+        tokens,
+        word_vocab,
+        oov_replace_token="OOV",
+        normlize_vocab=normlize_vocab)
+    length = len(token_ids)
+    if labels is not None:
+        labels = labels[:max_seq_len]
+        label_ids = convert_tokens_to_ids(
+            labels, label_vocab, oov_replace_token="O")
+        return token_ids, length, label_ids
+    else:
+        return token_ids, length
+
+
+def parse_result(words, preds, lengths, word_vocab, label_vocab):
     """ parse padding result """
     batch_out = []
     id2word_dict = dict(zip(word_vocab.values(), word_vocab.keys()))
