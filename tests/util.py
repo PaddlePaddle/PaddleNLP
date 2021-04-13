@@ -112,15 +112,15 @@ def get_bool_from_env(key, default_value=False):
     return value
 
 
-_run_expensive_test = get_bool_from_env("RUN_EXPENSIVE")
+_run_slow_test = get_bool_from_env("RUN_SLOW_TEST")
 
 
-def expensive(test):
+def slow(test):
     """
     Mark a test which spends too much time.
-    Expensive tests are skipped by default. Excute the command `export RUN_EXPENSIVE=True` to run them.
+    Slow tests are skipped by default. Excute the command `export RUN_SLOW_TEST=True` to run them.
     """
-    if not _run_expensive_test:
+    if not _run_slow_test:
         return unittest.skip("test spends too much time")(test)
     else:
         return test

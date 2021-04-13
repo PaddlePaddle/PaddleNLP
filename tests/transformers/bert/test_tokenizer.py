@@ -19,7 +19,7 @@ from paddlenlp.transformers import BertTokenizer, BasicTokenizer, WordpieceToken
 from paddlenlp.data import Vocab
 
 from common_test import CpuCommonTest
-import util
+from util import slow, assert_raises
 
 
 class TestBasicTokenizer(CpuCommonTest):
@@ -90,7 +90,7 @@ class TestBasicTokenizerBytes(TestBasicTokenizer):
 
 
 class TestBasicTokenizerErrorStr(CpuCommonTest):
-    @util.assert_raises(ValueError)
+    @assert_raises(ValueError)
     def test_tokenize(self):
         self.tokenizer = BasicTokenizer()
         self.text = 1
@@ -223,14 +223,14 @@ class TestBertTokenizer(CpuCommonTest):
         self.check_output_equal(truncate_ids, ids)
         self.check_output_equal(truncate_pair_ids, pair_ids[:-3])
 
-    @util.assert_raises(ValueError)
+    @assert_raises(ValueError)
     def test_truncate_do_not_truncate(self):
         ids = [1, 3, 4, 5, 8, 6, 7, 2]
         pair_ids = [12, 5, 11, 10, 13, 2]
         truncate_ids, truncate_pair_ids, _ = self.tokenizer.truncate_sequences(
             ids, pair_ids, 3, truncation_strategy='do_not_truncate')
 
-    @util.assert_raises(ValueError)
+    @assert_raises(ValueError)
     def test_truncate_error_strategy(self):
         ids = [1, 3, 4, 5, 8, 6, 7, 2]
         pair_ids = [12, 5, 11, 10, 13, 2]
@@ -250,7 +250,7 @@ class TestBertTokenizer(CpuCommonTest):
             vocabs = [vocab.strip() for vocab in fr.readlines()]
         self.check_output_equal(vocabs, self.vocab)
 
-    @util.assert_raises(ValueError)
+    @assert_raises(ValueError)
     def test_from_pretrained_non_exist(self):
         BertTokenizer.from_pretrained("")
 
@@ -268,13 +268,13 @@ class TestBertTokenizer(CpuCommonTest):
         self.check_output_equal(
             set(self.tokenizer.all_special_ids), set([0, 1, 2, 14, 15]))
 
-    @util.assert_raises(ValueError)
+    @assert_raises(ValueError)
     def test_non_exist_vocab_file(self):
         BertTokenizer("non_exist.txt")
 
 
 class TestBertTokenizerFromPretrained(CpuCommonTest):
-    @util.expensive
+    @slow
     def test_from_pretrained(self):
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         text1 = "This is a simple text"
@@ -314,7 +314,7 @@ class TestBertTokenizerFromPretrained(CpuCommonTest):
         self.check_output_equal(results['token_type_ids'],
                                 expected_token_type_ids)
 
-    @util.expensive
+    @slow
     def test_from_pretrained_pad_left(self):
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         tokenizer.padding_side = "left"

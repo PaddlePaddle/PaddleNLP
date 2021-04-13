@@ -21,7 +21,7 @@ from paddlenlp.transformers import BigBirdForSequenceClassification, \
 from paddlenlp.transformers import create_bigbird_rand_mask_idx_list
 
 from common_test import CommonTest
-from util import softmax_with_cross_entropy, expensive
+from util import softmax_with_cross_entropy, slow
 import unittest
 
 
@@ -200,7 +200,7 @@ class TestBigBirdPretrainingCriterionNotUseNSP(
 
 
 class TestBigBirdFromPretrain(CommonTest):
-    @expensive
+    @slow
     def test_bigbird_base_uncased(self):
         model = BigBirdModel.from_pretrained(
             'bigbird-base-uncased', attn_dropout=0.0, hidden_dropout_prob=0.0)

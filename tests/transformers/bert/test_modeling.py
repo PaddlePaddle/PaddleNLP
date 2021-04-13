@@ -22,7 +22,7 @@ from paddlenlp.transformers import BertModel, BertForPretraining, BertPretrainin
 from paddlenlp.transformers import BertForQuestionAnswering, BertForSequenceClassification, BertForTokenClassification
 
 from common_test import CommonTest
-from util import softmax_with_cross_entropy, expensive
+from util import softmax_with_cross_entropy, slow
 
 
 def create_input_data(config, seed=None):
@@ -203,7 +203,7 @@ class TestBertPretrainingCriterion(CommonTest):
 
 
 class TestBertFromPretrain(CommonTest):
-    @expensive
+    @slow
     def test_bert_base_uncased(self):
         model = BertModel.from_pretrained(
             'bert-base-uncased',
