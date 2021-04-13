@@ -108,7 +108,7 @@ class FasterTransformer(TransformerModel):
         assert init_from_params, (
             "Please set init_from_params to load the infer model.")
 
-        model_dict = paddle.load(init_from_params)
+        model_dict = paddle.load(init_from_params, return_numpy=True)
 
         # To set weight[padding_idx] to 0.
         model_dict["trg_word_embedding.word_embedding.weight"][
@@ -150,7 +150,7 @@ class FasterTransformer(TransformerModel):
         assert init_from_params, (
             "Please set init_from_params to load the infer model.")
 
-        model_dict = paddle.load(init_from_params)
+        model_dict = paddle.load(init_from_params, return_numpy=True)
 
         # To set weight[padding_idx] to 0.
         model_dict["trg_word_embedding.word_embedding.weight"][
