@@ -61,6 +61,7 @@ class ChunkEvaluator(paddle.metric.Metric):
             num_correct_chunks (tensor): the number of the correct chunks.
         """
         if dummy is not None:
+            # TODO(qiujinxuan): rm compatibility support after lic.
             dummy, lengths, predictions, labels = lengths, predictions, labels, dummy
             if not getattr(self, "has_warn", False):
                 logger.warning(

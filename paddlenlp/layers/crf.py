@@ -263,6 +263,7 @@ class LinearChainCrfLoss(nn.Layer):
         # Note: When closing to convergence, the loss could be a small negative number. This may caused by underflow when calculating exp in logsumexp.
         #       We add relu here to avoid negative loss. In theory, the crf loss must be greater than or equal to 0, relu will not impact on it.
         if old_version_labels is not None:
+            # TODO(qiujinxuan): rm compatibility support after lic.
             labels = old_version_labels
             if not getattr(self, "has_warn", False):
                 logger.warning(
