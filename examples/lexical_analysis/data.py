@@ -120,7 +120,7 @@ def convert_example(example,
         return token_ids, length
 
 
-def parse_lac_result(words, preds, lengths, word_vocab, label_vocab):
+def parse_result(words, preds, lengths, word_vocab, label_vocab):
     """ parse padding result """
     batch_out = []
     id2word_dict = dict(zip(word_vocab.values(), word_vocab.keys()))

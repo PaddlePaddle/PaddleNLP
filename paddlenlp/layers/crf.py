@@ -266,7 +266,7 @@ class LinearChainCrfLoss(nn.Layer):
             labels = old_version_labels
             if not getattr(self, "has_warn", False):
                 logger.warning(
-                    'Compatibility Warning: The params of LinearChainCrfLoss.forward has been modified. The third param is labels, and the fourth is not necessary. Please update the usage.'
+                    'Compatibility Warning: The params of LinearChainCrfLoss.forward has been modified. The third param is `labels`, and the fourth is not necessary. Please update the usage.'
                 )
                 self.has_warn = True
         return nn.functional.relu(

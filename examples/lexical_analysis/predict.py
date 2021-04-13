@@ -23,7 +23,7 @@ from paddle.static import InputSpec
 from paddlenlp.data import Pad, Tuple, Stack
 from paddlenlp.metrics import ChunkEvaluator
 
-from data import load_dataset, load_vocab, convert_example, parse_lac_result
+from data import load_dataset, load_vocab, convert_example, parse_result
 from model import BiGruCrf
 
 # yapf: disable
@@ -87,9 +87,9 @@ def infer(args):
     for batch in infer_loader:
         token_ids, length = batch
         preds = model(token_ids, length)
-        result = parse_lac_result(token_ids.numpy(),
-                                  preds.numpy(),
-                                  length.numpy(), word_vocab, label_vocab)
+        result = parse_result(token_ids.numpy(),
+                              preds.numpy(),
+                              length.numpy(), word_vocab, label_vocab)
         results += result
 
     sent_tags = []

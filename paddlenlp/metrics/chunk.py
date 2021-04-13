@@ -51,7 +51,7 @@ class ChunkEvaluator(paddle.metric.Metric):
             redundant, lengths, predictions, labels = lengths, predictions, labels, redundant
             if not getattr(self, "has_warn", False):
                 logger.warning(
-                    'Compatibility Warning: The params of ChunkEvaluator.compute has been modified. The old version is inputs, lengths, predictions, labels while the current version is lengths, predictions, labels.  Please update the usage.'
+                    'Compatibility Warning: The params of ChunkEvaluator.compute has been modified. The old version is `inputs`, `lengths`, `predictions`, `labels` while the current version is `lengths`, `predictions`, `labels`.  Please update the usage.'
                 )
                 self.has_warn = True
         labels = labels.numpy()
