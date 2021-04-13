@@ -42,13 +42,9 @@ python download.py --data_dir ./
 
 ### 模型训练
 
-模型训练支持 CPU 和 GPU，使用 GPU 之前应指定使用的显卡卡号：
+#### 单卡训练
 
-```bash
-export CUDA_VISIBLE_DEVICES=0 # 支持多卡训练，如使用双卡，可以设置为0,1
-```
-
-训练启动方式如下：
+启动方式如下：
 
 ```bash
 python train.py \
@@ -56,11 +52,31 @@ python train.py \
         --model_save_dir ./save_dir \
         --epochs 10 \
         --batch_size 32 \
-        --n_gpu 1 \
+        --device gpu \
         # --init_checkpoint ./save_dir/final
 ```
 
-其中 data_dir 是数据集所在文件夹路径，init_checkpoint 是模型加载路径，通过设置init_checkpoint可以启动增量训练。
+其中参数释义如下：
+- `data_dir`: 数据集所在文件夹路径.
+- `model_save_dir`: 训练期间模型保存路径。
+- `epochs`: 模型训练迭代轮数。
+- `batch_size`: 表示每次迭代**每张卡**上的样本数目。
+- `device`: 训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `init_checkpoint`: 模型加载路径，通过设置init_checkpoint可以启动增量训练。
+
+#### 多卡训练
+
+启动方式如下：
+
+```bash
+python -m paddle.distributed.launch --gpus "0,1"  train.py \
+        --data_dir ./lexical_analysis_dataset_tiny \
+        --model_save_dir ./save_dir \
+        --epochs 10 \
+        --batch_size 32 \
+        --device gpu \
+        # --init_checkpoint ./save_dir/final
+```
 
 ### 模型评估
 
@@ -68,10 +84,12 @@ python train.py \
 
 ```bash
 python eval.py --data_dir ./lexical_analysis_dataset_tiny \
-        --init_checkpoint ./save_dir/final \
+        --init_checkpoint ./save_dir/model_100.pdparams \
         --batch_size 32 \
-        --use_gpu
+        --device gpu
 ```
+
+其中`./save_dir/model_100.pdparams`是训练过程中保存的参数文件，请更换为实际得到的训练保存路径。
 
 ### 模型预测
 
@@ -79,9 +97,9 @@ python eval.py --data_dir ./lexical_analysis_dataset_tiny \
 
 ```bash
 python predict.py --data_dir ./lexical_analysis_dataset_tiny \
-        --init_checkpoint ./save_dir/final \
+        --init_checkpoint ./save_dir/model_100.pdparams \
         --batch_size 32 \
-        --use_gpu
+        --device gpu
 ```
 
 得到类似以下输出：

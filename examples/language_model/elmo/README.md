@@ -29,10 +29,10 @@ ELMo(Embeddings from Language Models)是重要的通用语义表示模型之一�
 ├── args.py # 运行参数配置文件
 ├── dataset.py # 数据读取
 ├── elmo.py # 模型组网
-├── train.py # 训练模型主程序入口
-├── eval.py # 评估模型主程序入口
-├── base.py # 下游二分类任务base模型训练测试主程序入口
-├── example.py # 下游二分类任务训练测试主程序入口
+├── run_pretrain.py # 训练模型主程序入口
+├── run_eval.py # 评估模型主程序入口
+├── word2vec_base.py # 下游二分类任务base模型训练测试主程序入口
+├── run_finetune.py # 下游二分类任务训练测试主程序入口
 ├── download_data.sh # 数据下载脚本
 └── README.md # 文档说明
 ```

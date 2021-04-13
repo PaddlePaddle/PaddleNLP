@@ -15,6 +15,7 @@
 import numpy as np
 import paddle
 import paddle.nn as nn
+from paddlenlp.utils.log import logger
 from paddlenlp.layers import sequence_mask
 
 __all__ = ['LinearChainCrf', 'LinearChainCrfLoss', 'ViterbiDecoder']
@@ -75,13 +76,26 @@ class LinearChainCrf(nn.Layer):
     def forward(self, inputs, lengths):
         """
         Computes the normalization in a linear-chain CRF. See http://www.cs.columbia.edu/~mcollins/fb.pdf for reference.
-        $$ F = logZ(x) = log\\sum_y exp(score(x,y)) $$
-        $$ score(x,y) = \\sum_i Emit(x_i,y_i) + Trans(y_{i-1}, y_i) $$
-        mark $$ p(y_i) = Emit(x_i,y_i), T(y_{i-1}, y_i)=Trans(y_{i-1}, y_i) $$
-        then we can get
-        $$ F(1) = log\\sum_{y1} exp(p(y_1) + T([START], y1)) $$
-        $$ F(2) = log\\sum_{y1}\\sum_{y2} exp(p(y_1) + T([START], y1) + p(y_2) + T(y_1,y_2)) =  log\\sum_{y2} exp(F(1) + p(y_2) + T(y_1,y_2)) $$
-        $$ F(...) = ... $$
+
+        .. math::
+            F & = logZ(x) = log\\sum_y exp(score(x,y))
+
+            score(x,y) & = \\sum_i Emit(x_i,y_i) + Trans(y_{i-1}, y_i)
+
+            p(y_i) & = Emit(x_i,y_i), T(y_{i-1}, y_i) = Trans(y_{i-1}, y_i)
+
+        then we can get:
+
+        .. math::
+            F(1) = log\\sum_{y1} exp(p(y_1) + T([START], y1))
+
+        .. math::
+            F(2) & = log\\sum_{y1}\\sum_{y2} exp(p(y_1) + T([START], y1) + p(y_2) + T(y_1,y_2)) \\\\
+            & = log\\sum_{y2} exp(F(1) + p(y_2) + T(y_1,y_2))
+
+        .. math::
+            F(...) = ...
+
         A recursive formula.
 
         Args:
@@ -106,13 +120,13 @@ class LinearChainCrf(nn.Layer):
             # input_exp: batch_size, num_tags, num_tags
             # alpha_exp: batch_size, num_tags, num_tags
             if i == 0 and not self.with_start_stop_tag:
-                mat = input_exp
+                alpha = inputs[:, 0]
             else:
                 alpha_exp = alpha.unsqueeze(1).expand(
                     [batch_size, n_labels, n_labels])
                 # F(n) = logsumexp(F(n-1) + p(y_n) + T(y_{n-1}, y_n))
                 mat = input_exp + trans_exp + alpha_exp
-            alpha = paddle.logsumexp(mat, 2)
+                alpha = paddle.logsumexp(mat, 2)
             all_alpha.append(alpha)
 
         # Get the valid alpha
@@ -141,6 +155,7 @@ class LinearChainCrf(nn.Layer):
         Returns:
             Tensor: The unnormalized sequence scores tensor, with shape `[batch_size]`.
         """
+
         return self._point_score(inputs, labels, lengths) + self._trans_score(
             labels, lengths)
 
@@ -177,7 +192,7 @@ class LinearChainCrf(nn.Layer):
             mask = paddle.cast(
                 sequence_mask(
                     self._get_batch_seq_index(batch_size, seq_len),
-                    lengths + 1), 'int32')
+                    lengths + 1), 'int64')
             pad_stop = paddle.full(
                 (batch_size, seq_len + 2),
                 dtype='int64',
@@ -187,7 +202,7 @@ class LinearChainCrf(nn.Layer):
             mask = paddle.cast(
                 sequence_mask(
                     self._get_batch_seq_index(batch_size, seq_len), lengths),
-                'int32')
+                'int64')
             labels_ext = labels
 
         start_tag_indices = labels_ext[:, :-1]
@@ -257,9 +272,17 @@ class LinearChainCrfLoss(nn.Layer):
                 "From paddlenlp >= 2.0.0b4, the first param of LinearChainCrfLoss shoule be a LinearChainCrf object. For input parameter 'crf.transitions', you can remove '.transitions' to 'crf'"
             )
 
-    def forward(self, inputs, lengths, predictions, labels):
+    def forward(self, inputs, lengths, labels, old_version_labels=None):
         # Note: When closing to convergence, the loss could be a small negative number. This may caused by underflow when calculating exp in logsumexp.
         #       We add relu here to avoid negative loss. In theory, the crf loss must be greater than or equal to 0, relu will not impact on it.
+        if old_version_labels is not None:
+            # TODO(qiujinxuan): rm compatibility support after lic.
+            labels = old_version_labels
+            if not getattr(self, "has_warn", False):
+                logger.warning(
+                    'Compatibility Warning: The params of LinearChainCrfLoss.forward has been modified. The third param is `labels`, and the fourth is not necessary. Please update the usage.'
+                )
+                self.has_warn = True
         return nn.functional.relu(
             self.crf.forward(inputs, lengths) - self.crf.gold_score(
                 inputs, labels, lengths))
@@ -330,19 +353,22 @@ class ViterbiDecoder(nn.Layer):
             alpha = paddle.zeros((batch_size, self.num_tags), dtype='float32')
 
         for i, logit in enumerate(inputs_t):
-            alpha_exp = alpha.unsqueeze(1).expand(
-                [batch_size, n_labels, n_labels])
+            # if not with_start_stop_tag, the first label has not antecedent tag.
+            if i == 0 and not self.with_start_stop_tag:
+                alpha = logit
+                all_alpha.append(alpha)
+                continue
+            alpha_exp = alpha.unsqueeze(2)
             # alpha_trn_sum: batch_size, n_labels, n_labels
             alpha_trn_sum = alpha_exp + trans_exp
+
             # alpha_max: batch_size, n_labels
             # We don't include the emission scores here because the max does not depend on them (we add them in below)
-            alpha_max = alpha_trn_sum.max(2)
-            if i == 0:
-                # if self.with_start_stop_tag, the first antecedent tag must be START, drop it.
-                # else, the first label has not antecedent tag, pass it.
-                pass
-            else:
-                alpha_argmax = alpha_trn_sum.argmax(2)
+            alpha_max = alpha_trn_sum.max(1)
+            # If with_start_stop_tag, the first antecedent tag must be START, else the first label has not antecedent tag. 
+            # So we can record the path from i=1.
+            if i >= 1:
+                alpha_argmax = alpha_trn_sum.argmax(1)
                 historys.append(alpha_argmax)
             # Now add the emission scores
             alpha = alpha_max + logit

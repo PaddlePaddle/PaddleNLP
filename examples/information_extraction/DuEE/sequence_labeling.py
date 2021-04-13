@@ -90,7 +90,6 @@ def convert_example_to_feature(example, tokenizer, label_vocab=None, max_seq_len
         tokens,
         return_length=True,
         is_split_into_words=True,
-        pad_to_max_seq_len=True,
         max_seq_len=max_seq_len)
 
     input_ids = tokenized_input['input_ids']
@@ -103,8 +102,6 @@ def convert_example_to_feature(example, tokenizer, label_vocab=None, max_seq_len
         labels = labels[:(max_seq_len-2)]
         encoded_label = [no_entity_label] + labels + [no_entity_label]
         encoded_label = [label_vocab[x] for x in encoded_label]
-        # padding label 
-        encoded_label += [ignore_label]* (max_seq_len - len(encoded_label))
         return input_ids, token_type_ids, seq_len, encoded_label
 
 
@@ -185,9 +182,19 @@ def do_train():
         collate_fn=batchify_fn)
 
     num_training_steps = len(train_loader) * args.num_epoch
-    optimizer = paddle.optimizer.AdamW(learning_rate=args.learning_rate, parameters=model.parameters())
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
+    optimizer = paddle.optimizer.AdamW(
+        learning_rate=args.learning_rate,
+        parameters=model.parameters(),
+        weight_decay=args.weight_decay,
+        apply_decay_param_fun=lambda x: x in decay_params)
 
-    metric = ChunkEvaluator(label_list=train_ds.label_vocab.keys(), suffix=True)
+    metric = ChunkEvaluator(label_list=train_ds.label_vocab.keys(), suffix=False)
     criterion = paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label)
 
     step, best_f1 = 0, 0.0

@@ -86,9 +86,11 @@ def convert_example(example, tokenizer, label_vocab):
 
 def load_dict(dict_path):
     vocab = {}
+    i = 0
     for line in open(dict_path, 'r', encoding='utf-8'):
-        value, key = line.strip('\n').split('\t')
-        vocab[key] = int(value)
+        key = line.strip('\n')
+        vocab[key] = i
+        i += 1
     return vocab
 
 
@@ -115,7 +117,7 @@ if __name__ == '__main__':
     train_ds, dev_ds, test_ds = load_dataset(datafiles=(
         './data/train.txt', './data/dev.txt', './data/test.txt'))
 
-    label_vocab = load_dict('./conf/tag.dic')
+    label_vocab = load_dict('./data/tag.dic')
     tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
     trans_func = partial(
