@@ -119,7 +119,7 @@ def convert_example(example,
         return input_ids, token_type_ids
 
 
-def collect_data(samples, dataset):
+def collect_data(samples, dataset, config):
     stack_fn = Stack(dtype="int64" if dataset.label_list else "float32")
     stack_fn1 = Stack()
 
@@ -190,6 +190,17 @@ def do_train(args):
     train_ds = load_dataset('glue', args.task_name, splits="train")
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
+    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
+    # In finetune task, bigbird performs better when setting dropout to zero.
+    model = model_class.from_pretrained(
+        args.model_name_or_path,
+        num_classes=num_classes,
+        attn_dropout=0.0,
+        hidden_dropout_prob=0.0)
+    if worker_num > 1:
+        model = paddle.DataParallel(model)
+    config = getattr(model, model_class.base_model_prefix).config
+
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
@@ -198,7 +209,7 @@ def do_train(args):
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
-    batchify_fn = partial(collect_data, dataset=train_ds)
+    batchify_fn = partial(collect_data, dataset=train_ds, config=config)
 
     train_data_loader = DataLoader(
         dataset=train_ds,
@@ -241,16 +252,6 @@ def do_train(args):
             num_workers=0,
             return_list=True)
 
-    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
-    # In finetune task, bigbird performs better when setting dropout to zero.
-    model = model_class.from_pretrained(
-        args.model_name_or_path,
-        num_classes=num_classes,
-        attn_dropout=0.0,
-        hidden_dropout_prob=0.0)
-    if worker_num > 1:
-        model = paddle.DataParallel(model)
-
     num_training_steps = args.max_steps if args.max_steps > 0 else (
         len(train_data_loader) * args.epochs)
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
@@ -275,8 +276,6 @@ def do_train(args):
 
     loss_fct = paddle.nn.loss.CrossEntropyLoss(
     ) if train_ds.label_list else paddle.nn.loss.MSELoss()
-    global config
-    config = getattr(model, model_class.base_model_prefix).config
 
     metric = metric_class()
     global_step = 0

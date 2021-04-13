@@ -55,7 +55,11 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
-def create_dataloader(batch_size, max_encoder_length, tokenizer, pad_val=0):
+def create_dataloader(batch_size,
+                      max_encoder_length,
+                      tokenizer,
+                      config,
+                      pad_val=0):
     def _tokenize(text):
         input_ids = [tokenizer.cls_id]
         input_ids.extend(
@@ -117,11 +121,10 @@ def main():
 
     # Define the tokenizer and dataloader
     tokenizer = BigBirdTokenizer.from_pretrained(args.model_name_or_path)
-    global config
     config = getattr(model,
                      BigBirdForSequenceClassification.base_model_prefix).config
     train_data_loader, test_data_loader = \
-            create_dataloader(args.batch_size, args.max_encoder_length, tokenizer)
+            create_dataloader(args.batch_size, args.max_encoder_length, tokenizer, config)
 
     # Define the Adam optimizer 
     optimizer = paddle.optimizer.Adam(
@@ -173,7 +176,6 @@ def do_train(model, criterion, metric, optimizer, train_data_loader, tokenizer):
 
             if global_steps >= args.max_steps:
                 return
-        metric.reset()
 
 
 @paddle.no_grad()

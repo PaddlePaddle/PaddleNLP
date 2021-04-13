@@ -72,8 +72,8 @@ export CUDA_VISIBLE_DEVICES=0
 python run_classifier.py --model_name_or_path bigbird-base-uncased \
     --output_dir "output" \
     --batch_size 2 \
-    --learning_rate 1e-5 \
-    --max_steps 10000 \
+    --learning_rate 5e-6 \
+    --max_steps 16000 \
     --save_steps 1000 \
     --max_encoder_length 3072
 ```
