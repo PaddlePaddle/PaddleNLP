@@ -143,6 +143,7 @@ def parse_args():
         "--device",
         type=str,
         default="gpu",
+        choices=["cpu", "gpu", "xpu"],
         help="Device for selecting for the training.")
     parser.add_argument(
         "--use_amp",
@@ -448,8 +449,4 @@ def do_train(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    assert args.device in [
-        "cpu", "gpu", "xpu"
-    ], "Invalid device! Available device should be cpu, gpu, or xpu."
-
     do_train(args)
