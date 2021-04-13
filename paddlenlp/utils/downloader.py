@@ -293,27 +293,23 @@ def _uncompress_file_zip(filepath):
 def _uncompress_file_tar(filepath, mode="r:*"):
     files = tarfile.open(filepath, mode)
     file_list = files.getnames()
-
     file_dir = os.path.dirname(filepath)
 
     if _is_a_single_file(file_list):
         rootpath = file_list[0]
         uncompressed_path = os.path.join(file_dir, rootpath)
-        for item in file_list:
-            files.extract(item, file_dir)
+        files.extractall(file_dir, files.getmembers())
     elif _is_a_single_dir(file_list):
         rootpath = os.path.splitext(file_list[0])[0].split(os.sep)[-1]
         uncompressed_path = os.path.join(file_dir, rootpath)
-        for item in file_list:
-            files.extract(item, file_dir)
+        files.extractall(file_dir, files.getmembers())
     else:
         rootpath = os.path.splitext(filepath)[0].split(os.sep)[-1]
         uncompressed_path = os.path.join(file_dir, rootpath)
         if not os.path.exists(uncompressed_path):
             os.makedirs(uncompressed_path)
 
-        for item in file_list:
-            files.extract(item, os.path.join(file_dir, rootpath))
+        files.extractall(os.path.join(file_dir, rootpath), files.getmembers())
 
     files.close()
 

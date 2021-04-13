@@ -964,20 +964,21 @@ class XLNetModel(XLNetPretrainedModel):
                 the weighted average in the self-attention heads. Each Tensor (one for each layer) has a data type
                 of `float32` and has a shape of [batch_size, num_heads, sequence_length, sequence_length].
 
-        Example::
+        Example:
+            .. code-block::
 
-        >>> import paddle
-        >>> from paddlenlp.transformers.xlnet.modeling import XLNetModel
-        >>> from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
-        >>>
-        >>> tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
-        >>> model = XLNetModel.from_pretrained('xlnet-base-cased')
-        >>>
-        >>> inputs = tokenizer("Hey, Paddle-paddle is awesome !")
-        >>> inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
-        >>> outputs = model(**inputs)
-        >>>
-        >>> last_hidden_states = outputs[0]
+                import paddle
+                from paddlenlp.transformers.xlnet.modeling import XLNetModel
+                from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
+
+                tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+                model = XLNetModel.from_pretrained('xlnet-base-cased')
+
+                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                last_hidden_states = outputs[0]
         """
 
         if self.training:
@@ -1313,20 +1314,21 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
             attentions (`List[Tensor]`, optional):
                 See :class:`XLNetModel`.
 
-        Example::
+        Example:
+            .. code-block::
 
-            >>> import paddle
-            >>> from paddlenlp.transformers.xlnet.modeling import XLNetForSequenceClassification
-            >>> from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
-            >>>
-            >>> tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
-            >>> model = XLNetForSequenceClassification.from_pretrained('xlnet-base-cased')
-            >>>
-            >>> inputs = tokenizer("Hey, Paddle-paddle is awesome !")
-            >>> inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
-            >>> outputs = model(**inputs)
-            >>>
-            >>> logits = outputs[0]
+                import paddle
+                from paddlenlp.transformers.xlnet.modeling import XLNetForSequenceClassification
+                from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
+
+                tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+                model = XLNetForSequenceClassification.from_pretrained('xlnet-base-cased')
+
+                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
         """
 
         transformer_outputs = self.transformer(
@@ -1444,20 +1446,21 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
             - attentions (`List[Tensor]`, optional):
                 See :class:`XLNetModel`.
 
-        Example::
+        Example:
+            .. code-block::
 
-            >>> import paddle
-            >>> from paddlenlp.transformers.xlnet.modeling import XLNetForTokenClassification
-            >>> from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
-            >>>
-            >>> tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
-            >>> model = XLNetForTokenClassification.from_pretrained('xlnet-base-cased')
-            >>>
-            >>> inputs = tokenizer("Hey, Paddle-paddle is awesome !")
-            >>> inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
-            >>> outputs = model(**inputs)
-            >>>
-            >>> logits = outputs[0]
+                import paddle
+                from paddlenlp.transformers.xlnet.modeling import XLNetForTokenClassification
+                from paddlenlp.transformers.xlnet.tokenizer import XLNetTokenizer
+
+                tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
+                model = XLNetForTokenClassification.from_pretrained('xlnet-base-cased')
+
+                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
         """
         transformer_outputs = self.transformer(
             input_ids,

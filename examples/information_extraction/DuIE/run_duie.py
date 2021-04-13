@@ -52,7 +52,7 @@ parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight deca
 parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.")
 parser.add_argument("--warmup_ratio", default=0, type=float, help="Linear warmup over warmup_ratio * total_steps.")
 parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
-parser.add_argument("--n_gpu", default=1, type=int, help="number of gpus to use, 0 for cpu.")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -147,6 +147,8 @@ def evaluate(model, criterion, data_loader, file_path, mode):
 
 
 def do_train():
+    paddle.set_device(args.device)
+    rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -225,52 +227,50 @@ def do_train():
             lr_scheduler.step()
             optimizer.clear_grad()
             loss_item = loss.numpy().item()
+            global_step += 1
 
-            if global_step % logging_steps == 0 and paddle.distributed.get_rank(
-            ) == 0:
+            if global_step % logging_steps == 0 and rank == 0:
                 print(
                     "epoch: %d / %d, steps: %d / %d, loss: %f, speed: %.2f step/s"
                     % (epoch, args.num_train_epochs, step, steps_by_epoch,
                        loss_item, logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
 
-            if global_step % save_steps == 0 and global_step != 0 and paddle.distributed.get_rank(
-            ) == 0:
+            if global_step % save_steps == 0 and rank == 0:
                 print("\n=====start evaluating ckpt of %d steps=====" %
                       global_step)
                 precision, recall, f1 = evaluate(
                     model, criterion, test_data_loader, eval_file_path, "eval")
                 print("precision: %.2f\t recall: %.2f\t f1: %.2f\t" %
                       (100 * precision, 100 * recall, 100 * f1))
-                if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
-                    print("saving checkpoing model_%d.pdparams to %s " %
-                          (global_step, args.output_dir))
-                    paddle.save(model.state_dict(),
-                                os.path.join(args.output_dir,
-                                             "model_%d.pdparams" % global_step))
+                print("saving checkpoing model_%d.pdparams to %s " %
+                      (global_step, args.output_dir))
+                paddle.save(model.state_dict(),
+                            os.path.join(args.output_dir,
+                                         "model_%d.pdparams" % global_step))
                 model.train()  # back to train mode
 
-            global_step += 1
         tic_epoch = time.time() - tic_epoch
         print("epoch time footprint: %d hour %d min %d sec" %
               (tic_epoch // 3600, (tic_epoch % 3600) // 60, tic_epoch % 60))
 
     # Does final evaluation.
-    if paddle.distributed.get_rank() == 0:
+    if rank == 0:
         print("\n=====start evaluating last ckpt of %d steps=====" %
               global_step)
         precision, recall, f1 = evaluate(model, criterion, test_data_loader,
                                          eval_file_path, "eval")
         print("precision: %.2f\t recall: %.2f\t f1: %.2f\t" %
               (100 * precision, 100 * recall, 100 * f1))
-        if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
-            paddle.save(model.state_dict(),
-                        os.path.join(args.output_dir,
-                                     "model_%d.pdparams" % global_step))
+        paddle.save(model.state_dict(),
+                    os.path.join(args.output_dir,
+                                 "model_%d.pdparams" % global_step))
         print("\n=====training complete=====")
 
 
 def do_predict():
+    paddle.set_device(args.device)
+
     # Reads label_map.
     label_map_path = os.path.join(args.data_path, "predicate2id.json")
     if not (os.path.exists(label_map_path) and os.path.isfile(label_map_path)):
@@ -313,13 +313,7 @@ def do_predict():
 
 
 if __name__ == "__main__":
-    set_random_seed(args.seed)
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
-
     if args.do_train:
-        if args.n_gpu > 1:
-            paddle.distributed.spawn(do_train, nprocs=args.n_gpu)
-        else:
-            do_train()
-    if args.do_predict:
+        do_train()
+    elif args.do_predict:
         do_predict()

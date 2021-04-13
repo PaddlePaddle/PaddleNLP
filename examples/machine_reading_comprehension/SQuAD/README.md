@@ -29,21 +29,22 @@ SQuAD v2.0
 对于 SQuAD v1.1,按如下方式启动 Fine-tuning:
 
 ```shell
-python -u ./run_squad.py \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" run_squad.py \
     --model_type bert \
     --model_name_or_path bert-base-uncased \
     --max_seq_length 384 \
     --batch_size 12 \
     --learning_rate 3e-5 \
     --num_train_epochs 2 \
-    --logging_steps 100 \
+    --logging_steps 1000 \
     --save_steps 1000 \
     --warmup_proportion 0.1 \
     --weight_decay 0.01 \
     --output_dir ./tmp/squad/ \
+    --device gpu \
     --do_train \
-    --do_predict \
-    --n_gpu 1
+    --do_predict
  ```
 
 * `model_type`: 预训练模型的种类。如bert，ernie，roberta等。
@@ -68,7 +69,8 @@ python -u ./run_squad.py \
 对于 SQuAD v2.0,按如下方式启动 Fine-tuning:
 
 ```shell
-python -u ./run_squad.py \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" run_squad.py \
     --model_type bert \
     --model_name_or_path bert-base-uncased \
     --max_seq_length 384 \
@@ -80,9 +82,9 @@ python -u ./run_squad.py \
     --warmup_proportion 0.1 \
     --weight_decay 0.01 \
     --output_dir ./tmp/squad/ \
-    --n_gpu 1 \
+    --device gpu \
     --do_train \
-    --do_pred \
+    --do_predict \
     --version_2_with_negative
  ```
 
@@ -112,3 +114,37 @@ python -u ./run_squad.py \
 训练方法与前面大体相同，只需要设定 `--null_score_diff_threshold` 参数的值为测评时输出的 `best_f1_thresh` ，通常这个值在 -1.0 到 -5.0 之间。
 
 **NOTE:** 如需恢复模型训练，则model_name_or_path只需指定到文件夹名即可。如`--model_name_or_path=./tmp/squad/model_19000/`，程序会自动加载模型参数`/model_state.pdparams`，也会自动加载词表，模型config和tokenizer的config。
+
+### 预测
+
+在Fine-tune完成后，我们可以使用如下方式导出希望用来预测的模型：
+
+```shell
+python -u ./export_model.py \
+    --model_type bert \
+    --model_path bert-base-uncased \
+    --output_path ./infer_model/model
+```
+
+其中参数释义如下：
+- `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
+- `model_path` 表示训练模型的保存路径，与训练时的`output_dir`一致。
+- `output_path` 表示导出预测模型文件的前缀。保存时会添加后缀（`pdiparams`，`pdiparams.info`，`pdmodel`）；除此之外，还会在`output_path`包含的目录下保存tokenizer相关内容。
+
+然后按照如下的方式对阅读理解任务进行预测（基于Paddle的[Python预测API](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/python_infer_cn.html)）：
+
+```shell
+python -u deploy/python/predict.py \
+    --model_type bert \
+    --model_name_or_path ./infer_model/model \
+    --batch_size 4 \
+    --max_seq_length 384
+```
+
+其中参数释义如下：
+- `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
+- `model_name_or_path` 表示预测模型文件的前缀，和上一步导出预测模型中的`output_path`一致。
+- `batch_size` 表示每个预测批次的样本数目。
+- `max_seq_length` 表示最大句子长度，超过该长度将被截断，和训练时一致。
+
+以上命令将在SQuAD v1.1的验证集上进行预测。此外，同训练时一样，用户可以通过命令行传入`--version_2_with_negative`控制所需要的SQuAD数据集版本，也可以通过`--train_file`和`--predict_file`传入本地数据集的位置，数据集需保证与SQuAD数据集格式一致。

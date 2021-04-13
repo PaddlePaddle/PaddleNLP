@@ -16,7 +16,7 @@
 
 :func:`load_dataset` 方法会从 :obj:`paddlenlp.datasets` 下找到msra_ner数据集对应的数据读取脚本（默认路径：paddlenlp/datasets/msra_ner.py），并调用脚本中 :class:`DatasetBuilder` 类的相关方法生成数据集。
 
-生成数据集可以以 :class:`MapDataset` 和 :class:`IterDataset` 两种类型返回，分别是对 :class:`paddle.io.Dataset` 和 :class:`paddle.io.IterableDataset` 的扩展，只需在 :func:`load_dataset` 时设置 :attr:`lazy` 参数即可获取相应类型。:obj:`Flase` 对应返回:class:`MapDataset` ，:obj:`True` 对应返回:class:`IterDataset`，默认值为None，对应返回:class:`DatasetBuilder` 默认的数据集类型，大多数为:class:`MapDataset` 。
+生成数据集可以以 :class:`MapDataset` 和 :class:`IterDataset` 两种类型返回，分别是对 :class:`paddle.io.Dataset` 和 :class:`paddle.io.IterableDataset` 的扩展，只需在 :func:`load_dataset` 时设置 :attr:`lazy` 参数即可获取相应类型。:obj:`Flase` 对应返回 :class:`MapDataset` ，:obj:`True` 对应返回 :class:`IterDataset`，默认值为None，对应返回 :class:`DatasetBuilder` 默认的数据集类型，大多数为 :class:`MapDataset` 。
 
 .. code-block::
 

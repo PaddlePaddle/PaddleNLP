@@ -1,13 +1,14 @@
 set -eux
 
-export BATCH_SIZE=8
+export CUDA_VISIBLE_DEVICES=0 
+export BATCH_SIZE=64
 export CKPT=./checkpoints/model_90000.pdparams
-export DATASET_FILE=./data/dev_data.json
+export DATASET_FILE=./data/test1.json
 
-CUDA_VISIBLE_DEVICES=0 python run_duie.py \
-                   --do_predict \
-                   --init_checkpoint $CKPT \
-                   --predict_data_file $DATASET_FILE \
-                   --max_seq_length 512 \
-                   --batch_size $BATCH_SIZE
+python run_duie.py \
+    --do_predict \
+    --init_checkpoint $CKPT \
+    --predict_data_file $DATASET_FILE \
+    --max_seq_length 128 \
+    --batch_size $BATCH_SIZE
 

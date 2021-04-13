@@ -11,3 +11,4 @@
    /data_prepare/dataset_list.rst
    /data_prepare/dataset_load.rst
    /data_prepare/dataset_self_defined.rst
+   /data_prepare/data_preprocess.rst

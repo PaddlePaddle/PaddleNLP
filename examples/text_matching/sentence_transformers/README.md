@@ -71,9 +71,8 @@ sentence_transformers/
 
 我们以中文文本匹配公开数据集LCQMC为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 ```shell
-# 设置使用的GPU卡号
-CUDA_VISIBLE_DEVICES=0
-python train.py --save_dir ./checkpoints
+$ unset CUDA_VISIBLE_DEVICES
+$ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_dir ./checkpoints
 ```
 
 可支持配置的参数：
@@ -87,7 +86,7 @@ python train.py --save_dir ./checkpoints
 * `warmup_proption`：可选，学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.1。
 * `init_from_ckpt`：可选，模型参数路径，热启动模型训练；默认为None。
 * `seed`：可选，随机种子，默认为1000.
-* `n_gpu`：可选，训练过程中使用GPU卡数量，默认为1。若n_gpu=0，则使用CPU训练。
+* `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 
 代码示例中使用的预训练模型是ERNIE，如果想要使用其他预训练模型如BERT，RoBERTa，Electra等，只需更换`model` 和 `tokenizer`即可。
 
@@ -148,8 +147,8 @@ checkpoints/
 
 启动预测：
 ```shell
-CUDA_VISIBLE_DEVICES=0
-python predict.py --params_path checkpoints/model_400/model_state.pdparams
+export CUDA_VISIBLE_DEVICES=0
+python predict.py --device gpu --params_path checkpoints/model_400/model_state.pdparams
 ```
 
 将待预测数据如以下示例：
