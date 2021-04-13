@@ -142,7 +142,15 @@ if(ON_INFER)
 
   cuda_add_library(pd_infer_custom_op ${decoding_op_files} SHARED)
   add_dependencies(pd_infer_custom_op extern_${THIRD_PARTY_NAME})
-  add_executable(transformer_e2e ${DEMO})
+  string(REPLACE "/" ";" DEMO_PATH ${DEMO})
+
+  list(LENGTH DEMO_PATH PATH_LEN)
+  MATH(EXPR PATH_LEN "${PATH_LEN}-1")
+  list(GET DEMO_PATH ${PATH_LEN} DEMO_NAME)
+
+  string(REPLACE "." ";" DEMO_NAME ${DEMO_NAME})
+  list(GET DEMO_NAME 0 DEMO_NAME)
+  add_executable(${DEMO_NAME} ${DEMO})
   set(DEPS pd_infer_custom_op ${ft_lib_link} boost ${DEPS} cublas cudart)
 
   if(WIN32)
