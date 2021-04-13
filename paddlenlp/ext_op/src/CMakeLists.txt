@@ -8,7 +8,6 @@ if(ON_INFER)
   )
 
   if(WITH_GPU)
-    # find_package(CUDA REQUIRED)
     add_definitions("-DPADDLE_WITH_CUDA")
   endif()
 
@@ -220,6 +219,22 @@ else(ON_INFER)
   if(EXISTS ${PY_LIB_DIR}/libpaddle_custom_op.so)
     set(lib_link
       -lpaddle_custom_op
+    )
+  endif()
+
+  if(EXISTS ${PY_LIB_DIR}/../fluid/core_avx.so)
+    set(lib_link
+      -l:core_avx.so
+    )
+    link_directories(
+      ${PY_LIB_DIR}/../fluid/
+    )
+  else()
+    set(lib_link
+      -l:core_noavx.so
+    )
+    link_directories(
+      ${PY_LIB_DIR}/../fluid/
     )
   endif()
 
