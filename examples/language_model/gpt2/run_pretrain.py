@@ -98,12 +98,13 @@ def do_train(args):
 
     # define log writer
     log_writer_path = os.path.join(
-        args.output_dir, "gpt2_bs={}_amp={}_recompute={}_card={}".format(
-            args.batch_size, False, False, worker_num))
+        args.output_dir, "{}_bs_{}_amp_{}_recompute_{}_card_{}".format(
+            args.model_name_or_path, args.batch_size, False, False, worker_num))
     if os.path.exists(log_writer_path):
         import shutil
         shutil.rmtree(log_writer_path)
     log_writer = SummaryWriter(log_writer_path)
+    # TODO launch the tensorbord
 
     pretrained_models_list = list(
         model_class.pretrained_init_configuration.keys())
@@ -155,6 +156,24 @@ def do_train(args):
         opt_dict = paddle.load(
             os.path.join(args.model_name_or_path, "model_state.pdopt"))
         optimizer.set_state_dict(opt_dict)
+
+    # init with Megatron params
+    init_dir = None
+    if args.batch_size == 4:
+        print("Loading bs4 init params.")
+        init_dir = os.path.join(os.environ['HOME'],
+                                './init_checkponits/gpt2-init-bs4.pdparams')
+    elif args.batch_size == 32:
+        print("Loading bs32 init params.")
+        init_dir = os.path.join(os.environ['HOME'],
+                                './init_checkponits/gpt2-init-bs32.pdparams')
+    if "small" in args.model_name_or_path:
+        init_dir = os.path.join(
+            os.environ['HOME'],
+            './init_checkponits/gpt2-init-small-bs32.pdparams')
+    if init_dir is not None:
+        print(init_dir)
+        model.set_state_dict(paddle.load(init_dir))
 
     global_step = 0
     tic_train = time.time()

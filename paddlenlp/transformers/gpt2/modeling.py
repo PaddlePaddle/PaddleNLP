@@ -36,13 +36,20 @@ __all__ = [
 ]
 
 
+def print_t(name, tensor):
+    print(name)
+    print("sum", tensor.sum())
+    print("abs sum", tensor.abs().sum())
+    print(tensor)
+
+
 class LayerNormByBN(nn.Layer):
     def __init__(self, dim, epsilon=1e-5):
         super().__init__()
         # normalized_shape = np.prod(input_shape[:-1])
         normalized_shape = 16 * 1024
         input_shape = [dim if dim != -1 else 1024]
-        print(input_shape)
+        # print(input_shape)
         self.batch_norm = paddle.nn.BatchNorm(
             normalized_shape,
             epsilon=epsilon,
@@ -55,11 +62,11 @@ class LayerNormByBN(nn.Layer):
         # self.batch_norm.bias.stop_gradient =True
 
         self.weight = self.create_parameter(
-            shape=[1, input_shape[-1]],
+            shape=[input_shape[-1]],
             dtype=self._dtype,
             default_initializer=Constant(1.0))
         self.bias = self.create_parameter(
-            shape=[1, input_shape[-1]],
+            shape=[input_shape[-1]],
             dtype=self._dtype,
             default_initializer=Constant(0.0))
 
@@ -214,7 +221,10 @@ class MultiHeadAttention(nn.Layer):
         product = layers.matmul(
             x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
         if attn_mask is not None:
-            product = product + attn_mask
+            # product = product + attn_mask
+            product = product * attn_mask
+            mask_score = (attn_mask - 1.0) * 10000.0
+            product = product + mask_score
         weights = F.softmax(product)
         if self.dropout:
             weights = F.dropout(
@@ -271,6 +281,7 @@ class TransformerDecoder(nn.Layer):
         new_caches = []
         self.checkpoints = []
         for i, mod in enumerate(self.layers):
+            #print_t("loop_{}, output".format(i), output)
             if cache is None:
                 if use_cache:
                     output, new_cache = mod(output,
@@ -572,11 +583,17 @@ class GPT2Model(GPT2PretrainedModel):
         self.checkpoints = []
         if attention_mask is None:
             length = paddle.shape(input_ids)[1]
-            attention_mask = paddle.tensor.triu(
-                (paddle.ones(
+            # attention_mask = paddle.tensor.triu(
+            #     (paddle.ones(
+            #         (length, length),
+            #         dtype=self.embeddings.word_embeddings.weight.dtype) * -1e9),
+            #     1)
+            # use bool mask
+            attention_mask = paddle.tensor.tril(
+                paddle.ones(
                     (length, length),
-                    dtype=self.embeddings.word_embeddings.weight.dtype) * -1e9),
-                1)
+                    dtype=self.embeddings.word_embeddings.weight.dtype))
+
         if position_ids is None:
             past_length = 0
             if cache is not None:
@@ -591,6 +608,7 @@ class GPT2Model(GPT2PretrainedModel):
                                                          input_ids)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
+        # print_t("embedding_output", embedding_output)
         encoder_outputs = self.decoder(
             embedding_output,
             memory=None,

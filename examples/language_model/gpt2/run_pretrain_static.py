@@ -412,17 +412,17 @@ def do_train(args):
              p.name for n, p in model.named_parameters()
              if not any(nd in n for nd in ["bias", "norm"])]
 
-    # optimizer = paddle.optimizer.AdamW(
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
-        parameters=opt_param,  # TODO @ZHUI, no use, please fix. 
+        parameters=opt_param,
         weight_decay=args.weight_decay,
         grad_clip=clip,
         apply_decay_param_fun=decay_param)
-    # Use the fleet api to compile the distributed optimizer
 
+    # Use the fleet api to compile the distributed optimizer
     optimizer.apply_optimize = optimizer._apply_optimize
+
     optimizer = dist_optimizer(args, optimizer, model, worker_num)
     optimizer.minimize(loss)
     logger.info("The training meta optimizer is/are %s" %
@@ -440,21 +440,21 @@ def do_train(args):
     # paddle.static.set_program_state(reset_state_dict)
 
     # init with Megatron params
+    init_dir = None
     if args.batch_size == 4:
         print("Loading bs4 init params.")
-        init_static_with_params(
-            model,
-            paddle.load(
-                os.path.join(os.environ['HOME'],
-                             './init_checkponits/gpt2-init-bs4.pdparams')))
+        init_dir = os.path.join(os.environ['HOME'],
+                                './init_checkponits/gpt2-init-bs4.pdparams')
     elif args.batch_size == 32:
         print("Loading bs32 init params.")
         init_dir = os.path.join(os.environ['HOME'],
                                 './init_checkponits/gpt2-init-bs32.pdparams')
-        if "small" in args.model_name_or_path:
-            init_dir = os.path.join(
-                os.environ['HOME'],
-                './init_checkponits/gpt2-init-small-bs32.pdparams')
+    if "small" in args.model_name_or_path:
+        init_dir = os.path.join(
+            os.environ['HOME'],
+            './init_checkponits/gpt2-init-small-bs32.pdparams')
+    if init_dir is not None:
+        print(init_dir)
         init_static_with_params(model, paddle.load(init_dir))
 
     test_program = main_program.clone(for_test=True)

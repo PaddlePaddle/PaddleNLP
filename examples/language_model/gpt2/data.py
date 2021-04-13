@@ -298,7 +298,7 @@ class GPT2Dataset(paddle.io.Dataset):
         position_ids = np.arange(0, seq_length, dtype="int64")
 
         # -INF mask value as default
-        attention_mask = (attention_mask - 1.0) * 1e9
+        # attention_mask = (attention_mask - 1.0) * 1e9
         # Bool mask of attention
         attention_mask = attention_mask.astype("float32")
         return [tokens, loss_mask, attention_mask, position_ids, labels]
