@@ -77,6 +77,12 @@ def load_vocab(dict_path):
     return vocab
 
 
+def normalize_token(token, token_replace_vocab):
+    if token_replace_vocab:
+        token = token_replace_vocab.get(token, token)
+    return token
+
+
 def convert_tokens_to_ids(tokens,
                           vocab,
                           oov_replace_token=None,
@@ -86,8 +92,7 @@ def convert_tokens_to_ids(tokens,
     oov_replace_token = vocab.get(
         oov_replace_token) if oov_replace_token else None
     for token in tokens:
-        if token_replace_vocab:
-            token = token_replace_vocab.get(token, token)
+        token = normalize_token(token, token_replace_vocab)
         token_id = vocab.get(token, oov_replace_token)
         token_ids.append(token_id)
 
