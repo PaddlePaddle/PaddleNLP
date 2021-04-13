@@ -157,8 +157,8 @@ def parse_args():
         "--device",
         default="gpu",
         type=str,
-        choices=["cpu", "gpu", "xpu"],
-        help="The device to select to train the model, is must be cpu/gpu/xpu.")
+        choices=["cpu", "gpu"],
+        help="The device to select to train the model, is must be cpu/gpu.")
     args = parser.parse_args()
     return args
 
