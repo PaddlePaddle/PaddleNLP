@@ -89,6 +89,8 @@ python eval.py --data_dir ./lexical_analysis_dataset_tiny \
         --device gpu
 ```
 
+其中`./save_dir/model_100.pdparams`是训练过程中保存的参数文件，请更换为实际得到的训练保存路径。
+
 ### 模型预测
 
 对无标签数据可以启动模型预测：

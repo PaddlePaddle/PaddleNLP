@@ -77,22 +77,23 @@ def load_vocab(dict_path):
     return vocab
 
 
-def normalize_token(token, token_replace_vocab):
-    if token_replace_vocab:
-        token = token_replace_vocab.get(token, token)
+def normalize_token(token, normlize_vocab):
+    """Normalize text from DBC case to SBC case"""
+    if normlize_vocab:
+        token = normlize_vocab.get(token, token)
     return token
 
 
 def convert_tokens_to_ids(tokens,
                           vocab,
                           oov_replace_token=None,
-                          token_replace_vocab=None):
+                          normlize_vocab=None):
     """convert tokens to token indexs"""
     token_ids = []
     oov_replace_token = vocab.get(
         oov_replace_token) if oov_replace_token else None
     for token in tokens:
-        token = normalize_token(token, token_replace_vocab)
+        token = normalize_token(token, normlize_vocab)
         token_id = vocab.get(token, oov_replace_token)
         token_ids.append(token_id)
 
@@ -103,7 +104,7 @@ def convert_example(example,
                     max_seq_len,
                     word_vocab,
                     label_vocab=None,
-                    token_replace_vocab=None):
+                    normlize_vocab=None):
     if len(example) == 2:
         tokens, labels = example
     else:
@@ -114,7 +115,7 @@ def convert_example(example,
         tokens,
         word_vocab,
         oov_replace_token="OOV",
-        token_replace_vocab=token_replace_vocab)
+        normlize_vocab=normlize_vocab)
     length = len(token_ids)
     if labels is not None:
         labels = labels[:max_seq_len]

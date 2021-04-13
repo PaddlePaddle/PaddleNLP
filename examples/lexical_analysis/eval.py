@@ -47,15 +47,15 @@ def evaluate(args):
     test_ds = load_dataset(datafiles=(os.path.join(args.data_dir, 'test.tsv')))
     word_vocab = load_vocab(os.path.join(args.data_dir, 'word.dic'))
     label_vocab = load_vocab(os.path.join(args.data_dir, 'tag.dic'))
-    # q2b.dic is used to replace SBC case to DBC case
-    token_replace_vocab = load_vocab(os.path.join(args.data_dir, 'q2b.dic'))
+    # q2b.dic is used to replace DBC case to SBC case
+    normlize_vocab = load_vocab(os.path.join(args.data_dir, 'q2b.dic'))
 
     trans_func = partial(
         convert_example,
         max_seq_len=args.max_seq_len,
         word_vocab=word_vocab,
         label_vocab=label_vocab,
-        token_replace_vocab=token_replace_vocab)
+        normlize_vocab=normlize_vocab)
     test_ds.map(trans_func)
 
     batchify_fn = lambda samples, fn=Tuple(

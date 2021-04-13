@@ -46,9 +46,22 @@ class ChunkEvaluator(paddle.metric.Metric):
         self.num_label_chunks = 0
         self.num_correct_chunks = 0
 
-    def compute(self, lengths, predictions, labels, redundant=None):
-        if redundant is not None:
-            redundant, lengths, predictions, labels = lengths, predictions, labels, redundant
+    def compute(self, lengths, predictions, labels, dummy=None):
+        """Computes the precision, recall and F1-score for chunk detection.
+
+        Args:
+            lengths (tensor): The valid length of every sequence, a tensor with shape `[batch_size]`
+            predictions (tensor): The predictions index, a tensor with shape `[batch_size, sequence_length]`.
+            labels (tensor): The labels index, a tensor with shape `[batch_size, sequence_length]`.
+            dummy (tensor, optional): Unnecessary parameter for compatibility with older versions with parameters list `inputs`, `lengths`, `predictions`, `labels`. Defaults to None.
+
+        Returns:
+            num_infer_chunks (tensor): [description]
+            num_label_chunks (tensor): [description]
+            num_correct_chunks (tensor): [description]
+        """
+        if dummy is not None:
+            dummy, lengths, predictions, labels = lengths, predictions, labels, dummy
             if not getattr(self, "has_warn", False):
                 logger.warning(
                     'Compatibility Warning: The params of ChunkEvaluator.compute has been modified. The old version is `inputs`, `lengths`, `predictions`, `labels` while the current version is `lengths`, `predictions`, `labels`.  Please update the usage.'
