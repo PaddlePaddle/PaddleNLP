@@ -119,6 +119,7 @@ def parse_args(MODEL_CLASSES):
         "--device",
         type=str,
         default="gpu",
+        choices=["cpu", "gpu", "xpu"],
         help="select cpu, gpu, xpu devices.")
     args = parser.parse_args()
     return args
