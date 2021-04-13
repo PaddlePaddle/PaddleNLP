@@ -47,7 +47,7 @@ parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup o
 parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
 parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
 parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
-parser.add_argument("--n_gpu", type=int, default=1, help="number of gpus to use, 0 for cpu.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
 # yapf: enable
 
 
@@ -91,7 +91,7 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
 
 
 def do_train(args):
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -191,7 +191,7 @@ def do_train(args):
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % args.save_steps == 0 or global_step == last_step:
-                if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+                if paddle.distributed.get_rank() == 0:
                     evaluate(model, loss_fct, metric, test_data_loader,
                              label_num)
                     paddle.save(model.state_dict(),
@@ -201,7 +201,4 @@ def do_train(args):
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_gpu)
-    else:
-        do_train(args)
+    do_train(args)

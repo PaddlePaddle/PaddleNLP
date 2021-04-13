@@ -1,0 +1,407 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.transformers.xlnet.tokenizer.rst:2
+msgid "tokenizer"
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer:1
+msgid "Tokenization class for XLNet model."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:1
+msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:1
+msgid ""
+"Constructs an XLNet tokenizer. Based on `SentencePiece "
+"<https://github.com/google/sentencepiece>`__."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_ids_to_tokens
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_tokens_to_ids
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.get_special_tokens_mask
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.save_resources
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.tokenize
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:3
+msgid ""
+"``SentencePiece`` file (ends with .spm) that contains the vocabulary "
+"necessary to instantiate a tokenizer."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:6
+msgid ""
+"Whether to lowercase the input when tokenizing. Defaults to ``False`` and"
+" we do not lowercase the input."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:9
+msgid ""
+"Whether to strip the text when tokenizing. Defaults to ``True`` and we "
+"remove excess spaces before and after the string."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:12
+msgid ""
+"Whether to keep accents when tokenizing. Defaults to ``False`` and we "
+"don't keep accents."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:15
+msgid ""
+"The beginning of sequence token that was used during pretraining. "
+"Defaults to ``\"<s>\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:17
+msgid "The end of sequence token. Defaults to ``\"</s>\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:19
+msgid ""
+"The unknown token. A token that is not in the vocabulary is set to be "
+"unk_token inorder to be converted to an ID. Defaults to ``\"<unk>\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:22
+msgid "The separator token. Defaults to ``\"<sep>\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:24
+msgid "The token used for padding. Defaults to ``\"<pad>\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:26
+msgid ""
+"The classifier token which is used when doing sequence classification. It"
+" is the last token of the sequence when built with special tokens. "
+"Defaults to ``\"<cls>\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:29
+msgid ""
+"The token used for masking values. In the masked language modeling task, "
+"this is the token used and which the model will try to predict. Defaults "
+"to ``\"<mask>\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:32
+msgid ""
+"Additional special tokens used by the tokenizer. Defaults to "
+"``[\"<eop>\", \"<eod>\"]``."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:37
+msgid ""
+"The ``SentencePiece`` processor that is used for every conversion "
+"(string, tokens and IDs)."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer
+msgid "type"
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:39
+msgid "`SentencePieceProcessor`"
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.tokenize:1
+msgid "End-to-end tokenization for XLNet models."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.tokenize:3
+msgid "The text to be tokenized."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_ids_to_tokens
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_tokens_to_ids
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.get_special_tokens_mask
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.tokenize
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.tokenize:6
+msgid "A list of string representing converted tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_ids_to_tokens
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_tokens_to_ids
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.get_special_tokens_mask
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.tokenize
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.tokenize:7
+msgid "`List(str)`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_tokens_to_ids:1
+msgid ""
+"Converts a token (or a sequence of tokens) to a single integer id (or a "
+"sequence of ids), using the vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_tokens_to_ids:4
+msgid "One or several token(s) to convert to token id(s)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_tokens_to_ids:7
+msgid "The token id or list of token ids or tuple of token ids."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_tokens_to_ids:8
+msgid "`int` or `List[int]` or `tuple(int)`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_ids_to_tokens:1
+msgid ""
+"Converts a single index or a sequence of indices to a token or a sequence"
+" of tokens, using the vocabulary and added tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_ids_to_tokens:4
+msgid "The token id (or token ids) to be converted to token(s)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_ids_to_tokens:6
+msgid ""
+"Whether or not to remove special tokens in the decoding. Defaults to "
+"``False`` and we do not remove special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_ids_to_tokens:10
+msgid "The decoded token(s)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_ids_to_tokens:11
+msgid "`str` or `List[str]`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_tokens_to_string:1
+msgid "Converts a sequence of tokens (strings for sub-words) in a single string."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.num_special_tokens_to_add:1
+msgid ""
+"Returns the number of added tokens when encoding a sequence with special "
+"tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.num_special_tokens_to_add:5
+msgid ""
+"This encodes inputs and checks the number of added tokens, and is "
+"therefore not efficient. Do not put this inside your training loop."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.num_special_tokens_to_add:8
+msgid ""
+"Whether the sequence is a sequence pair or a single sequence. Defaults to"
+" ``False`` and the input is a single sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.num_special_tokens_to_add:12
+msgid "Number of tokens added to sequences."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.num_special_tokens_to_add:13
+msgid "`int`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_inputs_with_special_tokens:1
+msgid ""
+"Builds model inputs from a sequence or a pair of sequence for sequence "
+"classification tasks by concatenating and adding special tokens. An XLNet"
+" sequence has the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_inputs_with_special_tokens:5
+msgid "single sequence:      ``X <sep> <cls>``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_inputs_with_special_tokens:6
+msgid "pair of sequences:    ``A <sep> B <sep> <cls>``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_inputs_with_special_tokens:8
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.create_token_type_ids_from_sequences:13
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.get_special_tokens_mask:4
+msgid "List of IDs for the first sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_inputs_with_special_tokens:10
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.get_special_tokens_mask:6
+msgid "Optional second list of IDs for sequence pairs. Defaults to ``None``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_inputs_with_special_tokens:13
+msgid "List of input IDs with the appropriate special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_inputs_with_special_tokens:14
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.create_token_type_ids_from_sequences:19
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.get_special_tokens_mask:14
+msgid "`List[int]`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_offset_mapping_with_special_tokens:1
+msgid ""
+"Builds offset map from a pair of offset map by concatenating and adding "
+"offsets of special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_offset_mapping_with_special_tokens:4
+msgid "An XLNet offset_mapping has the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_offset_mapping_with_special_tokens:6
+msgid "single sequence:      ``X (0,0) (0,0)``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_offset_mapping_with_special_tokens:7
+msgid "pair of sequences:    ``A (0,0) B (0,0) (0,0)``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_offset_mapping_with_special_tokens:9
+msgid "List of char offsets to which the special tokens will be added."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_offset_mapping_with_special_tokens:11
+msgid ""
+"Optional second list of char offsets for offset mapping pairs. Defaults "
+"to ``None``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_offset_mapping_with_special_tokens:15
+msgid "List of char offsets with the appropriate offsets of special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.build_offset_mapping_with_special_tokens:16
+msgid "`List[tuple]`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.get_special_tokens_mask:1
+msgid ""
+"Creates a special tokens mask from the input sequences. This method is "
+"called when adding special tokens using the tokenizer ``encode`` method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.get_special_tokens_mask:9
+msgid ""
+"Whether or not the token list is already formatted with special tokens "
+"for the model. Defaults to ``False``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.get_special_tokens_mask:13
+msgid ""
+"A list of integers in the range [0, 1]: 1 for a special token, 0 for a "
+"sequence token."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.create_token_type_ids_from_sequences:1
+msgid ""
+"Creates a mask from the input sequences. An XLNet sequence pair mask has "
+"the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.create_token_type_ids_from_sequences:9
+msgid "0 stands for the segment id of **first segment tokens**,"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.create_token_type_ids_from_sequences:10
+msgid "1 stands for the segment id of **second segment tokens**,"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.create_token_type_ids_from_sequences:11
+msgid "2 stands for the segment id of **cls_token**."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.create_token_type_ids_from_sequences:15
+msgid "Optional second list of IDs for the sequence pair. Defaults to ``None``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.create_token_type_ids_from_sequences:18
+msgid "List of token type IDs according to the given sequence(s)."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.save_resources:1
+msgid "Saves tokenizer related resources to files under `save_directory`."
+msgstr ""
+
+#: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.save_resources:3
+msgid "Directory to save files into."
+msgstr ""
+

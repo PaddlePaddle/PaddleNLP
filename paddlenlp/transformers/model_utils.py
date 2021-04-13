@@ -18,6 +18,7 @@ import json
 import os
 import six
 import logging
+import inspect
 
 import paddle
 from paddle.nn import Layer
@@ -119,7 +120,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 this as position argument values for model initialization.
             **kwargs (dict): keyword arguments for `__init__`. If provide, use
                 this to update pre-defined keyword argument values for model
-                initialization.
+                initialization. If the key is in base model `__init__`, update
+                keyword argument of base model; else update keyword argument of
+                derived model.
         Returns:
             PretrainedModel: An instance of PretrainedModel.
         """
@@ -178,7 +181,6 @@ class PretrainedModel(Layer, GenerationMixin):
         # class name corresponds to this configuration
         init_class = init_kwargs.pop("init_class",
                                      cls.base_model_class.__name__)
-
         # Check if the loaded config matches the current model class's __init__
         # arguments. If not match, the loaded config is for the base model class.
         if init_class == cls.base_model_class.__name__:
@@ -209,6 +211,7 @@ class PretrainedModel(Layer, GenerationMixin):
                     base_arg_index = arg_name
                     base_arg = arg
                     break
+
             base_args = base_arg.pop("init_args", ())
             base_kwargs = base_arg
         if cls == cls.base_model_class:
@@ -218,13 +221,21 @@ class PretrainedModel(Layer, GenerationMixin):
             model = cls(*base_args, **base_kwargs)
         else:
             # Update with newly provided args and kwargs for derived model
+            base_parameters_dict = inspect.signature(
+                cls.base_model_class.__init__).parameters
+            for k, v in kwargs.items():
+                if k in base_parameters_dict:
+                    base_kwargs[k] = v
             base_model = cls.base_model_class(*base_args, **base_kwargs)
             if base_arg_index is not None:
                 derived_args[base_arg_index] = base_model
             else:
                 derived_args = (base_model, )  # assume at the first position
             derived_args = derived_args if not args else args
-            derived_kwargs.update(kwargs)
+            derived_parameters_dict = inspect.signature(cls.__init__).parameters
+            for k, v in kwargs.items():
+                if k in derived_parameters_dict:
+                    derived_kwargs[k] = v
             model = cls(*derived_args, **derived_kwargs)
 
         # Maybe need more ways to load resources.
