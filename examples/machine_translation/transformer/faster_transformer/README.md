@@ -226,8 +226,6 @@ cd ../
 * `-DDEMO` 说明预测库使用 demo 的位置。
 * **当使用预测库的自定义 op 的时候，请务必开启 `-DON_INFER=ON` 选项，否则，不会得到预测库的可执行文件。**
 
-#### 编译产出
-
 编译完成后，在 `build/bin/` 路径下将会看到 `transformer_e2e` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
 
 ``` sh
@@ -235,17 +233,7 @@ cd bin/
 ./transformer_e2e <batch_size> <gpu_id> <model_directory> <dict_directory> <input_data>
 ```
 
-举例说明：
-
-``` sh
-cd bin/
-../third-party/build/bin/decoding_gemm 8 5 8 64 38512 256 512 0
-./transformer_e2e 8 0 ./infer_model/ /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
-```
-
-其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer/v3.1#execute-the-decoderdecoding-demos)。
-
-#### 导出基于 Faster Transformer 自定义 op 的预测库可使用模型文件
+### 导出基于 Faster Transformer 自定义 op 的预测库可使用模型文件
 
 我们提供一个已经基于动态图训练好的 base model 的 checkpoint 以供使用，当前 checkpoint 是基于 WMT 英德翻译的任务训练。可以通过[tranformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz)下载。
 
@@ -266,7 +254,7 @@ python export_model.py --config ../configs/transformer.base.yaml --decoding-lib 
     └── transformer.pdmodel
   ```
 
-#### 使用 PaddlePaddle 预测库预测
+### 使用 PaddlePaddle 预测库预测
 
 自定义 op 编译完成后，在 `paddlenlp/ext_op/build/bin/` 路径下将会看到 `transformer_e2e` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
 
