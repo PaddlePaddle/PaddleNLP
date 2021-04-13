@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
+import distutils.util
 
 
 def parse_args():
@@ -33,7 +34,6 @@ def parse_args():
         "--input_dir",
         default=None,
         type=str,
-        required=True,
         help="The input directory where the data will be read from.")
 
     parser.add_argument(
@@ -61,6 +61,12 @@ def parse_args():
         default=10000,
         type=int,
         help="Linear warmup over warmup_steps.")
+
+    parser.add_argument(
+        "--warmup_proportion",
+        default=0.1,
+        type=float,
+        help="Linear warmup proportion over total steps.")
 
     parser.add_argument(
         "--weight_decay",
@@ -126,6 +132,20 @@ def parse_args():
         default=False,
         type=bool,
         help="Whether or not add the nsp loss to the total loss.")
+
+    parser.add_argument(
+        "--use_amp",
+        type=distutils.util.strtobool,
+        default=False,
+        help="Enable mixed precision training.")
+
+    parser.add_argument(
+        "--task_name",
+        default="sst-2",
+        type=str,
+        required=False,
+        help="The name of the task to train selected in the list: sst-2, cola, mrpc, sts-b, qqp, mnli, qnli, rte"
+    )
 
     args = parser.parse_args()
     return args

@@ -55,7 +55,11 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
-def create_dataloader(batch_size, max_encoder_length, tokenizer, pad_val=0):
+def create_dataloader(batch_size,
+                      max_encoder_length,
+                      tokenizer,
+                      config,
+                      pad_val=0):
     def _tokenize(text):
         input_ids = [tokenizer.cls_id]
         input_ids.extend(
@@ -108,18 +112,19 @@ def main():
     # Define the model and metric 
     # In finetune task, bigbird performs better when setting dropout to zero.
     model = BigBirdForSequenceClassification.from_pretrained(
-        args.model_name_or_path, attn_dropout=0.0, hidden_dropout_prob=0.0)
+        args.model_name_or_path,
+        attn_dropout=args.attn_dropout,
+        hidden_dropout_prob=args.hidden_dropout_prob)
 
     criterion = nn.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
 
     # Define the tokenizer and dataloader
     tokenizer = BigBirdTokenizer.from_pretrained(args.model_name_or_path)
-    global config
     config = getattr(model,
                      BigBirdForSequenceClassification.base_model_prefix).config
     train_data_loader, test_data_loader = \
-            create_dataloader(args.batch_size, args.max_encoder_length, tokenizer)
+            create_dataloader(args.batch_size, args.max_encoder_length, tokenizer, config)
 
     # Define the Adam optimizer 
     optimizer = paddle.optimizer.Adam(
@@ -144,7 +149,7 @@ def do_train(model, criterion, metric, optimizer, train_data_loader, tokenizer):
             input_ids, labels = batch[:2]
             rand_mask_idx_list = batch[2:]
 
-            output = model(input_ids, None, rand_mask_idx_list)
+            output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
             loss = criterion(output, labels)
             loss.backward()
             optimizer.step()
@@ -171,7 +176,6 @@ def do_train(model, criterion, metric, optimizer, train_data_loader, tokenizer):
 
             if global_steps >= args.max_steps:
                 return
-        metric.reset()
 
 
 @paddle.no_grad()
