@@ -73,6 +73,7 @@ def train(args):
 
     word_vocab = load_vocab(os.path.join(args.data_dir, 'word.dic'))
     label_vocab = load_vocab(os.path.join(args.data_dir, 'tag.dic'))
+    # q2b.dic is used to replace SBC case to DBC case
     token_replace_vocab = load_vocab(os.path.join(args.data_dir, 'q2b.dic'))
 
     trans_func = partial(
