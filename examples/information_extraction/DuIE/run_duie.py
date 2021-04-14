@@ -88,47 +88,41 @@ def evaluate(model, criterion, data_loader, file_path, mode):
         predict_test.json and predict_test.json.zip \
         under args.data_path dir for later submission or evaluation.
     """
+    example_all = []
+    with open(file_path, "r", encoding="utf-8") as fp:
+        for line in fp:
+            example_all.append(json.loads(line))
+    id2spo_path = os.path.join(os.path.dirname(file_path), "id2spo.json")
+    with open(id2spo_path, 'r', encoding='utf8') as fp:
+        id2spo = json.load(fp)
+
     model.eval()
-    probs_all = None
-    seq_len_all = None
-    tok_to_orig_start_index_all = None
-    tok_to_orig_end_index_all = None
     loss_all = 0
     eval_steps = 0
+    formatted_outputs = []
+    current_idx = 0
     for batch in tqdm(data_loader, total=len(data_loader)):
         eval_steps += 1
         input_ids, seq_len, tok_to_orig_start_index, tok_to_orig_end_index, labels = batch
         logits = model(input_ids=input_ids)
-        mask = (input_ids != 0).logical_and((input_ids != 1)).logical_and(
-            (input_ids != 2))
+        mask = (input_ids != 0).logical_and((input_ids != 1)).logical_and((input_ids != 2))
         loss = criterion(logits, labels, mask)
         loss_all += loss.numpy().item()
         probs = F.sigmoid(logits)
-        if probs_all is None:
-            probs_all = probs.numpy()
-            seq_len_all = seq_len.numpy()
-            tok_to_orig_start_index_all = tok_to_orig_start_index.numpy()
-            tok_to_orig_end_index_all = tok_to_orig_end_index.numpy()
-        else:
-            probs_all = np.append(probs_all, probs.numpy(), axis=0)
-            seq_len_all = np.append(seq_len_all, seq_len.numpy(), axis=0)
-            tok_to_orig_start_index_all = np.append(
-                tok_to_orig_start_index_all,
-                tok_to_orig_start_index.numpy(),
-                axis=0)
-            tok_to_orig_end_index_all = np.append(
-                tok_to_orig_end_index_all,
-                tok_to_orig_end_index.numpy(),
-                axis=0)
+        logits_batch = probs.numpy()
+        seq_len_batch = seq_len.numpy()
+        tok_to_orig_start_index_batch = tok_to_orig_start_index.numpy()
+        tok_to_orig_end_index_batch = tok_to_orig_end_index.numpy()
+        formatted_outputs.extend(decoding(example_all[current_idx: current_idx+len(logits)],
+                                          id2spo,
+                                          logits_batch,
+                                          seq_len_batch,
+                                          tok_to_orig_start_index_batch,
+                                          tok_to_orig_end_index_batch))
+        current_idx = current_idx+len(logits)
     loss_avg = loss_all / eval_steps
     print("eval loss: %f" % (loss_avg))
 
-    id2spo_path = os.path.join(os.path.dirname(file_path), "id2spo.json")
-    with open(id2spo_path, 'r', encoding='utf8') as fp:
-        id2spo = json.load(fp)
-    formatted_outputs = decoding(file_path, id2spo, probs_all, seq_len_all,
-                                 tok_to_orig_start_index_all,
-                                 tok_to_orig_end_index_all)
     if mode == "predict":
         predict_file_path = os.path.join(args.data_path, 'predictions.json')
     else:
@@ -228,7 +222,7 @@ def do_train():
             optimizer.clear_grad()
             loss_item = loss.numpy().item()
             global_step += 1
-
+            
             if global_step % logging_steps == 0 and rank == 0:
                 print(
                     "epoch: %d / %d, steps: %d / %d, loss: %f, speed: %.2f step/s"
@@ -270,7 +264,7 @@ def do_train():
 
 def do_predict():
     paddle.set_device(args.device)
-
+    
     # Reads label_map.
     label_map_path = os.path.join(args.data_path, "predicate2id.json")
     if not (os.path.exists(label_map_path) and os.path.isfile(label_map_path)):
@@ -313,6 +307,7 @@ def do_predict():
 
 
 if __name__ == "__main__":
+
     if args.do_train:
         do_train()
     elif args.do_predict:
