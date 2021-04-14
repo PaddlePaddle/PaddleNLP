@@ -39,7 +39,7 @@ parser.add_argument("--model_save_dir", type=str, default=None, help="The model 
 parser.add_argument("--epochs", type=int, default=10, help="Corpus iteration num.")
 parser.add_argument("--batch_size", type=int, default=300, help="The number of sequences contained in a mini-batch.")
 parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
 parser.add_argument("--base_lr", type=float, default=0.001, help="The basic learning rate that affects the entire network.")
 parser.add_argument("--emb_dim", type=int, default=128, help="The dimension in which a word is embedded.")
 parser.add_argument("--hidden_size", type=int, default=128, help="The number of hidden nodes in the GRU layer.")
