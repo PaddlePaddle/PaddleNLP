@@ -18,9 +18,9 @@ from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.datasets import DatasetBuilder
 
 
-class Reader(DatasetBuilder):
+class TextReader(DatasetBuilder):
     def __init__(self, only_src=False):
-        super(Reader, self).__init__()
+        super(TextReader, self).__init__()
         self.only_src = only_src
 
     def _read(self, filename, *args):
@@ -85,7 +85,7 @@ def min_max_filer(data, max_len, min_len=0):
 def create_data_loader(args, places=None):
     data_files = {'train': args.training_file, 'dev': args.validation_file}
 
-    reader_instance = Reader()
+    reader_instance = TextReader()
     datasets = reader_instance.read_datasets(data_files=data_files)
 
     src_vocab = Vocab(
@@ -173,7 +173,7 @@ def create_data_loader(args, places=None):
 
 def create_infer_loader(args, places=None):
     data_files = {'test': args.predict_file, }
-    reader_instance = Reader(only_src=True)
+    reader_instance = TextReader(only_src=True)
     dataset = reader_instance.read_datasets(data_files=data_files)
 
     src_vocab = Vocab(

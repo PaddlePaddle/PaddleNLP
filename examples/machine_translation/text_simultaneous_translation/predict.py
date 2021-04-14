@@ -111,8 +111,8 @@ def do_predict(args):
 
 
 if __name__ == "__main__":
-    ARGS = parse_args()
-    yaml_file = ARGS.config
+    args = parse_args()
+    yaml_file = args.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)

@@ -40,9 +40,6 @@ Wait-k策略首先等待源句单词，然后与源句的其余部分同时翻�
 </p>
 
 ## 环境依赖
-
- - paddlepaddle==2.0.1
- - paddlenlp==2.0.0rc14
  - attrdict==2.0.1
  - PyYAML==5.4.1
 
@@ -118,6 +115,6 @@ perl mosesdecoder/scripts/generic/multi-bleu.perl newstest2017.tok.en < predict.
 
 ## 参考文献
 1. Vaswani A, Shazeer N, Parmar N, et al. [Attention is all you need](http://papers.nips.cc/paper/7181-attention-is-all-you-need.pdf)[C]//Advances in Neural Information Processing Systems. 2017: 6000-6010.
-2. Ma, M. ,  Huang, L. ,  Xiong, H. ,  Zheng, R. ,  Liu, K. , &  Zheng, B. , et al. (2018). [Stacl: simultaneous translation with implicit anticipation and controllable latency using prefix-to-prefix framework](https://www.aclweb.org/anthology/P19-1289/).
+2. Ma M ,  Huang L ,  Xiong H , et al. [STACL: Simultaneous Translation with Implicit Anticipation and Controllable Latency using Prefix-to-Prefix Framework](https://www.aclweb.org/anthology/P19-1289/)[J]//Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics. 2018: 3025–3036.
 3. He K, Zhang X, Ren S, et al. [Deep residual learning for image recognition](http://openaccess.thecvf.com/content_cvpr_2016/papers/He_Deep_Residual_Learning_CVPR_2016_paper.pdf)[C]//Proceedings of the IEEE conference on computer vision and pattern recognition. 2016: 770-778.
 4. Ba J L, Kiros J R, Hinton G E. [Layer normalization](https://arxiv.org/pdf/1607.06450.pdf)[J]. arXiv preprint arXiv:1607.06450, 2016.

@@ -15,7 +15,6 @@
 import os
 import time
 
-import logging
 import argparse
 from pprint import pprint
 import numpy as np
@@ -24,14 +23,11 @@ from attrdict import AttrDict
 
 import paddle
 import paddle.distributed as dist
+from paddlenlp.utils.log import logger
 
 from model import TransformerModel, CrossEntropyCriterion
 import reader
 from utils.record import AverageStatistical
-
-FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
 
 
 def parse_args():
@@ -136,13 +132,12 @@ def do_train(args):
                     init_loss_scaling=args.scale_loss)
                 with paddle.amp.auto_cast():
                     logits = transformer(src_word=src_word, trg_word=trg_word)
-                    sum_cost, random_seedavg_cost, token_num = criterion(
-                        logits, lbl_word)
+                    sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
 
-                scaled = scaler.scale(avg_cost)  # scale the loss
-                scaled.backward()  # do backward
+                scaled_loss = scaler.scale(avg_cost)  # scale the loss
+                scaled_loss.backward()  # do backward
 
-                scaler.minimize(optimizer, scaled)  # update parameters
+                scaler.minimize(optimizer, scaled_loss)  # update parameters
                 optimizer.clear_grad()
             else:
                 logits = transformer(src_word=src_word, trg_word=trg_word)
@@ -241,8 +236,8 @@ def do_train(args):
 
 
 if __name__ == "__main__":
-    ARGS = parse_args()
-    yaml_file = ARGS.config
+    args = parse_args()
+    yaml_file = args.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
