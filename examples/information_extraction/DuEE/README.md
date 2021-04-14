@@ -7,10 +7,10 @@
 <img src="pictures/DuEE-Fin/ee.png" width="600" height="200" alt="事件抽取" align=center />
 </div>
 
-该示例展示了如何使用PaddleNLP快速复现[LIC2021事件抽取比赛](http://aistudio-bce.bcc-bdbl.baidu.com/aistudio/competition/detail/141)基线并进阶优化基线。
+该示例展示了如何使用PaddleNLP快速复现[LIC2021事件抽取比赛](http://lic2021.ccf.org.cn/)基线并进阶优化基线。
 
 同时，我们提供了该示例在线运行展示教程：
-[PaddleNLP实战——LIC2021事件抽取任务基线](https://aistudio.baidu.com/aistudio/projectdetail/1605425)
+[PaddleNLP实战——LIC2021事件抽取任务基线](https://aistudio.baidu.com/aistudio/projectdetail/1639964)
 
 ## 目录结构
 

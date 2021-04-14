@@ -157,7 +157,8 @@ def parse_args():
         "--device",
         default="gpu",
         type=str,
-        help="The device to select to train the model, is must be cpu/gpu/xpu.")
+        choices=["cpu", "gpu"],
+        help="The device to select to train the model, is must be cpu/gpu.")
     args = parser.parse_args()
     return args
 
@@ -390,9 +391,6 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    assert args.device in [
-        "cpu", "gpu", "xpu"
-    ], "Invalid device! Available device should be cpu, gpu, or xpu."
     n_gpu = len(os.getenv("CUDA_VISIBLE_DEVICES", "").split(","))
     if args.device in "gpu" and n_gpu > 1:
         paddle.distributed.spawn(do_train, args=(args, ), nprocs=n_gpu)
