@@ -39,12 +39,13 @@ parser.add_argument("--model_save_dir", type=str, default=None, help="The model 
 parser.add_argument("--epochs", type=int, default=10, help="Corpus iteration num.")
 parser.add_argument("--batch_size", type=int, default=300, help="The number of sequences contained in a mini-batch.")
 parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
 parser.add_argument("--base_lr", type=float, default=0.001, help="The basic learning rate that affects the entire network.")
 parser.add_argument("--emb_dim", type=int, default=128, help="The dimension in which a word is embedded.")
 parser.add_argument("--hidden_size", type=int, default=128, help="The number of hidden nodes in the GRU layer.")
 parser.add_argument("--logging_steps", type=int, default=10, help="Log every X updates steps.")
 parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
+parser.add_argument("--do_eval", type=distutils.util.strtobool, default=True, help="To evaluate the model if True.")
 # yapf: enable
 
 
@@ -130,24 +131,37 @@ def train(args):
     # Start training
     global_step = 0
     last_step = args.epochs * len(train_loader)
-    tic_train = time.time()
+    train_reader_cost = 0.0
+    train_run_cost = 0.0
+    total_samples = 0
     for epoch in range(args.epochs):
+        reader_start = time.time()
         for step, batch in enumerate(train_loader):
+            train_reader_cost += time.time() - reader_start
             global_step += 1
             token_ids, length, label_ids = batch
+            train_start = time.time()
             loss = model(token_ids, length, label_ids)
             avg_loss = paddle.mean(loss)
+            train_run_cost += time.time() - train_start
+            total_samples += args.batch_size
             if global_step % args.logging_steps == 0:
-                print("global step %d / %d, loss: %f, speed: %.2f step/s" %
-                      (global_step, last_step, avg_loss,
-                       args.logging_steps / (time.time() - tic_train)))
-                tic_train = time.time()
+                print(
+                    "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
+                    % (global_step, last_step, avg_loss, train_reader_cost /
+                       args.logging_steps, (train_reader_cost + train_run_cost)
+                       / args.logging_steps, total_samples / args.logging_steps,
+                       total_samples / (train_reader_cost + train_run_cost)))
+                train_reader_cost = 0.0
+                train_run_cost = 0.0
+                total_samples = 0
             avg_loss.backward()
             optimizer.step()
             optimizer.clear_grad()
             if global_step % args.save_steps == 0 or global_step == last_step:
                 if paddle.distributed.get_rank() == 0:
-                    evaluate(model, chunk_evaluator, test_loader)
+                    if args.do_eval:
+                        evaluate(model, chunk_evaluator, test_loader)
                     paddle.save(model.state_dict(),
                                 os.path.join(args.model_save_dir,
                                              "model_%d.pdparams" % global_step))
