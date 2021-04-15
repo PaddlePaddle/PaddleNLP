@@ -14,65 +14,24 @@
 
 from functools import partial
 from paddle.io import DataLoader
+from paddlenlp.data import Vocab
 from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.datasets import DatasetBuilder
+from paddlenlp.datasets import load_dataset
 
 
-class TextReader(DatasetBuilder):
-    def __init__(self, only_src=False):
-        super(TextReader, self).__init__()
-        self.only_src = only_src
-
-    def _read(self, filename, *args):
-        src_tgt_file = filename
-        with open(src_tgt_file, 'r', encoding='utf8') as src_tgt_f:
-            for line in src_tgt_f:
-                line = line.strip('\n')
-                if not line:
+def read(src_tgt_file, only_src=False):
+    with open(src_tgt_file, 'r', encoding='utf8') as src_tgt_f:
+        for line in src_tgt_f:
+            line = line.strip('\n')
+            if not line:
+                continue
+            line_split = line.split('\t')
+            if only_src:
+                yield {"src": line_split[0]}
+            else:
+                if len(line_split) != 2:
                     continue
-                line_split = line.split('\t')
-                if self.only_src:
-                    yield {"src": line_split[0]}
-                else:
-                    if len(line_split) != 2:
-                        continue
-                    yield {"src": line_split[0], "trg": line_split[1]}
-
-
-class Vocab(object):
-    def __init__(self,
-                 vocab_file,
-                 start_mark="<s>",
-                 end_mark="<e>",
-                 unk_mark="<unk>"):
-        self.vocab_file = vocab_file
-        self.word2idx = {}
-        self.idx2word = {}
-        self.build_vocab()
-        self.unk_mark = unk_mark
-        self.bos_idx = self.word2idx[start_mark]
-        self.eos_idx = self.word2idx[end_mark]
-        self.unk_idx = self.word2idx[self.unk_mark]
-
-    def build_vocab(self):
-        with open(self.vocab_file, 'r', encoding='utf8') as f:
-            lines = f.readlines()
-            for idx, line in enumerate(lines):
-                line = line.strip()
-                self.word2idx[line] = idx
-                self.idx2word[idx] = line
-
-    def covert_tokens_to_ids(self, tokens):
-        return [
-            self.word2idx.get(token, self.word2idx[self.unk_mark])
-            for token in tokens
-        ]
-
-    def covert_ids_to_tokens(self, ids):
-        return [self.idx2word[id] for id in ids]
-
-    def get_vocab_size(self):
-        return len(self.word2idx)
+                yield {"src": line_split[0], "trg": line_split[1]}
 
 
 def min_max_filer(data, max_len, min_len=0):
@@ -85,41 +44,35 @@ def min_max_filer(data, max_len, min_len=0):
 def create_data_loader(args, places=None):
     data_files = {'train': args.training_file, 'dev': args.validation_file}
 
-    reader_instance = TextReader()
-    datasets = reader_instance.read_datasets(data_files=data_files)
+    datasets = [
+        load_dataset(
+            read, src_tgt_file=filename, lazy=False)
+        for split, filename in data_files.items()
+    ]
 
-    src_vocab = Vocab(
-        vocab_file=args.src_vocab_fpath,
-        start_mark=args.special_token[0],
-        end_mark=args.special_token[1],
-        unk_mark=args.special_token[2])
-    trg_vocab = Vocab(
-        vocab_file=args.trg_vocab_fpath,
-        start_mark=args.special_token[0],
-        end_mark=args.special_token[1],
-        unk_mark=args.special_token[2])
+    src_vocab = Vocab.load_vocabulary(
+        args.src_vocab_fpath,
+        bos_token=args.special_token[0],
+        eos_token=args.special_token[1],
+        unk_token=args.special_token[2])
+    trg_vocab = Vocab.load_vocabulary(
+        args.trg_vocab_fpath,
+        bos_token=args.special_token[0],
+        eos_token=args.special_token[1],
+        unk_token=args.special_token[2])
 
-    args.src_vocab_size = src_vocab.get_vocab_size()
-    args.trg_vocab_size = trg_vocab.get_vocab_size()
+    args.src_vocab_size = len(src_vocab)
+    args.trg_vocab_size = len(trg_vocab)
 
     def convert_samples(sample):
         source = [item.strip() for item in sample['src'].split()]
         target = [item.strip() for item in sample['trg'].split()]
 
-        source = src_vocab.covert_tokens_to_ids(source) + [src_vocab.eos_idx]
-        target = [trg_vocab.bos_idx] + \
-                 trg_vocab.covert_tokens_to_ids(target) + [trg_vocab.eos_idx]
+        source = src_vocab.to_indices(source) + [args.eos_idx]
+        target = [args.bos_idx] + \
+                 trg_vocab.to_indices(target) + [args.eos_idx]
 
         return source, target
-
-    def _max_token_fn(current_idx, current_batch_size, tokens_sofar,
-                      data_source):
-        return max(tokens_sofar,
-                   len(data_source[current_idx][0]),
-                   len(data_source[current_idx][1]))
-
-    def _key(size_so_far, minibatch_len):
-        return size_so_far * minibatch_len
 
     data_loaders = [(None)] * 2
     for i, dataset in enumerate(datasets):
@@ -142,21 +95,19 @@ def create_data_loader(args, places=None):
             if args.sort_type == SortType.POOL:
                 sampler = sampler.sort(key=max_key, buffer_size=args.pool_size)
 
+        batch_size_fn = lambda new, count, sofar, data_source: max(sofar, len(data_source[new][0]),
+                                                                   len(data_source[new][1]))
         batch_sampler = sampler.batch(
             batch_size=args.batch_size,
             drop_last=False,
-            batch_size_fn=_max_token_fn,
-            key=_key)
+            batch_size_fn=batch_size_fn,
+            key=lambda size_so_far, minibatch_len: size_so_far * minibatch_len)
 
         if args.shuffle_batch:
             batch_sampler = batch_sampler.shuffle(seed=args.random_seed)
 
         if i == 0:
             batch_sampler = batch_sampler.shard()
-
-        args.bos_idx = src_vocab.bos_idx
-        args.eos_idx = src_vocab.eos_idx
-        args.unk_idx = src_vocab.unk_idx
 
         data_loader = DataLoader(
             dataset=dataset,
@@ -173,27 +124,28 @@ def create_data_loader(args, places=None):
 
 def create_infer_loader(args, places=None):
     data_files = {'test': args.predict_file, }
-    reader_instance = TextReader(only_src=True)
-    dataset = reader_instance.read_datasets(data_files=data_files)
+    dataset = load_dataset(
+        read, src_tgt_file=data_files['test'], only_src=True, lazy=False)
 
-    src_vocab = Vocab(
-        vocab_file=args.src_vocab_fpath,
-        start_mark=args.special_token[0],
-        end_mark=args.special_token[1],
-        unk_mark=args.special_token[2])
-    trg_vocab = Vocab(
-        vocab_file=args.trg_vocab_fpath,
-        start_mark=args.special_token[0],
-        end_mark=args.special_token[1],
-        unk_mark=args.special_token[2])
+    src_vocab = Vocab.load_vocabulary(
+        args.src_vocab_fpath,
+        bos_token=args.special_token[0],
+        eos_token=args.special_token[1],
+        unk_token=args.special_token[2])
 
-    args.src_vocab_size = src_vocab.get_vocab_size()
-    args.trg_vocab_size = trg_vocab.get_vocab_size()
+    trg_vocab = Vocab.load_vocabulary(
+        args.trg_vocab_fpath,
+        bos_token=args.special_token[0],
+        eos_token=args.special_token[1],
+        unk_token=args.special_token[2])
+
+    args.src_vocab_size = len(src_vocab)
+    args.trg_vocab_size = len(trg_vocab)
 
     def convert_samples(sample):
         source = [item.strip() for item in sample['src'].split()]
-        source = src_vocab.covert_tokens_to_ids(source) + [src_vocab.eos_idx]
-        target = [trg_vocab.bos_idx]
+        source = src_vocab.to_indices(source) + [args.eos_idx]
+        target = [args.bos_idx]
         return source, target
 
     dataset = dataset.map(convert_samples, lazy=False)
@@ -210,7 +162,7 @@ def create_infer_loader(args, places=None):
         num_workers=0,
         return_list=True)
 
-    return data_loader, trg_vocab.covert_ids_to_tokens
+    return data_loader, trg_vocab.to_tokens
 
 
 def prepare_train_input(insts, pad_idx):
