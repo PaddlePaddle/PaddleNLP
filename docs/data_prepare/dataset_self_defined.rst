@@ -120,19 +120,36 @@
     from paddlenlp.datasets import MapDataset
     from datasets import load_dataset
     
-    hg_ds = load_dataset('msra_ner', split='train')
-    print(tpye(hg_ds)) # <class 'datasets.arrow_dataset.Dataset'>
+    train_ds = load_dataset('msra_ner', split='train')
+    print(type(train_ds)) # <class 'datasets.arrow_dataset.Dataset'>
 
-    ppnlp_ds = MapDataset(hg_ds)
-    print(tpye(ppnlp_ds)) # <class 'paddlenlp.datasets.dataset.MapDataset'>
+    train_ds = MapDataset(train_ds)
+    print(type(train_ds)) # <class 'paddlenlp.datasets.dataset.MapDataset'>
 
-    print(ppnlp_ds[0]) # {'id': '0', 
-                       #  'ner_tags': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                       #               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                       #               0, 0, 0, 0, 0, 0, 0, 0], 
-                       #  'tokens': ['当', '希', '望', '工', '程', '救', '助', '的', '百', '万', '儿', 
-                       #             '童', '成', '长', '起', '来', '，', '科', '教', '兴', '国', '蔚', 
-                       #             '然', '成', '风', '时', '，', '今', '天', '有', '收', '藏', '价', 
-                       #             '值', '的', '书', '你', '没', '买', '，', '明', '日', '就', '叫', 
-                       #             '你', '悔', '不', '当', '初', '！']}
+    print(train_ds[2]) # {'id': '2', 
+                       #  'ner_tags': [0, 0, 0, 5, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                       #               0, 0, 0, 0, 0, 0, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+                       #  'tokens': ['因', '有', '关', '日', '寇', '在', '京', '掠', '夺', '文', '物',
+                       #             '详', '情', '，', '藏', '界', '较', '为', '重', '视', '，', '也', 
+                       #             '是', '我', '们', '收', '藏', '北', '京', '史', '料', '中', '的',
+                       #             '要', '件', '之', '一', '。']}
 
+    train_ds = load_dataset('cmrc2018', split='train')
+    train_ds = MapDataset(train_ds)
+    print(train_ds[1818]) # {'answers': {'answer_start': [9], 'text': ['字仲可']}, 
+                          #  'context': '徐珂（），原名昌，字仲可，浙江杭县（今属杭州市）人。光绪举人。
+                          #              后任商务印书馆编辑。参加南社。1901年在上海担任了《外交报》、
+                          #              《东方杂志》的编辑，1911年，接管《东方杂志》的“杂纂部”。与潘仕成、
+                          #              王晋卿、王辑塘、冒鹤亭等友好。编有《清稗类钞》、《历代白话诗选》、
+                          #              《古今词选集评》等。光绪十五年（1889年）举人。后任商务印书馆编辑。
+                          #              参加南社。曾担任袁世凯在天津小站练兵时的幕僚，不久离去。', 
+                          #  'id': 'TRAIN_113_QUERY_0', 
+                          #  'question': '徐珂字什么？'}
+    
+    train_ds = load_dataset('glue', 'sst2', split='train')
+    train_ds = MapDataset(train_ds)
+    print(train_ds[0]) # {'idx': 0, 'label': 0, 'sentence': 'hide new secretions from the parental units '}
+
+    train_ds = load_dataset('ptb_text_only', split='train')
+    train_ds = MapDataset(train_ds)
+    print(train_ds[1]) # {'sentence': 'pierre <unk> N years old will join the board as a nonexecutive director nov. N'}
