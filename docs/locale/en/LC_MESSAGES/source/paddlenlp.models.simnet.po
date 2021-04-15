@@ -1,0 +1,106 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.models.simnet.rst:2
+msgid "simnet"
+msgstr ""
+
+#: of paddlenlp.models.simnet.BoWModel:1 paddlenlp.models.simnet.CNNModel:1
+#: paddlenlp.models.simnet.GRUModel:1 paddlenlp.models.simnet.LSTMModel:1
+#: paddlenlp.models.simnet.SimNet:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+
+#: of paddlenlp.models.simnet.BoWModel.forward:1
+#: paddlenlp.models.simnet.CNNModel.forward:1
+#: paddlenlp.models.simnet.GRUModel.forward:1
+#: paddlenlp.models.simnet.LSTMModel.forward:1
+#: paddlenlp.models.simnet.SimNet.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of paddlenlp.models.simnet.BoWModel.forward
+#: paddlenlp.models.simnet.CNNModel.forward
+#: paddlenlp.models.simnet.GRUModel.forward
+#: paddlenlp.models.simnet.LSTMModel.forward
+#: paddlenlp.models.simnet.SimNet.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.models.simnet.BoWModel.forward:4
+#: paddlenlp.models.simnet.CNNModel.forward:4
+#: paddlenlp.models.simnet.GRUModel.forward:4
+#: paddlenlp.models.simnet.LSTMModel.forward:4
+#: paddlenlp.models.simnet.SimNet.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of paddlenlp.models.simnet.BoWModel.forward:6
+#: paddlenlp.models.simnet.CNNModel.forward:6
+#: paddlenlp.models.simnet.GRUModel.forward:6
+#: paddlenlp.models.simnet.LSTMModel.forward:6
+#: paddlenlp.models.simnet.SimNet.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of paddlenlp.models.simnet.BoWModel:1
+msgid ""
+"This class implements the Bag of Words Classification Network model to "
+"classify texts. At a high level, the model starts by embedding the tokens"
+" and running them through a word embedding. Then, we encode these "
+"epresentations with a `BoWEncoder`. Lastly, we take the output of the "
+"encoder to create a final representation, which is passed through some "
+"feed-forward layers to output a logits (`output_layer`). :param "
+"vocab_size (obj: `int`): The vocabulary size. :param emb_dim (obj: `int`,"
+" optional, defaults to 128):  The embedding dimension. :param padding_idx"
+" (obj: `int`, optinal, defaults to 0) : The pad token index. :param "
+"hidden_size (obj: `int`, optional, defaults to 128): The first full-"
+"connected layer hidden size. :param fc_hidden_size (obj: `int`, optional,"
+" defaults to 96): The second full-connected layer hidden size. :param "
+"num_classes (obj: `int`): All the labels that the data has."
+msgstr ""
+
+#: of paddlenlp.models.simnet.CNNModel:1
+msgid "This class implements the"
+msgstr ""
+
+#: of paddlenlp.models.simnet.CNNModel:4
+msgid "Convolution Neural Network model."
+msgstr ""
+
+#: of paddlenlp.models.simnet.CNNModel:5
+msgid ""
+"At a high level, the model starts by embedding the tokens and running "
+"them through a word embedding. Then, we encode these epresentations with "
+"a `CNNEncoder`. The CNN has one convolution layer for each ngram filter "
+"size. Each convolution operation gives out a vector of size num_filter. "
+"The number of times a convolution layer will be used is `num_tokens - "
+"ngram_size + 1`. The corresponding maxpooling layer aggregates all these "
+"outputs from the convolution layer and outputs the max. Lastly, we take "
+"the output of the encoder to create a final representation, which is "
+"passed through some feed-forward layers to output a logits "
+"(`output_layer`). :param vocab_size (obj: `int`): The vocabulary size. "
+":param emb_dim (obj: `int`, optional, defaults to 128):  The embedding "
+"dimension. :param padding_idx (obj: `int`, optinal, defaults to 0) : The "
+"pad token index. :param num_classes (obj: `int`): All the labels that the"
+" data has."
+msgstr ""
+

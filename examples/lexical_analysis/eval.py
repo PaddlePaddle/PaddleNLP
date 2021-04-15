@@ -16,6 +16,7 @@
 import os
 import math
 import argparse
+from functools import partial
 
 import numpy as np
 import paddle
@@ -23,7 +24,7 @@ from paddle.static import InputSpec
 from paddlenlp.data import Pad, Tuple, Stack
 from paddlenlp.metrics import ChunkEvaluator
 
-from data import LacDataset
+from data import load_dataset, load_vocab, convert_example
 from model import BiGruCrf
 
 # yapf: disable
@@ -32,7 +33,7 @@ parser.add_argument("--data_dir", type=str, default=None, help="The folder where
 parser.add_argument("--init_checkpoint", type=str, default=None, help="Path to init model.")
 parser.add_argument("--batch_size", type=int, default=300, help="The number of sequences contained in a mini-batch.")
 parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
-parser.add_argument('--use_gpu', action='store_true', help='If set, use gpu to excute')
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
 parser.add_argument("--emb_dim", type=int, default=128, help="The dimension in which a word is embedded.")
 parser.add_argument("--hidden_size", type=int, default=128, help="The number of hidden nodes in the GRU layer.")
 args = parser.parse_args()
@@ -40,47 +41,63 @@ args = parser.parse_args()
 
 
 def evaluate(args):
-    place = paddle.CUDAPlace(0) if args.use_gpu else paddle.CPUPlace()
-    paddle.set_device("gpu" if args.use_gpu else "cpu")
+    paddle.set_device(args.device)
 
     # create dataset.
-    test_dataset = LacDataset(args.data_dir, mode='test')
+    test_ds = load_dataset(datafiles=(os.path.join(args.data_dir, 'test.tsv')))
+    word_vocab = load_vocab(os.path.join(args.data_dir, 'word.dic'))
+    label_vocab = load_vocab(os.path.join(args.data_dir, 'tag.dic'))
+    # q2b.dic is used to replace DBC case to SBC case
+    normlize_vocab = load_vocab(os.path.join(args.data_dir, 'q2b.dic'))
+
+    trans_func = partial(
+        convert_example,
+        max_seq_len=args.max_seq_len,
+        word_vocab=word_vocab,
+        label_vocab=label_vocab,
+        normlize_vocab=normlize_vocab)
+    test_ds.map(trans_func)
+
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=0),  # word_ids
-        Stack(),  # length
-        Pad(axis=0, pad_val=0),  # label_ids
+        Pad(axis=0, pad_val=0, dtype='int64'),  # word_ids
+        Stack(dtype='int64'),  # length
+        Pad(axis=0, pad_val=0, dtype='int64'),  # label_ids
     ): fn(samples)
 
     # Create sampler for dataloader
     test_sampler = paddle.io.BatchSampler(
-        dataset=test_dataset,
+        dataset=test_ds,
         batch_size=args.batch_size,
         shuffle=False,
         drop_last=False)
     test_loader = paddle.io.DataLoader(
-        dataset=test_dataset,
+        dataset=test_ds,
         batch_sampler=test_sampler,
-        places=place,
         return_list=True,
         collate_fn=batchify_fn)
 
     # Define the model network and metric evaluator
-    network = BiGruCrf(args.emb_dim, args.hidden_size, test_dataset.vocab_size,
-                       test_dataset.num_labels)
-    inputs = InputSpec(shape=(-1, ), dtype="int16", name='inputs')
-    lengths = InputSpec(shape=(-1, ), dtype="int16", name='lengths')
-    model = paddle.Model(network, inputs=[inputs, lengths])
-    chunk_evaluator = ChunkEvaluator(
-        label_list=test_dataset.label_vocab.keys(), suffix=True)
-    model.prepare(None, None, chunk_evaluator)
+    model = BiGruCrf(args.emb_dim, args.hidden_size,
+                     len(word_vocab), len(label_vocab))
+    chunk_evaluator = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
 
     # Load the model and start predicting
-    model.load(args.init_checkpoint)
-    model.evaluate(
-        eval_data=test_loader,
-        batch_size=args.batch_size,
-        log_freq=100,
-        verbose=2, )
+    model_dict = paddle.load(args.init_checkpoint)
+    model.load_dict(model_dict)
+
+    model.eval()
+    chunk_evaluator.reset()
+    for batch in test_loader:
+        token_ids, length, labels = batch
+        preds = model(token_ids, length)
+        num_infer_chunks, num_label_chunks, num_correct_chunks = chunk_evaluator.compute(
+            length, preds, labels)
+        chunk_evaluator.update(num_infer_chunks.numpy(),
+                               num_label_chunks.numpy(),
+                               num_correct_chunks.numpy())
+        precision, recall, f1_score = chunk_evaluator.accumulate()
+    print("eval precision: %f, recall: %f, f1: %f" %
+          (precision, recall, f1_score))
 
 
 if __name__ == '__main__':

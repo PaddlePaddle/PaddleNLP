@@ -1,7 +1,7 @@
 # Global Enviroment Settings 
 
 # trainer config ------
-n_gpu: 1 # number of gpus used to train, delete it, if use cpu
+device: "gpu" # use cpu or gpu devices to train.
 seed: 2020
 
 task: "link_prediction"
