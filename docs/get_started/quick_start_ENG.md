@@ -102,13 +102,13 @@ Display part of data:
 >>> for idx in range(5):
 ...     print(train_ds[idx])
 
-{'text': 'The reason for choosing Zhujiang Garden was its convenience. There were escalators directly to the seaside, and there were restaurants, food galleries, shopping malls, supermarkets and stalls all around.
-The decoration of the hotel was not bad, but it's clean and tidy. The pool was on the roof, so it's very small. But my daughter liked it. The breakfast was western-style and rich. Service? Not bad
-', 'label': 1}
-{'text': 'The keyboard of 15.4" laptop is really cool. It's just like the desktop. I really like the numeric keypad. It's very convenient for inputting numbers. It's also very beautiful and the workmanship is quite good', 'label': 1}
-{'text': 'The room was so small, and others were not bad…', 'label': 0}
-{'text': '1. Only a few minutes since plugged in, the power adapter became too hot. 2.Camera did not work. 3.The piano lacquer of the cover couldn’t be touched, or there would be some marks left. 4.It’s not easy to distinguish hard disks.', 'label': 0}
-{'text': 'Until today, I know that there is the 6th volume of this book, which is a little depressing. Why does one set of books have two versions? Should Dangdang coordinate with the publisher to publish the 6th volume as a single book? Then our kids will not feel regretful.', 'label': 1}
+{'text': '选择珠江花园的原因就是方便，有电动扶梯直接到达海边，周围餐馆、食廊、商场、超市、摊位一应俱全。
+酒店装修一般，但还算整洁。 泳池在大堂的屋顶，因此很小，不过女儿倒是喜欢。 包的早餐是西式的，还算丰富。 服务吗，一般', 'label': 1}
+{'text': '15.4寸笔记本的键盘确实爽，基本跟台式机差不多了，蛮喜欢数字小键盘，输数字特方便，样子也很美观，做工也相当不错', 'label': 1}
+{'text': '房间太小。其他的都一般。。。。。。。。。', 'label': 0}
+{'text': '1.接电源没有几分钟,电源适配器热的不行. 2.摄像头用不起来. 3.机盖的钢琴漆，手不能摸，一摸一个印. 4.硬盘分区不好办.', 'label': 0}
+{'text': '今天才知道这书还有第6卷,真有点郁闷:为什么同一套书有两种版本呢?当当网是不是该跟出版社商量商量,
+单独出个第6卷,让我们的孩子不会有所遗憾。', 'label': 1}
 ```
 
 ## 5\. Model Training and Evaluation
@@ -135,9 +135,9 @@ Let’s take the self-defined data and data labels as an example:
 
 ``` {.}
 >>> data = [
-...     'This hotel was a little old, and the special promotion room was not bad. Overall, it was just so so',
-...     'I was excited to show the films. When the film was finished, there was one episode of the cartoon–Mickey Mouse',
-...     'As the old four-star hotel, its rooms were tidy and clean, which was really good. The collection service from the airport was so nice that you could check-in on the bus and saved the time.',
+...     '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
+...     '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
+...     '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
 ... ]
 >>> label_map = {0: 'negative', 1: 'positive'}
 ```
@@ -149,8 +149,8 @@ And you will get the inference result:
 ...     model, data, tokenizer, label_map, batch_size=batch_size)
 >>> for idx, text in enumerate(data):
 ...     print('Data: {} \t Label: {}'.format(text, results[idx]))
-Data: This hotel was a little old, and the special promotion room was not bad. Overall, it was just so so      Label: negative
-Data: I was excited to show the films. When the film was finished, there was one episode of the cartoon–Mickey Mouse    Label: negative
-Data: As the old four-star hotel, its rooms were tidy and clean, which was really good. The collection service from the airport was so nice that you could check-in on the bus and saved the time.   Label: positive
+Data: 这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般     Label: negative
+Data: 怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片    Label: negative
+Data: 作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。   Label: positive
 ```
 
