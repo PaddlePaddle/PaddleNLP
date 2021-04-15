@@ -1,3 +1,5 @@
+add_definitions(-DNDEBUG)
+
 if(ON_INFER)
   add_definitions(-DPADDLE_ON_INFERENCE)
 
@@ -253,7 +255,9 @@ else(ON_INFER)
   add_definitions(-DPADDLE_WITH_CUDA)
   add_definitions(-DEIGEN_USE_GPU)
   add_definitions(-DPADDLE_USE_DSO)
-  add_definitions(-DPADDLE_WITH_MKLDNN)
+  if (WITH_MKL)
+    add_definitions(-DPADDLE_WITH_MKLDNN)
+  endif()
 
   add_library(decoding_op SHARED ${decoding_op_files})
   add_dependencies(decoding_op extern_${THIRD_PARTY_NAME} boost)
