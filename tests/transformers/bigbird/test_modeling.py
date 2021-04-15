@@ -12,21 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import numpy as np
 import os
-import unittest
 import paddle
 from paddlenlp.transformers import BigBirdForSequenceClassification, \
     BigBirdPretrainingCriterion, BigBirdForPretraining, BigBirdModel
 from paddlenlp.transformers import create_bigbird_rand_mask_idx_list
 
 from common_test import CommonTest
-from util import softmax_with_cross_entropy
+from util import softmax_with_cross_entropy, slow
 import unittest
 
 
-def create_input_data(config):
-    np.random.seed(102)
+def create_input_data(config, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
     rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
         config["num_layers"], config["seq_len"], config["seq_len"],
         config["nhead"], config["block_size"], config["window_size"],
@@ -53,17 +54,6 @@ def create_input_data(config):
     return rand_mask_idx_list, input_ids, masked_lm_positions
 
 
-def create_bigbird_model(config, filename, TEST_MODEL_CLASS):
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    model_file = os.path.join(dir_path, '{}.pdparams'.format(filename))
-    if not os.path.exists(model_file):
-        paddle.seed(102)
-        bigbird = BigBirdModel(**config)
-        model = TEST_MODEL_CLASS(bigbird)
-        paddle.save(model.state_dict(), model_file)
-    return model_file
-
-
 class NpBigBirdPretrainingCriterion(object):
     def __init__(self, vocab_size, use_nsp=False, ignore_index=0):
         self.vocab_size = vocab_size
@@ -87,9 +77,9 @@ class NpBigBirdPretrainingCriterion(object):
 
 
 class TestBigBirdForSequenceClassification(CommonTest):
-    def setUp(self):
-        self.config = BigBirdModel.pretrained_init_configuration[
-            'bigbird-base-uncased']
+    def set_input(self):
+        self.config = copy.deepcopy(BigBirdModel.pretrained_init_configuration[
+            'bigbird-base-uncased'])
         self.config['num_layers'] = 2
         self.config['vocab_size'] = 1024
         self.config['attn_dropout'] = 0.0
@@ -98,49 +88,55 @@ class TestBigBirdForSequenceClassification(CommonTest):
         self.config['seq_len'] = 1024
         self.config['batch_size'] = 2
         self.config['max_position_embeddings'] = 2048
-
-        self.model_file = create_bigbird_model(self.config, "test_bigbird_cls",
-                                               BigBirdForSequenceClassification)
-        self.rand_mask_idx_list, self.input_ids, _ = create_input_data(
-            self.config)
-
-    def test_forward(self):
-        bigbird = BigBirdModel(**self.config)
-        model = BigBirdForSequenceClassification(bigbird)
-        state_dict = paddle.load(self.model_file)
-        model.set_state_dict(state_dict)
-        input_ids = paddle.to_tensor(self.input_ids)
-        rand_mask_idx_list = paddle.to_tensor(self.rand_mask_idx_list)
-        output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
-        expected_output = np.array(
-            [[0.38314182, -0.13412490], [0.32075390, 0.07187212]])
-
-        self.check_output_equal(output.numpy(), expected_output)
-
-
-class TestBigBirdForPretraining(CommonTest):
-    def setUp(self):
-        self.config = BigBirdModel.pretrained_init_configuration[
-            'bigbird-base-uncased']
-        self.config['num_layers'] = 2
-        self.config['vocab_size'] = 1024
-        self.config['attn_dropout'] = 0.0
-        self.config['hidden_dropout_prob'] = 0.0
-        self.config['dim_feedforward'] = 1024
-        self.config['seq_len'] = 1024
-        self.config['batch_size'] = 2
-        self.config['max_position_embeddings'] = 2048
-
-        self.model_file = create_bigbird_model(
-            self.config, "test_bigbird_pretrain", BigBirdForPretraining)
         self.rand_mask_idx_list, self.input_ids, self.masked_lm_positions = create_input_data(
             self.config)
 
+    def set_output(self):
+        self.expected_shape = (self.config['batch_size'], 2)
+
+    def setUp(self):
+        self.set_model_class()
+        self.set_input()
+        self.set_output()
+
+    def set_model_class(self):
+        self.TEST_MODEL_CLASS = BigBirdForSequenceClassification
+
     def test_forward(self):
         bigbird = BigBirdModel(**self.config)
-        model = BigBirdForPretraining(bigbird)
-        state_dict = paddle.load(self.model_file)
-        model.set_state_dict(state_dict)
+        model = self.TEST_MODEL_CLASS(bigbird)
+        input_ids = paddle.to_tensor(self.input_ids)
+        rand_mask_idx_list = paddle.to_tensor(self.rand_mask_idx_list)
+        output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
+        self.check_output_equal(self.expected_shape, output.numpy().shape)
+
+
+class TestBigBirdForPretraining(TestBigBirdForSequenceClassification):
+    def set_input(self):
+        self.config = copy.deepcopy(BigBirdModel.pretrained_init_configuration[
+            'bigbird-base-uncased'])
+        self.config['num_layers'] = 2
+        self.config['vocab_size'] = 512
+        self.config['attn_dropout'] = 0.0
+        self.config['hidden_dropout_prob'] = 0.0
+        self.config['dim_feedforward'] = 1024
+        self.config['seq_len'] = 1024
+        self.config['batch_size'] = 2
+        self.config['max_position_embeddings'] = 2048
+        self.rand_mask_idx_list, self.input_ids, self.masked_lm_positions = create_input_data(
+            self.config)
+
+    def set_model_class(self):
+        self.TEST_MODEL_CLASS = BigBirdForPretraining
+
+    def set_output(self):
+        self.expected_pred_shape = (self.masked_lm_positions.shape[0],
+                                    self.config['vocab_size'])
+        self.expected_seq_shape = (self.config['batch_size'], 2)
+
+    def test_forward(self):
+        bigbird = BigBirdModel(**self.config)
+        model = self.TEST_MODEL_CLASS(bigbird)
         input_ids = paddle.to_tensor(self.input_ids)
         rand_mask_idx_list = paddle.to_tensor(self.rand_mask_idx_list)
         masked_positions = paddle.to_tensor(self.masked_lm_positions)
@@ -148,23 +144,10 @@ class TestBigBirdForPretraining(CommonTest):
             input_ids,
             rand_mask_idx_list=rand_mask_idx_list,
             masked_positions=masked_positions)
-
-        expected_prediction_scores_sum = np.array([-0.00156948])
-        expected_prediction_scores_abs_sum = np.array([0.44451436])
-        expected_seq_relationship_score = np.array(
-            [[-0.23682573, -0.78529185], [0.20035000, -0.75405741]])
-
-        prediction_scores_sum = output[0].sum().numpy() / output[0].size
-        prediction_scores_abs_sum = output[0].abs().sum().numpy() / output[
-            0].size
-        seq_relationship_score = output[1].numpy()
-
-        self.check_output_equal(prediction_scores_sum,
-                                expected_prediction_scores_sum)
-        self.check_output_equal(prediction_scores_abs_sum,
-                                expected_prediction_scores_abs_sum)
-        self.check_output_equal(seq_relationship_score,
-                                expected_seq_relationship_score)
+        self.check_output_equal(output[0].numpy().shape,
+                                self.expected_pred_shape)
+        self.check_output_equal(output[1].numpy().shape,
+                                self.expected_seq_shape)
 
 
 class TestBigBirdPretrainingCriterionUseNSP(CommonTest):
@@ -214,6 +197,42 @@ class TestBigBirdPretrainingCriterionNotUseNSP(
         self.config['use_nsp'] = False
         self.criterion = BigBirdPretrainingCriterion(**self.config)
         self.np_criterion = NpBigBirdPretrainingCriterion(**self.config)
+
+
+class TestBigBirdFromPretrain(CommonTest):
+    @slow
+    def test_bigbird_base_uncased(self):
+        model = BigBirdModel.from_pretrained(
+            'bigbird-base-uncased', attn_dropout=0.0, hidden_dropout_prob=0.0)
+        self.config = copy.deepcopy(model.config)
+        self.config['seq_len'] = 512
+        self.config['batch_size'] = 3
+
+        rand_mask_idx_list, input_ids, _ = create_input_data(self.config, 102)
+        input_ids = paddle.to_tensor(input_ids)
+        rand_mask_idx_list = paddle.to_tensor(rand_mask_idx_list)
+        output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
+
+        expected_seq_shape = (self.config['batch_size'], self.config['seq_len'],
+                              self.config['hidden_size'])
+        expected_pooled_shape = (self.config['batch_size'],
+                                 self.config['hidden_size'])
+        self.check_output_equal(output[0].numpy().shape, expected_seq_shape)
+        self.check_output_equal(output[1].numpy().shape, expected_pooled_shape)
+
+        expected_seq_slice = np.array([[0.06685783, 0.01576832, -0.14448889],
+                                       [0.16531630, 0.00974050, -0.15113291],
+                                       [0.08514148, -0.01252885, -0.12458798]])
+        # There's output diff about 1e-4 between cpu and gpu
+        self.check_output_equal(
+            output[0].numpy()[0, 0:3, 0:3], expected_seq_slice, atol=1e-4)
+
+        expected_pooled_slice = np.array(
+            [[0.78695089, 0.87273526, -0.88046724],
+             [0.66016346, 0.74889791, -0.76608104],
+             [0.15944470, 0.25242448, -0.34336662]])
+        self.check_output_equal(
+            output[1].numpy()[0:3, 0:3], expected_pooled_slice, atol=1e-4)
 
 
 if __name__ == "__main__":

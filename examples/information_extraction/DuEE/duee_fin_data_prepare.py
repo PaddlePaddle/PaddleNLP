@@ -245,11 +245,11 @@ if __name__ == "__main__":
     print("\n********** start document process **********")
     if not os.path.exists(sentence_dir):
         os.makedirs(sentence_dir)
-    train_sent = docs_data_process("{}/train.json".format(data_dir))
+    train_sent = docs_data_process("{}/duee_fin_train.json".format(data_dir))
     write_by_lines("{}/train.json".format(sentence_dir), train_sent)
-    dev_sent = docs_data_process("{}/dev.json".format(data_dir))
+    dev_sent = docs_data_process("{}/duee_fin_dev.json".format(data_dir))
     write_by_lines("{}/dev.json".format(sentence_dir), dev_sent)
-    test_sent = docs_data_process("{}/test.json".format(data_dir))
+    test_sent = docs_data_process("{}/duee_fin_test1.json".format(data_dir))
     write_by_lines("{}/test.json".format(sentence_dir), test_sent)
     print("train {} dev {} test {}".format(
         len(train_sent), len(dev_sent), len(test_sent)))

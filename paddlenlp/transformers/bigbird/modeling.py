@@ -231,34 +231,11 @@ class BigBirdPretrainedModel(PretrainedModel):
             "num_labels": 2,
             "initializer_range": 0.02,
         },
-        "bigbird-base-uncased-finetune": {
-            "num_layers": 12,
-            "vocab_size": 50358,
-            "nhead": 12,
-            "attn_dropout": 0.0,
-            "dim_feedforward": 3072,
-            "activation": "gelu",
-            "normalize_before": False,
-            "block_size": 16,
-            "window_size": 3,
-            "num_global_blocks": 2,
-            "num_rand_blocks": 3,
-            "seed": None,
-            "pad_token_id": 0,
-            "hidden_size": 768,
-            "hidden_dropout_prob": 0.0,
-            "max_position_embeddings": 4096,
-            "type_vocab_size": 2,
-            "num_labels": 2,
-            "initializer_range": 0.02,
-        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "bigbird-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/bigbird-base-uncased.pdparams",
-            "bigbird-base-uncased-finetune":
             "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/bigbird-base-uncased.pdparams",
         }
     }
@@ -355,22 +332,24 @@ class BigBirdModel(BigBirdPretrainedModel):
 
 
 class BigBirdForSequenceClassification(BigBirdPretrainedModel):
-    def __init__(self, bigbird):
+    def __init__(self, bigbird, num_classes=None):
         super(BigBirdForSequenceClassification, self).__init__()
         self.bigbird = bigbird
-        self.linear = nn.Linear(self.bigbird.config["hidden_size"],
-                                self.bigbird.config["num_labels"])
+        if num_classes is None:
+            num_classes = self.bigbird.config["num_labels"]
+        self.linear = nn.Linear(self.bigbird.config["hidden_size"], num_classes)
         self.dropout = nn.Dropout(
             self.bigbird.config['hidden_dropout_prob'], mode="upscale_in_train")
         self.apply(self.init_weights)
 
     def forward(self,
                 input_ids,
+                token_type_ids=None,
                 attention_mask_list=None,
                 rand_mask_idx_list=None):
         _, pooled_output = self.bigbird(
             input_ids,
-            None,
+            token_type_ids,
             attention_mask_list=attention_mask_list,
             rand_mask_idx_list=rand_mask_idx_list)
         output = self.dropout(pooled_output)
@@ -391,7 +370,7 @@ class BigBirdLMPredictionHead(Layer):
         self.decoder_weight = self.create_parameter(
             shape=[hidden_size, vocab_size],
             dtype=self.transform.weight.dtype,
-            is_bias=True) if embedding_weights is None else embedding_weights
+            is_bias=False) if embedding_weights is None else embedding_weights
         self.decoder_bias = self.create_parameter(
             shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
 

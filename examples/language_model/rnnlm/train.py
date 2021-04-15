@@ -121,8 +121,4 @@ def train(args):
 
 if __name__ == '__main__':
     args = parse_args()
-    assert args.device in [
-        "cpu", "gpu", "xpu"
-    ], "Invalid device! Available device should be cpu, gpu, or xpu."
-
     train(args)
