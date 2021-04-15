@@ -41,6 +41,7 @@ from tensorboardX import SummaryWriter
 
 from data import create_pretrained_dataset
 import lr
+from topo import Topology
 
 MODEL_CLASSES = {
     "gpt2": (GPT2ForPretraining, GPT2Tokenizer),
@@ -261,7 +262,7 @@ def dist_optimizer(args, optimizer, model, worker_num):
     dist_strategy = fleet.DistributedStrategy()
     dist_strategy.execution_strategy = exec_strategy
     dist_strategy.build_strategy = build_strategy
-    dist_strategy.nccl_comm_num = 1
+    dist_strategy.nccl_comm_num = 3
 
     dist_strategy.fuse_grad_size_in_MB = 16
     if args.use_amp:
@@ -282,14 +283,13 @@ def dist_optimizer(args, optimizer, model, worker_num):
         # }
     if args.use_sharding:
         dist_strategy.sharding = True
-        if worker_num > 8:
-            dist_strategy.sharding_configs = {
-                "fuse_broadcast_MB": 32,
-                "hybird_dp": True,
-                "sharding_group_size": 8,
-            }
-        else:
-            dist_strategy.sharding_configs = {"fuse_broadcast_MB": 32, }
+        dist_strategy.sharding_configs = {
+            "segment_broadcast_MB": 32,
+            "sharding_degree": args.sharding_degree,
+            "mp_degree": args.mp_degree,
+            "pp_degree": args.pp_degree,
+            "dp_degree": args.dp_degree,
+        }
 
     if args.use_recompute:
         dist_strategy.recompute = True
@@ -344,6 +344,10 @@ def init_static_with_params(model, dygraph_params):
 
 def do_train(args):
     args.test_iters = args.eval_iters * 5
+    args.sharding_degree = 2
+    args.mp_degree = 2
+    args.pp_degree = 1
+    args.dp_degree = 1
     # Initialize the paddle and paddle fleet execute environment
     paddle.enable_static()
     assert args.device in [
@@ -355,18 +359,27 @@ def do_train(args):
     worker_num = fleet.worker_num()
     worker_index = fleet.worker_index()
 
+    topo = Topology(
+        rank=worker_index,
+        world_size=worker_num,
+        dp=args.dp_degree,
+        pp=args.pp_degree,
+        sharding=args.sharding_degree,
+        mp=args.mp_degree)
+
     # Create the random seed for the worker
     set_seed(args, worker_index)
     worker_init = WorkerInitObj(args.seed + worker_index)
 
     # create log write
-    log_writer_path = os.path.join(
-        args.output_dir, "gpt2_bs={}_amp={}_recompute={}_card={}".format(
-            args.batch_size, args.use_amp, args.use_recompute, worker_num))
-    if os.path.exists(log_writer_path):
-        import shutil
-        shutil.rmtree(log_writer_path)
-    log_writer = SummaryWriter(log_writer_path)
+    if worker_index == 0:
+        log_writer_path = os.path.join(
+            args.output_dir, "gpt2_bs_{}_amp_{}_recompute_{}_card_{}".format(
+                args.batch_size, args.use_amp, args.use_recompute, worker_num))
+        if os.path.exists(log_writer_path):
+            import shutil
+            shutil.rmtree(log_writer_path)
+        log_writer = SummaryWriter(log_writer_path)
 
     # Define the input data in the static mode
     main_program = paddle.static.default_main_program()
@@ -381,6 +394,8 @@ def do_train(args):
         args.model_name_or_path]
     if model_config["vocab_size"] % 8 != 0:
         model_config["vocab_size"] += 8 - (model_config["vocab_size"] % 8)
+    if args.mp_degree != 1:
+        model_config["topo"] = topo
 
     # create the model for the gpt model
     model = GPT2ForPretraining(GPT2Model(**model_config))
@@ -412,16 +427,18 @@ def do_train(args):
              p.name for n, p in model.named_parameters()
              if not any(nd in n for nd in ["bias", "norm"])]
 
-    optimizer = paddle.optimizer.AdamW(
+    #optimizer = paddle.optimizer.AdamW(
+    optimizer = paddle.fluid.optimizer.Adam(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
-        parameters=opt_param,
-        weight_decay=args.weight_decay,
+        parameter_list=opt_param,
+        #weight_decay=args.weight_decay,
         grad_clip=clip,
-        apply_decay_param_fun=decay_param)
+        #apply_decay_param_fun=decay_param
+    )
 
     # Use the fleet api to compile the distributed optimizer
-    optimizer.apply_optimize = optimizer._apply_optimize
+    #optimizer.apply_optimize = optimizer._apply_optimize
 
     optimizer = dist_optimizer(args, optimizer, model, worker_num)
     optimizer.minimize(loss)
@@ -455,12 +472,26 @@ def do_train(args):
             './init_checkponits/gpt2-init-small-bs32.pdparams')
     if init_dir is not None:
         print(init_dir)
-        init_static_with_params(model, paddle.load(init_dir))
+        # Sharding is incompatible with init params.
+        #init_static_with_params(model, paddle.load(init_dir))
 
     test_program = main_program.clone(for_test=True)
     if worker_num == 1:
         # Construct the compiled program
         main_program = build_compiled_program(args, main_program, loss)
+
+    program_desc_dir = os.path.join(args.output_dir, "program_desc")
+    if not os.path.isdir(program_desc_dir):
+        os.mkdir(program_desc_dir)
+
+    with open(program_desc_dir + "/main_program.txt.%d" %
+              (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
+        f.write(str(main_program))
+
+    with open(program_desc_dir + "/startup_program.txt.%d" %
+              (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
+        f.write(str(startup_program))
+
     global_step = 0
     tic_train = time.time()
     for epoch in range(args.num_train_epochs):
