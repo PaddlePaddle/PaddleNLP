@@ -54,7 +54,7 @@ python run_ernie.py
 ```
 
 
-#### 启动ERNIE + FC训练
+#### 启动ERNIE + CRF训练
 
 
 ```bash
