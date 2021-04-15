@@ -26,7 +26,41 @@ __all__ = ['AccuracyAndF1', 'Mcc', 'PearsonAndSpearman']
 
 class AccuracyAndF1(Metric):
     """
-    Encapsulates Accuracy, Precision, Recall and F1 metric logic.
+    This class encapsulates Accuracy, Precision, Recall and F1 metric logic.
+
+    Args:
+        topk (`int` or `tuple(int)`, optional):
+            Number of top elements to look at for computing accuracy.
+            Defaults to (1,).
+        pos_label (`int`, optional):
+            Defaults to 1.
+        name (`str`, optional):
+            String name of the metric instance. Defaults to 'acc_and_f1'.
+
+    Example:
+
+        .. code-block::
+
+            import paddle
+            from paddlenlp.metrics import AccuracyAndF1
+
+            metric = AccuracyAndF1()
+
+            # Users could run `run_glue.py` on GLUE-QQP for testing
+            @paddle.no_grad()
+            def evaluate(model, loss_fct, metric, data_loader):
+                model.eval
+                metric.reset()
+                for batch in data_loader:
+                    input_ids, segment_ids, labels = batch
+                    logits = model(input_ids, segment_ids)
+                    loss = loss_fct(logits, labels)
+                    correct = metric.compute(logits, labels)
+                    metric.update(correct)
+                res = metric.accumulate()
+                model.train()
+                return res
+
     """
 
     def __init__(self,
@@ -45,16 +79,68 @@ class AccuracyAndF1(Metric):
         self.reset()
 
     def compute(self, pred, label, *args):
+        """
+        Accepts network's output and the labels of dataloader, and calculates
+        with `Tensor`.
+
+        Args:
+            pred (`Tensor`): The predicted value is a Tensor with dtype
+                float32 or float64. Shape is [batch_size, d0, ..., dN].
+
+            label (`Tensor`): The ground truth value is Tensor with dtype
+                int64. Shape is [batch_size, d0, ..., 1], or
+                [batch_size, d0, ..., num_classes] in one hot representation.
+
+        Returns:
+            - output (`Tensor`):
+                Correct mask, a tensor with a data type of `float32` and a
+                shape of [batch_size, topk].
+
+        """
         self.label = label
         self.preds_pos = paddle.nn.functional.softmax(pred)[:, self.pos_label]
         return self.acc.compute(pred, label)
 
     def update(self, correct, *args):
+        """
+
+        Update the metrics states (accuracy, precision and recall), in order to
+        calculate accumulated accuracy, precision and recall of all instances.
+
+        Args:
+            correct (`Tensor`):
+                Correct mask for calculating accuracy, and it's a tensor with
+                shape [batch_size, topk] and has a dtype of int.
+
+        Returns:
+            None.
+
+        """
         self.acc.update(correct)
         self.precision.update(self.preds_pos, self.label)
         self.recall.update(self.preds_pos, self.label)
 
     def accumulate(self):
+        """
+        Calculates and returns the accumulated metric.
+
+        Returns:
+            A `tuple` of Metrics:
+
+            With the fileds:
+
+            - acc (`numpy.float64`):
+                The accumulated accuracy.
+            - precision (`numpy.float64`):
+                The accumulated precision.
+            - recall (`numpy.float64`):
+                The accumulated recall.
+            - f1 (`numpy.float64`):
+                The accumulated f1.
+            - average of acc and f1 (`numpy.float64`):
+                The average of accumulated accuracy and f1.
+
+        """
         acc = self.acc.accumulate()
         precision = self.precision.accumulate()
         recall = self.recall.accumulate()
@@ -71,6 +157,9 @@ class AccuracyAndF1(Metric):
             (acc + f1) / 2, )
 
     def reset(self):
+        """
+        Resets all of the metric state.
+        """
         self.acc.reset()
         self.precision.reset()
         self.recall.reset()
@@ -80,6 +169,11 @@ class AccuracyAndF1(Metric):
     def name(self):
         """
         Return name of metric instance.
+
+        Returns:
+           - name (`str`):
+               The name of the metric instance.
+
         """
         return self._name
 
