@@ -332,22 +332,24 @@ class BigBirdModel(BigBirdPretrainedModel):
 
 
 class BigBirdForSequenceClassification(BigBirdPretrainedModel):
-    def __init__(self, bigbird):
+    def __init__(self, bigbird, num_classes=None):
         super(BigBirdForSequenceClassification, self).__init__()
         self.bigbird = bigbird
-        self.linear = nn.Linear(self.bigbird.config["hidden_size"],
-                                self.bigbird.config["num_labels"])
+        if num_classes is None:
+            num_classes = self.bigbird.config["num_labels"]
+        self.linear = nn.Linear(self.bigbird.config["hidden_size"], num_classes)
         self.dropout = nn.Dropout(
             self.bigbird.config['hidden_dropout_prob'], mode="upscale_in_train")
         self.apply(self.init_weights)
 
     def forward(self,
                 input_ids,
+                token_type_ids=None,
                 attention_mask_list=None,
                 rand_mask_idx_list=None):
         _, pooled_output = self.bigbird(
             input_ids,
-            None,
+            token_type_ids,
             attention_mask_list=attention_mask_list,
             rand_mask_idx_list=rand_mask_idx_list)
         output = self.dropout(pooled_output)
@@ -368,7 +370,7 @@ class BigBirdLMPredictionHead(Layer):
         self.decoder_weight = self.create_parameter(
             shape=[hidden_size, vocab_size],
             dtype=self.transform.weight.dtype,
-            is_bias=True) if embedding_weights is None else embedding_weights
+            is_bias=False) if embedding_weights is None else embedding_weights
         self.decoder_bias = self.create_parameter(
             shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
 

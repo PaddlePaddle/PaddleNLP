@@ -454,7 +454,7 @@ class BertLMPredictionHead(Layer):
         self.decoder_weight = self.create_parameter(
             shape=[hidden_size, vocab_size],
             dtype=self.transform.weight.dtype,
-            is_bias=True) if embedding_weights is None else embedding_weights
+            is_bias=False) if embedding_weights is None else embedding_weights
         self.decoder_bias = self.create_parameter(
             shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
 

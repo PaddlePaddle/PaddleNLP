@@ -92,6 +92,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
         self.unk_id = vocab_dict[unk_token]
         self.cls_id = vocab_dict[cls_token]
         self.sep_id = vocab_dict[sep_token]
+        self.pad_id = vocab_dict[pad_token] if pad_token in vocab_dict else 0
 
     @property
     def vocab_size(self):
@@ -125,12 +126,12 @@ class BigBirdTokenizer(PretrainedTokenizer):
                 in_vocab_tokens.append(self.unk_token)
         return in_vocab_tokens
 
-    def __call__(self, text):
+    def __call__(self, text, pair_text=None):
         """
         End-to-end tokenization for BigBird models.
         Args:
             text (str): The text to be tokenized.
-        
+            pair_text(str):  The pair text to be tokenized.
         Returns:
             list: A list of string representing converted tokens.
         """
@@ -244,3 +245,49 @@ class BigBirdTokenizer(PretrainedTokenizer):
                                      [0, pred_padding_len], "constant")
         masked_lm_ids = np.pad(masked_lm_ids, [0, pred_padding_len], "constant")
         return span_ids, masked_lm_positions, masked_lm_ids, masked_lm_weights
+
+    def num_special_tokens_to_add(self, pair=False):
+        """
+        Returns the number of added tokens when encoding a sequence with special tokens.
+
+        Note:
+            This encodes inputs and checks the number of added tokens, and is therefore not efficient. Do not put this
+            inside your training loop.
+
+        Args:
+            pair: Returns the number of added tokens in the case of a sequence pair if set to True, returns the
+                number of added tokens in the case of a single sequence if set to False.
+
+        Returns:
+            Number of tokens added to sequences
+        """
+        token_ids_0 = []
+        token_ids_1 = []
+        return len(
+            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
+                                                  if pair else None))
+
+    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        """
+        Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
+        adding special tokens. 
+        
+        A BERT sequence has the following format:
+        ::
+            - single sequence: ``[CLS] X [SEP]``
+            - pair of sequences: ``[CLS] A [SEP] B [SEP]``
+
+        Args:
+            token_ids_0 (:obj:`List[int]`):
+                List of IDs to which the special tokens will be added.
+            token_ids_1 (:obj:`List[int]`, `optional`):
+                Optional second list of IDs for sequence pairs.
+
+        Returns:
+            :obj:`List[int]`: List of input_id with the appropriate special tokens.
+        """
+        if token_ids_1 is None:
+            return [self.cls_id] + token_ids_0 + [self.sep_id]
+        _cls = [self.cls_id]
+        _sep = [self.sep_id]
+        return _cls + token_ids_0 + _sep + token_ids_1 + _sep
