@@ -84,10 +84,12 @@ python -m paddle.distributed.launch --gpus "0,1"  train.py \
 
 ```bash
 python eval.py --data_dir ./lexical_analysis_dataset_tiny \
-        --init_checkpoint ./save_dir/final \
+        --init_checkpoint ./save_dir/model_100.pdparams \
         --batch_size 32 \
         --device gpu
 ```
+
+其中`./save_dir/model_100.pdparams`是训练过程中保存的参数文件，请更换为实际得到的训练保存路径。
 
 ### 模型预测
 
@@ -95,7 +97,7 @@ python eval.py --data_dir ./lexical_analysis_dataset_tiny \
 
 ```bash
 python predict.py --data_dir ./lexical_analysis_dataset_tiny \
-        --init_checkpoint ./save_dir/final \
+        --init_checkpoint ./save_dir/model_100.pdparams \
         --batch_size 32 \
         --device gpu
 ```

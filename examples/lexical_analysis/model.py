@@ -91,14 +91,9 @@ class BiGruCrf(nn.Layer):
         word_embed = self.word_embedding(inputs)
         bigru_output, _ = self.gru(word_embed)
         emission = self.fc(bigru_output)
-        _, prediction = self.viterbi_decoder(emission, lengths)
         if labels is not None:
-            loss = self.crf_loss(emission, lengths, prediction, labels)
-            return loss, lengths, prediction, labels
+            loss = self.crf_loss(emission, lengths, labels)
+            return loss
         else:
-            return inputs, lengths, prediction
-
-
-def get_loss(loss, lengths, prediction, labels):
-    # get loss from the output from the BiGruCrf forward
-    return loss
+            _, prediction = self.viterbi_decoder(emission, lengths)
+            return prediction
