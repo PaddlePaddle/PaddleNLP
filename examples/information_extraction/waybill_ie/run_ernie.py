@@ -43,6 +43,7 @@ def predict(model, data_loader, ds, label_vocab):
     for input_ids, seg_ids, lens, labels in data_loader:
         logits = model(input_ids, seg_ids)
         preds = paddle.argmax(logits, axis=-1)
+        # Drop CLS prediction
         preds = [pred[1:] for pred in preds.numpy()]
         all_preds.append(preds)
         all_lens.append(lens)

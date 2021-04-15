@@ -42,6 +42,7 @@ def predict(model, data_loader, ds, label_vocab):
     all_lens = []
     for input_ids, seg_ids, lens, labels in data_loader:
         preds = model(input_ids, seg_ids, lengths=lens)
+        # Drop CLS prediction
         preds = [pred[1:] for pred in preds.numpy()]
         all_preds.append(preds)
         all_lens.append(lens)
