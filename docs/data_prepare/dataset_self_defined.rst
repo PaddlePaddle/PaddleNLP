@@ -120,7 +120,7 @@
     from paddlenlp.datasets import MapDataset
     from datasets import load_dataset
     
-    train_ds = load_dataset('msra_ner', split='train')
+    hf_train_ds = load_dataset('msra_ner', split='train')
     print(type(train_ds)) # <class 'datasets.arrow_dataset.Dataset'>
 
     train_ds = MapDataset(train_ds)
@@ -134,7 +134,7 @@
                        #             '是', '我', '们', '收', '藏', '北', '京', '史', '料', '中', '的',
                        #             '要', '件', '之', '一', '。']}
 
-    train_ds = load_dataset('cmrc2018', split='train')
+    hf_train_ds = load_dataset('cmrc2018', split='train')
     train_ds = MapDataset(train_ds)
     print(train_ds[1818]) # {'answers': {'answer_start': [9], 'text': ['字仲可']}, 
                           #  'context': '徐珂（），原名昌，字仲可，浙江杭县（今属杭州市）人。光绪举人。
@@ -146,10 +146,10 @@
                           #  'id': 'TRAIN_113_QUERY_0', 
                           #  'question': '徐珂字什么？'}
     
-    train_ds = load_dataset('glue', 'sst2', split='train')
+    hf_train_ds = load_dataset('glue', 'sst2', split='train')
     train_ds = MapDataset(train_ds)
     print(train_ds[0]) # {'idx': 0, 'label': 0, 'sentence': 'hide new secretions from the parental units '}
 
-    train_ds = load_dataset('ptb_text_only', split='train')
+    hf_train_ds = load_dataset('ptb_text_only', split='train')
     train_ds = MapDataset(train_ds)
     print(train_ds[1]) # {'sentence': 'pierre <unk> N years old will join the board as a nonexecutive director nov. N'}
