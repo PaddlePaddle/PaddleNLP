@@ -13,7 +13,7 @@ If you want to know the installation, or meet with some problems, please refer t
 
 ## 2\. Load Pre-trained Models with One Click
 
-The essence of sentiment analysis is text classification. PaddleNLP has a lot of built-in pre-trained models like ERNIE, BERT, RoBERTa, Electra. There are also different finetuned nets of pre-trained models, aiming to process various downstream tasks. You can finish tasks like Q&A, sequence classification, token classification and so forth. If you want to know more details, please refer to [pre-trained models](https://paddlenlp.readthedocs.io/en/latest/modelzoo/transformer.html). We will take ERNIE as an example and introduce how to use the finetuned net of the pre-trained model to finish text classification tasks.
+The essence of sentiment analysis is text classification. PaddleNLP has many built-in pre-trained models like ERNIE, BERT, RoBERTa, Electra. There are also different finetuned nets of pre-trained models, aiming to process various downstream tasks. You can finish tasks like Q&A, sequence classification, token classification and so forth. If you want to know more details, please refer to [pre-trained models](https://paddlenlp.readthedocs.io/en/latest/modelzoo/transformer.html). We will take ERNIE as an example and introduce how to use the finetuned net of the pre-trained model to finish text classification tasks.
 
 Load the pre-trained model–ERNIE
 
