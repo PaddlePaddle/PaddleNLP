@@ -18,15 +18,15 @@ import os
 from datasets import load_dataset
 
 
-class BookscorpusTextFormatting:
-    def __init__(self, output_filename):
+class BookscorpusTextFormatter:
+    def __init__(self, save_path):
         self.bookcorpus_ds = load_dataset("bookcorpus")
         self.books_path = books_path
-        self.output_filename = output_filename
+        self.formatted_file = os.path.join(self.save_path, "book_formatted.txt")
 
     # This puts one book per line
     def merge(self):
-        with open(self.output_filename, mode='w', newline='\n') as ofile:
+        with open(self.formatted_file, mode='w', newline='\n') as ofile:
             for data in self.bookcorpus_ds['train']:
                 text = data['text']
                 if text.strip() != "":

@@ -17,10 +17,11 @@ import glob
 import os
 import urllib.request
 
+from paddlenlp.utils.log import logger
 from tqdm import tqdm
 
 
-class WikicorpusTextFormatting:
+class WikicorpusTextFormatter:
     def __init__(self, language, save_path):
         assert language.lower() in ["en", "zh"], \
             'WikicorpusTextFormatting is not implemented for language %s yet.' % language
@@ -51,13 +52,13 @@ class WikicorpusTextFormatting:
         filename = self.downloaded_files[self.language]
         downloaded_file = os.path.join(self.save_path, filename)
 
-        print('Downloading:', url)
+        logger.info('Downloading:', url)
         if os.path.isfile(self.save_path + '/' + filename):
-            print(f'File {filename} already exists, skipping download.')
+            logger.info(f'File {filename} already exists, skipping download.')
         else:
             response = urllib.request.urlopen(url)
             content_size = int(response.headers['Content-Length']) / 1024
-            print(
+            logger.info(
                 f"Downloading: {url}, content size: {content_size} k and saving file to {downloaded_file}."
             )
             with open(downloaded_file, "wb") as handle:
@@ -68,7 +69,7 @@ class WikicorpusTextFormatting:
                     handle.write(data)
 
             # Always unzipping since this is relatively fast and will overwrite
-            print('Unzipping: ', downloaded_file)
+            logger.info('Unzipping: ', downloaded_file)
             self.unzipped_file = os.path.join(self.save_path,
                                               filename.replace(".bz2", ""))
             file_size = os.path.getsize(self.unzipped_file) / 1024 * 1024
@@ -88,7 +89,7 @@ class WikicorpusTextFormatting:
 
     def merge(self):
         # This puts one article per line
-        print(
+        logger.info(
             "Formatting the raw wiki texts and it takes some time to process. Please wait some minutes."
         )
         cnt = 0
@@ -96,7 +97,7 @@ class WikicorpusTextFormatting:
             open(self.unzipped_file, mode='r', newline='\n') as f:
             for index, line in enumerate(f):
                 if index % 10000:
-                    print(f"Precoessing the line number {index} .")
+                    logger.info(f"Precoessing the line number {index} .")
 
                 if '<doc id=' in line:
                     article_open = True
