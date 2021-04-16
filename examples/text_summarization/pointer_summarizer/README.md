@@ -32,7 +32,7 @@ rouge_l_precision: 0.3371 with confidence interval (0.3348, 0.3396)
 * Decoding the entire test set takes 2-3 hours
 
 ## Data Preprocessing:
-1) Follow data generation instruction from https://github.com/abisee/cnn-dailymail **while but use the *make_datafiles_json.py* script provided in this repo instead of *make_datafiles.py* to minimize package dependencies.**
+1) Follow data generation instruction from https://github.com/abisee/cnn-dailymail **but place the *make_datafiles_json.py* script provided in this repo into https://github.com/abisee/cnn-dailymail and run *make_datafiles_json.py* instead of *make_datafiles.py* to minimize package dependencies.**
 2) place the output folder *finished_files/* as a subfolder in this repo
 3) You might need to change some paths and parameters in *config.py*
 
