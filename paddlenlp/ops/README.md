@@ -40,7 +40,7 @@ git clone https://github.com/PaddlePaddle/PaddleNLP.git
 
 ``` sh
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-cd PaddleNLP/paddlenlp/ext_op/
+cd PaddleNLP/paddlenlp/ops/
 ```
 
 #### 编译
@@ -68,7 +68,7 @@ cd ../
 举例如下：
 
 ``` python
-from paddlenlp.ext_op import FasterTransformer
+from paddlenlp.ops import FasterTransformer
 
 transformer = FasterTransformer(
     src_vocab_size=args.src_vocab_size,
@@ -134,7 +134,7 @@ git clone https://github.com/PaddlePaddle/PaddleNLP.git
 其次，让我们可以使用当前 clone 的 paddlenlp，并进入到自定义 OP 的路径，准备后续的编译操作：
 
 ``` sh
-cd PaddleNLP/paddlenlp/ext_op/
+cd PaddleNLP/paddlenlp/ops/
 ```
 
 #### 编译

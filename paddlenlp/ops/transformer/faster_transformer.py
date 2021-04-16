@@ -6,7 +6,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from paddlenlp.transformers import TransformerModel, position_encoding_init
-from paddlenlp.ext_op import InferTransformerDecoding
+from paddlenlp.ops import InferTransformerDecoding
 
 
 class FasterTransformer(TransformerModel):

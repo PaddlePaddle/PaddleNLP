@@ -25,7 +25,7 @@
 
 ### 编译自定义OP
 
-在 Python 动态图下使用自定义 OP 需要将实现的 C++、CUDA 代码编译成动态库，我们已经提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。同样的自定义 op 编译的说明也可以在自定义 op 对应的路径 `PaddleNLP/paddlenlp/ext_op/` 下面找到。
+在 Python 动态图下使用自定义 OP 需要将实现的 C++、CUDA 代码编译成动态库，我们已经提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。同样的自定义 op 编译的说明也可以在自定义 op 对应的路径 `PaddleNLP/paddlenlp/ops/` 下面找到。
 
 #### 克隆 PaddleNLP
 
@@ -39,7 +39,7 @@ git clone https://github.com/PaddlePaddle/PaddleNLP.git
 
 ``` sh
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-cd PaddleNLP/paddlenlp/ext_op/
+cd PaddleNLP/paddlenlp/ops/
 ```
 
 #### 编译
@@ -67,7 +67,7 @@ cd ../
 举例如下：
 
 ``` python
-from paddlenlp.ext_op import FasterTransformer
+from paddlenlp.ops import FasterTransformer
 
 transformer = FasterTransformer(
     src_vocab_size=args.src_vocab_size,
@@ -125,9 +125,9 @@ tar -zxf tranformer-base-wmt_ende_bpe.tar.gz
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
-cp -rf ../../../../paddlenlp/ext_op/build/third-party/build/bin/decoding_gemm ./
+cp -rf ../../../../paddlenlp/ops/build/third-party/build/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 0
-python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding-lib ../../../../paddlenlp/ext_op/build/lib/libdecoding_op.so
+python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding-lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so
 ```
 
 其中，`--config` 选项用于指明配置文件的位置，而 `--decoding-lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。
@@ -143,9 +143,9 @@ float16 与 float32 预测的基本流程相同，不过在使用 float16 的 de
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
-cp -rf ../../../../paddlenlp/ext_op/build/third-party/build/bin/decoding_gemm ./
+cp -rf ../../../../paddlenlp/ops/build/third-party/build/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 1
-python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding-lib ../../../../paddlenlp/ext_op/build/lib/libdecoding_op.so --use-fp16-decoding
+python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding-lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --use-fp16-decoding
 ```
 
 其中，`--config` 选项用于指明配置文件的位置，而 `--decoding-lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。
@@ -191,7 +191,7 @@ git clone https://github.com/PaddlePaddle/PaddleNLP.git
 
 ``` sh
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-cd PaddleNLP/paddlenlp/ext_op/
+cd PaddleNLP/paddlenlp/ops/
 ```
 
 #### 编译
@@ -240,7 +240,7 @@ cd bin/
 使用 C++ 预测库，首先，我们需要做的是将动态图的 checkpoint 导出成预测库能使用的模型文件和参数文件。可以执行 `export_model.py` 实现这个过程。
 
 ``` python
-python export_model.py --config ../configs/transformer.base.yaml --decoding-lib ../../../../paddlenlp/ext_op/src/build/lib/libdecoding_op.so
+python export_model.py --config ../configs/transformer.base.yaml --decoding-lib ../../../../paddlenlp/ops/src/build/lib/libdecoding_op.so
 ```
 
 注意：这里的 `libdecoding_op.so` 的动态库是参照前文 **`Python 动态图使用自定义 op`** 编译出来的 lib，当前 **`C++ 预测库使用自定义 op`** 不包含编译的动态库。因此，如果在使用预测库前，还需要额外导出模型，需要编译两次：
@@ -256,7 +256,7 @@ python export_model.py --config ../configs/transformer.base.yaml --decoding-lib 
 
 ### 使用 PaddlePaddle 预测库预测
 
-自定义 op 编译完成后，在 `paddlenlp/ext_op/build/bin/` 路径下将会看到 `transformer_e2e` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
+自定义 op 编译完成后，在 `paddlenlp/ops/build/bin/` 路径下将会看到 `transformer_e2e` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
 
 ``` sh
 cd bin/
