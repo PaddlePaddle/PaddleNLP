@@ -42,19 +42,18 @@ def find_entity(text_raw, id_, predictions, tok_to_orig_start_index,
     return list(set(entity_list))
 
 
-def decoding(file_path, id2spo, logits_all, seq_len_all,
-             tok_to_orig_start_index_all, tok_to_orig_end_index_all):
+def decoding(example_batch,
+             id2spo,
+             logits_batch,
+             seq_len_batch,
+             tok_to_orig_start_index_batch,
+             tok_to_orig_end_index_batch):
     """
     model output logits -> formatted spo (as in data set file)
     """
-    example_all = []
-    with open(file_path, "r", encoding="utf-8") as fp:
-        for line in fp:
-            example_all.append(json.loads(line))
-
     formatted_outputs = []
     for (i, (example, logits, seq_len, tok_to_orig_start_index, tok_to_orig_end_index)) in \
-            enumerate(zip(example_all, logits_all, seq_len_all, tok_to_orig_start_index_all, tok_to_orig_end_index_all)):
+            enumerate(zip(example_batch, logits_batch, seq_len_batch, tok_to_orig_start_index_batch, tok_to_orig_end_index_batch)):
 
         logits = logits[1:seq_len +
                         1]  # slice between [CLS] and [SEP] to get valid logits

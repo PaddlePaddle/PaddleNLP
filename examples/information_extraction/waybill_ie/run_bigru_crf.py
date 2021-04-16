@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,67 +21,7 @@ from paddlenlp.layers import LinearChainCrf, ViterbiDecoder, LinearChainCrfLoss
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.embeddings import TokenEmbedding
 
-
-def parse_decodes(ds, decodes, lens, label_vocab):
-    decodes = [x for batch in decodes for x in batch]
-    lens = [x for batch in lens for x in batch]
-    id_label = dict(zip(label_vocab.values(), label_vocab.keys()))
-
-    outputs = []
-    for idx, end in enumerate(lens):
-        sent = ds.data[idx][0][:end]
-        tags = [id_label[x] for x in decodes[idx][:end]]
-        sent_out = []
-        tags_out = []
-        words = ""
-        for s, t in zip(sent, tags):
-            if t.endswith('-B') or t == 'O':
-                if len(words):
-                    sent_out.append(words)
-                tags_out.append(t.split('-')[0])
-                words = s
-            else:
-                words += s
-        if len(sent_out) < len(tags_out):
-            sent_out.append(words)
-        outputs.append(''.join(
-            [str((s, t)) for s, t in zip(sent_out, tags_out)]))
-    return outputs
-
-
-def convert_tokens_to_ids(tokens, vocab, oov_token=None):
-    token_ids = []
-    oov_id = vocab.get(oov_token) if oov_token else None
-    for token in tokens:
-        token_id = vocab.get(token, oov_id)
-        token_ids.append(token_id)
-    return token_ids
-
-
-def load_dict(dict_path):
-    vocab = {}
-    i = 0
-    for line in open(dict_path, 'r', encoding='utf-8'):
-        key = line.strip('\n')
-        vocab[key] = i
-        i += 1
-    return vocab
-
-
-def load_dataset(datafiles):
-    def read(data_path):
-        with open(data_path, 'r', encoding='utf-8') as fp:
-            next(fp)
-            for line in fp.readlines():
-                words, labels = line.strip('\n').split('\t')
-                words = words.split('\002')
-                labels = labels.split('\002')
-                yield words, labels
-
-    if isinstance(datafiles, str):
-        return MapDataset(list(read(datafiles)))
-    elif isinstance(datafiles, list) or isinstance(datafiles, tuple):
-        return [MapDataset(list(read(datafile))) for datafile in datafiles]
+from data import load_dict, load_dataset, convert_tokens_to_ids, parse_decodes
 
 
 class BiGRUWithCRF(nn.Layer):
@@ -178,7 +118,8 @@ if __name__ == '__main__':
 
     model.evaluate(eval_data=test_loader)
     outputs, lens, decodes = model.predict(test_data=test_loader)
-    preds = parse_decodes(test_ds, decodes, lens, label_vocab)
+    sentences = [example[0] for example in test_ds.data]
+    preds = parse_decodes(sentences, decodes, lens, label_vocab)
 
     file_path = "bigru_results.txt"
     with open(file_path, "w", encoding="utf8") as fout:
