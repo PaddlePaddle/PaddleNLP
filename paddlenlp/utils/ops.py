@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import paddle
-import paddle.nn.functional as F  # diag_embed
 
 __all__ = ['einsum']
 
@@ -81,6 +80,8 @@ def einsum(equation, *operands):
         result = paddle.transpose(result, output_perm)
         return result
 
+    if len(operands) == 1 and isinstance(operands[0], (list, tuple)):
+        operands = operands[0]
     # equation is case insensitive
     num_letters = 26
     letters_to_idx = [-1] * num_letters
@@ -155,6 +156,7 @@ def einsum(equation, *operands):
         ell_char_count = 0
         for ch in output_eqn:
             if ch == '.':
+                ell_char_count += 1
                 assert ell_char_count <= 3, "The '.' should only exist in one ellispis '...' in term {}".format(
                     output_eqn)
                 if ell_char_count == 3:
@@ -164,6 +166,7 @@ def einsum(equation, *operands):
                         idxes_to_output_dims[first_ell_idx +
                                              j] = num_output_dims
                         num_output_dims += 1
+
             else:
                 assert ((ell_char_count == 0) or (ell_char_count == 3)
                         ), "'.' must only occur in ellipsis, operand {}".format(
@@ -231,15 +234,11 @@ def einsum(equation, *operands):
                 preprocessed_operand = paddle.unsqueeze(preprocessed_operand,
                                                         dim)
 
-        print("Tensor {}: original shape = {}, preprocessed shape = {}".format(
-            i, operands[i].shape, preprocessed_operand.shape))
         preprocessed_operands.append(preprocessed_operand)
 
     # 2. execute the sum
     sum_dims = []
     result = preprocessed_operands[0]
-    print(idx_last_operand)
-    print(idxes_to_output_dims)
     for i in range(num_total_idxes):
         if idx_last_operand[i] == 0 and idxes_to_output_dims[
                 i] >= num_output_dims:
