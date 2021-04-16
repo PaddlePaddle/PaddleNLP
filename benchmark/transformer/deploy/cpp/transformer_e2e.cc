@@ -214,8 +214,7 @@ void SummaryConfig(const paddle_infer::Config& config,
 }
 
 
-void Main(
-    int batch_size, int use_gpu, int gpu_id, int use_mkl, int use_threads) {
+void Main(int batch_size, int use_gpu, int gpu_id, int use_mkl, int threads) {
   Config config;
   config.SetModel(model_dir + "/transformer.pdmodel",
                   model_dir + "/transformer.pdiparams");
@@ -226,9 +225,7 @@ void Main(
     config.DisableGpu();
     if (use_mkl) {
       config.EnableMKLDNN();
-      if (use_threads) {
-        config.SetCpuMathLibraryNumThreads(6);
-      }
+      config.SetCpuMathLibraryNumThreads(threads);
     }
   }
 
@@ -268,13 +265,13 @@ int main(int argc, char** argv) {
   gpu_id = std::stoi(std::string(argv[3]));
 
   int use_mkl = std::stoi(std::string(argv[4]));
-  int use_threads = std::stoi(std::string(argv[5]));
+  int threads = std::stoi(std::string(argv[5]));
 
   model_dir = std::string(argv[6]);
   dict_dir = std::string(argv[7]);
   datapath = std::string(argv[8]);
 
-  paddle::inference::Main(batch_size, use_gpu, gpu_id, use_mkl, use_threads);
+  paddle::inference::Main(batch_size, use_gpu, gpu_id, use_mkl, threads);
 
   return 0;
 }
