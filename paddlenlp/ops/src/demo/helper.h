@@ -49,31 +49,5 @@ static void split(const std::string &str,
   }
 }
 
-template <typename T>
-static std::string DescribeTensor(
-    const std::unique_ptr<paddle::ZeroCopyTensor> &tensor,
-    std::vector<T> out_data) {
-  std::stringstream os;
-  os << "\nTensor [" << tensor->name() << "]\n";
-  os << '\n';
-  os << " - shape: " << to_string(tensor->shape()) << '\n';
-  os << " - lod: ";
-  for (auto &l : tensor->lod()) {
-    os << to_string(l) << "; ";
-  }
-  os << "\n";
-  os << " - data: ";
-  std::vector<int> output_shape = tensor->shape();
-  int out_num = std::accumulate(
-      output_shape.begin(), output_shape.end(), 1, std::multiplies<int>());
-  out_data.resize(out_num);
-  tensor->copy_to_cpu(out_data.data());
-  for (int i = 0; i < out_num; i++) {
-    os << out_data[i] << " ";
-  }
-  os << '\n';
-  return os.str();
-}
-
 }  // namespace inference
 }  // namespace paddle
