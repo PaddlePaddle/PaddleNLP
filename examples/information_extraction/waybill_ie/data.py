@@ -1,13 +1,28 @@
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from paddlenlp.datasets import MapDataset
 
 
 def load_dict(dict_path):
     vocab = {}
     i = 0
-    for line in open(dict_path, 'r', encoding='utf-8'):
-        key = line.strip('\n')
-        vocab[key] = i
-        i += 1
+    with open(dict_path, 'r', encoding='utf-8') as fin:
+        for line in fin:
+            key = line.strip('\n')
+            vocab[key] = i
+            i += 1
     return vocab
 
 
