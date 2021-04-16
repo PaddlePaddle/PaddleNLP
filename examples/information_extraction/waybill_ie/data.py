@@ -42,26 +42,6 @@ def load_dataset(datafiles):
         return [MapDataset(list(read(datafile))) for datafile in datafiles]
 
 
-def convert_tokens_to_ids(tokens, vocab, oov_token=None):
-    token_ids = []
-    oov_id = vocab.get(oov_token) if oov_token else None
-    for token in tokens:
-        token_id = vocab.get(token, oov_id)
-        token_ids.append(token_id)
-    return token_ids
-
-
-def convert_ernie_example(example, tokenizer, label_vocab):
-    tokens, labels = example
-    tokenized_input = tokenizer(
-        tokens, return_length=True, is_split_into_words=True)
-    # Token '[CLS]' and '[SEP]' will get label 'O'
-    labels = ['O'] + labels + ['O']
-    tokenized_input['labels'] = [label_vocab[x] for x in labels]
-    return tokenized_input['input_ids'], tokenized_input[
-        'token_type_ids'], tokenized_input['seq_len'], tokenized_input['labels']
-
-
 def parse_decodes(sentences, predictions, lengths, label_vocab):
     """Parse the padding result
 
