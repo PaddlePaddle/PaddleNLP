@@ -78,14 +78,17 @@ if __name__ == '__main__':
 
     train_loader = paddle.io.DataLoader(
         dataset=train_ds,
-        batch_size=16,
+        batch_size=200,
         return_list=True,
         collate_fn=batchify_fn)
     dev_loader = paddle.io.DataLoader(
-        dataset=dev_ds, batch_size=16, return_list=True, collate_fn=batchify_fn)
+        dataset=dev_ds,
+        batch_size=200,
+        return_list=True,
+        collate_fn=batchify_fn)
     test_loader = paddle.io.DataLoader(
         dataset=test_ds,
-        batch_size=16,
+        batch_size=200,
         return_list=True,
         collate_fn=batchify_fn)
 
@@ -93,7 +96,6 @@ if __name__ == '__main__':
     ernie = ErnieForTokenClassification.from_pretrained(
         "ernie-1.0", num_classes=len(label_vocab))
     model = ErnieCrfForTokenClassification(ernie)
-    # model = ErnieCrfForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_vocab))
 
     metric = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
     optimizer = paddle.optimizer.AdamW(
