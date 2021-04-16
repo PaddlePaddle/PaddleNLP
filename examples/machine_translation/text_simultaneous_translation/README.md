@@ -5,22 +5,37 @@
 本项目是基于机器翻译领域主流模型 Transformer[1]的 PaddlePaddle 实现，包含模型训练，预测以及使用自定义数据等内容。用户可以基于发布的内容搭建自己的同传翻译模型。
 
 ## 模型介绍
-STACL 是论文 [STACL: Simultaneous Translation with Implicit Anticipation and Controllable Latency using Prefix-to-Prefix Framework](https://www.aclweb.org/anthology/P19-1289/) 中新提出的前缀到前缀框架，该框架仅使用源句子的前缀来预测目标词[2]。
 
+### 同声传译难点
+源语言和目标语言之间词序的差异带来的翻译延迟。 例如，考虑将SOV语言（如日语或德语）翻译为SVO语言（如英语或汉语），必须等到源语言动词出现才可以准确翻译。因此，翻译系统必须求助于传统的全句翻译，因此造成至少一句话的延迟。
+
+### 模型特点
+
+STACL 是论文 [STACL: Simultaneous Translation with Implicit Anticipation and Controllable Latency using Prefix-to-Prefix Framework](https://www.aclweb.org/anthology/P19-1289/) 中新提出的Prefix-to-Prefix架构，该架构仅使用源句子的前缀来预测目标词[2]。
+
+STACL 主要具有以下优势：
+
+- Prefix-to-Prefix架构隐式地将预期作为副产品学习，克服了SOV→SVO等词序差异；
+
+- Wait-k策略可以不需要全句的源句，直接预测目标句，可以实现任意的字级延迟，同时保持较高的翻译质量。
+
+#### Prefix-to-Prefix架构
 <p align="center">
 <img src="images/STACL_architecture.png" height=300 hspace='10'/> <br />
 图 1. Seq2Seq vs. STACL
 </p>
 
-和传统的机器翻译模型主要的区别在于翻译时是否需要利用全句的源句。上图中，Seq2Seq模型需要等到全句的源句（1-5）全部输入Encoder后，Decoder才开始解码进行翻译；而STACL框架采用了Wait-k（图中Wait-2）的策略，当源句只有两个词（1和2）输入到Encoder后，Decoder即可开始解码预测目标句的第一个词。
+和传统的机器翻译模型主要的区别在于翻译时是否需要利用全句的源句。上图中，Seq2Seq模型需要等到全句的源句（1-5）全部输入Encoder后，Decoder才开始解码进行翻译；而STACL架构采用了Wait-k（图中Wait-2）的策略，当源句只有两个词（1和2）输入到Encoder后，Decoder即可开始解码预测目标句的第一个词。
 
-该框架主要具有以下优势：
+####  Wait-k 策略
+Wait-k策略首先等待源句单词，然后与源句的其余部分同时翻译，即输出总是隐藏在输入后面。这是受到同声传译人员的启发，同声传译人员通常会在几秒钟内开始翻译演讲者的演讲，在演讲者结束几秒钟后完成。例如，如果k=2，第一个目标词使用前2个源词预测，第二个目标词使用前3个源词预测，以此类推。下图3中，(a)simultaneous: our wait-2 等到"布什"和"总统"输入后就开始解码预测"pres."，而(b) non-simultaneous baseline 为传统的翻译模型，需要等到整句"布什 总统 在 莫斯科 与 普京 会晤"才开始解码预测。
+<p align="center">
+<img src="images/example.png" height=100 hspace='10'/> <br />
+图 3. Wait-k 例子
+</p>
 
-- 前缀到前缀框架是为同声传译量身定制的，并且可以在不使用全句模型的情况下从头开始训练；
 
-- 该框架可以不需要全句的源句，直接预测目标句；
-
-### 模型特点
+### 模型实现
 
 该项目基于Transformer实现。
 
@@ -32,49 +47,48 @@ Transformer 中的 Encoder 由若干相同的 layer 堆叠组成，每个 layer 
 </p>
 Decoder 具有和 Encoder 类似的结构，只是相比于组成 Encoder 的 layer ，在组成 Decoder 的 layer 中还多了一个 Multi-Head Attention 的 sub-layer 来实现对 Encoder 输出的 Attention，这个 Encoder-Decoder Attention 在其他 Seq2Seq 模型中也是存在的。
 
-### Wait-k 策略
-Wait-k策略首先等待源句单词，然后与源句的其余部分同时翻译，即输出总是隐藏在输入后面。这是受到同声传译人员的启发，同声传译人员通常会在几秒钟内开始翻译演讲者的演讲，在演讲者结束几秒钟后完成。例如，如果k=2，第一个目标词使用前2个源词预测，第二个目标词使用前3个源词预测，以此类推。下图3中，(a)simultaneous: our wait-2 等到"布什"和"总统"输入后就开始解码预测"pres."，而(b) non-simultaneous baseline 为传统的翻译模型，需要等到整句"布什 总统 在 莫斯科 与 普京 会晤"才开始解码预测。
-<p align="center">
-<img src="images/example.png" height=100 hspace='10'/> <br />
-图 3. Wait-k 例子
-</p>
-
 ## 环境依赖
  - attrdict==2.0.1
  - PyYAML==5.4.1
+ - subword_nmt==0.3.7
+ - jieba==0.42.1
 
 安装命令：`pip install -r requirements.txt`
 
 ## 数据准备
 
-数据格式：中文需要首先经过[jieba分词](https://github.com/fxsjy/jieba/)，然后经过[BPE分词(Byte Pair Encoding)](https://github.com/rsennrich/subword-nmt)；英文需要经过BPE分词。每行数据为分词后的中英文，用制表符分割。
+### 数据分词
+中文需要首先经过jieba分词，然后经过BPE分词(Byte Pair Encoding)；英文需要经过BPE分词。
+我们也提供分词的接口，下面给出分词的具体操作：
+```python
+from utils.tokenizer import STACLTokenizer
 
+tokenizer_zh = STACLTokenizer('data/nist2m/2M.zh2en.dict4bpe.zh', is_chinese=True)
+# 处理中文字符串
+print(tokenizer_zh.tokenize('玻利维亚举行总统与国会选举'))
+# 输出是: 玻@@ 利@@ 维亚 举行 总统 与 国会 选举
+
+# 处理英文字符串
+tokenizer_en = STACLTokenizer('data/nist2m/2M.zh2en.dict4bpe.en', is_chinese=False)
+print(tokenizer_en.tokenize('bolivia holds presidential and parliament elections'))
+# 输出是：bol@@ i@@ via holds presidential and parliament elections
+```
+### 数据格式
+每行数据为分词后的中英文，用制表符分割。
 ```
 兵营 是 双@@ 枪 老@@ 大@@ 爷 的 前提 建筑 之一 。	it serves as a prerequisite for Re@@ apers to be built at the Bar@@ rac@@ ks .
 ```
 
 ## 单机训练
 
-### 单机单卡
+### 单机单卡/单机多卡
 可以执行以下命令进行模型训练：
 ``` sh
-# Setting visible devices for training
-export CUDA_VISIBLE_DEVICES=0
-python train.py --config ./config/transformer.yaml
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" train.py --config ./config/transformer.yaml
 ```
 
 可以在`config/transformer.yaml` 文件中设置相应的参数。如果执行不提供 `--config` 选项，程序将默认使用`config/transformer.yaml` 的配置。
-
-### 单机多卡
-
-同样，可以执行如下命令实现八卡训练：
-
-``` sh
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train.py --config ./config/transformer.yaml
-```
-
-与上面的情况相似，可以在`config/transformer.yaml` 文件中设置相应的参数。如果执行不提供 `--config` 选项，程序将默认使用`config/transformer.yaml` 的配置。
 
 ## 模型推理
 
@@ -110,6 +124,8 @@ perl mosesdecoder/scripts/generic/multi-bleu.perl newstest2017.tok.en < predict.
 | ------------ | --------------- |---------|
 | Wait-1 | [下载]() |30.94|
 | Wait-3   |[下载]()|34.62 |
+| Wait-5   |[下载]()|36.80 |
+| Wait-7   |[下载]()|38.22 |
 | Wait-∞(整句模型)   |[下载]()|41.41 |
 
 
