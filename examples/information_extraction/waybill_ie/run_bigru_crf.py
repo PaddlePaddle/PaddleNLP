@@ -23,8 +23,24 @@ from paddlenlp.layers import LinearChainCrf, ViterbiDecoder, LinearChainCrfLoss
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.embeddings import TokenEmbedding
 
-from data import load_dict, load_dataset, convert_gru_example, parse_decodes
+from data import load_dict, load_dataset, parse_decodes
 from model import BiGRUWithCRF
+
+
+def convert_tokens_to_ids(tokens, vocab, oov_token=None):
+    token_ids = []
+    oov_id = vocab.get(oov_token) if oov_token else None
+    for token in tokens:
+        token_id = vocab.get(token, oov_id)
+        token_ids.append(token_id)
+    return token_ids
+
+
+def convert_to_features(example, word_vocab, label_vocab):
+    tokens, labels = example
+    token_ids = convert_tokens_to_ids(tokens, word_vocab, 'OOV')
+    label_ids = convert_tokens_to_ids(labels, label_vocab, 'O')
+    return token_ids, len(token_ids), label_ids
 
 
 @paddle.no_grad()
@@ -65,7 +81,7 @@ if __name__ == '__main__':
     word_vocab = load_dict('./data/word.dic')
 
     trans_func = partial(
-        convert_gru_example, word_vocab=word_vocab, label_vocab=label_vocab)
+        convert_to_features, word_vocab=word_vocab, label_vocab=label_vocab)
     train_ds.map(trans_func)
     dev_ds.map(trans_func)
     test_ds.map(trans_func)
@@ -107,8 +123,6 @@ if __name__ == '__main__':
 
     step = 0
     for epoch in range(10):
-        # Switch the model to training mode
-        model.train()
         for idx, (token_ids, lengths, label_ids) in enumerate(train_loader):
             loss = model(token_ids, lengths, label_ids)
             loss = loss.mean()
