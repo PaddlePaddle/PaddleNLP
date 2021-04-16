@@ -3,10 +3,10 @@
 This code is the Paddle v2.0 implementation of *[Get To The Point: Summarization with Pointer-Generator Networks](https://arxiv.org/abs/1704.04368)*.
 The code adapts and aligns with [a previous Pytorch implmentation](https://github.com/atulkum/pointer_summarizer).
 
-To reach the state-of-the-art performance stated in the source paper, please use the default hyper-parameters listed in *utils/config.py*.  
+To reach the state-of-the-art performance stated in the source paper, please use the default hyper-parameters listed in *config.py*.  
 
-## Train with pointer generation and coverage loss enabled
-After training for 100k iterations with coverage loss enabled (batch size 8), the Paddle implementation achieves a ROUGE-1-f1 of 0.3980 (0.3907 by [a previous Pytorch implmentation](https://github.com/atulkum/pointer_summarizer) and 0.3953 by [the source paper](https://arxiv.org/abs/1704.04368)).
+## Model performance (with pointer generation and coverage loss enabled)
+After training for 100k iterations with *batch_size=8*, the Paddle implementation achieves a ROUGE-1-f1 of 0.3980 (0.3907 by [a previous Pytorch implmentation](https://github.com/atulkum/pointer_summarizer) and 0.3953 by [the source paper](https://arxiv.org/abs/1704.04368)).
 
 ```
 ROUGE-1:
@@ -26,34 +26,43 @@ rouge_l_precision: 0.3371 with confidence interval (0.3348, 0.3396)
 
 ```
 
-
-## How to run training:
-1) Follow data generation instruction from https://github.com/abisee/cnn-dailymail; place the folder *finished_files/* as a sister folder of *src/*, *utils/*
-2) You might need to change some paths and parameters in *utils/config.py*
-3) You need to setup [pyrouge](https://github.com/andersjo/pyrouge) to get the rouge score; also see [this tutorial](https://poojithansl7.wordpress.com/2018/08/04/setting-up-rouge/) to set up rouge and pyrouge.
-4)
-* To train the model from start:
-```
-cd src/ && python train.py
-```
-* To continue training using a previously trained model:
-```
-cd src/ && python train.py -m path/to/model/dir/
-```
-* To decode using a previously trained model:
-```
-cd src/ && python decode.py path/to/model/dir/
-```
-* If you already have the summaries generated using *src/decode.py* and only needs to run rouge evaluation:
-```
-cd src/ && python rouge_eval.py path/to/decoded/dir/
-```
-
-
-## Other information:
+## Prerequisites:
 * The code is tested on Python 3.7.1 and Paddle 2.0.0
 * Training takes around 1s/iter on a single Tesla V100 (\~28 hours to train 100k iters)
 * Decoding the entire test set takes 2-3 hours
+
+## Data Preprocessing:
+1) Follow data generation instruction from https://github.com/abisee/cnn-dailymail **while but use the *make_datafiles_json.py* script provided in this repo instead of *make_datafiles.py* to minimize package dependencies.**
+2) place the output folder *finished_files/* as a subfolder in this repo
+3) You might need to change some paths and parameters in *config.py*
+
+
+## How to run training:
+* To train the model from start:
+```
+python train.py
+```
+* To continue training using a previously trained model:
+```
+python train.py -m path/to/model/dir/
+```
+
+## Set up ROUGE
+* You need to setup [pyrouge](https://github.com/andersjo/pyrouge) to get the rouge score
+* Also see [this tutorial](https://poojithansl7.wordpress.com/2018/08/04/setting-up-rouge/) to set up rouge and pyrouge.
+
+
+## How to decode & evaluate:
+* To decode using a previously trained model:
+```
+python decode.py path/to/model/dir/
+```
+* If you already have the summaries generated using *decode.py* and only needs to run rouge evaluation:
+```
+python rouge_eval.py path/to/decoded/dir/
+```
+
+
 
 ## Papers using this code:
 1) TBD

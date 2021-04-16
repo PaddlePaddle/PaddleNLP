@@ -1,6 +1,6 @@
 import sys
 
-from utils.utils import write_for_rouge, rouge_eval, rouge_log
+from utils import write_for_rouge, rouge_eval, rouge_log
 
 decode_dir = sys.argv[1]
 

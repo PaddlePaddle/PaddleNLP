@@ -8,7 +8,8 @@ import time
 import paddle
 
 from data import Batcher, Vocab
-from utils import data, config
+import data
+import config
 from model import Model
 from utils import write_for_rouge, rouge_eval, rouge_log
 from train_util import get_input_from_batch
@@ -68,7 +69,7 @@ class BeamSearch(object):
         start = time.time()
         counter = 0
         batch = self.batcher.next_batch()
-        while batch is not None and counter <= 100:  # 100 # 11490 #  and counter <= 100
+        while batch is not None:  #  and counter <= 100 # 11490
             # Run beam search to get best Hypothesis
             best_summary = self.beam_search(batch)
 

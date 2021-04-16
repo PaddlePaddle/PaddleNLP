@@ -15,8 +15,6 @@ import paddle
 import paddle.nn as nn
 from paddle.optimizer import Adagrad, Adam, SGD
 
-import tensorflow as tf
-
 # Flush out immediately
 sys.stdout.flush()
 
@@ -39,8 +37,6 @@ class Trainer(object):
         self.model_dir = os.path.join(train_dir, 'model')
         if not os.path.exists(self.model_dir):
             os.mkdir(self.model_dir)
-
-        self.summary_writer = tf.summary.FileWriter(train_dir)
 
     def save_model(self, running_avg_loss, iter):
         state = {
@@ -85,16 +81,6 @@ class Trainer(object):
 
         return start_iter, start_loss
 
-    def customize_clip_consec(self, loss):
-        params_grads = self.optimizer.backward(loss)
-        encoder_params_grads = params_grads[:10]
-        decoder_params_grads = params_grads[10:27]
-        reduce_state_params_grads = params_grads[27:]
-
-        self.optimizer.apply_gradients(params_grads=encoder_params_grads)
-        self.optimizer.apply_gradients(params_grads=decoder_params_grads)
-        self.optimizer.apply_gradients(params_grads=reduce_state_params_grads)
-
     def train_one_batch(self, batch, iter):
 
         enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage = \
@@ -137,12 +123,7 @@ class Trainer(object):
         loss = paddle.mean(batch_avg_loss)
 
         loss.backward()
-
-        # Default clip in one go
-        # self.optimizer.minimize(loss)
-
-        # Customized clip consec
-        self.customize_clip_consec(loss)
+        self.optimizer.minimize(loss)
 
         return loss.numpy()[0]
 
@@ -154,12 +135,10 @@ class Trainer(object):
             loss = self.train_one_batch(batch, iter)
             print('Loss for one batch:  %.8f' % loss, iter)
             running_avg_loss = calc_running_avg_loss(loss, running_avg_loss,
-                                                     self.summary_writer, iter)
+                                                     iter)
 
             iter += 1
 
-            if iter % 100 == 0:
-                self.summary_writer.flush()
             print_interval = 10
             if iter % print_interval == 0:
                 print('iter %d, seconds for %d batch: %.2f , loss: %f\t' %

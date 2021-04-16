@@ -7,10 +7,6 @@ import paddle.nn.initializer as I
 import paddle.nn as nn
 import paddle.nn.functional as F
 import config
-from numpy import random
-
-random.seed(123)
-paddle.seed(123)
 
 
 def paddle2D_scatter_add(x_tensor, index_tensor, update_tensor, dim=0):
@@ -19,16 +15,13 @@ def paddle2D_scatter_add(x_tensor, index_tensor, update_tensor, dim=0):
     index_tensor = paddle.reshape(index_tensor, [-1, 1])
     if dim == 0:
         index_tensor = paddle.concat(
-            x=[
-                index_tensor,
-                paddle.to_tensor([[x] for x in range(dim1)] * dim0)
-            ],
+            x=[index_tensor, (paddle.arange(dim1 * dim0) % dim0).unsqueeze(1)],
             axis=1)
     elif dim == 1:
         index_tensor = paddle.concat(
             x=[
                 paddle.flatten(
-                    paddle.to_tensor([[[x]] * dim1 for x in range(dim0)]),
+                    (paddle.arange(dim1 * dim0) // dim1).unsqueeze(1),
                     start_axis=0,
                     stop_axis=1), index_tensor
             ],

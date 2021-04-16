@@ -1,7 +1,7 @@
 # Data directories
-train_data_path = "./finished_files/chunked/train_*"
-eval_data_path = "./finished_files/val.bin"
-decode_data_path = "./finished_files/test.bin"
+train_data_path = "./finished_files/chunked/train_*.json"
+eval_data_path = "./finished_files/val.json"
+decode_data_path = "./finished_files/test.json"
 vocab_path = "./finished_files/vocab"
 log_root = "./log"
 
