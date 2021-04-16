@@ -214,18 +214,21 @@ void SummaryConfig(const paddle_infer::Config& config,
 }
 
 
-void Main(int batch_size, int use_gpu, int gpu_id, int use_mkl) {
+void Main(
+    int batch_size, int use_gpu, int gpu_id, int use_mkl, int use_threads) {
   Config config;
   config.SetModel(model_dir + "/transformer.pdmodel",
                   model_dir + "/transformer.pdiparams");
 
   if (use_gpu) {
-    config.EnableUseGpu(2000, gpu_id);
+    config.EnableUseGpu(100, gpu_id);
   } else {
     config.DisableGpu();
     if (use_mkl) {
       config.EnableMKLDNN();
-      config.SetCpuMathLibraryNumThreads(6);
+      if (use_threads) {
+        config.SetCpuMathLibraryNumThreads(6);
+      }
     }
   }
 
@@ -239,9 +242,6 @@ void Main(int batch_size, int use_gpu, int gpu_id, int use_mkl) {
   Timer timer;
   int num_batches = 0;
   std::vector<std::string> source_query_vec;
-
-  std::vector<float> print_f;
-  std::vector<int64_t> print_int;
 
   while (reader.NextBatch(predictor, batch_size, source_query_vec)) {
     timer.tic();
@@ -263,16 +263,18 @@ void Main(int batch_size, int use_gpu, int gpu_id, int use_mkl) {
 
 int main(int argc, char** argv) {
   batch_size = std::stoi(std::string(argv[1]));
-  gpu_id = std::stoi(std::string(argv[3]));
 
   int use_gpu = std::stoi(std::string(argv[2]));
+  gpu_id = std::stoi(std::string(argv[3]));
+
   int use_mkl = std::stoi(std::string(argv[4]));
+  int use_threads = std::stoi(std::string(argv[5]));
 
-  model_dir = std::string(argv[5]);
-  dict_dir = std::string(argv[6]);
-  datapath = std::string(argv[7]);
+  model_dir = std::string(argv[6]);
+  dict_dir = std::string(argv[7]);
+  datapath = std::string(argv[8]);
 
-  paddle::inference::Main(batch_size, use_gpu, gpu_id, use_mkl);
+  paddle::inference::Main(batch_size, use_gpu, gpu_id, use_mkl, use_threads);
 
   return 0;
 }

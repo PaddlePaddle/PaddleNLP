@@ -21,6 +21,21 @@ def parse_args():
         default="./configs/transformer.big.yaml",
         type=str,
         help="Path of the config file. ")
+    parser.add_argument(
+        "--use-gpu", action="store_true", help="Whether to use gpu. ")
+    parser.add_argument(
+        "--use-xpu", action="store_true", help="Whether to use xpu. ")
+    parser.add_argument(
+        "--use-mkl", action="store_true", help="Whether to use mkl. ")
+    parser.add_argument(
+        "--threads",
+        default=1,
+        type=int,
+        help="The number of threads when enable mkl. ")
+    parser.add_argument(
+        "--batch-size", default=1, type=int, help="Batch size. ")
+    parser.add_argument(
+        "--model-dir", default="", type=str, help="Path of the model. ")
     args = parser.parse_args()
     return args
 
@@ -119,5 +134,12 @@ if __name__ == "__main__":
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
+    args.use_gpu = ARGS.use_gpu
+    args.use_xpu = ARGS.use_xpu
+    args.use_mkl = ARGS.use_mkl
+    args.use_threads = ARGS.use_threads
+    args.infer_batch_size = ARGS.batch_size
+    if ARGS.model_dir != "":
+        args.inference_model_dir = ARGS.model_dir
 
     do_inference(args)

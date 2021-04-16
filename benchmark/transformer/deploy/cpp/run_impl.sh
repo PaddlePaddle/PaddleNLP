@@ -25,4 +25,4 @@ cmake .. -DPADDLE_LIB=${LIB_DIR} \
 make -j
 
 # <batch_size> <use_gpu> <gpu_id> <use_mkl> <model_dir> <dict_dir> <input_data>
-./${DEMO_NAME} 8 1 0 0 ${MODEL_FILE_DIR} ${VOCAB_DIR} ${DATA_DIR}
+./${DEMO_NAME} 32 1 0 0 ${MODEL_FILE_DIR} ${VOCAB_DIR} ${DATA_DIR}

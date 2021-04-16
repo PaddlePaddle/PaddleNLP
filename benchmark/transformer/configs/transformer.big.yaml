@@ -23,6 +23,7 @@ root: None
 
 # Whether to use cuda
 use_gpu: True
+use_xpu: False
 
 # Args for reader, see reader.py for details
 # The translation task to process.
