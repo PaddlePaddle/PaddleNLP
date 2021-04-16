@@ -41,17 +41,29 @@ python download.py --data_dir ./
 #### 启动BiGRU + CRF训练
 
 ```bash
-export CUDA_VISIBLE_DEVICES=0 # 只支持单卡训练
+export CUDA_VISIBLE_DEVICES=0
 python run_bigru_crf.py
 ```
 
-更多详细教程请参考：[基于Bi-GRU+CRF的快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1317771)
 
 #### 启动ERNIE + FC训练
 
 ```bash
-export CUDA_VISIBLE_DEVICES=0 # 只支持单卡训练
+export CUDA_VISIBLE_DEVICES=0
 python run_ernie.py
 ```
 
-更多详细教程请参考：[使用PaddleNLP预训练模型ERNIE优化快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1329361)
+
+#### 启动ERNIE + CRF训练
+
+
+```bash
+export CUDA_VISIBLE_DEVICES=0
+python run_ernie_crf.py
+```
+
+更多详细教程请参考：
+
+[基于Bi-GRU+CRF的快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1317771)
+
+[使用PaddleNLP预训练模型ERNIE优化快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1329361)
