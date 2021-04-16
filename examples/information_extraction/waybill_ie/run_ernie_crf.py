@@ -118,10 +118,10 @@ if __name__ == '__main__':
         evaluate(model, metric, dev_loader)
 
         paddle.save(model.state_dict(),
-                    './ernie_result/model_%d.pdparams' % step)
+                    './ernie_crf_result/model_%d.pdparams' % step)
 
     preds = predict(model, test_loader, test_ds, label_vocab)
-    file_path = "ernie_results.txt"
+    file_path = "ernie_crf_results.txt"
     with open(file_path, "w", encoding="utf8") as fout:
         fout.write("\n".join(preds))
     # Print some examples
