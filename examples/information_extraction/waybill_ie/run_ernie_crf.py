@@ -19,6 +19,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import ErnieTokenizer, ErnieForTokenClassification
 from paddlenlp.metrics import ChunkEvaluator
 
+from model import ErnieCrfForTokenClassification
 from data import load_dict, load_dataset, convert_ernie_example, parse_decodes
 
 
@@ -27,8 +28,7 @@ def evaluate(model, metric, data_loader):
     model.eval()
     metric.reset()
     for input_ids, seg_ids, lens, labels in data_loader:
-        logits = model(input_ids, seg_ids)
-        preds = paddle.argmax(logits, axis=-1)
+        preds = model(input_ids, seg_ids, lengths=lens)
         n_infer, n_label, n_correct = metric.compute(lens, preds, labels)
         metric.update(n_infer.numpy(), n_label.numpy(), n_correct.numpy())
         precision, recall, f1_score = metric.accumulate()
@@ -42,8 +42,7 @@ def predict(model, data_loader, ds, label_vocab):
     all_preds = []
     all_lens = []
     for input_ids, seg_ids, lens, labels in data_loader:
-        logits = model(input_ids, seg_ids)
-        preds = paddle.argmax(logits, axis=-1)
+        preds = model(input_ids, seg_ids, lengths=lens)
         # Drop CLS prediction
         preds = [pred[1:] for pred in preds.numpy()]
         all_preds.append(preds)
@@ -72,10 +71,10 @@ if __name__ == '__main__':
 
     ignore_label = -1
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-        Stack(),  # seq_len
-        Pad(axis=0, pad_val=ignore_label)  # labels
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # token_type_ids
+        Stack(dtype='int64'),  # seq_len
+        Pad(axis=0, pad_val=ignore_label, dtype='int64')  # labels
     ): fn(samples)
 
     train_loader = paddle.io.DataLoader(
@@ -95,10 +94,11 @@ if __name__ == '__main__':
         collate_fn=batchify_fn)
 
     # Define the model netword and its loss
-    model = ErnieForTokenClassification.from_pretrained(
+    ernie = ErnieForTokenClassification.from_pretrained(
         "ernie-1.0", num_classes=len(label_vocab))
+    model = ErnieCrfForTokenClassification(ernie)
+
     metric = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
-    loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label)
     optimizer = paddle.optimizer.AdamW(
         learning_rate=2e-5, parameters=model.parameters())
 
@@ -106,22 +106,23 @@ if __name__ == '__main__':
     for epoch in range(10):
         # Switch the model to training mode
         model.train()
-        for idx, (input_ids, token_type_ids, length,
+        for idx, (input_ids, token_type_ids, lengths,
                   labels) in enumerate(train_loader):
-            logits = model(input_ids, token_type_ids)
-            loss = paddle.mean(loss_fn(logits, labels))
-            loss.backward()
+            loss = model(
+                input_ids, token_type_ids, lengths=lengths, labels=labels)
+            avg_loss = paddle.mean(loss)
+            avg_loss.backward()
             optimizer.step()
             optimizer.clear_grad()
             step += 1
-            print("epoch:%d - step:%d - loss: %f" % (epoch, step, loss))
+            print("epoch:%d - step:%d - loss: %f" % (epoch, step, avg_loss))
         evaluate(model, metric, dev_loader)
 
         paddle.save(model.state_dict(),
-                    './ernie_result/model_%d.pdparams' % step)
+                    './ernie_crf_result/model_%d.pdparams' % step)
 
     preds = predict(model, test_loader, test_ds, label_vocab)
-    file_path = "ernie_results.txt"
+    file_path = "ernie_crf_results.txt"
     with open(file_path, "w", encoding="utf8") as fout:
         fout.write("\n".join(preds))
     # Print some examples
