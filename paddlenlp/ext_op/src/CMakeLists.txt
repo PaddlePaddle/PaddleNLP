@@ -157,7 +157,7 @@ if(ON_INFER)
 
   if(WIN32)
     if(USE_TENSORRT)
-      add_custom_command(TARGET transformer_e2e POST_BUILD
+      add_custom_command(TARGET ${DEMO_NAME} POST_BUILD
               COMMAND ${CMAKE_COMMAND} -E copy ${TENSORRT_LIB_DIR}/nvinfer${CMAKE_SHARED_LIBRARY_SUFFIX}
                 ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}
               COMMAND ${CMAKE_COMMAND} -E copy ${TENSORRT_LIB_DIR}/nvinfer_plugin${CMAKE_SHARED_LIBRARY_SUFFIX}
@@ -165,24 +165,24 @@ if(ON_INFER)
       )
     endif()
     if(WITH_MKL)
-      add_custom_command(TARGET transformer_e2e POST_BUILD
+      add_custom_command(TARGET ${DEMO_NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy ${MATH_LIB_PATH}/lib/mklml.dll ${CMAKE_BINARY_DIR}/Release
             COMMAND ${CMAKE_COMMAND} -E copy ${MATH_LIB_PATH}/lib/libiomp5md.dll ${CMAKE_BINARY_DIR}/Release
             COMMAND ${CMAKE_COMMAND} -E copy ${MKLDNN_PATH}/lib/mkldnn.dll  ${CMAKE_BINARY_DIR}/Release
       )
     else()
-      add_custom_command(TARGET transformer_e2e POST_BUILD
+      add_custom_command(TARGET ${DEMO_NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy ${OPENBLAS_LIB_PATH}/lib/openblas.dll ${CMAKE_BINARY_DIR}/Release
       )
     endif()
     if(NOT WITH_STATIC_LIB)
-        add_custom_command(TARGET transformer_e2e POST_BUILD
+        add_custom_command(TARGET ${DEMO_NAME} POST_BUILD
           COMMAND ${CMAKE_COMMAND} -E copy "${PADDLE_LIB}/paddle/lib/paddle_fluid.dll" ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}
         )
     endif()
   endif()
 
-  target_link_libraries(transformer_e2e ${DEPS})
+  target_link_libraries(${DEMO_NAME} ${DEPS})
 
 else(ON_INFER)
   if(NOT PY_CMD)
