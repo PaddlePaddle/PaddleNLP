@@ -19,12 +19,7 @@ def paddle2D_scatter_add(x_tensor, index_tensor, update_tensor, dim=0):
             axis=1)
     elif dim == 1:
         index_tensor = paddle.concat(
-            x=[
-                paddle.flatten(
-                    (paddle.arange(dim1 * dim0) // dim1).unsqueeze(1),
-                    start_axis=0,
-                    stop_axis=1), index_tensor
-            ],
+            x=[(paddle.arange(dim1 * dim0) // dim1).unsqueeze(1), index_tensor],
             axis=1)
     output_tensor = paddle.scatter_nd_add(x_tensor, index_tensor, update_tensor)
     return output_tensor
