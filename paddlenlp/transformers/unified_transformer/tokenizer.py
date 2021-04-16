@@ -22,6 +22,7 @@ import unicodedata
 from shutil import copyfile
 
 import numpy as np
+import paddle
 from paddle.utils import try_import
 
 from .. import PretrainedTokenizer
@@ -204,7 +205,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         ret = [token for token in ret if token]
         return ret
 
-    def convert_tokens_to_string(self, tokens):
+    def convert_tokens_to_string(self, tokens, keep_space=True):
         """
         Converts a sequence of tokens (list of string) in a single string. Since
         the usage of WordPiece introducing `__` to concat subwords, also remove
@@ -215,15 +216,18 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             str: Converted string from tokens.
         """
         tokens = self.merge_subword(tokens)
-        out_string = " ".join(tokens).replace("<s>", "")
+        if keep_space:
+            out_string = " ".join(tokens).replace("<s>", "")
+        else:
+            out_string = "".join(tokens).replace("<s>", "")
         out_string = out_string.replace("</s>", "\n").replace("\n ",
                                                               "\n").strip()
         return out_string
 
-    def convert_ids_to_string(self, ids):
+    def convert_ids_to_string(self, ids, keep_space=True):
         """Convert ids to string."""
         tokens = self.convert_ids_to_tokens(ids)
-        out_string = self.convert_tokens_to_string(tokens)
+        out_string = self.convert_tokens_to_string(tokens, keep_space)
         return out_string
 
     def num_special_tokens_to_add(self, pair=False):
@@ -438,7 +442,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                         return_attention_mask=True,
                         return_length=False,
                         add_start_token_as_response=False,
-                        pad_to_max_seq_len=False):
+                        pad_to_max_seq_len=False,
+                        return_tensors=False):
         """
         Main method to encode the single-turn or multi-turn dialogue conversation. 
         It will return a dictionary containing the encoded sequence and other 
@@ -482,6 +487,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             pad_to_max_seq_len (bool, optional): Whether to pad the returned 
                 sequences to the `max_seq_len`. Note that, in this method, 
                 returned sequences will be padded on the left. Default False.
+            return_tensors (bool, optional): Whether to convert the returned 
+                sequences to Tensor. Default False.
         """
         task_type_list = ["chitchat", "knowledge", "recommend"]
         # Input type checking for clearer error
@@ -563,6 +570,10 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             encoded_inputs["input_ids"] = [
                 self.pad_token_id
             ] * pad_length + encoded_inputs["input_ids"]
+        if return_tensors:
+            # Add dimention for batch_size
+            encoded_inputs["input_ids"] = paddle.to_tensor(encoded_inputs[
+                "input_ids"]).unsqueeze(0)
 
         if return_token_type_ids:
             encoded_inputs["token_type_ids"] = [0] * len(
@@ -571,6 +582,10 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 encoded_inputs["token_type_ids"] = [
                     self.pad_token_id
                 ] * pad_length + encoded_inputs["token_type_ids"]
+            if return_tensors:
+                # Add dimention for batch_size
+                encoded_inputs["token_type_ids"] = paddle.to_tensor(
+                    encoded_inputs["token_type_ids"]).unsqueeze(0)
 
         if return_length:
             encoded_inputs["seq_len"] = sequence_length
@@ -581,6 +596,10 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 encoded_inputs["position_ids"] = [
                     self.pad_token_id
                 ] * pad_length + encoded_inputs["position_ids"]
+            if return_tensors:
+                # Add dimention for batch_size
+                encoded_inputs["position_ids"] = paddle.to_tensor(
+                    encoded_inputs["position_ids"]).unsqueeze(0)
 
         if return_attention_mask:
             attention_mask = np.ones(
@@ -599,5 +618,9 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                     (max_seq_len, max_seq_len), dtype='float32') * -1e9
                 new_mask[-sequence_length:, -sequence_length:] = attention_mask
                 encoded_inputs["attention_mask"] = new_mask
+            if return_tensors:
+                # Add dimentions for batch_size and num_heads
+                encoded_inputs["attention_mask"] = paddle.to_tensor(
+                    encoded_inputs["attention_mask"]).unsqueeze((0, 1))
 
         return encoded_inputs
