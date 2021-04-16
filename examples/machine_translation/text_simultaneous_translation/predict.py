@@ -20,7 +20,7 @@ from attrdict import AttrDict
 
 import paddle
 import reader
-from model import TransformerModel, position_encoding_init
+from model import SimultaneousTransformer, position_encoding_init
 
 
 def parse_args():
@@ -62,7 +62,7 @@ def do_predict(args):
     test_loader, to_tokens = reader.create_infer_loader(args)
 
     # Define model
-    transformer = TransformerModel(
+    transformer = SimultaneousTransformer(
         args.src_vocab_size, args.trg_vocab_size, args.max_length + 1,
         args.n_layer, args.n_head, args.d_model, args.d_inner_hid, args.dropout,
         args.weight_sharing, args.bos_idx, args.eos_idx, args.waitk)
@@ -92,11 +92,8 @@ def do_predict(args):
         for input_data in test_loader:
             (src_word, _) = input_data
 
-            finished_seq, finished_scores = transformer.beam_search(
-                src_word,
-                beam_size=args.beam_size,
-                max_len=args.max_out_len,
-                waitk=args.waitk)
+            finished_seq, finished_scores = transformer.greedy_search(
+                src_word, max_len=args.max_out_len, waitk=args.waitk)
             finished_seq = finished_seq.numpy()
             finished_scores = finished_scores.numpy()
             for idx, ins in enumerate(finished_seq):

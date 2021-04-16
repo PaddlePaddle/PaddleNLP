@@ -34,12 +34,12 @@ class CrossEntropyCriterion(nn.Layer):
             label = F.label_smooth(
                 label=F.one_hot(
                     x=label, num_classes=predict.shape[-1]),
-                epsilon=self.label_smooth_eps).squeeze()
+                epsilon=self.label_smooth_eps)
 
         cost = F.softmax_with_cross_entropy(
             logits=predict,
             label=label,
-            soft_label=True if self.label_smooth_eps else False)
+            soft_label=True if self.label_smooth_eps else False).squeeze()
         weighted_cost = cost * weights
         sum_cost = paddle.sum(weighted_cost)
         token_num = paddle.sum(weights)
@@ -160,7 +160,7 @@ class DecoderLayer(nn.TransformerDecoderLayer):
         return tgt if cache is None else (tgt, (incremental_cache, ))
 
 
-class TransformerModel(nn.Layer):
+class SimultaneousTransformer(nn.Layer):
     """
     model
     """
@@ -178,7 +178,7 @@ class TransformerModel(nn.Layer):
                  bos_id=0,
                  eos_id=1,
                  waitk=-1):
-        super(TransformerModel, self).__init__()
+        super(SimultaneousTransformer, self).__init__()
         self.trg_vocab_size = trg_vocab_size
         self.emb_dim = d_model
         self.bos_id = bos_id
@@ -244,7 +244,7 @@ class TransformerModel(nn.Layer):
         base_attn_bias = paddle.cast(
             src_word == self.bos_id,
             dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
-        src_slf_attn_bias = paddle.tile(base_attn_bias, [1, 1, src_max_len, 1])
+        src_slf_attn_bias = base_attn_bias
         src_slf_attn_bias.stop_gradient = True
         trg_slf_attn_bias = paddle.tensor.triu(
             (paddle.ones(
@@ -278,7 +278,7 @@ class TransformerModel(nn.Layer):
                 for i in range(self.waitk, src_max_len + 1):
                     enc_output = self.encoder(
                         enc_input[:, :i, :],
-                        src_mask=src_slf_attn_bias[:, :, :i, :i])
+                        src_mask=src_slf_attn_bias[:, :, :, :i])
                     enc_outputs.append(enc_output)
 
             trg_emb = self.trg_word_embedding(trg_word)
@@ -293,30 +293,20 @@ class TransformerModel(nn.Layer):
                 tgt_mask=trg_slf_attn_bias,
                 memory_mask=trg_src_attn_bias)
 
-            dec_output = paddle.reshape(
-                dec_output, shape=[-1, dec_output.shape[-1]])
-
             predict = self.linear(dec_output)
 
         return predict
 
     def beam_search(self, src_word, beam_size=4, max_len=256, waitk=-1):
-        if beam_size == 1:
-            return self._greedy_search(src_word, max_len=max_len, waitk=waitk)
-        else:
-            return self._beam_search(
-                src_word, beam_size=beam_size, max_len=max_len, waitk=waitk)
-
-    def _beam_search(self, src_word, beam_size=4, max_len=256, waitk=-1):
         # TODO: "Speculative Beam Search for Simultaneous Translation"
         raise NotImplementedError
 
-    def _greedy_search(self, src_word, max_len=256, waitk=-1):
+    def greedy_search(self, src_word, max_len=256, waitk=-1):
         src_max_len = paddle.shape(src_word)[-1]
         base_attn_bias = paddle.cast(
             src_word == self.bos_id,
             dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
-        src_slf_attn_bias = paddle.tile(base_attn_bias, [1, 1, src_max_len, 1])
+        src_slf_attn_bias = base_attn_bias
         src_slf_attn_bias.stop_gradient = True
         trg_src_attn_bias = paddle.tile(base_attn_bias, [1, 1, 1, 1])
         src_pos = paddle.cast(
@@ -335,7 +325,7 @@ class TransformerModel(nn.Layer):
             for i in range(waitk, src_max_len + 1):
                 enc_output = self.encoder(
                     enc_input[:, :i, :],
-                    src_mask=src_slf_attn_bias[:, :, :i, :i])
+                    src_mask=src_slf_attn_bias[:, :, :, :i])
                 enc_outputs.append(enc_output)
 
         # constant number

@@ -25,8 +25,8 @@ import paddle
 import paddle.distributed as dist
 from paddlenlp.utils.log import logger
 
-from model import TransformerModel, CrossEntropyCriterion
 import reader
+from model import SimultaneousTransformer, CrossEntropyCriterion
 from utils.record import AverageStatistical
 
 
@@ -63,7 +63,7 @@ def do_train(args):
         args, places=paddle.get_device())
 
     # Define model
-    transformer = TransformerModel(
+    transformer = SimultaneousTransformer(
         args.src_vocab_size, args.trg_vocab_size, args.max_length + 1,
         args.n_layer, args.n_head, args.d_model, args.d_inner_hid, args.dropout,
         args.weight_sharing, args.bos_idx, args.eos_idx, args.waitk)
@@ -124,8 +124,6 @@ def do_train(args):
         for input_data in train_loader:
             train_reader_cost = time.time() - batch_start
             (src_word, trg_word, lbl_word) = input_data
-
-            lbl_word = paddle.reshape(lbl_word, shape=[-1, 1])
 
             if args.use_amp:
                 scaler = paddle.amp.GradScaler(
