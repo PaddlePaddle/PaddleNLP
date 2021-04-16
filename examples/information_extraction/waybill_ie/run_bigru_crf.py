@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import partial
+
 import paddle
 import paddle.nn as nn
 
@@ -21,36 +23,35 @@ from paddlenlp.layers import LinearChainCrf, ViterbiDecoder, LinearChainCrfLoss
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.embeddings import TokenEmbedding
 
-from data import load_dict, load_dataset, convert_tokens_to_ids, parse_decodes
+from data import load_dict, load_dataset, convert_gru_example, parse_decodes
+from model import BiGRUWithCRF
 
 
-class BiGRUWithCRF(nn.Layer):
-    def __init__(self,
-                 emb_size,
-                 hidden_size,
-                 word_num,
-                 label_num,
-                 use_w2v_emb=False):
-        super(BiGRUWithCRF, self).__init__()
-        if use_w2v_emb:
-            self.word_emb = TokenEmbedding(
-                extended_vocab_path='./data/word.dic', unknown_token='OOV')
-        else:
-            self.word_emb = nn.Embedding(word_num, emb_size)
-        self.gru = nn.GRU(emb_size,
-                          hidden_size,
-                          num_layers=2,
-                          direction='bidirectional')
-        self.fc = nn.Linear(hidden_size * 2, label_num + 2)  # BOS EOS
-        self.crf = LinearChainCrf(label_num)
-        self.decoder = ViterbiDecoder(self.crf.transitions)
+@paddle.no_grad()
+def evaluate(model, metric, data_loader):
+    model.eval()
+    metric.reset()
+    for token_ids, lengths, label_ids in data_loader:
+        preds = model(token_ids, lengths)
+        n_infer, n_label, n_correct = metric.compute(lengths, preds, label_ids)
+        metric.update(n_infer.numpy(), n_label.numpy(), n_correct.numpy())
+        precision, recall, f1_score = metric.accumulate()
+    print("eval precision: %f - recall: %f - f1: %f" %
+          (precision, recall, f1_score))
+    model.train()
 
-    def forward(self, x, lens):
-        embs = self.word_emb(x)
-        output, _ = self.gru(embs)
-        output = self.fc(output)
-        _, pred = self.decoder(output, lens)
-        return output, lens, pred
+
+@paddle.no_grad()
+def predict(model, data_loader, ds, label_vocab):
+    all_preds = []
+    all_lens = []
+    for token_ids, lengths, label_ids in data_loader:
+        preds = model(token_ids, lengths)
+        all_preds.append(preds.numpy())
+        all_lens.append(lengths)
+    sentences = [example[0] for example in ds.data]
+    results = parse_decodes(sentences, all_preds, all_lens, label_vocab)
+    return results
 
 
 if __name__ == '__main__':
@@ -63,15 +64,11 @@ if __name__ == '__main__':
     label_vocab = load_dict('./data/tag.dic')
     word_vocab = load_dict('./data/word.dic')
 
-    def convert_example(example):
-        tokens, labels = example
-        token_ids = convert_tokens_to_ids(tokens, word_vocab, 'OOV')
-        label_ids = convert_tokens_to_ids(labels, label_vocab, 'O')
-        return token_ids, len(token_ids), label_ids
-
-    train_ds.map(convert_example)
-    dev_ds.map(convert_example)
-    test_ds.map(convert_example)
+    trans_func = partial(
+        convert_gru_example, word_vocab=word_vocab, label_vocab=label_vocab)
+    train_ds.map(trans_func)
+    dev_ds.map(trans_func)
+    test_ds.map(trans_func)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=word_vocab.get('OOV'), dtype='int64'),  # token_ids
@@ -102,26 +99,31 @@ if __name__ == '__main__':
         collate_fn=batchify_fn)
 
     # Define the model netword and its loss
-    network = BiGRUWithCRF(300, 300, len(word_vocab), len(label_vocab))
-    model = paddle.Model(network)
+    model = BiGRUWithCRF(300, 300, len(word_vocab), len(label_vocab))
+
     optimizer = paddle.optimizer.Adam(
         learning_rate=0.001, parameters=model.parameters())
-    crf_loss = LinearChainCrfLoss(network.crf)
-    chunk_evaluator = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
-    model.prepare(optimizer, crf_loss, chunk_evaluator)
+    metric = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
 
-    model.fit(train_data=train_loader,
-              eval_data=dev_loader,
-              epochs=10,
-              save_dir='./results',
-              log_freq=1)
+    step = 0
+    for epoch in range(10):
+        # Switch the model to training mode
+        model.train()
+        for idx, (token_ids, lengths, label_ids) in enumerate(train_loader):
+            loss = model(token_ids, lengths, label_ids)
+            loss = loss.mean()
+            loss.backward()
+            optimizer.step()
+            optimizer.clear_grad()
+            step += 1
+            print("epoch:%d - step:%d - loss: %f" % (epoch, step, loss))
+        evaluate(model, metric, dev_loader)
 
-    model.evaluate(eval_data=test_loader)
-    outputs, lens, decodes = model.predict(test_data=test_loader)
-    sentences = [example[0] for example in test_ds.data]
-    preds = parse_decodes(sentences, decodes, lens, label_vocab)
+        paddle.save(model.state_dict(),
+                    './ernie_result/model_%d.pdparams' % step)
 
-    file_path = "bigru_results.txt"
+    preds = predict(model, test_loader, test_ds, label_vocab)
+    file_path = "ernie_results.txt"
     with open(file_path, "w", encoding="utf8") as fout:
         fout.write("\n".join(preds))
     # Print some examples

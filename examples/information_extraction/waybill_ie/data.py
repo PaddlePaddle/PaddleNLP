@@ -62,6 +62,13 @@ def convert_ernie_example(example, tokenizer, label_vocab):
         'token_type_ids'], tokenized_input['seq_len'], tokenized_input['labels']
 
 
+def convert_gru_example(example, word_vocab, label_vocab):
+    tokens, labels = example
+    token_ids = convert_tokens_to_ids(tokens, word_vocab, 'OOV')
+    label_ids = convert_tokens_to_ids(labels, label_vocab, 'O')
+    return token_ids, len(token_ids), label_ids
+
+
 def parse_decodes(sentences, predictions, lengths, label_vocab):
     """Parse the padding result
 
