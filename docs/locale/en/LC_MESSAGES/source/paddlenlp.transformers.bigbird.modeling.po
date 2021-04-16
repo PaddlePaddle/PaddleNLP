@@ -1,0 +1,86 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.transformers.bigbird.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining:1
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification:1
+#: paddlenlp.transformers.bigbird.modeling.BigBirdModel:1
+msgid "基类：:class:`paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:1
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:1
+#: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:1
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:1
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward
+#: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:4
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:4
+#: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:4
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:4
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:6
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:6
+#: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:6
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:6
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel:1
+msgid ""
+"An abstract class for pretrained BigBird models. It provides BigBird "
+"related `model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+"`PretrainedModel` for more details."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel.init_weights:1
+msgid "Initialization hook"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion:1
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+

@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument("--max_seq_len", type=int, default=256, help='max grad norm')
     parser.add_argument("--sent_embedding_dim", type=int, default=64, help="The size of sentence embedding.")
     parser.add_argument("--num_classes", type=int, default=2, help="The num of classification classes.")
-    parser.add_argument("--device", type=str, default="gpu", help="Device for selecting for the training.")
+    parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Device for selecting for the training.")
 
     args = parser.parse_args()
     return args

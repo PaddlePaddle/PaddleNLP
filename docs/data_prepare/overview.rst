@@ -18,6 +18,15 @@
 数据处理流程设计
 -----------------
 
-以基于Bert的文本分类任务为例：
+目前PaddleNLP的通用数据处理流程如下：
+
+#. 加载数据集（内置数据集或者自定义数据集，数据集返回 **原始数据**）。
+#. 定义 :func:`trans_func` ，包括tokenize，token to id等操作，并传入数据集的 :func:`map` 方法，将原始数据转为 *feature* 。
+#. 根据上一步数据处理的结果定义 **batchify** 方法和 :class:`BatchSampler` 。
+#. 定义 :class:`DataLoader` ， 传入 :class:`BatchSampler` 和 :func:`batchify_fn` 。
+
+下面是基于Bert的文本分类任务的数据处理流程图：
 
 .. image:: /imgs/data_preprocess_pipline.png
+
+关于数据处理的详细信息，请移步 :doc:`./data_preprocess` 。

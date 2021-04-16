@@ -1,0 +1,228 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../index.rst:31
+msgid "安装"
+msgstr "Installation"
+
+#: ../../index.rst:31
+msgid "10分钟完成高精度中文情感分析"
+msgstr "Chinese sentiment analysis with PaddleNLP: A 10-Minute Tutorial"
+
+#: ../../index.rst:31
+msgid "快速开始"
+msgstr "Quick Start"
+
+#: ../../index.rst:38
+msgid "整体介绍"
+msgstr "Overview"
+
+#: ../../index.rst:38
+msgid "数据集列表"
+msgstr "Datasets List"
+
+#: ../../index.rst:38
+msgid "加载数据集"
+msgstr "Load Datasets"
+
+#: ../../index.rst:38
+msgid "自定义数据集"
+msgstr "Customize Your Datasets"
+
+#: ../../index.rst:38
+msgid "数据处理"
+msgstr "Data Preprocess"
+
+#: ../../index.rst:38
+msgid "数据准备"
+msgstr "Data Preparation"
+
+#: ../../index.rst:48
+msgid "文本分类"
+msgstr "Text Classification"
+
+#: ../../index.rst:48
+msgid "词向量"
+msgstr "Word Embeddings"
+
+#: ../../index.rst:48
+msgid "语义匹配"
+msgstr "Semantic Matching"
+
+#: ../../index.rst:48
+msgid "文本生成"
+msgstr "Text Generation"
+
+#: ../../index.rst:48
+msgid "机器翻译"
+msgstr "Machine Translation"
+
+#: ../../index.rst:48
+msgid "阅读理解"
+msgstr "Reading Comprehension"
+
+#: ../../index.rst:48
+msgid "通用对话"
+msgstr "General Dialogue"
+
+#: ../../index.rst:48
+msgid "序列标注"
+msgstr "Sequence Labeling"
+
+#: ../../index.rst:48
+msgid "词法分析"
+msgstr "Lexical Analysis"
+
+#: ../../index.rst:48
+msgid "实践教程"
+msgstr "Tutorials"
+
+#: ../../index.rst:62
+msgid "模型压缩"
+msgstr "Model Compression"
+
+#: ../../index.rst:62
+msgid "高性能预测部署"
+msgstr "Deployment"
+
+#: ../../index.rst:62
+msgid "大规模分布式训练"
+msgstr "Distributed Training"
+
+#: ../../index.rst:62
+msgid "进阶指南"
+msgstr "Advanced Guide"
+
+#: ../../index.rst:70
+msgid "如何贡献数据集"
+msgstr "Dataset Contribution"
+
+#: ../../index.rst:70
+msgid "社区贡献"
+msgstr "Community Contribution"
+
+#: ../../index.rst:76
+msgid "paddlenlp.data"
+msgstr ""
+
+#: ../../index.rst:76
+msgid "paddlenlp.datasets"
+msgstr ""
+
+#: ../../index.rst:76
+msgid "paddlenlp.embeddings"
+msgstr ""
+
+#: ../../index.rst:76
+msgid "paddlenlp.ext_op"
+msgstr ""
+
+#: ../../index.rst:76
+msgid "paddlenlp.layers"
+msgstr ""
+
+#: ../../index.rst:76
+msgid "paddlenlp.metrics"
+msgstr ""
+
+#: ../../index.rst:76
+msgid "paddlenlp.seq2vec"
+msgstr ""
+
+#: ../../index.rst:76
+msgid "paddlenlp.transformers"
+msgstr ""
+
+#: ../../index.rst:76
+msgid "paddlenlp.utils"
+msgstr ""
+
+#: ../../index.rst:76
+msgid "API Reference"
+msgstr "API Reference"
+
+#: ../../index.rst:2
+msgid "欢迎使用PaddleNLP"
+msgstr "Welcome to PaddleNLP"
+
+#: ../../index.rst:4
+msgid ""
+"`PaddleNLP 2.0 <https://github.com/PaddlePaddle/PaddleNLP>`_ "
+"拥有覆盖多场景的模型库、简洁易用的全流程API与动静统一的高性能分布式训练能力，旨在为飞桨开发者提升文本领域建模效率，并提供基于PaddlePaddle"
+" 2.0的NLP领域最佳实践。具备如下特性："
+msgstr ""
+
+#: ../../index.rst:7
+msgid "**覆盖多场景的模型库**"
+msgstr ""
+
+#: ../../index.rst:9
+msgid "PaddleNLP集成了RNN与Transformer等多种主流模型结构，涵盖从词向量、词法分析、命名实体识别、语义表示等NLP基础技术，到文本分类、文本匹配、文本生成、文本图学习、信息抽取等NLP核心技术。同时针对机器翻译、通用对话、阅读理解等系统应用提供相应核心组件与预训练模型。"
+msgstr ""
+
+#: ../../index.rst:13
+msgid "**简洁易用的全流程API**"
+msgstr ""
+
+#: ../../index.rst:15
+msgid ""
+"深度兼容飞桨2.0的高层API体系，内置可复用的文本建模模块(Embedding、CRF、 "
+"Seq2Vec、Transformer)，可大幅度减少在数据处理、模型组网、训练与评估、推理部署环节的开发量，提升NLP任务迭代与落地的效率。"
+msgstr ""
+
+#: ../../index.rst:19
+msgid "**动静统一的高性能分布式训练**"
+msgstr "**动静统一的高性能分布式训练**"
+
+#: ../../index.rst:21
+msgid "基于飞桨2.0核心框架『动静统一』的特性与领先的混合精度优化策略，结合Fleet分布式训练API，可充分利用GPU集群资源，高效完成大规模预训练模型的分布式训练。"
+msgstr ""
+
+#: ../../index.rst:25
+msgid "项目GitHub: https://github.com/PaddlePaddle/PaddleNLP"
+msgstr "GitHub: https://github.com/PaddlePaddle/PaddleNLP"
+
+#: ../../index.rst:26
+msgid "项目Gitee: https://gitee.com/paddlepaddle/PaddleNLP"
+msgstr "Gitee: https://gitee.com/paddlepaddle/PaddleNLP"
+
+#: ../../index.rst:27
+msgid "GitHub Issue反馈: https://github.com/PaddlePaddle/PaddleNLP/issues"
+msgstr ""
+
+#: ../../index.rst:28
+msgid "官方QQ技术交流群: 973379845"
+msgstr ""
+
+#: ../../index.rst:91
+msgid "Indices and tables"
+msgstr ""
+
+#: ../../index.rst:92
+msgid ":ref:`genindex`"
+msgstr ""
+
+#: ../../index.rst:93
+msgid ":ref:`modindex`"
+msgstr ""
+
+#: ../../index.rst:94
+msgid ":ref:`search`"
+msgstr ""
+

@@ -1,0 +1,95 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.transformers.gpt2.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining:1
+#: paddlenlp.transformers.gpt2.modeling.GPT2Model:1
+msgid "基类：:class:`paddlenlp.transformers.gpt2.modeling.GPT2PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2Model:1
+msgid "The base model of gpt2."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining.forward:1
+#: paddlenlp.transformers.gpt2.modeling.GPT2Model.forward:1
+#: paddlenlp.transformers.gpt2.modeling.GPT2PretrainingCriterion.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining.forward
+#: paddlenlp.transformers.gpt2.modeling.GPT2Model.forward
+#: paddlenlp.transformers.gpt2.modeling.GPT2PretrainingCriterion.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining.forward:4
+#: paddlenlp.transformers.gpt2.modeling.GPT2Model.forward:4
+#: paddlenlp.transformers.gpt2.modeling.GPT2PretrainingCriterion.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining.forward:6
+#: paddlenlp.transformers.gpt2.modeling.GPT2Model.forward:6
+#: paddlenlp.transformers.gpt2.modeling.GPT2PretrainingCriterion.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2PretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2PretrainedModel:1
+msgid ""
+"An abstract class for pretrained GPT2 models. It provides GPT2 related "
+"`model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+"`PretrainedModel` for more details."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2PretrainedModel.init_weights:1
+msgid "Initialization hook"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining:1
+msgid "The pretraining model of GPT2."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2ForPretraining:3
+msgid "It returns some logits and cached_kvs."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2PretrainingCriterion:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2PretrainingCriterion:1
+msgid "Criterion for GPT2."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt2.modeling.GPT2PretrainingCriterion:3
+msgid "It calculates the final loss."
+msgstr ""
+

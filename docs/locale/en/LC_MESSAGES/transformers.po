@@ -1,0 +1,145 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../transformers.md:1
+msgid "PaddleNLP Transformer API"
+msgstr ""
+
+#: ../../transformers.md:3
+msgid "随着深度学习的发展，NLP领域涌现了一大批高质量的Transformer类预训练模型，多次刷新各种NLP任务SOTA。PaddleNLP为用户提供了常用的BERT、ERNIE、RoBERTa、XLNet经典结构预训练模型，让开发者能够方便快捷应用各类Transformer预训练模型及其下游任务。"
+msgstr ""
+
+#: ../../transformers.md:6
+msgid "Transformer预训练模型汇总"
+msgstr ""
+
+#: ../../transformers.md:8
+msgid "下表汇总了目前PaddleNLP支持的各类预训练模型。用户可以使用PaddleNLP提供的模型，完成问答、文本分类、序列标注、文本生成等任务。同时我们提供了34种预训练的参数权重供用户使用，其中包含了17种中文语言模型的预训练权重。"
+msgstr ""
+
+#: ../../transformers.md:77
+msgid ""
+"NOTE：其中中文的预训练模型有bert-base-chinese, bert-wwm-chinese, bert-wwm-ext-"
+"chinese, ernie-1.0, ernie-tiny, gpt2-base-cn, roberta-wwm-ext, roberta-"
+"wwm-ext-large, rbt3, rbtl3, chinese-electra-base, chinese-electra-small, "
+"chinese-xlnet-base, chinese-xlnet-mid, chinese-xlnet-large, "
+"unified_transformer-12L-cn, unified_transformer-12L-cn-luge。"
+msgstr ""
+
+#: ../../transformers.md:79
+msgid "预训练模型使用方法"
+msgstr ""
+
+#: ../../transformers.md:81
+msgid ""
+"PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用户的使用门槛。只需十几行代码"
+"，用户即可完成模型加载和下游任务Fine-tuning。"
+msgstr ""
+
+#: ../../transformers.md:109
+msgid "上面的代码给出使用预训练模型的简要示例，更完整详细的示例代码，可以参考使用预训练模型Fine-tune完成中文文本分类任务。"
+msgstr ""
+
+#: ../../transformers.md:111
+msgid "加载数据集：PaddleNLP内置了多种数据集，用户可以一键导入所需的数据集。"
+msgstr ""
+
+#: ../../transformers.md:112
+msgid ""
+"加载预训练模型：PaddleNLP的预训练模型可以很容易地通过from_pretrained()方法加载。第一个参数是汇总表中对应的 "
+"Pretrained "
+"Weight，可加载对应的预训练权重。BertForSequenceClassification初始化__init__所需的其他参数，如num_classes等，也是通过from_pretrained()传入。Tokenizer使用同样的from_pretrained方法加载。"
+msgstr ""
+
+#: ../../transformers.md:113
+msgid "使用tokenier将dataset处理成模型的输入。此部分可以参考前述的详细示例代码。"
+msgstr ""
+
+#: ../../transformers.md:114
+msgid "定义训练所需的优化器，loss函数等，就可以开始进行模型fine-tune任务。"
+msgstr ""
+
+#: ../../transformers.md:117
+msgid "预训练模型适用任务汇总"
+msgstr ""
+
+#: ../../transformers.md:119
+msgid "本小节按照模型适用的不同任务类型，对上表Transformer预训练模型汇总的Task进行分类汇总。主要包括文本分类、序列标注、问答任务、文本生成、机器翻译等。"
+msgstr ""
+
+#: ../../transformers.md:164
+msgid ""
+"用户可以切换表格中的不同模型，来处理相同类型的任务。如对于预训练模型使用方法中的文本分类任务，用户可以将BertForSequenceClassification换成ErnieForSequenceClassification,"
+" 来寻找更适合的预训练模型。"
+msgstr ""
+
+#: ../../transformers.md:167
+msgid "Reference"
+msgstr ""
+
+#: ../../transformers.md:168
+msgid ""
+"部分中文预训练模型来自：ymcui/Chinese-BERT-wwm, ymcui/Chinese-XLNet, "
+"huggingface/xlnet_chinese_large, Knover/luge-dialogue"
+msgstr ""
+
+#: ../../transformers.md:169
+msgid ""
+"Sun, Yu, et al. \"Ernie: Enhanced representation through knowledge "
+"integration.\" arXiv preprint arXiv:1904.09223 (2019)."
+msgstr ""
+
+#: ../../transformers.md:170
+msgid ""
+"Devlin, Jacob, et al. \"Bert: Pre-training of deep bidirectional "
+"transformers for language understanding.\" arXiv preprint "
+"arXiv:1810.04805 (2018)."
+msgstr ""
+
+#: ../../transformers.md:171
+msgid ""
+"Cui, Yiming, et al. \"Pre-training with whole word masking for chinese "
+"bert.\" arXiv preprint arXiv:1906.08101 (2019)."
+msgstr ""
+
+#: ../../transformers.md:172
+msgid ""
+"Vaswani, Ashish, et al. \"Attention is all you need.\" arXiv preprint "
+"arXiv:1706.03762 (2017)."
+msgstr ""
+
+#: ../../transformers.md:173
+msgid ""
+"Yang, Zhilin, et al. \"Xlnet: Generalized autoregressive pretraining for "
+"language understanding.\" arXiv preprint arXiv:1906.08237 (2019)."
+msgstr ""
+
+#: ../../transformers.md:174
+msgid ""
+"Clark, Kevin, et al. \"Electra: Pre-training text encoders as "
+"discriminators rather than generators.\" arXiv preprint arXiv:2003.10555 "
+"(2020)."
+msgstr ""
+
+#: ../../transformers.md:175
+msgid ""
+"Radford, Alec, et al. \"Language models are unsupervised multitask "
+"learners.\" OpenAI blog 1.8 (2019): 9."
+msgstr ""
+

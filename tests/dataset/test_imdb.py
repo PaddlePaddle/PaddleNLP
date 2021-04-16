@@ -19,6 +19,7 @@ from paddlenlp.datasets import Imdb
 
 from common_test import CpuCommonTest
 import util
+import unittest
 
 
 class TestImdbTrainSet(CpuCommonTest):
@@ -69,3 +70,7 @@ class TestImdbWrongMode(CpuCommonTest):
     @util.assert_raises
     def test_wrong_set(self):
         Imdb(**self.config)
+
+
+if __name__ == "__main__":
+    unittest.main()
