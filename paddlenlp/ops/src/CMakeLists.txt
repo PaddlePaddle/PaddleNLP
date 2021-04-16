@@ -224,7 +224,7 @@ else(ON_INFER)
   )
 
   include_directories(${PY_INCLUDE_DIR})
-  include_directories(${PY_INCLUDE_DIR}\third_party)
+  include_directories(${PY_INCLUDE_DIR}/third_party)
 
   if(EXISTS ${PY_LIB_DIR}/libpaddle_custom_op.so)
     set(lib_link
