@@ -15,7 +15,7 @@ import numpy as np
 import unittest
 import paddle
 import paddlenlp.utils.ops as ops
-from common_test import CommonTest, CpuCommonTest
+from common_test import CommonTest
 
 EINSUM_TEST_SAMPLE = {
     "x": np.random.rand(5),
@@ -159,6 +159,16 @@ class TestEinsumEllipsis3(TestEinsum):
 class TestEinsumTestEinsumBilinear(TestEinsum):
     def setUp(self):
         self.sample = {"paradigm": "bn,anm,bm->ba", "data": ["B", "E", "I"]}
+
+
+class TestEinsumTestEinsumOthers(TestEinsum):
+    def setUp(self):
+        self.sample = {"paradigm": "ijkl, lmn->kmn", "data": ["F", "H"]}
+
+
+class TestEinsumTestEinsumOthers(TestEinsum):
+    def setUp(self):
+        self.sample = {"paradigm": "ijkl, lmn->ijn", "data": ["F", "H"]}
 
 
 if __name__ == "__main__":

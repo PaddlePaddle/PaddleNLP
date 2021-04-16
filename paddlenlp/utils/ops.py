@@ -41,12 +41,14 @@ def einsum(equation, *operands):
                 elif is_right_summed_dim:
                     right = right.sum(axis=i, keepdim=True)
             elif is_left_summed_dim and is_right_summed_dim:
+                assert left.shape[i] == right.shape[
+                    i], "Non-brocast dim should be equal."
                 batch_dims.append(i)
                 batch_size *= left.shape[i]
             elif is_left_summed_dim:
                 left_out_dims.append(i)
                 left_size *= left.shape[i]
-            elif is_right_summed_dim:
+            else:
                 right_out_dims.append(i)
                 right_size *= right.shape[i]
         out_shape = [left.shape[i] for i in batch_dims + left_out_dims]
@@ -243,7 +245,6 @@ def einsum(equation, *operands):
         if idx_last_operand[i] == 0 and idxes_to_output_dims[
                 i] >= num_output_dims:
             result = result.sum(axis=idxes_to_output_dims[i], keepdim=True)
-
     for i in range(1, len(preprocessed_operands)):
         for j in range(num_total_idxes):
             if idx_last_operand[j] == i and idxes_to_output_dims[
