@@ -17,7 +17,7 @@ __version__ = '2.0.0rc3'
 from . import data
 from . import datasets
 from . import embeddings
-from . import ext_op
+from . import ops
 from . import layers
 from . import metrics
 from . import models

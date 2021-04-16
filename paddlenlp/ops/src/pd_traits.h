@@ -1,25 +1,24 @@
 #pragma once
 
 #include "fastertransformer/common.h"
-#include "paddle/fluid/platform/float16.h"
 
 using namespace fastertransformer;
-namespace paddle {
-template <typename T>
+
+template <paddle::DataType D>
 class PDTraits;
 
 template <>
-class PDTraits<float> {
+class PDTraits<paddle::DataType::FLOAT32> {
 public:
   typedef float DataType;
+  typedef float data_t;
   static const OperationType OpType = OperationType::FP32;
 };
 
 template <>
-class PDTraits<platform::float16> {
+class PDTraits<paddle::DataType::FLOAT16> {
 public:
   typedef half DataType;
+  typedef paddle::float16 data_t;
   static const OperationType OpType = OperationType::FP16;
 };
-
-}  // namespace paddle
