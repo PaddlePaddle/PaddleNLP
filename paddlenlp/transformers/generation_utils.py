@@ -447,14 +447,14 @@ class GenerationMixin(object):
                 0, which means no effect.
             top_p (float, optional): The cumulative probability for 
                 top-p-filtering in the "sampling" strategy. The value should 
-                satisfy :math:`0 <= top_p < 1`. Default to 1.0, which means no 
+                satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no 
                 effect.
             num_beams (int, optional): The number of beams in the "beam_search"
                 strategy. Default to 1.
             length_penalty (float, optional): The exponential penalty to the 
                 sequence length in the "beam_search" strategy. If 
-                :math:`length_penalty < 1.0`, the model will generate shorter 
-                sequences. If :math:`length_penalty > 1.0`, the model will 
+                :math:`length\_penalty < 1.0`, the model will generate shorter 
+                sequences. If :math:`length\_penalty > 1.0`, the model will 
                 generate longer sequences. Default to 1.0, which means no 
                 penalty.
             early_stopping (bool, optional): Whether to stop searching in the 
@@ -480,6 +480,19 @@ class GenerationMixin(object):
                 type is same as the input `input_ids`. The scores is a Tensor 
                 with shape [batch_size * num_return_sequences, 1]. The data type 
                 is float32 or float64, the same as the parameters in the model.
+
+            tuple: It is a tuple contains two elements: ids and scores. Each 
+            element is a Tensor.
+
+            With the fields:
+
+            - ids (Tensor): The ids of the generated sequences. It is a Tensor 
+                with shape [batch_size * num_return_sequences, sequence_length]. 
+                The data type is same as the input `input_ids`.
+            - scores (Tensor):The scores of the generated sequences. It is a 
+                Tensor with shape [batch_size * num_return_sequences, 1]. The 
+                data type is float32 or float64, which is the same as the 
+                parameters in the model.
 
         Example:
             .. code-block::
