@@ -43,7 +43,7 @@ def evaluate(model, metric, data_loader):
         n_infer, n_label, n_correct = metric.compute(lens, preds, labels)
         metric.update(n_infer.numpy(), n_label.numpy(), n_correct.numpy())
         precision, recall, f1_score = metric.accumulate()
-    print("eval precision: %f - recall: %f - f1: %f" %
+    print("[Eval] Precision: %f - Recall: %f - F1: %f" %
           (precision, recall, f1_score))
     model.train()
 
@@ -115,19 +115,17 @@ if __name__ == '__main__':
 
     step = 0
     for epoch in range(10):
-        for idx, (input_ids, token_type_ids, length,
-                  labels) in enumerate(train_loader):
+        for input_ids, token_type_ids, length, labels in train_loader:
             logits = model(input_ids, token_type_ids)
             loss = paddle.mean(loss_fn(logits, labels))
             loss.backward()
             optimizer.step()
             optimizer.clear_grad()
             step += 1
-            print("epoch:%d - step:%d - loss: %f" % (epoch, step, loss))
+            print("[TRAIN] Epoch:%d - Step:%d - Loss: %f" % (epoch, step, loss))
         evaluate(model, metric, dev_loader)
 
-        paddle.save(model.state_dict(),
-                    './ernie_result/model_%d.pdparams' % step)
+        paddle.save(model.state_dict(), './ernie_ckpt/model_%d.pdparams' % step)
 
     preds = predict(model, test_loader, test_ds, label_vocab)
     file_path = "ernie_results.txt"
