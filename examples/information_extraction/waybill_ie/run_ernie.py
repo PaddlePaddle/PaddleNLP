@@ -43,7 +43,7 @@ def evaluate(model, metric, data_loader):
         n_infer, n_label, n_correct = metric.compute(lens, preds, labels)
         metric.update(n_infer.numpy(), n_label.numpy(), n_correct.numpy())
         precision, recall, f1_score = metric.accumulate()
-    print("[Eval] Precision: %f - Recall: %f - F1: %f" %
+    print("[EVAL] Precision: %f - Recall: %f - F1: %f" %
           (precision, recall, f1_score))
     model.train()
 
