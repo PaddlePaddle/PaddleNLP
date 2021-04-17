@@ -33,8 +33,9 @@ class BiGRUWithCRF(nn.Layer):
         self.gru = nn.GRU(emb_size,
                           hidden_size,
                           num_layers=2,
-                          direction='bidirectional')
-        self.fc = nn.Linear(hidden_size * 2, label_num + 2)  # BOS EOS
+                          direction='bidirect')
+        # We need `label_num + 2` for appending BOS and EOS tag 
+        self.fc = nn.Linear(hidden_size * 2, label_num + 2)
         self.crf = LinearChainCrf(label_num)
         self.crf_loss = LinearChainCrfLoss(self.crf)
         self.viterbi_decoder = ViterbiDecoder(self.crf.transitions)
