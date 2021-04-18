@@ -81,15 +81,15 @@ class Sharding:
 
         global_article_count = 0
         for input_file in self.input_files:
-            logger.info('input file:', input_file)
+            logger.info(f'input file: {input_file}')
             with open(input_file, mode='r', newline='\n') as f:
                 for i, line in enumerate(f):
                     if line.strip():
                         self.articles[global_article_count] = line.rstrip()
                         global_article_count += 1
 
-        logger.info('End: Loading Articles: There are',
-                    len(self.articles), 'articles.')
+        logger.info(
+            f'End: Loading Articles: There are {len(self.articles)} articles.')
 
     def segment_articles_into_sentences(self, segmenter):
         logger.info('Start: Sentence Segmentation')
@@ -103,8 +103,8 @@ class Sharding:
         for i, article in enumerate(self.articles):
             self.sentences[i] = segmenter.segment_string(self.articles[article])
 
-            if i % 500 == 0:
-                logger.info('Segmenting article', i)
+            if i % 100000 == 0:
+                logger.info(f'Segmenting article {i}')
         logger.info('End: Sentence Segmentation')
 
     def init_output_files(self):
@@ -303,22 +303,22 @@ class Sharding:
             training_median = statistics.median(training_counts)
             test_median = statistics.median(test_counts)
 
-            logger.info('Distributing data over shards:',
-                        len(unused_article_set), 'articles remaining.')
+            logger.info(
+                f'Distributing data over shards: {len(unused_article_set)} articles remaining.'
+            )
 
         if len(unused_article_set) != 0:
-            logger.info(
-                'Warning: Some articles did not make it into output files.')
+            logger.warning('Some articles did not make it into output files.')
 
         for shard in self.output_training_files:
             logger.info(
-                'Training shard:',
-                self.get_sentences_per_shard(self.output_training_files[shard]))
+                f'Train shard: {self.get_sentences_per_shard(self.output_training_files[shard])}'
+            )
 
         for shard in self.output_test_files:
             logger.info(
-                'Test shard:',
-                self.get_sentences_per_shard(self.output_test_files[shard]))
+                f'Test shard: {self.get_sentences_per_shard(self.output_test_files[shard])}'
+            )
 
         logger.info('End: Distribute Articles Over Shards')
 
@@ -330,7 +330,7 @@ class Sharding:
         for shard in self.output_test_files:
             self.write_single_shard(shard, self.output_test_files[shard])
 
-        logger.info('End: Write Shards to Disk')
+        logger.info(f'End: Write Shards to Disk')
 
     def write_single_shard(self, shard_name, shard):
         with open(shard_name, mode='w', newline='\n') as f:

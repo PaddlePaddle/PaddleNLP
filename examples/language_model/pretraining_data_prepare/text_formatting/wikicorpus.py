@@ -15,8 +15,10 @@
 import bz2
 import glob
 import os
-import urllib.request
+import requests
+import subprocess
 
+from opencc import OpenCC
 from paddlenlp.utils.log import logger
 from tqdm import tqdm
 
@@ -37,7 +39,7 @@ class WikicorpusTextFormatter:
             'en': 'wikicorpus_en.xml.bz2',
             'zh': 'wikicorpus_zh.xml.bz2'
         }
-
+        self.chinese_coneverter = OpenCC('t2s')
         self.save_path = save_path + '/wikicorpus_' + language
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
@@ -50,68 +52,72 @@ class WikicorpusTextFormatter:
     def download(self):
         url = self.download_urls[self.language]
         filename = self.downloaded_files[self.language]
-        downloaded_file = os.path.join(self.save_path, filename)
+        self.unzipped_file = os.path.join(self.save_path,
+                                          filename.replace(".bz2", ""))
 
-        logger.info('Downloading:', url)
-        if os.path.isfile(self.save_path + '/' + filename):
-            logger.info(f'File {filename} already exists, skipping download.')
-        else:
-            response = urllib.request.urlopen(url)
-            content_size = int(response.headers['Content-Length']) / 1024
+        if os.path.isfile(self.unzipped_file):
             logger.info(
-                f"Downloading: {url}, content size: {content_size} k and saving file to {downloaded_file}."
+                f'File {self.unzipped_file} already exists, skipping download.')
+        else:
+            response = requests.get(url=url, stream=True)
+            content_size = int(response.headers['Content-Length']) / (1024 *
+                                                                      1024)
+            self.downloaded_file = os.path.join(self.save_path, filename)
+            logger.info(
+                f"Downloading: {url}, content size: {content_size:.2f} M and saving file to {downloaded_file}."
             )
             with open(downloaded_file, "wb") as handle:
                 for data in tqdm(
-                        iterable=response.iter_content(1024),
+                        iterable=response.iter_content(1024 * 1024),
                         total=content_size,
-                        unit='k'):
+                        unit='M'):
                     handle.write(data)
 
-            # Always unzipping since this is relatively fast and will overwrite
-            logger.info('Unzipping: ', downloaded_file)
-            self.unzipped_file = os.path.join(self.save_path,
-                                              filename.replace(".bz2", ""))
-            file_size = os.path.getsize(self.unzipped_file) / 1024 * 1024
+            logger.info(f'Unzipping: {downloaded_file}')
             with open(self.unzipped_file, "wb") as new_file, bz2.BZ2File(
-                    downloaded_file, "rb") as f:
-                for data in tqdm(
-                        iterable=iter(lambda: f.read(1024 * 1024)),
-                        total=file_size,
-                        unit="m"):
+                    downloaded_file, "rb") as handle:
+                for data in iter(lambda: handle.read(1024 * 1024), b""):
                     new_file.write(data)
-            os.removedirs(downloaded_file)
 
-            # subprocess.run('bzip2 -dk ' + downloaded_file, shell=True, check=True)
-
-            # for data in iter(lambda : f.read(1024 * 1024), ''):
-            #     new_file.write(data)
+        # Always do wikiextractor since this is relatively fast and will overwrite
+        self.extracted_files = os.path.join(self.save_path, "extracted")
+        if not os.path.exists(self.extracted_files):
+            os.makedirs(self.extracted_files)
+        subprocess.run('wikiextractor ' + self.unzipped_file + ' -o ' +
+                       self.extracted_files,
+                       shell=True,
+                       check=True)
 
     def merge(self):
         # This puts one article per line
         logger.info(
             "Formatting the raw wiki texts and it takes some time to process. Please wait some minutes."
         )
-        cnt = 0
-        with open(self.formatted_file, mode='w', newline='\n') as ofile, \
-            open(self.unzipped_file, mode='r', newline='\n') as f:
-            for index, line in enumerate(f):
-                if index % 10000:
-                    logger.info(f"Precoessing the line number {index} .")
-
-                if '<doc id=' in line:
-                    article_open = True
-                elif '</doc>' in line:
-                    article_open = False
-                    for oline in article_lines[1:]:
-                        if oline != '\n':
-                            ofile.write(oline.rstrip() + " ")
-                    ofile.write("\n\n")
+        with open(self.formatted_file, mode='w', newline='\n') as ofile:
+            for dirname in glob.glob(
+                    self.extracted_files + '/*/', recursive=False):
+                for filename in glob.glob(dirname + 'wiki_*', recursive=True):
+                    logger.info(f"Formatting file {filename} .")
                     article_lines = []
-                else:
-                    if article_open:
-                        article_lines.append(line)
+                    article_open = False
+
+                    with open(filename, mode='r', newline='\n') as file:
+                        for line in file:
+                            if self.language == "zh":
+                                line = self.chinese_coneverter.convert(line)
+                            if '<doc id=' in line:
+                                article_open = True
+                            elif '</doc>' in line:
+                                article_open = False
+                                for oline in article_lines[1:]:
+                                    if oline != '\n':
+                                        ofile.write(oline.rstrip() + " ")
+                                ofile.write("\n\n")
+                                article_lines = []
+                            else:
+                                if article_open:
+                                    article_lines.append(line)
 
 
 if __name__ == "__main__":
-    wiki_formatting = WikicorpusTextFormatting("zh", "./test")
+    wiki_formatting = WikicorpusTextFormatter("en", "./test")
