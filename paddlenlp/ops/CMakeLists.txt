@@ -1,11 +1,21 @@
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
-project(FasterTransformer LANGUAGES CXX CUDA)
+project(FasterTransformer LANGUAGES C CXX CUDA)
 
 find_package(CUDA 10.1 REQUIRED)
 
 INCLUDE(ExternalProject)
 
 set(CXX_STD "11" CACHE STRING "C++ standard")
+
+option(ON_INFER        "Compile with inference. "                                  OFF)
+option(WITH_GPU        "Compile with GPU/CPU, default use CPU."                    ON)
+option(USE_TENSORRT    "Compile with TensorRT."                                    OFF)
+
+if(NOT WITH_GPU)
+  message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
+endif()
+
+set(decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu)
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 
@@ -68,17 +78,20 @@ set(COMMON_LIB_DIRS
   ${CUDA_PATH}/lib64
 )
 
-set(THIRD_PARTY_PATH "third-party")
+set(FT_PATH "third-party")
 set(THIRD_PARTY_NAME "fastertransformer")
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(external/boost)
 
 ExternalProject_Add(
   extern_${THIRD_PARTY_NAME}
   GIT_REPOSITORY    https://github.com/NVIDIA/DeepLearningExamples.git
   GIT_TAG           master
-  PREFIX            ${THIRD_PARTY_PATH}
-  SOURCE_DIR        ${THIRD_PARTY_PATH}/${THIRD_PARTY_NAME}
+  PREFIX            ${FT_PATH}
+  SOURCE_DIR        ${FT_PATH}/${THIRD_PARTY_NAME}
   SOURCE_SUBDIR     "FasterTransformer/v3.1"
-  BINARY_DIR        ${THIRD_PARTY_PATH}/build
+  BINARY_DIR        ${FT_PATH}/build
   INSTALL_COMMAND   ""
   CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM}
 )
@@ -91,44 +104,6 @@ set(FT_LIB_PATH ${BINARY_DIR}/lib)
 
 include_directories(
   ${FT_INCLUDE_PATH}
-)
-
-if(NOT PY_CMD)
-  set(PYTHON_PATH "python" CACHE STRING "Python path")
-else()
-  set(PYTHON_PATH ${PY_CMD} CACHE STRING "Python path")
-endif()
-
-execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.sysconfig.get_include())"
-                RESULT_VARIABLE _INC_PYTHON_SUCCESS
-                OUTPUT_VARIABLE _INC_PYTHON_VALUES)
-if (NOT _INC_PYTHON_SUCCESS MATCHES 0)
-    message(FATAL_ERROR "Python config Error.")
-endif()
-string(REGEX REPLACE ";" "\\\\;" _INC_PYTHON_VALUES ${_INC_PYTHON_VALUES})
-string(REGEX REPLACE "\n" ";" _INC_PYTHON_VALUES ${_INC_PYTHON_VALUES})
-list(GET _INC_PYTHON_VALUES 0 PY_INCLUDE_DIR)
-
-list(APPEND COMMON_HEADER_DIRS ${PY_INCLUDE_DIR})
-list(APPEND COMMON_HEADER_DIRS ${PY_INCLUDE_DIR}/third_party)
-
-include_directories(
-  ${COMMON_HEADER_DIRS}
-)
-
-execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.sysconfig.get_lib())"
-                RESULT_VARIABLE _LIB_PYTHON_SUCCESS
-                OUTPUT_VARIABLE _LIB_PYTHON_VALUES)
-if (NOT _LIB_PYTHON_SUCCESS MATCHES 0)
-    message(FATAL_ERROR "Python config Error.")
-endif()
-string(REGEX REPLACE ";" "\\\\;" _LIB_PYTHON_VALUES ${_LIB_PYTHON_VALUES})
-string(REGEX REPLACE "\n" ";" _LIB_PYTHON_VALUES ${_LIB_PYTHON_VALUES})
-list(GET _LIB_PYTHON_VALUES 0 PY_LIB_DIR)
-list(APPEND COMMON_LIB_DIRS ${PY_LIB_DIR})
-
-link_directories(
-  ${COMMON_LIB_DIRS}
 )
 
 link_directories(
