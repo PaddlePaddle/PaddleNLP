@@ -416,8 +416,8 @@ class BigBirdModel(BigBirdPretrainedModel):
 
             Returns:
                 A tuple of shape (``encoder_output``, ``pooled_output``)
-            
-            Example:
+
+            Examples:
                 .. code-block::
                     
                     import paddle
@@ -582,6 +582,22 @@ class BigBirdLMPredictionHead(Layer):
 
 
 class BigBirdPretrainingHeads(Layer):
+    """
+    The BigBird pretraining headss for a pretraiing task on top.
+
+    Args:
+        hidden_size (`int`):
+            See :class:`BigBirdModel`.
+        vocab_size (`int`):
+            See :class:`BigBirdModel`.
+        activation (`str`):
+            See :class:`BigBirdModel`.
+        embedding_weights (`Tensor`, optional):
+            The weight of pretraining linear. Shape:[hidden_size, vocab_size].
+            If set to `None`, use random weight.
+            Default to `None`.
+    """
+
     def __init__(self,
                  hidden_size,
                  vocab_size,
@@ -593,6 +609,24 @@ class BigBirdPretrainingHeads(Layer):
         self.seq_relationship = nn.Linear(hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output, masked_positions=None):
+        r"""
+        The BigBirdPretrainingHeads forward method, overrides the __call__() special method.
+
+        Args:
+            sequence_output (`Tensor`):
+                The sequence output of BigBirdModel.
+            pooled_output (`Tensor`):
+                The pooled output of BigBirdModel.
+            masked_positions (`Tensor`):
+                The list of masked positions.
+        Returns:
+            A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
+
+            - prediction_scores:
+                The logits of masked token prediction.
+            - seq_relationship_score:
+                The logits whether 2 sequences are NSP relationship.
+        """
         prediction_scores = self.predictions(sequence_output, masked_positions)
         seq_relationship_score = self.seq_relationship(pooled_output)
         return prediction_scores, seq_relationship_score
@@ -736,6 +770,7 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
                 The scale of masked tokens.
             masked_lm_weights (`Tensor`):
                 The weight of masked tokens. Shape: [mask_token_num, 1]
+
         Returns:
             A pretraining loss.
 
