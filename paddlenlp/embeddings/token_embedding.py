@@ -60,6 +60,7 @@ class TokenEmbedding(nn.Embedding):
             Whether the weight of embedding can be trained.
         keep_extended_vocab_only (object: `bool`, optional, default to True):
             Whether keep the extended vocabulary only, will be effective only if provides extended_vocab_path
+
     """
 
     def __init__(self,
@@ -218,19 +219,24 @@ class TokenEmbedding(nn.Embedding):
     def set_trainable(self, trainable):
         """
         Set the weight of embedding can be trained.
+
         Args:
             trainable (object: `bool`, required):
                 Whether the weight of embedding can be trained.
+
         """
         self.weight.stop_gradient = not trainable
 
     def search(self, words):
         """
         Get the vectors of specifying words.
+
         Args:
             words (object: `list` or `str` or `int`, required): The words which need to be searched.
+
         Returns:
             word_vector (object: `numpy.array`): The vectors of specifying words.
+
         """
         idx_list = self.get_idx_list_from_words(words)
         idx_tensor = paddle.to_tensor(idx_list)
@@ -239,13 +245,27 @@ class TokenEmbedding(nn.Embedding):
     def get_idx_from_word(self, word):
         """
         Get the index of specifying word by searching word_to_idx dict. 
+
+        Args:
+            word (object: `list` or `str` or `int`, required): The word which need to be get index.
+
+        Returns:
+            word_idx (object: `int`): The index of specifying word.
+
         """
         return get_idx_from_word(word, self.vocab.token_to_idx,
                                  self.unknown_token)
 
     def get_idx_list_from_words(self, words):
         """
-        Get the index list of specifying words by searching word_to_idx dict. 
+        Get the index list of specifying words by searching word_to_idx dict.
+
+        Args:
+            words (object: `list` or `str` or `int`, required): The words which need to be get indexes.
+
+        Returns:
+            word_idxes (object: `list`): The indexes list of specifying words.
+
         """
         if isinstance(words, str):
             idx_list = [self.get_idx_from_word(words)]
@@ -272,11 +292,14 @@ class TokenEmbedding(nn.Embedding):
     def dot(self, word_a, word_b):
         """
         Calculate the scalar product of 2 words.
+
         Args:
             word_a (object: `str`, required): The first word string.
             word_b (object: `str`, required): The second word string.
+
         Returns:
             The scalar product of 2 words.
+
         """
         dot = self._dot_np
         return self._calc_word(word_a, word_b, lambda x, y: dot(x, y))
@@ -284,11 +307,14 @@ class TokenEmbedding(nn.Embedding):
     def cosine_sim(self, word_a, word_b):
         """
         Calculate the cosine similarity of 2 words.
+
         Args:
             word_a (object: `str`, required): The first word string.
             word_b (object: `str`, required): The second word string.
+
         Returns:
             The cosine similarity of 2 words.
+
         """
         dot = self._dot_np
         return self._calc_word(
@@ -298,10 +324,13 @@ class TokenEmbedding(nn.Embedding):
     def _construct_word_to_idx(self, idx_to_word):
         """
         Construct word to index dict.
+
         Args:
             idx_to_word (object: 'list', required): 
+
         Returns:
             word_to_idx (object: `dict`): The word to index dict constructed by idx_to_word.
+
         """
         word_to_idx = {}
         for i, word in enumerate(idx_to_word):
@@ -312,6 +341,7 @@ class TokenEmbedding(nn.Embedding):
         """
         Returns:
             info (object: `str`): The token embedding infomation.
+
         """
         info = "Object   type: {}\
              \nUnknown index: {}\
