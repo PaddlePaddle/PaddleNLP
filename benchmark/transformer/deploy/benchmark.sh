@@ -7,7 +7,7 @@ for batch_size in "1" "2" "4"; do
         --config="../configs/transformer.base.yaml" \
         --model_dir=${model_dir} \
         --batch_size=${batch_size} \
-        2>&1 | tee ${log_path}/transformer_base_cpu_nomkl_bs${batch_size}_inference.log
+        --profile > ${log_path}/transformer_base_cpu_nomkl_bs${batch_size}_inference.log 2>&1
 
     for threads in "1" "6"; do
         python3.6 python/inference.py \
@@ -16,7 +16,7 @@ for batch_size in "1" "2" "4"; do
             --use_mkl \
             --threads=${threads} \
             --batch_size=${batch_size} \
-            2>&1 | tee ${log_path}/transformer_base_cpu_mkl_threads${threads}_bs${batch_size}_inference.log
+            --profile > ${log_path}/transformer_base_cpu_mkl_threads${threads}_bs${batch_size}_inference.log 2>&1 
     done
 
     python3.6 python/inference.py \
@@ -24,5 +24,5 @@ for batch_size in "1" "2" "4"; do
         --model_dir=${model_dir} \
         --use_gpu \
         --batch_size=${batch_size} \
-        2>&1 | tee ${log_path}/transformer_base_gpu_bs${batch_size}_inference.log
+        --profile > tee ${log_path}/transformer_base_gpu_bs${batch_size}_inference.log 2>&1 
 done

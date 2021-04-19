@@ -66,6 +66,9 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
     for (int k = 0; k < n_best; ++k) {
       dataresultvec[bsz * n_best + k].result_q = "";
       for (int len = 0; len < max_output_length; ++len) {
+        if (seq_ids_out[bsz * max_output_length * beam_size + len * beam_size +
+                        k] == eos_idx)
+          break;
         dataresultvec[bsz * n_best + k].result_q =
             dataresultvec[bsz * n_best + k].result_q +
             num2word_dict[seq_ids_out[bsz * max_output_length * beam_size +
@@ -239,6 +242,7 @@ void Main(int batch_size, int use_gpu, int gpu_id, int use_mkl, int threads) {
   Timer timer;
   int num_batches = 0;
   std::vector<std::string> source_query_vec;
+  std::ofstream out("predict.txt");
 
   while (reader.NextBatch(predictor, batch_size, source_query_vec)) {
     timer.tic();
@@ -252,6 +256,12 @@ void Main(int batch_size, int use_gpu, int gpu_id, int use_mkl, int threads) {
     whole_time += timer.toc();
     num_batches++;
     source_query_vec.clear();
+
+    if (out.is_open()) {
+      for (int i = 0; i < dataresultvec.size(); ++i) {
+        out << dataresultvec[i].result_q << "\n";
+      }
+    }
   }
   SummaryConfig(config, whole_time, num_batches);
 }
