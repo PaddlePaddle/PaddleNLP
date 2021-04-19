@@ -474,7 +474,7 @@ class GenerationMixin(object):
                 passed to the model.
 
         Returns:
-            tuple: It is a tuple contains two elements: ids and scores. Each 
+            tuple(Tensor): It is a tuple contains two elements: ids and scores. Each 
             element is a Tensor.
 
             With the fields:
