@@ -48,6 +48,8 @@ class LinearChainCrf(nn.Layer):
             attr=paddle.ParamAttr(learning_rate=crf_lr),
             shape=[self.num_tags, self.num_tags],
             dtype='float32')
+        with paddle.no_grad():
+            self.flattened_transition_params = paddle.flatten(self.transitions)
         self.with_start_stop_tag = with_start_stop_tag
 
         self._initial_alpha = None
@@ -211,10 +213,9 @@ class LinearChainCrf(nn.Layer):
         # Encode the indices in a flattened representation.
         transition_indices = start_tag_indices * self.num_tags + stop_tag_indices
         flattened_transition_indices = transition_indices.reshape([-1])
-        flattened_transition_params = self.transitions.reshape([-1])
 
         scores = paddle.gather(
-            flattened_transition_params,
+            self.flattened_transition_params,
             flattened_transition_indices).reshape([batch_size, -1])
         mask_scores = scores * mask[:, 1:]
 

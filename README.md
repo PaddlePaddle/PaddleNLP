@@ -43,6 +43,16 @@ PaddleNLP 2.0拥有**覆盖多场景的模型库**、**简洁易用的全流程A
 pip install --upgrade paddlenlp -i https://pypi.org/simple
 ```
 
+### 源码安装
+
+如果您想体验最新的版本，可以使用以下命令进行源码安装，支持GitHub和Gitee两种方式。
+```
+pip install --upgrade git+https://github.com/PaddlePaddle/PaddleNLP.git
+
+pip install --upgrade git+https://gitee.com/PaddlePaddle/PaddleNLP.git
+```
+
+
 更多关于PaddlePaddle的安装和PaddleNLP安装详细教程请查看[Installation](./docs/get_started/installation.rst)
 
 ## 快速开始
