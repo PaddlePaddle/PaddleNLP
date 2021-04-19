@@ -45,25 +45,19 @@ class AccuracyAndF1(Metric):
 
         .. code-block::
 
+            import numpy as np
+
             import paddle
             from paddlenlp.metrics import AccuracyAndF1
 
-            metric = AccuracyAndF1()
+            x = paddle.to_tensor([[0.1, 0.9], [0.5, 0.5], [0.6, 0.4], [0.7, 0.3]])
+            y = paddle.to_tensor([1, 0, 1, 1])
 
-            # Users could run `run_glue.py` on QQP or MRPC dataset for testing.
-            @paddle.no_grad()
-            def evaluate(model, loss_fct, metric, data_loader):
-                model.eval
-                metric.reset()
-                for batch in data_loader:
-                    input_ids, segment_ids, labels = batch
-                    logits = model(input_ids, segment_ids)
-                    loss = loss_fct(logits, labels)
-                    correct = metric.compute(logits, labels)
-                    metric.update(correct)
-                res = metric.accumulate()
-                model.train()
-                return res
+            m = AccuracyAndF1()
+            correct = m.compute(x, y)
+            m.update(correct)
+            res = m.accumulate()
+            print(res) # (0.5, 0.5, 0.3333333333333333, 0.4, 0.45)
 
     """
 
@@ -85,14 +79,16 @@ class AccuracyAndF1(Metric):
     def compute(self, pred, label, *args):
         """
         Accepts network's output and the labels of dataloader, and calculates
-        the top-k (maxinum value in `topk`) indices for accuracy.
+        the top-k (maxinum value in topk) indices for accuracy.
 
         Args:
-            pred (Tensor): The predicted value is a Tensor with dtype
-                float32 or float64. Shape is [batch_size, d0, ..., dN].
-            label (Tensor): The ground truth value is a Tensor with dtype
-                int64. Shape is [batch_size, d0, ..., 1], or
-                [batch_size, d0, ..., num_classes] in one hot representation.
+            pred (Tensor): 
+                The predicted value is a Tensor with dtype float32 or float64.
+                Shape is [batch_size, d0, ..., dN].
+            label (Tensor):
+                The ground truth value is a Tensor with dtype int64. Shape is
+                [batch_size, d0, ..., 1], or [batch_size, d0, ..., num_classes]
+                in one hot representation.
 
         Returns:
             Tensor: Correct mask, a tensor with a data type of float32 and a
@@ -109,12 +105,8 @@ class AccuracyAndF1(Metric):
         calculate accumulated accuracy, precision and recall of all instances.
 
         Args:
-            Tensor:
-                Correct mask for calculating accuracy, and it's a tensor with
-                shape [batch_size, topk] and has a dtype of int.
-
-        Returns:
-            None.
+            correct (Tensor): Correct mask for calculating accuracy, and it's a
+                tensor with shape [batch_size, topk] and has a dtype of int.
 
         """
         self.acc.update(correct)
@@ -180,7 +172,7 @@ class AccuracyAndF1(Metric):
 
 class Mcc(Metric):
     """
-    Matthews correlation coefficient. Users could see
+    Matthews correlation coefficient. Could see
     https://en.wikipedia.org/wiki/Matthews_correlation_coefficient for details.
 
     Args:
@@ -191,25 +183,19 @@ class Mcc(Metric):
 
         .. code-block::
 
+            import numpy as np
+
             import paddle
             from paddlenlp.metrics import Mcc
 
-            metric = Mcc()
+            x = paddle.to_tensor([[0.1, 0.9], [1.0, 0.0], [0.4, 0.6], [0.3, 0.7]])
+            y = paddle.to_tensor([1, 0, 1, 1])
 
-            # Users could run `run_glue.py` on GLUE-CoLA for testing
-            @paddle.no_grad()
-            def evaluate(model, loss_fct, metric, data_loader):
-                model.eval
-                metric.reset()
-                for batch in data_loader:
-                    input_ids, segment_ids, labels = batch
-                    logits = model(input_ids, segment_ids)
-                    loss = loss_fct(logits, labels)
-                    correct = metric.compute(logits, labels)
-                    metric.update(correct)
-                res = metric.accumulate()
-                model.train()
-                return res
+            m = Mcc()
+            (preds, label) = m.compute(x, y)
+            m.update((preds, label))
+            res = m.accumulate()
+            print(res) # (0.0,)
 
     """
 
@@ -224,16 +210,17 @@ class Mcc(Metric):
     def compute(self, pred, label, *args):
         """
         Args:
-            pred (Tensor): The predicted value is a Tensor with dtype
-                float32 or float64. Shape is [batch_size, d0, ..., dN].
-
-            label (Tensor): The ground truth value is Tensor with dtype
-                int64. Shape is [batch_size, d0, ..., 1], or
-                [batch_size, d0, ..., num_classes] in one hot representation.
+            pred (Tensor):
+                The predicted value is a Tensor with dtype float32 or float64.
+                Shape is [batch_size, d0, ..., dN].
+            label (Tensor):
+                The ground truth value is Tensor with dtype int64. Shape is
+                [batch_size, d0, ..., 1], or [batch_size, d0, ..., num_classes]
+                in one hot representation.
 
         Returns:
-            Tensor: Correct mask, a tensor with a data type of float32 and a
-                shape of [batch_size, topk].
+            tuple: A tuple of preds and label. Each shape is
+            [batch_size, d0, ..., dN], with dtype float32 or float64.
 
         """
         preds = paddle.argsort(pred, descending=True)[:, :1]
@@ -242,9 +229,9 @@ class Mcc(Metric):
     def update(self, preds_and_labels):
         """
         Args:
-            preds_and_labels (list[Tensor]): List of predicted value and the
-            ground truth label, with dtype float32 or float64. Each shape is
-            [batch_size, d0, ..., dN].
+            preds_and_labels (tuple[Tensor]):
+                Tuple of predicted value and the ground truth label, with dtype
+                float32 or float64. Each shape is [batch_size, d0, ..., dN].
 
         """
         preds = preds_and_labels[0]
@@ -304,8 +291,7 @@ class Mcc(Metric):
         Return name of metric instance.
 
         Returns:
-           - name (str):
-               The name of the metric instance.
+            str: The name of the metric instance.
 
         """
         return self._name
@@ -315,7 +301,7 @@ class PearsonAndSpearman(Metric):
     """
     The class calculates Pearson correlation coefficient and Spearman's rank
     correlation coefficient. Explanations could be seen at wikipedia
-    https://en.wikipedia.org/wiki/Pearson_correlation_coefficient and 
+    https://en.wikipedia.org/wiki/Pearson_correlation_coefficient and
     https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient.
 
     Args:
@@ -326,25 +312,18 @@ class PearsonAndSpearman(Metric):
 
         .. code-block::
 
+            import numpy as np
+
             import paddle
             from paddlenlp.metrics import PearsonAndSpearman
 
-            metric = PearsonAndSpearman()
+            x = paddle.to_tensor([0.1, 1.0, 0.4, 0.3])
+            y = paddle.to_tensor([1, 0, 1, 1])
 
-            # Users could run `run_glue.py` on GLUE-STS-B for testing
-            @paddle.no_grad()
-            def evaluate(model, loss_fct, metric, data_loader):
-                model.eval
-                metric.reset()
-                for batch in data_loader:
-                    input_ids, segment_ids, labels = batch
-                    logits = model(input_ids, segment_ids)
-                    loss = loss_fct(logits, labels)
-                    correct = metric.compute(logits, labels)
-                    metric.update(correct)
-                res = metric.accumulate()
-                model.train()
-                return res
+            m = PearsonAndSpearman()
+            m.update((x, y))
+            res = m.accumulate()
+            print(res) # (-0.9467292595562846, -0.8, -0.8733646297781423)
 
     """
 
@@ -355,6 +334,13 @@ class PearsonAndSpearman(Metric):
         self.labels = []
 
     def update(self, preds_and_labels):
+        """
+        Args:
+            preds_and_labels (tuple[Tensor] or list[Tensor]):
+                Tuple of predicted value and the ground truth label, with dtype
+                float32 or float64. Each shape is [batch_size, d0, ..., dN].
+
+        """
         preds = preds_and_labels[0]
         labels = preds_and_labels[1]
         if isinstance(preds, paddle.Tensor):
