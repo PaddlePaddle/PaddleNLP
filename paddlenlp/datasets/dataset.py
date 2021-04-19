@@ -35,7 +35,8 @@ DATASETS_MODULE_PATH = "paddlenlp.datasets."
 
 
 def import_main_class(module_path):
-    """Import a module at module_path and return its main class.
+    """
+    Import a module at module_path and return its DatasetBuilder class.
 
     """
     module_path = DATASETS_MODULE_PATH + module_path
@@ -60,6 +61,36 @@ def load_dataset(path_or_read_func,
                  splits=None,
                  lazy=None,
                  **kwargs):
+    """
+    This method will load a dataset, either form PaddleNLP library or from a 
+    self-defined loading script, by calling functions in `DatasetBuilder`.
+
+    For all the names of datasets in PaddleNLP library, see here:  `dataset_list 
+    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html>`__.
+
+    Args:
+        path_or_read_func (str|function): Name of of dataset in PaddleNLP library
+            or a custom data reading function.
+        name (str, optional): Additional name to select a more specific dataset.
+            Default to None.
+        data_files (str|list|tuple|dict, optional): Defineing to path of dataset 
+            files. Default to None.
+        splits (str|list|tuple, optional): Which split of the data to load.
+            Default to None.
+        lazy (bool, optional): Wheather to return `MapDataset` or a `IterDataset`.
+            True for `IterDataset`. False for `MapDataset`. If None, return the 
+            default type of this dataset.
+        kwargs (dict): Other keyword arguments to be passed to the `DatasetBuilder`.
+
+    Returns:
+        A `MapDataset` or `IterDataset` or a tuple of those.
+
+    For how to use this function, please see `dataset_load 
+    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html>`__
+    and `dataset_self_defined 
+    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html>`__
+
+    """
     if inspect.isfunction(path_or_read_func):
         assert lazy is not None, "lazy can not be None in custom mode."
         kwargs['name'] = name
@@ -86,12 +117,17 @@ def load_dataset(path_or_read_func,
 
 class MapDataset(Dataset):
     """
-    Wraps a dataset-like object as a instance of Dataset, and equips it with
-    `map` and other utility methods. All non-magic methods of the raw object
+    Wraps a map-style dataset-like object as a instance of Dataset, and equips it 
+    with `map` and other utility methods. All non-magic methods of the raw object
     also accessible.
     Args:
-        data (list|Dataset): A dataset-like object. It can be a list or a
-            subclass of Dataset.
+        data (list|Dataset): An object with `__getitem__` and `__len__`. It could 
+            be a list or a subclass of `paddle.io.Dataset`.
+        kwargs (dict, optional): Other information to be passed to the dataset. 
+
+    For examples of this class, please see `dataset_self_defined 
+    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html>`__.
+
     """
 
     def __init__(self, data, **kwargs):
@@ -108,10 +144,17 @@ class MapDataset(Dataset):
         return data
 
     def __getitem__(self, idx):
+        """
+        Basic function of `MapDataset` to get sample from dataset with a given 
+        index.
+        """
         return self._transform(self.new_data[
             idx]) if self._transform_pipline else self.new_data[idx]
 
     def __len__(self):
+        """
+        return the number of samples in dataset.
+        """
         return len(self.new_data)
 
     def filter(self, fn):
@@ -137,7 +180,7 @@ class MapDataset(Dataset):
                 data shards. If None, `num_shards` would be number of trainers.
                 Default: None
             index (int, optional): A integer representing the index of the
-                current shard. If None, index` would be the current trainer rank
+                current shard. If None, `index` would be the current trainer rank
                 id. Default: None.
         """
         if num_shards is None:
@@ -163,12 +206,12 @@ class MapDataset(Dataset):
             fn (callable): Transformations to be performed. It receives single
                 sample as argument if batched is False. Else it receives all examples.
             lazy (bool, optional): If True, transformations would be delayed and
-                performed on demand. Otherwise, transforms all samples at once. Note that if `fn` is
-                stochastic, `lazy` should be True or you will get the same
+                performed on demand. Otherwise, transforms all samples at once. Note that 
+                if `fn` is stochastic, `lazy` should be True or you will get the same
                 result on all epochs. Defalt: False.
-            batched(bool, optional): If True, transformations would take all examples as input and 
-                return a collection of transformed examples. Note that if set True, `lazy` option 
-                would be ignored. 
+            batched(bool, optional): If True, transformations would take all examples as 
+                input and return a collection of transformed examples. Note that if set 
+                True, `lazy` option would be ignored. 
         """
         if batched:
             self.new_data = fn(self.new_data)
@@ -191,8 +234,12 @@ class IterDataset(IterableDataset):
     `map` and other utility methods. All non-magic methods of the raw object
     also accessible.
     Args:
-        data (Iterable): A dataset-like object. It can be a Iterable or a
-            subclass of Dataset.
+        data (Iterable): An object with `__iter__` function. It can be a Iterable or a
+            subclass of `paddle.io.IterableDataset`.
+        kwargs (dict, optional): Other information to be passed to the dataset. 
+
+    For examples of this class, please see `dataset_self_defined 
+    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html>`__.
     """
 
     def __init__(self, data, **kwargs):
@@ -218,6 +265,9 @@ class IterDataset(IterableDataset):
         return True
 
     def __iter__(self):
+        """
+        yield sample sequentially.
+        """
         num_samples = 0
         if inspect.isfunction(self.data):
             for example in self.data():
@@ -261,7 +311,7 @@ class IterDataset(IterableDataset):
                 data shards. If None, `num_shards` would be number of trainers.
                 Default: None
             index (int, optional): A integer representing the index of the
-                current shard. If None, index` would be the current trainer rank
+                current shard. If None, `index` would be the current trainer rank
                 id. Default: None.
         """
         if num_shards is None:
@@ -302,6 +352,9 @@ class DatasetBuilder:
 
     `_get_data()` function and `_read()` function should be implemented to download
     data file and read data file into a `Iterable` of the examples.
+
+    For how to define a custom `DatasetBuilder`, please see `contribute_dataset 
+    <https://paddlenlp.readthedocs.io/zh/latest/community/contribute_dataset.html>`__.
     """
     lazy = False
 
@@ -357,9 +410,9 @@ class DatasetBuilder:
     def read(self, filename, split='train'):
         """
         Returns an dataset containing all the examples that can be read from the file path.
-        If `self.lazy` is `False`, this eagerly reads all instances from `self._read()`
+        If `self.lazy` is False, this eagerly reads all instances from `self._read()`
         and returns an `MapDataset`.
-        If `self.lazy` is `True`, this returns an `IterDataset`, which internally
+        If `self.lazy` is True, this returns an `IterDataset`, which internally
         relies on the generator created from `self._read()` to lazily produce examples.
         In this case your implementation of `_read()` must also be lazy
         (that is, not load all examples into memory at once).
@@ -451,13 +504,18 @@ class DatasetBuilder:
     def _read(self, filename: str, *args):
         """
         Reads examples from the given file_path and returns them as an
-        `Iterable` (which could be a list or could be a generator).
+        `Iterable` (which could be a list or a generator).
+
+        This method must be implemented in self-defined `DatasetBuilder`.
         """
         raise NotImplementedError
 
     def _get_data(self, mode: str):
         """
-        Download examples from the given URL and customized split informations and returns a filepath.
+        Download examples from the given URL and customized split 
+        informations and returns a filepath.
+
+        This method must be implemented in self-defined `DatasetBuilder`.
         """
         raise NotImplementedError
 
