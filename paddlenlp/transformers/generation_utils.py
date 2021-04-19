@@ -474,25 +474,19 @@ class GenerationMixin(object):
                 passed to the model.
 
         Returns:
-            tuple (Tensor): It is a tuple includes generated sequence ids and 
-                scores. The generated sequence ids is a Tensor with shape 
-                [batch_size * num_return_sequences, sequence_length]. The data 
-                type is same as the input `input_ids`. The scores is a Tensor 
-                with shape [batch_size * num_return_sequences, 1]. The data type 
-                is float32 or float64, the same as the parameters in the model.
-
             tuple: It is a tuple contains two elements: ids and scores. Each 
             element is a Tensor.
 
             With the fields:
 
-            - ids (Tensor): The ids of the generated sequences. It is a Tensor 
-                with shape [batch_size * num_return_sequences, sequence_length]. 
-                The data type is same as the input `input_ids`.
-            - scores (Tensor):The scores of the generated sequences. It is a 
-                Tensor with shape [batch_size * num_return_sequences, 1]. The 
-                data type is float32 or float64, which is the same as the 
-                parameters in the model.
+            - ids (Tensor): 
+                The ids of the generated sequences. It is a Tensor with shape 
+                [batch_size * num_return_sequences, sequence_length]. The data 
+                type is same as the input `input_ids`.
+            - scores (Tensor): 
+                The scores of the generated sequences. It is a Tensor with shape 
+                [batch_size * num_return_sequences, 1]. The data type is float32 
+                or float64, which is the same as the parameters in the model.
 
         Example:
             .. code-block::
