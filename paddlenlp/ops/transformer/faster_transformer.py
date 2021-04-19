@@ -6,7 +6,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from paddlenlp.transformers import TransformerModel, position_encoding_init
-from paddlenlp.ext_op import InferTransformerDecoding
+from paddlenlp.ops import InferTransformerDecoding
 
 
 class FasterTransformer(TransformerModel):
@@ -108,7 +108,7 @@ class FasterTransformer(TransformerModel):
         assert init_from_params, (
             "Please set init_from_params to load the infer model.")
 
-        model_dict = paddle.load(init_from_params)
+        model_dict = paddle.load(init_from_params, return_numpy=True)
 
         # To set weight[padding_idx] to 0.
         model_dict["trg_word_embedding.word_embedding.weight"][
@@ -144,3 +144,52 @@ class FasterTransformer(TransformerModel):
                 "decoding_linear.weight"])
 
         self.load_dict(model_dict)
+
+    def export_params(self, init_from_params, place):
+        # Load the trained model
+        assert init_from_params, (
+            "Please set init_from_params to load the infer model.")
+
+        model_dict = paddle.load(init_from_params, return_numpy=True)
+
+        # To set weight[padding_idx] to 0.
+        model_dict["trg_word_embedding.word_embedding.weight"][
+            self.bos_id] = [0] * self.d_model
+
+        # Dealing with weight sharing. 
+        if self.weight_sharing:
+            model_dict["decoding_linear.weight"] = np.transpose(model_dict[
+                "trg_word_embedding.word_embedding.weight"])
+        else:
+            model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
+        # NOTE: the data type of the embedding bias for logits is different
+        # between decoding with beam search and top-k/top-p sampling in
+        # Faster Transformer when using float16.
+        bias_dtype = "float32"
+        if self.use_fp16_decoding and "beam_search" != self.decoding_strategy:
+            bias_dtype = "float16"
+        model_dict["decoding_linear.bias"] = np.zeros(
+            [self.trg_vocab_size], dtype=bias_dtype)
+
+        # To avoid a longer length than training, reset the size of position
+        # encoding to max_length
+        model_dict["encoder.pos_encoder.weight"] = position_encoding_init(
+            self.max_length, self.d_model)
+        model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
+            self.max_length, self.d_model)
+
+        if self.use_fp16_decoding:
+            for item in self.state_dict():
+                if "decoder" in item:
+                    model_dict[item] = np.float16(model_dict[item])
+            model_dict["decoding_linear.weight"] = np.float16(model_dict[
+                "decoding_linear.weight"])
+
+        for item in self.state_dict():
+            param = self
+            attr_list = item.split(".")
+            for attr in attr_list:
+                param = getattr(param, attr)
+            param_name = param.name
+            var = paddle.static.global_scope().find_var(param_name).get_tensor()
+            var.set(model_dict[item], place)
