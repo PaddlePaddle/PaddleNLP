@@ -15,41 +15,32 @@
 from functools import partial
 
 import paddle
-import paddle.nn as nn
-
-from paddlenlp.datasets import MapDataset
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.layers import LinearChainCrf, ViterbiDecoder, LinearChainCrfLoss
+from paddlenlp.transformers import ErnieTokenizer, ErnieForTokenClassification
 from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.embeddings import TokenEmbedding
 
+from model import ErnieCrfForTokenClassification
 from data import load_dict, load_dataset, parse_decodes
-from model import BiGRUWithCRF
 
 
-def convert_tokens_to_ids(tokens, vocab, oov_token=None):
-    token_ids = []
-    oov_id = vocab.get(oov_token) if oov_token else None
-    for token in tokens:
-        token_id = vocab.get(token, oov_id)
-        token_ids.append(token_id)
-    return token_ids
-
-
-def convert_to_features(example, word_vocab, label_vocab):
+def convert_to_features(example, tokenizer, label_vocab):
     tokens, labels = example
-    token_ids = convert_tokens_to_ids(tokens, word_vocab, 'OOV')
-    label_ids = convert_tokens_to_ids(labels, label_vocab, 'O')
-    return token_ids, len(token_ids), label_ids
+    tokenized_input = tokenizer(
+        tokens, return_length=True, is_split_into_words=True)
+    # Token '[CLS]' and '[SEP]' will get label 'O'
+    labels = ['O'] + labels + ['O']
+    tokenized_input['labels'] = [label_vocab[x] for x in labels]
+    return tokenized_input['input_ids'], tokenized_input[
+        'token_type_ids'], tokenized_input['seq_len'], tokenized_input['labels']
 
 
 @paddle.no_grad()
 def evaluate(model, metric, data_loader):
     model.eval()
     metric.reset()
-    for token_ids, lengths, label_ids in data_loader:
-        preds = model(token_ids, lengths)
-        n_infer, n_label, n_correct = metric.compute(lengths, preds, label_ids)
+    for input_ids, seg_ids, lens, labels in data_loader:
+        preds = model(input_ids, seg_ids, lengths=lens)
+        n_infer, n_label, n_correct = metric.compute(lens, preds, labels)
         metric.update(n_infer.numpy(), n_label.numpy(), n_correct.numpy())
         precision, recall, f1_score = metric.accumulate()
     print("[EVAL] Precision: %f - Recall: %f - F1: %f" %
@@ -61,10 +52,12 @@ def evaluate(model, metric, data_loader):
 def predict(model, data_loader, ds, label_vocab):
     all_preds = []
     all_lens = []
-    for token_ids, lengths, label_ids in data_loader:
-        preds = model(token_ids, lengths)
-        all_preds.append(preds.numpy())
-        all_lens.append(lengths)
+    for input_ids, seg_ids, lens, labels in data_loader:
+        preds = model(input_ids, seg_ids, lengths=lens)
+        # Drop CLS prediction
+        preds = [pred[1:] for pred in preds.numpy()]
+        all_preds.append(preds)
+        all_lens.append(lens)
     sentences = [example[0] for example in ds.data]
     results = parse_decodes(sentences, all_preds, all_lens, label_vocab)
     return results
@@ -78,68 +71,71 @@ if __name__ == '__main__':
         './data/train.txt', './data/dev.txt', './data/test.txt'))
 
     label_vocab = load_dict('./data/tag.dic')
-    word_vocab = load_dict('./data/word.dic')
+    tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
     trans_func = partial(
-        convert_to_features, word_vocab=word_vocab, label_vocab=label_vocab)
+        convert_to_features, tokenizer=tokenizer, label_vocab=label_vocab)
+
     train_ds.map(trans_func)
     dev_ds.map(trans_func)
     test_ds.map(trans_func)
 
+    ignore_label = -1
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=word_vocab.get('OOV')),  # token_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
         Stack(),  # seq_len
-        Pad(axis=0, pad_val=label_vocab.get('O'))  # label_ids
+        Pad(axis=0, pad_val=ignore_label)  # labels
     ): fn(samples)
 
     train_loader = paddle.io.DataLoader(
         dataset=train_ds,
         batch_size=200,
-        shuffle=True,
-        drop_last=True,
         return_list=True,
         collate_fn=batchify_fn)
-
     dev_loader = paddle.io.DataLoader(
         dataset=dev_ds,
         batch_size=200,
-        drop_last=True,
         return_list=True,
         collate_fn=batchify_fn)
-
     test_loader = paddle.io.DataLoader(
         dataset=test_ds,
         batch_size=200,
-        drop_last=True,
         return_list=True,
         collate_fn=batchify_fn)
 
     # Define the model netword and its loss
-    model = BiGRUWithCRF(300, 256, len(word_vocab), len(label_vocab))
+    ernie = ErnieForTokenClassification.from_pretrained(
+        "ernie-1.0", num_classes=len(label_vocab))
+    model = ErnieCrfForTokenClassification(ernie)
 
-    optimizer = paddle.optimizer.Adam(
-        learning_rate=0.001, parameters=model.parameters())
     metric = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
+    optimizer = paddle.optimizer.AdamW(
+        learning_rate=2e-5, parameters=model.parameters())
 
     step = 0
     for epoch in range(10):
-        for token_ids, lengths, label_ids in train_loader:
-            loss = model(token_ids, lengths, label_ids)
-            loss = loss.mean()
-            loss.backward()
+        for input_ids, token_type_ids, lengths, labels in train_loader:
+            loss = model(
+                input_ids, token_type_ids, lengths=lengths, labels=labels)
+            avg_loss = paddle.mean(loss)
+            avg_loss.backward()
             optimizer.step()
             optimizer.clear_grad()
             step += 1
-            print("[TRAIN] Epoch:%d - Step:%d - Loss: %f" % (epoch, step, loss))
+            print("[TRAIN] Epoch:%d - Step:%d - Loss: %f" %
+                  (epoch, step, avg_loss))
         evaluate(model, metric, dev_loader)
-        paddle.save(model.state_dict(), './ernie_ckpt/model_%d.pdparams' % step)
+
+        paddle.save(model.state_dict(),
+                    './ernie_crf_ckpt/model_%d.pdparams' % step)
 
     preds = predict(model, test_loader, test_ds, label_vocab)
-    file_path = "ernie_results.txt"
+    file_path = "ernie_crf_results.txt"
     with open(file_path, "w", encoding="utf8") as fout:
         fout.write("\n".join(preds))
     # Print some examples
     print(
-        "The results have been saved into: %s, some examples are shown below: "
+        "The results have been saved in the file: %s, some examples are shown below: "
         % file_path)
     print("\n".join(preds[:10]))
