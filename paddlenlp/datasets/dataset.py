@@ -120,6 +120,7 @@ class MapDataset(Dataset):
     Wraps a map-style dataset-like object as a instance of Dataset, and equips it 
     with `map` and other utility methods. All non-magic methods of the raw object
     also accessible.
+
     Args:
         data (list|Dataset): An object with `__getitem__` and `__len__`. It could 
             be a list or a subclass of `paddle.io.Dataset`.
@@ -161,6 +162,7 @@ class MapDataset(Dataset):
         """
         Filters samples by the filter function and uses the filtered data to
         update this dataset.
+
         Args:
             fn (callable): A filter function that takes a sample as input and
                 returns a boolean. Samples that return False are discarded.
@@ -175,6 +177,7 @@ class MapDataset(Dataset):
     def shard(self, num_shards=None, index=None):
         """
         Use samples whose indices mod `index` equals 0 to update this dataset.
+
         Args:
             num_shards (int, optional): A integer representing the number of
                 data shards. If None, `num_shards` would be number of trainers.
@@ -202,6 +205,7 @@ class MapDataset(Dataset):
     def map(self, fn, lazy=True, batched=False):
         """
         Performs specific function on the dataset to transform and update every sample.
+
         Args:
             fn (callable): Transformations to be performed. It receives single
                 sample as argument if batched is False. Else it receives all examples.
@@ -233,6 +237,7 @@ class IterDataset(IterableDataset):
     Wraps a dataset-like object as a instance of Dataset, and equips it with
     `map` and other utility methods. All non-magic methods of the raw object
     also accessible.
+
     Args:
         data (Iterable): An object with `__iter__` function. It can be a Iterable or a
             subclass of `paddle.io.IterableDataset`.
@@ -294,6 +299,7 @@ class IterDataset(IterableDataset):
         """
         Filters samples by the filter function and uses the filtered data to
         update this dataset.
+
         Args:
             fn (callable): A filter function that takes a sample as input and
                 returns a boolean. Samples that return False are discarded.
@@ -306,6 +312,7 @@ class IterDataset(IterableDataset):
     def shard(self, num_shards=None, index=None):
         """
         Use samples whose indices mod `index` equals 0 to update this dataset.
+
         Args:
             num_shards (int, optional): A integer representing the number of
                 data shards. If None, `num_shards` would be number of trainers.
@@ -332,6 +339,7 @@ class IterDataset(IterableDataset):
     def map(self, fn):
         """
         Performs specific function on the dataset to transform and update every sample.
+
         Args:
             fn (callable): Transformations to be performed. It receives single
                 sample as argument.
@@ -410,8 +418,10 @@ class DatasetBuilder:
     def read(self, filename, split='train'):
         """
         Returns an dataset containing all the examples that can be read from the file path.
+
         If `self.lazy` is False, this eagerly reads all instances from `self._read()`
         and returns an `MapDataset`.
+
         If `self.lazy` is True, this returns an `IterDataset`, which internally
         relies on the generator created from `self._read()` to lazily produce examples.
         In this case your implementation of `_read()` must also be lazy
