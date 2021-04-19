@@ -63,21 +63,21 @@ def load_dataset(path_or_read_func,
                  **kwargs):
     """
     This method will load a dataset, either form PaddleNLP library or from a 
-    self-defined loading script, by calling functions in `DatasetBuilder`.
+    self-defined data loading script, by calling functions in `DatasetBuilder`.
 
     For all the names of datasets in PaddleNLP library, see here:  `dataset_list 
     <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html>`__.
 
     Args:
-        path_or_read_func (str|function): Name of of dataset in PaddleNLP library
-            or a custom data reading function.
+        path_or_read_func (str|callable): Name of the dataset processing script 
+            in PaddleNLP library or a custom data reading function.
         name (str, optional): Additional name to select a more specific dataset.
             Default to None.
-        data_files (str|list|tuple|dict, optional): Defineing to path of dataset 
+        data_files (str|list|tuple|dict, optional): Defineing the path of dataset 
             files. Default to None.
         splits (str|list|tuple, optional): Which split of the data to load.
             Default to None.
-        lazy (bool, optional): Wheather to return `MapDataset` or a `IterDataset`.
+        lazy (bool, optional): Wheather to return `MapDataset` or an `IterDataset`.
             True for `IterDataset`. False for `MapDataset`. If None, return the 
             default type of this dataset.
         kwargs (dict): Other keyword arguments to be passed to the `DatasetBuilder`.
@@ -117,12 +117,12 @@ def load_dataset(path_or_read_func,
 
 class MapDataset(Dataset):
     """
-    Wraps a map-style dataset-like object as a instance of Dataset, and equips it 
+    Wraps a map-style dataset-like object as an instance of Dataset, and equips it 
     with `map` and other utility methods. All non-magic methods of the raw object
-    also accessible.
+    are also accessible.
 
     Args:
-        data (list|Dataset): An object with `__getitem__` and `__len__`. It could 
+        data (list|Dataset): An object with `__getitem__` and `__len__` methods. It could 
             be a list or a subclass of `paddle.io.Dataset`.
         kwargs (dict, optional): Other information to be passed to the dataset. 
 
@@ -154,7 +154,7 @@ class MapDataset(Dataset):
 
     def __len__(self):
         """
-        return the number of samples in dataset.
+        returns the number of samples in dataset.
         """
         return len(self.new_data)
 
@@ -165,7 +165,7 @@ class MapDataset(Dataset):
 
         Args:
             fn (callable): A filter function that takes a sample as input and
-                returns a boolean. Samples that return False are discarded.
+                returns a boolean. Samples that return False would be discarded.
         """
 
         self.new_data = [
@@ -176,7 +176,7 @@ class MapDataset(Dataset):
 
     def shard(self, num_shards=None, index=None):
         """
-        Use samples whose indices mod `index` equals 0 to update this dataset.
+        Uses samples whose indices mod `index` equals 0 to update this dataset.
 
         Args:
             num_shards (int, optional): A integer representing the number of
@@ -234,7 +234,7 @@ class MapDataset(Dataset):
 
 class IterDataset(IterableDataset):
     """
-    Wraps a dataset-like object as a instance of Dataset, and equips it with
+    Wraps a dataset-like object as an instance of Dataset, and equips it with
     `map` and other utility methods. All non-magic methods of the raw object
     also accessible.
 
@@ -271,7 +271,7 @@ class IterDataset(IterableDataset):
 
     def __iter__(self):
         """
-        yield sample sequentially.
+        yields sample sequentially.
         """
         num_samples = 0
         if inspect.isfunction(self.data):
@@ -311,7 +311,7 @@ class IterDataset(IterableDataset):
 
     def shard(self, num_shards=None, index=None):
         """
-        Use samples whose indices mod `index` equals 0 to update this dataset.
+        Uses samples whose indices mod `index` equals 0 to update this dataset.
 
         Args:
             num_shards (int, optional): A integer representing the number of
@@ -420,7 +420,7 @@ class DatasetBuilder:
         Returns an dataset containing all the examples that can be read from the file path.
 
         If `self.lazy` is False, this eagerly reads all instances from `self._read()`
-        and returns an `MapDataset`.
+        and returns a `MapDataset`.
 
         If `self.lazy` is True, this returns an `IterDataset`, which internally
         relies on the generator created from `self._read()` to lazily produce examples.
@@ -522,7 +522,7 @@ class DatasetBuilder:
 
     def _get_data(self, mode: str):
         """
-        Download examples from the given URL and customized split 
+        Downloads examples from the given URL and customized split 
         informations and returns a filepath.
 
         This method must be implemented in self-defined `DatasetBuilder`.
@@ -531,13 +531,13 @@ class DatasetBuilder:
 
     def get_labels(self):
         """
-        Return list of class labels of the dataset if specified.
+        Returns list of class labels of the dataset if specified.
         """
         return None
 
     def get_vocab(self):
         """
-        Return vocab file path of the dataset if specified.
+        Returns vocab file path of the dataset if specified.
         """
         return None
 
