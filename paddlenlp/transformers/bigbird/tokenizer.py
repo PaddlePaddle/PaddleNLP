@@ -41,7 +41,9 @@ class BigBirdTokenizer(PretrainedTokenizer):
         cls_token (str): The special token for cls. Default: "[CLS]".
         mask_token (str): The special token for mask. Default: "[MASK]".
     
-    Examples:
+    Raises:
+        ValueError: If file sentencepiece_model_file doesn't exist. 
+
     """
     resource_files_names = {
         "sentencepiece_model_file": "sentencepiece_gpt2.model",
@@ -156,6 +158,18 @@ class BigBirdTokenizer(PretrainedTokenizer):
                max_pred_len=None,
                masked_lm_prob=0.15):
         """
+        Returns a tuple containing the encoded sequence and mask information.
+        Args:
+            text (:obj:`str`, :obj:`List[str]` or :obj:`List[int]`):
+                The first sequence to be encoded. This can be a string, a list of strings (tokenized string using
+                the `tokenize` method) or a list of integers (tokenized string ids using the `convert_tokens_to_ids`
+                method)
+            max_seq_len (:obj:`int`, `optional`, defaults to :int:`None`):
+                If set to a number, will limit the total sequence returned so that it has a maximum length.
+                If set to None, will not limit the total sequence.
+            max_pred_len (:obj:`int`, `optional`, defaults to :int:`None`):
+                If set to a number, will limit the mask sequence returned so that it has a maximum prediction length.
+                If set to None, will not limit the mask sequence.
         """
 
         def get_input_ids(text):
