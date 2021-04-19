@@ -28,7 +28,7 @@ class AccuracyAndF1(Metric):
     """
     This class encapsulates Accuracy, Precision, Recall and F1 metric logic,
     and `accumulate` function returns accuracy, precision, recall and f1.
-    The overview of metric could be seen at PaddlePaddle `Official document
+    The overview of metric could be seen at the document of `paddle.metric
     <https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/metric/Overview_cn.html>`_ 
     for details.
 
@@ -36,8 +36,7 @@ class AccuracyAndF1(Metric):
         topk (int or tuple(int), optional):
             Number of top elements to look at for computing accuracy.
             Defaults to (1,).
-        pos_label (int, optional): The dimension to determine the prediction
-            for calculating precision and recall.
+        pos_label (int, optional): The positive label.
             Defaults to 1.
         name (str, optional):
             String name of the metric instance. Defaults to 'acc_and_f1'.
@@ -45,8 +44,6 @@ class AccuracyAndF1(Metric):
     Example:
 
         .. code-block::
-
-            import numpy as np
 
             import paddle
             from paddlenlp.metrics import AccuracyAndF1
@@ -79,21 +76,22 @@ class AccuracyAndF1(Metric):
 
     def compute(self, pred, label, *args):
         """
-        Accepts network's output and the labels of dataloader, and calculates
-        the top-k (maxinum value in topk) indices for accuracy.
+        Accepts network's output and the labels, and calculates the top-k
+        (maxinum value in topk) indices for accuracy.
 
         Args:
             pred (Tensor): 
-                The predicted value is a Tensor with dtype float32 or float64.
-                Shape is [batch_size, d0, ..., dN].
+                The predicted value, and its dtype is float32 or float64, and
+                has a shape of [batch_size, d0, ..., dN-1].
             label (Tensor):
                 The ground truth value is a Tensor with dtype int64. Shape is
-                [batch_size, d0, ..., 1], or [batch_size, d0, ..., num_classes]
+                [batch_size, d0, ..., dN-1, 1], or [batch_size, d0, ..., num_classes]
                 in one hot representation.
 
         Returns:
-            Tensor: Correct mask, a tensor with a data type of float32 and a 
-            shape of [batch_size, topk].
+            Tensor: Correct mask, each element indice whether the prediction
+            equals to the label. Its' a tensor with a data type of float32 and
+            has a shape of [batch_size, topk].
 
         """
         self.label = label
@@ -120,7 +118,7 @@ class AccuracyAndF1(Metric):
         Calculates and returns the accumulated metric.
 
         Returns:
-            A tuple of Metrics:
+            tuple: the accumulated metric.
 
             With the fileds:
 
@@ -184,8 +182,6 @@ class Mcc(Metric):
 
         .. code-block::
 
-            import numpy as np
-
             import paddle
             from paddlenlp.metrics import Mcc
 
@@ -215,9 +211,9 @@ class Mcc(Metric):
                 The predicted value is a Tensor with dtype float32 or float64.
                 Shape is [batch_size, d0, ..., dN].
             label (Tensor):
-                The ground truth value is Tensor with dtype int64. Shape is
-                [batch_size, d0, ..., 1], or [batch_size, d0, ..., num_classes]
-                in one hot representation.
+                The ground truth value is Tensor with dtype int64, and its
+                shape is [batch_size, d0, ..., 1], or
+                [batch_size, d0, ..., num_classes] in one hot representation.
 
         Returns:
             tuple: A tuple of preds and label. Each shape is
@@ -261,9 +257,9 @@ class Mcc(Metric):
         Calculates and returns the accumulated metric.
 
         Returns:
-            A tuple of Metrics
+            tuple: the accumulated metric.
 
-            With the fileds:
+            With the fields:
 
             - mcc (numpy.float64):
                 The accumulated mcc.
@@ -312,8 +308,6 @@ class PearsonAndSpearman(Metric):
 
         .. code-block::
 
-            import numpy as np
-
             import paddle
             from paddlenlp.metrics import PearsonAndSpearman
 
@@ -357,14 +351,14 @@ class PearsonAndSpearman(Metric):
         Calculates and returns the accumulated metric.
 
         Returns:
-            A tuple of Metrics:
+            tuple: the accumulated metric.
 
             With the fileds:
 
             - pearson (numpy.float64):
                 The accumulated pearson.
             - spearman (numpy.float64):
-                The accumulated pearson.
+                The accumulated spearman.
             - the average of pearson and spearman (numpy.float64):
                 The average of accumulated pearson and spearman correlation
                 coefficient.
