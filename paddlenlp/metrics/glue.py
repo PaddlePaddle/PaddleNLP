@@ -28,8 +28,9 @@ class AccuracyAndF1(Metric):
     """
     This class encapsulates Accuracy, Precision, Recall and F1 metric logic,
     and `accumulate` function returns accuracy, precision, recall and f1.
-    The overview of metric could be seen at PaddlePaddle Official document
-    https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/metric/Overview_cn.html.
+    The overview of metric could be seen at PaddlePaddle `Official document
+    <https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/metric/Overview_cn.html>`_ 
+    for details.
 
     Args:
         topk (int or tuple(int), optional):
@@ -91,8 +92,8 @@ class AccuracyAndF1(Metric):
                 in one hot representation.
 
         Returns:
-            Tensor: Correct mask, a tensor with a data type of float32 and a
-                shape of [batch_size, topk].
+            Tensor: Correct mask, a tensor with a data type of float32 and a 
+            shape of [batch_size, topk].
 
         """
         self.label = label
@@ -105,8 +106,9 @@ class AccuracyAndF1(Metric):
         calculate accumulated accuracy, precision and recall of all instances.
 
         Args:
-            correct (Tensor): Correct mask for calculating accuracy, and it's a
-                tensor with shape [batch_size, topk] and has a dtype of int.
+            correct (Tensor):
+                Correct mask for calculating accuracy, and it's a tensor with
+                shape [batch_size, topk] and has a dtype of int.
 
         """
         self.acc.update(correct)
@@ -172,8 +174,7 @@ class AccuracyAndF1(Metric):
 
 class Mcc(Metric):
     """
-    Matthews correlation coefficient. Could see
-    https://en.wikipedia.org/wiki/Matthews_correlation_coefficient for details.
+    This class calculates `Matthews correlation coefficient <https://en.wikipedia.org/wiki/Matthews_correlation_coefficient>`_ .
 
     Args:
         name (str, optional):
@@ -299,10 +300,9 @@ class Mcc(Metric):
 
 class PearsonAndSpearman(Metric):
     """
-    The class calculates Pearson correlation coefficient and Spearman's rank
-    correlation coefficient. Explanations could be seen at wikipedia
-    https://en.wikipedia.org/wiki/Pearson_correlation_coefficient and
-    https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient.
+    The class calculates `Pearson correlation coefficient <https://en.wikipedia.org/wiki/Pearson_correlation_coefficient>`_
+    and `Spearman's rank correlation coefficient <https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient>`_ .
+
 
     Args:
         name (str, optional):
