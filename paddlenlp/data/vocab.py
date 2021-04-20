@@ -21,7 +21,9 @@ import warnings
 
 class Vocab(object):
     """
-    Vocab is for mapping between text tokens and ids.
+    The class used to convert between tokens and ids. It also includes some 
+    store/load functions.
+
     Args:
         counter (collections.Counter, optional): A Counter intance describes
             the tokens and their frequencies. Its keys will be indexed accroding
@@ -44,7 +46,8 @@ class Vocab(object):
             could be None. Default: None.
         eos_token (str): special token for eos token '<eos>'. If no need, it also
             could be None. Default: None.
-        **kwargs (dict): Keyword arguments ending with `_token`. It can be used
+
+        kwargs (dict): Keyword arguments ending with `_token`. It can be used
             to specify further special tokens that will be exposed as attribute
             of the vocabulary and associated with an index.
     """
@@ -166,10 +169,30 @@ class Vocab(object):
     def to_tokens(self, indices):
         """
         Map the input indices to token list.
+
         Args:
-            indices (list|tuple|int): input indices for mapping.
+            indices (int|list|tuple): The input indice(s) for mapping.
+
         Returns:
-            list|str: obtained token(s).
+            str|list: Obtained token(s). If `indices` is an integer, it will 
+            return a str. If `indices` is a list/tuple of integers, it will 
+            return a list of str.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import Vocab
+                # The vocab file. The sample file can be downloaded firstly.
+                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                vocab_file_path = './senta_word_dict.txt'
+                # Initialize the Vocab
+                vocab = Vocab.load_vocabulary(
+                    vocab_file_path,
+                    unk_token='[UNK]',
+                    pad_token='[PAD]')
+                tokens = vocab.to_tokens([0, 1, 2, 3])
+                print(tokens)
+                # ['[PAD]', '[UNK]', '一斤三', '意面屋']
         """
         to_reduce = False
         if not isinstance(indices, (list, tuple)):
@@ -195,11 +218,31 @@ class Vocab(object):
 
     def to_indices(self, tokens):
         """
-        Map the input tokens into indices
+        Map the input tokens into indices.
+
         Args:
-            tokens (list|tuple, optional): input tokens for mapping.
+            tokens (str|list|tuple, optional): The input token(s) for mapping.
+        
         Returns:
-            list|int: obationed indice list.
+            int|list: Obationed indice(s). If `tokens` is a str, it will return 
+            an integer. If `tokens` is a list/tuple of str, it will return a 
+            list of integers.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import Vocab
+                # The vocab file. The sample file can be downloaded firstly.
+                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                vocab_file_path = './senta_word_dict.txt'
+                # Initialize the Vocab
+                vocab = Vocab.load_vocabulary(
+                    vocab_file_path,
+                    unk_token='[UNK]',
+                    pad_token='[PAD]')
+                tokens = vocab.to_indices(['[PAD]', '[UNK]', '一斤三', '意面屋'])
+                print(tokens)
+                # [0, 1, 2, 3]
         """
         return self[tokens]
 
@@ -220,27 +263,41 @@ class Vocab(object):
 
     @property
     def idx_to_token(self):
-        """
-        Return index-token dict
-        """
+        # Return index-token dict
         return self._idx_to_token
 
     @property
     def token_to_idx(self):
-        """
-        Return token-index dict
-        """
+        # Return token-index dict
         return self._token_to_idx
 
     def to_json(self, path=None):
         """
         Summarize some information of vocab as JSON string. If path is gaven,
-        the JSON string will be saved into files.
+        the JSON string will be saved into files. The JSON string and the saved
+        file all can be used to reconstruct the :class:`Vocab` by calling 
+        :meth:`from_json` method.
+
         Args:
-            path (str, optional): the path to save JSON string. If None, the
+            path (str, optional): The path to save JSON string. If None, the
                 JSON will not be saved. Default: None.
+        
         Returns:
-                str: JSON string.
+            str: The JSON string including information of vocab.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import Vocab
+                # The vocab file. The sample file can be downloaded firstly.
+                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                vocab_file_path = './senta_word_dict.txt'
+                # Initialize the Vocab
+                vocab = Vocab.load_vocabulary(
+                    vocab_file_path,
+                    unk_token='[UNK]',
+                    pad_token='[PAD]')
+                json_str = vocab.to_json(path='./vocab.json')
         """
         vocab_dict = {}
         vocab_dict['idx_to_token'] = self.idx_to_token
@@ -256,14 +313,37 @@ class Vocab(object):
     @classmethod
     def from_json(cls, json_str):
         """
-        Load vocab from JSON string or JSON file.
+        Load :class:`Vocab` from JSON string or JSON file, which is gotten by 
+        calling :meth:`to_json` method.
+
         Args:
             json_str (str): JSON string or file path of JSON string.
+
         Returns:
-            Vocab: vocab generated from information contained in JSON string.
+            Vocab: An instance of :class:`Vocab` generated from information 
+            contained in JSON string.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import Vocab
+                # The vocab file. The sample file can be downloaded firstly.
+                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                vocab_file_path = './senta_word_dict.txt'
+                # Initialize the Vocab
+                vocab = Vocab.load_vocabulary(
+                    vocab_file_path,
+                    unk_token='[UNK]',
+                    pad_token='[PAD]')
+                json_str = vocab.to_json(path='./vocab.json')
+
+                vocab1 = Vocab.from_json(json_str)
+                vocab2 = Vocab.from_json('./vocab.json')
+                print(len(vocab), len(vocab1), len(vocab2))
+                # 1256608 1256608 1256608
         """
         if os.path.isfile(json_str):
-            with io.open(json_str, 'w', encoding='utf-8') as f:
+            with io.open(json_str, 'r', encoding='utf-8') as f:
                 vocab_dict = json.load(f)
         else:
             vocab_dict = json.loads(json_str)
@@ -287,23 +367,44 @@ class Vocab(object):
                   eos_token=None,
                   **kwargs):
         """
-        Generate vocab from a dict.
+        Building the :class:`Vocab` from a dict.
+
         Args:
             token_to_idx (dict): A dict describes the mapping relationship between
-                tokens to indices.
-            unk_token (str): special token for unknow token. If no need, it also
-                could be None. Default: None.
-            pad_token (str): special token for padding token. If no need, it also
-                could be None. Default: None.
-            bos_token (str): special token for bos token. If no need, it also
-                could be None. Default: None.
-            eos_token (str): special token for eos token. If no need, it also
-                could be None. Default: None.
-            **kwargs (dict): Keyword arguments ending with `_token`. It can be used
-                to specify further special tokens that will be exposed as attribute
-                of the vocabulary and associated with an index.
+                tokens and indices.
+            unk_token (str, optional): The special token for unknow token. If 
+                no need, it also could be None. Default: None.
+            pad_token (str, optional): The special token for padding token. If 
+                no need, it also could be None. Default: None.
+            bos_token (str, optional): The special token for bos token. If no 
+                need, it also could be None. Default: None.
+            eos_token (str, optional): The special token for eos token. If no 
+                need, it also could be None. Default: None.
+
+            kwargs (dict): Keyword arguments ending with `_token`. It can be 
+                used to specify further special tokens that will be exposed as 
+                attribute of the vocabulary and associated with an index.
+
         Returns:
-            Vocab: vocab generated from the given dict and special tokens.
+            Vocab: An instance of :class:`Vocab` generated from the given dict 
+            and special tokens.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import Vocab
+                # The vocab file. The sample file can be downloaded firstly.
+                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                vocab_file_path = './senta_word_dict.txt'
+                # Initialize the Vocab
+                vocab = Vocab.load_vocabulary(
+                    vocab_file_path,
+                    unk_token='[UNK]',
+                    pad_token='[PAD]')
+
+                vocab1 = Vocab.from_dict(vocab.token_to_idx)
+                print(len(vocab), len(vocab.token_to_idx), len(vocab1))
+                # 1256608 1256608 1256608
         """
         vocab = cls(counter=None,
                     token_to_idx=token_to_idx,
@@ -325,29 +426,54 @@ class Vocab(object):
                     eos_token=None,
                     **kwargs):
         """
-        Building vocab accoring to given iterator and other information. Iterate
-        over the `iterator` to construct a `Counter` and as `__init__`
+        Building the :class:`Vocab` accoring to given iterator and other 
+        information. Firstly, iterate over the `iterator` to construct a 
+        :class:`collections.Counter` and used to init the as  :class:`Vocab`.
+
         Args:
-            iterator (collections.Iterable): Iterator of tokens. Each tokens should be list of token if wordlevel vocab is needed.
-            max_size (int, optional): Max size of vocab, not including special tokens. Default: None.
-            min_freq (int): Ignore tokens whose frequencies are less than `min_freq`. Default: 1.
-            token_to_idx (dict, optional): A dict specifies the mapping relationship
-                between tokens and indices to be used. If provided, adjust the tokens
-                and indices mapping according to it. If None, counter must be provided.
-                Default: None.
-            unk_token (str): special token for unknow token '<unk>'. If no need, it also
-                could be None. Default: None.
-            pad_token (str): special token for padding token '<pad>'. If no need, it also
-                could be None. Default: None.
-            bos_token (str): special token for bos token '<bos>'. If no need, it also
-                could be None. Default: None.
-            eos_token (str): special token for eos token '<eos>'. If no need, it also
-                could be None. Default: None.
-            **kwargs (dict): Keyword arguments ending with `_token`. It can be used
-                to specify further special tokens that will be exposed as attribute
-                of the vocabulary and associated with an index.
+            iterator (collections.Iterable): Iterator of tokens. Each element 
+                should be a list of tokens if wordlevel vocab is needed.
+            max_size (int, optional): The max size of vocab, not including 
+                special tokens. Default: None.
+            min_freq (int, optional): Ignore tokens whose frequencies are less 
+                than `min_freq`. Default: 1.
+            token_to_idx (dict, optional): A dict specifies the mapping 
+                relationship between tokens and indices to be used. If provided, 
+                adjust the tokens and indices mapping according to it. If None, 
+                counter must be provided. Default: None.
+            unk_token (str, optional): The special token for unknow token 
+                '<unk>'. If no need, it also could be None. Default: None.
+            pad_token (str, optional): The special token for padding token 
+                '<pad>'. If no need, it also could be None. Default: None.
+            bos_token (str, optional): The special token for bos token '<bos>'. 
+                If no need, it also could be None. Default: None.
+            eos_token (str, optional): The special token for eos token '<eos>'. 
+                If no need, it also could be None. Default: None.
+            
+            kwargs (dict): Keyword arguments ending with `_token`. It can be 
+                used to specify further special tokens that will be exposed as 
+                attribute of the vocabulary and associated with an index.
+
         Returns:
-            Vocab: Generated vocab from given iterator and other informations.
+            Vocab: An instance of :class:`Vocab` generated from given iterator 
+            and other informations.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import Vocab
+                # The vocab file. The sample file can be downloaded firstly.
+                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                vocab_file_path = './senta_word_dict.txt'
+                # Initialize the Vocab
+                vocab = Vocab.load_vocabulary(
+                    vocab_file_path,
+                    unk_token='[UNK]',
+                    pad_token='[PAD]')
+
+                vocab1 = Vocab.build_vocab([list(vocab.token_to_idx.keys())])
+                print(len(vocab), len(vocab1))
+                # 1256608 1256608
         """
         counter = collections.Counter()
         for tokens in iterator:
@@ -372,22 +498,42 @@ class Vocab(object):
                         eos_token=None,
                         **kwargs):
         """
-        Instantiate an instance of `Vocab` from a file reserving all tokens
-        by using `Vocab.from_dict`. The file contains a token per line, and the
-        line number would be the index of corresponding token.
+        Building the :class:`Vocab` from a file reserving all tokens by calling 
+        :meth:`Vocab.from_dict` method. The file contains a token per line, and 
+        the line number would be the index of corresponding token.
+
         Args:
-            filepath (str): path of file to construct vocabulary.
-            unk_token (str): special token for unknown token. If no need, it also
-                could be None. Default: None.
-            pad_token (str): special token for padding token. If no need, it also
-                could be None. Default: None.
-            bos_token (str): special token for bos token. If no need, it also
-                could be None. Default: None.
-            eos_token (str): special token for eos token. If no need, it also
-                could be None. Default: None.
-            **kwargs (dict): keyword arguments for `Vocab.from_dict`.
+            filepath (str): the path of file to construct vocabulary.
+            unk_token (str, optional): special token for unknown token. If no 
+                need, it also could be None. Default: None.
+            pad_token (str, optional): special token for padding token. If no 
+                need, it also could be None. Default: None.
+            bos_token (str, optional): special token for bos token. If no need, 
+                it also could be None. Default: None.
+            eos_token (str, optional): special token for eos token. If no need, 
+                it also could be None. Default: None.
+
+            kwargs (dict): Keyword arguments ending with `_token`. It can be 
+                used to specify further special tokens that will be exposed as 
+                attribute of the vocabulary and associated with an index.
+
         Returns:
-            Vocab: An instance of `Vocab`.
+            Vocab: An instance of :class:`Vocab` generated from the given file.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import Vocab
+                # The vocab file. The sample file can be downloaded firstly.
+                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                vocab_file_path = './senta_word_dict.txt'
+                # Initialize the Vocab
+                vocab = Vocab.load_vocabulary(
+                    vocab_file_path,
+                    unk_token='[UNK]',
+                    pad_token='[PAD]')
+                print(len(vocab))
+                # 1256608
         """
         token_to_idx = {}
         with io.open(filepath, 'r', encoding='utf-8') as f:

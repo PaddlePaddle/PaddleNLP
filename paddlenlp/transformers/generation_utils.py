@@ -425,7 +425,7 @@ class GenerationMixin(object):
         by using decoding strategy. Currently, there are three decoding 
         strategies supported: "greedy_search", "sampling" and "beam_search".
 
-        Parameters:
+        Args:
             input_ids (Tensor, optional): The input sequence ids for the 
                 generation. It is a Tensor with shape [batch_size, sequence_length]. 
                 The data type should be int32 or int64. Default to None, which 

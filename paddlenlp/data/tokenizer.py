@@ -37,6 +37,15 @@ class BaseTokenizer(object):
 
 
 class JiebaTokenizer(BaseTokenizer):
+    """
+    Constructs an tokenizer based on `jieba <https://github.com/fxsjy/jieba>`__. 
+    It supports :meth:`cut` method to cut the text to tokens, and :meth:`encode` 
+    method to covert text to ids.
+
+    Args:
+        vocab(paddlenlp.data.Vocab): An instance of :class:`paddlenlp.data.Vocab`.
+    """
+
     def __init__(self, vocab):
         super(JiebaTokenizer, self).__init__(vocab)
         self.tokenizer = jieba.Tokenizer()
@@ -46,9 +55,69 @@ class JiebaTokenizer(BaseTokenizer):
         self.tokenizer.initialized = True
 
     def cut(self, sentence, cut_all=False, use_hmm=True):
+        """
+        The method used to cut the text to tokens.
+
+        Args:
+            sentence(str): The text that needs to be cuted.
+            cut_all(bool, optional): Whether to use the full mode. Default: False.
+            use_hmm(bool, optional): Whether to use the HMM model. Default: True.
+
+        Returns:
+            list: A list of tokens.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import Vocab, JiebaTokenizer
+                # The vocab file. The sample file can be downloaded firstly.
+                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                vocab_file_path = './senta_word_dict.txt'
+                # Initialize the Vocab
+                vocab = Vocab.load_vocabulary(
+                    vocab_file_path,
+                    unk_token='[UNK]',
+                    pad_token='[PAD]')
+                tokenizer = JiebaTokenizer(vocab)
+
+                tokens = tokenizer.cut('我爱你中国')
+                print(tokens)
+                # ['我爱你', '中国']
+        """
         return self.tokenizer.lcut(sentence, cut_all, use_hmm)
 
     def encode(self, sentence, cut_all=False, use_hmm=True):
+        """
+        The method used to convert the text to ids. It will firstly call 
+        :meth:`cut` method to cut the text to tokens. Then, convert tokens to 
+        ids using `vocab`.
+
+        Args:
+            sentence(str): The text that needs to be cuted.
+            cut_all(bool, optional): Whether to use the full mode. Default: False.
+            use_hmm(bool, optional): Whether to use the HMM model. Default: True.
+
+        Returns:
+            list: A list of ids.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import Vocab, JiebaTokenizer
+                # The vocab file. The sample file can be downloaded firstly.
+                # wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
+                vocab_file_path = './senta_word_dict.txt'
+                # Initialize the Vocab
+                vocab = Vocab.load_vocabulary(
+                    vocab_file_path,
+                    unk_token='[UNK]',
+                    pad_token='[PAD]')
+                tokenizer = JiebaTokenizer(vocab)
+                
+                ids = tokenizer.encode('我爱你中国')
+                print(ids)
+                # [1170578, 575565]
+        """
         words = self.cut(sentence, cut_all, use_hmm)
         return [
             get_idx_from_word(word, self.vocab.token_to_idx,
