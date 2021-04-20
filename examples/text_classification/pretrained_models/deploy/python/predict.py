@@ -14,13 +14,12 @@
 
 import argparse
 
-from scipy.special import softmax
-from paddle import inference
 import numpy as np
 import paddle
-
-from paddlenlp.data import Stack, Tuple, Pad
 import paddlenlp as ppnlp
+from scipy.special import softmax
+from paddle import inference
+from paddlenlp.data import Stack, Tuple, Pad
 
 # yapf: disable
 parser = argparse.ArgumentParser()

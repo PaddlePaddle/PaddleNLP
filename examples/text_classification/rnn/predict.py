@@ -16,7 +16,7 @@ import argparse
 import paddle
 import paddle.nn.functional as F
 import paddlenlp as ppnlp
-from paddlenlp.data import JiebaTokenizer, Stack, Tuple, Pad
+from paddlenlp.data import JiebaTokenizer, Stack, Tuple, Pad, Vocab
 
 from utils import preprocess_prediction_data
 
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     paddle.set_device(args.device.lower())
 
     # Loads vocab.
-    vocab = ppnlp.data.Vocab.load_vocabulary(
+    vocab = Vocab.load_vocabulary(
         args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
     label_map = {0: 'negative', 1: 'positive'}
 
