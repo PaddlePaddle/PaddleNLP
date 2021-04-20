@@ -82,7 +82,7 @@
    paddlenlp.embeddings <source/paddlenlp.embeddings>
    paddlenlp.layers <source/paddlenlp.layers>
    paddlenlp.metrics <source/paddlenlp.metrics>
-   paddlenlp.op <source/paddlenlp.op>
+   paddlenlp.ops <source/paddlenlp.ops>
    paddlenlp.seq2vec <source/paddlenlp.seq2vec>
    paddlenlp.transformers <source/paddlenlp.transformers>
    paddlenlp.utils <source/paddlenlp.utils>
