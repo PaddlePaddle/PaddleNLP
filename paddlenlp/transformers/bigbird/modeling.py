@@ -594,7 +594,7 @@ class BigBirdLMPredictionHead(Layer):
 
 class BigBirdPretrainingHeads(Layer):
     """
-    The BigBird pretraining headss for a pretraiing task on top.
+    The BigBird pretraining heads for a pretraiing task on top.
 
     Args:
         hidden_size (`int`):
