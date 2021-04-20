@@ -46,9 +46,9 @@ simnet/
 #### 使用PaddleNLP内置数据集
 
 ```python
-from paddlenlp.datasets import LCQMC
+from paddlenlp.datasets import load_dataset
 
-train_ds, dev_dataset, test_ds = LCQMC.get_datasets(['train', 'dev', 'test'])
+train_ds, dev_ds, test_ds = load_dataset("lcqmc", splits=["train", "dev", "test"])
 ```
 
 部分样例数据如下：
