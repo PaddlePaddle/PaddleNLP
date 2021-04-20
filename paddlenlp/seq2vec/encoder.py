@@ -40,7 +40,7 @@ class BoWEncoder(nn.Layer):
         self._emb_dim = emb_dim
 
     def get_input_dim(self):
-        """
+        r"""
         Returns the dimension of the vector input for each element in the sequence input
         to a `BoWEncoder`. This is not the shape of the input tensor, but the
         last element of that shape.
@@ -48,14 +48,14 @@ class BoWEncoder(nn.Layer):
         return self._emb_dim
 
     def get_output_dim(self):
-        """
+        r"""
         Returns the dimension of the final vector output by this `BoWEncoder`.  This is not
         the shape of the returned tensor, but the last element of that shape.
         """
         return self._emb_dim
 
     def forward(self, inputs, mask=None):
-        """
+        r"""
         It simply sums the embeddings of a sequence across the time dimension.
 
         Args:
@@ -80,7 +80,7 @@ class BoWEncoder(nn.Layer):
 
 
 class CNNEncoder(nn.Layer):
-    """
+    r"""
     A `CNNEncoder` takes as input a sequence of vectors and returns a
     single vector, a combination of multiple convolution layers and max pooling layers.
     The input to this module is of shape `(batch_size, num_tokens, emb_dim)`, 
@@ -152,7 +152,7 @@ class CNNEncoder(nn.Layer):
             self._output_dim = maxpool_output_dim
 
     def get_input_dim(self):
-        """
+        r"""
         Returns the dimension of the vector input for each element in the sequence input
         to a `CNNEncoder`. This is not the shape of the input tensor, but the
         last element of that shape.
@@ -160,14 +160,14 @@ class CNNEncoder(nn.Layer):
         return self._emb_dim
 
     def get_output_dim(self):
-        """
+        r"""
         Returns the dimension of the final vector output by this `CNNEncoder`.  This is not
         the shape of the returned tensor, but the last element of that shape.
         """
         return self._output_dim
 
     def forward(self, inputs, mask=None):
-        """
+        r"""
         The combination of multiple convolution layers and max pooling layers.
 
         Args:
@@ -207,7 +207,7 @@ class CNNEncoder(nn.Layer):
 
 
 class GRUEncoder(nn.Layer):
-    """
+    r"""
     A GRUEncoder takes as input a sequence of vectors and returns a
     single vector, which is a combination of multiple GRU layers.
     The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
@@ -273,7 +273,7 @@ class GRUEncoder(nn.Layer):
                                 **kwargs)
 
     def get_input_dim(self):
-        """
+        r"""
         Returns the dimension of the vector input for each element in the sequence input
         to a `GRUEncoder`. This is not the shape of the input tensor, but the
         last element of that shape.
@@ -281,7 +281,7 @@ class GRUEncoder(nn.Layer):
         return self._input_size
 
     def get_output_dim(self):
-        """
+        r"""
         Returns the dimension of the final vector output by this `GRUEncoder`.  This is not
         the shape of the returned tensor, but the last element of that shape.
         """
@@ -291,7 +291,7 @@ class GRUEncoder(nn.Layer):
             return self._hidden_size
 
     def forward(self, inputs, sequence_length):
-        """
+        r"""
         GRUEncoder takes the a sequence of vectors and and returns a single vector, 
         which is a combination of multiple GRU layers. The input to this 
         module is of shape `(batch_size, num_tokens, input_size)`, 
@@ -344,7 +344,7 @@ class GRUEncoder(nn.Layer):
 
 
 class LSTMEncoder(nn.Layer):
-    """
+    r"""
     A LSTMEncoder takes as input a sequence of vectors and returns a
     single vector, which is a combination of multiple LSTM layers.
     The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
@@ -408,7 +408,7 @@ class LSTMEncoder(nn.Layer):
             **kwargs)
 
     def get_input_dim(self):
-        """
+        r"""
         Returns the dimension of the vector input for each element in the sequence input
         to a `LSTMEncoder`. This is not the shape of the input tensor, but the
         last element of that shape.
@@ -416,7 +416,7 @@ class LSTMEncoder(nn.Layer):
         return self._input_size
 
     def get_output_dim(self):
-        """
+        r"""
         Returns the dimension of the final vector output by this `LSTMEncoder`.  This is not
         the shape of the returned tensor, but the last element of that shape.
         """
@@ -426,7 +426,7 @@ class LSTMEncoder(nn.Layer):
             return self._hidden_size
 
     def forward(self, inputs, sequence_length):
-        """
+        r"""
         LSTMEncoder takes the a sequence of vectors and and returns a
         single vector, which is a combination of multiple LSTM layers.
         The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
@@ -545,7 +545,7 @@ class RNNEncoder(nn.Layer):
             **kwargs)
 
     def get_input_dim(self):
-        """
+        r"""
         Returns the dimension of the vector input for each element in the sequence input
         to a `RNNEncoder`. This is not the shape of the input tensor, but the
         last element of that shape.
@@ -553,7 +553,7 @@ class RNNEncoder(nn.Layer):
         return self._input_size
 
     def get_output_dim(self):
-        """
+        r"""
         Returns the dimension of the final vector output by this `RNNEncoder`.  This is not
         the shape of the returned tensor, but the last element of that shape.
         """
@@ -563,7 +563,7 @@ class RNNEncoder(nn.Layer):
             return self._hidden_size
 
     def forward(self, inputs, sequence_length):
-        """
+        r"""
         RNNEncoder takes the a sequence of vectors and and returns a
         single vector, which is a combination of multiple RNN layers.
         The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
