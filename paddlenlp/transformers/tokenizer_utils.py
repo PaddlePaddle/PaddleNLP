@@ -108,6 +108,38 @@ def _is_punctuation(char):
 @six.add_metaclass(InitTrackerMeta)
 class PretrainedTokenizer(object):
     """
+    The base class for all pretrained tokenizers. It mainly provides common methods
+    for pretrained tokenizers loading (construction and loading) and saving. Loading
+    and saving also rely on the following class attributes which should be overridden
+    by derived classes accordingly:
+
+    - `tokenizer_config_file` (`str`): Represents the file name of tokenizer
+      configuration for configuration saving and loading in local file system.
+      The value is `tokenizer_config.json`.
+    - `resource_files_names` (`dict`): Represents resources to specific file
+      names mapping for resource saving and loading in local file system. The
+      keys of dict representing resource items should be argument names in
+      tokenizer's `__init__` method, and the values are file names for saving
+      and loading corresponding resources. The mostly used resources here are
+      vocabulary file and sentence-piece model file.
+    - `pretrained_init_configuration` (`dict`): Provides the tokenizer configurations
+      of built-in pretrained tokenizers (constract to tokenizers in local file
+      system). It has pretrained tokenizer names as keys (the same as pretrained
+      model names, such as `bert-base-uncased`), and the values are dict preserving
+      corresponding configuration for tokenizer initialization.
+    - `pretrained_resource_files_map` (`dict`): Provides resource URLs of built-in
+      pretrained tokenizers (constract to tokenizers in local file system). It
+      has the same keys as `resource_files_names`, and the values are also `dict`
+      mapping specific pretrained tokenizer names (such as `bert-base-uncased`)
+      to corresponding resource URLs.
+
+    Moreover, methods common to tokenizers for tokenization are defined in `GenerationMixin`
+    and also inherited here.
+
+    Besides, metaclass `InitTrackerMeta` is used to create `PretrainedModel`,
+    and it makes subclasses can track arguments for initialization automatically.
+
+
     The base class for all pretrained tokenizers. It provides some attributes
     and common methods for all pretrained tokenizers, including attributes for
     and special tokens (arguments of `__init__` whose name ends with `_token`)

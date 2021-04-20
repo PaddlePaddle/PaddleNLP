@@ -73,30 +73,34 @@ class PretrainedModel(Layer, GenerationMixin):
     and saving also rely on the following class attributes which should be overridden
     by derived classes accordingly:
 
-    - `model_config_file` (`str`): Represents the file name for saving and loading
-      model configuration. The value is `model_config.json`.
-    - `resource_files_names` (`dict`): Maps resources to specific file names for
-      saving and loading. Currently, the dict only includes `'model_state'` as key
-      with corresponding value `'model_state.pdparams'` for model weights saving
-      and loading.
-    - `pretrained_resource_files_map` (`dict`): Provides resources' URLs. It has
-      the same keys as `resource_files_names` (that is `'model_state'`), and the
+    - `model_config_file` (`str`): Represents the file name of model configuration
+      for configuration saving and loading in local file system. The value is
+      `model_config.json`.
+    - `resource_files_names` (`dict`): Represents resources to specific file
+      names mapping for resource saving and loading in local file system. Currently,
+      resources only include the model state, thus the dict only includes
+      `'model_state'` as key with corresponding value `'model_state.pdparams'`
+      for model weights saving and loading.
+    - `pretrained_init_configuration` (`dict`): Provides the model configurations
+      of built-in pretrained models (constract to models in local file system).
+      It has pretrained model names as keys (such as `bert-base-uncased`), and
+      the values are dict preserving corresponding configuration for model initialization.
+    - `pretrained_resource_files_map` (`dict`): Provides resource URLs of built-in
+      pretrained models (constract to models in local file system). It has the
+      same keys as `resource_files_names` (that is `'model_state'`), and the
       values are also `dict` mapping specific pretrained model name (such as
       `bert-base-uncased`) to URL of pretrained model weights.
-    - `pretrained_init_configuration` (`dict`): It has pretrained model names
-      as keys (such as `bert-base-uncased`), and the values are dict preserving
-      corresponding configuration for model initialization.
     - `base_model_prefix` (`str`): Represents the attribute associated to the
       base model in derived classes of the same architecture adding layers on
       top of the base model. Note: A base model class is pretrained model class
       decorated by `register_base_model`, such as `BertModel`; A derived model
       class is a pretrained model class adding layers on top of the base model,
       and it has a base model as attribute, such as `BertForSequenceClassification`.
-    
+
     Methods common to models for text generation are defined in `GenerationMixin`
     and also inherited here.
 
-    Addtionally, metaclass `InitTrackerMeta` is used to create `PretrainedModel`,
+    Besides, metaclass `InitTrackerMeta` is used to create `PretrainedModel`,
     and it makes subclasses can track arguments for initialization automatically.
     """
     model_config_file = "model_config.json"
