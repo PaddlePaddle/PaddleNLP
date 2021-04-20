@@ -10,7 +10,7 @@ import paddle
 import yaml
 from pprint import pprint
 
-from paddlenlp.ext_op import FasterTransformer
+from paddlenlp.ops import FasterTransformer
 
 from paddlenlp.utils.log import logger
 

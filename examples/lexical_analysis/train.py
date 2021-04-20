@@ -134,8 +134,8 @@ def train(args):
     train_reader_cost = 0.0
     train_run_cost = 0.0
     total_samples = 0
+    reader_start = time.time()
     for epoch in range(args.epochs):
-        reader_start = time.time()
         for step, batch in enumerate(train_loader):
             train_reader_cost += time.time() - reader_start
             global_step += 1
@@ -165,6 +165,7 @@ def train(args):
                     paddle.save(model.state_dict(),
                                 os.path.join(args.model_save_dir,
                                              "model_%d.pdparams" % global_step))
+            reader_start = time.time()
 
 
 if __name__ == "__main__":

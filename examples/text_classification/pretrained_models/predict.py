@@ -12,18 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
-import random
-import time
+from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-
-from paddlenlp.data import Stack, Tuple, Pad
 import paddlenlp as ppnlp
+from paddlenlp.data import Stack, Tuple, Pad
 
 # yapf: disable
 parser = argparse.ArgumentParser()
