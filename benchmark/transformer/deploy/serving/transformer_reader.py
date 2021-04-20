@@ -54,27 +54,3 @@ class TransformerReader(object):
         ])
 
         return np.asarray(src_word)
-
-    def process(self, line):
-        tokens = self.tokenize(line)
-
-        # if len(tokens_a) > self.max_seq_len - 2:
-        #     tokens_a = tokens_a[0:(self.max_seq_len - 2)]
-        # tokens = []
-        # text_type_ids = []
-        # tokens.append("[CLS]")
-        # text_type_ids.append(0)
-        # for token in tokens_a:
-        #     tokens.append(token)
-        #     text_type_ids.append(0)
-        # token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
-        # position_ids = list(range(len(token_ids)))
-        # p_token_ids, p_pos_ids, p_text_type_ids, input_mask = \
-        #     self._pad_batch(token_ids, text_type_ids, position_ids)
-        # feed_result = {
-        #     self.feed_keys[0]: p_token_ids.reshape(-1).tolist(),
-        #     self.feed_keys[1]: p_pos_ids.reshape(-1).tolist(),
-        #     self.feed_keys[2]: p_text_type_ids.reshape(-1).tolist(),
-        #     self.feed_keys[3]: input_mask.reshape(-1).tolist()
-        # }
-        # return feed_result
