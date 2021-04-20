@@ -31,16 +31,16 @@ class BigBirdTokenizer(PretrainedTokenizer):
     tokenize as subwords.
 
     Args:
-        sentencepiece_model_file(str): file path of the vocabulary
-        do_lower_case (bool): Whether the text strips accents and convert to
+        sentencepiece_model_file (`str`): file path of the vocabulary
+        do_lower_case (`bool`): Whether the text strips accents and convert to
             lower case. If you use the BigBird pretrained model, lower is set to
             False when using the cased model, otherwise it is set to True.
             Default: True.
-        unk_token (str): The special token for unkown words. Default: "[UNK]".
-        sep_token (str): The special token for separator token . Default: "[SEP]".
-        pad_token (str): The special token for padding. Default: "[PAD]".
-        cls_token (str): The special token for cls. Default: "[CLS]".
-        mask_token (str): The special token for mask. Default: "[MASK]".
+        unk_token (`str`): The special token for unkown words. Default: "[UNK]".
+        sep_token (`str`): The special token for separator token . Default: "[SEP]".
+        pad_token (`str`): The special token for padding. Default: "[PAD]".
+        cls_token (`str`): The special token for cls. Default: "[CLS]".
+        mask_token (`str`): The special token for mask. Default: "[MASK]".
     
     Raises:
         ValueError: If file sentencepiece_model_file doesn't exist. 
@@ -102,7 +102,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
         """
         return the size of vocabulary.
         Returns:
-            int: the size of vocabulary.
+            `Int`: The size of vocabulary.
         """
         return len(self.vocab)
 
@@ -113,7 +113,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
             text (str): The text to be tokenized.
         
         Returns:
-            list: A list of string representing converted tokens.
+            `List`: A list of string representing converted tokens.
         """
         if len(text) == 0:
             return []
@@ -136,7 +136,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
             text (str): The text to be tokenized.
             pair_text(str):  The pair text to be tokenized.
         Returns:
-            list: A list of string representing converted tokens.
+            `List`: A list of string representing converted tokens.
         """
         return self._tokenize(text)
 
@@ -148,7 +148,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
         Args:
             tokens (list): A list of string representing tokens to be converted.
         Returns:
-            str: Converted string from tokens.
+            `Str`: Converted string from tokens.
         """
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
@@ -275,7 +275,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
                 number of added tokens in the case of a single sequence if set to False.
 
         Returns:
-            Number of tokens added to sequences
+            `Int`: Number of tokens added to sequences
         """
         token_ids_0 = []
         token_ids_1 = []
@@ -300,7 +300,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
                 Optional second list of IDs for sequence pairs.
 
         Returns:
-            :obj:`List[int]`: List of input_id with the appropriate special tokens.
+            `List[int]`: List of input_id with the appropriate special tokens.
         """
         if token_ids_1 is None:
             return [self.cls_id] + token_ids_0 + [self.sep_id]
