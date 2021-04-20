@@ -28,7 +28,7 @@ class AccuracyAndF1(Metric):
     """
     This class encapsulates Accuracy, Precision, Recall and F1 metric logic,
     and `accumulate` function returns accuracy, precision, recall and f1.
-    The overview of metric could be seen at the document of `paddle.metric
+    The overview of all metrics could be seen at the document of `paddle.metric
     <https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/metric/Overview_cn.html>`_ 
     for details.
 
@@ -81,7 +81,7 @@ class AccuracyAndF1(Metric):
 
         Args:
             pred (Tensor): 
-                predicted tensor, and its dtype is float32 or float64, and
+                Predicted tensor, and its dtype is float32 or float64, and
                 has a shape of [batch_size, d0, ..., dN-1].
             label (Tensor):
                 The ground truth tensor, and its dtype is is int64, and has a
@@ -100,7 +100,7 @@ class AccuracyAndF1(Metric):
 
     def update(self, correct, *args):
         """
-        Update the metrics states (accuracy, precision and recall), in order to
+        Updates the metrics states (accuracy, precision and recall), in order to
         calculate accumulated accuracy, precision and recall of all instances.
 
         Args:
@@ -118,7 +118,7 @@ class AccuracyAndF1(Metric):
         Calculates and returns the accumulated metric.
 
         Returns:
-            tuple: the accumulated metric.
+            tuple: The accumulated metric.
 
             With the fileds:
 
@@ -151,7 +151,7 @@ class AccuracyAndF1(Metric):
 
     def reset(self):
         """
-        Resets all of the metric state.
+        Resets all metric states.
         """
         self.acc.reset()
         self.precision.reset()
@@ -161,7 +161,7 @@ class AccuracyAndF1(Metric):
 
     def name(self):
         """
-        Return name of metric instance.
+        Returns name of the metric instance.
 
         Returns:
            str: The name of the metric instance.
@@ -257,7 +257,7 @@ class Mcc(Metric):
         Calculates and returns the accumulated metric.
 
         Returns:
-            tuple: the accumulated metric.
+            tuple: The accumulated metric.
 
             With the fields:
 
@@ -276,7 +276,7 @@ class Mcc(Metric):
 
     def reset(self):
         """
-        Resets all of the metric state.
+        Resets all metric states.
         """
         self.tp = 0  # true positive
         self.fp = 0  # false positive
@@ -285,7 +285,7 @@ class Mcc(Metric):
 
     def name(self):
         """
-        Return name of metric instance.
+        Returns name of the metric instance.
 
         Returns:
             str: The name of the metric instance.
@@ -351,7 +351,7 @@ class PearsonAndSpearman(Metric):
         Calculates and returns the accumulated metric.
 
         Returns:
-            tuple: the accumulated metric.
+            tuple: The accumulated metric.
 
             With the fileds:
 
@@ -412,14 +412,14 @@ class PearsonAndSpearman(Metric):
 
     def reset(self):
         """
-        Resets all of the metric state.
+        Resets all metric states.
         """
         self.preds = []
         self.labels = []
 
     def name(self):
         """
-        Return name of metric instance.
+        Returns name of the metric instance.
 
         Returns:
            str: The name of the metric instance.
