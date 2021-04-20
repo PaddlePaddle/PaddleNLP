@@ -64,7 +64,7 @@ class TokenEmbedding(nn.Embedding):
             Whether the weight of embedding can be trained.
             Defaults to True.
         keep_extended_vocab_only (`bool`, optional):
-            Whether to keep the extended vocabulary only, will be effective only if provides extended_vocab_path
+            Whether to keep the extended vocabulary only, will be effective only if provides extended_vocab_path.
             Defaults to False.
     """
 
