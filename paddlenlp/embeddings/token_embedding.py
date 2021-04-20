@@ -296,14 +296,16 @@ class TokenEmbedding(nn.Embedding):
 
     def dot(self, word_a, word_b):
         """
-        Calculate the dot product of 2 words.
+        Dot product or scalar product is an algebraic operation that takes
+        two equal-length sequences of numbers (usually coordinate vectors),
+        and returns a single number. Calculate the dot product of 2 words.
 
         Args:
             word_a (`str`): The first word string.
             word_b (`str`): The second word string.
 
         Returns:
-            `float`: The dot product of 2 words.
+            `Float`: The dot product of 2 words.
 
         """
         dot = self._dot_np
@@ -319,7 +321,7 @@ class TokenEmbedding(nn.Embedding):
             word_b (`str`): The second word string.
 
         Returns:
-            `float`: The cosine similarity of 2 words.
+            `Float`: The cosine similarity of 2 words.
 
         """
         dot = self._dot_np
@@ -335,7 +337,7 @@ class TokenEmbedding(nn.Embedding):
             idx_to_word ('list'):
 
         Returns:
-            `dict`: The word to index dict constructed by idx_to_word.
+            `Dict`: The word to index dict constructed by idx_to_word.
 
         """
         word_to_idx = {}
@@ -346,7 +348,7 @@ class TokenEmbedding(nn.Embedding):
     def __repr__(self):
         """
         Returns:
-            `str`: The token embedding infomation.
+            `Str`: The token embedding infomation.
 
         """
         info = "Object   type: {}\
