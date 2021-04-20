@@ -8,9 +8,8 @@ class TransformerReader(object):
     def __init__(self, args={}):
         super(TransformerReader, self).__init__()
 
-        use_all_vocab = args.use_all_vocab
         dataset = load_dataset('wmt14ende', splits=('test'))
-        if use_all_vocab:
+        if args.use_all_vocab:
             self.vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
         else:
             self.vocab = Vocab.load_vocabulary(
