@@ -35,12 +35,12 @@ class SamplerHelper(object):
     with a iterable dataset.
 
     .. note:: 
-        The :meth:`__len__` method isn't strictly required by :class:`DataLoader`, 
-        but is expected in any calculation involving the length of a 
-        :class:`DataLoader`.
+        The :meth:`__len__` method isn't strictly required by 
+        :class:`paddle.io.DataLoader`, but is expected in any calculation 
+        involving the length of a :class:`paddle.io.DataLoader`.
 
     Args:
-        dataset (Dataset): Input dataset for SamplerHelper.
+        dataset (Dataset): Input dataset for :class:`SamplerHelper`.
         iterable (Iterable, optional): Iterator of dataset. Default: None.
     """
 
@@ -112,7 +112,7 @@ class SamplerHelper(object):
 
         Args:
             buffer_size (int, optional): Buffer size for shuffle. if 
-                :math:`buffer_size < 0` or more than the length of the dataset, 
+                :math:`buffer\_size < 0` or more than the length of the dataset, 
                 `buffer_size` is the length of the dataset. Default: -1. 
             seed (int, optional): Seed for the random. Default: None.
 
@@ -182,7 +182,7 @@ class SamplerHelper(object):
             reverse (bool, optional): If True, it means in descending order, 
                 and False means in ascending order. Default: False.
             buffer_size (int, optional): Buffer size for sort. If 
-                :math:`buffer_size < 0` or `buffer_size` is more than the length 
+                :math:`buffer\_size < 0` or `buffer_size` is more than the length 
                 of the data, `buffer_size` will be set to the length of the data. 
                 Default: -1.
 
