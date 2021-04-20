@@ -54,7 +54,6 @@ class TransformerService(WebService):
 
     def preprocess(self, feed=[], fetch=[]):
         src_sequence = feed[0]["src_word"]
-        print(src_sequence)
         if isinstance(src_sequence, str):
             src_sequence = [src_sequence]
         src_word = self.transformer_reader.prepare_infer_input(src_sequence)

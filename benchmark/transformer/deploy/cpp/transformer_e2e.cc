@@ -67,8 +67,9 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
       dataresultvec[bsz * n_best + k].result_q = "";
       for (int len = 0; len < max_output_length; ++len) {
         if (seq_ids_out[bsz * max_output_length * beam_size + len * beam_size +
-                        k] == eos_idx)
+                        k] == eos_idx) {
           break;
+        }
         dataresultvec[bsz * n_best + k].result_q =
             dataresultvec[bsz * n_best + k].result_q +
             num2word_dict[seq_ids_out[bsz * max_output_length * beam_size +
