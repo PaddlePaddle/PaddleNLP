@@ -81,15 +81,15 @@ class AccuracyAndF1(Metric):
 
         Args:
             pred (Tensor): 
-                The predicted value, and its dtype is float32 or float64, and
+                predicted tensor, and its dtype is float32 or float64, and
                 has a shape of [batch_size, d0, ..., dN-1].
             label (Tensor):
-                The ground truth value is a Tensor with dtype int64. Shape is
-                [batch_size, d0, ..., dN-1, 1], or [batch_size, d0, ..., num_classes]
+                The ground truth tensor, and its dtype is is int64, and has a
+                shape of [batch_size, d0, ..., dN-1, 1] or [batch_size, d0, ..., num_classes]
                 in one hot representation.
 
         Returns:
-            Tensor: Correct mask, each element indice whether the prediction
+            Tensor: Correct mask, each element indicates whether the prediction
             equals to the label. Its' a tensor with a data type of float32 and
             has a shape of [batch_size, topk].
 
@@ -106,7 +106,7 @@ class AccuracyAndF1(Metric):
         Args:
             correct (Tensor):
                 Correct mask for calculating accuracy, and it's a tensor with
-                shape [batch_size, topk] and has a dtype of int.
+                shape [batch_size, topk] and has a dtype of float32.
 
         """
         self.acc.update(correct)
