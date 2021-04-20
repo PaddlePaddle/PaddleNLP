@@ -762,7 +762,7 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
             Specifies a target value that is ignored and does
             not contribute to the input gradient. Only valid
             if :attr:`soft_label` is set to :attr:`False`.
-            Defaults: kIgnoreIndex(0)
+            Defaults to `0`. 
     """
 
     def __init__(self, vocab_size, use_nsp=False, ignore_index=0):
