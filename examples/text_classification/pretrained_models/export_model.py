@@ -12,18 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
-import random
-import time
+from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-
-from paddlenlp.data import Stack, Tuple, Pad
 import paddlenlp as ppnlp
+from paddlenlp.data import Stack, Tuple, Pad
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -33,10 +30,6 @@ args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-
-    # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
-        'ernie-tiny')
 
     # The number of labels should be in accordance with the training dataset.
     label_map = {0: 'negative', 1: 'positive'}
