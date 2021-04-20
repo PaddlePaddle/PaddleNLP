@@ -29,6 +29,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
     Constructs a BigBird tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
+
     Args:
         sentencepiece_model_file(str): file path of the vocabulary
         do_lower_case (bool): Whether the text strips accents and convert to
@@ -159,6 +160,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
                masked_lm_prob=0.15):
         """
         Returns a tuple containing the encoded sequence and mask information.
+        
         Args:
             text (:obj:`str`, :obj:`List[str]` or :obj:`List[int]`):
                 The first sequence to be encoded. This can be a string, a list of strings (tokenized string using
