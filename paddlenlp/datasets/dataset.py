@@ -117,7 +117,7 @@ def load_dataset(path_or_read_func,
 
 class MapDataset(Dataset):
     """
-    Wraps a map-style dataset-like object as an instance of Dataset, and equips it 
+    Wraps a map-style dataset-like object as an instance of `MapDataset`, and equips it 
     with `map` and other utility methods. All non-magic methods of the raw object
     are also accessible.
 
@@ -179,10 +179,10 @@ class MapDataset(Dataset):
         Uses samples whose indices mod `index` equals 0 to update this dataset.
 
         Args:
-            num_shards (int, optional): A integer representing the number of
+            num_shards (int, optional): An integer representing the number of
                 data shards. If None, `num_shards` would be number of trainers.
                 Default: None
-            index (int, optional): A integer representing the index of the
+            index (int, optional): An integer representing the index of the
                 current shard. If None, `index` would be the current trainer rank
                 id. Default: None.
         """
@@ -234,7 +234,7 @@ class MapDataset(Dataset):
 
 class IterDataset(IterableDataset):
     """
-    Wraps a dataset-like object as an instance of Dataset, and equips it with
+    Wraps a dataset-like object as an instance of `IterDataset`, and equips it with
     `map` and other utility methods. All non-magic methods of the raw object
     also accessible.
 
@@ -314,10 +314,10 @@ class IterDataset(IterableDataset):
         Uses samples whose indices mod `index` equals 0 to update this dataset.
 
         Args:
-            num_shards (int, optional): A integer representing the number of
+            num_shards (int, optional): An integer representing the number of
                 data shards. If None, `num_shards` would be number of trainers.
                 Default: None
-            index (int, optional): A integer representing the index of the
+            index (int, optional): An integer representing the index of the
                 current shard. If None, `index` would be the current trainer rank
                 id. Default: None.
         """
