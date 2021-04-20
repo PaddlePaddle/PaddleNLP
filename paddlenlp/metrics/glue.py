@@ -118,7 +118,8 @@ class AccuracyAndF1(Metric):
         Calculates and returns the accumulated metric.
 
         Returns:
-            tuple: The accumulated metric.
+            tuple: The accumulated metric. A tuple of shape (acc, precision,
+            recall, f1, average_of_acc_and_f1)
 
             With the fileds:
 
@@ -130,7 +131,7 @@ class AccuracyAndF1(Metric):
                 The accumulated recall.
             - f1 (numpy.float64):
                 The accumulated f1.
-            - average of acc and f1 (numpy.float64):
+            - average_of_acc_and_f1 (numpy.float64):
                 The average of accumulated accuracy and f1.
 
         """
@@ -257,7 +258,7 @@ class Mcc(Metric):
         Calculates and returns the accumulated metric.
 
         Returns:
-            tuple: The accumulated metric.
+            tuple: The accumulated metric. A tuple of shape (mcc,)
 
             With the fields:
 
@@ -351,7 +352,8 @@ class PearsonAndSpearman(Metric):
         Calculates and returns the accumulated metric.
 
         Returns:
-            tuple: The accumulated metric.
+            tuple: The accumulated metric. A tuple of (pearson, spearman,
+            the_average_of_pearson_and_spearman)
 
             With the fileds:
 
@@ -359,7 +361,7 @@ class PearsonAndSpearman(Metric):
                 The accumulated pearson.
             - spearman (numpy.float64):
                 The accumulated spearman.
-            - the average of pearson and spearman (numpy.float64):
+            - the_average_of_pearson_and_spearman (numpy.float64):
                 The average of accumulated pearson and spearman correlation
                 coefficient.
 
