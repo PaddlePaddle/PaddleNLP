@@ -154,7 +154,7 @@ class MapDataset(Dataset):
 
     def __len__(self):
         """
-        returns the number of samples in dataset.
+        Returns the number of samples in dataset.
         """
         return len(self.new_data)
 
