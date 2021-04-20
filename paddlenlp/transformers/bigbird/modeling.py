@@ -243,7 +243,7 @@ class BigBirdPretrainedModel(PretrainedModel):
     base_model_prefix = "bigbird"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        # Initialization hook
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
@@ -290,7 +290,7 @@ class BigBirdModel(BigBirdPretrainedModel):
             ``"gelu"``, ``"relu"``, ``"silu"`` and ``"gelu_new"`` are supported.
             Defaults to ``"gelu"``.
         normalize_before (`bool`, optional):
-            Indicate whether to put layer normalization into preprocessing of MHA and FFN sub-layers.
+            Indicates whether to put layer normalization into preprocessing of MHA and FFN sub-layers.
             If True, pre-process is layer normalization and post-precess includes dropout,
             residual connection. Otherwise, no pre-process and post-precess includes dropout,
             residual connection, layer normalization. 
@@ -511,8 +511,7 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
                 See :class:`BigBirdModel`.
 
         Returns:
-            `Tensor`: Probability of each class. Its data type should be float32 and
-                      has a shape of [batch_size, num_classes].
+            `Tensor`: Probability of each class. Its data type should be float32 and it has a shape of [batch_size, num_classes].
 
         Examples:
             .. code-block::
@@ -604,7 +603,8 @@ class BigBirdPretrainingHeads(Layer):
         activation (`str`):
             See :class:`BigBirdModel`.
         embedding_weights (`Tensor`, optional):
-            The weight of pretraining embedding layer. Shape:[hidden_size, vocab_size].
+            The weight of pretraining embedding layer. Its data type should be float32
+            and its shape is [hidden_size, vocab_size].
             If set to `None`, use normal distribution to initialize weight.
             Defaults to `None`.
     """
@@ -678,7 +678,7 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
                 rand_mask_idx_list=None,
                 masked_positions=None):
         r"""
-        The BigBirdForSequenceClassification forward method, overrides the __call__() special method.
+        The BigBirdForPretraining forward method, overrides the __call__() special method.
 
         Args:
             input_ids (`Tensor`):
@@ -756,7 +756,7 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
         vocab_size (`int`):
             See :class:`BigBirdModel`.
         use_nsp (`bool`, optional):
-            It decides whether it consider NSP loss.
+            It decides whether it considers NSP loss.
             Defaults: False
         ignore_index (`int`):
             Specifies a target value that is ignored and does
