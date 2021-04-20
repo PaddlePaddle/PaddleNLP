@@ -275,7 +275,7 @@ class BigBirdModel(BigBirdPretrainedModel):
         num_layers (`int`):
             Number of hidden layers in the Transformer encoder.
         vocab_size (`int`):
-            Vocabulary size of the XLNet model. Defines the number of different tokens that can
+            Vocabulary size of the BigBird model. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling BigBirdModel.
         nhead (`int`):
             Number of heads in attention part.
@@ -396,7 +396,7 @@ class BigBirdModel(BigBirdPretrainedModel):
         Args:
             input_ids (`Tensor`):
                 Indices of input sequence tokens in the vocabulary.
-                It's data type should be int64 and it has a shape of [batch_size, sequence_length].
+                Its data type should be int64 and it has a shape of [batch_size, sequence_length].
             token_type_ids (`Tensor`, optional):
                 Segment token indices to indicate first and second portions of the inputs.
                 Indices can either be 0 or 1:
@@ -404,7 +404,7 @@ class BigBirdModel(BigBirdPretrainedModel):
                 - 0 corresponds to a *sentence A* token,
                 - 1 corresponds to a *sentence B* token.
 
-                It's data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to ``None``, which means we don't add segment embeddings.
             attention_mask_list (`list`, optional):
                 A list which contains some tensors used in multi-head attention
@@ -415,7 +415,17 @@ class BigBirdModel(BigBirdPretrainedModel):
                 A list which contains some tensors used in bigbird random block.
 
         Returns:
-            A tuple of shape (``encoder_output``, ``pooled_output``)
+            `Tuple`: (``encoder_output``, ``pooled_output``).
+            
+            With the fields:
+
+            - encoder_output (`Tensor`):
+                Sequence of output at the last layer of the model. Its data type should be float32 and
+                has a shape of [batch_size, sequence_length, hidden_size].
+
+            - pooled_output (`Tensor`):
+                The output of first token (`[CLS]`) in sequence. Its data type should be float32 and
+                has a shape of [batch_size, hidden_size].
 
         Examples:
             .. code-block::
@@ -501,7 +511,8 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
                 See :class:`BigBirdModel`.
 
         Returns:
-            ``output`` of classes logits.
+            `Tensor`: Probability of each class. Its data type should be float32 and
+                      has a shape of [batch_size, num_classes].
 
         Examples:
             .. code-block::
@@ -593,8 +604,8 @@ class BigBirdPretrainingHeads(Layer):
         activation (`str`):
             See :class:`BigBirdModel`.
         embedding_weights (`Tensor`, optional):
-            The weight of pretraining linear. Shape:[hidden_size, vocab_size].
-            If set to `None`, use random weight.
+            The weight of pretraining embedding layer. Shape:[hidden_size, vocab_size].
+            If set to `None`, use normal distribution to initialize weight.
             Default to `None`.
     """
 
@@ -620,12 +631,16 @@ class BigBirdPretrainingHeads(Layer):
             masked_positions (`Tensor`):
                 The list of masked positions.
         Returns:
-            A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
+            `Tuple`: (``prediction_scores``, ``seq_relationship_score``).
+            
+            With the fields:
 
-            - prediction_scores:
-                The logits of masked token prediction.
-            - seq_relationship_score:
-                The logits whether 2 sequences are NSP relationship.
+            - prediction_scores (`Tensor`):
+                The prediction score of masked tokens. Its data type should be float32 and
+                has a shape of [batch_size, sequence_length, vocab_size].
+            - seq_relationship_score (`Tensor`):
+                The logits whether 2 sequences are NSP relationship. Its data type should be float32 and
+                has a shape of [batch_size, 2].
         """
         prediction_scores = self.predictions(sequence_output, masked_positions)
         seq_relationship_score = self.seq_relationship(pooled_output)
@@ -675,12 +690,16 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
                 The list of masked positions.
 
         Returns:
-            A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
+            `Tuple`: (``prediction_scores``, ``seq_relationship_score``).
+            
+            With the fields:
 
-            - prediction_scores:
-                The logits of masked token prediction.
-            - seq_relationship_score:
-                The logits whether 2 sequences are NSP relationship.
+            - prediction_scores (`Tensor`):
+                The prediction score of masked tokens. Its data type should be float32 and
+                has a shape of [batch_size, sequence_length, vocab_size].
+            - seq_relationship_score (`Tensor`):
+                The logits whether 2 sequences are NSP relationship. Its data type should be float32 and
+                has a shape of [batch_size, 2].
 
         Examples:
             .. code-block::
@@ -772,7 +791,7 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
                 The weight of masked tokens. Shape: [mask_token_num, 1]
 
         Returns:
-            A pretraining loss.
+            `Float`: The pretraining loss.
 
         Example:
             .. code-block::

@@ -48,10 +48,10 @@ class TokenEmbedding(nn.Embedding):
     Args:
         embedding_name (`str`, optional):
             The pre-trained embedding model name. Use `paddlenlp.embeddings.list_embedding_name()` to
-            show which embedding model we have alreaady provide. 
+            list the names of all embedding models that we provide. 
             Default to `w2v.baidu_encyclopedia.target.word-word.dim300`.
         unknown_token (`str`, optional):
-            Specifying unknown token as unknown_token.
+            Specify unknown token.
             Default to `[UNK]`.
         unknown_token_vector (`list`, optional):
             To initialize the vector of unknown token. If it's none, use normal distribution to
@@ -223,11 +223,11 @@ class TokenEmbedding(nn.Embedding):
 
     def set_trainable(self, trainable):
         """
-        Set the weight of embedding can be trained.
+        Whether or not to set the weights of token embedding to be trainable.
 
         Args:
             trainable (`bool`):
-                Whether the weight of embedding can be trained.
+                The weights can be trained if trainable is set to True, or the weights are fixed if trainable is False.
 
         """
         self.weight.stop_gradient = not trainable
@@ -240,7 +240,7 @@ class TokenEmbedding(nn.Embedding):
             words (`list` or `str` or `int`): The words which need to be searched.
 
         Returns:
-            word_vector (`numpy.array`): The vectors of specifying words.
+            `numpy.array`: The vectors of specifying words.
 
         """
         idx_list = self.get_idx_list_from_words(words)
@@ -252,10 +252,10 @@ class TokenEmbedding(nn.Embedding):
         Get the index of specifying word by searching word_to_idx dict. 
 
         Args:
-            word (`list` or `str` or `int`): The word which need to be get index.
+            word (`list` or `str` or `int`): The input token words which we want to get the token indices converted from.
 
         Returns:
-            word_idx (`int`): The index of specifying word.
+            `int`: The index of specifying word.
 
         """
         return get_idx_from_word(word, self.vocab.token_to_idx,
@@ -269,7 +269,7 @@ class TokenEmbedding(nn.Embedding):
             words (`list` or `str` or `int`): The words which need to be get indexes.
 
         Returns:
-            word_idxes (`list`): The indexes list of specifying words.
+            `list`: The indexes list of specifying words.
 
         """
         if isinstance(words, str):
@@ -296,14 +296,14 @@ class TokenEmbedding(nn.Embedding):
 
     def dot(self, word_a, word_b):
         """
-        Calculate the scalar product of 2 words.
+        Calculate the dot product of 2 words.
 
         Args:
             word_a (`str`): The first word string.
             word_b (`str`): The second word string.
 
         Returns:
-            The scalar product of 2 words.
+            `float`: The dot product of 2 words.
 
         """
         dot = self._dot_np
@@ -311,14 +311,15 @@ class TokenEmbedding(nn.Embedding):
 
     def cosine_sim(self, word_a, word_b):
         """
-        Calculate the cosine similarity of 2 words.
+        Cosine similarity is the cosine of the angle between two n-dimensional
+        vectors in an n-dimensional space. Calculate the cosine similarity of 2 word vectors.
 
         Args:
             word_a (`str`): The first word string.
             word_b (`str`): The second word string.
 
         Returns:
-            The cosine similarity of 2 words.
+            `float`: The cosine similarity of 2 words.
 
         """
         dot = self._dot_np
@@ -334,7 +335,7 @@ class TokenEmbedding(nn.Embedding):
             idx_to_word ('list'):
 
         Returns:
-            word_to_idx (`dict`): The word to index dict constructed by idx_to_word.
+            `dict`: The word to index dict constructed by idx_to_word.
 
         """
         word_to_idx = {}
@@ -345,7 +346,7 @@ class TokenEmbedding(nn.Embedding):
     def __repr__(self):
         """
         Returns:
-            info (`str`): The token embedding infomation.
+            `str`: The token embedding infomation.
 
         """
         info = "Object   type: {}\
