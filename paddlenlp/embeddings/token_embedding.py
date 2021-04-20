@@ -252,7 +252,7 @@ class TokenEmbedding(nn.Embedding):
         Gets the index of specifying word by searching word_to_idx dict. 
 
         Args:
-            word (`list` or `str` or `int`): The input token words which we want to get the token indices converted from.
+            word (`list` or `str` or `int`): The input token word which we want to get the token index converted from.
 
         Returns:
             `int`: The index of specifying word.
