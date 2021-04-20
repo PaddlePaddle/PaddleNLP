@@ -51,7 +51,7 @@ class TokenEmbedding(nn.Embedding):
             list the names of all embedding models that we provide. 
             Default to `w2v.baidu_encyclopedia.target.word-word.dim300`.
         unknown_token (`str`, optional):
-            Specify unknown token.
+            Specifies unknown token.
             Default to `[UNK]`.
         unknown_token_vector (`list`, optional):
             To initialize the vector of unknown token. If it's none, use normal distribution to
@@ -64,7 +64,7 @@ class TokenEmbedding(nn.Embedding):
             Whether the weight of embedding can be trained.
             Default to True.
         keep_extended_vocab_only (`bool`, optional):
-            Whether keep the extended vocabulary only, will be effective only if provides extended_vocab_path
+            Whether to keep the extended vocabulary only, will be effective only if provides extended_vocab_path
             Default to False.
     """
 
@@ -126,7 +126,7 @@ class TokenEmbedding(nn.Embedding):
 
     def _init_without_extend_vocab(self, vector_np, pad_vector, unk_vector):
         """
-        Construct index to word list, word to index dict and embedding weight.
+        Constructs index to word list, word to index dict and embedding weight.
         """
         self._idx_to_word = list(vector_np['vocab'])
         self._idx_to_word.append(self.unknown_token)
@@ -150,7 +150,7 @@ class TokenEmbedding(nn.Embedding):
     def _extend_vocab(self, extended_vocab_path, vector_np, pad_vector,
                       unk_vector, keep_extended_vocab_only):
         """
-        Construct index to word list, word to index dict and embedding weight using
+        Constructs index to word list, word to index dict and embedding weight using
         extended vocab.
         """
         logger.info("Start extending vocab.")
@@ -234,7 +234,7 @@ class TokenEmbedding(nn.Embedding):
 
     def search(self, words):
         """
-        Get the vectors of specifying words.
+        Gets the vectors of specifying words.
 
         Args:
             words (`list` or `str` or `int`): The words which need to be searched.
@@ -249,7 +249,7 @@ class TokenEmbedding(nn.Embedding):
 
     def get_idx_from_word(self, word):
         """
-        Get the index of specifying word by searching word_to_idx dict. 
+        Gets the index of specifying word by searching word_to_idx dict. 
 
         Args:
             word (`list` or `str` or `int`): The input token words which we want to get the token indices converted from.
@@ -263,10 +263,10 @@ class TokenEmbedding(nn.Embedding):
 
     def get_idx_list_from_words(self, words):
         """
-        Get the index list of specifying words by searching word_to_idx dict.
+        Gets the index list of specifying words by searching word_to_idx dict.
 
         Args:
-            words (`list` or `str` or `int`): The words which need to be get indexes.
+            words (`list` or `str` or `int`): The input token words which we want to get the token indices converted from.
 
         Returns:
             `list`: The indexes list of specifying words.
@@ -296,9 +296,9 @@ class TokenEmbedding(nn.Embedding):
 
     def dot(self, word_a, word_b):
         """
-        Dot product or scalar product is an algebraic operation that takes
-        two equal-length sequences of numbers (usually coordinate vectors),
-        and returns a single number. Calculate the dot product of 2 words.
+        Calculates the dot product of 2 words. Dot product or scalar product is an
+        algebraic operation that takes two equal-length sequences of numbers (usually
+        coordinate vectors), and returns a single number.
 
         Args:
             word_a (`str`): The first word string.
@@ -313,8 +313,8 @@ class TokenEmbedding(nn.Embedding):
 
     def cosine_sim(self, word_a, word_b):
         """
-        Cosine similarity is the cosine of the angle between two n-dimensional
-        vectors in an n-dimensional space. Calculate the cosine similarity of 2 word vectors.
+        Calculates the cosine similarity of 2 word vectors. Cosine similarity is the
+        cosine of the angle between two n-dimensional vectors in an n-dimensional space.
 
         Args:
             word_a (`str`): The first word string.
@@ -331,7 +331,7 @@ class TokenEmbedding(nn.Embedding):
 
     def _construct_word_to_idx(self, idx_to_word):
         """
-        Construct word to index dict.
+        Constructs word to index dict.
 
         Args:
             idx_to_word ('list'):
