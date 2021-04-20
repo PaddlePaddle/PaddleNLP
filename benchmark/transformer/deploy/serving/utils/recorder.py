@@ -3,17 +3,10 @@ import paddle
 
 
 class Recorder(object):
-    def __init__(self, use_gpu, batch_size, model_name, mem_info=None):
+    def __init__(self, batch_size, model_name, mem_info=None):
         self.model_name = model_name
         self.precision = "fp32"
         self.batch_size = batch_size
-
-        self.use_gpu = use_gpu
-        self.use_cpu = not use_gpu
-        if use_gpu:
-            self.place = "gpu"
-        else:
-            self.place = "cpu"
 
         self.infer_time = 0
         self.samples = 0

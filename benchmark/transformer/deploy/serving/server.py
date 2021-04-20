@@ -8,10 +8,10 @@ import numpy as np
 import os
 
 from paddle_serving_client import Client
-# if sys.argv[1] == 'gpu':
-from paddle_serving_server_gpu.web_service import WebService
-# elif sys.argv[1] == 'cpu':
-#     from paddle_serving_server.web_service import WebService
+try:
+    from paddle_serving_server_gpu.web_service import WebService
+except:
+    from paddle_serving_server.web_service import WebService
 
 from transformer_reader import TransformerReader
 
@@ -20,7 +20,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
-        default="./configs/transformer.big.yaml",
+        default="../configs/transformer.big.yaml",
         type=str,
         help="Path of the config file. ")
     parser.add_argument(
@@ -54,6 +54,7 @@ class TransformerService(WebService):
 
     def preprocess(self, feed=[], fetch=[]):
         src_sequence = feed[0]["src_word"]
+        print(src_sequence)
         if isinstance(src_sequence, str):
             src_sequence = [src_sequence]
         src_word = self.transformer_reader.prepare_infer_input(src_sequence)

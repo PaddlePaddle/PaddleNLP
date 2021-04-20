@@ -7,13 +7,14 @@ import json
 import os, sys
 import time
 from paddlenlp.datasets import load_dataset
+from utils.recorder import Recorder
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
-        default="./configs/transformer.big.yaml",
+        default="../configs/transformer.big.yaml",
         type=str,
         help="Path of the config file. ")
     parser.add_argument("--batch-size", type=int, help="Batch size. ")
@@ -30,21 +31,30 @@ def do_client(args):
     url = "http://127.0.0.1:9292/transformer/prediction"
 
     batch = []
-    samples = 0
+    sample = 0
     f = open(args.output_file, "w")
-    # f.write(sequence + "\n")
+    if args.profile:
+        recorder = Recorder(args.infer_batch_size, args.model_name)
+        recorder.tic()
 
     for sequence in dataset:
-        samples += 1
-        if len(batch) < args.infer_batch_size:
-            batch.append(sequence[args.src_lang])
+        sample += 1
+        batch.append(sequence[args.src_lang])
+        if len(batch) < args.infer_batch_size and sample != len(dataset):
             continue
         data = {"feed": [{"src_word": batch}], "fetch": ["finished_sequence"]}
         r = requests.post(url=url, headers=headers, data=json.dumps(data))
-        for seq in r.json()["result"]["finished_sequence"]:
-            print(seq)
-            f.write(seq[0] + "\n")
+        print(r)
+
+        if args.profile:
+            recorder.toc(samples=len(batch))
         batch = []
+        for seq in r.json()["result"]["finished_sequence"]:
+            f.write(seq[0] + "\n")
+        if args.profile:
+            recorder.tic()
+    if args.profile:
+        recorder.report(model_name=args.model_name)
     f.close()
 
 
@@ -54,5 +64,9 @@ if __name__ == "__main__":
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
+    if ARGS.batch_size is not None:
+        args.infer_batch_size = ARGS.batch_size
+    args.profile = ARGS.profile
+    args.model_name = "transformer_base" if "base" in ARGS.config else "transformer_big"
 
     do_client(args)
