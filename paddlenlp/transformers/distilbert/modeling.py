@@ -15,7 +15,7 @@
 import paddle
 import paddle.nn as nn
 
-from paddlenlp.transformers import BertPretrainedModel, register_base_model
+from ..bert.modeling import BertPretrainedModel, register_base_model
 
 __all__ = [
     'DistilBertModel',
@@ -55,7 +55,6 @@ class BertEmbeddings(nn.Layer):
 
         input_embeddings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
-
         embeddings = input_embeddings + position_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
@@ -64,20 +63,19 @@ class BertEmbeddings(nn.Layer):
 
 @register_base_model
 class DistilBertModel(BertPretrainedModel):
-    def __init__(
-            self,
-            vocab_size,
-            hidden_size=768,
-            num_hidden_layers=12,
-            num_attention_heads=12,
-            intermediate_size=3072,
-            hidden_act="gelu",
-            hidden_dropout_prob=0.0,  #1,
-            attention_probs_dropout_prob=0.0,  #1,
-            max_position_embeddings=512,
-            type_vocab_size=16,
-            initializer_range=0.02,
-            pad_token_id=0):
+    def __init__(self,
+                 vocab_size,
+                 hidden_size=768,
+                 num_hidden_layers=12,
+                 num_attention_heads=12,
+                 intermediate_size=3072,
+                 hidden_act="gelu",
+                 hidden_dropout_prob=0.1,
+                 attention_probs_dropout_prob=0.1,
+                 max_position_embeddings=512,
+                 type_vocab_size=16,
+                 initializer_range=0.02,
+                 pad_token_id=0):
         super(DistilBertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -128,8 +126,6 @@ class DistilBertForSequenceClassification(BertPretrainedModel):
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
-        import pdb
-        pdb.set_trace()
 
         return logits
 
@@ -168,8 +164,6 @@ class DistilBertForTokenClassification(BertPretrainedModel):
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
-        import pdb
-        pdb.set_trace()
         return logits
 
 
@@ -195,5 +189,4 @@ class DistilBertForMaskedLM(BertPretrainedModel):
         prediction_logits = nn.GELU()(prediction_logits)
         prediction_logits = self.vocab_layer_norm(prediction_logits)
         prediction_logits = self.vocab_projector(prediction_logits)
-
         return prediction_logits
