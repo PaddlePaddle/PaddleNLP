@@ -34,7 +34,7 @@ __all__ = ['list_embedding_name', 'TokenEmbedding']
 
 def list_embedding_name():
     """
-    List all names of pretrained embedding models paddlenlp provides.
+    Lists all names of pretrained embedding models paddlenlp provides.
     """
     return list(EMBEDDING_NAME_LIST)
 
@@ -49,23 +49,23 @@ class TokenEmbedding(nn.Embedding):
         embedding_name (`str`, optional):
             The pre-trained embedding model name. Use `paddlenlp.embeddings.list_embedding_name()` to
             list the names of all embedding models that we provide. 
-            Default to `w2v.baidu_encyclopedia.target.word-word.dim300`.
+            Defaults to `w2v.baidu_encyclopedia.target.word-word.dim300`.
         unknown_token (`str`, optional):
             Specifies unknown token.
-            Default to `[UNK]`.
+            Defaults to `[UNK]`.
         unknown_token_vector (`list`, optional):
             To initialize the vector of unknown token. If it's none, use normal distribution to
             initialize the vector of unknown token.
-            Default to `None`.
+            Defaults to `None`.
         extended_vocab_path (`str`, optional):
             The file path of extended vocabulary.
-            Default to `None`.
+            Defaults to `None`.
         trainable (`bool`, optional):
             Whether the weight of embedding can be trained.
-            Default to True.
+            Defaults to True.
         keep_extended_vocab_only (`bool`, optional):
             Whether to keep the extended vocabulary only, will be effective only if provides extended_vocab_path
-            Default to False.
+            Defaults to False.
     """
 
     def __init__(self,
