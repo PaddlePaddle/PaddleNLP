@@ -7,7 +7,6 @@ import json
 import os, sys
 import time
 from paddlenlp.datasets import load_dataset
-from utils.recorder import Recorder
 
 
 def parse_args():
@@ -54,7 +53,7 @@ def do_client(args):
         if args.profile:
             recorder.tic()
     if args.profile:
-        recorder.report(model_name=args.model_name)
+        recorder.report()
     f.close()
 
 
@@ -68,5 +67,8 @@ if __name__ == "__main__":
         args.infer_batch_size = ARGS.batch_size
     args.profile = ARGS.profile
     args.model_name = "transformer_base" if "base" in ARGS.config else "transformer_big"
+
+    if args.profile:
+        from utils.recorder import Recorder
 
     do_client(args)

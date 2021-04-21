@@ -20,7 +20,7 @@ class Recorder(object):
         self.infer_time += (time.time() - self.start) * 1000
         self.samples += samples
 
-    def report(self, model_name=None):
+    def report(self):
         print("----------------------- Env info ------------------------")
         print("paddle_version: {}".format(paddle.__version__))
         print("----------------------- Model info ----------------------")
