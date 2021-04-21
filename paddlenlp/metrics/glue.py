@@ -83,12 +83,11 @@ class AccuracyAndF1(Metric):
         Args:
             pred (Tensor): 
                 Predicted tensor, and its dtype is float32 or float64, and
-                has a shape of [batch_size, 1].
+                has a shape of [batch_size, num_classes].
             label (Tensor):
                 The ground truth tensor, and its dtype is is int64, and has a
-                shape of [batch_size, 1] or
-                [batch_size, num_classes] in one hot
-                representation.
+                shape of [batch_size, 1] or [batch_size, num_classes] in one
+                hot representation.
 
         Returns:
             Tensor: Correct mask, each element indicates whether the prediction
