@@ -54,9 +54,11 @@ Decoder 具有和 Encoder 类似的结构，只是相比于组成 Encoder 的 la
 datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
 ```
 
-## 单机训练
+## 动态图
 
-### 单机单卡
+### 单机训练
+
+#### 单机单卡
 
 以提供的英德翻译数据为例，可以执行以下命令进行模型训练：
 
@@ -68,7 +70,10 @@ python train.py --config ./configs/transformer.base.yaml
 
 可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中设置相应的参数。如果执行不提供 `--config` 选项，程序将默认使用 big model 的配置。
 
-### 单机多卡
+需要注意的是，单卡下的超参设置与多卡下的超参设置有些不同，单卡执行需要修改 `configs/transformer.big.yaml` 或是 `configs/transformer.base.yaml` 中：
+* `warmup_steps` 参数为 `16000`。
+
+#### 单机多卡
 
 同样，可以执行如下命令实现八卡训练：
 
@@ -79,9 +84,9 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train.py --config .
 
 与上面的情况相似，可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中设置相应的参数。如果执行不提供 `--config` 选项，程序将默认使用 big model 的配置。
 
-## 模型推断
+### 模型推断
 
-### 使用动态图预测
+#### 使用动态图预测
 
 以英德翻译数据为例，模型训练完成后可以执行以下命令对指定文件中的文本进行翻译：
 
@@ -95,7 +100,7 @@ python predict.py --config ./configs/transformer.base.yaml
 
  需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
-### 导出静态图预测模型与预测引擎预测
+#### 导出静态图预测模型与预测引擎预测
 
 Transformer 同时提供了将训练的动态图的 checkpoint 转成静态图模型功能，并提供了对应的使用预测引擎进行预测推理的方法。具体的使用方式如下：
 
@@ -114,6 +119,57 @@ python deploy/python/inference.py  --config ./configs/transformer.base.yaml
 ```
 
 翻译结果同样将会保存在 `predict.txt` 文件中，可以在配置文件中自定义更改 `output_file` 来指定预测结果写入到的文件的名称。
+
+## 静态图
+
+### 单机训练
+
+#### 单机单卡
+
+如果是需要单机单卡训练，则使用下面的命令进行训练：
+``` shell
+cd static/
+export CUDA_VISIBLE_DEVICES=0
+python3 train.py --config ../configs/transformer.base.yaml
+```
+
+需要注意的是，单卡下的超参设置与多卡下的超参设置有些不同，单卡执行需要修改 `configs/transformer.big.yaml` 或是 `configs/transformer.base.yaml` 中：
+* `warmup_steps` 参数为 `16000`。
+
+#### 单机多卡
+
+如果是需要单机多卡训练，则使用下面的命令进行训练：
+
+##### PE 的方式启动单机多卡：
+``` shell
+cd static/
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+python3 train.py --config ../configs/transformer.base.yaml
+```
+
+##### fleet 的方式启动单机多卡：
+``` shell
+cd static/
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+python3 -m paddle.distributed.launch --gpus="0,1,2,3,4,5,6,7" train.py --config ../configs/transformer.base.yaml --distributed
+```
+
+需要注意的是，使用 fleet 的方式启动单机多卡务必设置 `--distributed`。
+
+#### 模型推断
+
+同样，以英德翻译数据为例，在静态图模式下，模型训练完成后可以执行以下命令对指定文件中的文本进行翻译：
+
+``` sh
+# setting visible devices for prediction
+cd static/
+export CUDA_VISIBLE_DEVICES=0
+python3 predict.py --config ../configs/transformer.base.yaml
+```
+
+ 由 `predict_file` 指定的文件中文本的翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 big model 的配置。
+
+ 需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
 ## 使用 Faster Transformer 实现预测
 
