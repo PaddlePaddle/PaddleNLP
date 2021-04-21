@@ -36,7 +36,8 @@ class AccuracyAndF1(Metric):
         topk (int or tuple(int), optional):
             Number of top elements to look at for computing accuracy.
             Defaults to (1,).
-        pos_label (int, optional): The positive label.
+        pos_label (int, optional): The positive label for calculating precision
+            and recall.
             Defaults to 1.
         name (str, optional):
             String name of the metric instance. Defaults to 'acc_and_f1'.
@@ -49,7 +50,7 @@ class AccuracyAndF1(Metric):
             from paddlenlp.metrics import AccuracyAndF1
 
             x = paddle.to_tensor([[0.1, 0.9], [0.5, 0.5], [0.6, 0.4], [0.7, 0.3]])
-            y = paddle.to_tensor([1, 0, 1, 1])
+            y = paddle.to_tensor([[1], [0], [1], [1]])
 
             m = AccuracyAndF1()
             correct = m.compute(x, y)
@@ -82,11 +83,12 @@ class AccuracyAndF1(Metric):
         Args:
             pred (Tensor): 
                 Predicted tensor, and its dtype is float32 or float64, and
-                has a shape of [batch_size, d0, ..., dN-1].
+                has a shape of [batch_size, 1].
             label (Tensor):
                 The ground truth tensor, and its dtype is is int64, and has a
-                shape of [batch_size, d0, ..., dN-1, 1] or [batch_size, d0, ..., num_classes]
-                in one hot representation.
+                shape of [batch_size, 1] or
+                [batch_size, num_classes] in one hot
+                representation.
 
         Returns:
             Tensor: Correct mask, each element indicates whether the prediction
@@ -106,7 +108,8 @@ class AccuracyAndF1(Metric):
         Args:
             correct (Tensor):
                 Correct mask for calculating accuracy, and it's a tensor with
-                shape [batch_size, topk] and has a dtype of float32.
+                shape [batch_size, topk] and has a dtype of
+                float32.
 
         """
         self.acc.update(correct)
@@ -186,8 +189,8 @@ class Mcc(Metric):
             import paddle
             from paddlenlp.metrics import Mcc
 
-            x = paddle.to_tensor([[0.1, 0.9], [1.0, 0.0], [0.4, 0.6], [0.3, 0.7]])
-            y = paddle.to_tensor([1, 0, 1, 1])
+            x = paddle.to_tensor([[-0.1, 0.12], [-0.23, 0.23], [-0.32, 0.21], [-0.13, 0.23]])
+            y = paddle.to_tensor([[1], [0], [1], [1]])
 
             m = Mcc()
             (preds, label) = m.compute(x, y)
@@ -207,18 +210,20 @@ class Mcc(Metric):
 
     def compute(self, pred, label, *args):
         """
+        Processes the pred tensor, and returns the indices of bigger elements
+        for each sample.
+
         Args:
             pred (Tensor):
                 The predicted value is a Tensor with dtype float32 or float64.
-                Shape is [batch_size, d0, ..., dN].
+                Shape is [batch_size, 1].
             label (Tensor):
                 The ground truth value is Tensor with dtype int64, and its
-                shape is [batch_size, d0, ..., 1], or
-                [batch_size, d0, ..., num_classes] in one hot representation.
+                shape is [batch_size, 1].
 
         Returns:
             tuple: A tuple of preds and label. Each shape is
-            [batch_size, d0, ..., dN], with dtype float32 or float64.
+            [batch_size, 1], with dtype float32 or float64.
 
         """
         preds = paddle.argsort(pred, descending=True)[:, :1]
@@ -226,10 +231,12 @@ class Mcc(Metric):
 
     def update(self, preds_and_labels):
         """
+        Calculates states, i.e. the number of true positive, false positive,
+        true negative and false negative samples.
         Args:
             preds_and_labels (tuple[Tensor]):
                 Tuple of predicted value and the ground truth label, with dtype
-                float32 or float64. Each shape is [batch_size, d0, ..., dN].
+                float32 or float64. Each shape is [batch_size, 1].
 
         """
         preds = preds_and_labels[0]
@@ -312,13 +319,13 @@ class PearsonAndSpearman(Metric):
             import paddle
             from paddlenlp.metrics import PearsonAndSpearman
 
-            x = paddle.to_tensor([0.1, 1.0, 0.4, 0.3])
-            y = paddle.to_tensor([1, 0, 1, 1])
+            x = paddle.to_tensor([[0.1], [1.0], [2.4], [0.9]])
+            y = paddle.to_tensor([[0.0], [1.0], [2.9], [1.0]])
 
             m = PearsonAndSpearman()
             m.update((x, y))
             res = m.accumulate()
-            print(res) # (-0.9467292595562846, -0.8, -0.8733646297781423)
+            print(res) # (0.9985229081857804, 1.0, 0.9992614540928901)
 
     """
 
@@ -330,6 +337,9 @@ class PearsonAndSpearman(Metric):
 
     def update(self, preds_and_labels):
         """
+        Ensures the type of preds and labels is numpy.ndarray and reshapes them
+        into [-1, 1].
+
         Args:
             preds_and_labels (tuple[Tensor] or list[Tensor]):
                 Tuple of predicted value and the ground truth label, with dtype
