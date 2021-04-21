@@ -268,9 +268,9 @@ class BertTokenizer(PretrainedTokenizer):
             "bert-wwm-ext-chinese":
             "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-wwm-ext-chinese-vocab.txt",
             "distilbert-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/bert/distilbert-base-uncased-vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/distilbert/distilbert-base-uncased-vocab.txt",
             "distilbert-base-cased":
-            "https://paddlenlp.bj.bcebos.com/models/bert/distilbert-base-cased-vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/distilbert/distilbert-base-cased-vocab.txt",
         }
     }
     pretrained_init_configuration = {
