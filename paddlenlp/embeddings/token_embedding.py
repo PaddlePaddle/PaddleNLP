@@ -34,7 +34,7 @@ __all__ = ['list_embedding_name', 'TokenEmbedding']
 
 def list_embedding_name():
     """
-    List all names of pretrained embedding models paddlenlp provides.
+    Lists all names of pretrained embedding models paddlenlp provides.
     """
     return list(EMBEDDING_NAME_LIST)
 
@@ -46,20 +46,26 @@ class TokenEmbedding(nn.Embedding):
     by specifying extended_vocab_path.
 
     Args:
-        embedding_name (object: `str`, optional, default to `w2v.baidu_encyclopedia.target.word-word.dim300`):
+        embedding_name (`str`, optional):
             The pre-trained embedding model name. Use `paddlenlp.embeddings.list_embedding_name()` to
-            show which embedding model we have alreaady provide.
-        unknown_token (object: `str`, optional, default to `[UNK]`):
-            Specifying unknown token as unknown_token.
-        unknown_token_vector (object: list, optional, default to `None`):
+            list the names of all embedding models that we provide. 
+            Defaults to `w2v.baidu_encyclopedia.target.word-word.dim300`.
+        unknown_token (`str`, optional):
+            Specifies unknown token.
+            Defaults to `[UNK]`.
+        unknown_token_vector (`list`, optional):
             To initialize the vector of unknown token. If it's none, use normal distribution to
             initialize the vector of unknown token.
-        extended_vocab_path (object: `str`, optional, default to `None`):
+            Defaults to `None`.
+        extended_vocab_path (`str`, optional):
             The file path of extended vocabulary.
-        trainable (object: `bool`, optional, default to True):
+            Defaults to `None`.
+        trainable (`bool`, optional):
             Whether the weight of embedding can be trained.
-        keep_extended_vocab_only (object: `bool`, optional, default to True):
-            Whether keep the extended vocabulary only, will be effective only if provides extended_vocab_path
+            Defaults to True.
+        keep_extended_vocab_only (`bool`, optional):
+            Whether to keep the extended vocabulary only, will be effective only if provides extended_vocab_path.
+            Defaults to False.
     """
 
     def __init__(self,
@@ -120,7 +126,7 @@ class TokenEmbedding(nn.Embedding):
 
     def _init_without_extend_vocab(self, vector_np, pad_vector, unk_vector):
         """
-        Construct index to word list, word to index dict and embedding weight.
+        Constructs index to word list, word to index dict and embedding weight.
         """
         self._idx_to_word = list(vector_np['vocab'])
         self._idx_to_word.append(self.unknown_token)
@@ -144,7 +150,7 @@ class TokenEmbedding(nn.Embedding):
     def _extend_vocab(self, extended_vocab_path, vector_np, pad_vector,
                       unk_vector, keep_extended_vocab_only):
         """
-        Construct index to word list, word to index dict and embedding weight using
+        Constructs index to word list, word to index dict and embedding weight using
         extended vocab.
         """
         logger.info("Start extending vocab.")
@@ -217,20 +223,25 @@ class TokenEmbedding(nn.Embedding):
 
     def set_trainable(self, trainable):
         """
-        Set the weight of embedding can be trained.
+        Whether or not to set the weights of token embedding to be trainable.
+
         Args:
-            trainable (object: `bool`, required):
-                Whether the weight of embedding can be trained.
+            trainable (`bool`):
+                The weights can be trained if trainable is set to True, or the weights are fixed if trainable is False.
+
         """
         self.weight.stop_gradient = not trainable
 
     def search(self, words):
         """
-        Get the vectors of specifying words.
+        Gets the vectors of specifying words.
+
         Args:
-            words (object: `list` or `str` or `int`, required): The words which need to be searched.
+            words (`list` or `str` or `int`): The words which need to be searched.
+
         Returns:
-            word_vector (object: `numpy.array`): The vectors of specifying words.
+            `numpy.array`: The vectors of specifying words.
+
         """
         idx_list = self.get_idx_list_from_words(words)
         idx_tensor = paddle.to_tensor(idx_list)
@@ -238,14 +249,28 @@ class TokenEmbedding(nn.Embedding):
 
     def get_idx_from_word(self, word):
         """
-        Get the index of specifying word by searching word_to_idx dict. 
+        Gets the index of specifying word by searching word_to_idx dict. 
+
+        Args:
+            word (`list` or `str` or `int`): The input token word which we want to get the token index converted from.
+
+        Returns:
+            `int`: The index of specifying word.
+
         """
         return get_idx_from_word(word, self.vocab.token_to_idx,
                                  self.unknown_token)
 
     def get_idx_list_from_words(self, words):
         """
-        Get the index list of specifying words by searching word_to_idx dict. 
+        Gets the index list of specifying words by searching word_to_idx dict.
+
+        Args:
+            words (`list` or `str` or `int`): The input token words which we want to get the token indices converted from.
+
+        Returns:
+            `list`: The indexes list of specifying words.
+
         """
         if isinstance(words, str):
             idx_list = [self.get_idx_from_word(words)]
@@ -271,24 +296,33 @@ class TokenEmbedding(nn.Embedding):
 
     def dot(self, word_a, word_b):
         """
-        Calculate the scalar product of 2 words.
+        Calculates the dot product of 2 words. Dot product or scalar product is an
+        algebraic operation that takes two equal-length sequences of numbers (usually
+        coordinate vectors), and returns a single number.
+
         Args:
-            word_a (object: `str`, required): The first word string.
-            word_b (object: `str`, required): The second word string.
+            word_a (`str`): The first word string.
+            word_b (`str`): The second word string.
+
         Returns:
-            The scalar product of 2 words.
+            `Float`: The dot product of 2 words.
+
         """
         dot = self._dot_np
         return self._calc_word(word_a, word_b, lambda x, y: dot(x, y))
 
     def cosine_sim(self, word_a, word_b):
         """
-        Calculate the cosine similarity of 2 words.
+        Calculates the cosine similarity of 2 word vectors. Cosine similarity is the
+        cosine of the angle between two n-dimensional vectors in an n-dimensional space.
+
         Args:
-            word_a (object: `str`, required): The first word string.
-            word_b (object: `str`, required): The second word string.
+            word_a (`str`): The first word string.
+            word_b (`str`): The second word string.
+
         Returns:
-            The cosine similarity of 2 words.
+            `Float`: The cosine similarity of 2 words.
+
         """
         dot = self._dot_np
         return self._calc_word(
@@ -297,11 +331,14 @@ class TokenEmbedding(nn.Embedding):
 
     def _construct_word_to_idx(self, idx_to_word):
         """
-        Construct word to index dict.
+        Constructs word to index dict.
+
         Args:
-            idx_to_word (object: 'list', required): 
+            idx_to_word ('list'):
+
         Returns:
-            word_to_idx (object: `dict`): The word to index dict constructed by idx_to_word.
+            `Dict`: The word to index dict constructed by idx_to_word.
+
         """
         word_to_idx = {}
         for i, word in enumerate(idx_to_word):
@@ -311,7 +348,8 @@ class TokenEmbedding(nn.Embedding):
     def __repr__(self):
         """
         Returns:
-            info (object: `str`): The token embedding infomation.
+            `Str`: The token embedding infomation.
+
         """
         info = "Object   type: {}\
              \nUnknown index: {}\
