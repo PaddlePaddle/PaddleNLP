@@ -10,8 +10,6 @@ from pprint import pprint
 import paddle
 from paddle import inference
 
-from utils.recorder import Recorder
-
 sys.path.append("../../")
 import reader
 
@@ -116,11 +114,21 @@ class Predictor(object):
         outputs = []
         samples = 0
         if self.recorder is not None:
+            cpu_mem, gpu_mem = 0, 0
+            gpu_id = 0
+            gpu_util = 0
             self.recorder.tic()
 
         for data in test_loader:
             samples += len(data[0])
             output = self.predict_batch(data)
+
+            if self.recorder is not None:
+                cm, gm = Recorder.get_current_memory_mb(gpu_id)
+                cpu_mem += cm
+                gpu_mem += gm
+                gpu_util += Recorder.get_current_gputil(gpu_id)
+
             finished_sequence = output[0].transpose([0, 2, 1])
             for ins in finished_sequence:
                 n_best_seq = []
@@ -135,6 +143,10 @@ class Predictor(object):
 
         if self.recorder is not None:
             self.recorder.toc(samples)
+            self.recorder.get_device_info(
+                cpu_mem=cpu_mem / len(test_loader),
+                gpu_mem=gpu_mem / len(test_loader),
+                gpu_util=gpu_util / len(test_loader))
             self.recorder.report()
         return outputs
 
@@ -171,5 +183,8 @@ if __name__ == "__main__":
     args.model_name = "transformer_base" if "base" in ARGS.config else "transformer_big"
     if ARGS.model_dir != "":
         args.inference_model_dir = ARGS.model_dir
+
+    if args.profile:
+        from utils.recorder import Recorder
 
     do_inference(args)
