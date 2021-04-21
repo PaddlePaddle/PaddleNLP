@@ -1,7 +1,7 @@
 # The frequency to save trained models when training.
 save_step: 10000
 # The frequency to fetch and print output when training.
-print_step: 10
+print_step: 100
 # Path of the checkpoint, to resume the previous training
 init_from_checkpoint: ""
 # Path of the pretrain model, to better solve the current task
