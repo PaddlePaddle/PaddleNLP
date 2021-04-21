@@ -1,6 +1,6 @@
 # 快递单信息抽取 (Waybill Information Extraction)
 
-## 1. 简介
+## 简介
 
 本示例将通过BiGRU-CRF和ERNIE + FC两类模型，演示如何从用户提供的快递单中，抽取姓名、电话、省、市、区、详细地址等内容，形成结构化信息。辅助物流行业从业者进行有效信息的提取，从而降低客户填单的成本。
 
@@ -45,7 +45,6 @@ export CUDA_VISIBLE_DEVICES=0
 python run_bigru_crf.py
 ```
 
-
 #### 启动ERNIE + FC训练
 
 ```bash
@@ -53,17 +52,15 @@ export CUDA_VISIBLE_DEVICES=0
 python run_ernie.py
 ```
 
-
 #### 启动ERNIE + CRF训练
-
 
 ```bash
 export CUDA_VISIBLE_DEVICES=0
 python run_ernie_crf.py
 ```
 
-更多详细教程请参考：
+## 更多详细教程请参考：
 
 [基于Bi-GRU+CRF的快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1317771)
 
-[使用PaddleNLP预训练模型ERNIE优化快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1329361)
+[使用预训练模型ERNIE优化快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1329361)
