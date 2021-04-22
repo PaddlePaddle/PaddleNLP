@@ -326,7 +326,7 @@ class AlbertLayer(Layer):
 
         return (hidden_states,) + attention_output[1:]  # add attentions if we output them
 
-# To begin with
+
 class AlbertLayerGroup(Layer):
     def __init__(self,
                  embedding_size,
@@ -334,12 +334,13 @@ class AlbertLayerGroup(Layer):
                  num_attention_heads,
                  intermediate_size,
                  inner_group_num,
+                 hidden_act,
                  hidden_dropout_prob,
                  attention_probs_dropout_prob,
                  max_position_embeddings,
                  layer_norm_eps,
                  position_embedding_type,
-                 ):
+    ):
         super(AlbertLayerGroup, self).__init__()
 
         self.albert_layers = nn.LayerList([
@@ -348,6 +349,7 @@ class AlbertLayerGroup(Layer):
                     hidden_size,
                     num_attention_heads,
                     intermediate_size,
+                    hidden_act,
                     hidden_dropout_prob,
                     attention_probs_dropout_prob,
                     max_position_embeddings,
@@ -362,11 +364,12 @@ class AlbertLayerGroup(Layer):
                 head_mask=None,
                 output_attentions=False,
                 output_hidden_states=False,
-                ):
+    ):
         layer_hidden_states = ()
         layer_attentions = ()
+
         for layer_index, albert_layer in enumerate(self.albert_layers):
-            layer_output = albert_layer(hidden_states, attention_mask, head_mask, output_attentions)
+            layer_output = albert_layer(hidden_states, attention_mask, head_mask[layer_index], output_attentions)
             hidden_states = layer_output[0]
 
             if output_attentions:
@@ -374,6 +377,7 @@ class AlbertLayerGroup(Layer):
 
             if output_hidden_states:
                 layer_hidden_states = layer_hidden_states + (hidden_states,)
+
         outputs = (hidden_states,)
         if output_hidden_states:
             outputs = outputs + (layer_hidden_states,)
@@ -398,8 +402,10 @@ class AlbertTransformer(Layer):
                  position_embedding_type,
                  ):
         super(AlbertTransformer, self).__init__()
+
         self.num_hidden_layers = num_hidden_layers
         self.num_hidden_groups = num_hidden_groups
+
         self.embedding_hidden_mapping_in = nn.Linear(embedding_size, hidden_size)
         self.albert_layer_groups = nn.LayerList([
             AlbertLayerGroup(
@@ -408,6 +414,7 @@ class AlbertTransformer(Layer):
                 num_attention_heads,
                 intermediate_size,
                 inner_group_num,
+                hidden_act,
                 hidden_dropout_prob,
                 attention_probs_dropout_prob,
                 max_position_embeddings,
@@ -426,18 +433,20 @@ class AlbertTransformer(Layer):
             return_dict=True,
     ):
         hidden_states = self.embedding_hidden_mapping_in(hidden_states)
+
         all_hidden_states = (hidden_states,) if output_hidden_states else None
         all_attentions = () if output_attentions else None
 
         for i in range(self.num_hidden_layers):
+            # Number of layers in a hidden group
             layers_per_group = int(self.num_hidden_layers / self.num_hidden_groups)
-
+            # Index of the hidden group
             group_idx = int(i / (self.num_hidden_layers / self.num_hidden_groups))
 
             layer_group_output = self.albert_layer_groups[group_idx](
                 hidden_states,
                 attention_mask,
-                head_mask[group_idx * layers_per_group: (group_idx + 1) * layers_per_group],
+                head_mask[group_idx * layers_per_group : (group_idx + 1) * layers_per_group],
                 output_attentions,
                 output_hidden_states,
             )
@@ -458,6 +467,7 @@ class AlbertTransformer(Layer):
         }
 
 
+# To begin with
 class AlbertPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained ALBERT models. It provides ALBERT related
