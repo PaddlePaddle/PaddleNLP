@@ -467,7 +467,7 @@ class AlbertTransformer(Layer):
         }
 
 
-# To begin with
+
 class AlbertPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained ALBERT models. It provides ALBERT related
@@ -532,46 +532,38 @@ class AlbertPretrainedModel(PretrainedModel):
         # Initialize weights
         self.apply(self._init_weights)
 
-    # todo
     def _init_weights(self, layer):
         # Initialize the weights.
-        if isinstance(layer, (nn.Linear, nn.Embedding)):
-            if isinstance(layer.weight, paddle.Tensor):
-                layer.weight.set_value(
-                    paddle.tensor.normal(
-                        mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
-                        self.transformer.config["initializer_range"],
-                        shape=layer.weight.shape))
-            if isinstance(layer, nn.Linear) and layer.bias is not None:
-                layer.bias.set_value(paddle.zeros_like(layer.bias))
-        elif isinstance(layer, nn.LayerNorm):
-            layer.bias.set_value(paddle.zeros_like(layer.bias))
-            layer.weight.set_value(paddle.full_like(layer.weight, 1.0))
-        elif isinstance(layer, AlbertAttention):
-            for param in [
-                    layer.query,
-                    layer.key,
-                    layer.value,
-            ]:
-                param.set_value(
-                    paddle.tensor.normal(
-                        mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
-                        self.transformer.config["initializer_range"],
-                        shape=param.shape))
-        elif isinstance(layer, AlbertModel):
-            layer.mask_emb.set_value(
+        if isinstance(layer, nn.Linear):
+            layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
                     std=self.initializer_range
                     if hasattr(self, "initializer_range") else
                     self.transformer.config["initializer_range"],
-                    shape=layer.mask_emb.shape))
+                    shape=layer.weight.shape)
+            )
+            if layer.bias is not None:
+                layer.bias.set_value(paddle.zeros_like(layer.bias))
+        elif isinstance(layer, nn.Embedding):
+            layer.weight.set_value(
+                paddle.tensor.normal(
+                    mean=0.0,
+                    std=self.initializer_range
+                    if hasattr(self, "initializer_range") else
+                    self.transformer.config["initializer_range"],
+                    shape=layer.weight.shape)
+            )
+            if layer._padding_idx is not None:
+                layer.weight[layer._padding_idx].set_value(
+                    paddle.zeros_like(layer.weight[layer._padding_idx])
+                )
+        elif isinstance(layer, nn.LayerNorm):
+            layer.bias.set_value(paddle.zeros_like(layer.bias))
+            layer.weight.set_value(paddle.ones_like(layer.weight))
 
 
+# To begin with
 @register_base_model
 class AlbertModel(AlbertPretrainedModel):
     def __init__(self,
