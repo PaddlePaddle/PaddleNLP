@@ -224,9 +224,9 @@ class Vocab(object):
             tokens (str|list|tuple, optional): The input token(s) for mapping.
         
         Returns:
-            int|list: Obationed indice(s). If `tokens` is a str, it will return 
-            an integer. If `tokens` is a list/tuple of str, it will return a 
-            list of integers.
+            int|list[int]: Obationed indice(s). If `tokens` is a str, it will 
+            return an integer. If `tokens` is a list/tuple of str, it will 
+            return a list of integers.
             
         Example:
             .. code-block:: python
