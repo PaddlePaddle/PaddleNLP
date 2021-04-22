@@ -35,6 +35,37 @@ __all__ = [
 dtype_float = paddle.get_default_dtype()
 
 
+def get_activation(activation_string):
+    if activation_string in ACT2FN:
+        return ACT2FN[activation_string]
+    else:
+        raise KeyError("function {} not found in ACT2FN mapping {}".format(
+            activation_string, list(ACT2FN.keys())))
+
+
+def mish(x):
+    return x * F.tanh(F.softplus(x))
+
+
+def linear_act(x):
+    return x
+
+
+def swish(x):
+    return x * F.sigmoid(x)
+
+
+ACT2FN = {
+    "relu": F.relu,
+    "gelu": F.gelu,
+    "tanh": F.tanh,
+    "sigmoid": F.sigmoid,
+    "mish": mish,
+    "linear": linear_act,
+    "swish": swish,
+}
+
+
 def einsum4x4(equation, x, y):
     """
     Only works for 4D x 4D.
@@ -232,6 +263,7 @@ class AlbertAttention(Layer):
         context_layer = context_layer.transpose([0, 2, 1, 3])
 
         context_layer = context_layer.reshape([0, 0, -1])
+
         # dense layer shape to be checked
         projected_context_layer = self.dense(context_layer)
 
@@ -239,19 +271,20 @@ class AlbertAttention(Layer):
         layer_normed_context_layer = self.layer_norm(hidden_states + projected_context_layer_dropout)
         return (layer_normed_context_layer, attention_probs) if output_attentions else (layer_normed_context_layer,)
 
-# To begin with
+
 class AlbertLayer(Layer):
     def __init__(self,
                  embedding_size,
                  hidden_size,
                  num_attention_heads,
                  intermediate_size,
+                 hidden_act,
                  hidden_dropout_prob,
                  attention_probs_dropout_prob,
                  max_position_embeddings,
                  layer_norm_eps,
                  position_embedding_type,
-                 ):
+    ):
         super(AlbertLayer, self).__init__()
         self.seq_len_dim = 1
         self.full_layer_layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
@@ -267,6 +300,7 @@ class AlbertLayer(Layer):
         )
         self.ffn = nn.Linear(hidden_size, intermediate_size)
         self.ffn_output = nn.Linear(intermediate_size, hidden_size)
+        self.activation = ACT2FN[hidden_act]
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
     def forward(
@@ -279,19 +313,20 @@ class AlbertLayer(Layer):
     ):
         attention_output = self.attention(
             hidden_states,
-            attention_mask=None,
-            head_mask=None,
-            output_attentions=False,
+            attention_mask=attention_mask,
+            head_mask=head_mask,
+            output_attentions=output_attentions,
         )
+
         ffn_output = self.ffn(attention_output)
-        ffn_output = F.gelu(ffn_output)
+        ffn_output = self.activation(ffn_output)
         ffn_output = self.ffn_output(ffn_output)
 
         hidden_states = self.full_layer_layer_norm(ffn_output + attention_output[0])
 
         return (hidden_states,) + attention_output[1:]  # add attentions if we output them
 
-
+# To begin with
 class AlbertLayerGroup(Layer):
     def __init__(self,
                  embedding_size,
