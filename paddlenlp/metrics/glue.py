@@ -209,7 +209,7 @@ class Mcc(Metric):
 
     def compute(self, pred, label, *args):
         """
-        Processes the pred tensor, and returns the indices of maxmimum of each
+        Processes the pred tensor, and returns the indices of the maximum of each
         sample.
 
         Args:
