@@ -78,7 +78,7 @@ class AccuracyAndF1(Metric):
     def compute(self, pred, label, *args):
         """
         Accepts network's output and the labels, and calculates the top-k
-        (maxinum value in topk) indices for accuracy.
+        (maximum value in topk) indices for accuracy.
 
         Args:
             pred (Tensor): 
@@ -209,8 +209,8 @@ class Mcc(Metric):
 
     def compute(self, pred, label, *args):
         """
-        Processes the pred tensor, and returns the indices of bigger elements
-        for each sample.
+        Processes the pred tensor, and returns the indices of maxmimum of each
+        sample.
 
         Args:
             pred (Tensor):
@@ -232,6 +232,7 @@ class Mcc(Metric):
         """
         Calculates states, i.e. the number of true positive, false positive,
         true negative and false negative samples.
+
         Args:
             preds_and_labels (tuple[Tensor]):
                 Tuple of predicted value and the ground truth label, with dtype
