@@ -16,7 +16,7 @@ import argparse
 import paddle
 import paddle.nn.functional as F
 import paddlenlp as ppnlp
-from paddlenlp.data import JiebaTokenizer, Stack, Tuple, Pad
+from paddlenlp.data import JiebaTokenizer, Stack, Tuple, Pad, Vocab
 
 from utils import preprocess_prediction_data
 
@@ -25,7 +25,8 @@ parser = argparse.ArgumentParser(__doc__)
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--batch_size", type=int, default=1, help="Total examples' number of a batch for training.")
 parser.add_argument("--vocab_path", type=str, default="./senta_word_dict.txt", help="The path to vocabulary.")
-parser.add_argument('--network', type=str, default="bilstm", help="Which network you would like to choose bow, lstm, bilstm, gru, bigru, rnn, birnn, bilstm_attn, cnn and textcnn?")
+parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru', 'rnn', 'birnn', 'bilstm_attn', 'cnn', 'textcnn'],
+    default="bilstm", help="Select which network to train, defaults to bilstm.")
 parser.add_argument("--params_path", type=str, default='./checkpoints/final.pdparams', help="The path of model parameter to be loaded.")
 args = parser.parse_args()
 # yapf: enable
@@ -75,7 +76,7 @@ if __name__ == "__main__":
     paddle.set_device(args.device.lower())
 
     # Loads vocab.
-    vocab = ppnlp.data.Vocab.load_vocabulary(
+    vocab = Vocab.load_vocabulary(
         args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
     label_map = {0: 'negative', 1: 'positive'}
 
