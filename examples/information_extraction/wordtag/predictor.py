@@ -158,7 +158,6 @@ class WordtagPredictor(object):
     @staticmethod
     def _load_schema(schema_path):
         schema_df = pd.read_csv(schema_path, sep="\t", encoding="gb2312")
-        # print(schema_df)
         schema = {}
         for idx in range(schema_df.shape[0]):
             if not isinstance(schema_df["type-1"][idx], float):

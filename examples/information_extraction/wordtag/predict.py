@@ -40,7 +40,7 @@ def do_predict(args):
     predictor = WordtagPredictor(
         model_dir=args.init_ckpt_dir,
         tag_path=os.path.join(args.data_dir, "tags.txt"),
-        term_schema_path="termtree_type_csv.csv",
+        term_schema_path="termtree_type.csv",
         term_data_path="termtree.rawbase")
     txts = [
         "美人鱼是周星驰导演的电影", "小米别熬粥了，加1个苹果，瞬间变小米蛋糕，太香了",
