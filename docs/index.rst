@@ -47,6 +47,21 @@
 
 .. toctree::
    :maxdepth: 2
+   :caption: 模型库
+
+   预训练模型 <model_zoo/transformers.md>
+   基本组网单元 <model_zoo/others>
+
+.. toctree::
+   :maxdepth: 2
+   :caption: 进阶指南
+
+   模型压缩 <advanced_guide/model_compression/index>
+   高性能预测部署 <advanced_guide/deployment>
+   大规模分布式训练 <advanced_guide/distributed_training>
+
+.. toctree::
+   :maxdepth: 2
    :caption: 实践教程
 
    文本分类 <tutorials/classify>
@@ -58,14 +73,6 @@
    通用对话 <tutorials/general_dialogue>
    序列标注 <tutorials/ner>
    词法分析 <tutorials/lexical_analysis>
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 进阶指南
-
-   模型压缩 <advanced_guide/model_compression/index>
-   高性能预测部署 <advanced_guide/deployment>
-   大规模分布式训练 <advanced_guide/distributed_training>
 
 .. toctree::
    :maxdepth: 2

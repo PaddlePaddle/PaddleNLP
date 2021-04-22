@@ -7,5 +7,5 @@
 .. toctree::
    :maxdepth: 1
 
-   /model_zoo/transformer.rst
+   /model_zoo/transformers.md
    /model_zoo/others.rst

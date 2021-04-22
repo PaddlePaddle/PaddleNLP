@@ -2,7 +2,9 @@
 数据处理
 ================
 
-Dataset中通常为原始数据，需要经过一定的数据处理并进行采样组batch，而后通过 :class:`paddle.io.DataLoader` 为训练或预测使用，PaddleNLP中为其中各环节提供了相应的功能支持。
+``paddlenlp.datasets.load_dataset``接口通常返回原始数据，需要经过转换id、采样组batch等操作，通过 :class:`paddle.io.DataLoader` 封装后，用于训练或预测，PaddleNLP提供了各环节的功能支持。
+
+对于预训练模型，可调用相应的Tokenizer完成切词、转换id等数据处理；对于，非预训练模型，可灵活自定义切词等操作。
 
 基于预训练模型的数据处理
 ------------------------

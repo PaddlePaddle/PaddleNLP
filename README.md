@@ -65,7 +65,7 @@ from paddlenlp.datasets import load_dataset
 train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
 ```
 
-可参考[Dataset文档](./docs/datasets.md)查看更多数据集。
+可参考[Dataset文档](./docs/data_prepare/dataset_list.rst)查看更多数据集。
 
 ### 一键加载预训练中文词向量
 
@@ -155,7 +155,7 @@ PaddleNLP模型库整体介绍请参考文档[PaddleNLP Model Zoo](./docs/model_
 - [使用预训练模型ERNIE-GEN实现智能写诗](https://aistudio.baidu.com/aistudio/projectdetail/1339888)
 - [使用TCN网络完成新冠疫情病例数预测](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
 
-更多教程参见[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
+
 
 
 ## 社区贡献与技术交流
@@ -176,3 +176,77 @@ PaddleNLP模型库整体介绍请参考文档[PaddleNLP Model Zoo](./docs/model_
 ## License
 
 PaddleNLP遵循[Apache-2.0开源协议](./LICENSE)。
+
+# [文档教程](https://paddlenlp.readthedocs.io/zh/latest/index.html)
+
+- 快速开始
+  - [安装](./docs/get_started/installation.rst)
+  - [10分钟玩转PaddleNLP](./docs/get_started/quick_start.rst)
+
+- 数据准备
+
+  - [整体介绍](./docs/data_prepare/overview.rst)
+  - [数据集列表](./docs/data_prepare/dataset_list.rst)
+  - [加载内置数据集](./docs/data_prepare/dataset_load.rst)
+  - [自定义数据集](./docs/data_prepare/dataset_self_defined.rst)
+  - [数据处理](./docs/data_prepare/data_preprocess.rst)
+
+- 模型库
+
+  - [Transformer类预训练模型](./docs/model_zoo/transformers.md)
+  - [基本组网单元](./docs/model_zoo/others.rst)
+
+- 进阶指南
+
+  - 模型压缩
+    - [Distill LSTM](./docs/advanced_guide/model_compression/distill_lstm.rst)
+    - [OFA BERT](./docs/advanced_guide/model_compression/ofa_bert.rst)
+  - 高性能预测部署
+  - 大规模分布式训练
+
+- 实践教程
+
+  - 词向量
+
+    - [使用预训练词向量改善模型效果](https://aistudio.baidu.com/aistudio/projectdetail/1535355)
+
+  - 文本分类
+
+    - [基于LSTM等RNN网络](https://aistudio.baidu.com/aistudio/projectdetail/1283423)
+    - [基于预训练模型](https://aistudio.baidu.com/aistudio/projectdetail/1294333)
+    - [自定义数据集实现文本多分类任务](https://aistudio.baidu.com/aistudio/projectdetail/1468469)
+
+  - 信息抽取
+
+    - [使用BiGRU-CRF模型完成快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1317771)
+    - [使用预训练模型ERNIE优化快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1329361)
+    - [关系抽取](https://aistudio.baidu.com/aistudio/projectdetail/1639963)
+    - [事件抽取](https://aistudio.baidu.com/aistudio/projectdetail/1639964)
+
+  - 阅读理解式问答
+
+    - [使用预训练模型完成阅读理解](https://aistudio.baidu.com/aistudio/projectdetail/1339612)
+
+  - 对话
+
+    - [多技能对话](https://aistudio.baidu.com/aistudio/projectdetail/1640180)
+
+  - 文本生成
+
+    - [使用Seq2Seq模型完成自动对联](https://aistudio.baidu.com/aistudio/projectdetail/1321118)
+    - [使用预训练模型ERNIE-GEN实现智能写诗](https://aistudio.baidu.com/aistudio/projectdetail/1339888)
+
+  - 时序预测
+
+    - [使用TCN网络完成新冠疫情病例数预测](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
+
+    更多教程参见[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
+
+    
+
+    
+
+    
+
+    
+
