@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 
-class SemanticIndexing(nn.Layer):
+class SemanticIndexHardestNeg(nn.Layer):
     def __init__(self, pretrained_model, dropout=None):
         super().__init__()
         self.ptm = pretrained_model

@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 from utils.util import convert_example
 
-from model import SemanticIndexing
+from model import SemanticIndexHardestNeg
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         "ernie-1.0")
-    model = SemanticIndexing(pretrained_model)
+    model = SemanticIndexHardestNeg(pretrained_model)
 
     # load pretrained semantic model
     if args.params_path and os.path.isfile(args.params_path):

@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
-from model import SemanticIndexing
+from model import SemanticIndexHardestNeg
 from utils.util import convert_example
 
 # yapf: disable
@@ -121,7 +121,7 @@ def do_train():
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
 
-    model = SemanticIndexing(pretrained_model)
+    model = SemanticIndexHardestNeg(pretrained_model)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
