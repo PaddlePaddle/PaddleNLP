@@ -25,10 +25,10 @@ class SamplerHelper(object):
     """
     The class is to help construct iterable sampler used for 
     :class:`paddle.io.DataLoader`. It wraps a dataset and uses its 
-    :meth:`__getitem__`. Every subclass of :class:`SamplerHelper` has to provide 
-    an :meth:`__iter__` method, providing a way to iterate over indices of 
-    dataset elements, and a :meth:`__len__` method that returns the length of 
-    the returned iterators.
+    :meth:`__getitem__` method. Every subclass of :class:`SamplerHelper` has 
+    to provide an :meth:`__iter__` method, providing a way to iterate over 
+    indices of dataset elements, and a :meth:`__len__` method that returns the 
+    length of the returned iterators.
 
     The class also can be used as batch iterator instead of indices iterator 
     when `iterator` yield samples rather than indices by initializing `iterator` 
@@ -75,7 +75,7 @@ class SamplerHelper(object):
     @property
     def length(self):
         """
-        Return the length.
+        Returns the length.
         """
 
         # since `len()` only produce integer, use length property to get None
@@ -108,11 +108,11 @@ class SamplerHelper(object):
 
     def shuffle(self, buffer_size=-1, seed=None):
         """
-        Shuffle the dataset according to the given buffer size and random seed.
+        Shuffles the dataset according to the given buffer size and random seed.
 
         Args:
-            buffer_size (int, optional): Buffer size for shuffle. if 
-                :math:`buffer\_size < 0` or more than the length of the dataset, 
+            buffer_size (int, optional): Buffer size for shuffle. If 
+                `buffer_size < 0` or more than the length of the dataset, 
                 `buffer_size` is the length of the dataset. Default: -1. 
             seed (int, optional): Seed for the random. Default: None.
 
@@ -174,15 +174,16 @@ class SamplerHelper(object):
 
     def sort(self, cmp=None, key=None, reverse=False, buffer_size=-1):
         """
-        Sort the dataset according to given callable :meth:`cmp` or :meth:`key`.
+        Sorts the dataset according to given callable :meth:`cmp` or :meth:`key`.
 
         Args:
             cmp (callable, optional): The function of comparison. Default: None. 
             key (callable, optional): The function of key. Default: None.
-            reverse (bool, optional): If True, it means in descending order, 
-                and False means in ascending order. Default: False.
+            reverse (bool, optional): Whether to reverse when sorting the data 
+                samples. If True, it means in descending order, and False means 
+                in ascending order. Default: False.
             buffer_size (int, optional): Buffer size for sort. If 
-                :math:`buffer\_size < 0` or `buffer_size` is more than the length 
+                `buffer_size < 0` or `buffer_size` is more than the length 
                 of the data, `buffer_size` will be set to the length of the data. 
                 Default: -1.
 
@@ -251,7 +252,7 @@ class SamplerHelper(object):
 
     def batch(self, batch_size, drop_last=False, batch_size_fn=None, key=None):
         """
-        Batched the dataset according to given `batch_size`.
+        Batches the dataset according to given `batch_size`.
 
         Args:
             batch_size (int): The batch size.
@@ -261,9 +262,9 @@ class SamplerHelper(object):
                 index of data source, the length of minibatch, the size of
                 minibatch so far and data source, and it returns the size of
                 mini batch so far. Actually, the returned value can be anything
-                and would used as argument size_so_far in `key`. If None, it
+                and would used as argument `size_so_far` in `key`. If None, it
                 would return the length of mini match. Default: None.
-            key (callable, optional): It accepts the size of minibatch so far
+            key (callable, optional): The function of key. It accepts the size of minibatch so far
                 and the length of minibatch, and returns what to be compared
                 with `batch_size`. If None, only the size of mini batch so far
                 would be compared with `batch_size`. Default: None.
@@ -343,14 +344,14 @@ class SamplerHelper(object):
 
     def shard(self, num_replicas=None, rank=None):
         """
-        Slice the dataset for multi GPU training.
+        Slices the dataset for multi GPU training.
 
         Args:
             num_replicas (int, optional): The number of training process, and 
                 is also the number of GPU cards used in training. If None, it 
                 will be set by :meth:`paddle.distributed.get_world_size` method. 
                 Default: None.
-            rank (int, optional): The number of current training process. Equal 
+            rank (int, optional): The id of current training process. Equal 
                 to the value of the environment variable PADDLE_TRAINER_ID. If 
                 None, it will be intialized by :meth:`paddle.distributed.get_rank` 
                 method. Default: None.

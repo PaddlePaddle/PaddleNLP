@@ -32,20 +32,20 @@ class Vocab(object):
             Default: None.
         max_size (int, optional): Max size of vocab, not including special tokens.
             Default: None.
-        min_freq (int): Ignore tokens whose frequencies are less than `min_freq`.
-            Default: 1.
+        min_freq (int, optional): Ignore tokens whose frequencies are less than 
+            `min_freq`. Default: 1.
         token_to_idx (dict, optional): A dict specifies the mapping relationship
             between tokens and indices to be used. If provided, adjust the tokens
             and indices mapping according to it. If None, counter must be provided.
             Default: None.
-        unk_token (str): special token for unknow token '<unk>'. If no need, it also
-            could be None. Default: None.
-        pad_token (str): special token for padding token '<pad>'. If no need, it also
-            could be None. Default: None.
-        bos_token (str): special token for bos token '<bos>'. If no need, it also
-            could be None. Default: None.
-        eos_token (str): special token for eos token '<eos>'. If no need, it also
-            could be None. Default: None.
+        unk_token (str, optional): Special token for unknow token. If no need, 
+            it also could be None. Default: None.
+        pad_token (str, optional): Special token for padding token. If no need, 
+            it also could be None. Default: None.
+        bos_token (str, optional): Special token for bos token. If no need, it 
+            also could be None. Default: None.
+        eos_token (str, optional): Special token for eos token. If no need, it 
+            lso could be None. Default: None.
 
         kwargs (dict): Keyword arguments ending with `_token`. It can be used
             to specify further special tokens that will be exposed as attribute
@@ -168,14 +168,14 @@ class Vocab(object):
 
     def to_tokens(self, indices):
         """
-        Map the input indices to token list.
+        Maps the input indices to token list.
 
         Args:
             indices (int|list|tuple): The input indice(s) for mapping.
 
         Returns:
-            str|list: Obtained token(s). If `indices` is an integer, it will 
-            return a str. If `indices` is a list/tuple of integers, it will 
+            str|list[str]: Obtained token(s). If `indices` is an integer, it 
+            will return a str. If `indices` is a list/tuple of integers, it will 
             return a list of str.
             
         Example:
@@ -218,7 +218,7 @@ class Vocab(object):
 
     def to_indices(self, tokens):
         """
-        Map the input tokens into indices.
+        Maps the input tokens into indices.
 
         Args:
             tokens (str|list|tuple, optional): The input token(s) for mapping.
@@ -259,11 +259,17 @@ class Vocab(object):
         return token in self._token_to_idx
 
     def __call__(self, tokens):
+        """
+        Maps the input tokens into indices. Its function is the same as the 
+        :meth:`to_indices` method.
+
+        See detail at `to_indices`.
+        """
         return self[tokens]
 
     @property
     def idx_to_token(self):
-        # Return index-token dict
+        # Returns index-token dict
         return self._idx_to_token
 
     @property
@@ -273,7 +279,7 @@ class Vocab(object):
 
     def to_json(self, path=None):
         """
-        Summarize some information of vocab as JSON string. If path is gaven,
+        Summarizes some information of vocab as JSON string. If path is gaven,
         the JSON string will be saved into files. The JSON string and the saved
         file all can be used to reconstruct the :class:`Vocab` by calling 
         :meth:`from_json` method.
@@ -313,7 +319,7 @@ class Vocab(object):
     @classmethod
     def from_json(cls, json_str):
         """
-        Load :class:`Vocab` from JSON string or JSON file, which is gotten by 
+        Loads :class:`Vocab` from JSON string or JSON file, which is gotten by 
         calling :meth:`to_json` method.
 
         Args:
@@ -367,7 +373,7 @@ class Vocab(object):
                   eos_token=None,
                   **kwargs):
         """
-        Building the :class:`Vocab` from a dict.
+        Builds the :class:`Vocab` from a dict.
 
         Args:
             token_to_idx (dict): A dict describes the mapping relationship between
@@ -426,7 +432,7 @@ class Vocab(object):
                     eos_token=None,
                     **kwargs):
         """
-        Building the :class:`Vocab` accoring to given iterator and other 
+        Builds the :class:`Vocab` accoring to given iterator and other 
         information. Firstly, iterate over the `iterator` to construct a 
         :class:`collections.Counter` and used to init the as  :class:`Vocab`.
 
@@ -498,9 +504,9 @@ class Vocab(object):
                         eos_token=None,
                         **kwargs):
         """
-        Building the :class:`Vocab` from a file reserving all tokens by calling 
+        Builds the :class:`Vocab` from a file reserving all tokens by calling 
         :meth:`Vocab.from_dict` method. The file contains a token per line, and 
-        the line number would be the index of corresponding token.
+        the line index would be the index of corresponding token.
 
         Args:
             filepath (str): the path of file to construct vocabulary.
