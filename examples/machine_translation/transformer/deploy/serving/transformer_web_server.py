@@ -27,6 +27,12 @@ def parse_args():
         "--use-gpu", action="store_true", help="Whether to use gpu. ")
     parser.add_argument(
         "--model-dir", default="", type=str, help="Path of the model. ")
+    parser.add_argument(
+        "--profile", action="store_true", help="Whether to profile. ")
+    parser.add_argument(
+        "--use-all-vocab",
+        action="store_true",
+        help="Whether to use benchmark vocab. ")
     args = parser.parse_args()
     return args
 
@@ -63,26 +69,29 @@ class TransformerService(WebService):
         return feed_batch, fetch, True
 
     def postprocess(self, feed={}, fetch=[], fetch_map=None):
-        finished_sequence = np.array(fetch_map[
-            "save_infer_model/scale_0.tmp_1"]).transpose([0, 2, 1])
-        outputs = []
-        for ins in finished_sequence:
-            n_best_seq = []
-            for beam_idx, beam in enumerate(ins):
-                if beam_idx >= self.args.n_best:
-                    break
-                id_list = post_process_seq(beam, self.args.bos_idx,
-                                           self.args.eos_idx)
-                word_list = self.transformer_reader.to_tokens(id_list)
-                sequence = " ".join(word_list)
-                n_best_seq.append(sequence)
-            outputs.append(n_best_seq)
-        res = {"finished_sequence": outputs}
-        return res
+        if fetch_map is not None:
+            finished_sequence = np.array(fetch_map[
+                "save_infer_model/scale_0.tmp_1"]).transpose([0, 2, 1])
+            outputs = []
+            for ins in finished_sequence:
+                n_best_seq = []
+                for beam_idx, beam in enumerate(ins):
+                    if beam_idx >= self.args.n_best:
+                        break
+                    id_list = post_process_seq(beam, self.args.bos_idx,
+                                               self.args.eos_idx)
+                    word_list = self.transformer_reader.to_tokens(id_list)
+                    sequence = " ".join(word_list)
+                    n_best_seq.append(sequence)
+                outputs.append(n_best_seq)
+            res = {"finished_sequence": outputs}
+            return res
 
 
 def do_server(args):
     service = TransformerService(name="transformer")
+    if args.profile:
+        service.setup_profile(30)
     service.load_model_config(args.inference_model_dir)
     if args.use_gpu:
         service.set_gpus("0")
@@ -93,7 +102,7 @@ def do_server(args):
 
     service.init_client(args=args)
 
-    service.run_rpc_service()
+    service.run_debugger_service()
     service.run_web_service()
 
 
@@ -103,8 +112,10 @@ if __name__ == "__main__":
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
+
+    args.profile = ARGS.profile
     args.use_gpu = ARGS.use_gpu
-    args.use_all_vocab = True
+    args.use_all_vocab = ARGS.use_all_vocab
     if ARGS.model_dir != "":
         args.inference_model_dir = ARGS.model_dir
 

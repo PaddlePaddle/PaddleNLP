@@ -8,6 +8,8 @@ import os, sys
 import time
 from paddlenlp.datasets import load_dataset
 
+from paddle_serving_client.utils import MultiThreadRunner
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -18,12 +20,14 @@ def parse_args():
         help="Path of the config file. ")
     parser.add_argument("--batch-size", type=int, help="Batch size. ")
     parser.add_argument(
+        "--threads", default=1, type=int, help="Number of threads. ")
+    parser.add_argument(
         "--profile", action="store_true", help="Whether to profile. ")
     args = parser.parse_args()
     return args
 
 
-def do_client(args):
+def do_client(idx, args):
     dataset = load_dataset('wmt14ende', splits=('test'))
 
     headers = {"Content-type": "application/json"}
@@ -43,18 +47,25 @@ def do_client(args):
             continue
         data = {"feed": [{"src_word": batch}], "fetch": ["finished_sequence"]}
         r = requests.post(url=url, headers=headers, data=json.dumps(data))
-        print(r)
+        if r is not None:
+            print(r)
 
-        if args.profile:
-            recorder.toc(samples=len(batch))
-        batch = []
-        for seq in r.json()["result"]["finished_sequence"]:
-            f.write(seq[0] + "\n")
+            if args.profile:
+                recorder.toc(samples=len(batch))
+            batch = []
+            for seq in r.json()["result"]["finished_sequence"]:
+                f.write(seq[0] + "\n")
         if args.profile:
             recorder.tic()
+    f.close()
     if args.profile:
         recorder.report()
-    f.close()
+        return [[recorder.infer_time]]
+
+
+def multithread_http(args):
+    multi_thread_runner = MultiThreadRunner()
+    result = multi_thread_runner.run(do_client, args.threads, args)
 
 
 if __name__ == "__main__":
@@ -66,9 +77,11 @@ if __name__ == "__main__":
     if ARGS.batch_size is not None:
         args.infer_batch_size = ARGS.batch_size
     args.profile = ARGS.profile
+    args.threads = ARGS.threads
     args.model_name = "transformer_base" if "base" in ARGS.config else "transformer_big"
 
     if args.profile:
         from utils.recorder import Recorder
 
-    do_client(args)
+    multithread_http(args)
+    # do_client(args)
