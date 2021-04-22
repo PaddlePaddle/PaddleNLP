@@ -19,7 +19,7 @@ __all__ = ['Stack', 'Pad', 'Tuple', 'Dict']
 
 class Stack(object):
     """
-    Stack the input data samples to construct the batch. The N input samples
+    Stacks the input data samples to construct the batch. The N input samples
     must have the same shape/length and will be stacked to construct a batch.
 
     Args:
@@ -35,7 +35,7 @@ class Stack(object):
 
     def __call__(self, data):
         """
-        Batchify the input data by stacking.
+        Batchifies the input data by stacking.
 
         Args:
             data (list): The input data samples. It is a list. Each element is 
@@ -68,12 +68,12 @@ class Stack(object):
 
 class Pad(object):
     """
-    Return a callable function that pads and stacks data.
+    Pads the input data samples to the largest length at `axis`.
 
     Args:
         pad_val (float|int, optional): The padding value. Default: 0.
         axis (int, optional): The axis to pad the arrays. The arrays will be
-            padded to the largest dimension at axis. For example, assume the 
+            padded to the largest length at `axis`. For example, assume the 
             input arrays have shape (10, 8, 5), (6, 8, 5), (3, 8, 5) and the 
             axis is 0. Each input will be padded into (10, 8, 5) and then 
             stacked to form the final output, which has shape (3, 10, 8, 5). 
@@ -81,7 +81,7 @@ class Pad(object):
         ret_length (bool|numpy.dtype, optional): If it is bool, indicate whether
             to return the valid length in the output, and the data type of
             returned length is int32 if True. If it is numpy.dtype, indicate the
-            data type of returned length. Default: False.
+            data type of returned length. Default: None.
         dtype (numpy.dtype, optional): The value type of the output. If it is
             set to None, the input data type is used. Default: None.
         pad_right (bool, optional): Whether the padding direction is right-side. 
@@ -103,10 +103,10 @@ class Pad(object):
 
     def __call__(self, data):
         """
-        Batchify the input data by padding. The input will be padded to the 
+        Batchifies the input data by padding. The input will be padded to the 
         largest dimension at `axis` and then stacked to form the final output. 
         In addition, the function will output the original dimensions at the 
-        `axis` if `ret_length` is not None.
+        `axis` if `ret_length` is not None or False.
 
         Args:
             data (list): The input data samples. It is a list. Each element is 
@@ -114,10 +114,10 @@ class Pad(object):
 
         Returns:
             numpy.ndarray|tuple: If `ret_length` is False, it is a numpy.ndarray 
-                representing the padded batch data and the shape is (N, …). 
-                Otherwise, it is a tuple, except for the padded batch data, the 
-                tuple also includes a numpy.ndarray representing original length 
-                at `axis` of all input samples, which shaped `(N,)`. 
+            representing the padded batch data and the shape is (N, …). 
+            Otherwise, it is a tuple, besides the padded batch data, the tuple 
+            also includes a numpy.ndarray representing original length at 
+            `axis` of all input samples, which shaped `(N,)`. 
 
         Example:
             .. code-block:: python
@@ -168,7 +168,7 @@ class Pad(object):
 
 class Tuple(object):
     """
-    Wrap multiple batchify functions together. The input functions will be applied
+    Wraps multiple batchify functions together. The input functions will be applied
     to the corresponding input fields.
     
     Each sample should be a list or tuple containing multiple fields. The i'th
@@ -200,7 +200,7 @@ class Tuple(object):
 
     def __call__(self, data):
         """
-        Batchify data samples by applying each function on the corresponding 
+        Batchifies data samples by applying each function on the corresponding 
         data field, and each data field is produced by stacking the field data 
         of samples.
 
@@ -247,7 +247,7 @@ class Tuple(object):
 
 class Dict(object):
     """
-    Wrap multiple batchify functions together. The input functions will be 
+    Wraps multiple batchify functions together. The input functions will be 
     applied to the corresponding input fields.
     
     Each sample should be a dict containing multiple fields. Each batchify 
@@ -278,7 +278,7 @@ class Dict(object):
 
     def __call__(self, data):
         """
-        Batchify data samples by applying each function on the corresponding 
+        Batchifies data samples by applying each function on the corresponding 
         data field, and each data field is produced by stacking the field data 
         with the same key as batchify functions of all samples.
 

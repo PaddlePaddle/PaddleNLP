@@ -499,14 +499,18 @@ class GenerationMixin(object):
 
                 paddle.seed(2)
 
+                # Initialize the model and tokenizer
                 model_name_or_path = 'unified_transformer-12L-cn-luge'
                 model = UnifiedTransformerLMHeadModel.from_pretrained(model_name_or_path)
                 tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name_or_path)
 
+                # Prepare the model inputs.
                 history = "早上好，今天空气质量不错。"
                 inputs = tokenizer.dialogue_encode(history, task_type='chitchat', 
                     add_start_token_as_response=True, return_tensors=True)
                 
+            .. code-block::
+
                 # Generate the sequence by using "greedy_search" strategy
                 ids, scores = model.generate(
                     input_ids=inputs['input_ids'],
@@ -522,6 +526,8 @@ class GenerationMixin(object):
                 print(response)
                 # 是的
 
+            .. code-block::
+            
                 # Generate 2 sequences by using "sampling" strategy (top_k=5)
                 ids, scores = model.generate(
                     input_ids=inputs['input_ids'],
@@ -541,6 +547,8 @@ class GenerationMixin(object):
                 print(response)
                 # ['天气好,心情也好', '你也是']
 
+            .. code-block::
+            
                 # Generate 2 sequences by using "beam_search" strategy (num_beams=5)
                 ids, scores = model.generate(
                     input_ids=inputs['input_ids'],

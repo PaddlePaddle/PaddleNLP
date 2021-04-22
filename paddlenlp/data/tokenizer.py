@@ -38,9 +38,9 @@ class BaseTokenizer(object):
 
 class JiebaTokenizer(BaseTokenizer):
     """
-    Constructs an tokenizer based on `jieba <https://github.com/fxsjy/jieba>`__. 
-    It supports :meth:`cut` method to cut the text to tokens, and :meth:`encode` 
-    method to covert text to ids.
+    Constructs a tokenizer based on `jieba <https://github.com/fxsjy/jieba>`__. 
+    It supports :meth:`cut` method to split the text to tokens, and :meth:`encode` 
+    method to covert text to token ids.
 
     Args:
         vocab(paddlenlp.data.Vocab): An instance of :class:`paddlenlp.data.Vocab`.
@@ -60,7 +60,12 @@ class JiebaTokenizer(BaseTokenizer):
 
         Args:
             sentence(str): The text that needs to be cuted.
-            cut_all(bool, optional): Whether to use the full mode. Default: False.
+            cut_all(bool, optional): Whether to use the full mode. If True, 
+                using full mode that gets all the possible words from the 
+                sentence, which is fast but not accurate. If False, using 
+                accurate mode that attempts to cut the sentence into the most 
+                accurate segmentations, which is suitable for text analysis. 
+                Default: False.
             use_hmm(bool, optional): Whether to use the HMM model. Default: True.
 
         Returns:
@@ -94,7 +99,12 @@ class JiebaTokenizer(BaseTokenizer):
 
         Args:
             sentence(str): The text that needs to be cuted.
-            cut_all(bool, optional): Whether to use the full mode. Default: False.
+            cut_all(bool, optional): Whether to use the full mode. If True, 
+                using full mode that gets all the possible words from the 
+                sentence, which is fast but not accurate. If False, using 
+                accurate mode that attempts to cut the sentence into the most 
+                accurate segmentations, which is suitable for text analysis. 
+                Default: False.
             use_hmm(bool, optional): Whether to use the HMM model. Default: True.
 
         Returns:
