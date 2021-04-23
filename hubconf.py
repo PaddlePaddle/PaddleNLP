@@ -14,9 +14,8 @@
 
 dependencies = ['paddle']
 
-from paddlenlp.transformers import BertModel, BertForSequenceClassification
+from paddlenlp.transformers import BertForPretraining, BertModel, BertForSequenceClassification
 from paddlenlp.transformers import BertForTokenClassification, BertForQuestionAnswering
-from paddlenlp.transformers import BertForPretraining
 from paddlenlp.transformers import BertTokenizer
 
 BERT_MODEL_CLASSES = {
@@ -31,7 +30,8 @@ BERT_MODEL_CLASSES = {
 def bert(model_name_or_path='bert-base-uncased',
          model_select='sequence_classification'):
     """
-    Returns BERT model from given pretrained model.
+    Returns BERT model and tokenizer from given pretrained model name or path
+    and class type of tasks, such as sequence classification.
 
     Args:
         model_name_or_path (str, optional):  A name of or a file path to a
