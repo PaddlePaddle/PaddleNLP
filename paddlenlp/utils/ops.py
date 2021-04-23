@@ -18,6 +18,46 @@ __all__ = ['einsum']
 
 
 def einsum(equation, *operands):
+    r"""
+    Executes the sum of product of provided operands based on the Einstein summation convention.
+    Einsum can be used to complete a variety of operations, such as sum, transpose,
+    batch matrix multiplication.
+
+    Args:
+        equation (`str`):
+            Uses uncased letters to specify the dimension of the operands and result. The input
+            equation is on the left hand before `->` while the output equation is on the right side.
+            Einsum can infer the result shape so that the `->` and the result label letters can be omitted.
+            Operands in the input equation are splited by commas (','), e.g. 'abc,cde' describes two 3D
+            operands. The dimensions labeled with same letter should be same or be 1. Ellipsis ('...') can
+            be used to specify the broadcast dimensions.
+
+        operands (`Tensor`):
+            The operands to compute the Einstein sum of.
+    
+    Returns:
+        `Tensor`: The result of Einstein sum product.
+    
+    Example:
+    .. code-block::
+
+        import paddle
+        import paddlenlp.utils.ops as ops
+
+        x = paddle.randn((4,))
+        y = paddle.randn((5,))
+        print(ops.einsum('i->', x)) # sum
+        print(ops.einsum('i,i->', x, x)) # dot
+        print(ops.einsum("i,j->ij", x, y)), # outer
+
+        A = paddle.randn((2, 4, 5))
+        B = paddle.randn((2, 5, 6))
+        print(ops.einsum('ijk->kji', A)) # transpose
+        print(ops.einsum('ijk, ikl->ijl', A,B)) # batch matrix multiplication
+        print(ops.einsum('...jk->...kj', A)) # Ellipsis transpose
+        print(ops.einsum('...jk, ...kl->...jl', A,B)) # Ellipsis batch matrix multiplication
+    """
+
     def _mul_sum(left, right, sum_dims):
         assert left.rank() == right.rank(), "number of rank should be equal."
         if len(sum_dims) == 0:
@@ -84,11 +124,11 @@ def einsum(equation, *operands):
 
     if len(operands) == 1 and isinstance(operands[0], (list, tuple)):
         operands = operands[0]
-    # equation is case insensitive
+    # Equation is case insensitive
     num_letters = 26
     letters_to_idx = [-1] * num_letters
     equation = equation.lower().replace(' ', '')
-    # 1. parse the equation
+    # 1. Parse the equation
     eqns = equation.split("->")
     num_eqns_size = len(eqns)
     assert num_eqns_size <= 2, "The '->' should exist at most only once"
@@ -100,11 +140,11 @@ def einsum(equation, *operands):
         operands
     ), "Number of operands in equation and the tensors provided should be equal."
 
-    # parse input equation
+    # Parse input equation
     num_total_idxes = 0
     input_operand_idxes = []
     letter_frequence = [0] * num_letters
-    idx_last_operand = []
+    idxes_last_operand = []
     num_ell_idxes = -1
     first_ell_idx = 0
     for i, term in enumerate(operand_eqns):
@@ -129,7 +169,7 @@ def einsum(equation, *operands):
 
                     for j in range(num_ell_idxes):
                         curr_operand_idxes.append(j + first_ell_idx)
-                        idx_last_operand.append(i)
+                        idxes_last_operand.append(i)
                     dims_in_terms += num_ell_idxes
             else:
                 assert (
@@ -141,9 +181,9 @@ def einsum(equation, *operands):
                 if letters_to_idx[letter_num] == -1:
                     letters_to_idx[letter_num] = num_total_idxes
                     num_total_idxes += 1
-                    idx_last_operand.append(i)
+                    idxes_last_operand.append(i)
                 else:
-                    idx_last_operand[letters_to_idx[letter_num]] = i
+                    idxes_last_operand[letters_to_idx[letter_num]] = i
                 letter_frequence[letter_num] += 1
                 curr_operand_idxes.append(letters_to_idx[letter_num])
                 dims_in_terms += 1
@@ -151,7 +191,7 @@ def einsum(equation, *operands):
         assert dims_in_terms == operand_rank, "Dimension dismatch for operand {}: equation {}, tensor {}".format(
             i, dims_in_terms, operand_rank)
         input_operand_idxes.append(curr_operand_idxes)
-    # parse output equation
+    # Parse output equation
     idxes_to_output_dims = [-1] * num_total_idxes
     num_output_dims = 0
     if num_eqns_size == 2:
@@ -187,7 +227,7 @@ def einsum(equation, *operands):
                     letter_num]] = num_output_dims
                 num_output_dims += 1
     else:  #  num_eqns_size == 1
-        # infer the output dims
+        # Infer the output dims
         if num_ell_idxes >= 0:
             for j in range(num_ell_idxes):
                 idxes_to_output_dims[first_ell_idx + j] = num_output_dims
@@ -197,7 +237,7 @@ def einsum(equation, *operands):
                 idxes_to_output_dims[letters_to_idx[j]] = num_output_dims
                 num_output_dims += 1
 
-    # for sum index
+    # Mark sum index
     sum_dim = num_output_dims
     for i in range(num_total_idxes):
         if idxes_to_output_dims[i] == -1:
@@ -221,14 +261,14 @@ def einsum(equation, *operands):
                         dim], "Dimension size does not match previous size. "
                 dim += 1
             else:
-                # diagonal repeated index
+                # Diagonal repeated index
                 # TODO(zhoushunjie): Need to develop a paddle.diagonal api
                 raise NotImplementedError("Can't support diagonal.")
         perm = []
         for input_dim in idx_to_dims:
             if input_dim > -1:
                 perm.append(input_dim)
-        # transpose the tensor by perm
+        # Transpose the tensor by perm
         preprocessed_operand = paddle.transpose(preprocessed_operand, perm=perm)
 
         for dim, input_dim in enumerate(idx_to_dims):
@@ -238,16 +278,16 @@ def einsum(equation, *operands):
 
         preprocessed_operands.append(preprocessed_operand)
 
-    # 2. execute the sum
+    # 2. Execute the mul_sum
     sum_dims = []
     result = preprocessed_operands[0]
     for i in range(num_total_idxes):
-        if idx_last_operand[i] == 0 and idxes_to_output_dims[
+        if idxes_last_operand[i] == 0 and idxes_to_output_dims[
                 i] >= num_output_dims:
             result = result.sum(axis=idxes_to_output_dims[i], keepdim=True)
     for i in range(1, len(preprocessed_operands)):
         for j in range(num_total_idxes):
-            if idx_last_operand[j] == i and idxes_to_output_dims[
+            if idxes_last_operand[j] == i and idxes_to_output_dims[
                     j] >= num_output_dims:
                 sum_dims.append(idxes_to_output_dims[j])
         result = _mul_sum(result, preprocessed_operands[i], sum_dims)
