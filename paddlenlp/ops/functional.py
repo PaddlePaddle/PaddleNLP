@@ -42,7 +42,7 @@ def einsum(equation, *operands):
     .. code-block::
 
         import paddle
-        import paddlenlp.utils.ops as ops
+        import paddlenlp.ops as ops
 
         x = paddle.randn((4,))
         y = paddle.randn((5,))
