@@ -6,6 +6,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from paddle.fluid.layer_helper import LayerHelper
+import paddle
 
 
 def infer_transformer_decoder(
@@ -25,32 +26,32 @@ def infer_transformer_decoder(
         'Input': enc_output,
         'MemSeqLen': memory_seq_lens,
         'WordEmbedding': word_emb,
-        'SelfLayernormWeight': slf_ln_weight,
-        'SelfLayernormBias': slf_ln_bias,
-        'SelfQueryWeight': slf_q_weight,
-        'SelfQueryBias': slf_q_bias,
-        'SelfKeyWeight': slf_k_weight,
-        'SelfKeyBias': slf_k_bias,
-        'SelfValueWeight': slf_v_weight,
-        'SelfValueBias': slf_v_bias,
-        'SelfOutWeight': slf_out_weight,
-        'SelfOutBias': slf_out_bias,
-        'CrossLayernormWeight': cross_ln_weight,
-        'CrossLayernormBias': cross_ln_bias,
-        'CrossQueryWeight': cross_q_weight,
-        'CrossQueryBias': cross_q_bias,
-        'CrossKeyWeight': cross_k_weight,
-        'CrossKeyBias': cross_k_bias,
-        'CrossValueWeight': cross_v_weight,
-        'CrossValueBias': cross_v_bias,
-        'CrossOutWeight': cross_out_weight,
-        'CrossOutBias': cross_out_bias,
-        'FFNLayernormWeight': ffn_ln_weight,
-        'FFNLayernormBias': ffn_ln_bias,
-        'FFNInterWeight': ffn_inter_weight,
-        'FFNInterBias': ffn_inter_bias,
-        'FFNOutWeight': ffn_out_weight,
-        'FFNOutBias': ffn_out_bias,
+        'SelfLayernormWeight@VECTOR': slf_ln_weight,
+        'SelfLayernormBias@VECTOR': slf_ln_bias,
+        'SelfQueryWeight@VECTOR': slf_q_weight,
+        'SelfQueryBias@VECTOR': slf_q_bias,
+        'SelfKeyWeight@VECTOR': slf_k_weight,
+        'SelfKeyBias@VECTOR': slf_k_bias,
+        'SelfValueWeight@VECTOR': slf_v_weight,
+        'SelfValueBias@VECTOR': slf_v_bias,
+        'SelfOutWeight@VECTOR': slf_out_weight,
+        'SelfOutBias@VECTOR': slf_out_bias,
+        'CrossLayernormWeight@VECTOR': cross_ln_weight,
+        'CrossLayernormBias@VECTOR': cross_ln_bias,
+        'CrossQueryWeight@VECTOR': cross_q_weight,
+        'CrossQueryBias@VECTOR': cross_q_bias,
+        'CrossKeyWeight@VECTOR': cross_k_weight,
+        'CrossKeyBias@VECTOR': cross_k_bias,
+        'CrossValueWeight@VECTOR': cross_v_weight,
+        'CrossValueBias@VECTOR': cross_v_bias,
+        'CrossOutWeight@VECTOR': cross_out_weight,
+        'CrossOutBias@VECTOR': cross_out_bias,
+        'FFNLayernormWeight@VECTOR': ffn_ln_weight,
+        'FFNLayernormBias@VECTOR': ffn_ln_bias,
+        'FFNInterWeight@VECTOR': ffn_inter_weight,
+        'FFNInterBias@VECTOR': ffn_inter_bias,
+        'FFNOutWeight@VECTOR': ffn_out_weight,
+        'FFNOutBias@VECTOR': ffn_out_bias,
         'DecoderLayernormWeight': decoder_ln_weight,
         'DecoderLayernormBias': decoder_ln_bias,
         'EmbWeight': linear_weight,
@@ -72,9 +73,9 @@ def infer_transformer_decoder(
         'beam_search_diversity_rate': _beam_search_diversity_rate
     }
 
-    output_ids = helper.create_variable_for_type_inference("int32")
-    parent_ids = helper.create_variable_for_type_inference("int32")
-    sequence_length = helper.create_variable_for_type_inference("int32")
+    output_ids = helper.create_variable(dtype="int32")
+    parent_ids = helper.create_variable(dtype="int32")
+    sequence_length = helper.create_variable(dtype="int32")
 
     outputs = {
         'OutputIds': output_ids,
@@ -138,7 +139,8 @@ class InferTransformerDecoding(nn.Layer):
             raise ValueError("The path to decoding lib is not exist.")
 
         super(InferTransformerDecoding, self).__init__()
-        paddle.utils.load_op_library(decoding_lib)
+        paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+            decoding_lib)
         for arg, value in locals().items():
             if arg not in [
                     "self", "decoder", "word_embedding", "positional_embedding",

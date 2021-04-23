@@ -14,6 +14,7 @@ paddlenlp.transformers
    paddlenlp.transformers.bigbird
    paddlenlp.transformers.electra
    paddlenlp.transformers.ernie
+   paddlenlp.transformers.ernie_ctm
    paddlenlp.transformers.ernie_gen
    paddlenlp.transformers.gpt2
    paddlenlp.transformers.roberta
