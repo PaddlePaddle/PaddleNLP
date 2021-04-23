@@ -14,4 +14,4 @@
 
 from .transformer.decoding import *
 from .transformer.faster_transformer import *
-from .functional import *
+from .einsum import *
