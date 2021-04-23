@@ -101,7 +101,7 @@ class PretrainedModel(Layer, GenerationMixin):
     and also inherited here.
 
     Besides, metaclass `InitTrackerMeta` is used to create `PretrainedModel`,
-    and it makes subclasses can track arguments for initialization automatically.
+    by which subclasses can track arguments for initialization automatically.
     """
     model_config_file = "model_config.json"
     pretrained_init_configuration = {}
@@ -335,7 +335,7 @@ class PretrainedModel(Layer, GenerationMixin):
         Save model configuration and related resources (model state) to files
         under `save_directory`. The model configuration would be saved into
         `model_config_file` indicating file (thus `model_config.json`), and model
-        state would be saved into `resource_files_names` indicating file. (thus
+        state would be saved into `resource_files_names` indicating file (thus
         `model_state.pdparams`).
         
         The `save_directory` can be used in `from_pretrained` as argument value
