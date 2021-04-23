@@ -105,6 +105,83 @@ def _is_punctuation(char):
     return False
 
 
+ENCODE_ARGS_COMMON_DOCSTR = r"""
+            max_seq_len (`int`, optional):
+                If set to a number, will limit the total sequence returned so
+                that it has a maximum length. If there are overflowing tokens,
+                those overflowing tokens will be added to the returned dictionary
+                when `return_overflowing_tokens` is `True`. Defaults to `None`.
+            stride (`int`, optional):
+                Only available for batch input of sequence pair and mainly for
+                question answering usage. When for QA, `text` represents questions
+                and `text_pair` represents contexts. If `stride` is set to a
+                positive number, the context will be split into multiple spans
+                where `stride` defines the number of (tokenized) tokens to skip
+                from the start of one span to get the next span, thus will produce
+                a bigger batch than inputs to include all spans. Moreover, 'overflow_to_sample'
+                and 'offset_mapping' preserving the original example and position
+                information will be added to the returned dictionary. Defaults to 0.
+            pad_to_max_seq_len (`bool`, optional):
+                If set to `True`, the returned sequences would be padded up to
+                `max_seq_len` specified length according to padding side
+                (`self.padding_side`) and padding token id. Defaults to `False`.
+            truncation_strategy (`str`, optional):
+                String selected in the following options:
+
+                - 'longest_first' (default) Iteratively reduce the inputs sequence
+                until the input is under `max_seq_len` starting from the longest
+                one at each token (when there is a pair of input sequences).
+                - 'only_first': Only truncate the first sequence.
+                - 'only_second': Only truncate the second sequence.
+                - 'do_not_truncate': Do not truncate (raise an error if the input
+                sequence is longer than `max_seq_len`).
+
+                Defaults to 'longest_first'.
+            return_position_ids (`bool`, optional):
+                Whether to include tokens position ids in the returned dictionary.
+                Defaults to `False`.
+            return_token_type_ids (`bool`, optional):
+                Whether to include token type ids in the returned dictionary.
+                Defaults to `True`.
+            return_attention_mask (`bool`, optional):
+                Whether to include the attention mask in the returned dictionary.
+                Defaults to `False`.
+            return_length (`bool`, optional):
+                Whether to include the length of each encoded inputs in the
+                returned dictionary. Defaults to `False`.
+            return_overflowing_tokens (`bool`, optional):
+                Whether to include overflowing token information in the returned
+                dictionary. Defaults to `False`.
+            return_special_tokens_mask (`bool`, optional):
+                Whether to include special tokens mask information in the returned
+                dictionary. Defaults to `False`.
+"""
+
+ENCODE_RETURNS_COMMON_DOCSTR = r"""
+                The dict has the following optional items:
+
+                - 'input_ids' (`list[int]`): List of token ids to be fed to a model. 
+                - 'position_ids' (`list[int]`): List of token position ids to be
+                  fed to a model. Included when `return_position_ids` is `True`
+                - 'token_type_ids' (`list[int]`): List of token type ids to be
+                  fed to a model. Included when `return_token_type_ids` is `True`.
+                - 'attention_mask' (`list[int]`): List of integers valued 0 or 1,
+                  where 0 specifies paddings and should not be attended to by the
+                  model. Included when `return_attention_mask` is `True`.
+                - 'length' (`int`): The input_ids length. Included when `return_length`
+                  is `True`.
+                - 'overflowing_tokens' (`list[int]`): List of overflowing tokens.
+                  Included when if `max_seq_len` is specified and `return_overflowing_tokens`
+                  is True.
+                - 'num_truncated_tokens' (`int`): The number of overflowing tokens.
+                  Included when if `max_seq_len` is specified and `return_overflowing_tokens`
+                  is True.
+                - 'special_tokens_mask' (`list[int]`): List of integers valued 0 or 1,
+                  with 0 specifying special added tokens and 1 specifying sequence tokens.
+                  Included when `return_special_tokens_mask` is `True`.
+"""
+
+
 @six.add_metaclass(InitTrackerMeta)
 class PretrainedTokenizer(object):
     """
@@ -957,6 +1034,7 @@ class PretrainedTokenizer(object):
 
         return encoded_inputs
 
+    @append_docstr(ENCODE_ARGS_COMMON_DOCSTR, ENCODE_RETURNS_COMMON_DOCSTR)
     def batch_encode(self,
                      batch_text_or_text_pairs,
                      max_seq_len=512,
@@ -978,70 +1056,6 @@ class PretrainedTokenizer(object):
             batch_text_or_text_pairs (:obj:`List[str]`, :obj:`List[Tuple[str, str]]`, :obj:`List[List[str]]`, :obj:`List[Tuple[List[str], List[str]]]`, :obj:`List[List[int]]`, :obj:`List[Tuple[List[int], List[int]]]`):
                 Batch of sequences or pair of sequences to be encoded. This can be a list of
                 string/string-sequences/int-sequences or a list of pair of string/string-sequences/int-sequence
-            max_seq_len (:obj:`int`, `optional`, defaults to :int:`512`):
-                If set to a number, will limit the total sequence returned so that it has a maximum length.
-                If there are overflowing tokens, those will be added to the returned dictionary
-            pad_to_max_seq_len (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                If set to True, the returned sequences will be padded according to the model's padding side and
-                padding index, up to their max length. If no max length is specified, the padding is done up to the
-                model's max length.
-            stride (:obj:`int`, `optional`, defaults to 0):
-                If set to a positive number and batch_text_or_text_pairs is a list of pair sequences, the overflowing 
-                tokens which contain some tokens from the end of the truncated second sequence will be concatenated with 
-                the first sequence to generate new features. And The overflowing tokens would not be returned in dictionary.
-                The value of this argument defines the number of overlapping tokens.
-            is_split_into_words (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Whether or not the text has been pretokenized.
-            truncation_strategy (:obj:`str`, `optional`, defaults to `longest_first`):
-                String selected in the following options:
-
-                - 'longest_first' (default) Iteratively reduce the inputs sequence until the input is under max_seq_len
-                  starting from the longest one at each token (when there is a pair of input sequences)
-                - 'only_first': Only truncate the first sequence
-                - 'only_second': Only truncate the second sequence
-                - 'do_not_truncate': Does not truncate (raise an error if the input sequence is longer than max_seq_len)
-            return_position_ids (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Set to True to return tokens position ids (default True).
-            return_token_type_ids (:obj:`bool`, `optional`, defaults to :obj:`True`):
-                Whether to return token type IDs.
-            return_attention_mask (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Whether to return the attention mask.
-            return_length (:obj:`int`, defaults to :obj:`False`):
-                If set the resulting dictionary will include the length of each encoded inputs
-            return_overflowing_tokens (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Set to True to return overflowing token information (default False).
-            return_special_tokens_mask (:obj:`bool`, `optional`, defaults to :obj:`False`):
-                Set to True to return special tokens mask information (default False).
-
-        Return:
-            A List of dictionary of shape::
-
-                {
-                    input_ids: list[int],
-                    position_ids: list[int] if return_position_ids is True 
-                    token_type_ids: list[int] if return_token_type_ids is True (default)
-                    attention_mask: list[int] if return_attention_mask is True 
-                    seq_len: int if return_length is True 
-                    overflowing_tokens: list[int] if a ``max_seq_len`` is specified and return_overflowing_tokens is True and stride is 0
-                    num_truncated_tokens: int if a ``max_seq_len`` is specified and return_overflowing_tokens is True and stride is 0
-                    special_tokens_mask: list[int] if return_special_tokens_mask is True
-                    offset_mapping: list[Tuple] if stride is a positive number and batch_text_or_text_pairs is a list of pair sequences
-                    overflow_to_sample: int if stride is a positive number and batch_text_or_text_pairs is a list of pair sequences
-                }
-
-            With the fields:
-
-            - ``input_ids``: list of token ids to be fed to a model
-            - ``position_ids``: list of token position ids to be fed to a model
-            - ``token_type_ids``: list of token type ids to be fed to a model
-            - ``attention_mask``: list of indices specifying which tokens should be attended to by the model
-            - ``length``: the input_ids length
-            - ``overflowing_tokens``: list of overflowing tokens if a max length is specified.
-            - ``num_truncated_tokens``: number of overflowing tokens a ``max_seq_len`` is specified
-            - ``special_tokens_mask``: if adding special tokens, this is a list of [0, 1], with 0 specifying special added
-              tokens and 1 specifying sequence tokens.
-            - ``offset_mapping``: list of (index of start char in text,index of end char in text) of token. (0,0) if token is a sqecial token
-            - ``overflow_to_sample``: index of example from which this feature is generated
         """
 
         def get_input_ids(text):
