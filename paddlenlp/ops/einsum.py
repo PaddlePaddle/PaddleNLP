@@ -33,7 +33,8 @@ def einsum(equation, *operands):
             be used to specify the broadcast dimensions.
 
         operands (`Tensor`):
-            The operands to compute the Einstein sum of.
+            The operands to compute the Einstein sum of. The number of operands should be the same as the
+            the operands described in input equation.
     
     Returns:
         `Tensor`: The result of Einstein sum product.
@@ -42,20 +43,72 @@ def einsum(equation, *operands):
     .. code-block::
 
         import paddle
-        import paddlenlp.ops as ops
+        import paddlenlp
+        import numpy as np
 
-        x = paddle.randn((4,))
-        y = paddle.randn((5,))
-        print(ops.einsum('i->', x)) # sum
-        print(ops.einsum('i,i->', x, x)) # dot
-        print(ops.einsum("i,j->ij", x, y)), # outer
+        np.random.seed(102)
 
-        A = paddle.randn((2, 4, 5))
-        B = paddle.randn((2, 5, 6))
-        print(ops.einsum('ijk->kji', A)) # transpose
-        print(ops.einsum('ijk, ikl->ijl', A,B)) # batch matrix multiplication
-        print(ops.einsum('...jk->...kj', A)) # Ellipsis transpose
-        print(ops.einsum('...jk, ...kl->...jl', A,B)) # Ellipsis batch matrix multiplication
+        x = paddle.to_tensor(np.random.rand(4))
+        y = paddle.to_tensor(np.random.rand(5))
+        # sum
+        print(paddlenlp.ops.einsum('i->', x))
+        # Tensor(shape=[], dtype=float64, place=CUDAPlace(0), stop_gradient=True, 2.30369050)
+
+        # dot
+        print(paddlenlp.ops.einsum('i,i->', x, x))
+        # Tensor(shape=[], dtype=float64, place=CUDAPlace(0), stop_gradient=True, 1.43773247)
+
+        # outer
+        print(paddlenlp.ops.einsum("i,j->ij", x, y)),
+        # Tensor(shape=[4, 5], dtype=float64, place=CUDAPlace(0), stop_gradient=True,
+        #         [[0.34590188, 0.48353496, 0.09996135, 0.18656330, 0.21392910],
+        #         [0.39122025, 0.54688535, 0.11305780, 0.21100591, 0.24195704],
+        #         [0.17320613, 0.24212422, 0.05005442, 0.09341929, 0.10712238],
+        #         [0.42290818, 0.59118179, 0.12221522, 0.22809690, 0.26155500]])
+
+        A = paddle.to_tensor(np.random.rand(2, 3, 2))
+        B = paddle.to_tensor(np.random.rand(2, 2, 3))
+        # transpose
+        print(paddlenlp.ops.einsum('ijk->kji', A))
+        #  Tensor(shape=[2, 3, 2], dtype=float64, place=CUDAPlace(0), stop_gradient=True,
+        #        [[[0.49174730, 0.33344683],
+        #          [0.89440989, 0.26162022],
+        #          [0.36116209, 0.12241719]],
+
+        #         [[0.49019824, 0.51895050],
+        #          [0.18241053, 0.13092809],
+        #          [0.81059146, 0.55165734]]])
+
+        # batch matrix multiplication
+        print(paddlenlp.ops.einsum('ijk, ikl->ijl', A,B))
+        # Tensor(shape=[2, 3, 3], dtype=float64, place=CUDAPlace(0), stop_gradient=True,
+        #     [[[0.13654339, 0.39331432, 0.65059661],
+        #      [0.07171420, 0.57518653, 0.77629221],
+        #      [0.21250688, 0.37793541, 0.73643411]],
+
+        #     [[0.56925339, 0.65859030, 0.57509818],
+        #      [0.30368265, 0.25778348, 0.21630400],
+        #      [0.39587265, 0.58031243, 0.51824755]]])
+
+        # Ellipsis transpose
+        print(paddlenlp.ops.einsum('...jk->...kj', A))
+        # Tensor(shape=[2, 2, 3], dtype=float64, place=CUDAPlace(0), stop_gradient=True,
+        #     [[[0.49174730, 0.89440989, 0.36116209],
+        #         [0.49019824, 0.18241053, 0.81059146]],
+
+        #         [[0.33344683, 0.26162022, 0.12241719],
+        #         [0.51895050, 0.13092809, 0.55165734]]])
+
+        # Ellipsis batch matrix multiplication
+        print(paddlenlp.ops.einsum('...jk, ...kl->...jl', A,B))
+        # Tensor(shape=[2, 3, 3], dtype=float64, place=CUDAPlace(0), stop_gradient=True,
+        # [[[0.13654339, 0.39331432, 0.65059661],
+        #     [0.07171420, 0.57518653, 0.77629221],
+        #     [0.21250688, 0.37793541, 0.73643411]],
+
+        #     [[0.56925339, 0.65859030, 0.57509818],
+        #     [0.30368265, 0.25778348, 0.21630400],
+        #     [0.39587265, 0.58031243, 0.51824755]]])
     """
 
     def _mul_sum(left, right, sum_dims):
