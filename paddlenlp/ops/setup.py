@@ -118,9 +118,11 @@ def _write_setup_file(name, sourcedir, file_path):
 
 
 def load():
-    # cache
-    _write_setup_file()
-    _jit_compile()
+    # write setup file
+    #_write_setup_file()
+    # jit compile
+    #_jit_compile()
+    pass
 
 
 # The information here can also be placed in setup.cfg - better separation of
@@ -130,8 +132,9 @@ setup(
     version="0.0.1",
     author="guosheng",
     author_email="guosheng@baidu.com",
-    description="A test project using pybind11 and CMake",
+    description="A test project for setup using CMake",
     long_description="",
-    ext_modules=[CMakeExtension("cmake_example")],
+    ext_modules=[CMakeExtension(
+        "cmake_example", sourcedir=".")],
     cmdclass={"build_ext": CMakeBuild},
     zip_safe=False, )
