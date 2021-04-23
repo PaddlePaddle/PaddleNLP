@@ -19,7 +19,11 @@ import argparse
 
 from paddle.utils.download import get_path_from_url
 
-URL = "https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/wordtag_dataset.tar.gz"
+URLS = [
+    "https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/wordtag_dataset.tar.gz",
+    "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree.rawbase",
+    "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree_type.csv"
+]
 
 
 def main(arguments):
@@ -31,7 +35,8 @@ def main(arguments):
         type=str,
         default='./')
     args = parser.parse_args(arguments)
-    get_path_from_url(URL, args.data_dir)
+    for url in URLS:
+        get_path_from_url(url, args.data_dir)
 
 
 if __name__ == '__main__':
