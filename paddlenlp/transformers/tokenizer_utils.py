@@ -27,7 +27,7 @@ from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.utils.env import MODEL_HOME
 
 from ..data.vocab import Vocab
-from .utils import InitTrackerMeta, fn_args_to_dict
+from .utils import InitTrackerMeta, fn_args_to_dict, append_docstr
 
 __all__ = ['PretrainedTokenizer']
 
@@ -206,10 +206,15 @@ class PretrainedTokenizer(object):
                 those overflowing tokens will be added to the returned dictionary
                 when `return_overflowing_tokens` is `True`. Defaults to `None`.
             stride (`int`, optional):
-                If set to a positive number, the overflowing 
-                tokens which contain some tokens from the end of the truncated second sequence will be concatenated with 
-                the first sequence to generate new features. And The overflowing tokens would not be returned in dictionary.
-                The value of this argument defines the number of overlapping tokens. Defaults to 0.
+                Only available for batch input of sequence pair and mainly for
+                question answering usage. When for QA, `text` represents questions
+                and `text_pair` represents contexts. If `stride` is set to a
+                positive number, the context will be split into multiple spans
+                where `stride` defines the number of (tokenized) tokens to skip
+                from the start of one span to get the next span, thus will produce
+                a bigger batch than inputs to include all spans. Moreover, 'overflow_to_sample'
+                and 'offset_mapping' preserving the original example and position
+                information will be added to the returned dictionary. Defaults to 0.
             pad_to_max_seq_len (`bool`, optional):
                 If set to `True`, the returned sequences would be padded up to
                 `max_seq_len` specified length according to padding side
@@ -223,7 +228,7 @@ class PretrainedTokenizer(object):
                 - 'only_first': Only truncate the first sequence.
                 - 'only_second': Only truncate the second sequence.
                 - 'do_not_truncate': Do not truncate (raise an error if the input
-                sequence is longer than max_seq_len).
+                sequence is longer than `max_seq_len`).
 
                 Defaults to 'longest_first'.
             return_position_ids (`bool`, optional):
@@ -268,8 +273,12 @@ class PretrainedTokenizer(object):
                 - 'special_tokens_mask' (`list[int]`): List of integers valued 0 or 1,
                   with 0 specifying special added tokens and 1 specifying sequence tokens.
                   Included when `return_special_tokens_mask` is `True`.
-                - 'offset_mapping' (`list[int]`): list of (index of start char in text,index of end char in text) of token. (0,0) if token is a sqecial token
-                - 'overflow_to_sample' (`int`): Index of example from which this feature is generated
+                - 'offset_mapping' (`list[int]`): list of pair preserving the
+                  index of start and end char in original input for each token.
+                  For a sqecial token, the index pair is `(0, 0)`. Included when
+                  `stride` works.
+                - 'overflow_to_sample' (`int`): Index of example from which this
+                  feature is generated. Included when `stride` works.
         """
         # Input type checking for clearer error
         assert isinstance(text, str) or (

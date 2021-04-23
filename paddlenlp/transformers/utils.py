@@ -90,3 +90,11 @@ class InitTrackerMeta(type(Layer)):
             kwargs['init_class'] = self.__class__.__name__
 
         return __impl__
+
+
+def append_docstr(*docstr):
+    def docstr_decorator(fn):
+        fn.__doc__ = fn.__doc__ + "".join(docstr)
+        return fn
+
+    return docstr_decorator
