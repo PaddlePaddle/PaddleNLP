@@ -400,7 +400,7 @@ class AlbertTransformer(Layer):
                  max_position_embeddings,
                  layer_norm_eps,
                  position_embedding_type,
-                 ):
+    ):
         super(AlbertTransformer, self).__init__()
 
         self.num_hidden_layers = num_hidden_layers
@@ -575,6 +575,7 @@ class AlbertModel(AlbertPretrainedModel):
                  num_attention_heads=12,
                  intermediate_size=3072,
                  inner_group_num=1,
+                 hidden_act="gelu",
                  hidden_dropout_prob=0,
                  attention_probs_dropout_prob=0,
                  max_position_embeddings=512,
@@ -589,6 +590,7 @@ class AlbertModel(AlbertPretrainedModel):
                  add_pooling_layer=True,
                  ):
         super(AlbertModel, self).__init__()
+
         self.embeddings = AlbertEmbeddings(
             vocab_size,
             embedding_size,
@@ -597,27 +599,29 @@ class AlbertModel(AlbertPretrainedModel):
             type_vocab_size,
             layer_norm_eps,
             position_embedding_type,
-            pad_token_id,
-        )
+            pad_token_id,)
+
         self.encoder = AlbertTransformer(
             embedding_size,
             hidden_size,
-            num_hidden_groups,
-            intermediate_size,
-            hidden_dropout_prob,
-            layer_norm_eps,
-            inner_group_num,
             num_hidden_layers,
+            num_hidden_groups,
             num_attention_heads,
+            intermediate_size,
+            inner_group_num,
+            hidden_dropout_prob,
             attention_probs_dropout_prob,
             max_position_embeddings,
-        )
+            layer_norm_eps,
+            position_embedding_type,)
+
         if add_pooling_layer:
             self.pooler = nn.Linear(hidden_size, hidden_size)
             self.pooler_activation = nn.Tanh()
         else:
             self.pooler = None
             self.pooler_activation = None
+
         self.init_weights()
 
     def get_input_embeddings(self):
@@ -627,21 +631,7 @@ class AlbertModel(AlbertPretrainedModel):
         self.embeddings.word_embeddings = value
 
     def _prune_heads(self, heads_to_prune):
-        """
-        Prunes heads of the model. heads_to_prune: dict of {layer_num: list of heads to prune in this layer} ALBERT has
-        a different architecture in that its layers are shared across groups, which then has inner groups. If an ALBERT
-        model has 12 hidden layers and 2 hidden groups, with two inner groups, there is a total of 4 different layers.
-
-        These layers are flattened: the indices [0,1] correspond to the two inner groups of the first hidden layer,
-        while [2,3] correspond to the two inner groups of the second hidden layer.
-
-        Any layer with in index other than [0,1,2,3] will result in an error. See base class PreTrainedModel for more
-        information about head pruning
-        """
-        for layer, heads in heads_to_prune.items():
-            group_idx = int(layer / self.config.inner_group_num)
-            inner_group_idx = int(layer - group_idx * self.config.inner_group_num)
-            self.encoder.albert_layer_groups[group_idx].albert_layers[inner_group_idx].attention.prune_heads(heads)
+        pass
 
     def forward(
             self,
@@ -665,19 +655,27 @@ class AlbertModel(AlbertPretrainedModel):
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        device = input_ids.device if input_ids is not None else inputs_embeds.device
+        device = input_ids.place if input_ids is not None else inputs_embeds.place
+
         if attention_mask is None:
             attention_mask = paddle.ones(shape=input_shape)
         if token_type_ids is None:
-            token_type_ids = paddle.zeros(shape=input_shape, dtype='int64')
+            token_type_ids = paddle.zeros(shape=input_shape, dtype="int64")
+
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
         extended_attention_mask = paddle.cast(extended_attention_mask, dtype=dtype_float)
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-        head_mask = self.get_head_mask(head_mask, num_hidden_layers)
+        # todo: get head mask
+        # head_mask = self.get_head_mask(head_mask, num_hidden_layers)
+        head_mask = [None] * num_hidden_layers
 
         embedding_output = self.embeddings(
-            input_ids, position_ids=position_ids, token_type_ids=token_type_ids, inputs_embeds=inputs_embeds
+            input_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids,
+            inputs_embeds=inputs_embeds,
         )
+
         encoder_outputs = self.encoder(
             embedding_output,
             extended_attention_mask,
@@ -686,7 +684,9 @@ class AlbertModel(AlbertPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
+
         sequence_output = encoder_outputs[0]
+
         pooled_output = self.pooler_activation(self.pooler(sequence_output[:, 0])) if self.pooler is not None else None
         if not return_dict:
             return (sequence_output, pooled_output) + encoder_outputs[1:]
