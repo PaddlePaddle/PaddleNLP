@@ -19,7 +19,18 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import ErnieTokenizer, ErnieForTokenClassification
 from paddlenlp.metrics import ChunkEvaluator
 
-from data import load_dict, load_dataset, convert_ernie_example, parse_decodes
+from data import load_dict, load_dataset, parse_decodes
+
+
+def convert_to_features(example, tokenizer, label_vocab):
+    tokens, labels = example
+    tokenized_input = tokenizer(
+        tokens, return_length=True, is_split_into_words=True)
+    # Token '[CLS]' and '[SEP]' will get label 'O'
+    labels = ['O'] + labels + ['O']
+    tokenized_input['labels'] = [label_vocab[x] for x in labels]
+    return tokenized_input['input_ids'], tokenized_input[
+        'token_type_ids'], tokenized_input['seq_len'], tokenized_input['labels']
 
 
 @paddle.no_grad()
@@ -32,7 +43,7 @@ def evaluate(model, metric, data_loader):
         n_infer, n_label, n_correct = metric.compute(lens, preds, labels)
         metric.update(n_infer.numpy(), n_label.numpy(), n_correct.numpy())
         precision, recall, f1_score = metric.accumulate()
-    print("eval precision: %f - recall: %f - f1: %f" %
+    print("[EVAL] Precision: %f - Recall: %f - F1: %f" %
           (precision, recall, f1_score))
     model.train()
 
@@ -64,7 +75,7 @@ if __name__ == '__main__':
     tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
     trans_func = partial(
-        convert_ernie_example, tokenizer=tokenizer, label_vocab=label_vocab)
+        convert_to_features, tokenizer=tokenizer, label_vocab=label_vocab)
 
     train_ds.map(trans_func)
     dev_ds.map(trans_func)
@@ -104,21 +115,17 @@ if __name__ == '__main__':
 
     step = 0
     for epoch in range(10):
-        # Switch the model to training mode
-        model.train()
-        for idx, (input_ids, token_type_ids, length,
-                  labels) in enumerate(train_loader):
+        for input_ids, token_type_ids, length, labels in train_loader:
             logits = model(input_ids, token_type_ids)
             loss = paddle.mean(loss_fn(logits, labels))
             loss.backward()
             optimizer.step()
             optimizer.clear_grad()
             step += 1
-            print("epoch:%d - step:%d - loss: %f" % (epoch, step, loss))
+            print("[TRAIN] Epoch:%d - Step:%d - Loss: %f" % (epoch, step, loss))
         evaluate(model, metric, dev_loader)
 
-        paddle.save(model.state_dict(),
-                    './ernie_result/model_%d.pdparams' % step)
+        paddle.save(model.state_dict(), './ernie_ckpt/model_%d.pdparams' % step)
 
     preds = predict(model, test_loader, test_ds, label_vocab)
     file_path = "ernie_results.txt"
