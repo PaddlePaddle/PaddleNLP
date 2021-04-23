@@ -18,7 +18,7 @@ from paddlenlp.transformers import BertForPretraining, BertModel, BertForSequenc
 from paddlenlp.transformers import BertForTokenClassification, BertForQuestionAnswering
 from paddlenlp.transformers import BertTokenizer
 
-BERT_MODEL_CLASSES = {
+_BERT_MODEL_CLASSES = {
     "bert": BertModel,
     "sequence_classification": BertForSequenceClassification,
     "token_classification": BertForTokenClassification,
@@ -60,7 +60,7 @@ def bert(model_name_or_path='bert-base-uncased',
           model, tokenizer = hub.load('PaddlePaddle/PaddleNLP:develop', model='bert')
 
     """
-    model_class = BERT_MODEL_CLASSES[model_select]
+    model_class = _BERT_MODEL_CLASSES[model_select]
 
     model = model_class.from_pretrained(model_name_or_path)
     tokenizer = BertTokenizer.from_pretrained(model_name_or_path)
