@@ -467,7 +467,6 @@ class AlbertTransformer(Layer):
         }
 
 
-
 class AlbertPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained ALBERT models. It provides ALBERT related
@@ -563,7 +562,6 @@ class AlbertPretrainedModel(PretrainedModel):
             layer.weight.set_value(paddle.ones_like(layer.weight))
 
 
-# To begin with
 @register_base_model
 class AlbertModel(AlbertPretrainedModel):
     def __init__(self,
@@ -588,7 +586,7 @@ class AlbertModel(AlbertPretrainedModel):
                  bos_token_id=2,
                  eos_token_id=3,
                  add_pooling_layer=True,
-                 ):
+        ):
         super(AlbertModel, self).__init__()
 
         self.embeddings = AlbertEmbeddings(
@@ -699,18 +697,123 @@ class AlbertModel(AlbertPretrainedModel):
         }
 
 
-class AlbertForPreTraining(AlbertPretrainedModel):
-    pass
+class AlbertForPretraining(AlbertPretrainedModel):
+    def __init__(self, albert, lm_head, sop_head, vocab_size):
+        super(AlbertForPreTraining, self).__init__()
+
+        self.albert = albert
+        self.predictions = lm_head
+        self.sop_classifier = sop_head
+        self.init_weights()
+        self.vocab_size = vocab_size
+
+    def get_output_embeddings(self):
+        return self.predictions.decoder
+
+    def set_output_embeddings(self, new_embeddings):
+        self.predictions.decoder = new_embeddings
+
+    def get_input_embeddings(self):
+        return self.albert.embeddings.word_embeddings
+
+    def forward(self,
+                input_ids=None,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                head_mask=None,
+                inputs_embeds=None,
+                labels=None,
+                sentence_order_label=None,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False,
+    ):
+        outputs = self.albert(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        sequence_output, pooled_output = outputs[:2]
+
+        prediction_scores = self.predictions(sequence_output)
+        sop_scores = self.sop_classifier(pooled_output)
+
+        total_loss = None
+        if labels is not None and sentence_order_label is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            masked_lm_loss = loss_fct(prediction_scores.reshape((-1, self.vocab_size)), labels.reshape((-1)))
+            sentence_order_loss = loss_fct(sop_scores.reshape((-1, 2)), sentence_order_label.reshape((-1)))
+            total_loss = masked_lm_loss + sentence_order_loss
+
+        if not return_dict:
+            output = (prediction_scores, sop_scores) + outputs[2:]
+            return ((total_loss,) + output) if total_loss is not None else output
+
+        return {
+            "loss": total_loss,
+            "prediction_logits": prediction_scores,
+            "sop_logits": sop_scores,
+            "hidden_states": outputs["hidden_states"],
+            "attentions": outputs["attentions"],
+        }
 
 
 class AlbertMLMHead(Layer):
-    pass
+    def __init__(self,
+                 embedding_size,
+                 vocab_size,
+                 hidden_size,
+                 hidden_act,
+    ):
+        super(AlbertMLMHead, self).__init__()
+
+        self.layer_norm = nn.LayerNorm(embedding_size)
+        self.bias = self.create_parameter(
+            [vocab_size],
+            is_bias=True,
+            default_initializer=nn.initializer.Constant(value=0)
+        )
+        self.dense = nn.Linear(hidden_size, embedding_size)
+        self.decoder = nn.Linear(embedding_size, vocab_size)
+        self.activation = ACT2FN[hidden_act]
+
+        # link bias
+        self.decoder.bias = self.bias
+
+    def forward(self, hidden_states):
+        hidden_states = self.dense(hidden_states)
+        hidden_states = self.activation(hidden_states)
+        hidden_states = self.layer_norm(hidden_states)
+        hidden_states = self.decoder(hidden_states)
+
+        prediction_scores = hidden_states
+        print(prediction_scores)
 
 
 class AlbertSOPHead(Layer):
-    pass
+    def __init__(self,
+                 classifier_dropout_prob,
+                 hidden_size,
+                 num_labels,
+    ):
+        super(AlbertSOPHead, self).__init__()
+        self.dropout = nn.Dropout(classifier_dropout_prob)
+        self.classifier = nn.Linear(hidden_size, num_labels)
+
+    def forward(self, pooled_output):
+        dropout_pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(dropout_pooled_output)
+        return logits
 
 
+# To begin with
 class AlbertForMaskedLM(AlbertPretrainedModel):
     pass
 
