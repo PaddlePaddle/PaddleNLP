@@ -27,7 +27,7 @@ from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.utils.env import MODEL_HOME
 
 from ..data.vocab import Vocab
-from .utils import InitTrackerMeta, fn_args_to_dict, append_docstr
+from .utils import InitTrackerMeta, fn_args_to_dict
 
 __all__ = ['PretrainedTokenizer']
 
