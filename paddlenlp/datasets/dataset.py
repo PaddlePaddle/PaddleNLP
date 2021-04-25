@@ -19,6 +19,7 @@ import os
 import warnings
 import sys
 import inspect
+from multiprocess import Pool, RLock
 
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset
@@ -130,6 +131,7 @@ class MapDataset(Dataset):
     <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html>`__.
 
     """
+    data = None
 
     def __init__(self, data, **kwargs):
         self.data = data
@@ -158,7 +160,7 @@ class MapDataset(Dataset):
         """
         return len(self.new_data)
 
-    def filter(self, fn):
+    def filter(self, fn, num_workers=0):
         """
         Filters samples by the filter function and uses the filtered data to
         update this dataset.
@@ -166,8 +168,37 @@ class MapDataset(Dataset):
         Args:
             fn (callable): A filter function that takes a sample as input and
                 returns a boolean. Samples that return False would be discarded.
+            num_workers(int, optional): Number of processes for multiprocessing. If 
+                set to 0, it doesn't use multiprocessing. Defalt: 0.
         """
+        assert num_workers >= 0, "num_workers should be a non-negative value"
+        if num_workers > 0:
+            with Pool(num_workers, initargs=(RLock(), )) as pool:
 
+                def filter_shard(num_workers, index, fn):
+                    self.shard(num_shards=num_workers, index=index)
+                    self._filter(fn=fn)
+                    return self
+
+                kwds_per_shard = [
+                    dict(
+                        num_workers=num_workers, index=rank, fn=fn)
+                    for rank in range(num_workers)
+                ]
+                results = [
+                    pool.apply_async(
+                        filter_shard, kwds=kwds) for kwds in kwds_per_shard
+                ]
+                transformed_shards = [r.get() for r in results]
+
+                self.new_data = []
+                for i in range(num_workers):
+                    self.new_data += transformed_shards[i].new_data
+            return self
+        else:
+            return self._filter(fn)
+
+    def _filter(self, fn):
         self.new_data = [
             self.new_data[idx] for idx in range(len(self.new_data))
             if fn(self.new_data[idx])
@@ -202,7 +233,7 @@ class MapDataset(Dataset):
 
         return self
 
-    def map(self, fn, lazy=True, batched=False):
+    def map(self, fn, lazy=True, batched=False, num_workers=0):
         """
         Performs specific function on the dataset to transform and update every sample.
 
@@ -215,8 +246,43 @@ class MapDataset(Dataset):
                 result on all epochs. Defalt: False.
             batched(bool, optional): If True, transformations would take all examples as 
                 input and return a collection of transformed examples. Note that if set 
-                True, `lazy` option would be ignored. 
+                True, `lazy` option would be ignored. Defalt: False.
+            num_workers(int, optional): Number of processes for multiprocessing. If 
+                set to 0, it doesn't use multiprocessing. Note that if set to positive
+                value, `lazy` option would be ignored. Defalt: 0.
         """
+
+        assert num_workers >= 0, "num_workers should be a non-negative value"
+        if num_workers > 0:
+            with Pool(num_workers, initargs=(RLock(), )) as pool:
+
+                def map_shard(num_workers, index, fn, batched):
+                    self.shard(num_shards=num_workers, index=index)
+                    self._map(fn=fn, lazy=False, batched=batched)
+                    return self
+
+                kwds_per_shard = [
+                    dict(
+                        num_workers=num_workers,
+                        index=rank,
+                        fn=fn,
+                        batched=batched) for rank in range(num_workers)
+                ]
+                results = [
+                    pool.apply_async(
+                        map_shard, kwds=kwds) for kwds in kwds_per_shard
+                ]
+                transformed_shards = [r.get() for r in results]
+
+                self.new_data = []
+                for i in range(num_workers):
+                    self.new_data += transformed_shards[i].new_data
+
+            return self
+        else:
+            return self._map(fn, lazy=lazy, batched=batched)
+
+    def _map(self, fn, lazy=True, batched=False):
         if batched:
             self.new_data = fn(self.new_data)
         elif lazy:
@@ -225,11 +291,7 @@ class MapDataset(Dataset):
             self.new_data = [
                 fn(self.new_data[idx]) for idx in range(len(self.new_data))
             ]
-
         return self
-
-    def __getattr__(self, name):
-        return getattr(self.data, name)
 
 
 class IterDataset(IterableDataset):
@@ -348,9 +410,6 @@ class IterDataset(IterableDataset):
         self._transform_pipline.append(fn)
 
         return self
-
-    def __getattr__(self, name):
-        return getattr(self.data, name)
 
 
 class DatasetBuilder:
