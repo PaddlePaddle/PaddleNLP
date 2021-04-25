@@ -35,7 +35,7 @@
 
 公开数据集：WMT 翻译大赛是机器翻译领域最具权威的国际评测大赛，其中英德翻译任务提供了一个中等规模的数据集，这个数据集是较多论文中使用的数据集，也是 Transformer 论文中用到的一个数据集。我们也将[WMT'14 EN-DE 数据集](http://www.statmt.org/wmt14/translation-task.html)作为示例提供。
 
-同时，我们提供了一份已经处理好的数据集，可以编写如下代码，对应的数据集将会自动下载并且解压到 `~/.paddlenlp/datasets/machine_translation/WMT14ende/`。这部分已经在 reader.py 中有写明，若无自行修改可以无需编写相应代码。
+同时，我们提供了一份已经处理好的数据集，可以编写如下代码，对应的数据集将会自动下载并且解压到 `~/.paddlenlp/datasets/WMT14ende/`。这部分已经在 reader.py 中有写明，若无自行修改可以无需编写相应代码。
 
 ``` python
 datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
