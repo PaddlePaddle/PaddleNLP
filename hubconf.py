@@ -23,7 +23,7 @@ _BERT_MODEL_CLASSES = {
     "sequence_classification": BertForSequenceClassification,
     "token_classification": BertForTokenClassification,
     "question_answering": BertForQuestionAnswering,
-    "pretrain": BertForPretraining
+    "pretraining": BertForPretraining
 }
 
 
@@ -42,7 +42,7 @@ def bert(model_name_or_path='bert-base-uncased',
             'bert-wwm-ext-chinese'. Default: 'bert-base-uncased'.
         model_select (str, optional): model class to select. It could be
             'bert', 'sequence_classification', 'token_classification',
-            'question_answering' or 'pretrain'. If 'sequence_classification'
+            'question_answering' or 'pretraining'. If 'sequence_classification'
             is chosen, model class would be `BertForSequenceClassification`.
             The document of BERT model could be seen at `bert.modeling
             <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.bert.modeling.html>`_
