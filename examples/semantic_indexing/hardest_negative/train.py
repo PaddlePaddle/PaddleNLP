@@ -28,7 +28,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 from model import SemanticIndexHardestNeg
-from utils.util import convert_example
+from data import read_text_pair, convert_example
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -89,7 +89,8 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds = load_dataset("similar_text_pair", data_files=args.train_set_file)
+    train_ds = load_dataset(
+        read_text_pair, data_path=args.train_set_file, lazy=False)
 
     # If you wanna use bert/roberta pretrained model,
     # pretrained_model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese')

@@ -23,9 +23,9 @@ import paddle
 import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
+from data import convert_example
 
 from model import SemanticIndexHardestNeg
-from utils.util import convert_example
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -74,8 +74,10 @@ def predict(model, data, tokenizer, batch_size=1):
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
     ): [data for data in fn(samples)]
 
-    cosin_sims = []
+    cosine_sims = []
+
     model.eval()
+
     for batch in batches:
         query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batchify_fn(
             batch)
@@ -85,24 +87,17 @@ def predict(model, data, tokenizer, batch_size=1):
         title_input_ids = paddle.to_tensor(title_input_ids)
         title_token_type_ids = paddle.to_tensor(title_token_type_ids)
 
-        query_embeddings = model.get_pooled_embedding(
-            query_input_ids, token_type_ids=query_token_type_ids)
+        batch_cosine_sim = model.cosine_sim(
+            query_input_ids=query_input_ids,
+            title_input_ids=title_input_ids,
+            query_token_type_ids=query_token_type_ids,
+            title_token_type_ids=title_token_type_ids)
 
-        title_embeddings = model.get_pooled_embedding(
-            title_input_ids, token_type_ids=title_token_type_ids)
+        cosine_sims.append(batch_cosine_sim)
 
-        cosin_sim = [
-            local_cosin(query_embeddings[idx], title_embeddings[idx])
-            for idx in range(0, len(query_embeddings))
-        ]
-        cosin_sims += list(cosin_sim)
-    return cosin_sims
+    cosine_sims = np.concatenate(cosine_sims, axis=0)
 
-
-def local_cosin(u, v):
-    u = u.numpy()
-    v = v.numpy()
-    return np.dot(u, v) / (np.linalg.norm(u) * np.linalg.norm(v))
+    return cosine_sims
 
 
 if __name__ == "__main__":
@@ -114,7 +109,10 @@ if __name__ == "__main__":
         all_lines = []
         with open(input_file) as f:
             for line in f:
-                all_lines.append(line.rstrip().split("\t"))
+                data = line.rstrip().split("\t")
+                # Note: Here used dict is to compatible with  `convert_example` function
+                example = {"text_a": data[0], "text_b": data[1]}
+                all_lines.append(example)
         return all_lines
 
     data = gen_data(args.input_file)
@@ -131,6 +129,6 @@ if __name__ == "__main__":
     cosin_sim = predict(model, data, tokenizer, batch_size=args.batch_size)
 
     for idx, text in enumerate(data):
-        text_a = text[0]
-        text_b = text[1]
+        text_a = text["text_a"]
+        text_b = text["text_b"]
         print('{}\t{}\t{}'.format(text_a, text_b, cosin_sim[idx]))

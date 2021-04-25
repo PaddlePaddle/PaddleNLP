@@ -37,6 +37,28 @@ class SemanticIndexHardestNeg(nn.Layer):
 
         return cls_embedding
 
+    def cosine_sim(self,
+                   query_input_ids,
+                   title_input_ids,
+                   query_token_type_ids=None,
+                   query_position_ids=None,
+                   query_attention_mask=None,
+                   title_token_type_ids=None,
+                   title_position_ids=None,
+                   title_attention_mask=None):
+
+        query_cls_embedding = self.get_pooled_embedding(
+            query_input_ids, query_token_type_ids, query_position_ids,
+            query_attention_mask)
+
+        title_cls_embedding = self.get_pooled_embedding(
+            title_input_ids, title_token_type_ids, title_position_ids,
+            title_attention_mask)
+
+        cosine_sim = paddle.sum(query_cls_embedding * title_cls_embedding,
+                                axis=-1).numpy()
+        return cosine_sim
+
     def forward(self,
                 query_input_ids,
                 title_input_ids,

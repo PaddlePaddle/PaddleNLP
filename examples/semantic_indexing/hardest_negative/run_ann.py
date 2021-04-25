@@ -27,7 +27,7 @@ import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
-from utils.util import convert_example
+from data import convert_example
 
 from model import SemanticIndexHardestNeg
 
@@ -69,7 +69,7 @@ def get_semantic_embedding(data, model, tokenizer, batch_size=1):
     examples = []
     for text in data:
         query_input_ids, query_token_type_ids = convert_example(
-            [text], tokenizer, max_seq_length=args.max_seq_length)
+            text, tokenizer, max_seq_length=args.max_seq_length)
         examples.append((query_input_ids, query_token_type_ids))
 
     # Seperates data into some batches.
@@ -141,8 +141,8 @@ if __name__ == "__main__":
 
     def gen_data(corpus_file):
         with open(corpus_file) as f:
-            for idx, line in enumerate(f):
-                yield line
+            for line in f:
+                yield {"doc": line.rstrip()}
 
     def id2corpus(corpus_file):
         id2corpus = {}
@@ -175,7 +175,7 @@ if __name__ == "__main__":
             for line in f:
                 query, label_text = line.rstrip().split("\t")
                 query2label[query] = label_text
-                querys.append(query)
+                querys.append({"query": query})
         return querys, query2label
 
     querys, query2label = gen_query_file(args.similar_text_pair)
@@ -183,7 +183,10 @@ if __name__ == "__main__":
     query_embedding = get_semantic_embedding(
         querys, model, tokenizer, batch_size=args.batch_size)
 
-    recall_result_file = os.path.join("recall_result", args.recall_result)
+    recall_result_dir = "recall_result"
+    if not os.path.exists(recall_result_dir):
+        os.mkdir(recall_result_dir)
+    recall_result_file = os.path.join(recall_result_dir, args.recall_result)
     with open(recall_result_file, 'w') as f:
         for batch_index, batch_query_embedding in enumerate(query_embedding):
             recalled_idx, cosine_sims = final_index.knn_query(
@@ -194,6 +197,6 @@ if __name__ == "__main__":
             for row_index in range(batch_size):
                 query_index = args.batch_size * batch_index + row_index
                 for idx, doc_idx in enumerate(recalled_idx[row_index]):
-                    f.write("{}\t{}\t{}\n".format(querys[
-                        query_index], id2corpus[doc_idx], 1.0 - cosine_sims[
+                    f.write("{}\t{}\t{}\n".format(querys[query_index][
+                        "query"], id2corpus[doc_idx], 1.0 - cosine_sims[
                             row_index][idx]))

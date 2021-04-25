@@ -1,6 +1,6 @@
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License"
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
@@ -35,10 +35,20 @@ def convert_example(example, tokenizer, max_seq_length=512):
     """
 
     result = []
-    for text in example:
+    for key, text in example.items():
         encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length)
         input_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
         result += [input_ids, token_type_ids]
 
     return result
+
+
+def read_text_pair(data_path):
+    """Reads data."""
+    with open(data_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            data = line.rstrip().split("\t")
+            if len(data) != 2:
+                continue
+            yield {'query': data[0], 'pos_sample': data[1]}
