@@ -51,7 +51,7 @@ limitations under the License. */
 namespace fastertransformer {
 
 enum class OperationType { FP32, FP16 };
-enum class AllocatorType { CUDA, TF, TH, PD };
+enum class AllocatorType { CUDA, PD };
 
 #define PRINT_FUNC_NAME_()                                          \
   do {                                                              \

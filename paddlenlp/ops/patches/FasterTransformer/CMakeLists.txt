@@ -24,36 +24,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-cmake_minimum_required(VERSION 3.8 FATAL_ERROR) # for PyTorch extensions, version should be greater than 3.13
+cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 project(FasterTransformer LANGUAGES CXX CUDA)
 
 find_package(CUDA 10.1 REQUIRED)
 
 option(BUILD_TRT "Build in TensorRT mode" OFF)
-option(BUILD_TF "Build in TensorFlow mode" OFF)
-option(BUILD_THE "Build in PyTorch eager mode" OFF)
-option(BUILD_THS "Build in TorchScript class mode" OFF)
-
-if(BUILD_THS)
-  if(DEFINED ENV{NVIDIA_PYTORCH_VERSION})
-    if($ENV{NVIDIA_PYTORCH_VERSION} VERSION_LESS "20.03")
-      message(FATAL_ERROR "NVIDIA PyTorch image is too old for TorchScript mode.")
-    endif()
-    if($ENV{NVIDIA_PYTORCH_VERSION} VERSION_EQUAL "20.03")
-      add_definitions(-DLEGACY_THS=1)
-    endif()
-  endif()
-endif()
 
 set(CXX_STD "11" CACHE STRING "C++ standard")
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
-
-set(TF_PATH "" CACHE STRING "TensorFlow path")
-
-if(BUILD_TF AND NOT TF_PATH)
-  message(FATAL_ERROR "TF_PATH must be set if BUILD_TF(=TensorFlow mode) is on.")
-endif()
 
 set(TRT_PATH "" CACHE STRING "TensorRT path")
 
@@ -86,11 +66,6 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode=arch=compute_${SM},code=\\\"s
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}  -DWMMA")
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DWMMA")
   endif()
-if(BUILD_THE OR BUILD_THS)
-  string(SUBSTRING ${SM} 0 1 SM_MAJOR)
-  string(SUBSTRING ${SM} 1 1 SM_MINOR)
-  set(ENV{TORCH_CUDA_ARCH_LIST} "${SM_MAJOR}.${SM_MINOR}")
-endif()
 message("-- Assign GPU architecture (sm=${SM})")
 
 else()
@@ -102,9 +77,6 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}  \
 set(CMAKE_C_FLAGS    "${CMAKE_C_FLAGS}    -DWMMA")
 set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}  -DWMMA")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DWMMA")
-if(BUILD_THE OR BUILD_THS)
-  set(ENV{TORCH_CUDA_ARCH_LIST} "7.0;7.5")
-endif()
 message("-- Assign GPU architecture (sm=70,75)")
 endif()
 
@@ -136,11 +108,6 @@ set(COMMON_LIB_DIRS
   ${CUDA_PATH}/lib64
 )
 
-if(BUILD_TF)
-  list(APPEND COMMON_HEADER_DIRS ${TF_PATH}/include)
-  list(APPEND COMMON_LIB_DIRS ${TF_PATH})
-endif()
-
 if(BUILD_TRT)
   list(APPEND COMMON_HEADER_DIRS ${TRT_PATH}/include)
   list(APPEND COMMON_LIB_DIRS ${TRT_PATH}/lib)
@@ -150,46 +117,6 @@ if(NOT PY_CMD)
   set(PYTHON_PATH "python" CACHE STRING "Python path")
 else()
   set(PYTHON_PATH ${PY_CMD} CACHE STRING "Python path")
-endif()
-if(BUILD_THS)
-  execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import torch; print(torch.__version__,end='');"
-                  RESULT_VARIABLE _PYTHON_SUCCESS
-                  OUTPUT_VARIABLE TORCH_VERSION)
-  if (TORCH_VERSION VERSION_LESS "1.5.0")
-      message(FATAL_ERROR "PyTorch >= 1.5.0 is needed for TorchScript mode.")
-  endif()
-endif()
-if(BUILD_THE OR BUILD_THS)
-  execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import os; import torch;
-print(os.path.dirname(torch.__file__),end='');"
-                  RESULT_VARIABLE _PYTHON_SUCCESS
-                  OUTPUT_VARIABLE TORCH_DIR)
-  if (NOT _PYTHON_SUCCESS MATCHES 0)
-      message(FATAL_ERROR "Torch config Error.")
-  endif()
-  list(APPEND CMAKE_PREFIX_PATH ${TORCH_DIR})
-  find_package(Torch REQUIRED)
-
-  execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; from distutils import sysconfig;
-print(sysconfig.get_python_inc());
-print(sysconfig.get_config_var('SO'));"
-                  RESULT_VARIABLE _PYTHON_SUCCESS
-                  OUTPUT_VARIABLE _PYTHON_VALUES)
-  if (NOT _PYTHON_SUCCESS MATCHES 0)
-      message(FATAL_ERROR "Python config Error.")
-  endif()
-  string(REGEX REPLACE ";" "\\\\;" _PYTHON_VALUES ${_PYTHON_VALUES})
-  string(REGEX REPLACE "\n" ";" _PYTHON_VALUES ${_PYTHON_VALUES})
-  list(GET _PYTHON_VALUES 0 PY_INCLUDE_DIR)
-  list(GET _PYTHON_VALUES 1 PY_SUFFIX)
-  list(APPEND COMMON_HEADER_DIRS ${PY_INCLUDE_DIR})
-
-  execute_process(COMMAND ${PYTHON_PATH} "-c" "from torch.utils import cpp_extension; print(' '.join(cpp_extension._prepare_ldflags([],True,False)),end='');"
-                  RESULT_VARIABLE _PYTHON_SUCCESS
-                  OUTPUT_VARIABLE TORCH_LINK)
-  if (NOT _PYTHON_SUCCESS MATCHES 0)
-      message(FATAL_ERROR "PyTorch link config Error.")
-  endif()
 endif()
 
 if(BUILD_PD)
@@ -235,21 +162,3 @@ link_directories(
 add_subdirectory(fastertransformer)
 add_subdirectory(tools)
 add_subdirectory(sample)
-
-if(BUILD_TF)
-  add_custom_target(copy ALL COMMENT "Copying tensorflow test scripts")
-  add_custom_command(TARGET copy
-      POST_BUILD
-      COMMAND cp ${PROJECT_SOURCE_DIR}/sample/tensorflow/ ${PROJECT_BINARY_DIR} -r
- )
-endif()
-
-if(BUILD_THE OR BUILD_THS)
-  add_custom_target(copy ALL COMMENT "Copying pytorch test scripts")
-  add_custom_command(TARGET copy
-      POST_BUILD
-      COMMAND cp ${PROJECT_SOURCE_DIR}/sample/pytorch/ ${PROJECT_BINARY_DIR} -r
-      COMMAND mkdir -p ${PROJECT_BINARY_DIR}/pytorch/translation/data/
-      COMMAND cp ${PROJECT_SOURCE_DIR}/sample/tensorflow/utils/translation/test.* ${PROJECT_BINARY_DIR}/pytorch/translation/data/
- )
-endif()
