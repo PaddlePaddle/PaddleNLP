@@ -178,6 +178,7 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
         self.distilbert = distilbert  # allow bert to be config
         self.pre_classifier = nn.Linear(self.distilbert.config["hidden_size"],
                                         self.distilbert.config["hidden_size"])
+        self.activation = nn.ReLU()
         self.dropout = nn.Dropout(dropout if dropout is not None else
                                   self.distilbert.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.distilbert.config["hidden_size"],
@@ -190,7 +191,7 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
 
         pooled_output = distilbert_output[:, 0]
         pooled_output = self.pre_classifier(pooled_output)
-        pooled_output = nn.ReLU()(pooled_output)
+        pooled_output = self.activation(pooled_output)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
@@ -243,6 +244,7 @@ class DistilBertForMaskedLM(DistilBertPretrainedModel):
         self.distilbert = distilbert
         self.vocab_transform = nn.Linear(self.distilbert.config["hidden_size"],
                                          self.distilbert.config["hidden_size"])
+        self.activation = nn.GELU()
         self.vocab_layer_norm = nn.LayerNorm(self.distilbert.config[
             "hidden_size"])
         self.vocab_projector = nn.Linear(self.distilbert.config["hidden_size"],
@@ -250,14 +252,11 @@ class DistilBertForMaskedLM(DistilBertPretrainedModel):
 
         self.apply(self.init_weights)
 
-    def forward(
-            self,
-            input_ids=None,
-            attention_mask=None, ):
+    def forward(self, input_ids=None, attention_mask=None):
         distilbert_output = self.distilbert(
             input_ids=input_ids, attention_mask=attention_mask)
         prediction_logits = self.vocab_transform(distilbert_output)
-        prediction_logits = nn.GELU()(prediction_logits)
+        prediction_logits = self.activation(prediction_logits)
         prediction_logits = self.vocab_layer_norm(prediction_logits)
         prediction_logits = self.vocab_projector(prediction_logits)
         return prediction_logits
