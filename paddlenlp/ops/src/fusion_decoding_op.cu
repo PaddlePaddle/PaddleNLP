@@ -99,7 +99,7 @@ std::vector<paddle::Tensor> decoding_kernel(
   decoding_params.stream = stream;
   int device_id;
   cudaGetDevice(&device_id);
-  fastertransformer::Allocator<AllocatorType::CUDA> allocator_(device_id);
+  fastertransformer::Allocator<AllocatorType::PD> allocator_(stream);
 
   decoding_params.memory_tensor =
       reinterpret_cast<const DataType_*>(input.data<data_t_>());

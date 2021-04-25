@@ -5,7 +5,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddlenlp.transformers import TransformerModel, position_encoding_init
+from paddlenlp.transformers import TransformerModel, WordEmbedding, PositionalEmbedding, position_encoding_init
 from paddlenlp.ops import InferTransformerDecoding
 
 
@@ -55,6 +55,12 @@ class FasterTransformer(TransformerModel):
 
         self.decoding_linear = nn.Linear(
             in_features=d_model, out_features=trg_vocab_size)
+
+        if weight_sharing:
+            self.trg_word_embedding = WordEmbedding(
+                vocab_size=trg_vocab_size, emb_dim=d_model, bos_idx=self.bos_id)
+            self.trg_pos_embedding = PositionalEmbedding(
+                emb_dim=d_model, max_length=max_length, bos_idx=self.bos_id)
 
         self.decoding = InferTransformerDecoding(
             decoder=self.transformer.decoder,
@@ -142,6 +148,10 @@ class FasterTransformer(TransformerModel):
                     model_dict[item] = np.float16(model_dict[item])
             model_dict["decoding_linear.weight"] = np.float16(model_dict[
                 "decoding_linear.weight"])
+            model_dict["trg_word_embedding.word_embedding.weight"] = np.float16(
+                model_dict["trg_word_embedding.word_embedding.weight"])
+            model_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
+                model_dict["trg_pos_embedding.pos_encoder.weight"])
 
         self.load_dict(model_dict)
 
@@ -184,6 +194,10 @@ class FasterTransformer(TransformerModel):
                     model_dict[item] = np.float16(model_dict[item])
             model_dict["decoding_linear.weight"] = np.float16(model_dict[
                 "decoding_linear.weight"])
+            model_dict["trg_word_embedding.word_embedding.weight"] = np.float16(
+                model_dict["trg_word_embedding.word_embedding.weight"])
+            model_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
+                model_dict["trg_pos_embedding.pos_encoder.weight"])
 
         for item in self.state_dict():
             param = self
