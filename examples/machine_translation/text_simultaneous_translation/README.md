@@ -2,20 +2,19 @@
 
 同声传译（Simultaneous Translation），即在句子完成之前进行翻译，同声传译的目标是实现同声传译的自动化，它可以与源语言同时翻译，延迟时间只有几秒钟。
 
-本项目是基于机器翻译领域主流模型 Transformer[1]的 PaddlePaddle 实现，包含模型训练，预测以及使用自定义数据等内容。用户可以基于发布的内容搭建自己的同传翻译模型。
+同声传译的难点在于源语言和目标语言之间词序的差异带来的翻译延迟。 例如，考虑将SOV（主宾谓）语言（如日语或德语）翻译为SVO（主谓宾）语言（如英语或汉语），必须等到源语言动词出现才可以准确翻译。因此，翻译系统必须求助于传统的全句翻译，因此造成至少一句话的延迟。
+
+本项目是基于机器翻译领域主流模型 Transformer[1]网络结构的同传模型STACL的PaddlePaddle 实现，包含模型训练，预测以及使用自定义数据等内容。用户可以基于发布的内容搭建自己的同传翻译模型。
 
 ## 模型介绍
 
-### 同声传译难点
-源语言和目标语言之间词序的差异带来的翻译延迟。 例如，考虑将SOV语言（如日语或德语）翻译为SVO语言（如英语或汉语），必须等到源语言动词出现才可以准确翻译。因此，翻译系统必须求助于传统的全句翻译，因此造成至少一句话的延迟。
-
 ### 模型特点
 
-STACL 是论文 [STACL: Simultaneous Translation with Implicit Anticipation and Controllable Latency using Prefix-to-Prefix Framework](https://www.aclweb.org/anthology/P19-1289/) 中新提出的Prefix-to-Prefix架构，该架构仅使用源句子的前缀来预测目标词[2]。
+STACL 是论文 [STACL: Simultaneous Translation with Implicit Anticipation and Controllable Latency using Prefix-to-Prefix Framework](https://www.aclweb.org/anthology/P19-1289/) 中针对同传提出的适用于所有同传场景的翻译架构[2]，该架构基于Transformer实现，可参考PaddleNLP的[Transformer](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_translation/transformer)。
 
 STACL 主要具有以下优势：
 
-- Prefix-to-Prefix架构隐式地将预期作为副产品学习，克服了SOV→SVO等词序差异；
+- Prefix-to-Prefix架构拥有预测能力，即在未看到源词的情况下仍然可以翻译出对应的目标词，克服了SOV→SVO等词序差异；
 
 - Wait-k策略可以不需要全句的源句，直接预测目标句，可以实现任意的字级延迟，同时保持较高的翻译质量。
 
@@ -34,19 +33,6 @@ Wait-k策略首先等待源句单词，然后与源句的其余部分同时翻�
 图 3. Wait-k 例子
 </p>
 
-
-### 模型实现
-
-该项目基于Transformer实现。
-
-Transformer 中的 Encoder 由若干相同的 layer 堆叠组成，每个 layer 主要由多头注意力（Multi-Head Attention）和全连接的前馈（Feed-Forward）网络这两个 sub-layer 构成。 此外，每个 sub-layer 后还施以 Residual Connection [3]和 Layer Normalization [4]来促进梯度传播和模型收敛。
-
-<p align="center">
-<img src="images/transformer_network.png" height=500 hspace='10'/> <br />
-图 2. Transformer
-</p>
-Decoder 具有和 Encoder 类似的结构，只是相比于组成 Encoder 的 layer ，在组成 Decoder 的 layer 中还多了一个 Multi-Head Attention 的 sub-layer 来实现对 Encoder 输出的 Attention，这个 Encoder-Decoder Attention 在其他 Seq2Seq 模型中也是存在的。
-
 ## 环境依赖
  - attrdict==2.0.1
  - PyYAML==5.4.1
@@ -58,21 +44,24 @@ Decoder 具有和 Encoder 类似的结构，只是相比于组成 Encoder 的 la
 ## 数据准备
 
 ### 数据分词
-中文需要首先经过jieba分词，然后经过BPE分词(Byte Pair Encoding)；英文需要经过BPE分词。
-我们也提供分词的接口，下面给出分词的具体操作：
+中文需要首先经过jieba分词，然后经过BPE分词(Byte Pair Encoding)；英文仅需要经过BPE分词。
+BPE分词需要对应的BPE词典，这里提供下载链接：[中文BPE词典]()，[英文BPE词典]()。
+
+我们提供分词的接口，下面给出分词的具体操作：
 ```python
 from utils.tokenizer import STACLTokenizer
 
-tokenizer_zh = STACLTokenizer('data/nist2m/2M.zh2en.dict4bpe.zh', is_chinese=True)
+tokenizer_zh = STACLTokenizer('2M.zh2en.dict4bpe.zh', is_chinese=True)
 # 处理中文字符串
 print(tokenizer_zh.tokenize('玻利维亚举行总统与国会选举'))
 # 输出是: 玻@@ 利@@ 维亚 举行 总统 与 国会 选举
 
 # 处理英文字符串
-tokenizer_en = STACLTokenizer('data/nist2m/2M.zh2en.dict4bpe.en', is_chinese=False)
+tokenizer_en = STACLTokenizer('2M.zh2en.dict4bpe.en', is_chinese=False)
 print(tokenizer_en.tokenize('bolivia holds presidential and parliament elections'))
 # 输出是：bol@@ i@@ via holds presidential and parliament elections
 ```
+
 ### 数据格式
 每行数据为分词后的中英文，用制表符分割。
 ```
