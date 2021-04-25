@@ -355,7 +355,8 @@ class SimultaneousTransformer(nn.Layer):
                 training=self.training) if self.dropout else trg_emb
 
             if waitk < 0 or i >= len(enc_outputs):
-                # Avoid getting the whole source in advance, a diff from: https://github.com/autosimtrans/SimulTransBaseline/blob/master/model.py#L1207
+                # Avoid getting the whole source in advance, a diff from:
+                # https://github.com/autosimtrans/SimulTransBaseline/blob/master/model.py#L1207
                 # if the decoder step is full sent or longer than all source
                 # step, then read the whole src
                 _e = enc_outputs[-1]
