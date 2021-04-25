@@ -22,14 +22,15 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 import paddlenlp as ppnlp
+from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
-from data import convert_example
 
+from data import read_text_pair, convert_example, create_dataloader
 from model import SemanticIndexHardestNeg
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--input_file", type=str, default='', help="The full path of input file")
+parser.add_argument("--text_pair_file", type=str, default='', help="The full path of input file")
 parser.add_argument("--params_path", type=str, default='', help="The path to model parameters to be loaded.")
 parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
@@ -39,7 +40,7 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def predict(model, data, tokenizer, batch_size=1):
+def predict(model, data_loader):
     """
     Predicts the data labels.
 
@@ -54,19 +55,41 @@ def predict(model, data, tokenizer, batch_size=1):
     Returns:
         results(obj:`List`): cosine similarity of text pairs.
     """
-    examples = []
-    for text_pair in data:
-        query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = convert_example(
-            text_pair, tokenizer, max_seq_length=args.max_seq_length)
+    cosine_sims = []
 
-        examples.append((query_input_ids, query_token_type_ids, title_input_ids,
-                         title_token_type_ids))
+    model.eval()
 
-    # Seperates data into some batches.
-    batches = [
-        examples[idx:idx + batch_size]
-        for idx in range(0, len(examples), batch_size)
-    ]
+    with paddle.no_grad():
+        for batch_data in data_loader:
+            query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch_data
+
+            query_input_ids = paddle.to_tensor(query_input_ids)
+            query_token_type_ids = paddle.to_tensor(query_token_type_ids)
+            title_input_ids = paddle.to_tensor(title_input_ids)
+            title_token_type_ids = paddle.to_tensor(title_token_type_ids)
+
+            batch_cosine_sim = model.cosine_sim(
+                query_input_ids=query_input_ids,
+                title_input_ids=title_input_ids,
+                query_token_type_ids=query_token_type_ids,
+                title_token_type_ids=title_token_type_ids)
+
+            cosine_sims.append(batch_cosine_sim)
+
+        cosine_sims = np.concatenate(cosine_sims, axis=0)
+
+        return cosine_sims
+
+
+if __name__ == "__main__":
+    paddle.set_device(args.device)
+
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+
+    trans_func = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -75,48 +98,15 @@ def predict(model, data, tokenizer, batch_size=1):
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
     ): [data for data in fn(samples)]
 
-    cosine_sims = []
+    valid_ds = load_dataset(
+        read_text_pair, data_path=args.text_pair_file, lazy=False)
 
-    model.eval()
-
-    for batch in batches:
-        query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batchify_fn(
-            batch)
-
-        query_input_ids = paddle.to_tensor(query_input_ids)
-        query_token_type_ids = paddle.to_tensor(query_token_type_ids)
-        title_input_ids = paddle.to_tensor(title_input_ids)
-        title_token_type_ids = paddle.to_tensor(title_token_type_ids)
-
-        batch_cosine_sim = model.cosine_sim(
-            query_input_ids=query_input_ids,
-            title_input_ids=title_input_ids,
-            query_token_type_ids=query_token_type_ids,
-            title_token_type_ids=title_token_type_ids)
-
-        cosine_sims.append(batch_cosine_sim)
-
-    cosine_sims = np.concatenate(cosine_sims, axis=0)
-
-    return cosine_sims
-
-
-if __name__ == "__main__":
-    paddle.set_device(args.device)
-
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-
-    def gen_data(input_file):
-        all_lines = []
-        with open(input_file) as f:
-            for line in f:
-                data = line.rstrip().split("\t")
-                # Note: Here used dict is to compatible with  `convert_example` function
-                example = {"text_a": data[0], "text_b": data[1]}
-                all_lines.append(example)
-        return all_lines
-
-    data = gen_data(args.input_file)
+    valid_data_loader = create_dataloader(
+        valid_ds,
+        mode='predict',
+        batch_size=args.batch_size,
+        batchify_fn=batchify_fn,
+        trans_fn=trans_func)
 
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         "ernie-1.0")
@@ -127,9 +117,7 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
 
-    cosin_sim = predict(model, data, tokenizer, batch_size=args.batch_size)
+    cosin_sim = predict(model, valid_data_loader)
 
-    for idx, text in enumerate(data):
-        text_a = text["text_a"]
-        text_b = text["text_b"]
-        print('{}\t{}\t{}'.format(text_a, text_b, cosin_sim[idx]))
+    for idx, cosine in enumerate(cosin_sim):
+        print('{}'.format(cosine))

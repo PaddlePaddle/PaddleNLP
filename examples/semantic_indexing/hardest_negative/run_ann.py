@@ -34,7 +34,7 @@ from model import SemanticIndexHardestNeg
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--corpus_file", type=str, default='', help="The full path of input file")
-parser.add_argument("--similar_text_pair", type=str, default='', help="The full path of similar text pair file")
+parser.add_argument("--similar_text_pair_file_file", type=str, default='', help="The full path of similar text pair file")
 parser.add_argument("--recall_result", type=str, default='', help="The full path of recall result file")
 parser.add_argument("--params_path", type=str, default='./checkpoint/model_2700/model_state.pdparams', help="The path to model parameters to be loaded.")
 parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum total input sequence length after tokenization. "
@@ -90,7 +90,7 @@ def get_semantic_embedding(data, model, tokenizer, batch_size=1):
         query_token_type_ids = paddle.to_tensor(query_token_type_ids)
 
         query_embeddings = model.get_pooled_embedding(
-            query_input_ids, token_type_ids=query_token_type_ids).cpu()
+            query_input_ids, token_type_ids=query_token_type_ids)
 
         yield query_embeddings.numpy()
 
@@ -168,17 +168,17 @@ if __name__ == "__main__":
 
     id2corpus = id2corpus(args.corpus_file)
 
-    def gen_query_file(similar_text_pair):
+    def gen_query_file(similar_text_pair_file):
         query2label = {}
         querys = []
-        with open(args.similar_text_pair) as f:
+        with open(args.similar_text_pair_file) as f:
             for line in f:
                 query, label_text = line.rstrip().split("\t")
                 query2label[query] = label_text
                 querys.append({"query": query})
         return querys, query2label
 
-    querys, query2label = gen_query_file(args.similar_text_pair)
+    querys, query2label = gen_query_file(args.similar_text_pair_file)
 
     query_embedding = get_semantic_embedding(
         querys, model, tokenizer, batch_size=args.batch_size)

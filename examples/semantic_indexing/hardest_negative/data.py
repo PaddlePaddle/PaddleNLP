@@ -12,6 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import paddle
+
+
+def create_dataloader(dataset,
+                      mode='train',
+                      batch_size=1,
+                      batchify_fn=None,
+                      trans_fn=None):
+    if trans_fn:
+        dataset = dataset.map(trans_fn)
+
+    shuffle = True if mode == 'train' else False
+    if mode == 'train':
+        batch_sampler = paddle.io.DistributedBatchSampler(
+            dataset, batch_size=batch_size, shuffle=shuffle)
+    else:
+        batch_sampler = paddle.io.BatchSampler(
+            dataset, batch_size=batch_size, shuffle=shuffle)
+
+    return paddle.io.DataLoader(
+        dataset=dataset,
+        batch_sampler=batch_sampler,
+        collate_fn=batchify_fn,
+        return_list=True)
+
 
 def convert_example(example, tokenizer, max_seq_length=512):
     """
@@ -51,4 +76,4 @@ def read_text_pair(data_path):
             data = line.rstrip().split("\t")
             if len(data) != 2:
                 continue
-            yield {'query': data[0], 'pos_sample': data[1]}
+            yield {'text_a': data[0], 'text_b': data[1]}
