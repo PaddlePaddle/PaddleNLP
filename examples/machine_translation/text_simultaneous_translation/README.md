@@ -124,10 +124,10 @@ perl mosesdecoder/scripts/generic/multi-bleu.perl newstest2017.tok.en < predict.
 | Wait-k策略     | 模型连接     | 4-ref BLEU on NIST 2008|
 | ------------ | --------------- |---------|
 | Wait-1 | [下载]() |30.94|
-| Wait-3   |[下载]()|34.62 |
-| Wait-5   |[下载]()|36.80 |
-| Wait-7   |[下载]()|38.22 |
-| Wait-∞(整句模型)   |[下载]()|41.41 |
+| Wait-3   |[下载]()|34.24 |
+| Wait-5   |[下载]()|36.30 |
+| Wait-7   |[下载]()|37.84 |
+| Wait_-1(整句模型)   |[下载]()|41.41 |
 
 
 ## 参考文献
