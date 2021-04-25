@@ -45,6 +45,7 @@ parser.add_argument("--seed", type=int, default=1000, help="random seed for init
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--save_steps', type=int, default=10000, help="Inteval steps to save checkpoint")
 parser.add_argument("--train_set_file", default='./train.tsv', type=str, help="The full path of train_set_file")
+parser.add_argument("--margin", default=0.3, type=float, help="Margin for pair-wise margin_rank_loss")
 
 
 args = parser.parse_args()
@@ -122,7 +123,7 @@ def do_train():
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
 
-    model = SemanticIndexHardestNeg(pretrained_model)
+    model = SemanticIndexHardestNeg(pretrained_model, margin=args.margin)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -147,9 +148,6 @@ def do_train():
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
-
-    criterion = paddle.nn.loss.CrossEntropyLoss()
-    metric = paddle.metric.Accuracy()
 
     global_step = 0
     tic_train = time.time()

@@ -20,10 +20,11 @@ import paddle.nn.functional as F
 
 
 class SemanticIndexHardestNeg(nn.Layer):
-    def __init__(self, pretrained_model, dropout=None):
+    def __init__(self, pretrained_model, dropout=None, margin=0.3):
         super().__init__()
         self.ptm = pretrained_model
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
+        self.margin = margin
 
     def get_pooled_embedding(self,
                              input_ids,
@@ -77,17 +78,23 @@ class SemanticIndexHardestNeg(nn.Layer):
             title_input_ids, title_token_type_ids, title_position_ids,
             title_attention_mask)
 
-        cosin_sim = paddle.matmul(
+        cosine_sim = paddle.matmul(
             query_cls_embedding, title_cls_embedding, transpose_y=True)
-        pos_sim = paddle.max(cosin_sim, axis=-1)
+        pos_sim = paddle.diag(cosine_sim)
 
-        # mask pos_sim
-        mask_pos_sim = paddle.diag(
-            paddle.to_tensor(np.array([10000.0] * len(query_cls_embedding))))
-        tmp_cosin_sim = cosin_sim - mask_pos_sim
+        # subtract 10000 from all diagnal elements of cosine_sim
+        mask_socre = paddle.full(
+            shape=[query_cls_embedding.shape[0]],
+            fill_value=10000,
+            dtype='float32')
+        tmp_cosin_sim = cosine_sim - paddle.diag(mask_socre)
         hardest_negative_sim = paddle.max(tmp_cosin_sim, axis=-1)
 
-        labels = paddle.to_tensor([1.0] * len(query_cls_embedding))
+        labels = paddle.full(
+            shape=[query_cls_embedding.shape[0]],
+            fill_value=1.0,
+            dtype='float32')
+
         loss = F.margin_ranking_loss(
-            pos_sim, hardest_negative_sim, labels, margin=0.3)
+            pos_sim, hardest_negative_sim, labels, margin=self.margin)
         return loss

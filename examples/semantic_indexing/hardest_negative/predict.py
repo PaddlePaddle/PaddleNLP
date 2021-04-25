@@ -67,6 +67,7 @@ def predict(model, data, tokenizer, batch_size=1):
         examples[idx:idx + batch_size]
         for idx in range(0, len(examples), batch_size)
     ]
+
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
