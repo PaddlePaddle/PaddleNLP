@@ -17,7 +17,7 @@ import jieba
 from subword_nmt import subword_nmt
 
 
-class STACLTokenizer():
+class STACLTokenizer:
     def __init__(self, bpe_dict, is_chinese):
         bpe_parser = subword_nmt.create_apply_bpe_parser()
         bpe_args = bpe_parser.parse_args(args=['-c', bpe_dict])
