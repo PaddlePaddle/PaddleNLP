@@ -90,6 +90,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --config ./config/transf
 
 可以在`config/transformer.yaml` 文件中设置相应的参数。如果执行不提供 `--config` 选项，程序将默认使用`config/transformer.yaml` 的配置。
 
+建议：如果为了更好的效果，可先在整句模型(即waitk=-1)进行预训练，然后在此基础上根据不同的waitk进行微调来训练不同的waitk模型。
 ## 模型推理
 
 模型训练完成后可以执行以下命令对指定文件中的文本进行翻译：
