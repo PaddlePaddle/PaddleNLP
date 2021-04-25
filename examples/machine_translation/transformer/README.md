@@ -112,13 +112,17 @@ python export_model.py --config ./configs/transformer.base.yaml
 
 模型默认保存在 `infer_model/` 路径下面。可以在 `configs/` 路径下的配置文件中更改 `inference_model_dir` 配置，从而保存至自定义的路径。
 
-其次，对于完成动转静的静态图的模型，可以使用 `inference.py` 实现使用预测引擎进行高性能预测的功能。此时，因为保存静态图模型本身已经包括了模型结构，所以，指定的配置文件将只用于 `reader` 以及指定预测使用的设备（gpu/cpu/xpu），模型结构相关的配置将不再起作用。
+#### 使用 Paddle Inference API 进行推理
 
-``` sh
-python deploy/python/inference.py  --config ./configs/transformer.base.yaml
-```
+准备好以上模型之后，可以使用预测引擎 Paddle Inference API 进行推理。
 
-翻译结果同样将会保存在 `predict.txt` 文件中，可以在配置文件中自定义更改 `output_file` 来指定预测结果写入到的文件的名称。
+如果使用 Paddle Inference Python API，可以参考[使用 Paddle Inference Python API 推理](./deploy/python/README.md)。
+
+如果使用 Paddle Inference C++ API，可以参考[使用 Paddle Inference C++ API 推理](./deploy/cpp/README.md)。
+
+#### 使用 Paddle Serving 进行推理
+
+除了使用 Paddle Inference API 进行本地推理外，还可以使用 Paddle Serving 实现在服务器上部署推理模型，客户端发送数据进行推理。可以参考[使用 Paddle Serving 推理](./deploy/serving/README.md)。
 
 ## 静态图
 
