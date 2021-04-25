@@ -1,6 +1,6 @@
 # 快递单信息抽取 (Waybill Information Extraction)
 
-## 1. 简介
+## 简介
 
 本示例将通过BiGRU-CRF和ERNIE + FC两类模型，演示如何从用户提供的快递单中，抽取姓名、电话、省、市、区、详细地址等内容，形成结构化信息。辅助物流行业从业者进行有效信息的提取，从而降低客户填单的成本。
 
@@ -8,7 +8,13 @@
 
 ### 数据准备
 
-数据集已经保存在data目录中，示例如下
+执行以下命令，下载并解压示例数据集：
+
+```bash
+python download.py --data_dir ./  
+```
+
+数据示例如下：
 
 ```
 1^B6^B6^B2^B0^B2^B0^B0^B0^B7^B7^B宣^B荣^B嗣^B甘^B肃^B省^B白^B银^B市^B会^B宁^B县^B河^B畔^B镇^B十^B字^B街^B金^B海^B超^B市^B西^B行^B5^B0^B米    T-B^BT-I^BT-I^BT-I^BT-I^BT-I^BT-I^BT-I^BT-I^BT-I^BT-I^BP-B^BP-I^BP-I^BA1-B^BA1-I^BA1-I^BA2-B^BA2-I^BA2-I^BA3-B^BA3-I^BA3-I^BA4-B^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I^BA4-I
@@ -35,17 +41,26 @@
 #### 启动BiGRU + CRF训练
 
 ```bash
-export CUDA_VISIBLE_DEVICES=0 # 只支持单卡训练
+export CUDA_VISIBLE_DEVICES=0
 python run_bigru_crf.py
 ```
-
-更多详细教程请参考：[基于Bi-GRU+CRF的快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1317771)
 
 #### 启动ERNIE + FC训练
 
 ```bash
-export CUDA_VISIBLE_DEVICES=0 # 只支持单卡训练
+export CUDA_VISIBLE_DEVICES=0
 python run_ernie.py
 ```
 
-更多详细教程请参考：[使用PaddleNLP预训练模型ERNIE优化快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1329361)
+#### 启动ERNIE + CRF训练
+
+```bash
+export CUDA_VISIBLE_DEVICES=0
+python run_ernie_crf.py
+```
+
+## 更多详细教程请参考：
+
+[基于Bi-GRU+CRF的快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1317771)
+
+[使用预训练模型ERNIE优化快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1329361)

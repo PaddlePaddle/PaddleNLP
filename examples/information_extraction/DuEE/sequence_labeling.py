@@ -53,7 +53,7 @@ parser.add_argument("--checkpoints", type=str, default=None, help="Directory to 
 parser.add_argument("--init_ckpt", type=str, default=None, help="already pretraining model checkpoint")
 parser.add_argument("--predict_save_path", type=str, default=None, help="predict data save path")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument("--n_gpu", type=int, default=1, help="Number of GPUs to use, 0 for CPU.")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable.
 
@@ -87,15 +87,14 @@ def evaluate(model, criterion, metric, num_label, data_loader):
 def convert_example_to_feature(example, tokenizer, label_vocab=None, max_seq_len=512, no_entity_label="O", ignore_label=-1, is_test=False):
     tokens, labels = example
     tokenized_input = tokenizer(
-        example,
+        tokens,
         return_length=True,
         is_split_into_words=True,
-        pad_to_max_seq_len=True,
         max_seq_len=max_seq_len)
 
-    input_ids = tokenized_input[0]['input_ids']
-    token_type_ids = tokenized_input[0]['token_type_ids']
-    seq_len = tokenized_input[0]['seq_len']
+    input_ids = tokenized_input['input_ids']
+    token_type_ids = tokenized_input['token_type_ids']
+    seq_len = tokenized_input['seq_len']
 
     if is_test:
         return input_ids, token_type_ids, seq_len
@@ -103,8 +102,6 @@ def convert_example_to_feature(example, tokenizer, label_vocab=None, max_seq_len
         labels = labels[:(max_seq_len-2)]
         encoded_label = [no_entity_label] + labels + [no_entity_label]
         encoded_label = [label_vocab[x] for x in encoded_label]
-        # padding label 
-        encoded_label += [ignore_label]* (max_seq_len - len(encoded_label))
         return input_ids, token_type_ids, seq_len, encoded_label
 
 
@@ -133,12 +130,13 @@ class DuEventExtraction(paddle.io.Dataset):
 
 
 def do_train():
-    set_seed(args)
-    paddle.set_device("gpu" if args.n_gpu  else "cpu")
-
+    paddle.set_device(args.device)
     world_size = paddle.distributed.get_world_size()
+    rank = paddle.distributed.get_rank()
     if world_size > 1:
         paddle.distributed.init_parallel_env()
+
+    set_seed(args)
 
     no_entity_label = "O"
     ignore_label = -1
@@ -184,9 +182,19 @@ def do_train():
         collate_fn=batchify_fn)
 
     num_training_steps = len(train_loader) * args.num_epoch
-    optimizer = paddle.optimizer.AdamW(learning_rate=args.learning_rate, parameters=model.parameters())
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
+    optimizer = paddle.optimizer.AdamW(
+        learning_rate=args.learning_rate,
+        parameters=model.parameters(),
+        weight_decay=args.weight_decay,
+        apply_decay_param_fun=lambda x: x in decay_params)
 
-    metric = ChunkEvaluator(label_list=train_ds.label_vocab.keys(), suffix=True)
+    metric = ChunkEvaluator(label_list=train_ds.label_vocab.keys(), suffix=False)
     criterion = paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label)
 
     step, best_f1 = 0, 0.0
@@ -200,9 +208,9 @@ def do_train():
             optimizer.step()
             optimizer.clear_grad()
             loss_item = loss.numpy().item()
-            if step > 0 and step % args.skip_step == 0 and paddle.distributed.get_rank() == 0:
+            if step > 0 and step % args.skip_step == 0 and rank == 0:
                 print(f'train epoch: {epoch} - step: {step} (total: {num_training_steps}) - loss: {loss_item:.6f}')
-            if step > 0 and step % args.valid_step == 0 and paddle.distributed.get_rank() == 0:
+            if step > 0 and step % args.valid_step == 0 and rank == 0:
                 p, r, f1, avg_loss = evaluate(model, criterion, metric, len(label_map), dev_loader)
                 print(f'dev step: {step} - loss: {avg_loss:.5f}, precision: {p:.5f}, recall: {r:.5f}, ' \
                         f'f1: {f1:.5f} current best {best_f1:.5f}')
@@ -214,11 +222,13 @@ def do_train():
             step += 1
 
     # save the final model
-    if paddle.distributed.get_rank() == 0:
+    if rank == 0:
         paddle.save(model.state_dict(), '{}/final.pdparams'.format(args.checkpoints))
 
 
 def do_predict():
+    paddle.set_device(args.device)
+
     no_entity_label = "O"
     ignore_label = -1
 
@@ -241,8 +251,8 @@ def do_predict():
 
     encoded_inputs_list = []
     for sent in sentences:
-        sent = sent["text"]
-        input_ids, token_type_ids, seq_len = convert_example([list(sent), []], tokenizer,
+        sent = sent["text"].replace(" ", "\002")
+        input_ids, token_type_ids, seq_len = convert_example_to_feature([list(sent), []], tokenizer,
                     max_seq_len=args.max_seq_len, is_test=True)
         encoded_inputs_list.append((input_ids, token_type_ids, seq_len))
 
@@ -279,9 +289,7 @@ def do_predict():
 
 if __name__ == '__main__':
 
-    if args.n_gpu > 1 and args.do_train:
-        paddle.distributed.spawn(do_train, nprocs=args.n_gpu)
-    elif args.do_train:
+    if args.do_train:
         do_train()
     elif args.do_predict:
         do_predict()

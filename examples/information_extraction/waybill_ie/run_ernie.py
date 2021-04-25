@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,69 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from functools import partial
 
 import paddle
-from paddlenlp.datasets import MapDataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import ErnieTokenizer, ErnieForTokenClassification
 from paddlenlp.metrics import ChunkEvaluator
 
-
-def parse_decodes(ds, decodes, lens, label_vocab):
-    decodes = [x for batch in decodes for x in batch]
-    lens = [x for batch in lens for x in batch]
-    id_label = dict(zip(label_vocab.values(), label_vocab.keys()))
-
-    outputs = []
-    for idx, end in enumerate(lens):
-        sent = ds.data[idx][0][:end]
-        tags = [id_label[x] for x in decodes[idx][1:end]]
-        sent_out = []
-        tags_out = []
-        words = ""
-        for s, t in zip(sent, tags):
-            if t.endswith('-B') or t == 'O':
-                if len(words):
-                    sent_out.append(words)
-                tags_out.append(t.split('-')[0])
-                words = s
-            else:
-                words += s
-        if len(sent_out) < len(tags_out):
-            sent_out.append(words)
-        outputs.append(''.join(
-            [str((s, t)) for s, t in zip(sent_out, tags_out)]))
-    return outputs
+from data import load_dict, load_dataset, parse_decodes
 
 
-@paddle.no_grad()
-def evaluate(model, metric, data_loader):
-    model.eval()
-    metric.reset()
-    for input_ids, seg_ids, lens, labels in data_loader:
-        logits = model(input_ids, seg_ids)
-        preds = paddle.argmax(logits, axis=-1)
-        n_infer, n_label, n_correct = metric.compute(None, lens, preds, labels)
-        metric.update(n_infer.numpy(), n_label.numpy(), n_correct.numpy())
-        precision, recall, f1_score = metric.accumulate()
-    print("eval precision: %f - recall: %f - f1: %f" %
-          (precision, recall, f1_score))
-
-
-def predict(model, data_loader, ds, label_vocab):
-    pred_list = []
-    len_list = []
-    for input_ids, seg_ids, lens, labels in data_loader:
-        logits = model(input_ids, seg_ids)
-        pred = paddle.argmax(logits, axis=-1)
-        pred_list.append(pred.numpy())
-        len_list.append(lens.numpy())
-    preds = parse_decodes(ds, pred_list, len_list, label_vocab)
-    return preds
-
-
-def convert_example(example, tokenizer, label_vocab):
+def convert_to_features(example, tokenizer, label_vocab):
     tokens, labels = example
     tokenized_input = tokenizer(
         tokens, return_length=True, is_split_into_words=True)
@@ -84,28 +33,35 @@ def convert_example(example, tokenizer, label_vocab):
         'token_type_ids'], tokenized_input['seq_len'], tokenized_input['labels']
 
 
-def load_dict(dict_path):
-    vocab = {}
-    for line in open(dict_path, 'r', encoding='utf-8'):
-        value, key = line.strip('\n').split('\t')
-        vocab[key] = int(value)
-    return vocab
+@paddle.no_grad()
+def evaluate(model, metric, data_loader):
+    model.eval()
+    metric.reset()
+    for input_ids, seg_ids, lens, labels in data_loader:
+        logits = model(input_ids, seg_ids)
+        preds = paddle.argmax(logits, axis=-1)
+        n_infer, n_label, n_correct = metric.compute(lens, preds, labels)
+        metric.update(n_infer.numpy(), n_label.numpy(), n_correct.numpy())
+        precision, recall, f1_score = metric.accumulate()
+    print("[EVAL] Precision: %f - Recall: %f - F1: %f" %
+          (precision, recall, f1_score))
+    model.train()
 
 
-def load_dataset(datafiles):
-    def read(data_path):
-        with open(data_path, 'r', encoding='utf-8') as fp:
-            next(fp)  # Skip header
-            for line in fp.readlines():
-                words, labels = line.strip('\n').split('\t')
-                words = words.split('\002')
-                labels = labels.split('\002')
-                yield words, labels
-
-    if isinstance(datafiles, str):
-        return MapDataset(list(read(datafiles)))
-    elif isinstance(datafiles, list) or isinstance(datafiles, tuple):
-        return [MapDataset(list(read(datafile))) for datafile in datafiles]
+@paddle.no_grad()
+def predict(model, data_loader, ds, label_vocab):
+    all_preds = []
+    all_lens = []
+    for input_ids, seg_ids, lens, labels in data_loader:
+        logits = model(input_ids, seg_ids)
+        preds = paddle.argmax(logits, axis=-1)
+        # Drop CLS prediction
+        preds = [pred[1:] for pred in preds.numpy()]
+        all_preds.append(preds)
+        all_lens.append(lens)
+    sentences = [example[0] for example in ds.data]
+    results = parse_decodes(sentences, all_preds, all_lens, label_vocab)
+    return results
 
 
 if __name__ == '__main__':
@@ -115,11 +71,11 @@ if __name__ == '__main__':
     train_ds, dev_ds, test_ds = load_dataset(datafiles=(
         './data/train.txt', './data/dev.txt', './data/test.txt'))
 
-    label_vocab = load_dict('./conf/tag.dic')
+    label_vocab = load_dict('./data/tag.dic')
     tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
     trans_func = partial(
-        convert_example, tokenizer=tokenizer, label_vocab=label_vocab)
+        convert_to_features, tokenizer=tokenizer, label_vocab=label_vocab)
 
     train_ds.map(trans_func)
     dev_ds.map(trans_func)
@@ -159,21 +115,17 @@ if __name__ == '__main__':
 
     step = 0
     for epoch in range(10):
-        # Switch the model to training mode
-        model.train()
-        for idx, (input_ids, token_type_ids, length,
-                  labels) in enumerate(train_loader):
+        for input_ids, token_type_ids, length, labels in train_loader:
             logits = model(input_ids, token_type_ids)
             loss = paddle.mean(loss_fn(logits, labels))
             loss.backward()
             optimizer.step()
             optimizer.clear_grad()
             step += 1
-            print("epoch:%d - step:%d - loss: %f" % (epoch, step, loss))
+            print("[TRAIN] Epoch:%d - Step:%d - Loss: %f" % (epoch, step, loss))
         evaluate(model, metric, dev_loader)
 
-        paddle.save(model.state_dict(),
-                    './ernie_result/model_%d.pdparams' % step)
+        paddle.save(model.state_dict(), './ernie_ckpt/model_%d.pdparams' % step)
 
     preds = predict(model, test_loader, test_ds, label_vocab)
     file_path = "ernie_results.txt"

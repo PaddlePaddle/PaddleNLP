@@ -1,0 +1,123 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.transformers.model_utils.rst:2
+msgid "model\\_utils"
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel:1
+msgid ""
+"基类：:class:`paddle.fluid.dygraph.layers.Layer`, "
+":class:`paddlenlp.transformers.generation_utils.GenerationMixin`"
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel:1
+msgid ""
+"The base class for all pretrained models. It provides some attributes and"
+" common methods for all pretrained models, including attributes "
+"`init_config`, `config` for initialized arguments and methods for saving,"
+" loading. It also includes some class attributes (should be set by "
+"derived classes): - `model_config_file` (str): represents the file name "
+"for saving and loading"
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel:6
+msgid "model configuration, it's value is `model_config.json`."
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel:7
+msgid ""
+"`resource_files_names` (dict): use this to map resources to specific file"
+" names for saving and loading."
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel:9
+msgid ""
+"`pretrained_resource_files_map` (dict): The dict has the same keys as "
+"`resource_files_names`, the values are also dict mapping specific "
+"pretrained model name to URL linking to pretrained model."
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel:12
+msgid ""
+"`pretrained_init_configuration` (dict): The dict has pretrained model "
+"names as keys, and the values are also dict preserving corresponding "
+"configuration for model initialization."
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel:16
+msgid ""
+"`base_model_prefix` (str): represents the the attribute associated to the"
+" base model in derived classes of the same architecture adding layers on "
+"top of the base model."
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel.from_pretrained:1
+msgid ""
+"Instantiate an instance of `PretrainedModel` from a predefined model "
+"specified by name or path. :param pretrained_model_name_or_path: A name "
+"of or a file path to a"
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel.from_pretrained:4
+msgid "pretrained model."
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel.from_pretrained
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel.from_pretrained:6
+msgid ""
+"position arguments for `__init__`. If provide, use this as position "
+"argument values for model initialization."
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel.from_pretrained:9
+msgid ""
+"keyword arguments for `__init__`. If provide, use this to update pre-"
+"defined keyword argument values for model initialization."
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel.from_pretrained
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel.from_pretrained:14
+msgid "An instance of PretrainedModel."
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel.from_pretrained
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel.save_pretrained:1
+msgid ""
+"Save model configuration and related resources (model state) to files "
+"under `save_directory`. :param save_directory: Directory to save files "
+"into. :type save_directory: str"
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.register_base_model:1
+msgid ""
+"Add a `base_model_class` attribute for the base class of decorated class,"
+" representing the base model class in derived classes of the same "
+"architecture. :param cls: the name of the model :type cls: class"
+msgstr ""
+

@@ -30,7 +30,8 @@ DuReader-robust数据集是单篇章、抽取式阅读理解数据集，具体�
 按如下方式启动 Fine-tuning:
 
 ```shell
-python -u ./run_du.py \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" run_du.py \
     --task_name dureader_robust \
     --model_type bert \
     --model_name_or_path bert-base-chinese \
@@ -42,10 +43,10 @@ python -u ./run_du.py \
     --save_steps 1000 \
     --warmup_proportion 0.1 \
     --weight_decay 0.01 \
-    --output_dir ./tmp/dureader_robust/ \
-    --do_predict \
+    --output_dir ./tmp/dureader-robust/ \
     --do_train \
-    --n_gpu 1 \
+    --do_predict \
+    --device gpu \
  ```
 
 * `task_name`: 数据集的名称，不区分大小写，如dureader_robust，cmrc2018, drcd。

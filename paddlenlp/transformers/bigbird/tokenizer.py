@@ -29,19 +29,22 @@ class BigBirdTokenizer(PretrainedTokenizer):
     Constructs a BigBird tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
+
     Args:
-        sentencepiece_model_file(str): file path of the vocabulary
-        do_lower_case (bool): Whether the text strips accents and convert to
+        sentencepiece_model_file (`str`): File path of the vocabulary
+        do_lower_case (`bool`): Whether the text strips accents and convert to
             lower case. If you use the BigBird pretrained model, lower is set to
             False when using the cased model, otherwise it is set to True.
-            Default: True.
-        unk_token (str): The special token for unkown words. Default: "[UNK]".
-        sep_token (str): The special token for separator token . Default: "[SEP]".
-        pad_token (str): The special token for padding. Default: "[PAD]".
-        cls_token (str): The special token for cls. Default: "[CLS]".
-        mask_token (str): The special token for mask. Default: "[MASK]".
+            Defaults to True.
+        unk_token (`str`): The special token for unkown words. Defaults to `[UNK]`.
+        sep_token (`str`): The special token for separator token . Defaults to `[SEP]`.
+        pad_token (`str`): The special token for padding. Defaults to `[PAD]`.
+        cls_token (`str`): The special token for cls. Defaults to `[CLS]`.
+        mask_token (`str`): The special token for mask. Defaults to `[MASK]`.
     
-    Examples:
+    Raises:
+        ValueError: If file sentencepiece_model_file doesn't exist. 
+
     """
     resource_files_names = {
         "sentencepiece_model_file": "sentencepiece_gpt2.model",
@@ -50,17 +53,12 @@ class BigBirdTokenizer(PretrainedTokenizer):
         "sentencepiece_model_file": {
             "bigbird-base-uncased":
             "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/sentencepiece_gpt2.model",
-            "bigbird-base-uncased-finetune":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/bigbird/sentencepiece_gpt2.model"
         },
     }
     pretrained_init_configuration = {
         "bigbird-base-uncased": {
             "do_lower_case": True
         },
-        "bigbird-base-uncased-finetune": {
-            "do_lower_case": True
-        }
     }
 
     def __init__(self,
@@ -97,24 +95,27 @@ class BigBirdTokenizer(PretrainedTokenizer):
         self.unk_id = vocab_dict[unk_token]
         self.cls_id = vocab_dict[cls_token]
         self.sep_id = vocab_dict[sep_token]
+        self.pad_id = vocab_dict[pad_token] if pad_token in vocab_dict else 0
 
     @property
     def vocab_size(self):
         """
-        return the size of vocabulary.
+        Returns the size of vocabulary.
+
         Returns:
-            int: the size of vocabulary.
+            `Int`: The size of vocabulary.
         """
         return len(self.vocab)
 
     def _tokenize(self, text):
         """
         End-to-end tokenization for BigBird models.
+
         Args:
             text (str): The text to be tokenized.
         
         Returns:
-            list: A list of string representing converted tokens.
+            `List`: A list of string representing converted tokens.
         """
         if len(text) == 0:
             return []
@@ -130,14 +131,15 @@ class BigBirdTokenizer(PretrainedTokenizer):
                 in_vocab_tokens.append(self.unk_token)
         return in_vocab_tokens
 
-    def __call__(self, text):
+    def __call__(self, text, pair_text=None):
         """
         End-to-end tokenization for BigBird models.
+
         Args:
             text (str): The text to be tokenized.
-        
+            pair_text(str):  The pair text to be tokenized.
         Returns:
-            list: A list of string representing converted tokens.
+            `List`: A list of string representing converted tokens.
         """
         return self._tokenize(text)
 
@@ -146,10 +148,11 @@ class BigBirdTokenizer(PretrainedTokenizer):
         Converts a sequence of tokens (list of string) in a single string. Since
         the usage of WordPiece introducing `##` to concat subwords, also remove
         `##` when converting.
+
         Args:
             tokens (list): A list of string representing tokens to be converted.
         Returns:
-            str: Converted string from tokens.
+            `Str`: Converted string from tokens.
         """
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
@@ -160,6 +163,19 @@ class BigBirdTokenizer(PretrainedTokenizer):
                max_pred_len=None,
                masked_lm_prob=0.15):
         """
+        Returns a tuple containing the encoded sequence and mask information.
+
+        Args:
+            text (:obj:`str`, :obj:`List[str]` or :obj:`List[int]`):
+                The first sequence to be encoded. This can be a string, a list of strings (tokenized string using
+                the `tokenize` method) or a list of integers (tokenized string ids using the `convert_tokens_to_ids`
+                method)
+            max_seq_len (:obj:`int`, `optional`, defaults to`None`):
+                If set to a number, will limit the total sequence returned so that it has a maximum length.
+                If set to None, will not limit the total sequence.
+            max_pred_len (:obj:`int`, `optional`, defaults to `None`):
+                If set to a number, will limit the mask sequence returned so that it has a maximum prediction length.
+                If set to None, will not limit the mask sequence.
         """
 
         def get_input_ids(text):
@@ -249,3 +265,49 @@ class BigBirdTokenizer(PretrainedTokenizer):
                                      [0, pred_padding_len], "constant")
         masked_lm_ids = np.pad(masked_lm_ids, [0, pred_padding_len], "constant")
         return span_ids, masked_lm_positions, masked_lm_ids, masked_lm_weights
+
+    def num_special_tokens_to_add(self, pair=False):
+        """
+        Returns the number of added tokens when encoding a sequence with special tokens.
+
+        Note:
+            This encodes inputs and checks the number of added tokens, and is therefore not efficient. Do not put this
+            inside your training loop.
+
+        Args:
+            pair (`bool`): Returns the number of added tokens in the case of a sequence pair if set to True, returns the
+                number of added tokens in the case of a single sequence if set to False. 
+
+        Returns:
+            `Int`: Number of tokens added to sequences
+        """
+        token_ids_0 = []
+        token_ids_1 = []
+        return len(
+            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
+                                                  if pair else None))
+
+    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        """
+        Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
+        adding special tokens. 
+        
+        A BERT sequence has the following format:
+
+            - single sequence: `[CLS] X [SEP]`
+            - pair of sequences: `[CLS] A [SEP] B [SEP]`
+
+        Args:
+            token_ids_0 (:obj:`List[int]`):
+                List of IDs to which the special tokens will be added.
+            token_ids_1 (:obj:`List[int]`, `optional`):
+                Optional second list of IDs for sequence pairs.
+
+        Returns:
+            `List[int]`: List of input_id with the appropriate special tokens.
+        """
+        if token_ids_1 is None:
+            return [self.cls_id] + token_ids_0 + [self.sep_id]
+        _cls = [self.cls_id]
+        _sep = [self.sep_id]
+        return _cls + token_ids_0 + _sep + token_ids_1 + _sep
