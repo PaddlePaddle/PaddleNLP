@@ -18,7 +18,7 @@ def parse_args():
         default="../configs/transformer.big.yaml",
         type=str,
         help="Path of the config file. ")
-    parser.add_argument("--batch-size", type=int, help="Batch size. ")
+    parser.add_argument("--batch_size", type=int, help="Batch size. ")
     parser.add_argument(
         "--threads", default=1, type=int, help="Number of threads. ")
     parser.add_argument(

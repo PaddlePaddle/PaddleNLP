@@ -25,11 +25,11 @@ std::string model_dir = "";
 std::string dict_dir = "";
 std::string datapath = "";
 
-const int eos_idx = 1;
-const int pad_idx = 0;
-const int beam_size = 5;
-const int max_length = 256;
-const int n_best = 1;
+const int EOS_IDX = 1;
+const int PAD_IDX = 0;
+const int BEAM_SIZE = 5;
+const int MAX_LENGTH = 256;
+const int N_BEST = 1;
 
 int batch_size = 1;
 int gpu_id = 0;
@@ -55,21 +55,21 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
   seq_ids_out.resize(out_num);
   seq_ids->CopyToCpu(seq_ids_out.data());
 
-  dataresultvec.resize(batch_size * n_best);
+  dataresultvec.resize(batch_size * N_BEST);
   auto max_output_length = output_shape[1];
 
   for (int bsz = 0; bsz < output_shape[0]; ++bsz) {
-    for (int k = 0; k < n_best; ++k) {
-      dataresultvec[bsz * n_best + k].result_q = "";
+    for (int k = 0; k < N_BEST; ++k) {
+      dataresultvec[bsz * N_BEST + k].result_q = "";
       for (int len = 0; len < max_output_length; ++len) {
-        if (seq_ids_out[bsz * max_output_length * beam_size + len * beam_size +
-                        k] == eos_idx) {
+        if (seq_ids_out[bsz * max_output_length * BEAM_SIZE + len * BEAM_SIZE +
+                        k] == EOS_IDX) {
           break;
         }
-        dataresultvec[bsz * n_best + k].result_q =
-            dataresultvec[bsz * n_best + k].result_q +
-            num2word_dict[seq_ids_out[bsz * max_output_length * beam_size +
-                                      len * beam_size + k]] +
+        dataresultvec[bsz * N_BEST + k].result_q =
+            dataresultvec[bsz * N_BEST + k].result_q +
+            num2word_dict[seq_ids_out[bsz * max_output_length * BEAM_SIZE +
+                                      len * BEAM_SIZE + k]] +
             " ";
       }
     }
@@ -82,11 +82,10 @@ public:
   explicit DataReader(const std::string& path)
       : file(new std::ifstream(path)) {}
 
-  bool chg_tensor_more_batch(
-      std::shared_ptr<paddle_infer::Predictor>& predictor,
-      std::vector<DataInput>& data_input_vec,
-      int max_len,
-      int batch_size) {
+  bool TensorMoreBatch(std::shared_ptr<paddle_infer::Predictor>& predictor,
+                       std::vector<DataInput>& data_input_vec,
+                       int max_len,
+                       int batch_size) {
     auto src_word_t = predictor->GetInputHandle("src_word");
     std::vector<int64_t> src_word_vec;
     src_word_vec.resize(max_len * batch_size);
@@ -95,7 +94,7 @@ public:
         if (k < data_input_vec[i].src_data.size()) {
           src_word_vec[i * max_len + k] = data_input_vec[i].src_data[k];
         } else {
-          src_word_vec[i * max_len + k] = pad_idx;
+          src_word_vec[i * max_len + k] = PAD_IDX;
         }
       }
     }
@@ -118,7 +117,7 @@ public:
       split(line, ' ', &word_data);
       std::string query_str = "";
       for (int j = 0; j < word_data.size(); ++j) {
-        if (j >= max_length) {
+        if (j >= MAX_LENGTH) {
           break;
         }
         query_str += word_data[j];
@@ -129,16 +128,15 @@ public:
         }
       }
       source_query_vec.push_back(query_str);
-      data_input.src_data.push_back(eos_idx);
+      data_input.src_data.push_back(EOS_IDX);
       max_len = std::max(max_len, static_cast<int>(data_input.src_data.size()));
-      max_len = std::min(max_len, max_length);
+      max_len = std::min(max_len, MAX_LENGTH);
       data_input_vec.push_back(data_input);
     }
-    return chg_tensor_more_batch(
-        predictor, data_input_vec, max_len, batch_size);
+    return TensorMoreBatch(predictor, data_input_vec, max_len, batch_size);
   }
 
-  bool get_word_dict() {
+  bool GetWordDict() {
     std::ifstream fin(dict_dir);
     std::string line;
     int k = 0;
@@ -164,27 +162,6 @@ template <typename... Args>
 void SummaryConfig(const paddle_infer::Config& config,
                    double infer_time,
                    int num_batches) {
-  LOG(INFO) << "----------------------- Env info ------------------------";
-  LOG(INFO) << "cuda_version: "
-            << "10.1";
-  LOG(INFO) << "cudnn_version: "
-            << "7.6.5";
-  LOG(INFO) << "trt_version: "
-            << "6.0.15";
-  LOG(INFO) << "python_version: "
-            << "";
-  LOG(INFO) << "gcc_version: "
-            << "8.2";
-  LOG(INFO) << "paddle_version: "
-            << "v2.0.1";
-  LOG(INFO) << "cpu: "
-            << "6148";
-  LOG(INFO) << "gpu: "
-            << "t4";
-  LOG(INFO) << "xpu: "
-            << "";
-  LOG(INFO) << "api: "
-            << "cpp";
   LOG(INFO) << "----------------------- Model info ----------------------";
   LOG(INFO) << "model_name: "
             << "transformer";
@@ -214,13 +191,16 @@ void SummaryConfig(const paddle_infer::Config& config,
 }
 
 
-void Main(int batch_size, int use_gpu, int gpu_id, int use_mkl, int threads) {
+void Main(
+    int batch_size, std::string device, int gpu_id, int use_mkl, int threads) {
   Config config;
   config.SetModel(model_dir + "/transformer.pdmodel",
                   model_dir + "/transformer.pdiparams");
 
-  if (use_gpu) {
+  if (device == "gpu") {
     config.EnableUseGpu(100, gpu_id);
+  } else if (device == "xpu") {
+    config.EnableXpu(100);
   } else {
     config.DisableGpu();
     if (use_mkl) {
@@ -233,7 +213,7 @@ void Main(int batch_size, int use_gpu, int gpu_id, int use_mkl, int threads) {
   config.SwitchSpecifyInputNames(true);
   auto predictor = CreatePredictor(config);
   DataReader reader(datapath);
-  reader.get_word_dict();
+  reader.GetWordDict();
 
   double whole_time = 0;
   Timer timer;
@@ -268,7 +248,7 @@ void Main(int batch_size, int use_gpu, int gpu_id, int use_mkl, int threads) {
 int main(int argc, char** argv) {
   batch_size = std::stoi(std::string(argv[1]));
 
-  int use_gpu = std::stoi(std::string(argv[2]));
+  std::string device = std::string(argv[2]);
   gpu_id = std::stoi(std::string(argv[3]));
 
   int use_mkl = std::stoi(std::string(argv[4]));
@@ -278,7 +258,7 @@ int main(int argc, char** argv) {
   dict_dir = std::string(argv[7]);
   datapath = std::string(argv[8]);
 
-  paddle::inference::Main(batch_size, use_gpu, gpu_id, use_mkl, threads);
+  paddle::inference::Main(batch_size, device, gpu_id, use_mkl, threads);
 
   return 0;
 }

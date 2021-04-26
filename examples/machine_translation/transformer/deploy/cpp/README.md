@@ -61,14 +61,14 @@ sh run.sh
 执行的参数解释如下：
 
 ``` sh
-# ./build/bin/transformer_e2e <batch_size> <use_gpu> <gpu_id> <use_mkl> <threads> <model_dir> <vocab_dir> <data_dir>
-./build/bin/transformer_e2e 8 1 0 0 1 ./infer_model/ /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
+# ./build/bin/transformer_e2e <batch_size> <device> <gpu_id> <use_mkl> <threads> <model_dir> <vocab_dir> <data_dir>
+./build/bin/transformer_e2e 8 gpu 0 0 1 ./infer_model/ /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
 各个参数解释如下：
 * `<batch_size>`: 与配置文件中 `infer_batch_size` 意义相同，是指的使用 Paddle Inference 的时候一个 batch 的句子数目。
-* `<use_gpu>`: 是否使用 gpu，1 代表使用 gpu，0 代表不使用 gpu。
-* `<gpu_id>`: 所使用的 gpu 的 id。
+* `<device>`: 使用的设备，可以是 gpu，xpu 或是 cpu。
+* `<gpu_id>`: 若使用 gpu，则需要提供所使用的 gpu 的 id。
 * `<use_mkl>`: 是否使用 mkl，1 代表使用 mkl，0 代表不使用 mkl。
 * `<threads>`: 仅在使用 mkl 的时候起效，用于指定计算 math 库时的线程数。
 * `<model_dir>`: 导出的模型的位置。

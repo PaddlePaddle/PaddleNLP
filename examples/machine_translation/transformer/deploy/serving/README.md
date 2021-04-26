@@ -29,7 +29,7 @@ cp -rf ../../infer_model/ ./
 使用导出的 Paddle Inference 的模型，我们需要再做一次转换，将上面保存在 `infer_model/` 下面的模型重新转换成 Paddle Serving 使用的模型。具体操作方式如下：
 
 ``` sh
-python export_serving_model.py --model-dir ./infer_model/
+python export_serving_model.py --model_dir ./infer_model/
 ```
 
 执行结束之后，会在 shell 上打印出 Transformer 模型输入、输出的变量的名称：
@@ -60,13 +60,13 @@ model fetch_names : dict_keys(['save_infer_model/scale_0.tmp_1'])   # 模型输�
 Transformer 的服务端使用的是 Paddle Serving 的 `WebService` 相关接口。执行的命令如下：
 
 ``` sh
-python transformer_web_server.py --config ../../configs/transformer.base.yaml --use-gpu --model-dir ./transformer_server
+python transformer_web_server.py --config ../../configs/transformer.base.yaml --device gpu --model_dir ./transformer_server
 ```
 
 各个参数的解释如下：
 * `--config`: yaml 配置文件，和训练时使用的相同，不过因为模型导出时已经固定了模型结构，因此，模型超参相关配置将不会再起作用，仅有 `reader` 相关配置，比如词表以及 `inference_model_dir` 等仍会有效。
-* `--use-gpu`: 是否使用 gpu，没有设定表示不使用 gpu。
-* `--model-dir`: 导出的 Paddle Serving 可用的模型路径，与配置文件中的 `inference_model_dir` 对应。在这里，特指的 `transformer_server/` 的路径。
+* `--device`: 使用的设备，可以是 gpu 或是 cpu。
+* `--model_dir`: 导出的 Paddle Serving 可用的模型路径，与配置文件中的 `inference_model_dir` 对应。在这里，特指的 `transformer_server/` 的路径。
 
 ### 启动客户端完成推理
 
@@ -75,12 +75,12 @@ python transformer_web_server.py --config ../../configs/transformer.base.yaml --
 执行的方式如下：
 
 ``` sh
-python transformer_web_client.py --config ../../configs/transformer.base.yaml --batch-size 8
+python transformer_web_client.py --config ../../configs/transformer.base.yaml --batch_size 8
 ```
 
 各个参数的解释如下：
 * `--config`: yaml 配置文件，和训练时使用的相同，不过因为模型导出时已经固定了模型结构，因此，模型超参相关配置将不会再起作用，仅有 `reader` 相关配置，比如使用的测试集以及 `infer_batch_size` 等仍会有效。
-* `--batch-size`: 与配置文件中 `infer_batch_size` 意义相同，是指的使用 Paddle Serving 的时候一个 batch 的句子数目。
+* `--batch_size`: 与配置文件中 `infer_batch_size` 意义相同，是指的使用 Paddle Serving 的时候一个 batch 的句子数目。
 
 执行完客户端的脚本，将会在本地生成一个 `predict.txt` 的文件，存有推理的结果。
 

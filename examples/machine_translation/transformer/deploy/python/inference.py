@@ -23,18 +23,20 @@ def parse_args():
         type=str,
         help="Path of the config file. ")
     parser.add_argument(
-        "--use-gpu", action="store_true", help="Whether to use gpu. ")
+        "--device",
+        default="gpu",
+        type=str,
+        choices=["gpu", "xpu", "cpu"],
+        help="Device to use during inference. ")
     parser.add_argument(
-        "--use-xpu", action="store_true", help="Whether to use xpu. ")
-    parser.add_argument(
-        "--use-mkl", action="store_true", help="Whether to use mkl. ")
+        "--use_mkl", action="store_true", help="Whether to use mkl. ")
     parser.add_argument(
         "--threads",
         default=1,
         type=int,
         help="The number of threads when enable mkl. ")
     parser.add_argument(
-        "--model-dir", default="", type=str, help="Path of the model. ")
+        "--model_dir", default="", type=str, help="Path of the model. ")
     parser.add_argument(
         "--profile", action="store_true", help="Whether to profile. ")
     args = parser.parse_args()
@@ -71,9 +73,9 @@ class Predictor(object):
             config = inference.Config(
                 os.path.join(args.inference_model_dir, "transformer.pdmodel"),
                 os.path.join(args.inference_model_dir, "transformer.pdiparams"))
-            if args.use_gpu:
+            if args.device == "gpu":
                 config.enable_use_gpu(100, 0)
-            elif args.use_xpu:
+            elif args.device == "xpu":
                 config.enable_xpu(100)
             else:
                 # CPU
@@ -173,8 +175,7 @@ if __name__ == "__main__":
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
-    args.use_gpu = ARGS.use_gpu
-    args.use_xpu = ARGS.use_xpu
+    args.device = ARGS.device
     args.use_mkl = ARGS.use_mkl
     args.threads = ARGS.threads
     if ARGS.batch_size is not None:

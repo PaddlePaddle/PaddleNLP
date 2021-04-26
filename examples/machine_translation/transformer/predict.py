@@ -40,7 +40,7 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 
 
 def do_predict(args):
-    if args.use_gpu:
+    if args.device == "gpu":
         place = "gpu:0"
     else:
         place = "cpu"

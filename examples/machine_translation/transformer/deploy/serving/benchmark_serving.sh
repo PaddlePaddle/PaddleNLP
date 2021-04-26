@@ -6,13 +6,13 @@ sleep 3
 rm -rf profile_log_$modelname
 for thread_num in "1" "8" "16"; do
   for batch_size in "1" "2" "4"; do
-    python transformer_web_server.py --config ../../configs/transformer.base.yaml --use-gpu --model-dir ./transformer_server --profile &
+    python transformer_web_server.py --config ../../configs/transformer.base.yaml --device gpu --model_dir ./transformer_server --profile &
     sleep 3
     echo "----Transformer thread num: ${thread_num} batch size: ${batch_size} mode:http ----" >> profile_log_$modelname
     nvidia-smi --id=2 --query-compute-apps=used_memory --format=csv -lms 100 > gpu_use.log 2>&1 &
     nvidia-smi --id=2 --query-gpu=utilization.gpu --format=csv -lms 100 > gpu_utilization.log 2>&1 &
     echo "import psutil\ncpu_utilization=psutil.cpu_percent(1,False)\nprint('CPU_UTILIZATION:', cpu_utilization)\n" > cpu_utilization.py
-    python transformer_web_client.py --config ../../configs/transformer.base.yaml --batch-size ${batch_size} --threads ${thread_num} --profile
+    python transformer_web_client.py --config ../../configs/transformer.base.yaml --batch_size ${batch_size} --threads ${thread_num} --profile
     python cpu_utilization.py >> profile_log_$modelname
     ps -ef | grep web_server | awk '{print $2}' | xargs kill -9
     python benchmark.py benchmark.log benchmark.tmp

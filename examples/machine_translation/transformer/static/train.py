@@ -40,7 +40,7 @@ def parse_args():
         action="store_true",
         help="Whether to use fleet to launch. ")
     parser.add_argument(
-        "--max-iter",
+        "--max_iter",
         default=None,
         type=int,
         help="The maximum iteration for training. ")
@@ -53,10 +53,10 @@ def do_train(args):
     if args.is_distributed:
         fleet.init(is_collective=True)
         places = [paddle.set_device("gpu")] if \
-                 args.use_gpu else paddle.static.cpu_places()
+                 args.device == "gpu" else paddle.static.cpu_places()
         trainer_count = len(places)
     else:
-        if args.use_gpu:
+        if args.device == "gpu":
             places = paddle.static.cuda_places()
         else:
             places = paddle.static.cpu_places()

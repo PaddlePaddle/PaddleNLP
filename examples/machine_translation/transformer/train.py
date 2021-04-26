@@ -2,7 +2,6 @@ import os
 import time
 
 import yaml
-import logging
 import argparse
 import numpy as np
 from pprint import pprint
@@ -13,12 +12,9 @@ import paddle.distributed as dist
 
 import reader
 from paddlenlp.transformers import TransformerModel, CrossEntropyCriterion
+from paddlenlp.utils.log import logger
 
 from util.record import AverageStatistical
-
-FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
 
 
 def parse_args():
@@ -33,7 +29,7 @@ def parse_args():
         action="store_true",
         help="Whether to print logs on each cards. ")
     parser.add_argument(
-        "--max-iter",
+        "--max_iter",
         default=None,
         type=int,
         help="The maximum iteration for training. ")
@@ -42,7 +38,7 @@ def parse_args():
 
 
 def do_train(args):
-    if args.use_gpu:
+    if args.device == "gpu":
         rank = dist.get_rank()
         trainer_count = dist.get_world_size()
     else:

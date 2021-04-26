@@ -21,9 +21,8 @@ special_token: ["<s>", "<e>", "<unk>"]
 # The directory to store data.
 root: None
 
-# Whether to use cuda
-use_gpu: True
-use_xpu: False
+# Device to use. 
+device: "gpu"
 
 # Args for reader, see reader.py for details
 # The translation task to process.

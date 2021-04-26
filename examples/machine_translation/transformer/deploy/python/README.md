@@ -22,19 +22,18 @@ cp -rf ../../infer_model/ ./
 ``` sh
 python inference.py \
         --config ../../configs/transformer.base.yaml \
-        --batch-size 8 \
-        --use-gpu \
-        --model-dir ./infer_model/
+        --batch_size 8 \
+        --device gpu \
+        --model_dir ./infer_model/
 ```
 
 各个参数解释如下：
 * `--config`: yaml 配置文件，和训练时使用的相同，不过因为模型导出时已经固定了模型结构，因此，模型超参相关配置将不会再起作用，仅有 `reader` 相关配置、`infer_batch_size` 以及 `inference_model_dir` 仍会有效。
-* `--batch-size`: 与配置文件中 `infer_batch_size` 意义相同，是指的使用 Paddle Inference 的时候一个 batch 的句子数目。
-* `--use-gpu`: 是否使用 gpu，没有设定表示不使用 gpu。
-* `--use-xpu`: 是否使用 xpu，没有设定表示不使用 xpu。
-* `--use-mkl`: 是否使用 mkl，没有设定表示不使用 mkl。
+* `--batch_size`: 与配置文件中 `infer_batch_size` 意义相同，是指的使用 Paddle Inference 的时候一个 batch 的句子数目。
+* `--device`: 使用的设备，可以是 gpu，xpu 或是 cpu。
+* `--use_mkl`: 是否使用 mkl，没有设定表示不使用 mkl。
 * `--threads`: 仅在使用 mkl 的时候起效，用于指定计算 math 库时的线程数。
-* `--model-dir`: 导出的 Paddle Inference 可用的模型路径，与配置文件中的 `inference_model_dir` 对应。
+* `--model_dir`: 导出的 Paddle Inference 可用的模型路径，与配置文件中的 `inference_model_dir` 对应。
 
 英德翻译的结果会保存到 `predict.txt` 文件中。
 

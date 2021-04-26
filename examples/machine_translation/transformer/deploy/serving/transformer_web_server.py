@@ -24,13 +24,17 @@ def parse_args():
         type=str,
         help="Path of the config file. ")
     parser.add_argument(
-        "--use-gpu", action="store_true", help="Whether to use gpu. ")
+        "--device",
+        default="gpu",
+        type=str,
+        choices=["gpu", "cpu"],
+        help="Device to use during inference. ")
     parser.add_argument(
-        "--model-dir", default="", type=str, help="Path of the model. ")
+        "--model_dir", default="", type=str, help="Path of the model. ")
     parser.add_argument(
         "--profile", action="store_true", help="Whether to profile. ")
     parser.add_argument(
-        "--use-all-vocab",
+        "--use_all_vocab",
         action="store_true",
         help="Whether to use benchmark vocab. ")
     args = parser.parse_args()
@@ -96,7 +100,7 @@ def do_server(args):
         except:
             pass
     service.load_model_config(args.inference_model_dir)
-    if args.use_gpu:
+    if args.device == "gpu":
         service.set_gpus("0")
         service.prepare_server(
             workdir="workdir", port=9292, device="gpu", gpuid=0)
@@ -120,7 +124,7 @@ if __name__ == "__main__":
         pprint(args)
 
     args.profile = ARGS.profile
-    args.use_gpu = ARGS.use_gpu
+    args.device = ARGS.device
     args.use_all_vocab = ARGS.use_all_vocab
     if ARGS.model_dir != "":
         args.inference_model_dir = ARGS.model_dir

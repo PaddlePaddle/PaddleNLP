@@ -6,7 +6,7 @@ import paddle_serving_client.io as serving_io
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model-dir",
+        "--model_dir",
         type=str,
         required=True,
         help="input inference model dir")
