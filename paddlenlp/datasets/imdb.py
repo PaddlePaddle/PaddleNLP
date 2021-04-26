@@ -35,11 +35,17 @@ class Imdb(DatasetBuilder):
     """
     URL = 'https://dataset.bj.bcebos.com/imdb%2FaclImdb_v1.tar.gz'
     MD5 = '7c2ac02c03563afcf9b574c7e56c153a'
+    META_INFO = collections.namedtuple('META_INFO', ('data_dir', 'md5'))
+    SPLITS = {
+        'train': META_INFO(os.path.join('aclImdb', 'train'), None),
+        'test': META_INFO(os.path.join('aclImdb', 'test'), None),
+    }
 
     def _get_data(self, mode, **kwargs):
         """Downloads dataset."""
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
-        data_dir = os.path.join(default_root, "aclImdb", mode)
+        filename, _ = self.SPLITS[mode]
+        data_dir = os.path.join(default_root, filename)
         if not os.path.exists(data_dir):
             path = get_path_from_url(self.URL, default_root, self.MD5)
         return data_dir
