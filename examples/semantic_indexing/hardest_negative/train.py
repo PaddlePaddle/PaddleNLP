@@ -131,6 +131,11 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch
+            print("batch_query_input_ids:{}".format(query_input_ids))
+            print("batch_title_input_ids:{}".format(title_input_ids))
+            print("batch_query_token_type_ids:{}".format(query_token_type_ids))
+            print("batch_title_token_type_ids:{}".format(title_token_type_ids))
+
             loss = model(
                 query_input_ids=query_input_ids,
                 title_input_ids=title_input_ids,
