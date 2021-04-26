@@ -22,9 +22,10 @@ def load_dataset(datafiles):
 def load_dict(dict_path):
     vocab = {}
     i = 0
-    for line in open(dict_path, 'r', encoding='utf-8'):
-        vocab[line.strip()] = i
-        i += 1
+    with open(dict_path, 'r', encoding='utf-8') as fin:
+        for line in fin:
+            vocab[line.strip()] = i
+            i += 1
     return vocab
 
 

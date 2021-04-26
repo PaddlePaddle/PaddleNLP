@@ -1,4 +1,4 @@
-# ERNIE-CTM
+# 文本知识标注工具集 - ERNIE-CTM
 
 ## 简介
 

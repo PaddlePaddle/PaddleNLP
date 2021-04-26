@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-import sys
+import os
 import argparse
 
 import paddle
@@ -38,8 +37,16 @@ def parse_args():
 
 def do_predict(args):
     paddle.set_device(args.device)
-    predictor = WordtagPredictor(args.init_ckpt_dir, "./data/tags.txt")
-    txts = ['《孤女》是2010年九州出版社出版的小说，作者是余兼羽。', '4分40秒至10分钟只有歌声。']
+    predictor = WordtagPredictor(
+        model_dir=args.init_ckpt_dir,
+        tag_path=os.path.join(args.data_dir, "tags.txt"),
+        term_schema_path="termtree_type.csv",
+        term_data_path="termtree.rawbase")
+    txts = [
+        "美人鱼是周星驰导演的电影", "小米别熬粥了，加1个苹果，瞬间变小米蛋糕，太香了",
+        "618不要只知道小米、苹果，这三款产品一样是超级爆款", "天鸿美和院地处黄公望国家森林公园山麓", "你好百度"
+    ]
+
     res = predictor.run(txts)
     print(res)
 
