@@ -176,7 +176,8 @@ class MapDataset(Dataset):
             with Pool(num_workers, initargs=(RLock(), )) as pool:
 
                 def filter_shard(num_workers, index, fn):
-                    self.shard(num_shards=num_workers, index=index)
+                    self.shard(
+                        num_shards=num_workers, index=index, contiguous=True)
                     self._filter(fn=fn)
                     return self
 
@@ -205,9 +206,9 @@ class MapDataset(Dataset):
         ]
         return self
 
-    def shard(self, num_shards=None, index=None):
+    def shard(self, num_shards=None, index=None, contiguous=False):
         """
-        Uses samples whose indices mod `index` equals 0 to update this dataset.
+        Split the dataset into `num_shards` pieces.
 
         Args:
             num_shards (int, optional): An integer representing the number of
@@ -216,20 +217,32 @@ class MapDataset(Dataset):
             index (int, optional): An integer representing the index of the
                 current shard. If None, `index` would be the current trainer rank
                 id. Default: None.
+            contiguous: (bool, optional): If true, contiguous chunks of data 
+                will be select for sharding. And total number of examples will 
+                be the same. Otherwise extra examples will be added to make the
+                dataset evenly divisible. It is best to set this false for 
+                distributed training. Default: False.
         """
         if num_shards is None:
             num_shards = dist.get_world_size()
         if index is None:
             index = dist.get_rank()
 
-        num_samples = int(math.ceil(len(self.new_data) * 1.0 / num_shards))
-        # add extra samples to make it evenly divisible
-        self.new_data = [
-            self.new_data[idx] for idx in range(len(self.new_data))
-            if idx % num_shards == index
-        ]
-        if len(self.new_data) < num_samples:
-            self.new_data.append(self.new_data[index + 1 - num_shards])
+        if contiguous:
+            div = len(self) // num_shards
+            mod = len(self) % num_shards
+            start = div * index + min(index, mod)
+            end = start + div + (1 if index < mod else 0)
+            self.new_data = self.new_data[start:end]
+        else:
+            num_samples = int(math.ceil(len(self.new_data) * 1.0 / num_shards))
+            self.new_data = [
+                self.new_data[idx] for idx in range(len(self.new_data))
+                if idx % num_shards == index
+            ]
+            # add extra samples to make it evenly divisible
+            if len(self.new_data) < num_samples:
+                self.new_data.append(self.new_data[index + 1 - num_shards])
 
         return self
 
@@ -257,7 +270,8 @@ class MapDataset(Dataset):
             with Pool(num_workers, initargs=(RLock(), )) as pool:
 
                 def map_shard(num_workers, index, fn, batched):
-                    self.shard(num_shards=num_workers, index=index)
+                    self.shard(
+                        num_shards=num_workers, index=index, contiguous=True)
                     self._map(fn=fn, lazy=False, batched=batched)
                     return self
 
@@ -373,7 +387,7 @@ class IterDataset(IterableDataset):
 
     def shard(self, num_shards=None, index=None):
         """
-        Uses samples whose indices mod `index` equals 0 to update this dataset.
+        Split the dataset into `num_shards` pieces.
 
         Args:
             num_shards (int, optional): An integer representing the number of
