@@ -110,7 +110,7 @@ class ErnieCtmPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-ctm":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm_base.pdparams"
+            "https://paddlenlp.bj.bcebos.com/paddlenlp/models/transformers/ernie-ctm-base.pdparams"
         }
     }
     base_model_prefix = "ernie_ctm"

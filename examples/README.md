@@ -99,7 +99,7 @@ PaddleNLP 提供了多种成熟的预训练模型技术，适用于自然语言�
 | ------- | ------- |
 | [事件抽取](./information_extraction/DuEE)| 基于百度开放的大规模中文事件抽取数据集[DuEE](https://link.springer.com/chapter/10.1007/978-3-030-60457-8_44)，结合ERNIE预训练模型与序列标注模型完成高质量的事件抽取。|
 | [关系抽取](./information_extraction/DuIE)| 基于百度开放的业界规模最大的Schema的中文关系抽取数据集[DuIE](http://tcci.ccf.org.cn/conference/2019/papers/EV10.pdf)，结合ERNIE预训练模型与序列标注模型完成文本关系抽取。|
-| [知识抽取](./information_extraction/wordtag)| 基于百度大规模知识图谱数据集样例，结合ErnieCtm预训练模型完成百度百科知识抽取。|
+| [知识抽取](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge)| 基于百度大规模知识图谱数据集样例，结合ErnieCtm预训练模型完成百度百科知识抽取。|
 
 
 ## NLP系统应用

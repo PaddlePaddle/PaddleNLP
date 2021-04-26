@@ -11,3 +11,4 @@ paddlenlp.ops
    :maxdepth: 4
 
    paddlenlp.ops.transformer
+   paddlenlp.ops.einsum
