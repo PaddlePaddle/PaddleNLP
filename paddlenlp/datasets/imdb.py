@@ -30,6 +30,9 @@ __all__ = ['Imdb']
 
 class Imdb(DatasetBuilder):
     """
+    Subsets of IMDb data are available for access to customers for personal and non-commercial use.
+    Each dataset is contained in a gzipped, tab-separated-values (TSV) formatted file in the UTF-8 character set.
+    The first line in each file contains headers that describe what is in each column.
     Implementation of `IMDB <https://www.imdb.com/interfaces/>`_ dataset.
 
     """
