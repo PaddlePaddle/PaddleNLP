@@ -35,3 +35,5 @@ from .unified_transformer.modeling import *
 from .unified_transformer.tokenizer import *
 from .ernie_ctm.modeling import *
 from .ernie_ctm.tokenizer import *
+from .tinybert.modeling import *
+from .tinybert.tokenizer import *
