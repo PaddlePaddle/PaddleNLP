@@ -34,10 +34,10 @@ from model import SemanticIndexHardestNeg
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--corpus_file", type=str, default='', help="The full path of input file")
-parser.add_argument("--similar_text_pair_file", type=str, default='', help="The full path of similar text pair file")
-parser.add_argument("--recall_result", type=str, default='', help="The full path of recall result file")
-parser.add_argument("--params_path", type=str, default='./checkpoint/model_2700/model_state.pdparams', help="The path to model parameters to be loaded.")
+parser.add_argument("--corpus_file", type=str, required=True, help="The full path of input file")
+parser.add_argument("--similar_text_pair_file", type=str, required=True, help="The full path of similar text pair file")
+parser.add_argument("--recall_result", type=str, default='recall_result', help="The full path of recall result file")
+parser.add_argument("--params_path", type=str, required=True, help="The path to model parameters to be loaded.")
 parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
@@ -126,15 +126,15 @@ def id2corpus(corpus_file):
     return id2corpus
 
 
-def gen_query_file(similar_text_pair_file):
-    query2label = {}
-    querys = []
+def gen_text_file(similar_text_pair_file):
+    text2similar_text = {}
+    texts = []
     with open(args.similar_text_pair_file) as f:
         for line in f:
-            query, label_text = line.rstrip().split("\t")
-            query2label[query] = label_text
-            querys.append({"query": query})
-    return querys, query2label
+            text, similar_text = line.rstrip().split("\t")
+            text2similar_text[text] = similar_text
+            texts.append({"text": text})
+    return texts, text2similar_text
 
 
 if __name__ == "__main__":
@@ -148,12 +148,13 @@ if __name__ == "__main__":
         max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # text_segment
     ): [data for data in fn(samples)]
 
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         "ernie-1.0")
+
     model = SemanticIndexHardestNeg(pretrained_model)
 
     # load pretrained semantic model
@@ -177,9 +178,9 @@ if __name__ == "__main__":
 
     final_index = build_index(corpus_data_loader, model)
 
-    query_list, query2label = gen_query_file(args.similar_text_pair_file)
+    text_list, text2similar_text = gen_text_file(args.similar_text_pair_file)
 
-    query_ds = MapDataset(query_list)
+    query_ds = MapDataset(text_list)
 
     query_data_loader = create_dataloader(
         query_ds,
@@ -203,8 +204,8 @@ if __name__ == "__main__":
             batch_size = len(cosine_sims)
 
             for row_index in range(batch_size):
-                query_index = args.batch_size * batch_index + row_index
+                text_index = args.batch_size * batch_index + row_index
                 for idx, doc_idx in enumerate(recalled_idx[row_index]):
-                    f.write("{}\t{}\t{}\n".format(query_list[query_index][
-                        "query"], id2corpus[doc_idx], 1.0 - cosine_sims[
+                    f.write("{}\t{}\t{}\n".format(text_list[text_index][
+                        "text"], id2corpus[doc_idx], 1.0 - cosine_sims[
                             row_index][idx]))

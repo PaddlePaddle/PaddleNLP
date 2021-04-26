@@ -44,7 +44,7 @@ parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path o
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--save_steps', type=int, default=10000, help="Inteval steps to save checkpoint")
-parser.add_argument("--train_set_file", default='./train.tsv', type=str, help="The full path of train_set_file")
+parser.add_argument("--train_set_file", type=str, required=True, help="The full path of train_set_file")
 parser.add_argument("--margin", default=0.3, type=float, help="Margin for pair-wise margin_rank_loss")
 
 

@@ -30,8 +30,8 @@ from model import SemanticIndexHardestNeg
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--text_pair_file", type=str, default='', help="The full path of input file")
-parser.add_argument("--params_path", type=str, default='', help="The path to model parameters to be loaded.")
+parser.add_argument("--text_pair_file", type=str, required=True, help="The full path of input file")
+parser.add_argument("--params_path", type=str, required=True, help="The path to model parameters to be loaded.")
 parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
