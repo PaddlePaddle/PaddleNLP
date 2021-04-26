@@ -91,7 +91,10 @@ class TransformerService(WebService):
 def do_server(args):
     service = TransformerService(name="transformer")
     if args.profile:
-        service.setup_profile(30)
+        try:
+            service.setup_profile(30)
+        except:
+            pass
     service.load_model_config(args.inference_model_dir)
     if args.use_gpu:
         service.set_gpus("0")
@@ -102,7 +105,10 @@ def do_server(args):
 
     service.init_client(args=args)
 
-    service.run_debugger_service()
+    if args.profile:
+        service.run_debugger_service()
+    else:
+        service.run_rpc_service()
     service.run_web_service()
 
 

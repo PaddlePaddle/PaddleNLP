@@ -1,6 +1,6 @@
 # 使用 Paddle Inference C++ API 推理
 
-### 模型推理
+## 模型推理
 
 通过前文介绍，我们可以获取导出后的预测模型。模型导出后，`infer_model/` 下的目录结构如下：
 
@@ -48,7 +48,7 @@ DATA_DIR=/root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/new
 * `CUDNN_LIB_DIR`: 所使用的 CUDNN 的库的位置。
 * `MODEL_DIR`: 导出的模型的路径。
 * `VOCAB_DIR`: 词表的位置。
-* `DATA_DIR`: 需要推理的数据的位置，当前数据是经过 tokenize 以及 bpe 处理之后的数据，并非原始数据。
+* `DATA_DIR`: 需要推理的数据的位置，当前数据是经过 tokenize 以及 bpe 处理之后的序列用空格连接成的句子，并非原始数据。
 
 可以简单执行如下语句完成编译以及推理整个过程。
 
@@ -77,7 +77,7 @@ sh run.sh
 
 英德翻译的结果会保存到 `predict.txt` 文件中。
 
-### 模型评估
+## 模型评估
 
 推理结果中每行输出是对应行输入的得分最高的翻译，对于使用 BPE 的数据，预测出的翻译结果也将是 BPE 表示的数据，要还原成原始的数据（这里指 tokenize 后的数据）才能进行正确的评估。评估过程具体如下（BLEU 是翻译任务常用的自动评估方法指标）：
 

@@ -48,13 +48,14 @@ def do_client(idx, args):
         data = {"feed": [{"src_word": batch}], "fetch": ["finished_sequence"]}
         r = requests.post(url=url, headers=headers, data=json.dumps(data))
         if r is not None:
-            print(r)
+            print("Status: ", r)
 
             if args.profile:
                 recorder.toc(samples=len(batch))
+            else:
+                for seq in r.json()["result"]["finished_sequence"]:
+                    f.write(seq[0] + "\n")
             batch = []
-            for seq in r.json()["result"]["finished_sequence"]:
-                f.write(seq[0] + "\n")
         if args.profile:
             recorder.tic()
     f.close()
@@ -82,6 +83,6 @@ if __name__ == "__main__":
 
     if args.profile:
         from utils.recorder import Recorder
-
-    multithread_http(args)
-    # do_client(args)
+        multithread_http(args)
+    else:
+        do_client(args)

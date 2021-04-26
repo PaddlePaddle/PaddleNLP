@@ -1,6 +1,6 @@
 # 使用 Paddle Inference Python API 推理
 
-### 模型推理
+## 模型推理
 
 通过前文介绍，我们可以获取导出后的预测模型。模型导出后，`infer_model/` 下的目录结构如下：
 
@@ -34,11 +34,11 @@ python inference.py \
 * `--use-xpu`: 是否使用 xpu，没有设定表示不使用 xpu。
 * `--use-mkl`: 是否使用 mkl，没有设定表示不使用 mkl。
 * `--threads`: 仅在使用 mkl 的时候起效，用于指定计算 math 库时的线程数。
-* `--model-dir`: 导出的 Paddle Inference 可用的模型路径。
+* `--model-dir`: 导出的 Paddle Inference 可用的模型路径，与配置文件中的 `inference_model_dir` 对应。
 
 英德翻译的结果会保存到 `predict.txt` 文件中。
 
-### 模型评估
+## 模型评估
 
 推理结果中每行输出是对应行输入的得分最高的翻译，对于使用 BPE 的数据，预测出的翻译结果也将是 BPE 表示的数据，要还原成原始的数据（这里指 tokenize 后的数据）才能进行正确的评估。评估过程具体如下（BLEU 是翻译任务常用的自动评估方法指标）：
 
