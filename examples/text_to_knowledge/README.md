@@ -17,7 +17,7 @@
 ### 快速加载标注工具
 
 ## 在论文中引用解语
-如果您的工作成果中使用了TermTree，请增加下述引用。我们非常乐于看到TermTree对您的工作带来帮助。
+如果您的工作成果中使用了解语，请增加下述引用。我们非常乐于看到解语对您的工作带来帮助。
 ```
 @article{zhao2020TermTree,
 	title={TermTree and Knowledge Annotation Framework for Chinese Language Understanding},

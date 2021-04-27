@@ -467,7 +467,8 @@ wordtag模型对所有的词预测到上位词类之后，会直接根据预测�
 3. 根据TermPath及TermCorpus完成细粒度term及subterm消歧
 
 ## 在论文中引用wordtag
-如果您的工作成果中使用了TermTree，请增加下述引用。我们非常乐于看到TermTree对您的工作带来帮助。
+
+如果您的工作成果中使用了wordtag，请增加下述引用。我们非常乐于看到wordtag对您的工作带来帮助。
 ```
 @article{zhao2020TermTree,
 	title={TermTree and Knowledge Annotation Framework for Chinese Language Understanding},
