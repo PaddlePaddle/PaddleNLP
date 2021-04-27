@@ -106,10 +106,32 @@ def load_dataset(path_or_read_func,
         return reader_instance.read(**custom_kwargs)
     else:
         reader_cls = import_main_class(path_or_read_func)
-        if not name:
-            reader_instance = reader_cls(lazy=lazy, **kwargs)
+        reader_instance = reader_cls(lazy=lazy, name=name, **kwargs)
+
+        if hasattr(reader_instance, 'BUILDER_CONFIGS'):
+            if name in reader_cls.BUILDER_CONFIGS.keys():
+                split_names = reader_cls.BUILDER_CONFIGS[name]['splits'].keys()
+            else:
+                raise ValueError(
+                    'Invaild name "{}". Should be one of {}.'.format(
+                        name, list(reader_cls.BUILDER_CONFIGS.keys())))
+        elif hasattr(reader_instance, 'SPLITS'):
+            split_names = reader_instance.SPLITS.keys()
         else:
-            reader_instance = reader_cls(lazy=lazy, name=name, **kwargs)
+            raise AttributeError(
+                "Either 'SPLITS' or 'BUILDER_CONFIGS' must be implemented for DatasetBuilder."
+            )
+
+        selected_splits = []
+        selected_splits += data_files.keys() if isinstance(
+            data_files, dict) else selected_splits
+        selected_splits = selected_splits + splits if isinstance(
+            splits, list) else selected_splits + [splits]
+
+        for split_name in selected_splits:
+            if split_name not in split_names and split_name != None:
+                raise ValueError('Invaild split "{}". Should be one of {}.'.
+                                 format(split_name, list(split_names)))
 
         datasets = reader_instance.read_datasets(
             data_files=data_files, splits=splits)
@@ -131,7 +153,6 @@ class MapDataset(Dataset):
     <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html>`__.
 
     """
-    data = None
 
     def __init__(self, data, **kwargs):
         self.data = data
@@ -208,7 +229,9 @@ class MapDataset(Dataset):
 
     def shard(self, num_shards=None, index=None, contiguous=False):
         """
-        Split the dataset into `num_shards` pieces.
+        Split the dataset into `num_shards` pieces. Note that the size of each
+        shard might be different because the original dataset may not be evenly
+        divisible.
 
         Args:
             num_shards (int, optional): An integer representing the number of
@@ -219,9 +242,8 @@ class MapDataset(Dataset):
                 id. Default: None.
             contiguous: (bool, optional): If true, contiguous chunks of data 
                 will be select for sharding. And total number of examples will 
-                be the same. Otherwise extra examples will be added to make the
-                dataset evenly divisible. It is best to set this false for 
-                distributed training. Default: False.
+                be the same. Otherwise each shard will contain all examples of 
+                dataset whose index mod `num_shards` = `index`. Default: False.
         """
         if num_shards is None:
             num_shards = dist.get_world_size()
@@ -240,9 +262,6 @@ class MapDataset(Dataset):
                 self.new_data[idx] for idx in range(len(self.new_data))
                 if idx % num_shards == index
             ]
-            # add extra samples to make it evenly divisible
-            if len(self.new_data) < num_samples:
-                self.new_data.append(self.new_data[index + 1 - num_shards])
 
         return self
 
@@ -454,7 +473,7 @@ class DatasetBuilder:
                 data_files, dict
             ) or isinstance(data_files, tuple) or isinstance(
                 data_files, list
-            ), "`data_files` should be a string or tuple or list or a dictionary whose key is split name ande value is a path of data file."
+            ), "`data_files` should be a string or tuple or list or a dictionary whose key is split name and value is the path of data file."
             if isinstance(data_files, str):
                 split = 'train'
                 datasets.append(self.read(filename=data_files, split=split))
