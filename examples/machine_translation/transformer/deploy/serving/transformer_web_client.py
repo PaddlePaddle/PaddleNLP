@@ -85,4 +85,4 @@ if __name__ == "__main__":
         from utils.recorder import Recorder
         multithread_http(args)
     else:
-        do_client(args)
+        do_client(0, args)

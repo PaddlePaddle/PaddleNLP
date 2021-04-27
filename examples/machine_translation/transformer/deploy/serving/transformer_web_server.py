@@ -127,7 +127,6 @@ if __name__ == "__main__":
     args.use_all_vocab = not ARGS.benchmark
     args.profile = ARGS.profile
     args.device = ARGS.device
-    args.use_all_vocab = ARGS.use_all_vocab
     if ARGS.model_dir != "":
         args.inference_model_dir = ARGS.model_dir
 
