@@ -45,42 +45,42 @@ class XLNetTokenizer(PretrainedTokenizer):
 
     Args:
         vocab_file (str):
-            The file (ends with '.spm') which contains the vocabulary necessary
-            to instantiate a `SentencePiece <https://github.com/google/sentencepiece>`__ tokenizer.
+            The vocabulary file (ends with '.spm') required to instantiate
+            a `SentencePiece <https://github.com/google/sentencepiece>`__ tokenizer.
         do_lower_case (bool, optional):
-            Whether or not to lowercase the input when tokenizing. Defaults to ``False`` and
-            not lowercasing the input.
+            Whether or not to lowercase the input when tokenizing. Defaults to `False` and
+            **does not** lowercase the input.
         remove_space (bool, optional):
-            Whether or not to strip the text when tokenizing. Defaults to ``True`` and
+            Whether or not to strip the text when tokenizing. Defaults to `True` and
             removing excess spaces before and after the string.
         keep_accents (bool, optional):
-            Whether or not to keep accents when tokenizing. Defaults to ``False`` and not keeping accents.
+            Whether or not to keep accents when tokenizing. Defaults to `False` and **does not** keep accents.
         bos_token (str, optional):
-            A special token representing the beginning of a sequence. Mainly used during pretraining.
-            Defaults to ``"<s>"``.
+            A special token representing the beginning of a sequence that was used during pretraining.
+            Defaults to `"<s>"`.
         eos_token (str, optional):
-            A special token representing the end of a sequence. Mainly used during pretraining.
-            Defaults to ``"</s>"``.
+            A special token representing the end of a sequence that was used during pretraining.
+            Defaults to `"</s>"`.
         unk_token (str, optional):
-            A special token representing the unknown (out-of-vocabulary) token.
+            A special token representing the *unknown (out-of-vocabulary)* token.
             An unknown token is set to be `unk_token` inorder to be converted to an ID.
-            Defaults to ``"<unk>"``.
+            Defaults to `"<unk>"`.
         sep_token (str, optional):
             A special token separating two different sentences in the same input.
-            Defaults to ``"<sep>"``.
+            Defaults to `"<sep>"`.
         pad_token (str, optional):
             A special token used to make arrays of tokens the same size for batching purpose.
-            Defaults to ``"<pad>"``.
+            Defaults to `"<pad>"`.
         cls_token (str, optional):
             A special token used for sequence classification. It is the last token
-            of the sequence when built with special tokens. Defaults to ``"<cls>"``.
+            of the sequence when built with special tokens. Defaults to `"<cls>"`.
         mask_token (str, optional):
             A special token representing a masked token. This is the token used
             in the masked language modeling task which the model will try to predict the original unmasked ones.
-            Defaults to ``"<mask>"``.
+            Defaults to `"<mask>"`.
         additional_special_tokens (List[str], optional):
             A list of additional special tokens to be used by the tokenizer.
-            Defaults to ``["<eop>", "<eod>"]``.
+            Defaults to `["<eop>", "<eod>"]`.
 
     Attributes:
         sp_model (SentencePieceProcessor):
@@ -244,11 +244,11 @@ class XLNetTokenizer(PretrainedTokenizer):
         using the vocabulary.
 
         Args:
-            tokens (`str` or `List[str]`):
+            tokens (str or List[str]):
                 One or several token(s) to convert to token id(s).
 
         Returns:
-            `int` or `List[int]` or `tuple(int)`: The token id or list of token ids or tuple of token ids.
+            int or List[int] or tuple(int): The token id or list of token ids or tuple of token ids.
         """
         if not isinstance(tokens, (list, tuple)):
             return self._convert_token_to_id(tokens)
@@ -265,10 +265,10 @@ class XLNetTokenizer(PretrainedTokenizer):
                 The token id (or token ids) to be converted to token(s).
             skip_special_tokens (bool, optional):
                 Whether or not to remove special tokens in the decoding.
-                Defaults to ``False`` and we do not remove special tokens.
+                Defaults to `False` and we do not remove special tokens.
 
         Returns:
-            `str` or `List[str]`: The decoded token(s).
+            str or List[str]: The decoded token(s).
         """
         if not isinstance(ids, (list, tuple)):
             return self._convert_id_to_token(ids)
@@ -296,10 +296,10 @@ class XLNetTokenizer(PretrainedTokenizer):
         Args:
             pair (bool, optional):
                 Whether the sequence is a sequence pair or a single sequence.
-                Defaults to ``False`` and the input is a single sequence.
+                Defaults to `False` and the input is a single sequence.
 
         Returns:
-            `int`: Number of tokens added to sequences.
+            int: Number of tokens added to sequences.
         """
         token_ids_0 = []
         token_ids_1 = []
@@ -320,10 +320,10 @@ class XLNetTokenizer(PretrainedTokenizer):
             token_ids_0 (List[int]):
                 List of IDs for the first sequence.
             token_ids_1 (List[int], optional):
-                Optional second list of IDs for sequence pairs. Defaults to ``None``.
+                Optional second list of IDs for sequence pairs. Defaults to `None`.
 
         Returns:
-            `List[int]`: List of input IDs with the appropriate special tokens.
+            List[int]: List of input IDs with the appropriate special tokens.
         """
         sep = [self.sep_token_id]
         cls = [self.cls_token_id]
@@ -348,10 +348,10 @@ class XLNetTokenizer(PretrainedTokenizer):
                 List of char offsets to which the special tokens will be added.
             offset_mapping_1 (List[tuple], optional):
                 Optional second list of char offsets for offset mapping pairs.
-                Defaults to ``None``.
+                Defaults to `None`.
 
         Returns:
-            List[tuple]: List of char offsets with the appropriate offsets of special tokens.
+            List[tuple]: A list of char offsets with the appropriate offsets of special tokens.
         """
         if offset_mapping_1 is None:
             return offset_mapping_0 + [(0, 0)] + [(0, 0)]
@@ -370,16 +370,16 @@ class XLNetTokenizer(PretrainedTokenizer):
 
         Args:
             token_ids_0 (List[int]):
-                List of `inputs_ids` for the first sequence.
+                A list of `inputs_ids` for the first sequence.
             token_ids_1 (List[int], optional):
-                Optional second list of `inputs_ids` for second sequence.
-                Defaults to ``None``.
+                Optional second list of `inputs_ids` for the second sequence.
+                Defaults to `None`.
             already_has_special_tokens (bool, optional):
                 Whether or not the token list already contains special tokens for the model.
-                Defaults to ``False``.
+                Defaults to `False`.
 
         Returns:
-            List[int]: A list of integers in the range [0, 1]. 1 for a special token, 0 for a sequence token.
+            List[int]: A list of integers which is either 0 or 1: 1 for a special token, 0 for a sequence token.
         """
 
         if already_has_special_tokens:
@@ -402,16 +402,16 @@ class XLNetTokenizer(PretrainedTokenizer):
                                              token_ids_1=None):
         """
         Creates a token_type mask from the input sequences.
-        If `token_ids_1` is not None, then the token_type mask
-        of the sequence pair has the following format:
+        If `token_ids_1` is not `None`, then a sequence pair
+        token_type mask has the following format:
 
         ::
 
             0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 2
             | first sequence    | second sequence |
 
-        If `token_ids_1` is None and we only get a single sequence input.
-        The mask has the following format:
+        Else if `token_ids_1` is `None`, then a single sequence
+        token_type mask has the following format:
 
         ::
 
@@ -424,10 +424,10 @@ class XLNetTokenizer(PretrainedTokenizer):
 
         Args:
             token_ids_0 (List[int]):
-                A List of `inputs_ids` for the first sequence.
+                A list of `inputs_ids` for the first sequence.
             token_ids_1 (List[int], optional):
                 Optional second list of `inputs_ids` for the second sequence.
-                Defaults to ``None``.
+                Defaults to `None`.
 
         Returns:
             List[int]: List of token type IDs according to the given sequence(s).
@@ -442,7 +442,8 @@ class XLNetTokenizer(PretrainedTokenizer):
 
     def save_resources(self, save_directory):
         """
-        Saves `vocab_file` (ends with '.spm') under `save_directory`.
+        Saves `SentencePiece <https://github.com/google/sentencepiece>`__ file
+        (ends with '.spm') under `save_directory`.
 
         Args:
             save_directory (str):
