@@ -42,9 +42,7 @@ def convert_example(example, tokenizer):
     encoded_inputs = tokenizer(text=example["text"], max_seq_len=512, pad_to_max_seq_len=True)
     return tuple([np.array(x, dtype="int64") for x in [
             encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], [example["label"]]]])
-
-trans_func = partial(convert_example, tokenizer=tokenizer)
-train_ds = train_ds.map(trans_func)
+train_ds = train_ds.map(partial(convert_example, tokenizer=tokenizer))
 
 batch_sampler = paddle.io.DistributedBatchSampler(dataset=train_ds, batch_size=8, shuffle=False)
 train_data_loader = paddle.io.DataLoader(dataset=train_ds, batch_sampler=batch_sampler, return_list=True)
