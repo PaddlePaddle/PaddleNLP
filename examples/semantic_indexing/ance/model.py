@@ -12,31 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 import numpy as np
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+sys.path.append("../")
+from base_model import SemanticIndexBase
 
-class SemanticIndexANCE(nn.Layer):
+
+class SemanticIndexANCE(SemanticIndexBase):
     def __init__(self, pretrained_model, dropout=None, margin=0.3):
-        super().__init__()
-        self.ptm = pretrained_model
-        self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
+        super().__init__(pretrained_model, dropout)
         self.margin = margin
-
-    def get_pooled_embedding(self,
-                             input_ids,
-                             token_type_ids=None,
-                             position_ids=None,
-                             attention_mask=None):
-        _, cls_embedding = self.ptm(input_ids, token_type_ids, position_ids,
-                                    attention_mask)
-        cls_embedding = self.dropout(cls_embedding)
-        cls_embedding = F.normalize(cls_embedding, p=2, axis=-1)
-
-        return cls_embedding
 
     def forward(self,
                 text_input_ids,

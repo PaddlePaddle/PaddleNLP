@@ -149,3 +149,22 @@ def get_latest_ann_data(ann_data_dir):
 
     logger.info("no new ann_data, return (None, -1)")
     return None, -1
+
+
+def gen_id2corpus(corpus_file):
+    id2corpus = {}
+    with open(corpus_file) as f:
+        for idx, line in enumerate(f):
+            id2corpus[idx] = line.rstrip()
+    return id2corpus
+
+
+def gen_text_file(similar_text_pair_file):
+    text2similar_text = {}
+    texts = []
+    with open(similar_text_pair_file) as f:
+        for line in f:
+            text, similar_text = line.rstrip().split("\t")
+            text2similar_text[text] = similar_text
+            texts.append({"text": text})
+    return texts, text2similar_text
