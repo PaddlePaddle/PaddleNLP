@@ -21,9 +21,9 @@ predict_file: "data/nist2m/testdata/test_08.zh"
 # The file to output the translation results of predict_file to.
 output_file: "predict.txt"
 # The path of vocabulary file of source language.
-src_vocab_fpath: "data/nist2m/vocab_zh.20k.bpe"
+src_vocab_fpath: "data/nist2m/nist.20k.zh.vocab"
 # The path of vocabulary file of target language.
-trg_vocab_fpath: "data/nist2m/vocab_en.10k.bpe"
+trg_vocab_fpath: "data/nist2m/nist.10k.en.vocab"
 # The <bos>, <eos> and <unk> tokens in the dictionary.
 special_token: ["<s>", "<e>", "<unk>"]
 
