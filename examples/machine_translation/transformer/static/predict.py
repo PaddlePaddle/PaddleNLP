@@ -16,10 +16,6 @@ from paddlenlp.transformers import InferTransformerModel
 sys.path.append("../")
 import reader
 
-FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
-
 
 def cast_parameters_to_fp32(place, program, scope=None):
     all_parameters = []
@@ -42,6 +38,11 @@ def parse_args():
         default="../configs/transformer.big.yaml",
         type=str,
         help="Path of the config file. ")
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Whether to print logs on each cards. Normally, not necessary to set --benchmark. "
+    )
     args = parser.parse_args()
     return args
 
@@ -65,12 +66,13 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 def do_predict(args):
     paddle.enable_static()
     if args.device == "gpu":
-        place = paddle.set_device("gpu:0")
+        place = paddle.set_device("gpu")
     else:
         place = paddle.set_device("cpu")
 
     # Define data loader
-    test_loader, to_tokens = reader.create_infer_loader(args)
+    test_loader, to_tokens = reader.create_infer_loader(
+        args, places=[place], use_all_vocab=args.use_all_vocab)
 
     test_program = paddle.static.Program()
     startup_program = paddle.static.Program()
@@ -135,5 +137,7 @@ if __name__ == "__main__":
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
+    args.benchmark = ARGS.benchmark
+    args.use_all_vocab = not ARGS.benchmark
 
     do_predict(args)

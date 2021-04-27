@@ -1,6 +1,7 @@
+#!/bin/bash
 # Whether to use mkl or gpu 
 WITH_MKL=ON
-WITH_GPU=ON
+DEVICE='gpu'
 
 # Please set:
 # * Corresponding PaddlePaddle inference lib
@@ -16,4 +17,4 @@ MODEL_DIR=YOUR_MODEL_DIR
 VOCAB_DIR=/root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708
 DATA_DIR=/root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 
-sh run_impl.sh ${LIB_DIR} transformer_e2e ${MODEL_DIR} ${WITH_MKL} ${WITH_GPU} ${CUDNN_LIB_DIR} ${CUDA_LIB_DIR} ${VOCAB_DIR} ${DATA_DIR}
+bash run_impl.sh ${LIB_DIR} transformer_e2e ${MODEL_DIR} ${WITH_MKL} ${DEVICE} ${CUDNN_LIB_DIR} ${CUDA_LIB_DIR} ${VOCAB_DIR} ${DATA_DIR}

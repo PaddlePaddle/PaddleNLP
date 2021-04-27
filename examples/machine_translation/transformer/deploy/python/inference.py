@@ -16,7 +16,7 @@ import reader
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch-size", type=int, help="Batch size. ")
+    parser.add_argument("--batch_size", type=int, help="Batch size. ")
     parser.add_argument(
         "--config",
         default="./configs/transformer.big.yaml",
@@ -37,6 +37,11 @@ def parse_args():
         help="The number of threads when enable mkl. ")
     parser.add_argument(
         "--model_dir", default="", type=str, help="Path of the model. ")
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Whether to print logs on each cards. Normally, not necessary to set --benchmark. "
+    )
     parser.add_argument(
         "--profile", action="store_true", help="Whether to profile. ")
     args = parser.parse_args()
@@ -175,6 +180,8 @@ if __name__ == "__main__":
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
+    args.benchmark = ARGS.benchmark
+    args.use_all_vocab = not ARGS.benchmark
     args.device = ARGS.device
     args.use_mkl = ARGS.use_mkl
     args.threads = ARGS.threads

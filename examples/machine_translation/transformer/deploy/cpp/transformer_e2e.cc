@@ -199,8 +199,6 @@ void Main(
 
   if (device == "gpu") {
     config.EnableUseGpu(100, gpu_id);
-  } else if (device == "xpu") {
-    config.EnableXpu(100);
   } else {
     config.DisableGpu();
     if (use_mkl) {

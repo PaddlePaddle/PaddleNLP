@@ -1,3 +1,4 @@
+#!/bin/bash
 mkdir -p build
 cd build
 rm -rf *
@@ -6,11 +7,16 @@ LIB_DIR=$1
 DEMO_NAME=$2
 MODEL_FILE_DIR=$3
 WITH_MKL=$4
-WITH_GPU=$5
+DEVICE=$5
 CUDNN_LIB=$6
 CUDA_LIB=$7
 VOCAB_DIR=$8
 DATA_DIR=$9
+
+WITH_GPU=OFF
+if [[ $DEVICE="gpu" ]]; then
+  WITH_GPU=ON
+fi
 
 cmake .. -DPADDLE_LIB=${LIB_DIR} \
   -DWITH_MKL=${WITH_MKL} \
@@ -24,5 +30,5 @@ cmake .. -DPADDLE_LIB=${LIB_DIR} \
 
 make -j
 
-# <batch_size> <use_gpu> <gpu_id> <use_mkl> <threads> <model_dir> <vocab_dir> <data_dir>
-./${DEMO_NAME} 32 1 0 0 1 ${MODEL_FILE_DIR} ${VOCAB_DIR} ${DATA_DIR}
+# <batch_size> <device> <gpu_id> <use_mkl> <threads> <model_dir> <vocab_dir> <data_dir>
+./${DEMO_NAME} 8 ${DEVICE} 0 0 1 ${MODEL_FILE_DIR} ${VOCAB_DIR} ${DATA_DIR}

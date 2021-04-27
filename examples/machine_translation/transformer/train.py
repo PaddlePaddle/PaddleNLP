@@ -27,7 +27,8 @@ def parse_args():
     parser.add_argument(
         "--benchmark",
         action="store_true",
-        help="Whether to print logs on each cards. ")
+        help="Whether to print logs on each cards. Normally, not necessary to set --benchmark. "
+    )
     parser.add_argument(
         "--max_iter",
         default=None,
@@ -55,7 +56,8 @@ def do_train(args):
         paddle.seed(random_seed)
 
     # Define data loader
-    (train_loader), (eval_loader) = reader.create_data_loader(args)
+    (train_loader), (eval_loader) = reader.create_data_loader(
+        args, use_all_vocab=args.use_all_vocab)
 
     # Define model
     transformer = TransformerModel(
@@ -247,6 +249,7 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
     args.benchmark = ARGS.benchmark
+    args.use_all_vocab = not ARGS.benchmark
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
 

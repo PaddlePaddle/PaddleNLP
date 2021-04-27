@@ -33,7 +33,7 @@ def min_max_filer(data, max_len, min_len=0):
     return (data_min_len >= min_len) and (data_max_len <= max_len)
 
 
-def create_data_loader(args, places=None, use_all_vocab=False):
+def create_data_loader(args, places=None, use_all_vocab=True):
     data_files = None
     if args.root != "None" and os.path.exists(args.root):
         data_files = {
@@ -101,7 +101,7 @@ def create_data_loader(args, places=None, use_all_vocab=False):
     return data_loaders
 
 
-def create_infer_loader(args, use_all_vocab=False):
+def create_infer_loader(args, use_all_vocab=True):
     data_files = None
     if args.root != "None" and os.path.exists(args.root):
         data_files = {

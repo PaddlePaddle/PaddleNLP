@@ -32,11 +32,12 @@ def parse_args():
     parser.add_argument(
         "--model_dir", default="", type=str, help="Path of the model. ")
     parser.add_argument(
-        "--profile", action="store_true", help="Whether to profile. ")
-    parser.add_argument(
-        "--use_all_vocab",
+        "--benchmark",
         action="store_true",
-        help="Whether to use benchmark vocab. ")
+        help="Whether to print logs on each cards. Normally, not necessary to set --benchmark. "
+    )
+    parser.add_argument(
+        "--profile", action="store_true", help="Whether to profile. ")
     args = parser.parse_args()
     return args
 
@@ -122,7 +123,8 @@ if __name__ == "__main__":
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
-
+    args.benchmark = ARGS.benchmark
+    args.use_all_vocab = not ARGS.benchmark
     args.profile = ARGS.profile
     args.device = ARGS.device
     args.use_all_vocab = ARGS.use_all_vocab

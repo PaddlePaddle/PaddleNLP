@@ -53,7 +53,7 @@ DATA_DIR=/root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/new
 可以简单执行如下语句完成编译以及推理整个过程。
 
 ``` sh
-sh run.sh
+bash run.sh
 ```
 
 编译完成后，其实，在 `build/bin/` 路径下会生成 `transformer_e2e` 的可执行文件，如果有需要，也可以直接执行这个可执行文件进行推理。
@@ -67,7 +67,7 @@ sh run.sh
 
 各个参数解释如下：
 * `<batch_size>`: 与配置文件中 `infer_batch_size` 意义相同，是指的使用 Paddle Inference 的时候一个 batch 的句子数目。
-* `<device>`: 使用的设备，可以是 gpu，xpu 或是 cpu。
+* `<device>`: 使用的设备，可以是 gpu 或是 cpu。
 * `<gpu_id>`: 若使用 gpu，则需要提供所使用的 gpu 的 id。
 * `<use_mkl>`: 是否使用 mkl，1 代表使用 mkl，0 代表不使用 mkl。
 * `<threads>`: 仅在使用 mkl 的时候起效，用于指定计算 math 库时的线程数。

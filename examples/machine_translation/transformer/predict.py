@@ -19,6 +19,11 @@ def parse_args():
         default="./configs/transformer.big.yaml",
         type=str,
         help="Path of the config file. ")
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Whether to print logs on each cards. Normally, not necessary to set --benchmark. "
+    )
     args = parser.parse_args()
     return args
 
@@ -41,14 +46,15 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 
 def do_predict(args):
     if args.device == "gpu":
-        place = "gpu:0"
+        place = "gpu"
     else:
         place = "cpu"
 
     paddle.set_device(place)
 
     # Define data loader
-    test_loader, to_tokens = reader.create_infer_loader(args)
+    test_loader, to_tokens = reader.create_infer_loader(
+        args, use_all_vocab=args.use_all_vocab)
 
     # Define model
     transformer = InferTransformerModel(
@@ -105,5 +111,7 @@ if __name__ == "__main__":
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
+    args.benchmark = ARGS.benchmark
+    args.use_all_vocab = not ARGS.benchmark
 
     do_predict(args)

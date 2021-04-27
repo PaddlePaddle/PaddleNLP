@@ -34,7 +34,8 @@ def parse_args():
     parser.add_argument(
         "--benchmark",
         action="store_true",
-        help="Whether to print logs on each cards. ")
+        help="Whether to print logs on each cards. Normally, not necessary to set --benchmark. "
+    )
     parser.add_argument(
         "--distributed",
         action="store_true",
@@ -69,7 +70,8 @@ def do_train(args):
         paddle.seed(random_seed)
 
     # Define data loader
-    (train_loader), (eval_loader) = reader.create_data_loader(args, places)
+    (train_loader), (eval_loader) = reader.create_data_loader(
+        args, places=places, use_all_vocab=args.use_all_vocab)
 
     train_program = paddle.static.Program()
     startup_program = paddle.static.Program()
@@ -273,7 +275,8 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
     args.benchmark = ARGS.benchmark
-    args.is_distributed = distributed
+    args.use_all_vocab = not ARGS.benchmark
+    args.is_distributed = ARGS.distributed
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
 
