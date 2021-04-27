@@ -276,7 +276,7 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
             optimizer.clear_grad()
-            if global_step % 20 == 0 and rank == 0:
+            if global_step % 100 == 0 and rank == 0:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
