@@ -164,10 +164,12 @@ class DistilBertModel(DistilBertPretrainedModel):
     def forward(self, input_ids, attention_mask=None):
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype("float32") * -1e9,
+                (input_ids == self.pad_token_id
+                 ).astype(self.encoder.layers[0].norm1.weight.dtype) * -1e9,
                 axis=[1, 2])
         embedding_output = self.embeddings(input_ids=input_ids)
         encoder_outputs = self.encoder(embedding_output, attention_mask)
+
         return encoder_outputs
 
 
