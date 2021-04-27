@@ -70,6 +70,8 @@ def bert(model_name_or_path='bert-base-uncased',
     """
     assert model_name_or_path in _BERT_PRETRAINED_MODELS or os.path.isdir(model_name_or_path), \
         "Please check your model name or path. Supported model names are: {}.".format(tuple(_BERT_PRETRAINED_MODELS))
+    assert model_select in _BERT_MODEL_CLASSES.keys(), \
+        "Please check `model_select`, it should be in {}.".format(tuple(_BERT_MODEL_CLASSES.keys()))
 
     model_class = _BERT_MODEL_CLASSES[model_select]
 
