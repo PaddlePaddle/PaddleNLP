@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 import paddle
+
+from paddlenlp.utils.log import logger
 
 
 def create_dataloader(dataset,
@@ -77,3 +81,71 @@ def read_text_pair(data_path):
             if len(data) != 2:
                 continue
             yield {'text_a': data[0], 'text_b': data[1]}
+
+
+def read_text_triplet(data_path):
+    """Reads data."""
+    with open(data_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            data = line.rstrip().split("\t")
+            if len(data) != 3:
+                continue
+            yield {
+                'text': data[0],
+                'pos_sample': data[1],
+                'neg_sample': data[2]
+            }
+
+
+# ANN - active learning ------------------------------------------------------
+def get_latest_checkpoint(args):
+    """
+        Return: (latest_checkpint_path, global_step)
+    """
+    if not os.path.exists(args.save_model_dir):
+        return args.init_from_ckpt, 0
+
+    subdirectories = list(next(os.walk(args.save_model_dir))[1])
+
+    def valid_checkpoint(checkpoint):
+        chk_path = os.path.join(args.save_model_dir, checkpoint)
+        scheduler_path = os.path.join(chk_path, "model_state.pdparams")
+        return os.path.exists(scheduler_path)
+
+    trained_steps = [int(s) for s in subdirectories if valid_checkpoint(s)]
+
+    if len(trained_steps) > 0:
+        return os.path.join(args.save_model_dir,
+                            str(max(trained_steps)),
+                            "model_state.pdparams"), max(trained_steps)
+
+    return args.init_from_ckpt, 0
+
+
+# ANN - active learning ------------------------------------------------------
+def get_latest_ann_data(ann_data_dir):
+    if not os.path.exists(ann_data_dir):
+        return None, -1
+
+    subdirectories = list(next(os.walk(ann_data_dir))[1])
+
+    def valid_checkpoint(step):
+        ann_data_file = os.path.join(ann_data_dir, step, "new_ann_data")
+        # succed_flag_file is an empty file that indicates ann data has been generated
+        succeed_flag_file = os.path.join(ann_data_dir, step,
+                                         "succeed_flag_file")
+        return os.path.exists(succeed_flag_file) and os.path.exists(
+            ann_data_file)
+
+    ann_data_steps = [int(s) for s in subdirectories if valid_checkpoint(s)]
+
+    if len(ann_data_steps) > 0:
+        latest_ann_data_file = os.path.join(ann_data_dir,
+                                            str(max(ann_data_steps)),
+                                            "new_ann_data")
+        logger.info("Using lateset ann_data_file:{}".format(
+            latest_ann_data_file))
+        return latest_ann_data_file, max(ann_data_steps)
+
+    logger.info("no new ann_data, return (None, -1)")
+    return None, -1
