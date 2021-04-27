@@ -108,12 +108,13 @@ def load_dataset(path_or_read_func,
         reader_cls = import_main_class(path_or_read_func)
         reader_instance = reader_cls(lazy=lazy, name=name, **kwargs)
 
+        # Check if selected name and split is valid in this DatasetBuilder
         if hasattr(reader_instance, 'BUILDER_CONFIGS'):
             if name in reader_cls.BUILDER_CONFIGS.keys():
                 split_names = reader_cls.BUILDER_CONFIGS[name]['splits'].keys()
             else:
                 raise ValueError(
-                    'Invaild name "{}". Should be one of {}.'.format(
+                    'Invalid name "{}". Should be one of {}.'.format(
                         name, list(reader_cls.BUILDER_CONFIGS.keys())))
         elif hasattr(reader_instance, 'SPLITS'):
             split_names = reader_instance.SPLITS.keys()
@@ -130,7 +131,7 @@ def load_dataset(path_or_read_func,
 
         for split_name in selected_splits:
             if split_name not in split_names and split_name != None:
-                raise ValueError('Invaild split "{}". Should be one of {}.'.
+                raise ValueError('Invalid split "{}". Should be one of {}.'.
                                  format(split_name, list(split_names)))
 
         datasets = reader_instance.read_datasets(
