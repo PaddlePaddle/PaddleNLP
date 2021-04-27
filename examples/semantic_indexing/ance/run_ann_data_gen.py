@@ -18,6 +18,7 @@ sys.path.append("../")
 from data import get_latest_checkpoint, get_latest_ann_data
 from data import convert_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
+from ann_util import build_index
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -42,47 +43,6 @@ parser.add_argument("--hnsw_max_elements", default=1000000, type=int, help="Reca
 
 args = parser.parse_args()
 # yapf: enable
-
-
-def build_index(args, data_loader, model):
-
-    index = hnswlib.Index(space='ip', dim=768)
-
-    # Initializing index
-    # max_elements - the maximum number of elements (capacity). Will throw an exception if exceeded
-    # during insertion of an element.
-    # The capacity can be increased by saving/loading the index, see below.
-    #
-    # ef_construction - controls index search speed/build speed tradeoff
-    #
-    # M - is tightly connected with internal dimensionality of the data. Strongly affects memory consumption (~M)
-    # Higher M leads to higher accuracy/run_time at fixed ef/efConstruction
-    index.init_index(
-        max_elements=args.hnsw_max_elements,
-        ef_construction=args.hnsw_ef,
-        M=args.hnsw_m)
-
-    # Controlling the recall by setting ef:
-    # higher ef leads to better accuracy, but slower search
-    index.set_ef(args.hnsw_ef)
-
-    # Set number of threads used during batch search/construction
-    # By default using all available cores
-    index.set_num_threads(16)
-
-    logger.info("start build index..........")
-
-    all_embeddings = []
-
-    for text_embeddings in model.get_semantic_embedding(data_loader):
-        all_embeddings.append(text_embeddings)
-
-    all_embeddings = np.concatenate(all_embeddings, axis=0)
-    index.add_items(all_embeddings)
-
-    logger.info("Total index number:{}".format(index.get_current_count()))
-
-    return index
 
 
 def generate_new_ann(args, data_loader_dict, checkpoint_path, latest_step_num):
