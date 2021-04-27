@@ -26,9 +26,10 @@
 PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用户的使用门槛。只需十几行代码，用户即可完成模型加载和下游任务Fine-tuning。
 
 ```python
-import paddle
-import numpy as np
 from functools import partial
+import numpy as np
+
+import paddle
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 
@@ -44,7 +45,7 @@ def convert_example(example, tokenizer):
             encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], [example["label"]]]])
 train_ds = train_ds.map(partial(convert_example, tokenizer=tokenizer))
 
-batch_sampler = paddle.io.DistributedBatchSampler(dataset=train_ds, batch_size=8, shuffle=False)
+batch_sampler = paddle.io.BatchSampler(dataset=train_ds, batch_size=8, shuffle=True)
 train_data_loader = paddle.io.DataLoader(dataset=train_ds, batch_sampler=batch_sampler, return_list=True)
 
 optimizer = paddle.optimizer.AdamW(learning_rate=0.001, parameters=model.parameters())
