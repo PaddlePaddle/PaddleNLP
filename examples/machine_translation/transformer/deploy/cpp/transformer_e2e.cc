@@ -82,28 +82,6 @@ public:
   explicit DataReader(const std::string& path)
       : file(new std::ifstream(path)) {}
 
-  bool TensorMoreBatch(std::shared_ptr<paddle_infer::Predictor>& predictor,
-                       std::vector<DataInput>& data_input_vec,
-                       int max_len,
-                       int batch_size) {
-    auto src_word_t = predictor->GetInputHandle("src_word");
-    std::vector<int64_t> src_word_vec;
-    src_word_vec.resize(max_len * batch_size);
-    for (int i = 0; i < batch_size; ++i) {
-      for (int k = 0; k < max_len; ++k) {
-        if (k < data_input_vec[i].src_data.size()) {
-          src_word_vec[i * max_len + k] = data_input_vec[i].src_data[k];
-        } else {
-          src_word_vec[i * max_len + k] = PAD_IDX;
-        }
-      }
-    }
-    src_word_t->Reshape({batch_size, max_len});
-    src_word_t->CopyFromCpu(src_word_vec.data());
-
-    return true;
-  }
-
   bool NextBatch(std::shared_ptr<paddle_infer::Predictor>& predictor,
                  const int& batch_size,
                  std::vector<std::string>& source_query_vec) {
@@ -151,10 +129,32 @@ public:
     return true;
   }
 
-public:
   std::unordered_map<std::string, int> word2num_dict;
   std::unordered_map<int, std::string> num2word_dict;
   std::unique_ptr<std::ifstream> file;
+
+private:
+  bool TensorMoreBatch(std::shared_ptr<paddle_infer::Predictor>& predictor,
+                       std::vector<DataInput>& data_input_vec,
+                       int max_len,
+                       int batch_size) {
+    auto src_word_t = predictor->GetInputHandle("src_word");
+    std::vector<int64_t> src_word_vec;
+    src_word_vec.resize(max_len * batch_size);
+    for (int i = 0; i < batch_size; ++i) {
+      for (int k = 0; k < max_len; ++k) {
+        if (k < data_input_vec[i].src_data.size()) {
+          src_word_vec[i * max_len + k] = data_input_vec[i].src_data[k];
+        } else {
+          src_word_vec[i * max_len + k] = PAD_IDX;
+        }
+      }
+    }
+    src_word_t->Reshape({batch_size, max_len});
+    src_word_t->CopyFromCpu(src_word_vec.data());
+
+    return true;
+  }
 };
 
 
