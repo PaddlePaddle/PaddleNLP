@@ -106,12 +106,13 @@ PaddleNLP 提供了多种成熟的预训练模型技术，适用于自然语言�
 ## NLP系统应用
 
 ### 机器翻译 (Machine Translation)
-机器翻译是计算语言学的一个分支，是人工智能的终极目标之一，具有重要的科学研究价值。在机器翻译的任务上，提供了两大类模型，一类是传统的 Sequence to Sequence任务，简称Seq2Seq，通过RNN类模型进行编码，解码；另外一类是Transformer类模型，通过Self-Attention机制来提升Encoder和Decoder的效果，Transformer模型的具体信息可以参考论文, [Attention Is All You Need](https://arxiv.org/abs/1706.03762)。下面是具体的模型信息。
+机器翻译是计算语言学的一个分支，是人工智能的终极目标之一，具有重要的科学研究价值。在机器翻译的任务上，提供了两大类模型，一类是传统的 Sequence to Sequence任务，简称Seq2Seq，通过RNN类模型进行编码，解码；另外一类是Transformer类模型，通过Self-Attention机制来提升Encoder和Decoder的效果，Transformer模型的具体信息可以参考论文, [Attention Is All You Need](https://arxiv.org/abs/1706.03762)。同声传译（Simultaneous Translation）也隶属于机器翻译，它要求在句子完成之前进行翻译，同传模型STACL是针对同传场景提出的模型，它的Prefix-to-Prefix架构和Wait-k策略能够克服词序差异并带来较高的翻译质量。下面是具体的模型信息。
 
 | 模型    | 简介     |
 | ------ | ------- |
 | [Seq2Seq](./machine_translation/seq2seq) | 使用编码器-解码器（Encoder-Decoder）结构, 同时使用了Attention机制来加强Decoder和Encoder之间的信息交互，Seq2Seq 广泛应用于机器翻译，自动对话机器人，文档摘要自动生成，图片描述自动生成等任务中。|
 | [Transformer](./machine_translation/transformer) |基于PaddlePaddle框架的Transformer结构搭建的机器翻译模型，Transformer 计算并行度高，能解决学习长程依赖问题。并且模型框架集成了训练，验证，预测任务，功能完备，效果突出。|
+| [STACL](./machine_translation/text_simultaneous_translation) | 基于Transformer网络结构的同传模型STACL的PaddlePaddle 实现，STACL是针对同传提出的适用于所有同传场景的翻译模型，既能在未看到源词的情况下仍然翻译出对应的目标词，同时又能保持较高的翻译质量。|
 
 
 ### 阅读理解 (Machine Reading Comprehension)
