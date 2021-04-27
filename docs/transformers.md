@@ -27,6 +27,8 @@ PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用�
 
 ```python
 import paddle
+import numpy as np
+from functools import partial
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 
@@ -36,13 +38,24 @@ model = BertForSequenceClassification.from_pretrained("bert-wwm-chinese", num_cl
 
 tokenizer = BertTokenizer.from_pretrained("bert-wwm-chinese")
 
-# Define the dataloader from dataset and tokenizer here
+# Preprocess from text to token
+def convert_example(example, tokenizer):
+    encoded_inputs = tokenizer(text=example["text"], max_seq_len=512, pad_to_max_seq_len=True)
+    return tuple([np.array(x, dtype="int64") for x in [
+            encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], [example["label"]]]])
+
+trans_func = partial(convert_example, tokenizer=tokenizer)
+train_ds = train_ds.map(trans_func)
+
+# Define dataloader
+batch_sampler = paddle.io.DistributedBatchSampler(dataset=train_ds, batch_size=8,shuffle=False)
+train_data_loader = paddle.io.DataLoader(dataset=train_ds, batch_sampler=batch_sampler,return_list=True)
 
 optimizer = paddle.optimizer.AdamW(learning_rate=0.001, parameters=model.parameters())
 
 criterion = paddle.nn.loss.CrossEntropyLoss()
 
-for input_ids, token_type_ids, labels in train_dataloader:
+for input_ids, token_type_ids, labels in train_data_loader():
     logits = model(input_ids, token_type_ids)
     loss = criterion(logits, labels)
     probs = paddle.nn.functional.softmax(logits, axis=1)
