@@ -281,7 +281,7 @@ class XLNetTokenizer(PretrainedTokenizer):
         return tokens
 
     def convert_tokens_to_string(self, tokens):
-        """Converts a sequence of tokens (strings for sub-words) in a single string."""
+        # Converts a sequence of tokens (strings for sub-words) in a single string.
         out_string = "".join(tokens).replace(SPIECE_UNDERLINE, " ").strip()
         return out_string
 
@@ -295,7 +295,7 @@ class XLNetTokenizer(PretrainedTokenizer):
 
         Args:
             pair (bool, optional):
-                Whether the sequence is a sequence pair or a single sequence.
+                Whether the input is a sequence pair or a single sequence.
                 Defaults to `False` and the input is a single sequence.
 
         Returns:
@@ -320,7 +320,7 @@ class XLNetTokenizer(PretrainedTokenizer):
             token_ids_0 (List[int]):
                 List of IDs for the first sequence.
             token_ids_1 (List[int], optional):
-                Optional second list of IDs for sequence pairs. Defaults to `None`.
+                Optional second list of IDs for the second sequenze. Defaults to `None`.
 
         Returns:
             List[int]: List of input IDs with the appropriate special tokens.

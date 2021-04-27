@@ -646,9 +646,9 @@ class XLNetModel(XLNetPretrainedModel):
     The bare XLNet Model outputting raw hidden-states without any specific head on top.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
-    Refer to the superclass documentation for the generic methods to be inherited.
+    Refer to the superclass documentation for the generic methods inherited from.
 
-    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    This model is also a `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
     /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
@@ -675,8 +675,8 @@ class XLNetModel(XLNetPretrainedModel):
             Whether or not to use the same attention length for each token.
             Defaults to `False`.
         attn_type (str, optional):
-            The attention type used in the attention layer. Set *"bi"* for `XLNet`, *"uni"* for `Transformer-XL`.
-            Defaults to *"bi"*.
+            The attention type used in the attention layer. Set **"bi"** for ``XLNet``,
+            **"uni"** for ``Transformer-XL``. Defaults to **"bi"**.
         bi_data (bool, optional):
             Whether or not to use bidirectional input pipeline. Set to `True` during pretraining and
             `False` during fine-tuning. Defaults to `False`.
@@ -716,7 +716,7 @@ class XLNetModel(XLNetPretrainedModel):
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`XLNetPretrainedModel._init_weights` for how weights are initialized in `XLNetModel`.
+                See :meth:`XLNetPretrainedModel._init_weights()` for how weights are initialized in `XLNetModel`.
     """
 
     def __init__(
@@ -874,7 +874,7 @@ class XLNetModel(XLNetPretrainedModel):
             output_hidden_states=False,
             return_dict=False, ):
         r"""
-        The XLNetModel forward method, overrides the `__call__` special method.
+        The XLNetModel forward method, overrides the `__call__()` special method.
 
         Args:
             input_ids (Tensor):
@@ -885,19 +885,19 @@ class XLNetModel(XLNetPretrainedModel):
                 Segment token indices to indicate first and second portions of the inputs.
                 Indices can be either 0 or 1:
 
-                - 0 corresponds to a *sentence A* token,
-                - 1 corresponds to a *sentence B* token.
+                - 0 corresponds to a **sentence A** token,
+                - 1 corresponds to a **sentence B** token.
 
                 It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-                Defaults to None, which means no segment embeddings is added.
+                Defaults to None, which means no segment embeddings is added to token embeddings.
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token.
+                Mask to indicate whether to perform attention on each input token or not.
                 The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are 0, and will be
-                **unchanged** for positions that are 1.
+                to **-infinity** for any positions in the mask that are **0**, and will be
+                **unchanged** for positions that are **1**.
 
-                - 1 for tokens that are **not masked**,
-                - 0 for tokens that are **masked**.
+                - **1** for tokens that are **not masked**,
+                - **0** for tokens that are **masked**.
 
                 It's data type should be `float32` and has a shape of [batch_size, sequence_length].
                 Defaults to `None`.
@@ -907,7 +907,7 @@ class XLNetModel(XLNetPretrainedModel):
                 Defaults to None, and we don't use mems.
 
                 .. note::
-                    `use_mems` has to be set to `True` to make use of `mems`.
+                    `use_mems` has to be set to `True` in order to make use of `mems`.
             perm_mask (Tensor, optional):
                 Mask to indicate the permutation pattern of the input sequence with values being either 0 or 1.
 
@@ -927,12 +927,12 @@ class XLNetModel(XLNetPretrainedModel):
             input_mask (Tensor, optional):
                 Mask to avoid performing attention on padding token with values being either 0 or 1.
                 It's data type should be `float32` and it has a shape of [batch_size, sequence_length].
-                This mask is negative of `attention_mask`, i.e. with 0 for real tokens and 1 for padding.
+                This mask is negative of `attention_mask`:
 
                 - 1 for tokens that are **masked**,
                 - 0 for tokens that are **not masked**.
 
-                You can only use one of `input_mask` and `attention_mask`. Defaults to `None`.
+                You should use only one of `input_mask` and `attention_mask`. Defaults to `None`.
             head_mask (Tensor, optional):
                 Mask to nullify selected heads of the self-attention layers with values being either 0 or 1.
 
@@ -943,7 +943,7 @@ class XLNetModel(XLNetPretrainedModel):
                 Defaults to `None`, which means we keep all heads.
             inputs_embeds (Tensor, optional):
                 An embedded representation tensor which is an alternative of `input_ids`.
-                You should specify only one of both to avoid contradiction.
+                You should specify only either one of them to avoid contradiction.
                 It's data type should be `float32` and has a shape of [batch_size, sequence_length, hidden_size].
                 Defaults to `None`, which means we only specify `input_ids`.
             use_mems_train (bool, optional):
@@ -964,7 +964,7 @@ class XLNetModel(XLNetPretrainedModel):
                 Defaults to False.
 
         Returns:
-            Tuple or Dict: A tuple of shape (`output`, `new_mems`, `hidden_states`, `attentions`)
+            tuple or dict: A tuple of shape (`output`, `new_mems`, `hidden_states`, `attentions`)
             or a dict of shape {"last_hidden_state": `output`, "mems": `new_mems`,
             "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
@@ -979,18 +979,18 @@ class XLNetModel(XLNetPretrainedModel):
                     If `target_mapping` is `None`, then `num_predict` equals to `sequence_length`.
             - `mems` (List[Tensor]):
                 A list of pre-computed hidden-states. The length of the list is `n_layers`.
-                Each element of the list is a Tensor with dtype `float32` and has a shape of
+                Each element in the list is a Tensor with dtype `float32` and has a shape of
                 [batch_size, sequence_length, hidden_size].
             - `hidden_states` (List[Tensor], optional):
                 A list of Tensor containing hidden-states of the model at the output of each layer
                 plus the initial embedding outputs. Each Tensor has a data type of `float32` and
                 has a shape of [batch_size, sequence_length, hidden_size].
-                Returned when `output_hidden_states` is passed as `True`.
+                Being returned when `output_hidden_states` is set to `True`.
             - `attentions` (List[Tensor], optional):
                 A list of Tensor containing attentions weights of each hidden layer.
                 Each Tensor (one for each layer) has a data type of `float32` and
                 has a shape of [batch_size, num_heads, sequence_length, sequence_length].
-                Returned when `output_attentions` is passed as `True`.
+                Being returned when `output_attentions` is set to `True`.
 
         Example:
             .. code-block::
@@ -1293,7 +1293,7 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
             output_hidden_states=False,
             return_dict=False, ):
         r"""
-        The XLNetForSequenceClassification forward method, overrides the __call__() special method.
+        The XLNetForSequenceClassification forward method, overrides the `__call__()` special method.
 
         Args:
             input_ids (Tensor):
@@ -1326,7 +1326,7 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
                 See :class:`XLNetModel`.
 
         Returns:
-            Tuple or Dict: A tuple of shape (`output`, `new_mems`, `hidden_states`, `attentions`)
+            tuple or dict: A tuple of shape (`output`, `new_mems`, `hidden_states`, `attentions`)
             or a dict of shape {"last_hidden_state": `output`, "mems": `new_mems`,
             "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
@@ -1425,7 +1425,7 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
             output_hidden_states=False,
             return_dict=False, ):
         r"""
-        The XLNetForTokenClassification forward method, overrides the __call__() special method.
+        The XLNetForTokenClassification forward method, overrides the `__call__()` special method.
 
         Args:
             input_ids (Tensor):
@@ -1458,7 +1458,7 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
                 See :class:`XLNetModel`.
 
         Returns:
-            Tuple or Dict: A tuple of shape (`output`, `new_mems`, `hidden_states`, `attentions`)
+            tuple or dict: A tuple of shape (`output`, `new_mems`, `hidden_states`, `attentions`)
             or a dict of shape {"last_hidden_state": `output`, "mems": `new_mems`,
             "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
