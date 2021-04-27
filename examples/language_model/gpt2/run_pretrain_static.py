@@ -26,7 +26,7 @@ os.environ['FLAGS_sync_nccl_allreduce'] = "1"
 os.environ['FLAGS_eager_delete_tensor_gb'] = "0"
 os.environ['FLAGS_fuse_parameter_memory_size'] = "32"
 os.environ['FLAGS_fuse_parameter_groups_size'] = "50"
-os.environ['FLAGS_check_nan_inf'] = "0"
+os.environ['FLAGS_check_nan_inf'] = "1"
 os.environ['FLAGS_enable_sequential_execution'] = "1"
 os.path.expandvars('$HOME')
 os.path.expanduser('~')
@@ -36,6 +36,7 @@ import paddle
 import paddle.distributed.fleet as fleet
 from paddlenlp.transformers import GPT2Model, GPT2ForPretraining, GPT2PretrainingCriterion
 from paddlenlp.transformers import GPT2Tokenizer, GPT2ChineseTokenizer
+from paddlenlp.transformers.gpt2 import guard
 from paddlenlp.utils.log import logger
 from tensorboardX import SummaryWriter
 
@@ -186,10 +187,12 @@ def parse_args():
         default=500,
         help="Evaluate for every X updates steps.")
     parser.add_argument(
-        "--eval_iters",
-        type=int,
-        default=10,
-        help="Evaluate for every X updates steps.")
+        "--eval_iters", type=int, default=10, help="Evaluate iterations.")
+    parser.add_argument(
+        "--sharding_degree", type=int, default=1, help="sharding degree.")
+    parser.add_argument("--mp_degree", type=int, default=1, help="mp degree.")
+    parser.add_argument("--pp_degree", type=int, default=1, help="pp degree.")
+    parser.add_argument("--dp_degree", type=int, default=1, help="dp degree.")
     parser.add_argument(
         "--save_steps",
         type=int,
@@ -220,28 +223,35 @@ class WorkerInitObj:
         random.seed(self.seed + id)
 
 
-def create_data_holder():
+def create_data_holder(args):
     """creat data holdr"""
-    tokens = paddle.static.data(name="tokens", shape=[-1, -1], dtype="int64")
+    tokens = paddle.static.data(
+        name="tokens", shape=[-1, args.max_seq_len], dtype="int64")
     loss_mask = paddle.static.data(
-        name="loss_mask", shape=[-1, -1], dtype="float32")
+        name="loss_mask", shape=[-1, args.max_seq_len], dtype="float32")
     attention_mask = paddle.static.data(
-        name="attention_mask", shape=[-1, 1, -1, -1], dtype="float32")
+        name="attention_mask",
+        shape=[-1, 1, args.max_seq_len, args.max_seq_len],
+        dtype="float32")
     position_ids = paddle.static.data(
-        name="position_ids", shape=[-1, -1], dtype="int64")
-    labels = paddle.static.data(name="labels", shape=[-1, -1], dtype="int64")
+        name="position_ids", shape=[-1, args.max_seq_len], dtype="int64")
+    labels = paddle.static.data(
+        name="labels", shape=[-1, args.max_seq_len], dtype="int64")
     return [tokens, loss_mask, attention_mask, position_ids, labels]
 
 
 def create_strategy(args):
-    build_strategy = paddle.static.BuildStrategy()
-    exec_strategy = paddle.static.ExecutionStrategy()
+    #build_strategy = paddle.fluid.BuildStrategy()
+    build_strategy = None
+    exec_strategy = paddle.fluid.ExecutionStrategy()
 
-    build_strategy.enable_addto = args.enable_addto
-    build_strategy.enable_sequential_execution = args.use_recompute
+    # build_strategy.enable_addto = args.enable_addto
+    # build_strategy.enable_sequential_execution = args.use_recompute
+    # build_strategy.fuse_broadcast_ops = False
+    # build_strategy.enable_inplace = False
 
-    exec_strategy.num_threads = 1
-    exec_strategy.num_iteration_per_drop_scope = 100
+    exec_strategy.num_threads = 2
+    exec_strategy.num_iteration_per_drop_scope = 1
     return build_strategy, exec_strategy
 
 
@@ -255,16 +265,25 @@ def build_compiled_program(args, main_program, loss):
     return main_program
 
 
-def dist_optimizer(args, optimizer, model, worker_num):
-    build_strategy, exec_strategy = create_strategy(args)
+def dist_optimizer(args, topo):
 
-    exec_strategy.num_threads = 2
+    dp_sharding_rank = topo.dp.rank * topo.sharding.size + topo.sharding.rank
+    dp_worldsize = topo.dp.size * topo.sharding.size
+    bsz_per_dp = args.global_bsz // dp_worldsize
+
+    micro_bsz = args.micro_bsz
+    assert args.global_bsz % micro_bsz == 0, f"cannot do gradient accumulate, globa_bsz: {args.bsz} micro_bsz: {micro_bsz}"
+    acc_steps = bsz_per_dp // micro_bsz
+
+    build_strategy, exec_strategy = create_strategy(args)
     dist_strategy = fleet.DistributedStrategy()
     dist_strategy.execution_strategy = exec_strategy
-    dist_strategy.build_strategy = build_strategy
+    #dist_strategy.build_strategy = build_strategy
     dist_strategy.nccl_comm_num = 3
 
-    dist_strategy.fuse_grad_size_in_MB = 16
+    dist_strategy.recompute = args.use_recompute
+    dist_strategy.pipeline = args.pp_degree > 1
+
     if args.use_amp:
         dist_strategy.amp = True
         dist_strategy.amp_configs = {
@@ -289,16 +308,16 @@ def dist_optimizer(args, optimizer, model, worker_num):
             "mp_degree": args.mp_degree,
             "pp_degree": args.pp_degree,
             "dp_degree": args.dp_degree,
+            "optimize_offload": False,
+        }
+    if args.pp_degree > 1:
+        dist_strategy.pipeline_configs = {
+            "schedule_mode": "1F1B",
+            "micro_batch_size": micro_bsz,
+            "accumulate_steps": acc_steps,
         }
 
-    if args.use_recompute:
-        dist_strategy.recompute = True
-        dist_strategy.recompute_configs = {
-            "checkpoints": model.gpt2.checkpoints
-        }
-
-    optimizer = fleet.distributed_optimizer(optimizer, strategy=dist_strategy)
-    return optimizer
+    return dist_strategy
 
 
 def set_seed(args, worker_index):
@@ -342,23 +361,35 @@ def init_static_with_params(model, dygraph_params):
     paddle.static.set_program_state(prog, static_params)
 
 
+def simple_model(data, topo):
+    emb_out = paddle.distributed.split(
+        data, (8, 8), operation="embedding", num_partitions=topo.mp.size)
+    loss = emb_out.mean()
+    return loss
+
+
 def do_train(args):
     args.test_iters = args.eval_iters * 5
-    args.sharding_degree = 2
-    args.mp_degree = 2
-    args.pp_degree = 1
-    args.dp_degree = 1
+    # args.sharding_degree = 4
+    # args.mp_degree = 2
+    # args.pp_degree = 1
+    # args.dp_degree = 1
+    args.micro_bsz = 1
+    args.global_bsz = 64
+    args.max_seq_len = 1024
+
     # Initialize the paddle and paddle fleet execute environment
     paddle.enable_static()
+    fleet.init(is_collective=True)
+
     assert args.device in [
         "cpu", "gpu", "xpu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
     place = paddle.set_device(args.device)
-    fleet.init(is_collective=True)
+    #place = paddle.fluid.CUDAPlace(int(os.environ.get('FLAGS_selected_gpus', 0)))
 
     worker_num = fleet.worker_num()
     worker_index = fleet.worker_index()
-
     topo = Topology(
         rank=worker_index,
         world_size=worker_num,
@@ -367,83 +398,165 @@ def do_train(args):
         sharding=args.sharding_degree,
         mp=args.mp_degree)
 
+    dist_strategy = dist_optimizer(args, topo)
+    is_last = False
+    if topo.pp.rank == (topo.pp.size - 1):
+        is_last = True
+
+    print(topo)
     # Create the random seed for the worker
     set_seed(args, worker_index)
     worker_init = WorkerInitObj(args.seed + worker_index)
 
     # create log write
-    if worker_index == 0:
+    #if worker_index == 0:
+    if is_last:
         log_writer_path = os.path.join(
             args.output_dir, "gpt2_bs_{}_amp_{}_recompute_{}_card_{}".format(
-                args.batch_size, args.use_amp, args.use_recompute, worker_num))
+                args.batch_size, args.use_amp, args.use_recompute,
+                worker_index))
         if os.path.exists(log_writer_path):
             import shutil
             shutil.rmtree(log_writer_path)
         log_writer = SummaryWriter(log_writer_path)
 
     # Define the input data in the static mode
-    main_program = paddle.static.default_main_program()
-    startup_program = paddle.static.default_startup_program()
-    data_holders = create_data_holder()
-    [tokens, loss_mask, attention_mask, position_ids, labels] = data_holders
+    main_program = paddle.static.Program(
+    )  # paddle.static.default_main_program()
+    startup_program = paddle.static.Program(
+    )  # paddle.static.default_startup_program()
+    with paddle.static.program_guard(main_program, startup_program):
+        with paddle.fluid.unique_name.guard():
+            with paddle.static.device_guard('gpu:0'):
+                data_holders = create_data_holder(args)
+                [tokens, loss_mask, attention_mask, position_ids,
+                 labels] = data_holders
 
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    eod_id = tokenizer.command_name_map["eod"].Id
-    model_config = model_class.pretrained_init_configuration[
-        args.model_name_or_path]
-    if model_config["vocab_size"] % 8 != 0:
-        model_config["vocab_size"] += 8 - (model_config["vocab_size"] % 8)
-    if args.mp_degree != 1:
-        model_config["topo"] = topo
+                model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+                tokenizer = tokenizer_class.from_pretrained(
+                    args.model_name_or_path)
+                eod_id = tokenizer.command_name_map["eod"].Id
+                model_config = model_class.pretrained_init_configuration[
+                    args.model_name_or_path]
+                if model_config["vocab_size"] % 8 != 0:
+                    model_config["vocab_size"] += 8 - (
+                        model_config["vocab_size"] % 8)
+                model_config["topo"] = topo
 
-    # create the model for the gpt model
-    model = GPT2ForPretraining(GPT2Model(**model_config))
-    criterion = GPT2PretrainingCriterion()
-    preds = model(tokens, position_ids, attention_mask)
-    loss = criterion(preds, labels, loss_mask)
+                files = [
+                    os.path.join(args.input_dir, f)
+                    for f in os.listdir(args.input_dir)
+                    if (os.path.isfile(os.path.join(args.input_dir, f)) and
+                        "npz_" not in str(f))
+                ]
+                data_file = files[0]
+                train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
+                    args,
+                    data_file,
+                    worker_init,
+                    worker_index,
+                    worker_num,
+                    eod_id=eod_id,
+                    max_seq_len=args.max_seq_len,
+                    places=paddle.static.cuda_places(),
+                    data_holders=data_holders,
+                    pipeline_mode=True, )
 
-    # Create the learning_rate sheduler and optimizer
-    if args.decay_steps is None:
-        args.decay_steps = args.max_steps
-    warmup_step = args.warmup_rate * args.decay_steps
-    lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
-        max_lr=args.max_lr,
-        min_lr=args.min_lr,
-        warmup_step=warmup_step,
-        decay_step=args.decay_steps)
+                # create the model for the gpt model
+                model = guard(f'gpu:{args.pp_degree -1}')(GPT2ForPretraining)(
+                    guard(f'gpu:0')(GPT2Model)(**model_config))
+                preds = model(tokens, position_ids, attention_mask)
 
-    clip = None
-    if args.grad_clip > 0:
-        clip = paddle.nn.ClipGradByNorm(clip_norm=args.grad_clip)
+                criterion = guard(f'gpu:{args.pp_degree -1}')(
+                    GPT2PretrainingCriterion)()
+                loss = criterion(preds, labels, loss_mask)
 
-    opt_param = []
-    for pa in model.parameters():
-        if "batch_norm" not in pa.name:
-            opt_param.append(pa)
-        else:
-            print(pa.name)
-    decay_param = lambda x: x in [
-             p.name for n, p in model.named_parameters()
-             if not any(nd in n for nd in ["bias", "norm"])]
+            # loss = simple_model(paddle.ones(shape=[3, 1]).astype("int64"), topo)
 
-    #optimizer = paddle.optimizer.AdamW(
-    optimizer = paddle.fluid.optimizer.Adam(
-        learning_rate=lr_scheduler,
-        epsilon=args.adam_epsilon,
-        parameter_list=opt_param,
-        #weight_decay=args.weight_decay,
-        grad_clip=clip,
-        #apply_decay_param_fun=decay_param
-    )
+            # Create the learning_rate sheduler and optimizer
+            if args.decay_steps is None:
+                args.decay_steps = args.max_steps
+            warmup_step = args.warmup_rate * args.decay_steps
+            # lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
+            #     max_lr=args.max_lr,
+            #     min_lr=args.min_lr,
+            #     warmup_step=warmup_step,
+            #     decay_step=args.decay_steps)
 
-    # Use the fleet api to compile the distributed optimizer
-    #optimizer.apply_optimize = optimizer._apply_optimize
+            clip = None
+            if args.grad_clip > 0:
+                clip = paddle.nn.ClipGradByNorm(clip_norm=args.grad_clip)
 
-    optimizer = dist_optimizer(args, optimizer, model, worker_num)
-    optimizer.minimize(loss)
-    logger.info("The training meta optimizer is/are %s" %
-                fleet._get_applied_meta_list())
+            decay_param = lambda x: x in [
+                     p.name for n, p in model.named_parameters()
+                     if not any(nd in n for nd in ["bias", "norm"])]
+
+            #optimizer = paddle.optimizer.AdamW(
+            optimizer = paddle.fluid.optimizer.Adam(
+                #learning_rate=lr_scheduler,
+                learning_rate=0.001,
+                epsilon=args.adam_epsilon,
+                grad_clip=paddle.fluid.clip.GradientClipByGlobalNorm(
+                    clip_norm=1.0),
+                #parameter_list=opt_param,
+                #weight_decay=args.weight_decay,
+                #grad_clip=clip,
+                #apply_decay_param_fun=decay_param
+            )
+
+            # Use the fleet api to compile the distributed optimizer
+            #optimizer.apply_optimize = optimizer._apply_optimize
+
+            if args.use_recompute:
+                dist_strategy.recompute = True
+                dist_strategy.recompute_configs = {
+                    "checkpoints": model.gpt2.checkpoints
+                }
+
+            optimizer = fleet.distributed_optimizer(
+                optimizer, strategy=dist_strategy)
+            logger.info(f'using dist strategy {dist_strategy}')
+            # for op in main_program.global_block().ops:
+            #     print(op.type)
+            #     if op.type == 'fill_constant' or op.type=='seed':
+            #         op._set_attr('op_device', "gpu:0") 
+
+            # state_dict = model.state_dict()
+            # map_dict = {p.name: n for n, p in state_dict.items()}
+            # for name, var in main_program.global_block().vars.items():
+            #     print("{}, shape {}".format(map_dict[name] if name in map_dict
+            #                                 else name, var.shape))
+
+            program_desc_dir = os.path.join(args.output_dir, "program_desc")
+            if not os.path.isdir(program_desc_dir):
+                os.mkdir(program_desc_dir)
+
+            with open(program_desc_dir + "/main_program.txt.%d" %
+                      (int(os.environ.get('FLAGS_selected_gpus', 0))),
+                      'w') as f:
+                f.write(str(main_program))
+
+            with open(program_desc_dir + "/startup_program.txt.%d" %
+                      (int(os.environ.get('FLAGS_selected_gpus', 0))),
+                      'w') as f:
+                f.write(str(startup_program))
+
+            optimizer.minimize(loss)
+            logger.info(f'final strategy: {fleet._final_strategy()}')
+            logger.info("The training meta optimizer is/are %s" %
+                        fleet._get_applied_meta_list())
+
+    program_desc_dir = os.path.join(args.output_dir, "program_desc")
+    if not os.path.isdir(program_desc_dir):
+        os.mkdir(program_desc_dir)
+
+    with open(program_desc_dir + "/main_program.txt.%d" %
+              (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
+        f.write(str(main_program))
+
+    with open(program_desc_dir + "/startup_program.txt.%d" %
+              (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
+        f.write(str(startup_program))
 
     # Define the Executor for running the static model
     exe = paddle.static.Executor(place)
@@ -480,56 +593,69 @@ def do_train(args):
         # Construct the compiled program
         main_program = build_compiled_program(args, main_program, loss)
 
-    program_desc_dir = os.path.join(args.output_dir, "program_desc")
-    if not os.path.isdir(program_desc_dir):
-        os.mkdir(program_desc_dir)
-
-    with open(program_desc_dir + "/main_program.txt.%d" %
-              (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
-        f.write(str(main_program))
-
-    with open(program_desc_dir + "/startup_program.txt.%d" %
-              (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
-        f.write(str(startup_program))
-
     global_step = 0
     tic_train = time.time()
-    for epoch in range(args.num_train_epochs):
-        files = [
-            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_"
-                not in str(f))
-        ]
-        files.sort()
-        num_files = len(files)
-        random.Random(args.seed + epoch).shuffle(files)
-        for f_id in range(math.ceil(len(files) / worker_num)):
-            data_file = files[(f_id * worker_num + worker_index) % num_files]
-            train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                args,
-                data_file,
-                worker_init,
-                worker_index,
-                worker_num,
-                eod_id=eod_id,
-                places=paddle.static.cuda_places(),
-                data_holders=data_holders)
-            # bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
-            # many times. and start a new random dataloader.
-            valid_data_loader = valid_data_loader()
-            test_data_loader = test_data_loader()
+    epoch = 0
+    # for epoch in range(args.num_train_epochs):
+    #     files = [
+    #         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+    #         if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_"
+    #             not in str(f))
+    #     ]
+    #     files.sort()
+    #     num_files = len(files)
+    #     random.Random(args.seed + epoch).shuffle(files)
+    #     for f_id in range(math.ceil(len(files) / worker_num)):
+    #         data_file = files[(f_id * worker_num + worker_index) % num_files]
+    #         train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
+    #             args,
+    #             data_file,
+    #             worker_init,
+    #             worker_index,
+    #             worker_num,
+    #             eod_id=eod_id,
+    #             max_seq_len=args.max_seq_len,
+    #             places=paddle.static.cuda_places(),
+    #             data_holders=data_holders,
+    #             pipeline_mode=True,
+    #             )
+    #         # bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
+    #         # many times. and start a new random dataloader.
+    #         valid_data_loader = valid_data_loader()
+    #         test_data_loader = test_data_loader()
+    #
+    #         for step, batch in enumerate(train_data_loader()):
+    learning_rate = main_program.global_block().vars["learning_rate_0"]
+    print(learning_rate)
+    step = -1
+    if True:
+        if True:
+            #for step, batch in enumerate(train_data_loader()):
 
-            for step, batch in enumerate(train_data_loader()):
+            train_data_loader.start()
+            while True:
+                # param_t = paddle.fluid.global_scope().find_var(tokens.name).get_tensor()
+                # #param_t = paddle.fluid.global_scope().find_var('learning_rate_0').get_tensor()
+                # data = np.array(param_t)
+                # print(data)
+                step += 1
                 global_step += 1
-                loss_return, lr_return = exe.run(
+                fetchs = []
+                print("global_step ", global_step)
+                if is_last:
+                    #fetchs = [loss.name, 'learning_rate_0']
+                    fetchs = [loss, learning_rate]
+                ret = exe.run(
                     main_program,
-                    feed=batch,
-                    fetch_list=[loss.name, 'learning_rate_0'])
+                    #feed=batch,
+                    fetch_list=fetchs)
                 # In the new 2.0 api, must call this function to change the learning_rate
-                lr_scheduler.step()
+                #lr_scheduler.step()
 
                 if global_step % args.logging_steps == 0:
-                    if worker_index == 0:
+                    if is_last:
+                        print(ret)
+                        loss_return, lr_return = ret  # [0.00001] #[lr_scheduler.get_lr()]
                         logger.info(
                             "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s, learning rate: %.9f"
                             % (global_step, epoch, step, loss_return[0],

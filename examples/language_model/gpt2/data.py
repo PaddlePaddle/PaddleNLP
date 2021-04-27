@@ -193,14 +193,17 @@ def _build_shuffle_idx(num_samples, total_size, np_rng):
     return np.concatenate((shuffle_idx_first, shuffle_idx_last))
 
 
-def create_pretrained_dataset(args,
-                              input_path,
-                              worker_init,
-                              worker_index,
-                              worker_num,
-                              eod_id,
-                              places=None,
-                              data_holders=None):
+def create_pretrained_dataset(
+        args,
+        input_path,
+        worker_init,
+        worker_index,
+        worker_num,
+        eod_id,
+        max_seq_len=1024,
+        places=None,
+        data_holders=None,
+        pipeline_mode=False, ):
     print("the distributed run, worker_num:{}".format(worker_num))
 
     process_datas = np.load(input_path, mmap_mode="r+", allow_pickle=True)
@@ -220,6 +223,7 @@ def create_pretrained_dataset(args,
             file_path=input_path,
             worker_index=worker_index,
             name="gpt2" + name,
+            max_seq_len=max_seq_len,
             num_samples=num_samples,
             documents=np.arange(splits[index], splits[index + 1]),
             sample_ids=sample_ids,
@@ -230,24 +234,39 @@ def create_pretrained_dataset(args,
         batch_sampler = paddle.io.DistributedBatchSampler(
             dataset, batch_size=args.batch_size, shuffle=False, drop_last=True)
 
-        data_loader = DataLoader(
-            dataset=dataset,
-            places=places,
-            feed_list=data_holders,
-            batch_sampler=batch_sampler,
-            num_workers=0,
-            worker_init_fn=worker_init,
-            collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
-            return_list=False)
+        if pipeline_mode:
+
+            def data_gen():
+                for data in dataset:
+                    yield tuple(
+                        [np.expand_dims(
+                            np.array(x), axis=0) for x in data])
+
+            data_loader = paddle.fluid.io.DataLoader.from_generator(
+                feed_list=data_holders, capacity=70, iterable=False)
+            data_loader.set_batch_generator(data_gen, places)
+        else:
+            data_loader = DataLoader(
+                dataset=dataset,
+                places=places,
+                feed_list=data_holders,
+                batch_sampler=batch_sampler,
+                num_workers=0,
+                worker_init_fn=worker_init,
+                collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
+                return_list=False)
         return data_loader
 
     train_data_loader = build_dataset(0, "train", args.batch_size *
                                       args.max_steps * worker_num)
-    valid_data_loader = build_dataset(1, "valid", args.batch_size *
-                                      (args.max_steps // args.eval_steps + 1) *
-                                      args.eval_iters)
-    test_data_loader = build_dataset(2, "test",
-                                     args.batch_size * args.test_iters)
+    if pipeline_mode:
+        valid_data_loader, test_data_loader = None, None
+    else:
+        valid_data_loader = build_dataset(
+            1, "valid", args.batch_size *
+            (args.max_steps // args.eval_steps + 1) * args.eval_iters)
+        test_data_loader = build_dataset(2, "test",
+                                         args.batch_size * args.test_iters)
 
     return train_data_loader, valid_data_loader, test_data_loader
 

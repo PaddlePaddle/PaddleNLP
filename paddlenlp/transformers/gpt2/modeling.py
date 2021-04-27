@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import collections
-from collections import namedtuple
 import math
 
 import numpy as np
@@ -25,7 +24,7 @@ from paddle.fluid import layers
 from paddle.fluid.framework import in_dygraph_mode
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from paddle.fluid.initializer import Normal, Constant, NumpyArrayInitializer
-import paddle.distributed.fleet as fleet
+from paddle.distributed.fleet import fleet
 
 from .. import PretrainedModel, register_base_model
 
@@ -36,6 +35,7 @@ __all__ = [
     'GPT2PretrainingCriterion',
     'GPT2ForGreedyGeneration',
     'GPT2ForTopKPGeneration',
+    'guard',
 ]
 
 
@@ -46,32 +46,22 @@ def print_t(name, tensor):
     print(tensor)
 
 
-GroupInfo = namedtuple('GroupInfo', ['size', 'rank', 'world'])
+def guard(device):
+    def decorator(Layer):
+        class WrapperClass(Layer):
+            def __init__(self, *args, **kw):
+                with paddle.static.device_guard(device):
+                    print("Init {} on {}".format(Layer.__name__, device))
+                    return super().__init__(*args, **kw)
 
+            def forward(self, *args, **kw):
+                with paddle.static.device_guard(device):
+                    print("Forward {} on {}".format(Layer.__name__, device))
+                    return super().forward(*args, **kw)
 
-class Topology:
-    def __init__(self, rank, world_size, dp, pp, sharding, mp):
-        arr = np.arange(0, dp * pp * sharding * mp).reshape(
-            [dp, pp, sharding, mp])
-        idp, ipp, isharding, imp = np.where(arr == rank)
-        idp = idp[0]
-        ipp = ipp[0]
-        isharding = isharding[0]
-        imp = imp[0]
-        self.world = GroupInfo(
-            size=world_size, rank=rank, world=list(range(0, world_size)))
-        mp = arr[idp, ipp, isharding, :]
-        self.mp = GroupInfo(size=len(mp), rank=imp, world=mp.tolist())
-        sharding = arr[idp, ipp, :, imp]
-        self.sharding = GroupInfo(
-            size=len(sharding), rank=isharding, world=sharding.tolist())
-        pp = arr[idp, :, isharding, imp]
-        self.pp = GroupInfo(size=len(pp), rank=ipp, world=pp.tolist())
-        dp = arr[:, ipp, isharding, imp]
-        self.dp = GroupInfo(size=len(dp), rank=idp, world=dp.tolist())
+        return WrapperClass
 
-    def __repr__(self):
-        return f'dp: {self.dp}, pp: {self.pp}, sharding: {self.sharding}, mp: {self.mp}'
+    return decorator
 
 
 class ParallelEmbedding(nn.Layer):
@@ -82,6 +72,7 @@ class ParallelEmbedding(nn.Layer):
     def __init__(self,
                  num_embeddings,
                  embedding_dim,
+                 num_partitions,
                  padding_idx=None,
                  weight_attr=None,
                  name=None):
@@ -91,8 +82,8 @@ class ParallelEmbedding(nn.Layer):
             rank = paddle.distributed.get_rank()
             nranks = paddle.distributed.get_world_size()
         else:
-            # assert fleet._role_maker, ("To use paddle.distributed.split, "
-            #                            "you must call fleet.init() firstly.")
+            assert fleet._role_maker, ("To use paddle.distributed.split, "
+                                       "you must call fleet.init() firstly.")
             rank = fleet.worker_index()
             nranks = fleet.worker_num()
 
@@ -101,43 +92,42 @@ class ParallelEmbedding(nn.Layer):
         self.inner_rank = inner_rank
         self.num_partitions = num_partitions
 
-        assert axis == 0, ("We only support to split the weight of embedding "
-                           "along the first axis now.")
         per_part_size = (size[0] + num_partitions - 1) // num_partitions
         last_part_size = size[0] - per_part_size * (num_partitions - 1)
         if inner_rank == num_partitions - 1: per_part_size = last_part_size
         per_part_size += 1  # make the last row as the padding index
 
-        origin_size = size
+        self.origin_size = size
         if not name:
-            name = "emb_rank_%d" % inner_rank
+            self.name = "emb_rank_%d" % inner_rank
         else:
-            name = name + "_rank_%d" % inner_rank
-
+            self.name = name + "_rank_%d" % inner_rank
         self.per_part_embeddings = per_part_size
-        self.origin_num_embeddings = origin_size[0]
+        self.origin_num_embeddings = self.origin_size[0]
+        self.weight_attr = weight_attr
+
         self.embedding = paddle.nn.Embedding(
-            per_part_embeddings,
-            origin_size[1],
-            padding_idx=per_part_embeddings - 1,
+            self.per_part_embeddings,
+            self.origin_size[1],
+            padding_idx=self.per_part_embeddings - 1,
             sparse=False,
-            weight_attr=param_attr,
-            name=name)
+            weight_attr=self.weight_attr,
+            name=self.name)
 
         self.embedding.weight.is_distributed = True
-
         startup_block = paddle.static.default_startup_program().global_block()
         main_block = paddle.static.default_main_program().global_block()
-        startup_block.vars[embedding.weight.name].is_distributed = True
-        main_block.vars[embedding.weight.name].is_distributed = True
+        startup_block.vars[self.embedding.weight.name].is_distributed = True
+        main_block.vars[self.embedding.weight.name].is_distributed = True
 
-    def forward(x):
+    def forward(self, x):
         origin_input_shape = x.shape
         if len(origin_input_shape) == 2:
             x = paddle.unsqueeze(x, axis=-1)
         else:
             assert origin_input_shape[-1] == 1, (
                 "The last dimension size of x must be 1.")
+
         x_shard = paddle.shard_index(x, self.origin_num_embeddings,
                                      self.num_partitions, self.inner_rank,
                                      self.per_part_embeddings - 1)
@@ -145,6 +135,7 @@ class ParallelEmbedding(nn.Layer):
             x_shard = paddle.squeeze(x_shard, axis=-1)
 
         emb_out = self.embedding(x_shard)
+
         paddle.distributed.all_reduce(emb_out, group=None)
         return emb_out
 
@@ -163,12 +154,13 @@ class ParallelLinear(nn.Layer):
                  bias_attr=None,
                  name=None):
         super().__init__()
+
         if in_dygraph_mode():
             rank = paddle.distributed.get_rank()
             nranks = paddle.distributed.get_world_size()
         else:
-            #assert fleet._role_maker, ("To use paddle.distributed.split, "
-            #                           "you must call fleet.init() firstly.")
+            assert fleet._role_maker, ("To use paddle.distributed.split, "
+                                       "you must call fleet.init() firstly.")
             rank = fleet.worker_index()
             nranks = fleet.worker_num()
 
@@ -271,33 +263,6 @@ class RowParallelLiner(ParallelLinear):
             gather_out=True,
             param_attr=param_attr,
             bias_attr=bias_attr)
-
-
-# def _beuild_linear_column_parallel(x, n_in, n_out, name, init, mp):
-#     return paddle.distributed.split(x,
-#             size=(n_in, n_out),
-#             operation='linear',
-#             axis=1,
-#             gather_out=False,
-#             num_partitions=mp,
-#             weight_attr=fluid.ParamAttr(
-#                     name='%s.w_0' % name if name is not None else None,
-#                     initializer=init),
-#             bias_attr='%s.b_0' % name if name is not None else None, )
-# 
-# 
-# def _build_linear_row_parallel(x, n_in, n_out, name, init, mp):
-#     return paddle.distributed.split(x,
-#             size=(n_in, n_out),
-#             operation='linear',
-#             axis=0,
-#             gather_out=True,
-#             num_partitions=mp,
-#             weight_attr=fluid.ParamAttr(
-#                     name='%s.w_0' % name if name is not None else None,
-#                     initializer=init),
-#             bias_attr='%s.b_0' % name if name is not None else None, )
-# 
 
 
 class LayerNormByBN(nn.Layer):
@@ -536,14 +501,23 @@ class TransformerDecoder(nn.Layer):
     TransformerDecoder is a stack of N decoder layers.
     """
 
-    def __init__(self, decoder_layer, num_layers, norm=None):
+    def __init__(self,
+                 decoder_layers,
+                 num_layers,
+                 norm=None,
+                 hidden_size=None,
+                 topo=None):
         super(TransformerDecoder, self).__init__()
-        self.layers = nn.LayerList([(
-            decoder_layer
-            if i == 0 else type(decoder_layer)(**decoder_layer._config))
-                                    for i in range(num_layers)])
+
+        self.topo = topo
         self.num_layers = num_layers
+        self.layer_per_stage = self.num_layers // self.topo.pp.size
+        self.layers = decoder_layers
         self.norm = norm
+        if norm is "LayerNorm":
+            self.norm = nn.LayerNorm(hidden_size)
+        elif norm is not None:
+            raise ValueError("Only support LayerNorm")
         self.checkpoints = []
 
     def forward(self,
@@ -561,9 +535,8 @@ class TransformerDecoder(nn.Layer):
         output = tgt
         new_caches = []
         self.checkpoints = []
+
         for i, mod in enumerate(self.layers):
-            #print_t("loop_{}, output".format(i), output)
-            # need devices guard.
             if cache is None:
                 if use_cache:
                     output, new_cache = mod(output,
@@ -727,22 +700,24 @@ class GPT2Embeddings(nn.Layer):
                 hidden_size,
                 weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
                     mean=0.0, std=initializer_range)))
-            self.position_embeddings = nn.Embedding(
-                max_position_embeddings,
-                hidden_size,
-                weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
-                    mean=0.0, std=initializer_range)))
         else:
             self.word_embeddings = ParallelEmbedding(
                 vocab_size,
                 hidden_size,
+                topo.mp.size,
                 weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
                     mean=0.0, std=initializer_range)))
-            self.position_embeddings = ParallelEmbedding(
-                max_position_embeddings,
-                hidden_size,
-                weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
-                    mean=0.0, std=initializer_range)))
+            # self.position_embeddings = ParallelEmbedding(
+            #     max_position_embeddings,
+            #     hidden_size,
+            #     topo.mp.size,
+            #     weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
+            #         mean=0.0, std=initializer_range)))
+        self.position_embeddings = nn.Embedding(
+            max_position_embeddings,
+            hidden_size,
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
+                mean=0.0, std=initializer_range)))
 
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
@@ -836,6 +811,8 @@ class GPT2PretrainedModel(PretrainedModel):
 
     def init_weights(self, layer):
         """ Initialization hook """
+        # no hook
+        return
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
@@ -873,26 +850,51 @@ class GPT2Model(GPT2PretrainedModel):
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         self.topo = topo
+        self.hidden_size = hidden_size
+        self.vocab_size = vocab_size
+
+        self.pipline_mode = topo is not None and topo.pp.size > 1
+        if self.pipline_mode:
+            self.layer_per_stage = num_hidden_layers // self.topo.pp.size
 
         self.embeddings = GPT2Embeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, self.initializer_range)
+            max_position_embeddings, type_vocab_size, self.initializer_range,
+            topo)
 
-        decoder_layer = TransformerDecoderLayer(
-            d_model=hidden_size,
-            nhead=num_attention_heads,
-            dim_feedforward=intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0,  # TODO @ZHUI check the dropout rate.
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
-                mean=0.0, std=self.initializer_range)),
-            bias_attr=None,
+        decoder_layers = nn.LayerList()
+        for i in range(num_hidden_layers):
+            DecoderLayer = TransformerDecoderLayer
+            if self.pipline_mode:
+                DecoderLayer = guard(f'gpu:{i//self.layer_per_stage}')(
+                    TransformerDecoderLayer)
+            decoder_layers.append(
+                DecoderLayer(
+                    d_model=hidden_size,
+                    nhead=num_attention_heads,
+                    dim_feedforward=intermediate_size,
+                    dropout=hidden_dropout_prob,
+                    activation=hidden_act,
+                    attn_dropout=attention_probs_dropout_prob,
+                    act_dropout=0,  # TODO @ZHUI check the dropout rate.
+                    weight_attr=paddle.ParamAttr(
+                        initializer=nn.initializer.Normal(
+                            mean=0.0, std=self.initializer_range)),
+                    bias_attr=None,
+                    topo=topo))
+
+        if self.pipline_mode:
+            Decoder = guard(f'gpu:{self.topo.pp.size-1}')(TransformerDecoder)
+        else:
+            Decoder = TransformerDecoder
+
+        self.decoder = Decoder(
+            decoder_layers,
+            num_hidden_layers,
+            norm="LayerNorm",
+            hidden_size=hidden_size,
             topo=topo)
 
-        self.decoder = TransformerDecoder(
-            decoder_layer, num_hidden_layers, norm=nn.LayerNorm(hidden_size))
         self.apply(self.init_weights)
         self.checkpoints = []
 
@@ -930,7 +932,6 @@ class GPT2Model(GPT2PretrainedModel):
                                                          input_ids)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
-        # print_t("embedding_output", embedding_output)
         encoder_outputs = self.decoder(
             embedding_output,
             memory=None,
@@ -951,6 +952,7 @@ class GPT2ForPretraining(GPT2PretrainedModel):
     def __init__(self, gpt2):
         super(GPT2ForPretraining, self).__init__()
         self.gpt2 = gpt2
+        self.linear = nn.Linear(self.gpt2.hidden_size, self.gpt2.vocab_size)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -970,10 +972,11 @@ class GPT2ForPretraining(GPT2PretrainedModel):
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        logits = paddle.matmul(
-            encoder_outputs,
-            self.gpt2.embeddings.word_embeddings.weight,
-            transpose_y=True)
+        logits = self.linear(encoder_outputs)
+        # logits = paddle.matmul(
+        #     encoder_outputs,
+        #     self.gpt2.embeddings.word_embeddings.weight,
+        #     transpose_y=True)
 
         if use_cache:
             return logits, cached_kvs
