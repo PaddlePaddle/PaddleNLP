@@ -14,6 +14,7 @@
 
 from functools import partial
 import argparse
+import sys
 import os
 import random
 import time
@@ -25,6 +26,7 @@ import paddlenlp as ppnlp
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 
+sys.path.append("../")
 from data import read_text_pair, convert_example, create_dataloader
 from model import SemanticIndexHardestNeg
 

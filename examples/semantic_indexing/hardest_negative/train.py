@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
-import argparse
 import os
+import sys
 import random
 import time
+from functools import partial
+import argparse
 
 import numpy as np
 import paddle
@@ -28,6 +29,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 from model import SemanticIndexHardestNeg
+sys.path.append("../")
 from data import read_text_pair, convert_example, create_dataloader
 
 # yapf: disable
@@ -131,10 +133,6 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch
-            print("batch_query_input_ids:{}".format(query_input_ids))
-            print("batch_title_input_ids:{}".format(title_input_ids))
-            print("batch_query_token_type_ids:{}".format(query_token_type_ids))
-            print("batch_title_token_type_ids:{}".format(title_token_type_ids))
 
             loss = model(
                 query_input_ids=query_input_ids,
