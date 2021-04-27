@@ -8,7 +8,7 @@
 
 [百科知识树：描述所有汉语词汇的树状知识库](./termtree)
 
-[中文文本知识标注工具集](./wordtag)
+[中文文本知识标注工具集：wordtag](./wordtag)
 
 [ERNIE-CTM：适用于中文文本挖掘任务的全字表预训练语言模型](./ernie-ctm)
 
@@ -16,7 +16,7 @@
 
 ### 快速加载标注工具
 
-## 在论文中引用TermTree
+## 在论文中引用解语
 如果您的工作成果中使用了TermTree，请增加下述引用。我们非常乐于看到TermTree对您的工作带来帮助。
 ```
 @article{zhao2020TermTree,

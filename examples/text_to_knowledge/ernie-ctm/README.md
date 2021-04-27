@@ -144,7 +144,7 @@ python -u predict.py \
 3. 维护开源社区，探索模型优化方向，整合优秀idea
 
 
-## 在论文中引用TermTree
+## 在论文中引用ERNIE-CTM
 如果您的工作成果中使用了TermTree，请增加下述引用。我们非常乐于看到TermTree对您的工作带来帮助。
 ```
 @article{zhao2020TermTree,
