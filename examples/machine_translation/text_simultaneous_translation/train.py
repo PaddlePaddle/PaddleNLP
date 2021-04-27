@@ -189,7 +189,6 @@ def do_train(args):
                 with paddle.no_grad():
                     for input_data in eval_loader:
                         (src_word, trg_word, lbl_word) = input_data
-                        lbl_word = paddle.reshape(lbl_word, shape=[-1, 1])
                         logits = transformer(
                             src_word=src_word, trg_word=trg_word)
                         sum_cost, avg_cost, token_num = criterion(logits,
