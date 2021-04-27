@@ -118,11 +118,11 @@ def generate_new_ann(args, data_loader_dict, checkpoint_path, latest_step_num):
 
     model = SemanticIndexANCE(pretrained_model)
 
-    print("checkpoint_path:{}".format(checkpoint_path))
+    logger.info("checkpoint_path:{}".format(checkpoint_path))
     state_dict = paddle.load(checkpoint_path)
 
     model.set_dict(state_dict)
-    print("load params from:{}".format(checkpoint_path))
+    logger.info("load params from:{}".format(checkpoint_path))
 
     logger.info("***** inference of corpus *****")
     final_index = build_index(args, data_loader_dict["corpus_data_loader"],
@@ -165,98 +165,7 @@ def generate_new_ann(args, data_loader_dict, checkpoint_path, latest_step_num):
 
     succeed_flag_file = os.path.join(new_ann_data_path, "succeed_flag_file")
     open(succeed_flag_file, 'a').close()
-    print("finish generate ann data step:{}".format(latest_step_num))
-
-
-def get_arguments():
-    parser = argparse.ArgumentParser()
-
-    # Required parameters
-    parser.add_argument(
-        "--similar_text_pair_file",
-        default=None,
-        type=str,
-        required=True,
-        help="The train_set tsv file that each line is simialr text pair", )
-
-    parser.add_argument(
-        "--corpus_file",
-        default=None,
-        type=str,
-        required=True,
-        help="The corpus file that each line is a text for buinding indexing", )
-
-    parser.add_argument(
-        "--save_model_dir",
-        default=None,
-        type=str,
-        required=True,
-        help="Saved model dir, will look for latest checkpoint dir in here", )
-
-    parser.add_argument(
-        "--init_from_ckpt",
-        default=None,
-        type=str,
-        help="Initial model dir, will use this if no checkpoint is found in model_dir",
-    )
-
-    parser.add_argument(
-        "--ann_data_dir",
-        default=None,
-        type=str,
-        required=True,
-        help="The output directory where the training data will be written", )
-
-    parser.add_argument(
-        "--end_ann_step",
-        default=1000000,
-        type=int,
-        help="Stop after this number of data versions has been generated, default run forever",
-    )
-
-    parser.add_argument(
-        "--batch_size",
-        default=128,
-        type=int,
-        help="Batch size for predicting embedding of texts", )
-
-    parser.add_argument(
-        "--topk_training",
-        default=500,
-        type=int,
-        help="top k from which negative samples are collected", )
-
-    parser.add_argument(
-        "--num_negative_sample",
-        default=5,
-        type=int,
-        help="at each resample, how many negative samples per query do I use", )
-
-    parser.add_argument(
-        "--local_rank",
-        type=int,
-        default=-1,
-        help="For distributed training: local_rank", )
-
-    parser.add_argument(
-        "--hnsw_m",
-        default=10,
-        type=int,
-        help="Recall number for each query from Ann index.")
-    parser.add_argument(
-        "--hnsw_ef",
-        default=10,
-        type=int,
-        help="Recall number for each query from Ann index.")
-    parser.add_argument(
-        "--hnsw_max_elements",
-        default=1000000,
-        type=int,
-        help="Recall number for each query from Ann index.")
-
-    args = parser.parse_args()
-
-    return args
+    logger.info("finish generate ann data step:{}".format(latest_step_num))
 
 
 def get_semantic_embedding(data_loader, model):
@@ -300,17 +209,6 @@ def gen_id2corpus(corpus_file):
         for idx, line in enumerate(f):
             id2corpus[idx] = line.rstrip()
     return id2corpus
-
-
-def gen_text_file(similar_text_pair_file):
-    text2similar_text = {}
-    texts = []
-    with open(similar_text_pair_file) as f:
-        for line in f:
-            text, similar_text = line.rstrip().split("\t")
-            text2similar_text[text] = similar_text
-            texts.append({"text": text})
-    return texts, text2similar_text
 
 
 def build_data_loader(args, tokenizer):
@@ -402,7 +300,6 @@ def ann_data_gen(args):
 
 
 def main():
-    args = get_arguments()
     ann_data_gen(args)
 
 
