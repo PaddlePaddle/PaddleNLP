@@ -31,21 +31,25 @@ def is_integer(number):
 
 class LinearDecayWithWarmup(LambdaDecay):
     """
-    Create a learning rate scheduler, which increases learning rate linearly
+    Creates a learning rate scheduler, which increases learning rate linearly
     from 0 to given `learning_rate`, after this warmup period learning rate
     would be decreased linearly from the base learning rate to 0.
 
     Args:
-        learning_rate (float): The base learning rate. It is a python float
-            number.
-        total_steps (int): The number of training steps.
-        warmup (int|float): If int, it means the number of steps for warmup.
-            If float, it means the proportion of warmup in total training steps. 
-        last_epoch (int, optional): The index of last epoch. It can be set to
-            restart training. If None, it means initial learning rate. 
-            Default: -1.
-        verbose (bool, optional): If True, prints a message to stdout for each
-            update. Default: False.
+        learning_rate (float):
+            The base learning rate. It is a python float number.
+        total_steps (int):
+            The number of training steps.
+        warmup (int or float):
+            If int, it means the number of steps for warmup. If float, it means
+            the proportion of warmup in total training steps.
+        last_epoch (int, optional):
+            The index of last epoch. It can be set to restart training. If
+            None, it means initial learning rate. 
+            Defaults to -1.
+        verbose (bool, optional):
+            If True, prints a message to stdout for each update.
+            Defaults to False.
 
     Examples:
         
@@ -79,20 +83,24 @@ class LinearDecayWithWarmup(LambdaDecay):
 
 class ConstScheduleWithWarmup(LambdaDecay):
     """
-    Create a learning rate scheduler, which increases learning rate linearly
+    Creates a learning rate scheduler, which increases learning rate linearly
     from 0 to given `learning_rate` during warmup periods and keeps learning
     rate a constant after that.
 
     Args:
-        learning_rate (float): The base learning rate. It is a python float
-            number.
-        warmup (int|float): If int, it means the number of steps for warmup.
-            If float, it means the proportion of warmup in total training steps.
-        total_steps (int, optional): The number of training steps. If `warmup`
-            is a float number, `total_steps` must be provided.
-        last_epoch (int, optional): The index of last epoch. It can be set to
-            restart training. If None, it means initial learning rate. 
-            Default: -1.
+        learning_rate (float): 
+            The base learning rate. It is a python float number.
+        warmup (int or float):
+            If int, it means the number of steps for warmup. If float, it means
+            the proportion of warmup in total training steps.
+        total_steps (int, optional):
+            The number of training steps. If `warmup` is a float number,
+            `total_steps` must be provided.
+            Defaults to None.
+        last_epoch (int, optional):
+            The index of last epoch. It can be set to restart training. If
+            None, it means initial learning rate. 
+            Defaults to -1.
 
     Examples:
         
@@ -132,28 +140,33 @@ class ConstScheduleWithWarmup(LambdaDecay):
 
 class CosineDecayWithWarmup(LambdaDecay):
     """
-    Create a learning rate scheduler, which increases learning rate linearly
+    Creates a learning rate scheduler, which increases learning rate linearly
     from 0 to given `learning_rate`, after this warmup period learning rate
     would be decreased following the values of the cosine function. If
     `with_hard_restarts` is True, the cosine function could have serveral hard
     restarts.
 
     Args:
-        learning_rate (float): The base learning rate. It is a python float
-            number.
-        total_steps (int): The number of training steps.
-        warmup (int|float): If int, it means the number of steps for warmup.
-            If float, it means the proportion of warmup in total training steps.
-        with_hard_restarts (bool) Whether cosine function has several hard
-            restarts. Default: False.
-        num_cycles (int|float optional): If `with_hard_restarts` is False, it
-            means the number of waves in cosine scheduler and should be an
-            integer number and defaults to 1. If `with_hard_restarts` is True,
-            it means the number of hard restarts to use and should be a float
-            number and defaults to be 0.5. Default: None.
-        last_epoch (int, optional): The index of last epoch. It can be set to
-            restart training. If None, it means initial learning rate. 
-            Default: -1.
+        learning_rate (float):
+            The base learning rate. It is a python float number.
+        total_steps (int):
+            The number of training steps.
+        warmup (int or float):
+            If int, it means the number of steps for warmup. If float, it means
+            the proportion of warmup in total training steps.
+        with_hard_restarts (bool):
+            Whether cosine function has several hard restarts.
+            Defaults to False.
+        num_cycles (int or float, optional):
+            If `with_hard_restarts` is False, it means the number of waves in
+            cosine scheduler and should be an integer number and defaults to 1.
+            If `with_hard_restarts` is True, it means the number of hard
+            restarts to use and should be a float number and defaults to be 0.5.
+            Defaults to None.
+        last_epoch (int, optional):
+            The index of last epoch. It can be set to restart training. If
+            None, it means initial learning rate. 
+            Defaults to -1.
 
     Examples:
         
@@ -204,22 +217,29 @@ class CosineDecayWithWarmup(LambdaDecay):
 
 class PolyDecayWithWarmup(LambdaDecay):
     """
-    Create a learning rate scheduler, which increases learning rate linearly
+    Creates a learning rate scheduler, which increases learning rate linearly
     from 0 to given `lr_init`, after this warmup period learning rate would
     be decreased as a polynomial decay from the base learning rate to the end
     learning rate `lr_end`. 
 
     Args:
-        learning_rate (float): The base learning rate. It is a python float
-            number.
-        total_steps (int): The number of training steps.
-        warmup (int|float): If int, it means the number of steps for warmup.
-            If float, it means the proportion of warmup in total training steps.
-        lr_end (float, optional): The end learning rate. Default: 1e-7.
-        power (float, optional): Power factor. Default: 1.0.
-        last_epoch (int, optional): The index of last epoch. It can be set to
-            restart training. If None, it means initial learning rate.
-            Default: -1.
+        learning_rate (float):
+            The base learning rate. It is a python float number.
+        total_steps (int):
+            The number of training steps.
+        warmup (int or float):
+            If int, it means the number of steps for warmup. If float, it means
+            the proportion of warmup in total training steps.
+        lr_end (float, optional):
+            The end learning rate.
+            Defaults to 1e-7.
+        power (float, optional):
+            Power factor.
+            Defaults to 1.0.
+        last_epoch (int, optional):
+            The index of last epoch. It can be set to restart training. If
+            None, it means initial learning rate.
+            Defaults to -1.
 
     Examples:
         
