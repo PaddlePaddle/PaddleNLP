@@ -16,18 +16,18 @@ TermTree（百科知识树）是一个描述所有汉语词汇（包括概念、
 
 ## TermTree的字段说明
 
-|字段 | 说明 | 备注 |
-|---|---|---|
-| term| 【必有】term的名字 | |
-| termid| 【必有】term的id，构造方式为termtype_src_term	 | 采用显式构造id的方式，便于应用数据扩展和整合 |
-| src| 【必有】term的来源库，当前包括两个基础库cb和eb。其中cb为基础概念库（收录常用词汇用语，可作为各类应用的基础集），eb为基础实体库（收录常见命名实体，可根据应用需求扩展） |cb、eb的划分标准不同应用不一样，可根据需求调整；应用方也可以构造自己的应用库，与cb、eb整合使用。|
-| termtype| 【必有】term的主类别，详细描述参见 [termtree\_type\_csv](./termtree_type_csv.csv) | 多上位的term会选择其中一个作为termtype，其他上位作为subtype，方便应用筛选 |
-| subtype | 【非必须】term的辅助类别或细分类别  | 如果应用特别关注某个subtype，也可以将其升级为termtype使用 |
-| subterms| 【非必须】用于描述同类同名的term集，若“termtype+src”下term只对应一个实例，则subterms为空；若“termtype+src”下term对应多个实例，则subterms记录这些实例，其字段与term相同 | 不需要区分subterm的两种常见场景：1. 应用只需词类特征；2. 上下文信息不足，无法区分具体实例 |
-| subterms_num |【非必须】subterms中的subterm数量 | 如果没有subterm，则值为0 |
-| alias|【非必须】term的常用别名  | 通常为歧义小的别名 |
-| alias\_ext|【非必须】term的常用扩展别名，经常是term或alias的一个子片段，单独出现有其他含义，结合上下文可识别为别名。e.g., 四维彩超的alias_ext“四维”  | 通常为歧义大的别名，便于应用筛选使用 |
-| links|【非必须】该term对应的其他term的id，可以是本知识库中的id，也可以是其他知识库如百度百科id  | 如果是本知识库中的id，则表示两者可以指代同一实体 |
+| 字段         | 说明                                                         | 备注                                                         |
+| ------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| term         | 【必有】term的名字                                           |                                                              |
+| termid       | 【必有】term的id，构造方式为termtype_src_term                | 采用显式构造id的方式，便于应用数据扩展和整合                 |
+| src          | 【必有】term的来源库，当前包括两个基础库cb和eb。其中cb为基础概念库（收录常用词汇用语，可作为各类应用的基础集），eb为基础实体库（收录常见命名实体，可根据应用需求扩展） | cb、eb的划分标准不同应用不一样，可根据需求调整；应用方也可以构造自己的应用库，与cb、eb整合使用。 |
+| termtype     | 【必有】term的主类别，详细描述参见 [termtree\_type\_csv](./termtree_type_csv.csv) | 多上位的term会选择其中一个作为termtype，其他上位作为subtype，方便应用筛选 |
+| subtype      | 【非必须】term的辅助类别或细分类别                           | 如果应用特别关注某个subtype，也可以将其升级为termtype使用    |
+| subterms     | 【非必须】用于描述同类同名的term集，若“termtype+src”下term只对应一个实例，则subterms为空；若“termtype+src”下term对应多个实例，则subterms记录这些实例，其字段与term相同 | 不需要区分subterm的两种常见场景：1. 应用只需词类特征；2. 上下文信息不足，无法区分具体实例 |
+| subterms_num | 【非必须】subterms中的subterm数量                            | 如果没有subterm，则值为0                                     |
+| alias        | 【非必须】term的常用别名                                     | 通常为歧义小的别名                                           |
+| alias\_ext   | 【非必须】term的常用扩展别名，经常是term或alias的一个子片段，单独出现有其他含义，结合上下文可识别为别名。e.g., 四维彩超的alias_ext“四维” | 通常为歧义大的别名，便于应用筛选使用                         |
+| links        | 【非必须】该term对应的其他term的id，可以是本知识库中的id，也可以是其他知识库如百度百科id | 如果是本知识库中的id，则表示两者可以指代同一实体             |
 
 ```json
 // 示例1：无subterms的term
