@@ -110,7 +110,9 @@ def get_latest_checkpoint(args):
     def valid_checkpoint(checkpoint):
         chk_path = os.path.join(args.save_model_dir, checkpoint)
         scheduler_path = os.path.join(chk_path, "model_state.pdparams")
-        return os.path.exists(scheduler_path)
+        succeed_flag_file = os.path.join(chk_path, "succeed_flag_file")
+        return os.path.exists(scheduler_path) and os.path.exists(
+            succeed_flag_file)
 
     trained_steps = [int(s) for s in subdirectories if valid_checkpoint(s)]
 

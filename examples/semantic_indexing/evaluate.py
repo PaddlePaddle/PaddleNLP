@@ -22,7 +22,7 @@ from paddlenlp.utils.log import logger
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--similar_pair_file", type=str, default='', help="The full path of similat pair file")
-parser.add_argument("--recall_result", type=str, default='', help="The full path of recall result file")
+parser.add_argument("--recall_result_file", type=str, default='', help="The full path of recall result file")
 parser.add_argument("--recall_num", type=int, default=10, help="Most similair number of doc recalled from corpus per query")
 
 
@@ -59,8 +59,7 @@ if __name__ == "__main__":
 
     rs = []
 
-    recall_result_file = os.path.join("recall_result", args.recall_result)
-    with open(recall_result_file) as f:
+    with open(args.recall_result_file) as f:
         relevance_labels = []
         for index, line in enumerate(f):
 

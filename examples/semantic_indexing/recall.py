@@ -30,8 +30,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset, load_dataset
 from paddlenlp.utils.log import logger
 
-from model import SemanticIndexHardestNeg
-sys.path.append("../")
+from base_model import SemanticIndexBase
 from data import convert_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
 from ann_util import build_index
@@ -40,7 +39,8 @@ from ann_util import build_index
 parser = argparse.ArgumentParser()
 parser.add_argument("--corpus_file", type=str, required=True, help="The full path of input file")
 parser.add_argument("--similar_text_pair_file", type=str, required=True, help="The full path of similar text pair file")
-parser.add_argument("--recall_result", type=str, default='recall_result', help="The full path of recall result file")
+parser.add_argument("--recall_result_dir", type=str, default='recall_result', help="The full path of recall result file to save")
+parser.add_argument("--recall_result_file", type=str, default='recall_result_file', help="The file name of recall result")
 parser.add_argument("--params_path", type=str, required=True, help="The path to model parameters to be loaded.")
 parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
@@ -73,13 +73,16 @@ if __name__ == "__main__":
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         "ernie-1.0")
 
-    model = SemanticIndexHardestNeg(pretrained_model)
+    model = SemanticIndexBase(pretrained_model)
 
     # load pretrained semantic model
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
         logger.info("Loaded parameters from %s" % args.params_path)
+    else:
+        raise ValueError(
+            "Please set --params_path with correct pretrained model file")
 
     id2corpus = gen_id2corpus(args.corpus_file)
 
@@ -109,11 +112,11 @@ if __name__ == "__main__":
 
     query_embedding = model.get_semantic_embedding(query_data_loader)
 
-    recall_result_dir = "recall_result"
-    if not os.path.exists(recall_result_dir):
-        os.mkdir(recall_result_dir)
+    if not os.path.exists(args.recall_result_dir):
+        os.mkdir(args.recall_result_dir)
 
-    recall_result_file = os.path.join(recall_result_dir, args.recall_result)
+    recall_result_file = os.path.join(args.recall_result_dir,
+                                      args.recall_result_file)
     with open(recall_result_file, 'w') as f:
         for batch_index, batch_query_embedding in enumerate(query_embedding):
             recalled_idx, cosine_sims = final_index.knn_query(

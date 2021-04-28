@@ -14,7 +14,7 @@ from paddlenlp.datasets import load_dataset, MapDataset, load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 
-sys.path.append("../")
+from ance.model import SemanticIndexANCE
 from data import get_latest_checkpoint, get_latest_ann_data
 from data import convert_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
@@ -46,8 +46,6 @@ args = parser.parse_args()
 
 
 def generate_new_ann(args, data_loader_dict, checkpoint_path, latest_step_num):
-
-    from model import SemanticIndexANCE
 
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         'ernie-1.0')

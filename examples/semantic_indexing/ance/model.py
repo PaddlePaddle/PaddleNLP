@@ -19,7 +19,6 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-sys.path.append("../")
 from base_model import SemanticIndexBase
 
 
@@ -57,6 +56,9 @@ class SemanticIndexANCE(SemanticIndexBase):
         pos_sample_sim = paddle.sum(text_cls_embedding *
                                     pos_sample_cls_embedding,
                                     axis=-1)
+
+        # Note: The negatives samples is sampled by ANN engine in global corpus
+        # Please refer to run_ann_data_gen.py
         global_neg_sample_sim = paddle.sum(text_cls_embedding *
                                            neg_sample_cls_embedding,
                                            axis=-1)

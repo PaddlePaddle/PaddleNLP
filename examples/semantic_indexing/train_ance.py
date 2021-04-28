@@ -24,16 +24,13 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-sys.path.append("../")
-
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 
-from hardest_negative.model import SemanticIndexHardestNeg
-from model import SemanticIndexANCE
+from ance.model import SemanticIndexANCE
 from data import read_text_pair, read_text_triplet
 from data import convert_example, create_dataloader
 from data import get_latest_checkpoint, get_latest_ann_data
@@ -191,6 +188,11 @@ def do_train():
                                                    'model_state.pdparams')
                     paddle.save(model.state_dict(), save_param_path)
                     tokenizer.save_pretrained(save_dir)
+
+                    # Flag to indicate succeefully save model
+                    succeed_flag_file = os.path.join(save_dir,
+                                                     "succeed_flag_file")
+                    open(succeed_flag_file, 'a').close()
 
 
 if __name__ == "__main__":

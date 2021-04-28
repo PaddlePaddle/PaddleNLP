@@ -28,8 +28,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
-from model import SemanticIndexBatchNeg
-sys.path.append("../")
+from batch_negative.model import SemanticIndexBatchNeg
 from data import read_text_pair, convert_example, create_dataloader
 
 # yapf: disable

@@ -20,7 +20,6 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-sys.path.append("../")
 from base_model import SemanticIndexBase
 
 

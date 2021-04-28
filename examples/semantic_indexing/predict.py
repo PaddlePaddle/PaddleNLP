@@ -26,9 +26,8 @@ import paddlenlp as ppnlp
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 
-sys.path.append("../")
 from data import read_text_pair, convert_example, create_dataloader
-from model import SemanticIndexHardestNeg
+from base_model import SemanticIndexBase
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -112,12 +111,16 @@ if __name__ == "__main__":
 
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         "ernie-1.0")
-    model = SemanticIndexHardestNeg(pretrained_model)
+
+    model = SemanticIndexBase(pretrained_model)
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
+    else:
+        raise ValueError(
+            "Please set --params_path with correct pretrained model file")
 
     cosin_sim = predict(model, valid_data_loader)
 
