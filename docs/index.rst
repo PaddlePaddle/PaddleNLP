@@ -47,17 +47,22 @@
 
 .. toctree::
    :maxdepth: 2
+   :caption: 模型库
+
+   预训练模型 <model_zoo/transformers.md>
+   基本组网单元 <model_zoo/others>
+
+.. toctree::
+   :maxdepth: 2
+   :caption: 评价指标
+
+   评价指标 <metrics/metrics.md>
+
+.. toctree::
+   :maxdepth: 2
    :caption: 实践教程
 
-   文本分类 <tutorials/classify>
-   词向量 <tutorials/embedding>
-   语义匹配 <tutorials/semantic_matching>
-   文本生成 <tutorials/text_generation>
-   机器翻译 <tutorials/machine_translation>
-   阅读理解 <tutorials/reading_comprehension>
-   通用对话 <tutorials/general_dialogue>
-   序列标注 <tutorials/ner>
-   词法分析 <tutorials/lexical_analysis>
+   AI Studio Notebook <tutorials/overview>
 
 .. toctree::
    :maxdepth: 2
@@ -69,9 +74,12 @@
 
 .. toctree::
    :maxdepth: 2
-   :caption: 社区贡献
+   :caption: 社区交流共建
 
    如何贡献数据集 <community/contribute_dataset>
+   如何贡献模型 <community/contribute_models>
+   如何贡献文档案例 <community/contribute_docs>
+   如何加入兴趣小组 <community/join_in_PaddleNLP-SIG>
 
 .. toctree::
    :maxdepth: 2
