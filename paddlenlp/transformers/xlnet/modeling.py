@@ -689,7 +689,7 @@ class XLNetModel(XLNetPretrainedModel):
             The dropout ratio for all fully connected layers in the embeddings and encoder.
             Defaults to 0.1.
         classifier_dropout (float, optional):
-            The dropout ratio for all fully connected layers in the poller (classification head).
+            The dropout ratio for all fully connected layers in the pooler (classification head).
             Defaults to 0.1.
         n_head (int, optional):
             Number of attention heads in each attention layer.
@@ -1326,8 +1326,8 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
                 See :class:`XLNetModel`.
 
         Returns:
-            tuple or dict: A tuple of shape (`output`, `new_mems`, `hidden_states`, `attentions`)
-            or a dict of shape {"last_hidden_state": `output`, "mems": `new_mems`,
+            tuple or dict: A tuple with items: (`output`, `new_mems`, `hidden_states`, `attentions`)
+            or a dict with key-value pairs: {"last_hidden_state": `output`, "mems": `new_mems`,
             "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
             With the corresponding fields:

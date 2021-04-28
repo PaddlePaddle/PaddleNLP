@@ -415,7 +415,7 @@ class XLNetTokenizer(PretrainedTokenizer):
 
         ::
 
-            0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1
+            0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2
             |            first sequence           |
 
         - 0 stands for the segment id of **first segment tokens**,
