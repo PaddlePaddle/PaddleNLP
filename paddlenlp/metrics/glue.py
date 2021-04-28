@@ -123,7 +123,7 @@ class AccuracyAndF1(Metric):
             tuple: The accumulated metric. A tuple of shape (acc, precision,
             recall, f1, average_of_acc_and_f1)
 
-            With the fileds:
+            With the fields:
 
             - acc (numpy.float64):
                 The accumulated accuracy.
@@ -365,7 +365,7 @@ class PearsonAndSpearman(Metric):
             tuple: The accumulated metric. A tuple of (pearson, spearman,
             the_average_of_pearson_and_spearman)
 
-            With the fileds:
+            With the fields:
 
             - pearson (numpy.float64):
                 The accumulated pearson.
