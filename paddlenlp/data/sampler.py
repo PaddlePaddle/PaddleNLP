@@ -23,20 +23,25 @@ import paddle.distributed as dist
 
 class SamplerHelper(object):
     """
-    SamplerHelper is to help construct iterable sampler used for `DataLoader`. It wraps
-    a dataset and uses its :code:`__getitem__`
-    Every SamplerHelper subclass has to provide an :meth:`__iter__` method, providing a
-    way to iterate over indices of dataset elements, and a :meth:`__len__` method
-    that returns the length of the returned iterators.
-    Also can be used as batch iterator instead of indices iterator when `iterator`
-    yield samples rather than indices by initializing `iterator` with a iterable
-    dataset.
-    .. note:: The :meth:`__len__` method isn't strictly required by
-              :class:`DataLoader`, but is expected in any
-              calculation involving the length of a :class:`DataLoader`.
+    The class is to help construct iterable sampler used for 
+    :class:`paddle.io.DataLoader`. It wraps a dataset and uses its 
+    :meth:`__getitem__` method. Every subclass of :class:`SamplerHelper` has 
+    to provide an :meth:`__iter__` method, providing a way to iterate over 
+    indices of dataset elements, and a :meth:`__len__` method that returns the 
+    length of the returned iterators.
+
+    The class also can be used as batch iterator instead of indices iterator 
+    when `iterator` yield samples rather than indices by initializing `iterator` 
+    with a iterable dataset.
+
+    .. note:: 
+        The :meth:`__len__` method isn't strictly required by 
+        :class:`paddle.io.DataLoader`, but is expected in any calculation 
+        involving the length of a :class:`paddle.io.DataLoader`.
+
     Args:
-        dataset (Dataset): Input dataset for SamplerHelper.
-        iterable (collections.Iterable|callable, optional): Iterator of dataset. Default: None.
+        dataset (Dataset): Input dataset for :class:`SamplerHelper`.
+        iterable (Iterable, optional): Iterator of dataset. Default: None.
     """
 
     # chain sampler
@@ -70,8 +75,7 @@ class SamplerHelper(object):
     @property
     def length(self):
         """
-        Returns:
-            the length of the SamplerHelper.
+        Returns the length.
         """
 
         # since `len()` only produce integer, use length property to get None
@@ -87,13 +91,13 @@ class SamplerHelper(object):
         self._length = length
 
     def apply(self, fn):
-        """
-        Transformations would be performed. It includes `Shuffle`, `sort`, `fit` and `shard`.
-        Args:
-            fn (callable): Transformations to be performed. It returns transformed iterable (and data_source).
-        Returns:
-            SamplerHelper: A new transformed object.
-        """
+        # Transformation functions would be performed. It includes 
+        # :meth:`shuffle`, :meth:`sort`, :meth:`fit` and :meth:`shard`.
+        # Args:
+        #     fn (callable): Transformation functions to be performed.
+        # Returns:
+        #     SamplerHelper: A new transformed :class:`SamplerHelper` object.
+
         rs = fn(self)
         if isinstance(rs, (list, tuple)):
             iterable, data_source = rs
@@ -104,14 +108,49 @@ class SamplerHelper(object):
 
     def shuffle(self, buffer_size=-1, seed=None):
         """
-        Shuffle the dataset according to the given buffer size and random seed.
+        Shuffles the dataset according to the given buffer size and random seed.
+
         Args:
-            buffer_size (int): Buffer size for shuffle. if buffer_size < 0 or more than the length of the dataset, 
-                buffer_size is the length of the dataset. Default: -1. 
+            buffer_size (int, optional): Buffer size for shuffle. If 
+                `buffer_size < 0` or more than the length of the dataset, 
+                `buffer_size` is the length of the dataset. Default: -1. 
             seed (int, optional): Seed for the random. Default: None.
+
         Returns:
-            SamplerHelper
-         """
+            SamplerHelper: A new shuffled :class:`SamplerHelper` object.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import SamplerHelper
+                from paddle.io import Dataset
+
+                class MyDataset(Dataset):
+                    def __init__(self):
+                        super(MyDataset, self).__init__()
+                        self.data = [
+                            [[1, 2, 3, 4], [1]],
+                            [[5, 6, 7], [0]],
+                            [[8, 9], [1]],
+                        ]
+
+                    def __getitem__(self, index):
+                        data = self.data[index][0]
+                        label = self.data[index][1]
+                        return data, label
+
+                    def __len__(self):
+                        return len(self.data)
+
+                dataset = MyDataset()
+                sampler = SamplerHelper(dataset)
+                print(list(sampler))    # indices of dataset elements
+                # [0, 1, 2]
+
+                sampler = sampler.shuffle(seed=2)
+                print(list(sampler))    # indices of dataset elements
+                # [2, 1, 0]
+        """
         if seed is not None:
             random_generator = np.random.RandomState(seed)
         else:  # use the global random generator
@@ -135,15 +174,56 @@ class SamplerHelper(object):
 
     def sort(self, cmp=None, key=None, reverse=False, buffer_size=-1):
         """
-        Sort samples according to given callable cmp or key.
+        Sorts the dataset according to given callable :meth:`cmp` or :meth:`key`.
+
         Args:
-            cmp (callable): The function of comparison. Default: None. 
-            key (callable): Return element to be compared. Default: None.
-            reverse (bool): If True, it means in descending order, and False means in ascending order. Default: False.
-            buffer_size (int): Buffer size for sort. If buffer_size < 0 or buffer_size is more than the length of the data, 
-                buffer_size will be set to the length of the data. Default: -1.
+            cmp (callable, optional): The function of comparison. Default: None. 
+            key (callable, optional): The function of key. Default: None.
+            reverse (bool, optional): Whether to reverse when sorting the data 
+                samples. If True, it means in descending order, and False means 
+                in ascending order. Default: False.
+            buffer_size (int, optional): Buffer size for sort. If 
+                `buffer_size < 0` or `buffer_size` is more than the length 
+                of the data, `buffer_size` will be set to the length of the data. 
+                Default: -1.
+
         Returns:
-            SamplerHelper
+            SamplerHelper: A new sorted :class:`SamplerHelper` object.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import SamplerHelper
+                from paddle.io import Dataset
+
+                class MyDataset(Dataset):
+                    def __init__(self):
+                        super(MyDataset, self).__init__()
+                        self.data = [
+                            [[1, 2, 3, 4], [1]],
+                            [[5, 6, 7], [0]],
+                            [[8, 9], [1]],
+                        ]
+
+                    def __getitem__(self, index):
+                        data = self.data[index][0]
+                        label = self.data[index][1]
+                        return data, label
+
+                    def __len__(self):
+                        return len(self.data)
+
+                dataset = MyDataset()
+                sampler = SamplerHelper(dataset)
+                print(list(sampler))    # indices of dataset elements
+                # [0, 1, 2]
+
+                # Sorted in ascending order by the length of the first field 
+                # of the sample
+                key = (lambda x, data_source: len(data_source[x][0]))
+                sampler = sampler.sort(key=key)
+                print(list(sampler))    # indices of dataset elements
+                # [2, 1, 0]
         """
         if key:
             key_wrapper = (lambda x: key(x, self.data_source))
@@ -172,23 +252,57 @@ class SamplerHelper(object):
 
     def batch(self, batch_size, drop_last=False, batch_size_fn=None, key=None):
         """
-        To produce a BatchSampler.
+        Batches the dataset according to given `batch_size`.
+
         Args:
-            batch_size (int): Batch size.
-            drop_last (bool): Whether to drop the last mini batch. Default:
-                False.
+            batch_size (int): The batch size.
+            drop_last (bool, optional): Whether to drop the last mini batch. 
+                Default: False.
             batch_size_fn (callable, optional): It accepts four arguments: 
                 index of data source, the length of minibatch, the size of
                 minibatch so far and data source, and it returns the size of
                 mini batch so far. Actually, the returned value can be anything
-                and would used as argument size_so_far in `key`. If None, it
+                and would used as argument `size_so_far` in `key`. If None, it
                 would return the length of mini match. Default: None.
-            key (callable, optional): It accepts the size of minibatch so far
+            key (callable, optional): The function of key. It accepts the size of minibatch so far
                 and the length of minibatch, and returns what to be compared
                 with `batch_size`. If None, only the size of mini batch so far
                 would be compared with `batch_size`. Default: None.
+
         Returns:
-            SamplerHelper
+            SamplerHelper: A new batched :class:`SamplerHelper` object.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import SamplerHelper
+                from paddle.io import Dataset
+
+                class MyDataset(Dataset):
+                    def __init__(self):
+                        super(MyDataset, self).__init__()
+                        self.data = [
+                            [[1, 2, 3, 4], [1]],
+                            [[5, 6, 7], [0]],
+                            [[8, 9], [1]],
+                        ]
+
+                    def __getitem__(self, index):
+                        data = self.data[index][0]
+                        label = self.data[index][1]
+                        return data, label
+
+                    def __len__(self):
+                        return len(self.data)
+
+                dataset = MyDataset()
+                sampler = SamplerHelper(dataset)
+                print(list(sampler))    # indices of dataset elements
+                # [0, 1, 2]
+
+                sampler = sampler.batch(batch_size=2)
+                print(list(sampler))    # indices of dataset elements
+                # [[0, 1], [2]]
         """
         _key = lambda size_so_far, minibatch_len: size_so_far
 
@@ -230,14 +344,52 @@ class SamplerHelper(object):
 
     def shard(self, num_replicas=None, rank=None):
         """
-        Operates slice using multi GPU.
+        Slices the dataset for multi GPU training.
+
         Args:
-            num_replicas (int, optional): The number of training process, and is also the number of GPU cards used in training. 
+            num_replicas (int, optional): The number of training process, and 
+                is also the number of GPU cards used in training. If None, it 
+                will be set by :meth:`paddle.distributed.get_world_size` method. 
                 Default: None.
-            rank (int, optional): Number of training process. Equal to the value of the environment variable PADDLE_TRAINER_ID.
-                Default: None.
+            rank (int, optional): The id of current training process. Equal 
+                to the value of the environment variable PADDLE_TRAINER_ID. If 
+                None, it will be intialized by :meth:`paddle.distributed.get_rank` 
+                method. Default: None.
+
         Returns:
-            SamplerHelper
+            SamplerHelper: A new sliced :class:`SamplerHelper` object.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import SamplerHelper
+                from paddle.io import Dataset
+
+                class MyDataset(Dataset):
+                    def __init__(self):
+                        super(MyDataset, self).__init__()
+                        self.data = [
+                            [[1, 2, 3, 4], [1]],
+                            [[5, 6, 7], [0]],
+                            [[8, 9], [1]],
+                        ]
+
+                    def __getitem__(self, index):
+                        data = self.data[index][0]
+                        label = self.data[index][1]
+                        return data, label
+
+                    def __len__(self):
+                        return len(self.data)
+
+                dataset = MyDataset()
+                sampler = SamplerHelper(dataset)
+                print(list(sampler))    # indices of dataset elements
+                # [0, 1, 2]
+
+                sampler = sampler.shard(num_replicas=2)
+                print(list(sampler))    # indices of dataset elements
+                # [0, 2]
         """
         if num_replicas is None:
             num_replicas = dist.get_world_size()
@@ -260,12 +412,9 @@ class SamplerHelper(object):
         return sampler
 
     def list(self):
-        """
-        Produce a sampler with a `listiterator` when calling `iter`. Since `list`
-        would fetch all contents at time, thus it can get accurate length.
-        Returns:
-            SamplerHelper
-        """
+        # Produce a sampler with a `listiterator` when calling `iter`. Since 
+        # `list` would fetch all contents at time, thus it can get accurate 
+        # length.
 
         def _impl():
             indices = list(iter(self))
