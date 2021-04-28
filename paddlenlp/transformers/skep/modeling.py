@@ -77,6 +77,7 @@ class SkepEmbeddings(nn.Layer):
 
 class SkepPooler(nn.Layer):
     """
+    The pooling layer on skep model.
     """
 
     def __init__(self, hidden_size):

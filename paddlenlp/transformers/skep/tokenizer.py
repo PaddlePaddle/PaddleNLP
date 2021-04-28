@@ -68,8 +68,8 @@ class BpeEncoder(object):
         Constructs a BpeEncoder.
 
         Args:
-            encoder_json_file:
-            vocab_bpe_file:
+            encoder_json_file (`str`): The path to bpe encode json file.
+            vocab_bpe_file (`str`): The path to bpe vocab file.
         """
         self.encoder = self.__get_encoder(encoder_json_file)
         self.decoder = {v: k for k, v in self.encoder.items()}
@@ -195,11 +195,11 @@ class SkepTokenizer(PretrainedTokenizer):
     
     Examples:
         .. code-block:: python
-            from paddlenlp.transformers import ErnieTokenizer
-            tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+            from paddlenlp.transformers import SkepTokenizer
+            tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
             encoded_inputs = tokenizer('这是一个测试样例')
             # encoded_inputs: 
-            # { 
+            # {
             #   'input_ids': [1, 47, 10, 7, 27, 558, 525, 314, 656, 2], 
             #   'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             # }
@@ -207,17 +207,9 @@ class SkepTokenizer(PretrainedTokenizer):
 
     """
     resource_files_names = {
-        "skep_ernie_1.0_large_ch": {
-            "vocab_file": "skep_ernie_1.0_large_ch.vocab.txt",
-        },
-        "skep_ernie_2.0_large_en": {
-            "vocab_file": "skep_ernie_2.0_large_en.vocab.txt",
-        },
-        "skep_roberta_large_en": {
-            "vocab_file": "skep_roberta_large_en.vocab.txt",
-            "bpe_vocab_file": "skep_roberta_large_en.vocab.bpe",
-            "bpe_json_file": "skep_roberta_large_en.encoder.json",
-        },
+        "vocab_file": "vocab.txt",
+        "bpe_vocab_file": "vocab.bpe",
+        "bpe_json_file": "encoder.json"
     }  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
@@ -245,51 +237,60 @@ class SkepTokenizer(PretrainedTokenizer):
     pretrained_init_configuration = {
         "skep_ernie_1.0_large_ch": {
             "do_lower_case": True,
-            "model_name": "skep_ernie_1.0_large_ch",
+            "use_bpe_encoder": False,
+            "need_token_type_id": True,
+            "add_two_sep_token_inter": False,
         },
         "skep_ernie_2.0_large_en": {
             "do_lower_case": True,
-            "model_name": "skep_ernie_2.0_large_en",
+            "use_bpe_encoder": False,
+            "need_token_type_id": True,
+            "add_two_sep_token_inter": False,
         },
         "skep_roberta_large_en": {
             "do_lower_case": True,
-            "model_name": "skep_roberta_large_en",
+            "use_bpe_encoder": True,
+            "need_token_type_id": False,
+            "add_two_sep_token_inter": True,
         },
     }
 
     def __init__(self,
                  vocab_file,
-                 model_name,
                  bpe_vocab_file=None,
                  bpe_json_file=None,
                  do_lower_case=True,
+                 use_bpe_encoder=False,
+                 need_token_type_id=True,
+                 add_two_sep_token_inter=False,
                  unk_token="[UNK]",
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
                  mask_token="[MASK]"):
-        assert model_name in self.pretrained_init_configuration.keys(), (
-            "Got"
-            " model_name {}, SKEP model name should be {}".format(
-                model_name, list(cls.pretrained_init_configuration.keys())))
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = ErnieTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
+                "`tokenizer = SkepTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(vocab_file))
+        self.vocab_file = vocab_file
+        self.bpe_vocab_file = bpe_vocab_file
+        self.bpe_json_file = bpe_json_file
         self.vocab = self.load_vocabulary(
             vocab_file, unk_token=unk_token, pad_token=pad_token)
-        self.model_name = model_name
-        if "ernie" in self.model_name:
+
+        self.use_bpe_encoder = use_bpe_encoder
+        self.need_token_type_id = need_token_type_id
+        self.add_two_sep_token_inter = add_two_sep_token_inter
+
+        if not self.use_bpe_encoder:
             self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
             self.wordpiece_tokenizer = WordpieceTokenizer(
                 vocab=self.vocab, unk_token=unk_token)
         else:
             assert (bpe_vocab_file and bpe_json_file) is not None, (
-                f"When you use"
-                f" {self.model_name}, bpe_vocab_file and bpe_json_file must be not None."
-            )
+                f"bpe_vocab_file and bpe_json_file must be not None.")
             if os.path.isfile(bpe_vocab_file) and os.path.isfile(bpe_json_file):
                 self.bpe_tokenizer = BpeEncoder(bpe_json_file, bpe_vocab_file)
 
@@ -313,7 +314,7 @@ class SkepTokenizer(PretrainedTokenizer):
             List[`str`]: A list of string representing converted tokens.
         """
         split_tokens = []
-        if "ernie" in self.model_name:
+        if not self.use_bpe_encoder:
             for token in self.basic_tokenizer.tokenize(text):
                 for sub_token in self.wordpiece_tokenizer.tokenize(token):
                     split_tokens.append(sub_token)
@@ -362,10 +363,16 @@ class SkepTokenizer(PretrainedTokenizer):
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens. 
         
-        A ERNIE sequence has the following format:
+        A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence has the following format:
         ::
             - single sequence: ``[CLS] X [SEP]``
             - pair of sequences: ``[CLS] A [SEP] B [SEP]``
+
+        A skep_roberta_large_en sequence has the following format:
+        ::
+            - single sequence: ``[CLS] X [SEP]``
+            - pair of sequences: ``[CLS] A [SEP] [SEP] B [SEP]``
+
 
         Args:
             token_ids_0 (`List[int]`):
@@ -377,7 +384,7 @@ class SkepTokenizer(PretrainedTokenizer):
         Returns:
             `List[int]`: List of input_id with the appropriate special tokens.
         """
-        if "ernie" in self.model_name:
+        if not self.add_two_sep_token_inter:
             if token_ids_1 is None:
                 return [self.cls_token_id] + token_ids_0 + [self.sep_token_id]
             _cls = [self.cls_token_id]
@@ -396,13 +403,15 @@ class SkepTokenizer(PretrainedTokenizer):
         r"""
         Create a mask from the two sequences passed to be used in a sequence-pair classification task. 
 
-        A ERNIE sequence pair mask has the following format:
+        A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence pair mask has the following format:
         ::
 
             0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
             | first sequence    | second sequence |
 
         If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
+        
+        note: There is no need token type ids for skep_roberta_large_ch model.
 
         Args:
             token_ids_0 (`List[int]`):
@@ -414,7 +423,7 @@ class SkepTokenizer(PretrainedTokenizer):
         Returns:
             `List[int]`: List of token_type_id according to the given sequence(s).
         """
-        if "ernie" in self.model_name:
+        if self.need_token_type_id:
             _sep = [self.sep_token_id]
             _cls = [self.cls_token_id]
             if token_ids_1 is None:
@@ -428,11 +437,12 @@ class SkepTokenizer(PretrainedTokenizer):
     def save_resources(self, save_directory):
         """
         Save tokenizer related resources to files under `save_directory`.
+
         Args:
             save_directory (str): Directory to save files into.
         """
-        resource_map = self.resource_files_names[self.model_name]
-        for name, file_name in resource_map.items():
-            source_path = os.path.join(MODEL_HOME, self.model_name, file_name)
+        for name, file_name in self.resource_files_names.items():
             save_path = os.path.join(save_directory, file_name)
-            shutil.copyfile(source_path, save_path)
+            source_file = getattr(self, name)
+            if source_file is not None:
+                shutil.copyfile(source_file, save_path)

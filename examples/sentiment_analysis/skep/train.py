@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,14 +39,14 @@ parser.add_argument("--epochs", default=3, type=int, help="Total number of train
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--model_name', choices=['skep_ernie_1.0_large_ch', 'skep_ernie_2.0_large_en', 'skep_roberta_large_en'],
+parser.add_argument('--model_name', choices=['skep_ernie_1.0_large_ch', 'skep_ernie_2.0_large_en'],
     default="skep_ernie_1.0_large_ch", help="Select which model to train, defaults to skep_ernie_1.0_large_ch.")
 args = parser.parse_args()
 # yapf: enable
 
 
 def set_seed(seed):
-    """sets random seed"""
+    """Sets random seed."""
     random.seed(seed)
     np.random.seed(seed)
     paddle.seed(seed)
@@ -59,22 +59,16 @@ def evaluate(model, criterion, metric, data_loader):
 
     Args:
         model(obj:`paddle.nn.Layer`): A model to classify texts.
-        data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
         criterion(obj:`paddle.nn.Layer`): It can compute the loss.
         metric(obj:`paddle.metric.Metric`): The evaluation metric.
+        data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
     """
     model.eval()
     metric.reset()
     losses = []
     for batch in data_loader:
-        if args.model_name in [
-                "skep_ernie_1.0_large_ch", "skep_ernie_2.0_large_en"
-        ]:
-            input_ids, token_type_ids, labels = batch
-            logits = model(input_ids, token_type_ids)
-        else:
-            input_ids, labels = batch
-            logits = model(input_ids)
+        input_ids, token_type_ids, labels = batch
+        logits = model(input_ids, token_type_ids)
         loss = criterion(logits, labels)
         losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
@@ -95,17 +89,25 @@ def convert_example(example,
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
     to be used in a sequence-pair classification task.
         
-    A BERT sequence has the following format:
-
-    - single sequence: ``[CLS] X [SEP]``
-    - pair of sequences: ``[CLS] A [SEP] B [SEP]``
-
-    A BERT sequence pair mask has the following format:
+    A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence has the following format:
     ::
+        - single sequence: ``[CLS] X [SEP]``
+        - pair of sequences: ``[CLS] A [SEP] B [SEP]``
+
+    A skep_roberta_large_en sequence has the following format:
+    ::
+        - single sequence: ``[CLS] X [SEP]``
+        - pair of sequences: ``[CLS] A [SEP] [SEP] B [SEP]``
+
+    A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence pair mask has the following format:
+    ::
+
         0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
         | first sequence    | second sequence |
 
-    If only one sequence, only returns the first portion of the mask (0's).
+    If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
+    
+    note: There is no need token type ids for skep_roberta_large_ch model.
 
 
     Args:
@@ -115,6 +117,7 @@ def convert_example(example,
         max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
             Sequences longer than this will be truncated, sequences shorter will be padded.
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
+        dataset_name((obj:`str`, defaults to "chnsenticorp"): The dataset name, "chnsenticorp" or "sst-2".
 
     Returns:
         input_ids(obj:`list[int]`): The list of token ids.
@@ -129,10 +132,7 @@ def convert_example(example,
             text=example["text"], max_seq_len=max_seq_length)
 
     input_ids = encoded_inputs["input_ids"]
-    data_returned = [input_ids]
     token_type_ids = encoded_inputs["token_type_ids"]
-    if token_type_ids is not None:
-        data_returned.append(token_type_ids)
 
     if not is_test:
         if dataset_name == "sst-2":
@@ -144,10 +144,9 @@ def convert_example(example,
                 f"Got unkown datatset name {dataset_name}, it must be processed on your own."
             )
 
-        data_returned.append(label)
-        return data_returned
+        return input_ids, token_type_ids, label
     else:
-        return data_returned
+        return input_ids, token_type_ids
 
 
 def create_dataloader(dataset,
@@ -174,7 +173,6 @@ def create_dataloader(dataset,
 
 
 if __name__ == "__main__":
-
     paddle.set_device(args.device)
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
@@ -201,18 +199,11 @@ if __name__ == "__main__":
         tokenizer=tokenizer,
         max_seq_length=args.max_seq_length,
         dataset_name=dataset_name)
-    if args.model_name == "skep_roberta_large_en":
-        # There is no need to feed token type ids to skep_roberta_large_en model
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
-            Stack(dtype="int64")  # labels
-        ): [data for data in fn(samples)]
-    else:
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-            Stack(dtype="int64")  # labels
-        ): [data for data in fn(samples)]
+    batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
+        Stack(dtype="int64")  # labels
+    ): [data for data in fn(samples)]
 
     train_data_loader = create_dataloader(
         train_ds,
@@ -251,15 +242,8 @@ if __name__ == "__main__":
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
-            if args.model_name in [
-                    "skep_ernie_1.0_large_ch", "skep_ernie_2.0_large_en"
-            ]:
-                input_ids, token_type_ids, labels = batch
-                logits = model(input_ids, token_type_ids)
-            else:
-                input_ids, labels = batch
-                logits = model(input_ids)
-
+            input_ids, token_type_ids, labels = batch
+            logits = model(input_ids, token_type_ids)
             loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
             correct = metric.compute(probs, labels)
@@ -281,5 +265,6 @@ if __name__ == "__main__":
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 evaluate(model, criterion, metric, dev_data_loader)
+                # Need better way to get inner model of DataParallel
                 model._layers.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)

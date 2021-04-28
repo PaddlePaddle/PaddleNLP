@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--model_name', choices=['skep_ernie_1.0_large_ch', 'skep_ernie_2.0_large_en', 'skep_roberta_large_en'],
+parser.add_argument('--model_name', choices=['skep_ernie_1.0_large_ch', 'skep_ernie_2.0_large_en'],
     default="skep_ernie_1.0_large_ch", help="Select which model to train, defaults to skep_ernie_1.0_large_ch.")
 args = parser.parse_args()
 # yapf: enable
@@ -45,18 +45,25 @@ def convert_example(example,
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
     to be used in a sequence-pair classification task.
         
-    A BERT sequence has the following format:
-
-    - single sequence: ``[CLS] X [SEP]``
-    - pair of sequences: ``[CLS] A [SEP] B [SEP]``
-
-    A BERT sequence pair mask has the following format:
+    A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence has the following format:
     ::
+        - single sequence: ``[CLS] X [SEP]``
+        - pair of sequences: ``[CLS] A [SEP] B [SEP]``
+
+    A skep_roberta_large_en sequence has the following format:
+    ::
+        - single sequence: ``[CLS] X [SEP]``
+        - pair of sequences: ``[CLS] A [SEP] [SEP] B [SEP]``
+
+    A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence pair mask has the following format:
+    ::
+
         0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
         | first sequence    | second sequence |
 
-    If only one sequence, only returns the first portion of the mask (0's).
-
+    If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
+    
+    note: There is no need token type ids for skep_roberta_large_ch model.
 
     Args:
         example(obj:`list[str]`): List of input data, containing text and label if it have label.
@@ -73,18 +80,11 @@ def convert_example(example,
     encoded_inputs = tokenizer(text=example, max_seq_len=max_seq_length)
     input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
-    if token_type_ids is not None:
-        return input_ids, token_type_ids
-    else:
-        return input_ids
+
+    return input_ids, token_type_ids
 
 
-def predict(model,
-            data,
-            tokenizer,
-            label_map,
-            batch_size=1,
-            model_name="skep_ernie_1.0_large_ch"):
+def predict(model, data, tokenizer, label_map, batch_size=1):
     """
     Predicts the data labels.
 
@@ -102,22 +102,13 @@ def predict(model,
     """
     examples = []
     for text in data:
-        if model_name == "skep_roberta_large_en":
-            input_ids = convert_example(
-                text,
-                tokenizer,
-                label_list=label_map.values(),
-                max_seq_length=args.max_seq_length,
-                is_test=True)
-            examples.append((input_ids))
-        else:
-            input_ids, token_type_ids = convert_example(
-                text,
-                tokenizer,
-                label_list=label_map.values(),
-                max_seq_length=args.max_seq_length,
-                is_test=True)
-            examples.append((input_ids, token_type_ids))
+        input_ids, token_type_ids = convert_example(
+            text,
+            tokenizer,
+            label_list=label_map.values(),
+            max_seq_length=args.max_seq_length,
+            is_test=True)
+        examples.append((input_ids, token_type_ids))
 
     # Seperates data into some batches.
     batches = [
@@ -132,18 +123,10 @@ def predict(model,
     results = []
     model.eval()
     for batch in batches:
-        if args.model_name in [
-                "skep_ernie_1.0_large_ch", "skep_ernie_2.0_large_en"
-        ]:
-            input_ids, token_type_ids = batchify_fn(batch)
-            input_ids = paddle.to_tensor(input_ids)
-            token_type_ids = paddle.to_tensor(token_type_ids)
-            logits = model(input_ids, token_type_ids)
-        else:
-            # There is no need to feed token type ids to skep_roberta_large_en model
-            input_ids = Pad(axis=0, pad_val=tokenizer.pad_token_id)(batch)
-            input_ids = paddle.to_tensor(input_ids)
-            logits = model(input_ids)
+        input_ids, token_type_ids = batchify_fn(batch)
+        input_ids = paddle.to_tensor(input_ids)
+        token_type_ids = paddle.to_tensor(token_type_ids)
+        logits = model(input_ids, token_type_ids)
         probs = F.softmax(logits, axis=1)
         idx = paddle.argmax(probs, axis=1).numpy()
         idx = idx.tolist()
@@ -175,11 +158,6 @@ if __name__ == "__main__":
         print("Loaded parameters from %s" % args.params_path)
 
     results = predict(
-        model,
-        data,
-        tokenizer,
-        label_map,
-        batch_size=args.batch_size,
-        model_name=args.model_name)
+        model, data, tokenizer, label_map, batch_size=args.batch_size)
     for idx, text in enumerate(data):
         print('Data: {} \t Lable: {}'.format(text, results[idx]))
