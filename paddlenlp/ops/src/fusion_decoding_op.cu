@@ -110,8 +110,6 @@ std::vector<paddle::Tensor> decoding_kernel(
 
   typedef DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
   decoding_params.stream = stream;
-  int device_id;
-  cudaGetDevice(&device_id);
   fastertransformer::Allocator<AllocatorType::PD> allocator_(stream);
 
   decoding_params.memory_tensor =
