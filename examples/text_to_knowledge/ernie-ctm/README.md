@@ -1,4 +1,4 @@
-# 解语 - ERNIR-CTM
+# 解语|ERNIR-CTM
 
 ERNIE-CTM（**C**hinese **T**ext **M**ining）是适用于中文文本挖掘任务的全汉字字表预训练语言模型，拥有更全的中文字表集合，更优的挖掘任务表现，与PaddleNLP深度结合，提供更加便捷的应用实践。
 
