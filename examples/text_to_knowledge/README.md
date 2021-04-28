@@ -6,9 +6,9 @@
 
 ![image-20210427150638123](doc/img/image-20210427150638123.png)
 
-[百科知识树：描述所有汉语词汇的树状知识库](./termtree)
+[TermTree：描述所有汉语词汇的百科知识树](./termtree)
 
-[中文文本知识标注工具集：wordtag](./wordtag)
+[wordtag：中文文本知识标注工具](./wordtag)
 
 [ERNIE-CTM：适用于中文文本挖掘任务的全字表预训练语言模型](./ernie-ctm)
 

@@ -7,12 +7,12 @@ TermTree（百科知识树）是一个描述所有汉语词汇（包括概念、
 > II. TermPath知识库：Term的SPO知识库，描述Term属性值和Term间关系，用于整合各领域知识图谱；
 > III. TermCorpus语料库：用于计算Term特征表示的中文句子集合。
 
-本次发布的TermTree开源版（TermTreeOS）是TermTree的一个常用子集，包括两部分内容：
+本次发布的TermTree开源试用版是TermTree的一个常用子集，包括两部分内容：
 
 > A.  简化版的TermType词类体系，由160+ termtype 和 7000+ subtype构成。
 > B.  ~100w的term集（挂接在TermType词类体系下），包括大多数常用概念（src=cb，基础概念库，termtype准确率为98%）和一部分高频百科实体（src=eb，基础实体库，termtype准确率为95%）。开源版不包括SPO数据，但给出了实体的百科词条链接，应用方可以利用百科链接整合其他知识图谱使用。
 
-> **注：**与其他常见领域知识图谱不同，TermTree的核心是概念词，而非专名实体词。我们认为，在中文文本中，概念词的含义是相对稳定的，而实体词随应用变化（例如，不同电商有不同的商品实体集，不同的小说站有不同的小说实体集），因此，TermTree通过 “提供常用概念集 + 可插拔的应用实体集/领域知识图谱” 来达到支持不同的应用适配。
+> **注：**与其他常见领域知识图谱不同，TermTree的核心是概念词，而非专名实体词。因为，在中文文本中，概念词的含义是相对稳定的，而专名实体词随应用变化（例如，不同电商有不同的商品实体集，不同的小说站有不同的小说实体集），因此，TermTree通过 “提供常用概念集 + 可插拔的应用实体集/领域知识图谱” 来达到支持不同的应用适配。
 
 ## TermTree的字段说明
 
@@ -21,7 +21,7 @@ TermTree（百科知识树）是一个描述所有汉语词汇（包括概念、
 | term| 【必有】term的名字 | |
 | termid| 【必有】term的id，构造方式为termtype_src_term	 | 采用显式构造id的方式，便于应用数据扩展和整合 |
 | src| 【必有】term的来源库，当前包括两个基础库cb和eb。其中cb为基础概念库（收录常用词汇用语，可作为各类应用的基础集），eb为基础实体库（收录常见命名实体，可根据应用需求扩展） |cb、eb的划分标准不同应用不一样，可根据需求调整；应用方也可以构造自己的应用库，与cb、eb整合使用。|
-| termtype| 【必有】term的主类别，详细描述参见 [termtree\_type\_csv](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/termtree/termtree_type_csv) | 多上位的term会选择其中一个作为termtype，其他上位作为subtype，方便应用筛选 |
+| termtype| 【必有】term的主类别，详细描述参见 [termtree\_type\_csv](./termtree_type_csv.csv) | 多上位的term会选择其中一个作为termtype，其他上位作为subtype，方便应用筛选 |
 | subtype | 【非必须】term的辅助类别或细分类别  | 如果应用特别关注某个subtype，也可以将其升级为termtype使用 |
 | subterms| 【非必须】用于描述同类同名的term集，若“termtype+src”下term只对应一个实例，则subterms为空；若“termtype+src”下term对应多个实例，则subterms记录这些实例，其字段与term相同 | 不需要区分subterm的两种常见场景：1. 应用只需词类特征；2. 上下文信息不足，无法区分具体实例 |
 | subterms_num |【非必须】subterms中的subterm数量 | 如果没有subterm，则值为0 |
