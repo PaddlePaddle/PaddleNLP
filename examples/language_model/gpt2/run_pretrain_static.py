@@ -496,8 +496,8 @@ def do_train(args):
                 #learning_rate=lr_scheduler,
                 learning_rate=0.001,
                 epsilon=args.adam_epsilon,
-                grad_clip=paddle.fluid.clip.GradientClipByGlobalNorm(
-                    clip_norm=1.0),
+                #grad_clip=paddle.fluid.clip.GradientClipByGlobalNorm(
+                grad_clip=paddle.fluid.clip.GradientClipByNorm(clip_norm=1.0),
                 #parameter_list=opt_param,
                 #weight_decay=args.weight_decay,
                 #grad_clip=clip,
