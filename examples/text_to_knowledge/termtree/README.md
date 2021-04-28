@@ -33,10 +33,10 @@ TermTree（百科知识树）是一个描述所有汉语词汇（包括概念、
 
  1. 将所有汉语词汇放在一个统一类别体系下表示，包括概念、实体/专名、领域术语、语法词。
  - 解决传统标注技术下（e.g., 词性标注、命名实体识别），概念、实体、词性特征难以统一计算的问题。
- 
+
  2. 为中文精准解析挖掘服务的词汇类别体系，以全面覆盖百科词条、搜索query、新闻资讯中出现的汉语词汇为目标，支持通用场景文本理解。
  - 应用可以通过指定词表的TermType，方便地整合到TermTree中，定制应用特化版。
- 
+
  3. 尽可能收录常用概念词，并区分常用概念词（src=cb）和专名实体词，以解决专名实体与概念在计算中容易混淆的问题。为此，特别补充收录了很多百科中缺少的概念词。
  - 例：“琴房（歌曲类实体）” VS. “琴房（区域场所类概念）”
  - 例：“甩掉（歌曲类实体）” VS. “甩掉（场景事件类概念）”
@@ -80,8 +80,8 @@ TermTree（百科知识树）是一个描述所有汉语词汇（包括概念、
 如果您的工作成果中使用了TermTree，请增加下述引用。我们非常乐于看到TermTree对您的工作带来帮助。
 ```
 @article{zhao2020TermTree,
-	title={TermTree and Knowledge Annotation Framework for Chinese Language Understanding},
-	author={Zhao, Min and Qin, Huapeng and Zhang, Guoxin and Lyu, Yajuan and Zhu, Yong},
+    title={TermTree and Knowledge Annotation Framework for Chinese Language Understanding},
+    author={Zhao, Min and Qin, Huapeng and Zhang, Guoxin and Lyu, Yajuan and Zhu, Yong},
     technical report={Baidu, Inc. TR:2020-KG-TermTree},
     year={2020}
 }

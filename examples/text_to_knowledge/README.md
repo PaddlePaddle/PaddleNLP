@@ -12,6 +12,92 @@
 
 [ERNIE-CTM：适用于中文文本挖掘任务的全字表预训练语言模型](./ernie-ctm)
 
+## 直接应用
+
+解语中，中文标注模型（wordtag）与百科知识树结合，可直接应用于各挖掘场景中，如规则模板生成、匹配，以及词类知识增强深度学习模型的应用中。
+
+### 挖掘模板生成与匹配
+
+在实际文本处理应用中，往往不仅仅要使用深度学习模型学到的统计特征，还需要使用规则去更精准地匹配或生成文本，去支持相关的应用，如语义一致判定、文本相关性扩召、模型的样本增强等。
+
+wordtag包含了覆盖中文所有词汇的词类标注体系，在生成挖掘模板以及模板匹配上有着天然的优势，用户可以根据wordtag标注到的词类，配置更加丰富、精准的匹配模板，同时对于目标文本，只需使用wordtag标注之后，即可利用模板进行匹配。
+
+例如，输入文本：*美人鱼是周星驰执导的电影*，得到预测结果：
+
+```json
+{
+    "text": "美人鱼是周星驰执导的电影",
+    "items": [
+        {
+            "item": "美人鱼",
+            "offset": 0,
+            "wordtag_label": "作品类_实体",
+            "length": 3,
+            "termid": "作品与出版物_eb_美人鱼"
+        },
+        {
+            "item": "是",
+            "offset": 3,
+            "wordtag_label": "肯定词",
+            "length": 1,
+            "termid": "肯定否定词_cb_是"
+        },
+        {
+            "item": "周星驰",
+            "offset": 4,
+            "wordtag_label": "人物类_实体",
+            "length": 3,
+            "termid": "人物_eb_周星驰"
+        },
+        {
+            "item": "执导",
+            "offset": 7,
+            "wordtag_label": "场景事件",
+            "length": 2,
+            "termid": "场景事件_cb_执导"
+        },
+        {
+            "item": "的",
+            "offset": 9,
+            "wordtag_label": "助词",
+            "length": 1,
+            "termid": "助词_cb_的"
+        },
+        {
+            "item": "电影",
+            "offset": 10,
+            "wordtag_label": "作品类_概念",
+            "length": 2,
+            "termid": "影视作品_cb_电影"
+        }
+    ]
+}
+```
+
+如将上述标注结果中的词类取出，去除虚词、标点等与语义无关的词，将抽取出的词类构造成为匹配模板：
+
+```
+[作品类_实体][肯定词][人物类_实体][场景事件][作品类_概念]
+```
+
+利用该匹配模板，可以匹配所有该句式的文本，例如：
+
+> 《狂人日记》是鲁迅创作的第一个短篇白话日记体小说
+>
+> 《澳门风云》是王晶创作执导的合家欢贺岁喜剧赌片
+>
+> 《千王之王2000》是一部王晶于1999年导演的喜剧电影
+>
+> 《射雕英雄传》是金庸创作的长篇武侠小说
+
+同时结合term linking结果及百科知识树，可以得到更加细粒度的词类（如subtype），配制出更加精细的模板。
+
+### 词类增强的深度学习模型
+
+词类特征同时也可以是深度学习模型可以使用的一种重要特征，词类特征可以对原始文本token提供有效的边界信息、归组信息，减少样本中的噪音，防止模型过拟合。
+
+在实际应用中，可以将词类作为embedding特征，直接叠加到文本token上，输入到模型中；在BERT等模型中，也可以使用K-BERT等方式，将词类作为序列中的一部分，利用position id和可见性矩阵控制token和词类特征之间的可见性，作为模型的输入。
+
 ## 快速开始
 
 ### 快速加载标注工具
@@ -20,8 +106,8 @@
 如果您的工作成果中使用了解语，请增加下述引用。我们非常乐于看到解语对您的工作带来帮助。
 ```
 @article{zhao2020TermTree,
-	title={TermTree and Knowledge Annotation Framework for Chinese Language Understanding},
-	author={Zhao, Min and Qin, Huapeng and Zhang, Guoxin and Lyu, Yajuan and Zhu, Yong},
+    title={TermTree and Knowledge Annotation Framework for Chinese Language Understanding},
+    author={Zhao, Min and Qin, Huapeng and Zhang, Guoxin and Lyu, Yajuan and Zhu, Yong},
     technical report={Baidu, Inc. TR:2020-KG-TermTree},
     year={2020}
 }

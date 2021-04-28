@@ -63,9 +63,9 @@ ERNIE-CTM使用的预训练任务为掩码语言模型（Masked Language Model�
 如果您的工作成果中使用了ERNIE-CTM，请增加下述引用。我们非常乐于看到ERNIE-CTM对您的工作带来帮助。
 ```
 @article{zhao2020TermTree,
-  title={TermTree and Knowledge Annotation Framework for Chinese Language Understanding},
-  author={Zhao, Min and Qin, Huapeng and Zhang, Guoxin and Lyu, Yajuan and Zhu, Yong},
-  technical report={Baidu, Inc. TR:2020-KG-TermTree},
-  year={2020}
+    title={TermTree and Knowledge Annotation Framework for Chinese Language Understanding},
+    author={Zhao, Min and Qin, Huapeng and Zhang, Guoxin and Lyu, Yajuan and Zhu, Yong},
+    technical report={Baidu, Inc. TR:2020-KG-TermTree},
+    year={2020}
 }
 ```
