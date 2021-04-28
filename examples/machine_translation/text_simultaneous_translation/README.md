@@ -79,7 +79,25 @@ python -m paddle.distributed.launch --gpus "0" train.py --config ./config/transf
 
 可以在`config/transformer.yaml` 文件中设置相应的参数。如果执行不提供 `--config` 选项，程序将默认使用`config/transformer.yaml` 的配置。
 
-建议：如果为了更好的效果，可先在整句模型(即waitk=-1)进行预训练，然后在此基础上根据不同的waitk进行微调来训练不同的waitk模型。
+建议：如果为了更好的效果，可先在整句模型(即`waik=-1`)进行预训练，然后在此基础上根据不同的waitk进行微调来训练不同的waitk模型，训练的命令都同上，下面给出具体的流程以及主要的参数配置：
+- Pretrain
+  Pretrain用来训练整句模型(即`waik=-1`)，可在`config/transformer.yaml`文件中配置参数：
+  - `waik`表示waik策略，这里设置为-1
+  - `training_file`表示训练集，数据格式同上文
+  - `validation_file`表示验证集，数据格式同上文
+  - `init_from_checkpoint`表示模型目录，从该checkpoint恢复训练，这里设置为空
+  - `init_from_pretrain_model`表示模型目录，从该checkpoint开始finetune下游任务，这里设置为空
+  - `use_cuda`表示是否使用GPU，示例设置为True
+  - `use_amp`表示混合精度训练，示例设置为False
+- Finetune
+  Finetune用来训练waik模型(即`waitk=1,2,3,4...`)，可在`config/transformer.yaml`文件中配置参数：
+  - `waik`表示waik策略，这里设置为3（以wait-3模型为例）
+  - `training_file`表示训练集，数据格式同上文
+  - `validation_file`表示验证集，数据格式同上文
+  - `init_from_checkpoint`表示模型目录，从该checkpoint恢复训练，这里设置`waik=-1`模型的ckeckpoint
+  - `init_from_pretrain_model`表示模型目录，从该checkpoint开始finetune下游任务，这里设置为空
+  - `use_cuda`表示是否使用GPU，示例设置为True
+  - `use_amp`表示混合精度训练，示例设置为False
 ## 模型推理
 
 模型训练完成后可以执行以下命令对指定文件中的文本进行翻译：
@@ -89,8 +107,13 @@ python -m paddle.distributed.launch --gpus "0" train.py --config ./config/transf
 export CUDA_VISIBLE_DEVICES=0
 python predict.py --config ./config/transformer.yaml
 ```
-
-翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `config/transformer.yaml`文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 `config/transformer.yaml` 的配置。
+- Predict
+ 根据具体的waik策略来进行翻译，可在`config/transformer.yaml`文件中配置参数，预测的命令同上，下面给出主要的参数说明：
+  - `waik`表示waik策略，这里设置为3（以wait-3模型为例）
+  - `predict_file`表示测试集，数据格式是BPE分词后的源语言（中文为Jieba+BPE分词），按行区分
+  - `output_file`表示输出文件，翻译结果会输出到该参数指定的文件
+  - `init_from_params`表示模型的所在目录，根据具体的`waik`来设置，这里设置为`wait=3`模型目录
+  - 更多参数的使用可以在 `config/transformer.yaml`文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 `config/transformer.yaml` 的配置。
 
 需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
