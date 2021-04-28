@@ -964,8 +964,8 @@ class XLNetModel(XLNetPretrainedModel):
                 Defaults to False.
 
         Returns:
-            tuple or dict: A tuple of shape (`output`, `new_mems`, `hidden_states`, `attentions`)
-            or a dict of shape {"last_hidden_state": `output`, "mems": `new_mems`,
+            tuple or dict: A tuple with items: (`output`, `new_mems`, `hidden_states`, `attentions`)
+            or a dict with key-value pairs: {"last_hidden_state": `output`, "mems": `new_mems`,
             "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
             With the corresponding fields:
@@ -1458,8 +1458,8 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
                 See :class:`XLNetModel`.
 
         Returns:
-            tuple or dict: A tuple of shape (`output`, `new_mems`, `hidden_states`, `attentions`)
-            or a dict of shape {"last_hidden_state": `output`, "mems": `new_mems`,
+            tuple or dict: A tuple with items: (`output`, `new_mems`, `hidden_states`, `attentions`)
+            or a dict with key-value pairs: {"last_hidden_state": `output`, "mems": `new_mems`,
             "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
             With the corresponding fields:
