@@ -4,6 +4,7 @@
 
 情感预训练模型SKEP（Sentiment Knowledge Enhanced Pre-training for Sentiment Analysis）。SKEP利用情感知识增强预训练模型， 在14项中英情感分析典型任务上全面超越SOTA，此工作已经被ACL 2020录用。SKEP是百度研究团队提出的基于情感知识增强的情感预训练算法，此算法采用无监督方法自动挖掘情感知识，然后利用情感知识构建预训练目标，从而让机器学会理解情感语义。SKEP为各类情感分析任务提供统一且强大的情感语义表示。
 
+论文地址：https://arxiv.org/abs/2005.05635
 
 <p align="center">
 <img src="https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep.png" width="80%" height="60%"> <br />
