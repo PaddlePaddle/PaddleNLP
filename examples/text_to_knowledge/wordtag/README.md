@@ -185,7 +185,7 @@ python -u predict.py \
 
 模型使用ERNIE-CTM+CRF训练而成，预测时使用viterbi解码，模型结构如下：
 
-<img src="../doc/img/image-20210427183901319.png" alt="image-20210427183901319" style="zoom: 33%;" />
+<img src="../doc/img/image-20210427183901319.png" alt="image-20210427183901319" style="zoom: 25%;" />
 
 ## Term Linking
 
