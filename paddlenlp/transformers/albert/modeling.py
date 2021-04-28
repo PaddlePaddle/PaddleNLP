@@ -639,7 +639,6 @@ class AlbertModel(AlbertPretrainedModel):
             position_ids=None,
             head_mask=None,
             inputs_embeds=None,
-            num_hidden_layers=None,
             output_attentions=False,
             output_hidden_states=False,
             return_dict=False,
@@ -665,7 +664,7 @@ class AlbertModel(AlbertPretrainedModel):
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         # todo: get head mask
         # head_mask = self.get_head_mask(head_mask, num_hidden_layers)
-        head_mask = [None] * num_hidden_layers
+        head_mask = [None] * self.config["num_hidden_layers"]
 
         embedding_output = self.embeddings(
             input_ids,
@@ -819,11 +818,104 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
 
 
 class AlbertForSequenceClassification(AlbertPretrainedModel):
-    pass
+    def __init__(self, albert, num_classes=2):
+        super(AlbertForSequenceClassification, self).__init__()
+        self.num_classes = num_classes
+
+        self.transformer = albert
+        self.dropout = nn.Dropout(self.transformer.config["classifier_dropout_prob"])
+        self.classifier = nn.Linear(self.transformer.config["hidden_size"], self.num_classes)
+
+        self.init_weights()
+
+    def forward(
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
+        transformer_outputs = self.transformer(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+
+        pooled_output = transformer_outputs[1] if not return_dict \
+            else transformer_outputs["pooled_output"]
+
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)
+
+        if not return_dict:
+            return (logits,) + transformer_outputs[2:]
+
+        return {
+            "logits": logits,
+            "hidden_states": transformer_outputs["hidden_states"],
+            "attentions": transformer_outputs["attentions"],
+        }
 
 
 class AlbertForTokenClassification(AlbertPretrainedModel):
-    pass
+    def __init__(self, albert, num_classes=2):
+        super(AlbertForTokenClassification, self).__init__()
+        self.num_classes = num_classes
+
+        self.transformer = albert
+        self.dropout = nn.Dropout(self.transformer.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.transformer.config["hidden_size"], self.num_classes)
+
+        self.init_weights()
+
+    def forward(
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
+        transformer_outputs = self.transformer(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        sequence_output = transformer_outputs[0] if \
+            not return_dict else transformer_outputs["sequence_output"]
+        logits = self.classifier(sequence_output)
+
+        if not return_dict:
+            return (logits,) + transformer_outputs[2:]
+
+        return {
+            "logits": logits,
+            "hidden_states": transformer_outputs["hidden_states"],
+            "attentions": transformer_outputs["attentions"],
+        }
 
 
 class AlbertForMultipleChoice(AlbertPretrainedModel):
