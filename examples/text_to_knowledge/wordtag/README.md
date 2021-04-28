@@ -185,7 +185,7 @@ python -u predict.py \
 
 模型使用ERNIE-CTM+CRF训练而成，预测时使用viterbi解码，模型结构如下：
 
-<img src="../doc/img/image-20210427183901319.png" alt="image-20210427183901319" style="zoom: 25%;" />
+<img src="../doc/img/image-20210427183901319.png" alt="image-20210427183901319" style="zoom: 33%;" />
 
 ## Term Linking
 
@@ -204,8 +204,8 @@ wordtag模型对所有的词预测到上位词类之后，会直接根据预测�
 如果您的工作成果中使用了wordtag，请增加下述引用。我们非常乐于看到wordtag对您的工作带来帮助。
 ```
 @article{zhao2020TermTree,
-    title={TermTree and Knowledge Annotation Framework for Chinese Language Understanding},
-    author={Zhao, Min and Qin, Huapeng and Zhang, Guoxin and Lyu, Yajuan and Zhu, Yong},
+	title={TermTree and Knowledge Annotation Framework for Chinese Language Understanding},
+	author={Zhao, Min and Qin, Huapeng and Zhang, Guoxin and Lyu, Yajuan and Zhu, Yong},
     technical report={Baidu, Inc. TR:2020-KG-TermTree},
     year={2020}
 }

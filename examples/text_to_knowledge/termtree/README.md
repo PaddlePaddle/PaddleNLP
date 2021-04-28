@@ -29,6 +29,92 @@ TermTree（百科知识树）是一个描述所有汉语词汇（包括概念、
 | alias\_ext|【非必须】term的常用扩展别名，经常是term或alias的一个子片段，单独出现有其他含义，结合上下文可识别为别名。e.g., 四维彩超的alias_ext“四维”  | 通常为歧义大的别名，便于应用筛选使用 |
 | links|【非必须】该term对应的其他term的id，可以是本知识库中的id，也可以是其他知识库如百度百科id  | 如果是本知识库中的id，则表示两者可以指代同一实体 |
 
+```json
+// 示例1：无subterms的term
+{
+    "id": "XXX",
+    "termid": "植物_cb_苹果",
+    "term": "苹果",
+    "src": "cb",
+    "termtype": "植物",
+    "subtype": [],
+    "subterms": [],
+    "subterms_num": 0,
+    "alias": [
+        "苹果树"
+    ],
+    "alias_ext": [],
+    "links": [
+        {
+            "bdbkUrl": [
+                "http://baike.baidu.com/item/%E8%8B%B9%E6%9E%9C/14822460"
+            ]
+        }
+    ]
+}
+// 示例2：有subterms的term
+{
+    "id": "XXX",
+    "termid": "影视作品_eb_苹果",
+    "term": "苹果",
+    "src": "eb",
+    "termtype": "影视作品",
+    "subtype": [],
+    "subterms": [
+        {
+            "id": "XXX",
+            "subtype": [
+                "影视作品_cb_电影",
+                "影视动漫作品_cb_剧情片"
+            ],
+            "alias": [],
+            "alias_ext": [],
+            "links": [
+                {
+                    "bdbkUrl": [
+                        "http://baike.baidu.com/item/%E8%8B%B9%E6%9E%9C/6011191"
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "XXX", 
+            "subtype": [
+                "影视作品_cb_韩国电影"
+            ],
+            "alias": [],
+            "alias_ext": [],
+            "links": [
+                {
+                    "bdbkUrl": [
+                        "http://baike.baidu.com/item/%E8%8B%B9%E6%9E%9C/6011208"
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "XXX", 
+            "subtype": [
+                "影视作品_cb_剧情电影"
+            ],
+            "alias": [],
+            "alias_ext": [],
+            "links": [
+                {
+                    "bdbkUrl": [
+                        "http://baike.baidu.com/item/%E8%8B%B9%E6%9E%9C/6011176"
+                    ]
+                }
+            ]
+        }
+    ],
+    "subterms_num": 3,
+    "alias": [],
+    "alias_ext": [],
+    "links": []
+}
+```
+
 ## TermTree的特点
 
  1. 将所有汉语词汇放在一个统一类别体系下表示，包括概念、实体/专名、领域术语、语法词。
