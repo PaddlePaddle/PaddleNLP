@@ -21,7 +21,12 @@ from paddlenlp.utils.log import logger
 
 def build_index(args, data_loader, model):
 
-    index = hnswlib.Index(space='ip', dim=768)
+    for name, parameters in model.named_parameters():
+        if name == "ptm.pooler.dense.bias":
+            logger.info("emb_size for ANN:[{}]".format(emb_size))
+            break
+
+    index = hnswlib.Index(space='ip', dim=emb_size)
 
     # Initializing index
     # max_elements - the maximum number of elements (capacity). Will throw an exception if exceeded
