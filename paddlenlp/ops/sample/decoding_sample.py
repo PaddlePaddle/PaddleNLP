@@ -1,3 +1,16 @@
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import sys
 import os
 import numpy as np
@@ -35,27 +48,6 @@ def parse_args():
     return args
 
 
-def generate_encoder_result(batch_size, max_seq_len, memory_hidden_dim, dtype):
-    memory_sequence_length = np.random.randint(
-        1, max_seq_len, size=batch_size).astype(np.int32)
-    memory_sequence_length[np.random.randint(0, batch_size)] = max_seq_len
-    outter_embbeding = np.random.randn(memory_hidden_dim) * 0.01
-
-    memory = []
-    mem_max_seq_len = np.max(memory_sequence_length)
-    for i in range(batch_size):
-        data = np.random.randn(mem_max_seq_len, memory_hidden_dim) * 0.01
-        for j in range(memory_sequence_length[i], mem_max_seq_len):
-            data[j] = outter_embbeding
-        memory.append(data)
-    memory = np.asarray(memory)
-    memory = paddle.to_tensor(memory, dtype=dtype)
-    memory_sequence_length = paddle.to_tensor(
-        memory_sequence_length, dtype="int32")
-
-    return memory, memory_sequence_length
-
-
 def do_predict(args):
     place = "gpu"
     place = paddle.set_device(place)
@@ -84,9 +76,12 @@ def do_predict(args):
     # Set evaluate mode
     transformer.eval()
 
-    enc_output, mem_seq_len = generate_encoder_result(
-        args.infer_batch_size, args.max_length, args.d_model, "float16"
-        if args.use_fp16_decoding else "float32")
+    enc_output = paddle.randn(
+        [args.infer_batch_size, args.max_length, args.d_model])
+    if args.use_fp16_decoding:
+        enc_output = paddle.cast(enc_output, "float16")
+    mem_seq_len = paddle.randint(
+        1, args.max_length + 1, shape=[args.infer_batch_size], dtype="int32")
     with paddle.no_grad():
         for i in range(100):
             # For warmup. 
