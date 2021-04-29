@@ -91,7 +91,7 @@ def do_predict(args):
 
     with paddle.no_grad():
         for input_data in test_loader:
-            (src_word, _) = input_data
+            (src_word, ) = input_data
 
             finished_seq, finished_scores = transformer.greedy_search(
                 src_word, max_len=args.max_out_len, waitk=args.waitk)
