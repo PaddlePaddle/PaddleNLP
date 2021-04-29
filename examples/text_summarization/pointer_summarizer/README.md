@@ -1,4 +1,4 @@
-# Paddle Pointer Summarizer
+# Pointer Generator Network for Text Summarization
 
 This code is the Paddle v2.0 implementation of *[Get To The Point: Summarization with Pointer-Generator Networks](https://arxiv.org/abs/1704.04368)*.
 The code adapts and aligns with [a previous Pytorch implmentation](https://github.com/atulkum/pointer_summarizer).
