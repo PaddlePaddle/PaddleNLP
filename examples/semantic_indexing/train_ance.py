@@ -153,11 +153,15 @@ def do_train():
             p.name for n, p in model.named_parameters()
             if not any(nd in n for nd in ["bias", "norm"])
         ]
+
+        clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=1.0)
+
         optimizer = paddle.optimizer.AdamW(
             learning_rate=lr_scheduler,
             parameters=model.parameters(),
             weight_decay=args.weight_decay,
-            apply_decay_param_fun=lambda x: x in decay_params)
+            apply_decay_param_fun=lambda x: x in decay_params,
+            grad_clip=clip)
 
         tic_train = time.time()
         for epoch in range(1, args.epochs + 1):
