@@ -242,6 +242,15 @@ python predict.py --vocab_path='./senta_word_dict.txt' \
     --params_path='./checkpoints/final.pdparams'
 ```
 
+XPU启动：
+
+```shell
+python predict.py --vocab_path='./senta_word_dict.txt' \
+    --device=xpu \
+    --network=lstm \
+    --params_path=checkpoints/final.pdparams
+```
+
 将待预测数据分词完毕后，如以下示例：
 
 ```text
