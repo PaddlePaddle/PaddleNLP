@@ -19,8 +19,9 @@ import yaml
 from attrdict import AttrDict
 
 import paddle
+from paddlenlp.transformers import position_encoding_init
 import reader
-from model import SimultaneousTransformer, position_encoding_init
+from model import SimultaneousTransformer
 
 
 def parse_args():
