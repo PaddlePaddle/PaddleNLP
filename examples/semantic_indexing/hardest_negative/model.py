@@ -24,8 +24,12 @@ from base_model import SemanticIndexBase
 
 
 class SemanticIndexHardestNeg(SemanticIndexBase):
-    def __init__(self, pretrained_model, dropout=None, margin=0.3):
-        super().__init__(pretrained_model, dropout)
+    def __init__(self,
+                 pretrained_model,
+                 dropout=None,
+                 margin=0.3,
+                 output_emb_size=None):
+        super().__init__(pretrained_model, dropout, output_emb_size)
         self.margin = margin
 
     def forward(self,
@@ -48,7 +52,8 @@ class SemanticIndexHardestNeg(SemanticIndexBase):
 
         cosine_sim = paddle.matmul(
             query_cls_embedding, title_cls_embedding, transpose_y=True)
-        pos_sim = paddle.diag(cosine_sim)
+
+        pos_sim = paddle.max(cosine_sim, axis=-1)
 
         # subtract 10000 from all diagnal elements of cosine_sim
         mask_socre = paddle.full(

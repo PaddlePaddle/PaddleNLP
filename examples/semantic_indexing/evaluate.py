@@ -75,5 +75,9 @@ if __name__ == "__main__":
             else:
                 relevance_labels.append(0)
 
+    recall_N = []
     for topN in (10, 50, 100):
-        logger.info("Recall@{}: {}".format(topN, 100 * recall(rs, N=topN)))
+        #logger.info("Recall@{}: {}".format(topN, 100 * recall(rs, N=topN)))
+        R = round(100 * recall(rs, N=topN), 3)
+        recall_N.append(str(R))
+    print("\t".join(recall_N))

@@ -37,12 +37,13 @@ from data import get_latest_checkpoint, get_latest_ann_data
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--save_model_dir", default='./checkpoints', type=str, help="The output directory where the model checkpoints will be written.")
+parser.add_argument("--save_dir", default='./checkpoints', type=str, help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--ann_data_dir", default='./ann_data', type=str, help="The output directory where the ann generated training data will be saved.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--max_training_steps", default=1000000, type=int, help="The maximum total steps for training")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--output_emb_size", default=None, type=int, help="output_embedding_size")
 parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
@@ -83,7 +84,10 @@ def do_train():
     latest_checkpoint, latest_global_step = get_latest_checkpoint(args)
     logger.info("get latest_checkpoint:{}".format(latest_checkpoint))
 
-    model = SemanticIndexANCE(pretrained_model, margin=args.margin)
+    model = SemanticIndexANCE(
+        pretrained_model,
+        margin=args.margin,
+        output_emb_size=args.output_emb_size)
 
     if latest_checkpoint:
         state_dict = paddle.load(latest_checkpoint)
@@ -180,8 +184,7 @@ def do_train():
                 lr_scheduler.step()
                 optimizer.clear_grad()
                 if global_step % args.save_steps == 0 and rank == 0:
-                    save_dir = os.path.join(args.save_model_dir,
-                                            str(global_step))
+                    save_dir = os.path.join(args.save_dir, str(global_step))
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
                     save_param_path = os.path.join(save_dir,

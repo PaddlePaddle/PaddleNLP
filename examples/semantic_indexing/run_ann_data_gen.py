@@ -26,12 +26,14 @@ parser = argparse.ArgumentParser()
 # Required parameters
 parser.add_argument("--similar_text_pair_file", default=None, type=str,required=True, help="The train_set tsv file that each line is simialr text pair")
 parser.add_argument("--corpus_file", default=None, type=str, required=True, help="The corpus file that each line is a text for buinding indexing")
-parser.add_argument("--save_model_dir", default=None, type=str, required=True, help="Saved model dir, will look for latest checkpoint dir in here")
+parser.add_argument("--save_dir", default=None, type=str, required=True, help="Saved model dir, will look for latest checkpoint dir in here")
 parser.add_argument("--ann_data_dir", default=None, type=str, required=True, help="The output directory where the training data will be written")
 
 parser.add_argument("--init_from_ckpt", default=None, type=str, help="Initial model dir, will use this if no checkpoint is found in model_dir")
 parser.add_argument("--end_ann_step", default=1000000, type=int, help="Stop after this number of data versions has been generated, default run forever")
 parser.add_argument("--batch_size", default=128, type=int, help="Batch size for predicting embedding of texts")
+parser.add_argument("--output_emb_size", default=None, type=int, help="output_embedding_size")
+
 parser.add_argument("--max_seq_length", default=128, type=int, help="Batch size for predicting embedding of texts")
 parser.add_argument("--topk_training", default=500, type=int, help="top k from which negative samples are collected")
 parser.add_argument("--num_negative_sample", default=5, type=int, help="at each resample, how many negative samples per query do I use")
@@ -50,7 +52,8 @@ def generate_new_ann(args, data_loader_dict, checkpoint_path, latest_step_num):
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         'ernie-1.0')
 
-    model = SemanticIndexANCE(pretrained_model)
+    model = SemanticIndexANCE(
+        pretrained_model, output_emb_size=args.output_emb_size)
 
     logger.info("checkpoint_path:{}".format(checkpoint_path))
     state_dict = paddle.load(checkpoint_path)

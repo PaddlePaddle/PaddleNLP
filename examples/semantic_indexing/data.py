@@ -102,13 +102,13 @@ def get_latest_checkpoint(args):
     """
         Return: (latest_checkpint_path, global_step)
     """
-    if not os.path.exists(args.save_model_dir):
+    if not os.path.exists(args.save_dir):
         return args.init_from_ckpt, 0
 
-    subdirectories = list(next(os.walk(args.save_model_dir))[1])
+    subdirectories = list(next(os.walk(args.save_dir))[1])
 
     def valid_checkpoint(checkpoint):
-        chk_path = os.path.join(args.save_model_dir, checkpoint)
+        chk_path = os.path.join(args.save_dir, checkpoint)
         scheduler_path = os.path.join(chk_path, "model_state.pdparams")
         succeed_flag_file = os.path.join(chk_path, "succeed_flag_file")
         return os.path.exists(scheduler_path) and os.path.exists(
@@ -117,7 +117,7 @@ def get_latest_checkpoint(args):
     trained_steps = [int(s) for s in subdirectories if valid_checkpoint(s)]
 
     if len(trained_steps) > 0:
-        return os.path.join(args.save_model_dir,
+        return os.path.join(args.save_dir,
                             str(max(trained_steps)),
                             "model_state.pdparams"), max(trained_steps)
 

@@ -23,8 +23,13 @@ from base_model import SemanticIndexBase
 
 
 class SemanticIndexBatchNeg(SemanticIndexBase):
-    def __init__(self, pretrained_model, dropout=None, margin=0.3, scale=30):
-        super().__init__(pretrained_model, dropout)
+    def __init__(self,
+                 pretrained_model,
+                 dropout=None,
+                 margin=0.3,
+                 scale=30,
+                 output_emb_size=None):
+        super().__init__(pretrained_model, dropout, output_emb_size)
 
         self.margin = margin
         # Used scaling cosine similarity to ease converge

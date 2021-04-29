@@ -37,6 +37,7 @@ parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The ou
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--output_emb_size", default=None, type=int, help="output_embedding_size")
 parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
@@ -101,7 +102,10 @@ def do_train():
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
 
-    model = SemanticIndexHardestNeg(pretrained_model, margin=args.margin)
+    model = SemanticIndexHardestNeg(
+        pretrained_model,
+        margin=args.margin,
+        output_emb_size=args.output_emb_size)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
