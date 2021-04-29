@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument(
         "--benchmark",
         action="store_true",
-        help="Whether to print logs on each cards. Normally, not necessary to set --benchmark. "
+        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
     )
     args = parser.parse_args()
     return args
