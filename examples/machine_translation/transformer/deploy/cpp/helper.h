@@ -47,6 +47,5 @@ static void split(const std::string &str,
   }
 }
 
-
 }  // namespace inference
 }  // namespace paddle

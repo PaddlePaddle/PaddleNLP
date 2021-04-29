@@ -56,24 +56,23 @@ DATA_DIR=/root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/new
 bash run.sh
 ```
 
-编译完成后，其实，在 `build/bin/` 路径下会生成 `transformer_e2e` 的可执行文件，如果有需要，也可以直接执行这个可执行文件进行推理。
+以上步骤，如果全部正确执行，将会依次完成编译、预测全部过程。不过，如果需要自行执行可执行文件，编译完成后，其实，在 `build/bin/` 路径下会生成 `transformer_e2e` 的可执行文件，也可以直接执行这个可执行文件进行推理。
 
-执行的参数解释如下：
+执行的参数及解释如下：
 
 ``` sh
-# ./build/bin/transformer_e2e <batch_size> <device> <gpu_id> <use_mkl> <threads> <model_dir> <vocab_dir> <data_dir>
-./build/bin/transformer_e2e 8 gpu 0 0 1 ./infer_model/ /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
+./build/bin/transformer_e2e -batch_size 8 -device gpu -gpu_id 0 -model_dir ./infer_model/ -vocab_dir /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
 各个参数解释如下：
-* `<batch_size>`: 与配置文件中 `infer_batch_size` 意义相同，是指的使用 Paddle Inference 的时候一个 batch 的句子数目。
-* `<device>`: 使用的设备，可以是 gpu 或是 cpu。
-* `<gpu_id>`: 若使用 gpu，则需要提供所使用的 gpu 的 id。
-* `<use_mkl>`: 是否使用 mkl，1 代表使用 mkl，0 代表不使用 mkl。
-* `<threads>`: 仅在使用 mkl 的时候起效，用于指定计算 math 库时的线程数。
-* `<model_dir>`: 导出的模型的位置。
-* `<vocab_dir>`: 词表的位置。
-* `<data_dir>`: 推理用的数据的位置。
+* `-batch_size`: 使用 Paddle Inference 的时候一个 batch 的句子数目。
+* `-device`: 使用的设备，可以是 gpu 或是 cpu。
+* `-gpu_id`: 若使用 gpu，则需要提供所使用的 gpu 的 id。
+* `-use_mkl`: 是否使用 mkl，设置代表使用 mkl，不设置则不使用 mkl。仅在使用 cpu 进行预测的时候有效。
+* `-threads`: 仅在使用 mkl 的时候起效，用于指定计算 math 库时的线程数。
+* `-model_dir`: 导出的模型的位置。
+* `-vocab_dir`: 词表的位置。
+* `-data_dir`: 推理用的数据的位置。
 
 英德翻译的结果会保存到 `predict.txt` 文件中。
 

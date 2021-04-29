@@ -18,12 +18,30 @@
 #include <cstdlib>
 #include <ctime>
 
+DEFINE_int32(batch_size, 1, "Batch size to do inference. ");
+DEFINE_string(device, "gpu", "The device to do inference. Can be gpu or cpu. ");
+DEFINE_int32(gpu_id, 0, "The gpu id to do inference. ");
+DEFINE_bool(use_mkl,
+            false,
+            "Whether to use mkl when using cpu to do inference. ");
+DEFINE_int32(threads,
+             1,
+             "The number of threads to run math lib when using mkl. ");
+DEFINE_string(model_dir,
+              "./infer_model/",
+              "The directory to the inference model. ");
+DEFINE_string(vocab_dir,
+              "./vocab_all.bpe.33708",
+              "The directory to the vocabulary file. ");
+DEFINE_string(data_dir,
+              "./newstest2014.tok.bpe.33708.en",
+              "The directory to the input data. ");
+
 using namespace paddle_infer;
 
-
 std::string model_dir = "";
-std::string dict_dir = "";
-std::string datapath = "";
+std::string vocab_dir = "";
+std::string data_dir = "";
 
 const int EOS_IDX = 1;
 const int PAD_IDX = 0;
@@ -122,7 +140,7 @@ public:
   }
 
   bool GetWordDict() {
-    std::ifstream fin(dict_dir);
+    std::ifstream fin(vocab_dir);
     std::string line;
     int k = 0;
     while (std::getline(fin, line)) {
@@ -217,7 +235,7 @@ void Main(
   config.SwitchUseFeedFetchOps(false);
   config.SwitchSpecifyInputNames(true);
   auto predictor = CreatePredictor(config);
-  DataReader reader(datapath);
+  DataReader reader(data_dir);
   reader.GetWordDict();
 
   double whole_time = 0;
@@ -245,7 +263,7 @@ void Main(
         out << dataresultvec[i].result_q << "\n";
       }
     }
-    num_samples += dataresultvec.size()
+    num_samples += dataresultvec.size();
   }
   SummaryConfig(config, whole_time, num_batches, num_samples);
 }
@@ -253,19 +271,17 @@ void Main(
 }  // namespace paddle
 
 int main(int argc, char** argv) {
-  batch_size = std::stoi(std::string(argv[1]));
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  std::string device = std::string(argv[2]);
-  gpu_id = std::stoi(std::string(argv[3]));
+  batch_size = FLAGS_batch_size;
+  gpu_id = FLAGS_gpu_id;
 
-  int use_mkl = std::stoi(std::string(argv[4]));
-  int threads = std::stoi(std::string(argv[5]));
+  model_dir = FLAGS_model_dir;
+  vocab_dir = FLAGS_vocab_dir;
+  data_dir = FLAGS_data_dir;
 
-  model_dir = std::string(argv[6]);
-  dict_dir = std::string(argv[7]);
-  datapath = std::string(argv[8]);
-
-  paddle::inference::Main(batch_size, device, gpu_id, use_mkl, threads);
+  paddle::inference::Main(
+      batch_size, FLAGS_device, gpu_id, FLAGS_use_mkl, FLAGS_threads);
 
   return 0;
 }
