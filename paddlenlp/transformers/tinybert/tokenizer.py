@@ -22,13 +22,13 @@ class TinyBertTokenizer(BertTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "tinybert-4l-312d":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-4l-312d-vocab.txt",
+            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-4l-312d-vocab.txt",
             "tinybert-6l-768d":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-6l-768d-vocab.txt",
+            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-6l-768d-vocab.txt",
             "tinybert-4l-312d-v2":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-4l-312d-v2-vocab.txt",
+            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-4l-312d-v2-vocab.txt",
             "tinybert-6l-768d-v2":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-6l-768d-v2-vocab.txt",
+            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-6l-768d-v2-vocab.txt",
         }
     }
     pretrained_init_configuration = {
