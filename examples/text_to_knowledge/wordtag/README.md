@@ -2,7 +2,7 @@
 
 WordTag中文文本知识标注工具是首个覆盖中文所有词类的知识标注工具，旨在为中文文本解析提供全面、丰富的知识标注结果，可以应用于模板（挖掘模板、解析模板）生成与匹配、知识挖掘(新词发现、关系挖掘)等NLP任务中，提升文本解析与挖掘精度；也可以作为中文文本特征生成器，为各类机器学习模型提供文本特征。
 
-![image-20210427182133542](../doc/img/image-20210427182133542.png)
+<img src="../doc/img/image-20210427182133542.png" alt="image-20210427182133542" style="zoom:30%;" />
 
 ## WordTag特点
 
@@ -115,7 +115,7 @@ python -u predict.py \
 
 模型使用[ERNIE-CTM](../ernie-ctm)+CRF训练而成，预测时使用viterbi解码，模型结构如下：
 
-<img src="../doc/img/image-20210427183901319.png" alt="image-20210427183901319" style="zoom: 33%;" />
+<img src="/Users/zhaomin/Library/Application Support/typora-user-images/image-20210429200400633.png" alt="image-20210429200400633" style="zoom:20%;" />
 
 
 
