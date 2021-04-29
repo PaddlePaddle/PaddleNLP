@@ -1,4 +1,5 @@
 add_definitions(-DNDEBUG)
+add_definitions(-DPADDLE_CUDA)
 
 if(ON_INFER)
   add_definitions(-DPADDLE_ON_INFERENCE)
