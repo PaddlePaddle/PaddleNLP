@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import math
 
 import paddle
 from paddle.fluid.data_feeder import convert_dtype
@@ -59,7 +60,7 @@ def attention_forward(self,
     # Scale dot product attention
     product = tensor.matmul(x=q, y=k, transpose_y=True)
 
-    product *= self.head_dim**-0.5
+    product /= math.sqrt(self.head_dim)
 
     if attn_mask is not None:
         # Support bool or int mask
@@ -96,9 +97,6 @@ def attention_forward(self,
     return tuple(outs)
 
 
-MultiHeadAttention.forward = attention_forward
-
-
 def transformer_encoder_layer_forward(self, src, src_mask=None, cache=None):
     """
     Redefines the `forward` function of `paddle.nn.TransformerEncoderLayer`
@@ -133,9 +131,6 @@ def transformer_encoder_layer_forward(self, src, src_mask=None, cache=None):
                                                    incremental_cache)
 
 
-TransformerEncoderLayer.forward = transformer_encoder_layer_forward
-
-
 def transformer_encoder_forward(self, src, src_mask=None, cache=None):
     """
     Redefines the `forward` function of `paddle.nn.TransformerEncoder`
@@ -161,9 +156,6 @@ def transformer_encoder_forward(self, src, src_mask=None, cache=None):
 
     return (encoder_layers, encoder_atts) if cache is None else (
         encoder_layers, encoder_atts, new_caches)
-
-
-TransformerEncoder.forward = transformer_encoder_forward
 
 
 class TinyBertPretrainedModel(PretrainedModel):
@@ -237,13 +229,13 @@ class TinyBertPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "tinybert-4l-312d":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-4l-312d.pdparams",
+            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-4l-312d.pdparams",
             "tinybert-6l-768d":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-6l-768d.pdparams",
+            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-6l-768d.pdparams",
             "tinybert-4l-312d-v2":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-4l-312d-v2.pdparams",
+            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-4l-312d-v2.pdparams",
             "tinybert-6l-768d-v2":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/tinybert-6l-768d-v2.pdparams",
+            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-6l-768d-v2.pdparams",
         }
     }
     base_model_prefix = "tinybert"
@@ -259,7 +251,7 @@ class TinyBertPretrainedModel(PretrainedModel):
                         mean=0.0,
                         std=self.initializer_range
                         if hasattr(self, "initializer_range") else
-                        self.bert.config["initializer_range"],
+                        self.tinybert.config["initializer_range"],
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
@@ -286,6 +278,10 @@ class TinyBertModel(TinyBertPretrainedModel):
         self.embeddings = BertEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
             max_position_embeddings, type_vocab_size)
+        MultiHeadAttention._forward = attention_forward
+        TransformerEncoderLayer._forward = transformer_encoder_layer_forward
+        TransformerEncoder._forward = transformer_encoder_forward
+
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -294,7 +290,14 @@ class TinyBertModel(TinyBertPretrainedModel):
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0)
+
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
+        self.encoder.forward = self.encoder._forward
+
+        for i in range(len(self.encoder.layers)):
+            self.encoder.layers[i].forward = self.encoder.layers[i]._forward
+            self.encoder.layers[i].self_attn.forward = self.encoder.layers[
+                i].self_attn._forward
         self.pooler = BertPooler(hidden_size)
         self.apply(self.init_weights)
 
@@ -309,11 +312,9 @@ class TinyBertModel(TinyBertPretrainedModel):
                 (input_ids == self.pad_token_id
                  ).astype(self.pooler.dense.weight.dtype) * -1e9,
                 axis=[1, 2])
-
         embedding_output = self.embeddings(input_ids, token_type_ids)
         encoded_layers, layer_atts = self.encoder(embedding_output,
                                                   attention_mask)
-
         # "-1" refers to last layer
         pooled_output = self.pooler(encoded_layers[-1])
         if not output_all_encoded_layers:
@@ -326,14 +327,15 @@ class TinyBertModel(TinyBertPretrainedModel):
 
 
 class TinyBertForPretraining(TinyBertPretrainedModel):
-    def __init__(self, bert, fit_size=768):
+    def __init__(self, tinybert, fit_size=768):
         super(TinyBertForPretraining, self).__init__()
-        self.bert = bert
-        self.fit_dense = nn.Linear(self.bert.config["hidden_size"], fit_size)
+        self.tinybert = tinybert
+        self.fit_dense = nn.Linear(self.tinybert.config["hidden_size"],
+                                   fit_size)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
-        sequence_output, att_output, pooled_output = self.bert(
+        sequence_output, att_output, pooled_output = self.tinybert(
             input_ids, token_type_ids, attention_mask)
         tmp = []
         for sequence_layer in sequence_output:
@@ -344,15 +346,16 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
 
 
 class TinyBertForSequenceClassification(TinyBertPretrainedModel):
-    def __init__(self, bert, num_classes=2, dropout=None, fit_size=768):
+    def __init__(self, tinybert, num_classes=2, dropout=None, fit_size=768):
         super(TinyBertForSequenceClassification, self).__init__()
-        self.bert = bert
+        self.tinybert = tinybert
         self.num_classes = num_classes
         self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.bert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.bert.config["hidden_size"],
+                                  self.tinybert.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.tinybert.config["hidden_size"],
                                     num_classes)
-        self.fit_dense = nn.Linear(self.bert.config["hidden_size"], fit_size)
+        self.fit_dense = nn.Linear(self.tinybert.config["hidden_size"],
+                                   fit_size)
         self.activation = nn.ReLU()
         self.apply(self.init_weights)
 
@@ -362,7 +365,7 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
                 attention_mask=None,
                 is_student=False):
 
-        sequence_output, att_output, pooled_output = self.bert(
+        sequence_output, att_output, pooled_output = self.tinybert(
             input_ids,
             token_type_ids,
             attention_mask,
