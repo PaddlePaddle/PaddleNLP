@@ -25,7 +25,7 @@ from .. import PretrainedModel, register_base_model
 __all__ = [
     "AlbertModel",
     "AlbertPretrainedModel",
-    "AlbertForPreTraining",
+    "AlbertForPretraining",
     "AlbertForMaskedLM",
     "AlbertForSequenceClassification",
     "AlbertForTokenClassification",
@@ -395,6 +395,7 @@ class AlbertTransformer(Layer):
                  num_attention_heads,
                  intermediate_size,
                  inner_group_num,
+                 hidden_act,
                  hidden_dropout_prob,
                  attention_probs_dropout_prob,
                  max_position_embeddings,
@@ -698,7 +699,7 @@ class AlbertModel(AlbertPretrainedModel):
 
 class AlbertForPretraining(AlbertPretrainedModel):
     def __init__(self, albert, lm_head, sop_head, vocab_size):
-        super(AlbertForPreTraining, self).__init__()
+        super(AlbertForPretraining, self).__init__()
 
         self.albert = albert
         self.predictions = lm_head
@@ -851,7 +852,6 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-
 
         pooled_output = transformer_outputs[1] if not return_dict \
             else transformer_outputs["pooled_output"]
