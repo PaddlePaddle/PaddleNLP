@@ -4,3 +4,4 @@ h5py
 colorlog
 colorama
 seqeval
+multiprocess
