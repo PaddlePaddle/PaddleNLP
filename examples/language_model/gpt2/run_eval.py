@@ -43,7 +43,7 @@ parser.add_argument('--overlapping_eval', type=int, default=32, help='Sliding wi
 parser.add_argument("--init_checkpoint_path", default=None, type=str, help="The model checkpoint path.", )
 parser.add_argument( "--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.", )
 parser.add_argument('--seq_length', type=int, default=1024, help='Maximum sequence length to process for evaluation.')
-parser.add_argument("--device", type=str, default="gpu", help="Select cpu, gpu, xpu devices.")
+parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu"], help="Select cpu, gpu, xpu devices.")
 parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
 # yapf: enable
 
@@ -237,9 +237,6 @@ def create_eval_dataset(args):
 
 
 def do_eval(args):
-    assert args.device in [
-        "cpu", "gpu", "xpu"
-    ], "Invalid device! Available device should be cpu, gpu, or xpu."
     paddle.set_device(args.device)
     model_class, tokenizer_class = MODEL_CLASSES[args.model_name]
     tokenizer = tokenizer_class.from_pretrained(args.model_name)

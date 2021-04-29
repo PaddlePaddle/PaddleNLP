@@ -19,26 +19,14 @@ __all__ = ['Stack', 'Pad', 'Tuple', 'Dict']
 
 class Stack(object):
     """
-    Stack the input data samples to construct the batch. The N input samples
+    Stacks the input data samples to construct the batch. The N input samples
     must have the same shape/length and will be stacked to construct a batch.
+
     Args:
         axis (int, optional): The axis in the result data along which the input
             data are stacked. Default: 0.
         dtype (str|numpy.dtype, optional): The value type of the output. If it
-            is set to None, the input data type is used. Default: None.
-    Example:
-        .. code-block:: python
-            from paddle.incubate.hapi.text.data_utils import Stack
-            # Stack multiple lists
-            a = [1, 2, 3, 4]
-            b = [4, 5, 6, 8]
-            c = [8, 9, 1, 2]
-            Stack()([a, b, c])
-            '''
-            [[1 2 3 4]
-             [4 5 6 8]
-             [8 9 1 2]]
-             '''
+            is set to None, the type of input data is used. Default: None.
     """
 
     def __init__(self, axis=0, dtype=None):
@@ -47,11 +35,29 @@ class Stack(object):
 
     def __call__(self, data):
         """
-        Batchify the input data by stacking.
+        Batchifies the input data by stacking.
+
         Args:
-            data (list(numpy.ndarray)): The input data samples.
+            data (List[numpy.ndarray]): The input data samples. It is a list. 
+                Each element is a numpy.ndarray or list.
+
         Returns:
             numpy.ndarray: Stacked batch data.
+
+
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import Stack
+                a = [1, 2, 3, 4]
+                b = [3, 4, 5, 6]
+                c = [5, 6, 7, 8]
+                result = Stack()([a, b, c])
+                '''
+                [[1, 2, 3, 4],
+                 [3, 4, 5, 6],
+                 [5, 6, 7, 8]]
+                '''
         """
         data = np.stack(
             data,
@@ -62,37 +68,25 @@ class Stack(object):
 
 class Pad(object):
     """
-    Return a callable that pads and stacks data.
+    Pads the input data samples to the largest length at `axis`.
+
     Args:
         pad_val (float|int, optional): The padding value. Default: 0.
         axis (int, optional): The axis to pad the arrays. The arrays will be
-            padded to the largest dimension at axis. For example, 
-            assume the input arrays have shape (10, 8, 5), (6, 8, 5), (3, 8, 5)
-            and the axis is 0. Each input will be padded into 
-            (10, 8, 5) and then stacked to form the final output, which has
-            shape（3, 10, 8, 5). Default: 0.
+            padded to the largest length at `axis`. For example, assume the 
+            input arrays have shape (10, 8, 5), (6, 8, 5), (3, 8, 5) and the 
+            axis is 0. Each input will be padded into (10, 8, 5) and then 
+            stacked to form the final output, which has shape (3, 10, 8, 5). 
+            Default: 0.
         ret_length (bool|numpy.dtype, optional): If it is bool, indicate whether
             to return the valid length in the output, and the data type of
             returned length is int32 if True. If it is numpy.dtype, indicate the
-            data type of returned length. Default: False.
+            data type of returned length. Default: None.
         dtype (numpy.dtype, optional): The value type of the output. If it is
             set to None, the input data type is used. Default: None.
-        pad_right (bool, optional): Boolean argument indicating whether the 
-            padding direction is right-side. If True, it indicates we pad to the right side, 
-            while False indicates we pad to the left side. Default: True.
-    Example:
-        .. code-block:: python
-            from paddle.incubate.hapi.text.data_utils import Pad
-            # Inputs are multiple lists
-            a = [1, 2, 3, 4]
-            b = [4, 5, 6]
-            c = [8, 2]
-            Pad(pad_val=0)([a, b, c])
-            '''
-            [[1. 2. 3. 4.]
-                [4. 5. 6. 0.]
-                [8. 2. 0. 0.]]
-            '''
+        pad_right (bool, optional): Whether the padding direction is right-side. 
+            If True, it indicates we pad to the right side, while False indicates 
+            we pad to the left side. Default: True.
      """
 
     def __init__(self,
@@ -109,18 +103,35 @@ class Pad(object):
 
     def __call__(self, data):
         """
-        Batchify the input data by padding The input can be list of numpy.ndarray. 
-        The arrays will be padded to the largest dimension at axis and then
-        stacked to form the final output.  In addition, the function will output
-        the original dimensions at the axis if ret_length is not None.
+        Batchifies the input data by padding. The input will be padded to the 
+        largest dimension at `axis` and then stacked to form the final output. 
+        In addition, the function will output the original dimensions at the 
+        `axis` if `ret_length` is not None or False.
+
         Args:
-            data (list(numpy.ndarray)|list(list)): List of samples to pad and stack.
+            data (List[numpy.ndarray|List]): The input data samples. It is a 
+                list. Each element is a numpy.ndarray or list.
+
         Returns:
-            numpy.ndarray|tuple: If `ret_length` is False, it is a numpy.ndarray \
-                representing the padded batch data and the shape is (N, …). \
-                Otherwise, it is a tuple, except for the padded batch data, the \
-                tuple also includes a numpy.ndarray representing all samples' \
-                original length shaped `(N,)`. 
+            numpy.ndarray|Tuple[numpy.ndarray]: If `ret_length` is False, it 
+            is a numpy.ndarray representing the padded batch data and the 
+            shape is (N, …). Otherwise, it is a tuple, besides the padded batch 
+            data, the tuple also includes a numpy.ndarray representing original 
+            length at `axis` of all input samples, which shaped `(N,)`. 
+
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import Pad
+                a = [1, 2, 3, 4]
+                b = [5, 6, 7]
+                c = [8, 9]
+                result = Pad(pad_val=0)([a, b, c])
+                '''
+                [[1, 2, 3, 4],
+                 [5, 6, 7, 0],
+                 [8, 9, 0, 0]]
+                '''
         """
         arrs = [np.asarray(ele) for ele in data]
         original_length = [ele.shape[self._axis] for ele in arrs]
@@ -157,7 +168,7 @@ class Pad(object):
 
 class Tuple(object):
     """
-    Wrap multiple batchify functions together. The input functions will be applied
+    Wraps multiple batchify functions together. The input functions will be applied
     to the corresponding input fields.
     
     Each sample should be a list or tuple containing multiple fields. The i'th
@@ -166,13 +177,11 @@ class Tuple(object):
     For example, when data sample is (nd_data, label), you can wrap two batchify
     functions using `Tuple(DataBatchify, LabelBatchify)` to batchify nd_data and
     label correspondingly.
+
     Args:
-        fn (list|tuple|callable): The batchify functions to wrap.
-        *args (tuple of callable): The additional batchify functions to wrap.
-    Example:
-        .. code-block:: python
-            from paddle.incubate.hapi.text.data_utils import Tuple, Pad, Stack
-            batchify_fn = Tuple(Pad(axis=0, pad_val=0), Stack())
+        fn (callable|List[callable]|Tuple[callable]): The batchify functions to 
+            wrap. It is a callable function or a list/tuple of callable functions.
+        args (Tuple[callable]): The additional batchify functions to wrap.
     """
 
     def __init__(self, fn, *args):
@@ -191,12 +200,36 @@ class Tuple(object):
 
     def __call__(self, data):
         """
-        Batchify data samples by applying each function on the corresponding data
-        field, and each data field is produced by stacking the field data of samples.
+        Batchifies data samples by applying each function on the corresponding 
+        data field, and each data field is produced by stacking the field data 
+        of samples.
+
         Args:
-            data (list): The samples to batchfy. Each sample should contain N fields.
+            data (List|Tuple): The samples to batchfy. Each sample in list/tuple
+                should contain `N` fields.
+
         Returns:
-            tuple: A tuple composed of results from all including batchifying functions.
+            tuple: A tuple composed of results from all including batchifying 
+            functions.
+
+        Example:
+            .. code-block:: python
+                
+                from paddlenlp.data import Stack, Pad, Tuple
+                data = [
+                        [[1, 2, 3, 4], [1]],
+                        [[5, 6, 7], [0]],
+                        [[8, 9], [1]],
+                       ]
+                batchify_fn = Tuple(Pad(pad_val=0), Stack())
+                ids, label = batchify_fn(data)
+                '''
+                ids:
+                [[1, 2, 3, 4],
+                [5, 6, 7, 0],
+                [8, 9, 0, 0]]
+                label: [[1], [0], [1]]
+                '''
         """
 
         assert len(data[0]) == len(self._fn),\
@@ -214,21 +247,21 @@ class Tuple(object):
 
 class Dict(object):
     """
-    Wrap multiple batchify functions together. The input functions will be applied
-    to the corresponding input fields.
+    Wraps multiple batchify functions together. The input functions will be 
+    applied to the corresponding input fields.
     
-    Each sample should be a dictionary containing multiple fields. Each
-    batchify function with key stored in Dict will be applied on the field which has the same key. 
+    Each sample should be a dict containing multiple fields. Each batchify 
+    function with key stored in `Dict` will be applied on the field which has 
+    the same key. 
     
-    For example, when data sample is {'tokens': tokens, 'labels': labels), you can wrap two batchify
-    functions using `Dict({'tokens': DataBatchify, 'labels': LabelBatchify})` to batchify tokens and
-    labels correspondingly.
+    For example, when data sample is {'tokens': tokens, 'labels': labels}, you 
+    can wrap two batchify functions using 
+    `Dict({'tokens': DataBatchify, 'labels': LabelBatchify})` to batchify tokens 
+    and labels correspondingly.
+
     Args:
-        fn (dict of callable): The batchify functions to wrap.
-    Example:
-        .. code-block:: python
-            from paddle.incubate.hapi.text.data_utils import Dict, Pad, Stack
-            batchify_fn = Dict({'tokens': Pad(axis=0, pad_val=0), 'labels': Stack()})
+        fn (dict): The batchify functions to wrap. It is a dict, which values is 
+            callable functions.
     """
 
     def __init__(self, fn):
@@ -245,12 +278,36 @@ class Dict(object):
 
     def __call__(self, data):
         """
-        Batchify data samples by applying each function on the corresponding data
-        field, and each data field is produced by stacking the field data of samples.
+        Batchifies data samples by applying each function on the corresponding 
+        data field, and each data field is produced by stacking the field data 
+        with the same key as batchify functions of all samples.
+
         Args:
-            data (list): The samples to batchfy. Each sample should contain N fields.
+            data (List[Dict]|Tuple[Dict]): The samples to batchfy. Each sample 
+                in list/tuple is a dict with `N` key-values.
+                
         Returns:
-            tuple: A tuple composed of results from all including batchifying functions.
+            Tuple: A tuple composed of results from all including batchifying 
+            functions.
+            
+        Example:
+            .. code-block:: python
+
+                from paddlenlp.data import Stack, Pad, Dict
+                data = [
+                        {'labels':[1], 'token_ids':[1, 2, 3, 4]},
+                        {'labels':[0], 'token_ids':[5, 6, 7]},
+                        {'labels':[1], 'token_ids':[8, 9]},
+                       ]
+                batchify_fn = Dict({'token_ids':Pad(pad_val=0), 'labels':Stack()})
+                ids, label = batchify_fn(data)
+                '''
+                ids:
+                [[1, 2, 3, 4],
+                [5, 6, 7, 0],
+                [8, 9, 0, 0]]
+                label: [[1], [0], [1]]
+                '''
         """
 
         ret = []
