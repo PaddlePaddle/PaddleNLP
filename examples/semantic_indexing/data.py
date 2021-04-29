@@ -166,7 +166,15 @@ def gen_text_file(similar_text_pair_file):
     texts = []
     with open(similar_text_pair_file) as f:
         for line in f:
+            splited_line = line.rstrip().split("\t")
+            if len(splited_line) != 2:
+                continue
+
             text, similar_text = line.rstrip().split("\t")
+
+            if not text or not similar_text:
+                continue
+
             text2similar_text[text] = similar_text
             texts.append({"text": text})
     return texts, text2similar_text
