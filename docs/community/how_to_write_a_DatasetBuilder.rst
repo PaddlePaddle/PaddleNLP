@@ -1,10 +1,10 @@
 ==============
-如何贡献数据集
+如何创建 :class:`DatasetBuilder`
 ==============
 
-除了使用PaddleNLP内置的数据集以外，我们也鼓励用户向PaddleNLP贡献自己的数据集。
+数据集的贡献通过定义一个 :class:`DatasetBuilder` 的子类来实现。一个合格的 :class:`DatasetBuilder` 需要遵循一些协议和规范。
 
-数据集的贡献通过定义一个 :class:`DatasetBuilder` 的子类来实现。下面我们以 :obj:`LCQMC` 为例了解一下贡献一个合格的 :class:`DatasetBuilder` 通常需要包含哪些方法和参数。
+下面我们以 :obj:`LCQMC` 为例了解一下 :class:`DatasetBuilder` 通常需要包含哪些方法和参数。
 
 成员变量
 ---------------
@@ -37,7 +37,7 @@
                 '8f4b71e15e67696cc9e112a459ec42bd'),
         }
     
-首先贡献的数据集需要继承 :class:`paddlenlp.datasets.DatasetBuilder` 类，之后最好添加一段注释，简要说明数据集的来源等信息。之后需定义以下成员变量：
+首先贡献的数据集需要继承 :class:`paddlenlp.datasets.DatasetBuilder` 类，类名格式为camel case。之后应该添加一段注释，简要说明数据集的来源等信息。之后需定义以下成员变量：
 
 - :attr:`lazy` ：数据集的默认类型。:obj:`False` 对应 :class:`MapDataset` ，:obj:`True` 对应 :class:`IterDataset` 。
 - :attr:`URL` ：数据集压缩包下载地址，需提供有效并稳定的下载链接。如果数据集不是压缩包，可以不再这里提供。
@@ -45,7 +45,12 @@
 - :attr:`META_INFO` ：数据集split信息格式。
 - :attr:`SPLITS` ：数据集的split信息，包含数据集解压后的不同文件的具体位置，文件名，md5值等，如果数据集不是压缩包则通常在这里提供下载地址，还可以包含诸如不同文件对应的文件读取参数等信息。
 
-除此之外，不同的数据集可能还需要诸如 :attr:`VOCAB_INFO` 等其他成员变量（参见 `iwslt15.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/experimental/iwslt15.py>`__ ）。或者成员变量会有其他格式（参见 `glue.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/experimental/glue.py>`__ ）。贡献者可以根据实际情况自行调整。
+除此之外，不同的数据集可能还需要诸如 :attr:`VOCAB_INFO` 等其他成员变量（参见 `iwslt15.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/iwslt15.py>`__ ）。或者成员变量会有其他格式。贡献者可以根据实际情况自行调整。
+
+.. note::
+
+    - 如果贡献的数据集没有子数据集，那么 :class:`DatasetBuilder` **必须包含** :attr:`SPLITS` 成员变量，且该变量必须是一个字典，字典的key是该数据集包含的splits。
+    - 如果贡献的数据集有子数据集，那么 :class:`DatasetBuilder` **必须包含** :attr:`BUILDER_CONFIGS` 成员变量，且该变量必须是一个字典，字典的key是该数据集包含的子数据集的 :attr:`name` 。字典的value是包含该数据集的子数据集split信息的字典，key值必须是 `splits` 。具体格式（参见 `glue.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/glue.py>`__ ）
 
 :func:`_get_data` 方法
 -----------------------
@@ -109,7 +114,7 @@
 如果数据集提供词典文件，则需要加入 :func:`get_vocab` 方法和 :attr:`VOCAB_INFO` 变量。
 
 该方法会根据 :attr:`VOCAB_INFO` 变量返回一个包含数据集词典信息的 :class:`Dictionary` 对象并作为实例变量传给生成的数据集。用于在训练过程中初始化 :class:`paddlenlp.data.Vocab` 对象。
-该方法的写法请参考 `iwslt15.py  <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/experimental/iwslt15.py>`__ 。
+该方法的写法请参考 `iwslt15.py  <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/iwslt15.py>`__ 。
 
 .. note::
 

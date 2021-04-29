@@ -98,7 +98,9 @@ paddlenlp内置的 :class:`paddlenlp.datasets.MapDataset` 的 :func:`map` 方法
 
 可以看到，在本例中两种实现的结果是相同的。但是在诸如阅读理解，对话等任务中，一条原始数据可能会产生多个 *feature* 的情况（参见 `run_squad.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/machine_reading_comprehension/SQuAD/run_squad.py>`__ ）通常需要将 :attr:`batched` 参数设置为 :obj:`True` 。 
 
-关于 :func:`map` 方法的其他参数和 :class:`paddlenlp.datasets.MapDataset` 的其他数据处理方法，请移步MapDataset。
+:func:`map` 方法还有一个 :attr:`num_workers` 参数，当其大于0时进行多进程数据处理，可以提高处理速度。但是需要注意如果在数据处理的函数中用到了 **数据index** 的相关信息，多进程处理可能会导致错误的结果。
+
+关于 :func:`map` 方法的其他参数和 :class:`paddlenlp.datasets.MapDataset` 的其他数据处理方法，请移步 :doc:`dataset <../source/paddlenlp.datasets.dataset>` 。
 
 Batchify
 -----------
