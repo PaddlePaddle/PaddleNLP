@@ -16,6 +16,8 @@ import _locale
 import jieba
 from subword_nmt import subword_nmt
 
+# Windows系统默认以GBK编码打开文件，而subword_nmt暂时不支持设置打开编码，
+# 故这里统一设置为UTF-8
 _locale._getdefaultlocale = (lambda *args: ['en_US', 'utf8'])
 
 
