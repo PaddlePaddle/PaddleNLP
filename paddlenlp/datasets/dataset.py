@@ -510,7 +510,7 @@ class DatasetBuilder:
 
     def read(self, filename, split='train'):
         """
-        Returns an dataset containing all the examples that can be read from the file path.
+        Returns a dataset containing all the examples that can be read from the file path.
 
         If `self.lazy` is False, this eagerly reads all instances from `self._read()`
         and returns a `MapDataset`.
@@ -519,6 +519,15 @@ class DatasetBuilder:
         relies on the generator created from `self._read()` to lazily produce examples.
         In this case your implementation of `_read()` must also be lazy
         (that is, not load all examples into memory at once).
+
+        Args:
+            filename (str): Path of data file to read, usually provided by `_get_data` 
+                function.
+            split (str, optional): The split name of selected dataset. This only makes
+                a different when data files of different splits have different structures.
+        
+        Returns:
+            A `MapDataset|IterDataset`.
         """
 
         label_list = self.get_labels()
