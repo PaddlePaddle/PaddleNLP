@@ -115,7 +115,7 @@ python -u predict.py \
 
 模型使用[ERNIE-CTM](../ernie-ctm)+CRF训练而成，预测时使用viterbi解码，模型结构如下：
 
-<img src="/Users/zhaomin/Library/Application Support/typora-user-images/image-20210429200400633.png" alt="image-20210429200400633" style="zoom:20%;" />
+![image-20210429202208167](/Users/zhaomin/Library/Application Support/typora-user-images/image-20210429202208167.png)
 
 
 

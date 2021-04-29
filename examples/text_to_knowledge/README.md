@@ -20,7 +20,7 @@
 
 中文文本知识标注工具（WordTag）整合了传统中文解析的**分词**、**词性标注**、**命名实体识别**的能力，能够将任意中文句子解析为**完整的词类序列**。结合百科知识树（TermTree），可为应用提供一套通用的知识关联（term-linking）框架，方便应用适配关联自己的应用知识图谱，更好地将知识用于中文自然语言处理（NLP）任务。
 
-<img src="/Users/zhaomin/Library/Application Support/typora-user-images/image-20210429201014633.png" alt="image-20210429201014633" style="zoom:25%;" />
+<img src="/Users/zhaomin/Library/Application Support/typora-user-images/image-20210429201014633.png" alt="image-20210429201014633"/>
 
 
 

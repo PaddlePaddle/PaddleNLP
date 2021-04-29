@@ -40,7 +40,7 @@ ERNIE-CTM使用的预训练任务为掩码语言模型（Masked Language Model�
 
 `[CLS1]`做为全局的监督信号，应用于MLM任务中。训练MLM任务前，将`[CLS1]`特征表示拼接在所有的序列表示之后，通过线性层融合，成为最终的序列表示，之后预测MLM任务。所以，ERNIE-CTM最终输出的文本序列表示中，都融合了`[CLS1]`的特征表示。最终的序列表示中，带有全句的特征，一定程度可避免序列中全局特征捕捉不足，同时，`[CLS1]`最终的表示中也充分融合了句子内容的信息，弥补了SOP任务对文本主题信息捕捉不足的缺陷。
 
-<img src="/Users/zhaomin/Library/Application Support/typora-user-images/image-20210429201544435.png" alt="image-20210429201544435" style="zoom:20%;" />
+![image-20210429202329482](/Users/zhaomin/Library/Application Support/typora-user-images/image-20210429202329482.png)
 
 
 
