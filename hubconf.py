@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-dependencies = ['paddle']
+dependencies = ['paddle', 'jieba', 'colorlog', 'colorama', 'seqeval']
+
+import os
 
 from paddlenlp.transformers import BertForPretraining, BertModel, BertForSequenceClassification
 from paddlenlp.transformers import BertForTokenClassification, BertForQuestionAnswering
@@ -25,6 +27,12 @@ _BERT_MODEL_CLASSES = {
     "question_answering": BertForQuestionAnswering,
     "pretraining": BertForPretraining
 }
+
+_BERT_PRETRAINED_MODELS = [
+    'bert-base-uncased', 'bert-large-uncased', 'bert-base-multilingual-uncased',
+    'bert-base-cased', 'bert-base-chinese', 'bert-large-cased',
+    'bert-base-multilingual-cased', 'bert-wwm-chinese', 'bert-wwm-ext-chinese'
+]
 
 
 def bert(model_name_or_path='bert-base-uncased',
@@ -57,9 +65,14 @@ def bert(model_name_or_path='bert-base-uncased',
 
           import paddle.hub as hub
 
-          model, tokenizer = hub.load('PaddlePaddle/PaddleNLP:develop', model='bert')
+          model, tokenizer = hub.load('PaddlePaddle/PaddleNLP:develop', model='bert', model_name_or_path='bert-base-cased')
 
     """
+    assert model_name_or_path in _BERT_PRETRAINED_MODELS or os.path.isdir(model_name_or_path), \
+        "Please check your model name or path. Supported model names are: {}.".format(tuple(_BERT_PRETRAINED_MODELS))
+    assert model_select in _BERT_MODEL_CLASSES.keys(), \
+        "Please check `model_select`, it should be in {}.".format(tuple(_BERT_MODEL_CLASSES.keys()))
+
     model_class = _BERT_MODEL_CLASSES[model_select]
 
     model = model_class.from_pretrained(model_name_or_path)
