@@ -49,6 +49,7 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
                        std::vector<DataResult>& dataresultvec,
                        std::unordered_map<int, std::string>& num2word_dict) {
   std::vector<int> output_shape = seq_ids->shape();
+  int batch_size = output_shape[0];
   int out_num = std::accumulate(
       output_shape.begin(), output_shape.end(), 1, std::multiplies<int>());
   std::vector<int64_t> seq_ids_out;
@@ -90,7 +91,9 @@ public:
     std::vector<DataInput> data_input_vec;
     int max_len = 0;
     for (int i = 0; i < batch_size; i++) {
-      if (!std::getline(*file, line)) return false;
+      if (!std::getline(*file, line)) {
+        break;
+      }
       DataInput data_input;
       split(line, ' ', &word_data);
       std::string query_str = "";
@@ -111,7 +114,11 @@ public:
       max_len = std::min(max_len, MAX_LENGTH);
       data_input_vec.push_back(data_input);
     }
-    return TensorMoreBatch(predictor, data_input_vec, max_len, batch_size);
+    if (data_input_vec.empty()) {
+      return false;
+    }
+    return TensorMoreBatch(
+        predictor, data_input_vec, max_len, data_input_vec.size());
   }
 
   bool GetWordDict() {
@@ -161,7 +168,8 @@ private:
 template <typename... Args>
 void SummaryConfig(const paddle_infer::Config& config,
                    double infer_time,
-                   int num_batches) {
+                   int num_batches,
+                   int num_samples) {
   LOG(INFO) << "----------------------- Model info ----------------------";
   LOG(INFO) << "model_name: "
             << "transformer";
@@ -169,7 +177,7 @@ void SummaryConfig(const paddle_infer::Config& config,
             << "FP32";
   LOG(INFO) << "----------------------- Data info -----------------------";
   LOG(INFO) << "batch_size: " << batch_size;
-  LOG(INFO) << "num_of_samples: " << num_batches * batch_size;
+  LOG(INFO) << "num_of_samples: " << num_samples;
   LOG(INFO) << "----------------------- Conf info -----------------------";
   LOG(INFO) << "runtime_device: " << (config.use_gpu() ? "gpu" : "cpu");
   LOG(INFO) << "ir_optim: " << (config.ir_optim() ? "true" : "false");
@@ -185,9 +193,8 @@ void SummaryConfig(const paddle_infer::Config& config,
               << config.cpu_math_library_num_threads();
   }
   LOG(INFO) << "----------------------- Perf info -----------------------";
-  LOG(INFO) << "average_latency(ms): "
-            << infer_time / (num_batches * batch_size) << ", "
-            << "QPS: " << (num_batches * batch_size) / (infer_time / 1000.0);
+  LOG(INFO) << "average_latency(ms): " << infer_time / num_samples << ", "
+            << "QPS: " << num_samples / (infer_time / 1000.0);
 }
 
 
@@ -216,6 +223,7 @@ void Main(
   double whole_time = 0;
   Timer timer;
   int num_batches = 0;
+  int num_samples = 0;
   std::vector<std::string> source_query_vec;
   std::ofstream out("predict.txt");
 
@@ -237,8 +245,9 @@ void Main(
         out << dataresultvec[i].result_q << "\n";
       }
     }
+    num_samples += dataresultvec.size()
   }
-  SummaryConfig(config, whole_time, num_batches);
+  SummaryConfig(config, whole_time, num_batches, num_samples);
 }
 }  // namespace inference
 }  // namespace paddle

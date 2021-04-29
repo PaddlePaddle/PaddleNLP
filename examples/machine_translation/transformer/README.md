@@ -137,8 +137,7 @@ export CUDA_VISIBLE_DEVICES=0
 python train.py --config ../configs/transformer.base.yaml
 ```
 
-需要注意的是，单卡下的超参设置与多卡下的超参设置有些不同，单卡执行需要修改 `configs/transformer.big.yaml` 或是 `configs/transformer.base.yaml` 中：
-* `warmup_steps` 参数为 `16000`。
+我们建议可以在单卡执行的时候，尝试增大 `warmup_steps`。可以修改 `configs/transformer.big.yaml` 或是 `configs/transformer.base.yaml` 中对应参数。
 
 #### 单机多卡
 
