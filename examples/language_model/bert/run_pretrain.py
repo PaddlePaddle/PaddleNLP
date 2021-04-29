@@ -143,6 +143,7 @@ def parse_args():
         "--device",
         type=str,
         default="gpu",
+        choices=["cpu", "gpu", "xpu"],
         help="Device for selecting for the training.")
     parser.add_argument(
         "--use_amp",
@@ -332,8 +333,8 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if os.path.isfile(os.path.join(args.input_dir, f)) and
-            "training" in f
+            if os.path.isfile(os.path.join(args.input_dir, f)) and "training" in
+            f
         ]
         files.sort()
         num_files = len(files)
@@ -377,7 +378,13 @@ def do_train(args):
             dataset_future = pool.submit(create_pretraining_dataset, data_file,
                                          args.max_predictions_per_seq,
                                          shared_file_list, args, worker_init)
+            train_reader_cost = 0.0
+            train_run_cost = 0.0
+            total_samples = 0
+            reader_start = time.time()
             for step, batch in enumerate(train_data_loader):
+                train_reader_cost += time.time() - reader_start
+                train_start = time.time()
                 global_step += 1
                 (input_ids, segment_ids, input_mask, masked_lm_positions,
                  masked_lm_labels, next_sentence_labels,
@@ -401,13 +408,22 @@ def do_train(args):
                     optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
+                train_run_cost += time.time() - train_start
+                total_samples += args.batch_size
                 if global_step % args.logging_steps == 0:
                     if paddle.distributed.get_rank() == 0:
                         logger.info(
-                            "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
+                            "global step: %d, epoch: %d, batch: %d, loss: %f, "
+                            "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
                             % (global_step, epoch, step, loss,
-                               args.logging_steps / (time.time() - tic_train)))
-                    tic_train = time.time()
+                               train_reader_cost / args.logging_steps,
+                               (train_reader_cost + train_run_cost) /
+                               args.logging_steps, total_samples /
+                               args.logging_steps, total_samples /
+                               (train_reader_cost + train_run_cost)))
+                    train_reader_cost = 0.0
+                    train_run_cost = 0.0
+                    total_samples = 0
                 if global_step % args.save_steps == 0:
                     if paddle.distributed.get_rank() == 0:
                         output_dir = os.path.join(args.output_dir,
@@ -425,6 +441,7 @@ def do_train(args):
                 if global_step >= args.max_steps:
                     del train_data_loader
                     return
+                reader_start = time.time()
 
             del train_data_loader
             train_data_loader, data_file = dataset_future.result(timeout=None)
@@ -432,8 +449,4 @@ def do_train(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    assert args.device in [
-        "cpu", "gpu", "xpu"
-    ], "Invalid device! Available device should be cpu, gpu, or xpu."
-
     do_train(args)

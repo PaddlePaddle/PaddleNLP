@@ -52,6 +52,9 @@
 
 ```text
 pretrained_models/
+├── deploy # 部署
+│   └── python
+│       └── predict.py # python预测部署示例
 ├── export_model.py # 动态图参数导出静态图参数脚本
 ├── predict.py # 预测脚本
 ├── README.md # 使用说明
@@ -63,7 +66,7 @@ pretrained_models/
 我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 ```shell
 $ unset CUDA_VISIBLE_DEVICES
-$ python -m paddle.distributed.launch --gpus "0" train.py --device "gpu" --save_dir ./checkpoints
+$ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_dir ./checkpoints
 ```
 
 可支持配置的参数：
@@ -138,9 +141,15 @@ checkpoints/
   运行方式：
 
 ```shell
-$ python export_model.py --params_path=./checkpoint/model_900/model_state.pdparams --output_path=./static_graph_params
+python export_model.py --params_path=./checkpoint/model_900/model_state.pdparams --output_path=./static_graph_params
 ```
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
+
+导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式：
+
+```shell
+python deploy/python/predict.py --model_file=static_graph_params.pdmodel --params_file=static_graph_params.pdiparams
+```
 
 ### 模型预测
 

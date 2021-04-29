@@ -19,6 +19,7 @@ from paddlenlp.transformers import BigBirdTokenizer
 
 from common_test import CpuCommonTest
 import util
+import unittest
 
 
 class TestBigBirdTokenizer(CpuCommonTest):

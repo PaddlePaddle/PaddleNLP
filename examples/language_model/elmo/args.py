@@ -23,7 +23,7 @@ def parse_args():
     parser.add_argument("--projection_dim", type=int, default=512, help="The size of rnn hidden unit. (default: %(default)d)")
     parser.add_argument("--num_layers", type=int, default=2, help="The num of rnn layers. (default: %(default)d)")
     parser.add_argument("--num_highways", type=int, default=2, help="The num of highways in CharEncoder. (default: %(default)d)")
-    parser.add_argument("--device", type=str, default="gpu", help="Device for selecting for the training.")
+    parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Device for selecting for the training.")
 
     args = parser.parse_args()
     return args
