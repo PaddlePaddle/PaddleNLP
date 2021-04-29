@@ -31,7 +31,7 @@ TermTree（百科知识树）是一个描述所有汉语词汇（包括概念、
 ```json
 // 示例1：无subterms的term
 {
-    "id": "XXX",
+    "id": "c472a6fe74eb2008c4e5b958a047eb5c",
     "termid": "植物_cb_苹果",
     "term": "苹果",
     "src": "cb",
@@ -53,7 +53,7 @@ TermTree（百科知识树）是一个描述所有汉语词汇（包括概念、
 }
 // 示例2：有subterms的term
 {
-    "id": "XXX",
+    "id": "824716062a4d74efc0897d676700a24e",
     "termid": "影视作品_eb_苹果",
     "term": "苹果",
     "src": "eb",
@@ -61,7 +61,7 @@ TermTree（百科知识树）是一个描述所有汉语词汇（包括概念、
     "subtype": [],
     "subterms": [
         {
-            "id": "XXX",
+            "id": "9bb5b38dc50233b1ccd28d1c33c37605",
             "subtype": [
                 "影视作品_cb_电影",
                 "影视动漫作品_cb_剧情片"
@@ -77,7 +77,7 @@ TermTree（百科知识树）是一个描述所有汉语词汇（包括概念、
             ]
         },
         {
-            "id": "XXX", 
+            "id": "688dc07cc98f02cbd4d21e2700290590", 
             "subtype": [
                 "影视作品_cb_韩国电影"
             ],
@@ -92,7 +92,7 @@ TermTree（百科知识树）是一个描述所有汉语词汇（包括概念、
             ]
         },
         {
-            "id": "XXX", 
+            "id": "bbf4abe6ac412b181eac383333ca9fef", 
             "subtype": [
                 "影视作品_cb_剧情电影"
             ],
