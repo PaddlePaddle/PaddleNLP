@@ -177,6 +177,8 @@ if __name__ == "__main__":
     tokenizer = ppnlp.transformers.SkepTokenizer.from_pretrained(
         args.model_name)
 
+    # These data samples is in Chinese.
+    # If you use the english model, you should change the test data in English.
     data = [
         '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
         '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
@@ -187,4 +189,4 @@ if __name__ == "__main__":
     results = predictor.predict(
         data, tokenizer, label_map, batch_size=args.batch_size)
     for idx, text in enumerate(data):
-        print('Data: {} \t Lable: {}'.format(text, results[idx]))
+        print('Data: {} \t Label: {}'.format(text, results[idx]))

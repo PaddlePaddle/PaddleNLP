@@ -1,4 +1,4 @@
-# 情感分类预训练模型SKEP如何完成情绪识别
+# SKEP: Sentiment Knowledge Enhanced Pre-training for Sentiment Analysis
 
 情感分析旨在自动识别和提取文本中的倾向、立场、评价、观点等主观信息。它包含各式各样的任务，比如句子级情感分类、评价对象级情感分类、观点抽取、情绪分类等。情感分析是人工智能的重要研究方向，具有很高的学术价值。同时，情感分析在消费决策、舆情分析、个性化推荐等领域均有重要的应用，具有很高的商业价值。
 
@@ -9,6 +9,129 @@
 <p align="center">
 <img src="https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep.png" width="80%" height="60%"> <br />
 </p>
+
+百度研究团队在三个典型情感分析任务，句子级情感分类（Sentence-level Sentiment Classification），评价对象级情感分类（Aspect-level Sentiment Classification）、观点抽取（Opinion Role Labeling），共计14个中英文数据上进一步验证了情感预训练模型SKEP的效果。实验表明，以通用预训练模型ERNIE（内部版本）作为初始化，SKEP相比ERNIE平均提升约1.2%，并且较原SOTA平均提升约2%，具体效果如下表：
+
+
+
+<table>
+    <tr>
+        <td><strong><center>任务</strong></td>
+        <td><strong><center>数据集合</strong></td>
+        <td><strong><center>语言</strong></td>
+        <td><strong><center>指标</strong></td>
+        <td><strong><center>原SOTA</strong></td>
+        <td><strong><center>SKEP</strong></td>
+        <td><strong><center>数据集地址</strong></td>
+    </tr>
+    <tr>
+        <td rowspan="4"><center>句子级情感<br /><center>分类</td>
+        <td><center>SST-2</td>
+        <td><center>英文</td>
+        <td><center>ACC</td>
+        <td><center>97.50</td>
+        <td><center>97.60</td>
+        <td><center><a href="https://gluebenchmark.com/tasks" >下载地址</a></td>
+    </tr>
+    <tr>
+        <td><center>Amazon-2</td>
+        <td><center>英文</td>
+        <td><center>ACC</td>
+        <td><center>97.37</td>
+        <td><center>97.61</td>
+        <td><center><a href="https://www.kaggle.com/bittlingmayer/amazonreviews/data#" >下载地址</a></td>
+    </tr>
+    <tr>
+        <td><center>ChnSentiCorp</td>
+        <td><center>中文</td>
+        <td><center>ACC</td>
+        <td><center>95.80</td>
+        <td><center>96.50</td>
+        <td><center><a href="https://ernie.bj.bcebos.com/task_data_zh.tgz" >下载地址</a></td>
+    </tr>
+    <tr>
+        <td><center>NLPCC2014-SC</td>
+        <td><center>中文</td>
+        <td><center>ACC</td>
+        <td><center>78.72</td>
+        <td><center>83.53</td>
+        <td><center><a href="https://github.com/qweraqq/NLPCC2014_sentiment" >下载地址</a></td>
+    </tr>
+    <tr>
+        <td rowspan="5"><center>评价对象级的<br /><center>情感分类</td>
+        <td><center>Sem-L</td>
+        <td><center>英文</td>
+        <td><center>ACC</td>
+        <td><center>81.35</td>
+        <td><center>81.62</td>
+        <td><center><a href="http://alt.qcri.org/semeval2014/task4/index.php?id=data-and-tools" >下载地址</a></td>
+    </tr>
+    <tr>
+        <td><center>Sem-R</td>
+        <td><center>英文</td>
+        <td><center>ACC</td>
+        <td><center>87.89</td>
+        <td><center>88.36</td>
+        <td><center><a href="http://alt.qcri.org/semeval2014/task4/index.php?id=data-and-tools" >下载地址</a></td>
+    </tr>
+    <tr>
+        <td><center>SE-ABSA16_PHNS</td>
+        <td><center>中文</td>
+        <td><center>ACC</td>
+        <td><center>79.58</td>
+        <td><center>82.91</td>
+        <td><center><a href="http://alt.qcri.org/semeval2016/task5/" >下载地址</a></td>
+    </tr>
+    <tr>
+        <td><center>SE-ABSA16_CAME</td>
+        <td><center>中文</td>
+        <td><center>ACC</td>
+        <td><center>87.11</td>
+        <td><center>90.06</td>
+        <td><center><a href="http://alt.qcri.org/semeval2016/task5/" >下载地址</a></td>
+    </tr>
+    <tr>
+        <td rowspan="5"><center>观点<br /><center>抽取</td>
+        <td><center>MPQA-H</td>
+        <td><center>英文</td>
+        <td><center>b-F1/p-F1</td>
+        <td><center>83.67/77.12</td>
+        <td><center>86.32/81.11</td>
+        <td><center><a href="https://mpqa.cs.pitt.edu/corpora/mpqa_corpus/mpqa_corpus_2_0/" >下载地址</a></td>
+    </tr>
+    <tr>
+        <td><center>MPQA-T</td>
+        <td><center>英文</td>
+        <td><center>b-F1/p-F1</td>
+        <td><center>81.59/73.16</td>
+        <td><center>83.67/77.53</td>
+        <td><center><a href="https://mpqa.cs.pitt.edu/corpora/mpqa_corpus/mpqa_corpus_2_0/" >下载地址</a></td>
+    </tr>
+    <tr>
+        <td><center>COTE_BD</td>
+        <td><center>中文</td>
+        <td><center>F1</td>
+        <td><center>82.17</td>
+        <td><center>84.50</td>
+        <td><center><a href="https://github.com/lsvih/chinese-customer-review" >下载地址</a></td>
+    </tr>
+    <tr>
+        <td><center>COTE_MFW</td>
+        <td><center>中文</td>
+        <td><center>F1</td>
+        <td><center>86.18</td>
+        <td><center>87.90</td>
+        <td><center><a href="https://github.com/lsvih/chinese-customer-review" >下载地址</a></td>
+    </tr>
+    <tr>
+        <td><center>COTE_DP</td>
+        <td><center>中文</td>
+        <td><center>F1</td>
+        <td><center>84.33</td>
+        <td><center>86.30</td>
+        <td><center><a href="https://github.com/lsvih/chinese-customer-review" >下载地址</a></td>
+    </tr>
+</table>
 
 
 ## 快速开始
