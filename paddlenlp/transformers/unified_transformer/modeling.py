@@ -74,6 +74,25 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "eos_token_id": 2,
             "mask_token_id": 30000,
         },
+        "plato-mini": {
+            "vocab_size": 30001,
+            "hidden_size": 768,
+            "num_hidden_layers": 6,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": True,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "unk_token_id": 0,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 2,
+            "mask_token_id": 30000,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -82,6 +101,8 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn.pdparams",
             "unified_transformer-12L-cn-luge":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-luge.pdparams",
+            "plato-mini":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/plato-mini.pdparams",
         }
     }
     base_model_prefix = "unified_transformer"

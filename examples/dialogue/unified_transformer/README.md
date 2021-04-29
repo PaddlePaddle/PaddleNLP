@@ -122,7 +122,7 @@ python infer.py \
     --batch_size=4 \
     --min_dec_len=1 \
     --max_dec_len=64 \
-    --num_samples=20 \
+    --num_return_sequences=20 \
     --decode_strategy=sampling \
     --top_k=5 \
     --device=gpu
@@ -144,7 +144,7 @@ python infer.py \
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
 - `min_dec_len` 表示预测生成的句子的最小长度。
 - `max_dec_len` 表示预测生成的句子的最大长度。
-- `num_samples` 表示每条样本生成的句子的数量。对于每条样本，模型会生成`num_samples`个句子，根据每个句子的概率得分进行排序，得分最高的句子作为最终的生成结果。
+- `num_return_sequences` 表示每条样本生成的句子的数量。对于每条样本，模型会生成`num_return_sequences`个句子，根据每个句子的概率得分进行排序，得分最高的句子作为最终的生成结果。
 - `decode_strategy` 表示预测解码时采取的策略，可选"sampling"、"greedy_search"和"beam_search"之一。
 - `top_k` 表示采用"sampling"解码策略时，token的概率按从大到小排序，生成的token只从前`top_k`个中进行采样。
 - `device` 表示使用的设备。
@@ -159,6 +159,41 @@ python infer.py \
 |    ./checkpoints/model_best     | 0.2808 / 0.1744 |    0.1124 / 0.2899    |
 
 **NOTE:** `./checkpoints/model_best`是按本项目中的超参在单卡上finetune得到的结果。
+
+### 人机交互
+
+运行如下命令即可开始与聊天机器人用中文进行简单的对话
+
+```shell
+# GPU启动，仅支持单卡
+export CUDA_VISIBLE_DEVICES=0
+python interaction.py \
+    --model_name_or_path=plato-mini \
+    --min_dec_len=1 \
+    --max_dec_len=64 \
+    --num_return_sequences=20 \
+    --decode_strategy=sampling \
+    --top_k=5 \
+    --device=gpu
+```
+
+其中参数释义如下：
+- `model_name_or_path` 指示了预测使用的模型，可以是PaddleNLP提供的预训练模型，或者是本地的模型。如果使用本地的模型，则配置为本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle模型参数model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+
+   | PaddleNLP提供的预训练模型        |
+   |---------------------------------|
+   | unified_transformer-12L-cn      |
+   | unified_transformer-12L-cn-luge |
+   | plato-mini                      |
+
+- `min_dec_len` 表示预测生成的句子的最小长度。
+- `max_dec_len` 表示预测生成的句子的最大长度。
+- `num_return_sequences` 表示每条样本生成的句子的数量。对于每条样本，模型会生成`num_return_sequences`个句子，根据每个句子的概率得分进行排序，得分最高的句子作为最终的生成结果。
+- `decode_strategy` 表示预测解码时采取的策略，可选"sampling"、"greedy_search"和"beam_search"之一。
+- `top_k` 表示采用"sampling"解码策略时，token的概率按从大到小排序，生成的token只从前`top_k`个中进行采样。
+- `device` 表示使用的设备。
+
+**NOTE:** 输入"[EXIT]"退出交互程序，输入"[NEXT]"开启下一轮新的对话。
 
 ## Reference
 
