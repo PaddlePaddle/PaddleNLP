@@ -21,11 +21,13 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
+from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.transformers import LinearDecayWithWarmup
+
+from data import read_cote_dp_dataset
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -65,25 +67,29 @@ def evaluate(model, criterion, metric, data_loader):
     """
     model.eval()
     metric.reset()
-    losses = []
+    avg_loss, precision, recall, f1_score = 0, 0, 0, 0
     for batch in data_loader:
-        input_ids, token_type_ids, labels = batch
+        input_ids, token_type_ids, length, labels = batch
         logits = model(input_ids, token_type_ids)
         loss = criterion(logits, labels)
-        losses.append(loss.numpy())
-        correct = metric.compute(logits, labels)
-        metric.update(correct)
-        accu = metric.accumulate()
-    print("eval loss: %.5f, accu: %.5f" % (np.mean(losses), accu))
+        avg_loss = paddle.mean(loss)
+        preds = logits.argmax(axis=2)
+        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
+            length, preds, labels)
+        metric.update(num_infer_chunks.numpy(),
+                      num_label_chunks.numpy(), num_correct_chunks.numpy())
+        precision, recall, f1_score = metric.accumulate()
+    print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
+          (avg_loss, precision, recall, f1_score))
     model.train()
-    metric.reset()
 
 
-def convert_example(example,
-                    tokenizer,
-                    max_seq_length=512,
-                    is_test=False,
-                    dataset_name="chnsenticorp"):
+def convert_example_to_feature(example,
+                               tokenizer,
+                               label_map,
+                               max_seq_len=512,
+                               no_entity_label="O",
+                               is_test=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
@@ -114,39 +120,36 @@ def convert_example(example,
         example(obj:`list[str]`): List of input data, containing text and label if it have label.
         tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+        label_map(obj:`dict`): The label string maps a label index.
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
+        no_entity_label(obj:`str`, defaults to "O"): The label represents that the token isn't an entity. 
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
-        dataset_name((obj:`str`, defaults to "chnsenticorp"): The dataset name, "chnsenticorp" or "sst-2".
 
     Returns:
         input_ids(obj:`list[int]`): The list of token ids.
         token_type_ids(obj: `list[int]`): List of sequence pair mask.
-        label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
+        label(obj:`list[int]`, optional): The input label if not test data.
     """
-    if dataset_name == "sst-2":
-        encoded_inputs = tokenizer(
-            text=example["sentence"], max_seq_len=max_seq_length)
-    elif dataset_name == "chnsenticorp":
-        encoded_inputs = tokenizer(
-            text=example["text"], max_seq_len=max_seq_length)
+    tokens = example['tokens']
+    labels = example['labels']
+    tokenized_input = tokenizer(
+        tokens,
+        return_length=True,
+        is_split_into_words=True,
+        max_seq_len=max_seq_len)
 
-    input_ids = encoded_inputs["input_ids"]
-    token_type_ids = encoded_inputs["token_type_ids"]
+    input_ids = tokenized_input['input_ids']
+    token_type_ids = tokenized_input['token_type_ids']
+    seq_len = tokenized_input['seq_len']
 
-    if not is_test:
-        if dataset_name == "sst-2":
-            label = np.array([example["labels"]], dtype="int64")
-        elif dataset_name == "chnsenticorp":
-            label = np.array([example["label"]], dtype="int64")
-        else:
-            raise RuntimeError(
-                f"Got unkown datatset name {dataset_name}, it must be processed on your own."
-            )
-
-        return input_ids, token_type_ids, label
+    if is_test:
+        return input_ids, token_type_ids, seq_len
     else:
-        return input_ids, token_type_ids
+        labels = labels[:(max_seq_len - 2)]
+        encoded_label = [no_entity_label] + labels + [no_entity_label]
+        encoded_label = [label_map[x] for x in encoded_label]
+        return input_ids, token_type_ids, seq_len, encoded_label
 
 
 def create_dataloader(dataset,
@@ -178,31 +181,35 @@ if __name__ == "__main__":
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
+    train_ds = load_dataset(
+        read_cote_dp_dataset, file_path='cote_dp/new_train.txt', lazy=False)
+    dev_ds = load_dataset(
+        read_cote_dp_dataset, file_path='cote_dp/new_train.txt', lazy=False)
+    # The COTE_DP dataset labels with "BIO" schema.
+    label_map = {"B": 0, "I": 1, "O": 2}
+    # `no_entity_label` represents that the token isn't an entity. 
+    no_entity_label = "O"
+    # `ignore_label` is using t0 pad input labels.
+    ignore_label = -1
+
     set_seed(args.seed)
-    if args.model_name == "skep_ernie_1.0_large_ch":
-        dataset_name = "chnsenticorp"
-        train_ds, dev_ds, test_ds = load_dataset(
-            dataset_name, splits=["train", "dev", "test"])
-
-    else:
-        dataset_name = "sst-2"
-        train_ds, dev_ds, test_ds = load_dataset(
-            "glue", dataset_name, splits=["train", "dev", "test"])
-
-    model = ppnlp.transformers.SkepForSequenceClassification.from_pretrained(
-        args.model_name)
+    model = ppnlp.transformers.SkepForTokenClassification.from_pretrained(
+        'skep_ernie_1.0_large_ch', num_classes=len(label_map))
     tokenizer = ppnlp.transformers.SkepTokenizer.from_pretrained(
-        args.model_name)
+        'skep_ernie_1.0_large_ch')
 
     trans_func = partial(
-        convert_example,
+        convert_example_to_feature,
         tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        dataset_name=dataset_name)
+        label_map=label_map,
+        max_seq_len=args.max_seq_length,
+        no_entity_label=no_entity_label,
+        is_test=False)
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-        Stack(dtype="int64")  # labels
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input ids
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # token type ids
+        Stack(dtype='int64'),  # sequence lens
+        Pad(axis=0, pad_val=ignore_label)  # labels
     ): [data for data in fn(samples)]
 
     train_data_loader = create_dataloader(
@@ -235,26 +242,23 @@ if __name__ == "__main__":
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
-    criterion = paddle.nn.loss.CrossEntropyLoss()
-    metric = paddle.metric.Accuracy()
+
+    metric = ChunkEvaluator(label_list=label_map.keys(), suffix=False)
+    criterion = paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label)
 
     global_step = 0
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
-            input_ids, token_type_ids, labels = batch
+            input_ids, token_type_ids, _, labels = batch
             logits = model(input_ids, token_type_ids)
             loss = criterion(logits, labels)
-            probs = F.softmax(logits, axis=1)
-            correct = metric.compute(probs, labels)
-            metric.update(correct)
-            acc = metric.accumulate()
-
+            avg_loss = paddle.mean(loss)
             global_step += 1
             if global_step % 10 == 0 and rank == 0:
                 print(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, acc,
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, step, avg_loss,
                        10 / (time.time() - tic_train)))
                 tic_train = time.time()
             loss.backward()
