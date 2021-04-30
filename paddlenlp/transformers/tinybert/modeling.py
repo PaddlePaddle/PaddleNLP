@@ -25,6 +25,7 @@ from ..model_utils import PretrainedModel, register_base_model
 
 __all__ = [
     'TinyBertModel',
+    'TinyBertPretrainedModel',
     'TinyBertForPretraining',
     'TinyBertForSequenceClassification',
 ]
