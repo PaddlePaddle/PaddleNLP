@@ -168,25 +168,26 @@ class GPT2Tokenizer(PretrainedTokenizer):
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt"
     }  # for save_pretrained
+    gpt_vocab_link = "http://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-large-en-vocab.json"
+    gpt_merges_link = "http://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-large-en-merges.txt"
     pretrained_resource_files_map = {
         "vocab_file": {
-            "gpt2-large-en":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-large-en-vocab.json",
-            "gpt2-medium-en":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-medium-en-vocab.json",
-            "gpt2-small-en":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-small-en-vocab.json",
+            "gpt2-xlarge-en": gpt_vocab_link,
+            "gpt2-large-en": gpt_vocab_link,
+            "gpt2-medium-en": gpt_vocab_link,
+            "gpt2-small-en": gpt_vocab_link,
         },
         "merges_file": {
-            "gpt2-large-en":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-large-en-merges.txt",
-            "gpt2-medium-en":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-medium-en-merges.txt",
-            "gpt2-small-en":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-small-en-merges.txt",
+            "gpt2-xlarge-en": gpt_merges_link,
+            "gpt2-large-en": gpt_merges_link,
+            "gpt2-medium-en": gpt_merges_link,
+            "gpt2-small-en": gpt_merges_link,
         }
     }
     pretrained_init_configuration = {
+        "gpt2-xlarge-en": {
+            "do_lower_case": True
+        },
         "gpt2-large-en": {
             "do_lower_case": True
         },

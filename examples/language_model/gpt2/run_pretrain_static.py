@@ -39,10 +39,12 @@ from paddlenlp.transformers import GPT2Tokenizer, GPT2ChineseTokenizer
 from paddlenlp.transformers.gpt2 import guard
 from paddlenlp.utils.log import logger
 from tensorboardX import SummaryWriter
+from paddle.distributed.fleet.meta_optimizers.sharding.utils import save_persistables
 
 from data import create_pretrained_dataset
 import lr
-from topo import Topology
+from utils.topo import Topology
+from utils.random import get_rng_state_tracker
 
 MODEL_CLASSES = {
     "gpt2": (GPT2ForPretraining, GPT2Tokenizer),
@@ -93,10 +95,16 @@ def parse_args():
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
-        "--batch_size",
+        "--micro_bsz",
         default=8,
         type=int,
-        help="Batch size per GPU/CPU for training.", )
+        help="Batch size per gpu/cpu for training.", )
+    parser.add_argument(
+        "--global_bsz",
+        default=None,
+        type=int,
+        help="Global batch size for all training process. None for not check the size is valid.",
+    )
     parser.add_argument(
         "--weight_decay",
         default=0.0,
@@ -147,36 +155,6 @@ def parse_args():
         type=float,
         help="Linear warmup over warmup_steps.")
     parser.add_argument(
-        "--use_amp",
-        type=str2bool,
-        nargs='?',
-        const=True,
-        help="Enable mixed precision training.")
-    parser.add_argument(
-        "--use_sharding",
-        type=str2bool,
-        nargs='?',
-        const=True,
-        help="Spliting the parameters to many cards.")
-    parser.add_argument(
-        "--use_recompute",
-        type=str2bool,
-        nargs='?',
-        const=True,
-        help="Using the recompute to save the memory.")
-    parser.add_argument(
-        "--enable_addto",
-        type=str2bool,
-        nargs='?',
-        const=True,
-        help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training."
-    )
-    parser.add_argument(
-        "--scale_loss",
-        type=float,
-        default=128,
-        help="The value of scale_loss for fp16.")
-    parser.add_argument(
         "--logging_steps",
         type=int,
         default=1,
@@ -189,10 +167,42 @@ def parse_args():
     parser.add_argument(
         "--eval_iters", type=int, default=10, help="Evaluate iterations.")
     parser.add_argument(
+        "--max_seq_len", type=int, default=1024, help="Max sequence lenght.")
+    parser.add_argument(
+        "--use_sharding",
+        type=str2bool,
+        nargs='?',
+        const=True,
+        help="Spliting the parameters to many cards.")
+    parser.add_argument(
         "--sharding_degree", type=int, default=1, help="sharding degree.")
     parser.add_argument("--mp_degree", type=int, default=1, help="mp degree.")
     parser.add_argument("--pp_degree", type=int, default=1, help="pp degree.")
     parser.add_argument("--dp_degree", type=int, default=1, help="dp degree.")
+    parser.add_argument(
+        "--use_recompute",
+        type=str2bool,
+        nargs='?',
+        const=True,
+        help="Using the recompute to save the memory.")
+    parser.add_argument(
+        "--use_amp",
+        type=str2bool,
+        nargs='?',
+        const=True,
+        help="Enable mixed precision training.")
+    parser.add_argument(
+        "--enable_addto",
+        type=str2bool,
+        nargs='?',
+        const=True,
+        help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training."
+    )
+    parser.add_argument(
+        "--scale_loss",
+        type=float,
+        default=128,
+        help="The value of scale_loss for fp16.")
     parser.add_argument(
         "--save_steps",
         type=int,
@@ -208,7 +218,7 @@ def parse_args():
     parser.add_argument(
         "--init_params_path",
         type=str,
-        default="./data/gpt2.pdparams",
+        default=None,
         help="select cpu, gpu, xpu devices.")
     config = parser.parse_args()
     return config
@@ -224,7 +234,7 @@ class WorkerInitObj:
 
 
 def create_data_holder(args):
-    """creat data holdr"""
+    """creat data holder"""
     tokens = paddle.static.data(
         name="tokens", shape=[-1, args.max_seq_len], dtype="int64")
     loss_mask = paddle.static.data(
@@ -240,45 +250,22 @@ def create_data_holder(args):
     return [tokens, loss_mask, attention_mask, position_ids, labels]
 
 
-def create_strategy(args):
-    #build_strategy = paddle.fluid.BuildStrategy()
-    build_strategy = None
-    exec_strategy = paddle.fluid.ExecutionStrategy()
-
-    # build_strategy.enable_addto = args.enable_addto
-    # build_strategy.enable_sequential_execution = args.use_recompute
-    # build_strategy.fuse_broadcast_ops = False
-    # build_strategy.enable_inplace = False
-
-    exec_strategy.num_threads = 2
-    exec_strategy.num_iteration_per_drop_scope = 1
-    return build_strategy, exec_strategy
-
-
-def build_compiled_program(args, main_program, loss):
-    build_strategy, exec_strategy = create_strategy(args)
-    main_program = paddle.static.CompiledProgram(
-        main_program).with_data_parallel(
-            loss_name=loss.name,
-            exec_strategy=exec_strategy,
-            build_strategy=build_strategy)
-    return main_program
-
-
 def dist_optimizer(args, topo):
+    default_global_bsz = topo.data_worldsize * args.micro_bsz
+    if args.global_bsz is None:
+        args.global_bsz = default_global_bsz
 
-    dp_sharding_rank = topo.dp.rank * topo.sharding.size + topo.sharding.rank
-    dp_worldsize = topo.dp.size * topo.sharding.size
-    bsz_per_dp = args.global_bsz // dp_worldsize
-
+    bsz_per_dp = args.global_bsz // topo.data_worldsize
     micro_bsz = args.micro_bsz
     assert args.global_bsz % micro_bsz == 0, f"cannot do gradient accumulate, globa_bsz: {args.bsz} micro_bsz: {micro_bsz}"
     acc_steps = bsz_per_dp // micro_bsz
 
-    build_strategy, exec_strategy = create_strategy(args)
+    exec_strategy = paddle.fluid.ExecutionStrategy()
+    exec_strategy.num_threads = 2
+    exec_strategy.num_iteration_per_drop_scope = 1
+
     dist_strategy = fleet.DistributedStrategy()
     dist_strategy.execution_strategy = exec_strategy
-    #dist_strategy.build_strategy = build_strategy
     dist_strategy.nccl_comm_num = 3
 
     dist_strategy.recompute = args.use_recompute
@@ -287,19 +274,10 @@ def dist_optimizer(args, topo):
     if args.use_amp:
         dist_strategy.amp = True
         dist_strategy.amp_configs = {
-            "custom_white_list": ['softmax', 'gelu'],
+            "custom_white_list": ['softmax', 'layer_norm', 'gelu'],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
         }
-        # dist_strategy.amp_configs = {
-        #     "custom_white_list": ['softmax', 'layer_norm', 'gelu'],
-        #     "init_loss_scaling": args.scale_loss,
-        #     "incr_every_n_steps": 10,
-        #     "decr_every_n_nan_or_inf": 1,
-        #     "incr_ratio": 2.0,
-        #     "decr_ratio": 10,
-        #     "use_dynamic_loss_scaling": True,
-        # }
     if args.use_sharding:
         dist_strategy.sharding = True
         dist_strategy.sharding_configs = {
@@ -313,9 +291,11 @@ def dist_optimizer(args, topo):
     if args.pp_degree > 1:
         dist_strategy.pipeline_configs = {
             "schedule_mode": "1F1B",
-            "micro_batch_size": micro_bsz,
+            "micro_micro_bsz": micro_bsz,
             "accumulate_steps": acc_steps,
         }
+    else:
+        assert acc_steps == 1, f"Only support accumulate steps in piplinemode. Please set you global_bsz={default_global_bsz}"
 
     return dist_strategy
 
@@ -326,70 +306,31 @@ def set_seed(args, worker_index):
     paddle.seed(args.seed + worker_index)
 
 
-def reset_program_state_dict(model, state_dict):
-    scale = model.initializer_range if hasattr(model, "initializer_range")\
-        else model.gpt2.config["initializer_range"]
-    print("the init scale is :{}".format(scale))
-    new_state_dict = dict()
-    for n, p in state_dict.items():
-        if "layer_norm" not in p.name:
-            dtype_str = "float32"
-            if str(p.dtype) == "VarType.FP64":
-                dtype_str = "float64"
-            # print(p.name)
-            new_state_dict[p.name] = np.random.normal(
-                loc=0.0, scale=scale, size=p.shape).astype(dtype_str)
-    return new_state_dict
-
-
-def trans_param_from_static_to_dygrah(model):
-    from paddlenlp.utils.tools import static_params_to_dygraph
-    base_path = "/ssd1/zhonghui03/GPT2ModelCheckpoints"
-    load_path = "model_10000_recompute"
-    abs_path = os.path.join(base_path, load_path)
-    static_tensor_dict = paddle.static.load_program_state(abs_path)
-    new_dict = static_params_to_dygraph(model, static_tensor_dict)
-    paddle.save(new_dict,
-                os.path.join(base_path, "gpt2_%s.pdparams" % load_path))
-    exit(0)
-
-
-def init_static_with_params(model, dygraph_params):
-    from paddlenlp.utils.tools import dygraph_params_to_static
-    static_params = dygraph_params_to_static(model, dygraph_params)
-    prog = paddle.static.default_main_program()
-    paddle.static.set_program_state(prog, static_params)
-
-
-def simple_model(data, topo):
-    emb_out = paddle.distributed.split(
-        data, (8, 8), operation="embedding", num_partitions=topo.mp.size)
-    loss = emb_out.mean()
-    return loss
-
-
 def do_train(args):
     args.test_iters = args.eval_iters * 5
-    # args.sharding_degree = 4
-    # args.mp_degree = 2
-    # args.pp_degree = 1
-    # args.dp_degree = 1
-    args.micro_bsz = 1
-    args.global_bsz = 64
-    args.max_seq_len = 1024
-
     # Initialize the paddle and paddle fleet execute environment
     paddle.enable_static()
     fleet.init(is_collective=True)
+
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    paddle.seed(args.seed)
+    get_rng_state_tracker().add('global_seed', args.seed)
+    get_rng_state_tracker().add('local_seed',
+                                args.seed + fleet.worker_index() + 2021)
 
     assert args.device in [
         "cpu", "gpu", "xpu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
     place = paddle.set_device(args.device)
-    #place = paddle.fluid.CUDAPlace(int(os.environ.get('FLAGS_selected_gpus', 0)))
 
     worker_num = fleet.worker_num()
     worker_index = fleet.worker_index()
+
+    # Create the random seed for the worker
+    #set_seed(args, worker_index)
+    worker_init = WorkerInitObj(args.seed + worker_index)
+
     topo = Topology(
         rank=worker_index,
         world_size=worker_num,
@@ -398,35 +339,30 @@ def do_train(args):
         sharding=args.sharding_degree,
         mp=args.mp_degree)
 
-    dist_strategy = dist_optimizer(args, topo)
     is_last = False
     if topo.pp.rank == (topo.pp.size - 1):
         is_last = True
 
-    print(topo)
-    # Create the random seed for the worker
-    set_seed(args, worker_index)
-    worker_init = WorkerInitObj(args.seed + worker_index)
+    logger.info(f"The topo of hybrid parallelism:\n{topo}")
 
-    # create log write
-    #if worker_index == 0:
+    # create log write, train results show on last card of pipeline.
     if is_last:
         log_writer_path = os.path.join(
-            args.output_dir, "gpt2_bs_{}_amp_{}_recompute_{}_card_{}".format(
-                args.batch_size, args.use_amp, args.use_recompute,
-                worker_index))
+            args.output_dir, "train_log",
+            "{}_globalbsz_{}_amp_{}_recompute_{}_card_{}".format(
+                args.model_name_or_path, args.micro_bsz * topo.data_worldsize,
+                args.use_amp, args.use_recompute, worker_index).lower())
         if os.path.exists(log_writer_path):
             import shutil
             shutil.rmtree(log_writer_path)
         log_writer = SummaryWriter(log_writer_path)
 
     # Define the input data in the static mode
-    main_program = paddle.static.Program(
-    )  # paddle.static.default_main_program()
-    startup_program = paddle.static.Program(
-    )  # paddle.static.default_startup_program()
+    dist_strategy = dist_optimizer(args, topo)
+    main_program = paddle.static.default_main_program()
+    startup_program = paddle.static.default_startup_program()
     with paddle.static.program_guard(main_program, startup_program):
-        with paddle.fluid.unique_name.guard():
+        with paddle.utils.unique_name.guard():
             with paddle.static.device_guard('gpu:0'):
                 data_holders = create_data_holder(args)
                 [tokens, loss_mask, attention_mask, position_ids,
@@ -454,13 +390,12 @@ def do_train(args):
                     args,
                     data_file,
                     worker_init,
-                    worker_index,
-                    worker_num,
+                    topo,
                     eod_id=eod_id,
                     max_seq_len=args.max_seq_len,
                     places=paddle.static.cuda_places(),
                     data_holders=data_holders,
-                    pipeline_mode=True, )
+                    pipeline_mode=False, )
 
                 # create the model for the gpt model
                 model = guard(f'gpu:{args.pp_degree -1}')(GPT2ForPretraining)(
@@ -471,41 +406,39 @@ def do_train(args):
                     GPT2PretrainingCriterion)()
                 loss = criterion(preds, labels, loss_mask)
 
-            # loss = simple_model(paddle.ones(shape=[3, 1]).astype("int64"), topo)
-
             # Create the learning_rate sheduler and optimizer
             if args.decay_steps is None:
                 args.decay_steps = args.max_steps
             warmup_step = args.warmup_rate * args.decay_steps
-            # lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
-            #     max_lr=args.max_lr,
-            #     min_lr=args.min_lr,
-            #     warmup_step=warmup_step,
-            #     decay_step=args.decay_steps)
+
+            # TODO @ZHUI Use paddle network to support lr scheduler
+            lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
+                max_lr=args.max_lr,
+                min_lr=args.min_lr,
+                warmup_step=warmup_step,
+                decay_step=args.decay_steps)
 
             clip = None
             if args.grad_clip > 0:
-                clip = paddle.nn.ClipGradByNorm(clip_norm=args.grad_clip)
+                # TODO @ZHUI Use nn.ClipGradByNorm 
+                clip = paddle.fluid.clip.GradientClipByNorm(
+                    clip_norm=args.grad_clip)
 
             decay_param = lambda x: x in [
                      p.name for n, p in model.named_parameters()
                      if not any(nd in n for nd in ["bias", "norm"])]
 
-            #optimizer = paddle.optimizer.AdamW(
+            # TODO @ZHUI Use paddle.optimizer.AdamW
             optimizer = paddle.fluid.optimizer.Adam(
-                #learning_rate=lr_scheduler,
-                learning_rate=0.001,
+                learning_rate=lr_scheduler,
                 epsilon=args.adam_epsilon,
-                #grad_clip=paddle.fluid.clip.GradientClipByGlobalNorm(
-                grad_clip=paddle.fluid.clip.GradientClipByNorm(clip_norm=1.0),
-                #parameter_list=opt_param,
-                #weight_decay=args.weight_decay,
-                #grad_clip=clip,
-                #apply_decay_param_fun=decay_param
+                grad_clip=clip,
+                # parameter_list=opt_param,
+                # weight_decay=args.weight_decay,
+                # apply_decay_param_fun=decay_param
             )
 
-            # Use the fleet api to compile the distributed optimizer
-            #optimizer.apply_optimize = optimizer._apply_optimize
+            # optimizer.apply_optimize = optimizer._apply_optimize
 
             if args.use_recompute:
                 dist_strategy.recompute = True
@@ -513,33 +446,10 @@ def do_train(args):
                     "checkpoints": model.gpt2.checkpoints
                 }
 
+            # Use the fleet api to compile the distributed optimizer
             optimizer = fleet.distributed_optimizer(
                 optimizer, strategy=dist_strategy)
             logger.info(f'using dist strategy {dist_strategy}')
-            # for op in main_program.global_block().ops:
-            #     print(op.type)
-            #     if op.type == 'fill_constant' or op.type=='seed':
-            #         op._set_attr('op_device', "gpu:0") 
-
-            # state_dict = model.state_dict()
-            # map_dict = {p.name: n for n, p in state_dict.items()}
-            # for name, var in main_program.global_block().vars.items():
-            #     print("{}, shape {}".format(map_dict[name] if name in map_dict
-            #                                 else name, var.shape))
-
-            program_desc_dir = os.path.join(args.output_dir, "program_desc")
-            if not os.path.isdir(program_desc_dir):
-                os.mkdir(program_desc_dir)
-
-            with open(program_desc_dir + "/main_program.txt.%d" %
-                      (int(os.environ.get('FLAGS_selected_gpus', 0))),
-                      'w') as f:
-                f.write(str(main_program))
-
-            with open(program_desc_dir + "/startup_program.txt.%d" %
-                      (int(os.environ.get('FLAGS_selected_gpus', 0))),
-                      'w') as f:
-                f.write(str(startup_program))
 
             optimizer.minimize(loss)
             logger.info(f'final strategy: {fleet._final_strategy()}')
@@ -561,165 +471,88 @@ def do_train(args):
     # Define the Executor for running the static model
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
-
-    # trans_param_from_static_to_dygrah(model)
-
-    # Use the state dict to update the parameter
-    # state_dict = model.state_dict()
-    # reset_state_dict = reset_program_state_dict(model, state_dict)
-    # paddle.static.set_program_state(reset_state_dict)
-
-    # init with Megatron params
-    init_dir = None
-    if args.batch_size == 4:
-        print("Loading bs4 init params.")
-        init_dir = os.path.join(os.environ['HOME'],
-                                './init_checkponits/gpt2-init-bs4.pdparams')
-    elif args.batch_size == 32:
-        print("Loading bs32 init params.")
-        init_dir = os.path.join(os.environ['HOME'],
-                                './init_checkponits/gpt2-init-bs32.pdparams')
-    if "small" in args.model_name_or_path:
-        init_dir = os.path.join(
-            os.environ['HOME'],
-            './init_checkponits/gpt2-init-small-bs32.pdparams')
-    if init_dir is not None:
-        print(init_dir)
-        # Sharding is incompatible with init params.
-        #init_static_with_params(model, paddle.load(init_dir))
-
     test_program = main_program.clone(for_test=True)
-    if worker_num == 1:
-        # Construct the compiled program
-        main_program = build_compiled_program(args, main_program, loss)
 
     global_step = 0
     tic_train = time.time()
     epoch = 0
-    # for epoch in range(args.num_train_epochs):
-    #     files = [
-    #         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-    #         if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_"
-    #             not in str(f))
-    #     ]
-    #     files.sort()
-    #     num_files = len(files)
-    #     random.Random(args.seed + epoch).shuffle(files)
-    #     for f_id in range(math.ceil(len(files) / worker_num)):
-    #         data_file = files[(f_id * worker_num + worker_index) % num_files]
-    #         train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-    #             args,
-    #             data_file,
-    #             worker_init,
-    #             worker_index,
-    #             worker_num,
-    #             eod_id=eod_id,
-    #             max_seq_len=args.max_seq_len,
-    #             places=paddle.static.cuda_places(),
-    #             data_holders=data_holders,
-    #             pipeline_mode=True,
-    #             )
-    #         # bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
-    #         # many times. and start a new random dataloader.
-    #         valid_data_loader = valid_data_loader()
-    #         test_data_loader = test_data_loader()
-    #
-    #         for step, batch in enumerate(train_data_loader()):
     learning_rate = main_program.global_block().vars["learning_rate_0"]
-    print(learning_rate)
-    step = -1
-    if True:
-        if True:
-            #for step, batch in enumerate(train_data_loader()):
+    while True:
+        fetchs = []
+        if is_last:
+            fetchs = [loss, learning_rate]
 
-            train_data_loader.start()
-            while True:
-                # param_t = paddle.fluid.global_scope().find_var(tokens.name).get_tensor()
-                # #param_t = paddle.fluid.global_scope().find_var('learning_rate_0').get_tensor()
-                # data = np.array(param_t)
-                # print(data)
-                step += 1
-                global_step += 1
-                fetchs = []
-                print("global_step ", global_step)
+        # bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
+        # many times. and start a new random dataloader.
+        valid_data_loader = valid_data_loader()
+        test_data_loader = test_data_loader()
+
+        for step, batch in enumerate(train_data_loader()):
+            global_step += 1
+            ret = exe.run(main_program, feed=batch, fetch_list=fetchs)
+            # In the new 2.0 api, must call this function to change the learning_rate
+            lr_scheduler.step()
+
+            if global_step % args.logging_steps == 0:
                 if is_last:
-                    #fetchs = [loss.name, 'learning_rate_0']
-                    fetchs = [loss, learning_rate]
-                ret = exe.run(
-                    main_program,
-                    #feed=batch,
-                    fetch_list=fetchs)
-                # In the new 2.0 api, must call this function to change the learning_rate
-                #lr_scheduler.step()
+                    loss_return, lr_return = ret
+                    speed = args.logging_steps / (time.time() - tic_train)
+                    logger.info(
+                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f steps/s, %.0f token/s, learning rate: %.9f"
+                        % (global_step, epoch, step, loss_return[0], speed,
+                           speed * args.global_bsz * args.max_seq_len,
+                           lr_return[0]))
+                    log_writer.add_scalar("loss", loss_return[0], global_step)
+                    log_writer.add_scalar("learning_rate", lr_return[0],
+                                          global_step)
+                tic_train = time.time()
 
-                if global_step % args.logging_steps == 0:
+            def run_evaluate(data_loader,
+                             program,
+                             iter_steps,
+                             task_name="valid"):
+                all_loss = []
+                local_time = time.time()
+                eval_fetch = []
+                if is_last:
+                    eval_fetch = [loss]
+
+                for eval_step, batch in enumerate(data_loader):
+                    loss_return = exe.run(program,
+                                          feed=batch,
+                                          fetch_list=eval_fetch)
                     if is_last:
-                        print(ret)
-                        loss_return, lr_return = ret  # [0.00001] #[lr_scheduler.get_lr()]
-                        logger.info(
-                            "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s, learning rate: %.9f"
-                            % (global_step, epoch, step, loss_return[0],
-                               args.logging_steps / (time.time() - tic_train),
-                               lr_return[0]))
-                        log_writer.add_scalar("loss", loss_return[0],
-                                              global_step)
-                        log_writer.add_scalar("learning_rate", lr_return[0],
-                                              global_step)
-                    tic_train = time.time()
-
-                def run_evaluate(data_loader,
-                                 program,
-                                 iter_steps,
-                                 task_name="valid"):
-                    all_loss = []
-                    local_time = time.time()
-                    for eval_step, batch in enumerate(data_loader):
-                        loss_return = exe.run(program,
-                                              feed=batch,
-                                              fetch_list=[loss.name])
                         all_loss.append(float(loss_return[0]))
                         if eval_step >= iter_steps - 1:
                             average_loss = sum(all_loss) / len(all_loss)
                             logger.info(
-                                "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
+                                "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.0f tokens/s"
                                 % (task_name, global_step, epoch, eval_step,
-                                   average_loss,
-                                   iter_steps / (time.time() - local_time)))
+                                   average_loss, iter_steps * args.micro_bsz *
+                                   args.max_seq_len /
+                                   (time.time() - local_time)))
                             log_writer.add_scalar(task_name + "_loss",
                                                   average_loss, global_step)
                             break
 
-                if global_step % args.eval_steps == 0:
-                    if worker_index == 0:
-                        run_evaluate(valid_data_loader, test_program,
-                                     args.eval_iters, "valid")
-                        tic_train = time.time()
+            if global_step % args.eval_steps == 0:
+                # TODO, check the input data of validation
+                run_evaluate(valid_data_loader, test_program, args.eval_iters,
+                             "valid")
+                tic_train = time.time()
 
-                if global_step % args.save_steps == 0 or global_step >= args.max_steps:
-                    if worker_index == 0:
-                        output_dir = os.path.join(args.output_dir,
-                                                  "model_%d" % global_step)
-                        if not os.path.exists(output_dir):
-                            os.makedirs(output_dir)
-                        paddle.fluid.io.save_inference_model(
-                            output_dir,
-                            feeded_var_names=[
-                                tokens.name,
-                                loss_mask.name,
-                                attention_mask.name,
-                                position_ids.name,
-                                labels.name,
-                            ],
-                            target_vars=[loss],
-                            executor=exe)
-                        tic_train = time.time()
+            if global_step % args.save_steps == 0 or global_step >= args.max_steps:
+                output_dir = os.path.join(args.output_dir,
+                                          "model_%d" % global_step)
+                logger.debug("saving models to {}".format(output_dir))
+                save_persistables(exe, output_dir, main_program)
+                tic_train = time.time()
 
-                if global_step >= args.max_steps:
-                    run_evaluate(test_data_loader, test_program,
-                                 args.test_iters, "test")
-                    del train_data_loader
-                    return
-            del train_data_loader
+            if global_step >= args.max_steps:
+                run_evaluate(test_data_loader, test_program, args.test_iters,
+                             "test")
+                del train_data_loader
+                return
         epoch += 1
 
 

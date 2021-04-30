@@ -32,7 +32,7 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
 
 
     sum(sizes) = tokens_per_epoch
-    data_nums = num_samples *  batch_size
+    data_nums = num_samples *  micro_bsz
     num_epochs = (data_nums + 1) // sum(sizes)
     len(doc_idx) = num_epochs * sum(sizes) 
     
@@ -51,7 +51,9 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
     doc_idx_filename = _filename + '_doc_idx.npy'
     sample_idx_filename = _filename + '_sample_idx.npy'
     shuffle_idx_filename = _filename + '_shuffle_idx.npy'
+
     # Build the indexed mapping if not exist.
+    # TODO @ZHUI support multi-mechine, worker_index % len(cudas()) == 0
     if worker_index == 0:
         if (not os.path.isfile(doc_idx_filename)) or \
            (not os.path.isfile(sample_idx_filename)) or \
@@ -197,14 +199,16 @@ def create_pretrained_dataset(
         args,
         input_path,
         worker_init,
-        worker_index,
-        worker_num,
+        topo,
         eod_id,
         max_seq_len=1024,
         places=None,
         data_holders=None,
         pipeline_mode=False, ):
-    print("the distributed run, worker_num:{}".format(worker_num))
+    print("the distributed run, worker_num:{}".format(topo.world.size))
+    print("the distributed run, data_worldsize:{}".format(topo.data_worldsize))
+    print("the distributed run, data_inner_times:{}".format(
+        topo.data_inner_times))
 
     process_datas = np.load(input_path, mmap_mode="r+", allow_pickle=True)
     # all documment ids, extend as 1-D array.
@@ -221,7 +225,8 @@ def create_pretrained_dataset(
     def build_dataset(index, name, num_samples):
         dataset = GPT2Dataset(
             file_path=input_path,
-            worker_index=worker_index,
+            topo=topo,
+            micro_bsz=args.micro_bsz,
             name="gpt2" + name,
             max_seq_len=max_seq_len,
             num_samples=num_samples,
@@ -229,10 +234,10 @@ def create_pretrained_dataset(
             sample_ids=sample_ids,
             sample_lens=sample_lens,
             eod_id=eod_id,
-            seed=args.seed + worker_index)
+            seed=args.seed + topo.world.rank)
 
         batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=args.batch_size, shuffle=False, drop_last=True)
+            dataset, batch_size=args.micro_bsz, shuffle=False, drop_last=True)
 
         if pipeline_mode:
 
@@ -257,16 +262,21 @@ def create_pretrained_dataset(
                 return_list=False)
         return data_loader
 
-    train_data_loader = build_dataset(0, "train", args.batch_size *
-                                      args.max_steps * worker_num)
+    # Note, data should be broardcast to all devices.
+    # for train, the distinct data num is topo.data_worldsize
+    # for valid or test, the distinct data num is 1
+    # data_worldsize * data_inner_times -> topo.world.size
+    # 1 * topo.world.size -> topo.world.size
+    train_data_loader = build_dataset(0, "train", args.micro_bsz *
+                                      args.max_steps * topo.data_worldsize)
     if pipeline_mode:
         valid_data_loader, test_data_loader = None, None
     else:
         valid_data_loader = build_dataset(
-            1, "valid", args.batch_size *
+            1, "valid", args.micro_bsz *
             (args.max_steps // args.eval_steps + 1) * args.eval_iters)
         test_data_loader = build_dataset(2, "test",
-                                         args.batch_size * args.test_iters)
+                                         args.micro_bsz * args.test_iters)
 
     return train_data_loader, valid_data_loader, test_data_loader
 
@@ -274,7 +284,8 @@ def create_pretrained_dataset(
 class GPT2Dataset(paddle.io.Dataset):
     def __init__(self,
                  file_path,
-                 worker_index,
+                 topo,
+                 micro_bsz,
                  num_samples,
                  eod_id,
                  sample_ids,
@@ -290,6 +301,8 @@ class GPT2Dataset(paddle.io.Dataset):
         self.eod_id = eod_id
         self.sample_ids = sample_ids
         self.sample_lens = sample_lens
+        self.topo = topo
+        self.micro_bsz = micro_bsz
 
         if documents is None:
             document_ids = np.arange(0, self.sample_lens.shape[0])
@@ -298,9 +311,23 @@ class GPT2Dataset(paddle.io.Dataset):
 
         self.doc_idx, self.sample_idx, self.shuffle_idx = \
             construct_samples_and_shuffle_data(self.name, self.file_path, document_ids,\
-                self.sample_lens, num_samples, max_seq_len, seed, worker_index)
+                self.sample_lens, num_samples, max_seq_len, seed, topo.world.rank)
+
         # doc cumsum start pos
         self.start_pos = [0] + np.cumsum(self.sample_lens).tolist()
+
+        if "mode" == "train":
+            # Data broardcast inner data groups.
+            self._length = self.sample_idx.shape[
+                0] * self.topo.data_inner_times - 1
+            # if car=2 bs=4, for dataloader,
+            # the data should be [0,1,2,3] -> card_0 [4,5,6,7] -> card_1
+            self._reindex_func = lambda index: index % self.micro_bsz + index // (self.micro_bsz * self.topo.data_inner_times) * self.micro_bsz
+
+        else:
+            # Data broardcast all devices
+            self._length = self.sample_idx.shape[0] * self.topo.world.size - 1
+            self._reindex_func = lambda index: index % self.micro_bsz + index // (self.micro_bsz * self.topo.world.size) * self.micro_bsz
 
     def _construct_sample(self, tokens):
         tokens = np.array(tokens).astype("int64").tolist()
@@ -354,7 +381,9 @@ class GPT2Dataset(paddle.io.Dataset):
         return tokens
 
     def __getitem__(self, index):
-        idx = self.shuffle_idx[index]
+        # Reindex for card broardcast
+        real_idx = self._reindex_func(index)
+        idx = self.shuffle_idx[real_idx]
         # Start and end documents and offsets.
         doc_index_f = self.sample_idx[idx][0]
         doc_index_l = self.sample_idx[idx + 1][0]
@@ -365,4 +394,4 @@ class GPT2Dataset(paddle.io.Dataset):
         return self._construct_sample(tokens)
 
     def __len__(self):
-        return self.sample_idx.shape[0] - 1
+        return self._length

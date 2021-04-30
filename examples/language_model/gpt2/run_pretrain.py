@@ -28,6 +28,7 @@ from tensorboardX import SummaryWriter
 from data import create_pretrained_dataset
 from args import parse_args
 import lr
+from utils.topo import Topology
 
 MODEL_CLASSES = {
     "gpt2": (GPT2ForPretraining, GPT2Tokenizer),
@@ -92,26 +93,39 @@ def do_train(args):
     worker_num = paddle.distributed.get_world_size()
     set_seed(args)
     worker_init = WorkerInitObj(args.seed + paddle.distributed.get_rank())
+    # Now, we only support data parallel in dygraph mode
+    topo = Topology(
+        rank=worker_index,
+        world_size=worker_num,
+        dp=worker_num,
+        pp=1,
+        sharding=1,
+        mp=1)
+
+    default_global_bsz = topo.data_worldsize * args.micro_bsz
+    default_global_tokens_num = default_global_bsz * args.max_seq_len
+
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     eod_id = tokenizer.command_name_map["eod"].Id
 
     # define log writer
     log_writer_path = os.path.join(
-        args.output_dir, "{}_bs_{}_amp_{}_recompute_{}_card_{}".format(
-            args.model_name_or_path, args.batch_size, False, False, worker_num))
+        args.output_dir, "train_log",
+        "{}_global-bsz_{}_amp_{}_recompute_{}_card_{}".format(
+            args.model_name_or_path, args.micro_bsz * topo.data_worldsize,
+            False, False, worker_index).lower())
     if os.path.exists(log_writer_path):
         import shutil
         shutil.rmtree(log_writer_path)
     log_writer = SummaryWriter(log_writer_path)
-    # TODO launch the tensorbord
 
     pretrained_models_list = list(
         model_class.pretrained_init_configuration.keys())
     if args.model_name_or_path in pretrained_models_list:
-        model = GPT2ForPretraining(
-            GPT2Model(**model_class.pretrained_init_configuration[
-                args.model_name_or_path]))
+        model_config = model_class.pretrained_init_configuration[
+            args.model_name_or_path]
+        model = GPT2ForPretraining(GPT2Model(**model_config))
     else:
         model = GPT2ForPretraining.from_pretrained(args.model_name_or_path)
 
@@ -138,14 +152,10 @@ def do_train(args):
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
-    opt_param = []
-    for pa in model.parameters():
-        if "batch_norm" not in pa.name:
-            opt_param.append(pa)
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
-        parameters=opt_param,
+        parameters=model.parameters(),
         weight_decay=args.weight_decay,
         grad_clip=clip,
         apply_decay_param_fun=lambda x: x in decay_params)
@@ -156,24 +166,6 @@ def do_train(args):
         opt_dict = paddle.load(
             os.path.join(args.model_name_or_path, "model_state.pdopt"))
         optimizer.set_state_dict(opt_dict)
-
-    # init with Megatron params
-    init_dir = None
-    if args.batch_size == 4:
-        print("Loading bs4 init params.")
-        init_dir = os.path.join(os.environ['HOME'],
-                                './init_checkponits/gpt2-init-bs4.pdparams')
-    elif args.batch_size == 32:
-        print("Loading bs32 init params.")
-        init_dir = os.path.join(os.environ['HOME'],
-                                './init_checkponits/gpt2-init-bs32.pdparams')
-    if "small" in args.model_name_or_path:
-        init_dir = os.path.join(
-            os.environ['HOME'],
-            './init_checkponits/gpt2-init-small-bs32.pdparams')
-    if init_dir is not None:
-        print(init_dir)
-        model.set_state_dict(paddle.load(init_dir))
 
     global_step = 0
     tic_train = time.time()
@@ -188,17 +180,11 @@ def do_train(args):
         for f_id in range(num_files):
             data_file = files[f_id]
             train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                args,
-                data_file,
-                worker_init,
-                worker_index,
-                worker_num,
-                eod_id=eod_id)
-            # bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
-            # many times. and start a new random dataloader.
+                args, data_file, worker_init, topo=topo, eod_id=eod_id)
             valid_data_loader = valid_data_loader()
             test_data_loader = test_data_loader()
-
+            # bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
+            # many times. and start a new random dataloader.
             for step, batch in enumerate(train_data_loader()):
                 global_step += 1
                 tokens, loss_mask, attention_mask, position_ids, labels = batch
@@ -209,19 +195,14 @@ def do_train(args):
                 loss = criterion(preds, labels, loss_mask)
 
                 if global_step % args.logging_steps == 0:
-                    if worker_index == 0:
-                        logger.info(
-                            "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s, learning rate: %.9f"
-                            % (
-                                global_step,
-                                epoch,
-                                step,
-                                loss,
-                                args.logging_steps / (time.time() - tic_train),
-                                optimizer.get_lr(), ))
-                        log_writer.add_scalar("loss", float(loss), global_step)
-                        log_writer.add_scalar("learning_rate",
-                                              optimizer.get_lr(), global_step)
+                    speed = args.logging_steps / (time.time() - tic_train)
+                    logger.info(
+                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s, %.0f token/s, learning rate: %.9f"
+                        % (global_step, epoch, step, loss, speed, speed *
+                           default_global_tokens_num, optimizer.get_lr()))
+                    log_writer.add_scalar("loss", float(loss), global_step)
+                    log_writer.add_scalar("learning_rate",
+                                          optimizer.get_lr(), global_step)
 
                     tic_train = time.time()
                 loss.backward()
@@ -230,10 +211,10 @@ def do_train(args):
                 optimizer.clear_grad()
 
                 if global_step % args.eval_steps == 0:
-                    if worker_index == 0:
-                        run_evaluate(valid_data_loader, model, criterion,
-                                     args.eval_iters, log_writer, global_step,
-                                     epoch, "valid")
+                    # Since the valid data broardcast to all devices, we do evaluate on all device.
+                    run_evaluate(valid_data_loader, model, criterion,
+                                 args.eval_iters, log_writer, global_step,
+                                 epoch, "valid")
 
                 if global_step % args.save_steps == 0 or global_step >= args.max_steps:
                     if worker_index == 0:

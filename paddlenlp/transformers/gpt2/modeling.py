@@ -39,13 +39,6 @@ __all__ = [
 ]
 
 
-def print_t(name, tensor):
-    print(name)
-    print("sum", tensor.sum())
-    print("abs sum", tensor.abs().sum())
-    print(tensor)
-
-
 def guard(device):
     def decorator(Layer):
         class WrapperClass(Layer):
@@ -115,6 +108,8 @@ class ParallelEmbedding(nn.Layer):
             name=self.name)
 
         self.embedding.weight.is_distributed = True
+        # Alias for nn.Embedding
+        self.weight = self.embedding.weight
         startup_block = paddle.static.default_startup_program().global_block()
         main_block = paddle.static.default_main_program().global_block()
         startup_block.vars[self.embedding.weight.name].is_distributed = True
@@ -174,11 +169,6 @@ class ParallelLinear(nn.Layer):
                                                            num_partitions))
             self.per_part_size = size[0] // num_partitions
             linear_size = (self.per_part_size, size[1])
-            # assert x.shape[-1] == self.per_part_size, (
-            #     "The width ({}) of the input "
-            #     "x must be equal to the height ({}) of the weight. Maybe you "
-            #     "should split the input x using paddle.split.".format(
-            #         x.shape[-1], self.per_part_size))
 
         elif axis == 1:
             assert size[1] % num_partitions == 0, (
@@ -208,6 +198,8 @@ class ParallelLinear(nn.Layer):
 
         weight = self.linear.weight
         weight.is_distributed = True
+        self.weight = self.linear.weight
+
         startup_block = paddle.static.default_startup_program().global_block()
         main_block = paddle.static.default_main_program().global_block()
         startup_block.vars[weight.name].is_distributed = True
@@ -263,50 +255,6 @@ class RowParallelLiner(ParallelLinear):
             gather_out=True,
             param_attr=param_attr,
             bias_attr=bias_attr)
-
-
-class LayerNormByBN(nn.Layer):
-    def __init__(self, dim, epsilon=1e-5):
-        super().__init__()
-        # normalized_shape = np.prod(input_shape[:-1])
-        normalized_shape = 16 * 1024
-        input_shape = [dim if dim != -1 else 1024]
-        # print(input_shape)
-        self.batch_norm = paddle.nn.BatchNorm(
-            normalized_shape,
-            epsilon=epsilon,
-            param_attr=paddle.fluid.ParamAttr(),
-            data_layout='NHWC',
-            momentum=0.0,
-            do_model_average_for_mean_and_var=False)
-
-        # self.batch_norm.weight.stop_gradient =True
-        # self.batch_norm.bias.stop_gradient =True
-
-        self.weight = self.create_parameter(
-            shape=[input_shape[-1]],
-            dtype=self._dtype,
-            default_initializer=Constant(1.0))
-        self.bias = self.create_parameter(
-            shape=[input_shape[-1]],
-            dtype=self._dtype,
-            default_initializer=Constant(0.0))
-
-    def forward(self, input):
-        in_shape = paddle.shape(input)
-        # paddle.fluid.layers.Print(self.batch_norm.bias)
-        # input = input.reshape([1, -1, in_shape[-1]])
-        input = input.reshape([1, 16 * 1024, in_shape[-1]])
-        input_trans = input.transpose([0, 2, 1])
-        out = self.batch_norm(input_trans)
-        out = out.squeeze(axis=0)
-        out = out.transpose([1, 0])
-        out = out * self.weight + self.bias
-        out = out.reshape(in_shape)
-        return out
-
-
-# nn.LayerNorm = LayerNormByBN
 
 
 class MultiHeadAttention(nn.Layer):
@@ -511,7 +459,6 @@ class TransformerDecoder(nn.Layer):
 
         self.topo = topo
         self.num_layers = num_layers
-        self.layer_per_stage = self.num_layers // self.topo.pp.size
         self.layers = decoder_layers
         self.norm = norm
         if norm is "LayerNorm":
@@ -559,6 +506,7 @@ class TransformerDecoder(nn.Layer):
                                         use_cache=use_cache,
                                         cache=cache[i])
                 new_caches.append(new_cache)
+            # paddle.static.Print(output, message=f'checkpoints: {i} layers.')
             self.checkpoints.append(output.name)
 
         if self.norm is not None:
@@ -680,6 +628,62 @@ class TransformerDecoderLayer(nn.Layer):
         return incremental_cache
 
 
+class GPT2EmbeddingsStatic:
+    """
+    Include embeddings from word, position and token_type embeddings
+    """
+
+    def __init__(self,
+                 vocab_size,
+                 hidden_size=768,
+                 hidden_dropout_prob=0.1,
+                 max_position_embeddings=512,
+                 type_vocab_size=16,
+                 initializer_range=0.02,
+                 topo=None):
+        super(GPT2EmbeddingsStatic, self).__init__()
+        self.vocab_size = vocab_size
+        self.hidden_size = hidden_size
+        self.hidden_dropout_prob = hidden_dropout_prob
+        self.max_position_embeddings = max_position_embeddings
+        self.type_vocab_size = type_vocab_size
+        self.initializer_range = initializer_range
+
+    def __call__(self, *args, **kwargs):
+        return self.forward(*args, **kwargs)
+
+    def forward(self, input_ids, position_ids=None):
+
+        input_embedings = paddle.fluid.layers.embedding(
+            paddle.fluid.layers.unsqueeze(input_ids, -1),
+            (self.vocab_size, self.hidden_size),
+            param_attr=paddle.ParamAttr(
+                name="word_embeddings",
+                initializer=nn.initializer.Normal(
+                    mean=0.0, std=self.initializer_range)))
+
+        position_embeddings = paddle.fluid.layers.embedding(
+            paddle.fluid.layers.unsqueeze(position_ids, -1),
+            (self.max_position_embeddings, self.hidden_size),
+            param_attr=paddle.ParamAttr(
+                name="pos_embeddings",
+                initializer=nn.initializer.Normal(
+                    mean=0.0, std=self.initializer_range)))
+
+        from collections import namedtuple
+        LayerEmbedding = namedtuple('LayerEmbedding', ['weight'])
+        self.word_embeddings = LayerEmbedding(
+            weight=paddle.fluid.default_main_program().global_block().var(
+                "word_embeddings"))
+        # paddle.static.Print(self.word_embeddings.weight, message="embedding table")
+
+        embeddings = input_embedings + position_embeddings
+        embeddings = paddle.fluid.layers.dropout(embeddings,
+                                                 self.hidden_dropout_prob)
+
+        return embeddings
+
+
 class GPT2Embeddings(nn.Layer):
     """
     Include embeddings from word, position and token_type embeddings
@@ -694,30 +698,29 @@ class GPT2Embeddings(nn.Layer):
                  initializer_range=0.02,
                  topo=None):
         super(GPT2Embeddings, self).__init__()
-        if topo is None or topo.mp.size == 1:
-            self.word_embeddings = nn.Embedding(
-                vocab_size,
-                hidden_size,
-                weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
+        # TODO @ZHUI Use ParallelEmbedding
+        #if topo is None or topo.mp.size == 1:
+        self.word_embeddings = nn.Embedding(
+            vocab_size,
+            hidden_size,
+            weight_attr=paddle.ParamAttr(
+                name="word_embeddings",
+                initializer=nn.initializer.Normal(
                     mean=0.0, std=initializer_range)))
-        else:
-            self.word_embeddings = ParallelEmbedding(
-                vocab_size,
-                hidden_size,
-                topo.mp.size,
-                weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
-                    mean=0.0, std=initializer_range)))
-            # self.position_embeddings = ParallelEmbedding(
-            #     max_position_embeddings,
-            #     hidden_size,
-            #     topo.mp.size,
-            #     weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
-            #         mean=0.0, std=initializer_range)))
+        #else:
+        #    self.word_embeddings = ParallelEmbedding(
+        #        vocab_size,
+        #        hidden_size,
+        #        topo.mp.size,
+        #        weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
+        #            mean=0.0, std=initializer_range)))
         self.position_embeddings = nn.Embedding(
             max_position_embeddings,
             hidden_size,
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
-                mean=0.0, std=initializer_range)))
+            weight_attr=paddle.ParamAttr(
+                name="pos_embeddings",
+                initializer=nn.initializer.Normal(
+                    mean=0.0, std=initializer_range)))
 
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
@@ -726,9 +729,10 @@ class GPT2Embeddings(nn.Layer):
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=1)
             position_ids = seq_length - ones
+
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
-
+        # paddle.static.Print(self.word_embeddings.weight, message="embedding table")
         embeddings = input_embedings + position_embeddings
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -757,6 +761,32 @@ class GPT2PretrainedModel(PretrainedModel):
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
             "pad_token_id": 0,
+        },
+        "gpt-175B-en": { ## 175B
+            "vocab_size": 50304,
+            "hidden_size": 12288,
+            "num_hidden_layers": 96,
+            "num_attention_heads": 96,
+            "intermediate_size": 49152,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 1,  # no use
+            "initializer_range": 0.02,
+        },
+        "gpt2-xlarge-en": { ## 1.3B
+            "vocab_size": 50304,
+            "hidden_size": 2048,
+            "num_hidden_layers": 24,
+            "num_attention_heads": 16,
+            "intermediate_size": 8192,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 1,  # no use
+            "initializer_range": 0.02,
         },
         "gpt2-large-en": {
             "vocab_size": 50304,
@@ -932,6 +962,9 @@ class GPT2Model(GPT2PretrainedModel):
                                                          input_ids)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
+
+        # paddle.fluid.layers.Print(embedding_output, message="embedding_output")
+
         encoder_outputs = self.decoder(
             embedding_output,
             memory=None,
@@ -952,7 +985,6 @@ class GPT2ForPretraining(GPT2PretrainedModel):
     def __init__(self, gpt2):
         super(GPT2ForPretraining, self).__init__()
         self.gpt2 = gpt2
-        self.linear = nn.Linear(self.gpt2.hidden_size, self.gpt2.vocab_size)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -972,11 +1004,11 @@ class GPT2ForPretraining(GPT2PretrainedModel):
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        logits = self.linear(encoder_outputs)
-        # logits = paddle.matmul(
-        #     encoder_outputs,
-        #     self.gpt2.embeddings.word_embeddings.weight,
-        #     transpose_y=True)
+        # TODO @ZHUI Use all_to_all to 
+        logits = paddle.matmul(
+            encoder_outputs,
+            self.gpt2.embeddings.word_embeddings.weight,
+            transpose_y=True)
 
         if use_cache:
             return logits, cached_kvs
