@@ -125,7 +125,7 @@ class AlbertEmbeddings(Layer):
     # Copied from transformers.models.bert.modeling_bert.BertEmbeddings.forward
     def forward(
             self,
-            input_ids=None,
+            input_ids,
             token_type_ids=None,
             position_ids=None,
             inputs_embeds=None,
@@ -431,7 +431,6 @@ class AlbertTransformer(Layer):
             head_mask=None,
             output_attentions=False,
             output_hidden_states=False,
-            return_dict=True,
     ):
         hidden_states = self.embedding_hidden_mapping_in(hidden_states)
 
@@ -459,13 +458,7 @@ class AlbertTransformer(Layer):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-        if not return_dict:
-            return tuple(v for v in [hidden_states, all_hidden_states, all_attentions] if v is not None)
-        return {
-            "last_hidden_state": hidden_states,
-            "hidden_states": all_hidden_states,
-            "attentions": all_attentions,
-        }
+        return tuple(v for v in [hidden_states, all_hidden_states, all_attentions] if v is not None)
 
 
 class AlbertPretrainedModel(PretrainedModel):
@@ -634,7 +627,7 @@ class AlbertModel(AlbertPretrainedModel):
 
     def forward(
             self,
-            input_ids=None,
+            input_ids,
             attention_mask=None,
             token_type_ids=None,
             position_ids=None,
@@ -642,7 +635,6 @@ class AlbertModel(AlbertPretrainedModel):
             inputs_embeds=None,
             output_attentions=False,
             output_hidden_states=False,
-            return_dict=False,
     ):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
@@ -680,21 +672,13 @@ class AlbertModel(AlbertPretrainedModel):
             head_mask=head_mask,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
         )
 
         sequence_output = encoder_outputs[0]
 
-        pooled_output = self.pooler_activation(self.pooler(sequence_output[:, 0])) if self.pooler is not None else None
-        if not return_dict:
-            return (sequence_output, pooled_output) + encoder_outputs[1:]
-
-        return {
-            "last_hidden_state": sequence_output,
-            "pooler_output": pooled_output,
-            "hidden_states": encoder_outputs.hidden_states,
-            "attentions": encoder_outputs.attentions,
-        }
+        pooled_output = self.pooler_activation(self.pooler(sequence_output[:, 0])) \
+            if self.pooler is not None else None
+        return (sequence_output, pooled_output) + encoder_outputs[1:]
 
 
 class AlbertForPretraining(AlbertPretrainedModel):
@@ -717,17 +701,15 @@ class AlbertForPretraining(AlbertPretrainedModel):
         return self.albert.embeddings.word_embeddings
 
     def forward(self,
-                input_ids=None,
+                input_ids,
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
                 head_mask=None,
                 inputs_embeds=None,
-                labels=None,
                 sentence_order_label=None,
                 output_attentions=False,
                 output_hidden_states=False,
-                return_dict=False,
     ):
         outputs = self.albert(
             input_ids,
@@ -738,31 +720,13 @@ class AlbertForPretraining(AlbertPretrainedModel):
             inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
         )
         sequence_output, pooled_output = outputs[:2]
 
         prediction_scores = self.predictions(sequence_output)
         sop_scores = self.sop_classifier(pooled_output)
 
-        total_loss = None
-        if labels is not None and sentence_order_label is not None:
-            loss_fct = nn.CrossEntropyLoss()
-            masked_lm_loss = loss_fct(prediction_scores.reshape((-1, self.vocab_size)), labels.reshape((-1)))
-            sentence_order_loss = loss_fct(sop_scores.reshape((-1, 2)), sentence_order_label.reshape((-1)))
-            total_loss = masked_lm_loss + sentence_order_loss
-
-        if not return_dict:
-            output = (prediction_scores, sop_scores) + outputs[2:]
-            return ((total_loss,) + output) if total_loss is not None else output
-
-        return {
-            "loss": total_loss,
-            "prediction_logits": prediction_scores,
-            "sop_logits": sop_scores,
-            "hidden_states": outputs["hidden_states"],
-            "attentions": outputs["attentions"],
-        }
+        return (prediction_scores, sop_scores) + outputs[2:]
 
 
 class AlbertMLMHead(Layer):
@@ -813,9 +777,53 @@ class AlbertSOPHead(Layer):
         return logits
 
 
-# To begin with
 class AlbertForMaskedLM(AlbertPretrainedModel):
-    pass
+    def __init__(self, albert):
+        super(AlbertForMaskedLM, self).__init__()
+
+        self.transformer = albert
+        self.predictions = AlbertMLMHead(
+            embedding_size=self.transformer.config["embedding_size"],
+            vocab_size=self.transformer.config["vocab_size"],
+            hidden_size=self.transformer.config["hidden_size"],
+            hidden_act=self.transformer.config["hidden_act"],
+        )
+        self.init_weights()
+
+    def get_output_embeddings(self):
+        return self.predictions.decoder
+
+    def set_output_embeddings(self, new_embeddings):
+        self.predictions.decoder = new_embeddings
+
+    def get_input_embeddings(self):
+        return self.transformer.embeddings.word_embeddings
+
+    def forward(
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=False,
+        output_hidden_states=False,
+    ):
+        transformer_outputs = self.transformer(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+        )
+        sequence_outputs = transformer_outputs[0]
+        prediction_scores = self.predictions(sequence_outputs)
+        return (prediction_scores,) + transformer_outputs[2:]
 
 
 class AlbertForSequenceClassification(AlbertPretrainedModel):
@@ -839,7 +847,6 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
         inputs_embeds=None,
         output_attentions=False,
         output_hidden_states=False,
-        return_dict=False,
     ):
         transformer_outputs = self.transformer(
             input_ids,
@@ -850,23 +857,14 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
             inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
         )
 
-        pooled_output = transformer_outputs[1] if not return_dict \
-            else transformer_outputs["pooled_output"]
+        pooled_output = transformer_outputs[1]
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
 
-        if not return_dict:
-            return (logits,) + transformer_outputs[2:]
-
-        return {
-            "logits": logits,
-            "hidden_states": transformer_outputs["hidden_states"],
-            "attentions": transformer_outputs["attentions"],
-        }
+        return (logits,) + transformer_outputs[2:]
 
 
 class AlbertForTokenClassification(AlbertPretrainedModel):
@@ -890,7 +888,6 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
         inputs_embeds=None,
         output_attentions=False,
         output_hidden_states=False,
-        return_dict=False,
     ):
         transformer_outputs = self.transformer(
             input_ids,
@@ -901,22 +898,100 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
             inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
         )
 
-        sequence_output = transformer_outputs[0] if \
-            not return_dict else transformer_outputs["sequence_output"]
+        sequence_output = transformer_outputs[0]
         logits = self.classifier(sequence_output)
 
-        if not return_dict:
-            return (logits,) + transformer_outputs[2:]
+        return (logits,) + transformer_outputs[2:]
 
-        return {
-            "logits": logits,
-            "hidden_states": transformer_outputs["hidden_states"],
-            "attentions": transformer_outputs["attentions"],
-        }
+
+class AlbertForQuestionAnswering(AlbertPretrainedModel):
+    def __init__(self, albert, num_labels):
+        self.num_labels = num_labels
+        self.transformer = albert
+
+        self.qa_outputs = nn.Linear(self.transformer.config["hidden_size"], num_labels)
+        self.init_weights()
+
+    def forward(
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        start_positions=None,
+        end_positions=None,
+        output_attentions=False,
+        output_hidden_states=False,
+    ):
+        transformer_outputs = self.transformer(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+        )
+        sequence_output = transformer_outputs[0]
+        logits = self.qa_outputs(sequence_output)
+
+        start_logits, end_logits = paddle.split(logits, num_or_sections=1, axis=-1)
+        start_logits = start_logits.squeeze(axis=-1)
+        end_logits = start_logits.squeeze(axis=-1)
+        return (start_logits, end_logits) + transformer_outputs[2:]
 
 
 class AlbertForMultipleChoice(AlbertPretrainedModel):
-    pass
+    def __init__(self, albert, num_labels):
+        self.transformer = albert
+        self.dropout = nn.Dropout(self.transformer.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.transformer.config["hidden_size"], 1)
+        self.init_weights()
+
+    def forward(
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=False,
+        output_hidden_states=False,
+    ):
+        num_choices = input_ids.shape[1] if input_ids is not None else inputs_embeds.shape[1]
+
+        input_ids = input_ids.reshape([-1, input_ids.shape[-1]]) \
+            if input_ids is not None else None
+        attention_mask = attention_mask.reshape([-1, attention_mask.shape[-1]]) \
+            if attention_mask is not None else None
+        token_type_ids = token_type_ids.reshape([-1, token_type_ids.shape[-1]]) \
+            if token_type_ids is not None else None
+        position_ids = position_ids.reshape([-1, position_ids.shape[-1]]) \
+            if position_ids is not None else None
+        inputs_embeds = (
+            inputs_embeds.reshape([-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]])
+            if inputs_embeds is not None
+            else None
+        )
+        outputs = self.albert(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+        )
+        pooled_output = outputs[1]
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)
+        reshaped_logits = logits.reshape([-1, num_choices])
+        return (reshaped_logits,) + outputs[2:]
