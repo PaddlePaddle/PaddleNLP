@@ -1,3 +1,16 @@
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 project(FasterTransformer LANGUAGES C CXX CUDA)
 
@@ -78,22 +91,35 @@ set(COMMON_LIB_DIRS
   ${CUDA_PATH}/lib64
 )
 
-set(FT_PATH "third-party")
+set(THIRD_PATH "third-party")
 set(THIRD_PARTY_NAME "fastertransformer")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(external/boost)
 
+set(OPS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/allocator.h allocator_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/fastertransformer/allocator.h allocator_dst)
+
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/common.h common_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/fastertransformer/common.h common_dst)
+
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/CMakeLists.txt cmakelists_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/CMakeLists.txt cmakelists_dst)
+
+set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} | cp ${common_src} ${common_dst} | cp ${cmakelists_src} ${cmakelists_dst})
+
 ExternalProject_Add(
   extern_${THIRD_PARTY_NAME}
-  GIT_REPOSITORY    https://github.com/NVIDIA/DeepLearningExamples.git
-  GIT_TAG           master
-  PREFIX            ${FT_PATH}
-  SOURCE_DIR        ${FT_PATH}/${THIRD_PARTY_NAME}
-  SOURCE_SUBDIR     "FasterTransformer/v3.1"
-  BINARY_DIR        ${FT_PATH}/build
+  GIT_REPOSITORY    https://github.com/NVIDIA/FasterTransformer.git
+  GIT_TAG           v3.1
+  PREFIX            ${THIRD_PATH}
+  SOURCE_DIR        ${THIRD_PATH}/${THIRD_PARTY_NAME}
+  PATCH_COMMAND     ${FT_PATCH_COMMAND}
+  BINARY_DIR        ${THIRD_PATH}/build
   INSTALL_COMMAND   ""
-  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM}
+  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DPY_CMD=${PY_CMD}
 )
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} BINARY_DIR)
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} SOURCE_DIR)

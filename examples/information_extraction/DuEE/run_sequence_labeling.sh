@@ -12,7 +12,7 @@ pred_save_path=${10}
 
 if [ "$is_train" = True ]; then
     unset CUDA_VISIBLE_DEVICES
-    python -m paddle.distributed.launch --gpus "0"  sequence_labeling.py \
+    python -m paddle.distributed.launch --gpus "2,3"  sequence_labeling.py \
                             --num_epoch ${epoch} \
                             --learning_rate ${learning_rate} \
                             --tag_path ${conf_path} \

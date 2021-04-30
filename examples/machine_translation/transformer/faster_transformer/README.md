@@ -1,6 +1,6 @@
 # Faster Transformer 预测
 
-在这里我们集成了 Nvidia [Faster Transformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer) 用于预测加速。同时集成了 Faster Transformer float32 以及 float16 预测。以下是使用 Faster Transformer 的说明。
+在这里我们集成了 Nvidia [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。同时集成了 Faster Transformer float32 以及 float16 预测。以下是使用 Faster Transformer 的说明。
 
 ## 使用环境说明
 
@@ -9,7 +9,7 @@
 * CUDA 10.1（需要 PaddlePaddle 框架一致）
 * gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
 * 推荐使用 Python3
-* [Faster Transformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer/v3.1#setup) 使用必要的环境
+* [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#setup) 使用必要的环境
 * 环境依赖
   - attrdict
   - pyyaml
@@ -270,10 +270,12 @@ cd bin/
 ``` sh
 cd bin/
 ../third-party/build/bin/decoding_gemm 8 5 8 64 38512 256 512 0
-./transformer_e2e 8 0 ./infer_model/ /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
+./transformer_e2e 8 0 ./infer_model/ DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
-其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer/v3.1#execute-the-decoderdecoding-demos)。
+其中：
+* `decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。
+* `DATA_HOME` 则是 `paddlenlp.utils.env.DATA_HOME` 返回的路径。
 
 ## 模型评估
 

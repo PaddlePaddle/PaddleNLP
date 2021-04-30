@@ -37,3 +37,5 @@ from .ernie_ctm.modeling import *
 from .ernie_ctm.tokenizer import *
 from .skep.modeling import *
 from .skep.tokenizer import *
+from .distilbert.modeling import *
+from .distilbert.tokenizer import *
