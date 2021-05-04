@@ -58,7 +58,7 @@
         <td><center><a href="https://github.com/qweraqq/NLPCC2014_sentiment" >下载地址</a></td>
     </tr>
     <tr>
-        <td rowspan="5"><center>评价对象级的<br /><center>情感分类</td>
+        <td rowspan="4"><center>评价对象级的<br /><center>情感分类</td>
         <td><center>Sem-L</td>
         <td><center>英文</td>
         <td><center>ACC</td>
