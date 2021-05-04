@@ -141,22 +141,29 @@
 以下是本项目主要代码结构及说明：
 
 ```text
-pretrained_models/
+skep/
+├── aspect_sentiment_analysis_predict.py # 对象级的情感分类任务预测脚本
+├── aspect_sentiment_analysis_train.py # 评价对象级的情感分类任务训练脚本
 ├── deploy # 部署
 │   └── python
 │       └── predict.py # python预测部署示例
 ├── export_model.py # 动态图参数导出静态图参数脚本
-├── predict.py # 预测脚本
+├── keypoint_extraction_predict.py # 观点抽取任务预测脚本
+├── keypoint_extraction_train.py # 观点抽取任务训练脚本
 ├── README.md # 使用说明
-└── train.py # 训练评估脚本
+├── sentence_sentiment_analysis_predict.py # 句子级情感分类任务预测脚本
+└── sentence_sentiment_analysis_train.py # 句子级情感分类任务训练脚本
 ```
+
+
+以句子级情感分类任务为例，详细说明SKEP模型在下游任务中该如何使用，其他任务（对象级的情感分类任务、观点抽取任务）使用方式以此类推。
 
 ### 模型训练
 
 我们以情感分类公开数据集ChnSentiCorp（中文）、SST-2（英文）为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 ```shell
 $ unset CUDA_VISIBLE_DEVICES
-$ python -m paddle.distributed.launch --gpus "0" train.py --model_name "skep_ernie_1.0_large_ch" --device gpu --save_dir ./checkpoints
+$ python -m paddle.distributed.launch --gpus "0" sentence_sentiment_analysis_train.py --model_name "skep_ernie_1.0_large_ch" --device gpu --save_dir ./checkpoints
 ```
 
 可支持配置的参数：
@@ -219,7 +226,7 @@ python deploy/python/predict.py --model_name="skep_ernie_1.0_large_ch" --model_f
 启动预测：
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python predict.py --model_name "skep_ernie_1.0_large_ch" --device 'gpu' --params_path checkpoints/model_900/model_state.pdparams
+python sentence_sentiment_analysis_predict.py --model_name "skep_ernie_1.0_large_ch" --device 'gpu' --params_path checkpoints/model_900/model_state.pdparams
 ```
 
 将待预测数据如以下示例：

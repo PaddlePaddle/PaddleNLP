@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-def read_semval2016_phone_dataset(file_path):
+def read_semeval2016_phone_dataset(file_path):
     """Reads data"""
     with open(file_path, 'r', encoding='utf-8') as f:
         next(f)

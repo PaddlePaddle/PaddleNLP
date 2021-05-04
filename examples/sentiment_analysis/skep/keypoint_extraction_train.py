@@ -35,14 +35,14 @@ parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The ou
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--learning_rate", default=3e-6, type=float, help="The initial learning rate for Adam.")
+parser.add_argument("--learning_rate", default=5e-7, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
+parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
+parser.add_argument("--train_data_path", type=str, default='cote_dp/train.txt', help="The path to train dataset.")
+parser.add_argument("--dev_data_path", type=str, default='cote_dp/test.txt', help="The path to dev dataset.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--model_name', choices=['skep_ernie_1.0_large_ch', 'skep_ernie_2.0_large_en'],
-    default="skep_ernie_1.0_large_ch", help="Select which model to train, defaults to skep_ernie_1.0_large_ch.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -55,13 +55,12 @@ def set_seed(seed):
 
 
 @paddle.no_grad()
-def evaluate(model, criterion, metric, data_loader):
+def evaluate(model, metric, data_loader):
     """
     Given a dataset, it evals model and computes the metric.
 
     Args:
         model(obj:`paddle.nn.Layer`): A model to classify texts.
-        criterion(obj:`paddle.nn.Layer`): It can compute the loss.
         metric(obj:`paddle.metric.Metric`): The evaluation metric.
         data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
     """
@@ -69,13 +68,10 @@ def evaluate(model, criterion, metric, data_loader):
     metric.reset()
     avg_loss, precision, recall, f1_score = 0, 0, 0, 0
     for batch in data_loader:
-        input_ids, token_type_ids, length, labels = batch
-        logits = model(input_ids, token_type_ids)
-        loss = criterion(logits, labels)
-        avg_loss = paddle.mean(loss)
-        preds = logits.argmax(axis=2)
+        input_ids, token_type_ids, seq_lens, labels = batch
+        preds = model(input_ids, token_type_ids, seq_lens=seq_lens)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            length, preds, labels)
+            seq_lens, preds, labels)
         metric.update(num_infer_chunks.numpy(),
                       num_label_chunks.numpy(), num_correct_chunks.numpy())
         precision, recall, f1_score = metric.accumulate()
@@ -100,11 +96,6 @@ def convert_example_to_feature(example,
         - single sequence: ``[CLS] X [SEP]``
         - pair of sequences: ``[CLS] A [SEP] B [SEP]``
 
-    A skep_roberta_large_en sequence has the following format:
-    ::
-        - single sequence: ``[CLS] X [SEP]``
-        - pair of sequences: ``[CLS] A [SEP] [SEP] B [SEP]``
-
     A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence pair mask has the following format:
     ::
 
@@ -112,9 +103,6 @@ def convert_example_to_feature(example,
         | first sequence    | second sequence |
 
     If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
-    
-    note: There is no need token type ids for skep_roberta_large_ch model.
-
 
     Args:
         example(obj:`list[str]`): List of input data, containing text and label if it have label.
@@ -182,19 +170,21 @@ if __name__ == "__main__":
         paddle.distributed.init_parallel_env()
 
     train_ds = load_dataset(
-        read_cote_dp_dataset, file_path='cote_dp/new_train.txt', lazy=False)
+        read_cote_dp_dataset, file_path=args.train_data_path, lazy=False)
     dev_ds = load_dataset(
-        read_cote_dp_dataset, file_path='cote_dp/new_train.txt', lazy=False)
+        read_cote_dp_dataset, file_path=args.dev_data_path, lazy=False)
     # The COTE_DP dataset labels with "BIO" schema.
     label_map = {"B": 0, "I": 1, "O": 2}
     # `no_entity_label` represents that the token isn't an entity. 
     no_entity_label = "O"
-    # `ignore_label` is using t0 pad input labels.
+    # `ignore_label` is using to pad input labels.
     ignore_label = -1
 
     set_seed(args.seed)
-    model = ppnlp.transformers.SkepForTokenClassification.from_pretrained(
-        'skep_ernie_1.0_large_ch', num_classes=len(label_map))
+    skep = ppnlp.transformers.SkepModel.from_pretrained(
+        'skep_ernie_1.0_large_ch')
+    model = ppnlp.transformers.SkepCrfForTokenClassification(
+        skep, num_classes=len(label_map))
     tokenizer = ppnlp.transformers.SkepTokenizer.from_pretrained(
         'skep_ernie_1.0_large_ch')
 
@@ -242,17 +232,15 @@ if __name__ == "__main__":
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
-
-    metric = ChunkEvaluator(label_list=label_map.keys(), suffix=False)
-    criterion = paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label)
+    metric = ChunkEvaluator(label_list=label_map.keys(), suffix=True)
 
     global_step = 0
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
-            input_ids, token_type_ids, _, labels = batch
-            logits = model(input_ids, token_type_ids)
-            loss = criterion(logits, labels)
+            input_ids, token_type_ids, seq_lens, labels = batch
+            loss = model(
+                input_ids, token_type_ids, seq_lens=seq_lens, labels=labels)
             avg_loss = paddle.mean(loss)
             global_step += 1
             if global_step % 10 == 0 and rank == 0:
@@ -265,10 +253,10 @@ if __name__ == "__main__":
             optimizer.step()
             optimizer.clear_grad()
             if global_step % 100 == 0 and rank == 0:
+                evaluate(model, metric, dev_data_loader)
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                evaluate(model, criterion, metric, dev_data_loader)
+                file_name = os.path.join(save_dir, "model_state.pdparam")
                 # Need better way to get inner model of DataParallel
-                model._layers.save_pretrained(save_dir)
-                tokenizer.save_pretrained(save_dir)
+                paddle.save(model._layers.state_dict(), file_name)

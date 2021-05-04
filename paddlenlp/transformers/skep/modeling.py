@@ -15,12 +15,14 @@
 import paddle
 import paddle.nn as nn
 
+from paddlenlp.layers.crf import LinearChainCrf, ViterbiDecoder, LinearChainCrfLoss
 from paddlenlp.utils.log import logger
+
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
     'SkepModel', 'SkepPretrainedModel', 'SkepForSequenceClassification',
-    'SkepForTokenClassification'
+    'SkepForTokenClassification', 'SkepCrfForTokenClassification'
 ]
 
 
@@ -436,3 +438,52 @@ class SkepForTokenClassification(SkepPretrainedModel):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
         return logits
+
+
+class SkepCrfForTokenClassification(nn.Layer):
+    def __init__(self, skep, num_classes):
+        super().__init__()
+        self.num_classes = num_classes
+        self.skep = skep  # allow skep to be config
+        gru_hidden_size = 128
+
+        self.gru = nn.GRU(self.skep.config["hidden_size"],
+                          gru_hidden_size,
+                          num_layers=2,
+                          direction='bidirect')
+        self.fc = nn.Linear(
+            gru_hidden_size * 2,
+            self.num_classes,
+            weight_attr=paddle.ParamAttr(
+                initializer=nn.initializer.Uniform(
+                    low=-0.1, high=0.1),
+                regularizer=paddle.regularizer.L2Decay(coeff=1e-4)))
+        self.crf = LinearChainCrf(
+            self.num_classes, crf_lr=0.2, with_start_stop_tag=False)
+        self.crf_loss = LinearChainCrfLoss(self.crf)
+        self.viterbi_decoder = ViterbiDecoder(
+            self.crf.transitions, with_start_stop_tag=False)
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None,
+                seq_lens=None,
+                labels=None):
+        sequence_output, _ = self.skep(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+
+        bigru_output, _ = self.gru(
+            sequence_output)  #, sequence_length=seq_lens)
+        emission = self.fc(bigru_output)
+
+        if labels is not None:
+            loss = self.crf_loss(emission, seq_lens, labels)
+            return loss
+        else:
+            _, prediction = self.viterbi_decoder(emission, seq_lens)
+            return prediction

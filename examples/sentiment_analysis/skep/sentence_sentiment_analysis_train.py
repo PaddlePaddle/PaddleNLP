@@ -94,11 +94,6 @@ def convert_example(example,
         - single sequence: ``[CLS] X [SEP]``
         - pair of sequences: ``[CLS] A [SEP] B [SEP]``
 
-    A skep_roberta_large_en sequence has the following format:
-    ::
-        - single sequence: ``[CLS] X [SEP]``
-        - pair of sequences: ``[CLS] A [SEP] [SEP] B [SEP]``
-
     A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence pair mask has the following format:
     ::
 
@@ -106,8 +101,6 @@ def convert_example(example,
         | first sequence    | second sequence |
 
     If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
-    
-    note: There is no need token type ids for skep_roberta_large_ch model.
 
 
     Args:
