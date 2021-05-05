@@ -95,11 +95,6 @@ def convert_example(example,
         - single sequence: ``[CLS] X [SEP]``
         - pair of sequences: ``[CLS] A [SEP] B [SEP]``
 
-    A skep_roberta_large_en sequence has the following format:
-    ::
-        - single sequence: ``[CLS] X [SEP]``
-        - pair of sequences: ``[CLS] A [SEP] [SEP] B [SEP]``
-
     A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence pair mask has the following format:
     ::
 
