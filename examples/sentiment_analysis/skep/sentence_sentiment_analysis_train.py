@@ -181,6 +181,7 @@ if __name__ == "__main__":
         dataset_name = "sst-2"
         train_ds, dev_ds, test_ds = load_dataset(
             "glue", dataset_name, splits=["train", "dev", "test"])
+    label_map = {0: 'negative', 1: 'positive'}
 
     model = ppnlp.transformers.SkepForSequenceClassification.from_pretrained(
         args.model_name, num_classes=len(label_map))
