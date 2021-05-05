@@ -3,10 +3,10 @@
 信息抽取旨在从非结构化自然语言文本中提取结构化知识，如实体、关系、事件等。关系抽取的目标是对于给定的自然语言句子，根据预先定义的schema集合，抽取出所有满足schema约束的SPO三元组。schema定义了关系P以及其对应的主体S和客体O的类别。
 本基线系统基于预训练语言模型ERNIE设计了结构化的标注策略，可以实现多条、交叠的SPO抽取。
 
-该示例展示了如何使用PaddleNLP快速复现[LIC2021关系抽取比赛](http://aistudio-bce.bcc-bdbl.baidu.com/aistudio/competition/detail/141)基线并进阶优化模型基线。
+该示例展示了如何使用PaddleNLP快速复现[LIC2021关系抽取比赛](http://lic2021.ccf.org.cn/)基线并进阶优化模型基线。
 
 同时，我们提供了该示例在线运行展示教程：
-[PaddleNLP实战——LIC2021关系抽取任务基线](https://aistudio.baidu.com/aistudio/projectdetail/1611211)
+[PaddleNLP实战——LIC2021关系抽取任务基线](https://aistudio.baidu.com/aistudio/projectdetail/1639963)
 
 
 ## 目录结构

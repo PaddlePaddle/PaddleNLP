@@ -26,6 +26,9 @@
 PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用户的使用门槛。只需十几行代码，用户即可完成模型加载和下游任务Fine-tuning。
 
 ```python
+from functools import partial
+import numpy as np
+
 import paddle
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
@@ -36,13 +39,20 @@ model = BertForSequenceClassification.from_pretrained("bert-wwm-chinese", num_cl
 
 tokenizer = BertTokenizer.from_pretrained("bert-wwm-chinese")
 
-# Define the dataloader from dataset and tokenizer here
+def convert_example(example, tokenizer):
+    encoded_inputs = tokenizer(text=example["text"], max_seq_len=512, pad_to_max_seq_len=True)
+    return tuple([np.array(x, dtype="int64") for x in [
+            encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], [example["label"]]]])
+train_ds = train_ds.map(partial(convert_example, tokenizer=tokenizer))
+
+batch_sampler = paddle.io.BatchSampler(dataset=train_ds, batch_size=8, shuffle=True)
+train_data_loader = paddle.io.DataLoader(dataset=train_ds, batch_sampler=batch_sampler, return_list=True)
 
 optimizer = paddle.optimizer.AdamW(learning_rate=0.001, parameters=model.parameters())
 
 criterion = paddle.nn.loss.CrossEntropyLoss()
 
-for input_ids, token_type_ids, labels in train_dataloader:
+for input_ids, token_type_ids, labels in train_data_loader():
     logits = model(input_ids, token_type_ids)
     loss = criterion(logits, labels)
     probs = paddle.nn.functional.softmax(logits, axis=1)
@@ -55,8 +65,9 @@ for input_ids, token_type_ids, labels in train_dataloader:
 
 1. 加载数据集：PaddleNLP内置了多种数据集，用户可以一键导入所需的数据集。
 2. 加载预训练模型：PaddleNLP的预训练模型可以很容易地通过`from_pretrained()`方法加载。第一个参数是汇总表中对应的 `Pretrained Weight`，可加载对应的预训练权重。`BertForSequenceClassification`初始化`__init__`所需的其他参数，如`num_classes`等，也是通过`from_pretrained()`传入。`Tokenizer`使用同样的`from_pretrained`方法加载。
-3. 使用tokenier将dataset处理成模型的输入。此部分可以参考前述的详细示例代码。
-4. 定义训练所需的优化器，loss函数等，就可以开始进行模型fine-tune任务。
+3. 通过Dataset的map函数，使用tokenizer将dataset从原始文本处理成模型的输入。
+4. 定义BatchSampler和DataLoader，shuffle数据、组合Batch。
+5. 定义训练所需的优化器，loss函数等，就可以开始进行模型fine-tune任务。
 
 
 ## 预训练模型适用任务汇总
