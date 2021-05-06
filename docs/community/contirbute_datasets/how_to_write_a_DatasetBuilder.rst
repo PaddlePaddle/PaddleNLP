@@ -1,5 +1,5 @@
 ==============
-如何创建 :class:`DatasetBuilder`
+创建 :class:`DatasetBuilder`
 ==============
 
 数据集的贡献通过定义一个 :class:`DatasetBuilder` 的子类来实现。一个合格的 :class:`DatasetBuilder` 需要遵循一些协议和规范。
