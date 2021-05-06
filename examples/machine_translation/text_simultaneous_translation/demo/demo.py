@@ -24,7 +24,7 @@ from paddlenlp.data import Vocab
 from paddlenlp.transformers import position_encoding_init
 from subword_nmt import subword_nmt
 
-from model_for_demo import SimultaneousTransformer
+from model_for_demo import SimultaneousTransformerDemo
 
 # By default, the Windows system opens the file with GBK code,
 # and the subword_nmt package does not support setting open encoding,
@@ -75,7 +75,7 @@ class STACLTokenizer:
 def init_model(args, init_from_params):
     # Define model
     args.init_from_params = init_from_params
-    transformer = SimultaneousTransformer(
+    transformer = SimultaneousTransformerDemo(
         args.src_vocab_size, args.trg_vocab_size, args.max_length + 1,
         args.n_layer, args.n_head, args.d_model, args.d_inner_hid, args.dropout,
         args.weight_sharing, args.bos_idx, args.eos_idx, args.waitk)
@@ -128,8 +128,7 @@ def translate(args, tokenizer, tokenized_src, transformers, waitks,
             input_src = tokenized_src
             if is_last:
                 decoder_max_length[idx] = args.max_out_len
-                if idx == 0:
-                    input_src = input_src + [args.eos_idx]
+                input_src += [args.eos_idx]
             src_word = paddle.to_tensor(input_src).unsqueeze(axis=0)
             finished_seq, finished_scores, cache = transformer.greedy_search(
                 src_word,

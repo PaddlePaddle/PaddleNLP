@@ -12,202 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
-import numpy as np
+import os
+import sys
 
 import paddle
-import paddle.nn as nn
 import paddle.nn.functional as F
-from paddlenlp.transformers import WordEmbedding, PositionalEmbedding
+
+sys.path.append(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
+from model import SimultaneousTransformer
 
 
-class DecoderLayer(nn.TransformerDecoderLayer):
-    def __init__(self, *args, **kwargs):
-        super(DecoderLayer, self).__init__(*args, **kwargs)
-
-    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, cache=None):
-        residual = tgt
-        if self.normalize_before:
-            tgt = self.norm1(tgt)
-        if cache is None:
-            tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, None)
-        else:
-            tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask,
-                                                    cache[0])
-        tgt = residual + self.dropout1(tgt)
-        if not self.normalize_before:
-            tgt = self.norm1(tgt)
-
-        residual = tgt
-        if self.normalize_before:
-            tgt = self.norm2(tgt)
-        if len(memory) == 1:
-            # Full sent
-            tgt = self.cross_attn(tgt, memory[0], memory[0], memory_mask, None)
-        else:
-            # Wait-k policy
-            cross_attn_outputs = []
-            for i in range(tgt.shape[1]):
-                q = tgt[:, i:i + 1, :]
-                if i >= len(memory):
-                    e = memory[-1]
-                else:
-                    e = memory[i]
-                cross_attn_outputs.append(
-                    self.cross_attn(q, e, e, memory_mask[:, :, i:i + 1, :
-                                                         e.shape[1]], None))
-            tgt = paddle.concat(cross_attn_outputs, axis=1)
-        tgt = residual + self.dropout2(tgt)
-        if not self.normalize_before:
-            tgt = self.norm2(tgt)
-
-        residual = tgt
-        if self.normalize_before:
-            tgt = self.norm3(tgt)
-        tgt = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
-        tgt = residual + self.dropout3(tgt)
-        if not self.normalize_before:
-            tgt = self.norm3(tgt)
-        return tgt if cache is None else (tgt, (incremental_cache, ))
-
-
-class SimultaneousTransformer(nn.Layer):
+class SimultaneousTransformerDemo(SimultaneousTransformer):
     """
     model
     """
-
-    def __init__(self,
-                 src_vocab_size,
-                 trg_vocab_size,
-                 max_length,
-                 n_layer,
-                 n_head,
-                 d_model,
-                 d_inner_hid,
-                 dropout,
-                 weight_sharing,
-                 bos_id=0,
-                 eos_id=1,
-                 waitk=-1):
-        super(SimultaneousTransformer, self).__init__()
-        self.trg_vocab_size = trg_vocab_size
-        self.emb_dim = d_model
-        self.bos_id = bos_id
-        self.eos_id = eos_id
-        self.dropout = dropout
-        self.waitk = waitk
-        self.n_layer = n_layer
-        self.n_head = n_head
-        self.d_model = d_model
-
-        self.src_word_embedding = WordEmbedding(
-            vocab_size=src_vocab_size, emb_dim=d_model, bos_idx=self.bos_id)
-        self.src_pos_embedding = PositionalEmbedding(
-            emb_dim=d_model, max_length=max_length, bos_idx=self.bos_id)
-        if weight_sharing:
-            assert src_vocab_size == trg_vocab_size, (
-                "Vocabularies in source and target should be same for weight sharing."
-            )
-            self.trg_word_embedding = self.src_word_embedding
-            self.trg_pos_embedding = self.src_pos_embedding
-        else:
-            self.trg_word_embedding = WordEmbedding(
-                vocab_size=trg_vocab_size, emb_dim=d_model, bos_idx=self.bos_id)
-            self.trg_pos_embedding = PositionalEmbedding(
-                emb_dim=d_model, max_length=max_length, bos_idx=self.bos_id)
-
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model,
-            nhead=n_head,
-            dim_feedforward=d_inner_hid,
-            dropout=dropout,
-            activation='relu',
-            normalize_before=True,
-            bias_attr=[False, True])
-        encoder_norm = nn.LayerNorm(d_model)
-        self.encoder = nn.TransformerEncoder(
-            encoder_layer=encoder_layer, num_layers=n_layer, norm=encoder_norm)
-
-        decoder_layer = DecoderLayer(
-            d_model=d_model,
-            nhead=n_head,
-            dim_feedforward=d_inner_hid,
-            dropout=dropout,
-            activation='relu',
-            normalize_before=True,
-            bias_attr=[False, False, True])
-        decoder_norm = nn.LayerNorm(d_model)
-        self.decoder = nn.TransformerDecoder(
-            decoder_layer=decoder_layer, num_layers=n_layer, norm=decoder_norm)
-
-        if weight_sharing:
-            self.linear = lambda x: paddle.matmul(
-                x=x, y=self.trg_word_embedding.word_embedding.weight, transpose_y=True)
-        else:
-            self.linear = nn.Linear(
-                in_features=d_model,
-                out_features=trg_vocab_size,
-                bias_attr=False)
-
-    def forward(self, src_word, trg_word):
-        src_max_len = paddle.shape(src_word)[-1]
-        trg_max_len = paddle.shape(trg_word)[-1]
-        base_attn_bias = paddle.cast(
-            src_word == self.bos_id,
-            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
-        src_slf_attn_bias = base_attn_bias
-        src_slf_attn_bias.stop_gradient = True
-        trg_slf_attn_bias = paddle.tensor.triu(
-            (paddle.ones(
-                (trg_max_len, trg_max_len),
-                dtype=paddle.get_default_dtype()) * -np.inf),
-            1)
-        trg_slf_attn_bias.stop_gradient = True
-        trg_src_attn_bias = paddle.tile(base_attn_bias, [1, 1, trg_max_len, 1])
-        src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
-                start=0, end=src_max_len)
-        trg_pos = paddle.cast(
-            trg_word != self.bos_id, dtype="int64") * paddle.arange(
-                start=0, end=trg_max_len)
-        src_emb = self.src_word_embedding(src_word)
-        src_pos_emb = self.src_pos_embedding(src_pos)
-        src_emb = src_emb + src_pos_emb
-        enc_input = F.dropout(
-            src_emb, p=self.dropout,
-            training=self.training) if self.dropout else src_emb
-        with paddle.static.amp.fp16_guard():
-            if self.waitk >= src_max_len or self.waitk == -1:
-                # Full sentence
-                enc_outputs = [
-                    self.encoder(
-                        enc_input, src_mask=src_slf_attn_bias)
-                ]
-            else:
-                # Wait-k policy
-                enc_outputs = []
-                for i in range(self.waitk, src_max_len + 1):
-                    enc_output = self.encoder(
-                        enc_input[:, :i, :],
-                        src_mask=src_slf_attn_bias[:, :, :, :i])
-                    enc_outputs.append(enc_output)
-
-            trg_emb = self.trg_word_embedding(trg_word)
-            trg_pos_emb = self.trg_pos_embedding(trg_pos)
-            trg_emb = trg_emb + trg_pos_emb
-            dec_input = F.dropout(
-                trg_emb, p=self.dropout,
-                training=self.training) if self.dropout else trg_emb
-            dec_output = self.decoder(
-                dec_input,
-                enc_outputs,
-                tgt_mask=trg_slf_attn_bias,
-                memory_mask=trg_src_attn_bias)
-
-            predict = self.linear(dec_output)
-
-        return predict
 
     def greedy_search(self,
                       src_word,
@@ -215,6 +34,12 @@ class SimultaneousTransformer(nn.Layer):
                       waitk=-1,
                       caches=None,
                       bos_id=None):
+        """
+        greedy_search uses streaming reader. It doesn't need calling
+        encoder many times, an a sub-sentence just needs calling encoder once.
+        So, it needsprevious state(caches) and last one of generated
+        tokens id last time.
+        """
         src_max_len = paddle.shape(src_word)[-1]
         base_attn_bias = paddle.cast(
             src_word == self.bos_id,
