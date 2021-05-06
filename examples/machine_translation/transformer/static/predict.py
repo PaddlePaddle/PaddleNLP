@@ -72,7 +72,7 @@ def do_predict(args):
 
     # Define data loader
     test_loader, to_tokens = reader.create_infer_loader(
-        args, places=[place], use_all_vocab=args.use_all_vocab)
+        args, use_all_vocab=args.use_all_vocab)
 
     test_program = paddle.static.Program()
     startup_program = paddle.static.Program()
