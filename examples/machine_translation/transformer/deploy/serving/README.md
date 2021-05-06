@@ -60,6 +60,7 @@ model fetch_names : dict_keys(['save_infer_model/scale_0.tmp_1'])   # 模型输�
 Transformer 的服务端使用的是 Paddle Serving 的 `WebService` 相关接口。执行的命令如下：
 
 ``` sh
+export CUDA_VISIBLE_DEVICES=0
 python transformer_web_server.py --config ../../configs/transformer.base.yaml --device gpu --model_dir ./transformer_server
 ```
 

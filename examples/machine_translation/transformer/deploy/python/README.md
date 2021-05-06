@@ -20,6 +20,7 @@ cp -rf ../../infer_model/ ./
 执行如下命令可以使用 Paddle Inference Python API 进行推理：
 
 ``` sh
+export CUDA_VISIBLE_DEVICES=0
 python inference.py \
         --config ../../configs/transformer.base.yaml \
         --batch_size 8 \

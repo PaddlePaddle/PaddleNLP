@@ -61,6 +61,7 @@ bash run.sh
 执行的参数及解释如下：
 
 ``` sh
+export CUDA_VISIBLE_DEVICES=0
 ./build/bin/transformer_e2e -batch_size 8 -device gpu -gpu_id 0 -model_dir ./infer_model/ -vocab_dir /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
