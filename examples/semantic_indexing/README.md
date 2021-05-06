@@ -13,22 +13,22 @@
 |   HardestNeg|  50.22(**+3.23**) |  65.17(**+4.33**) |
 
 
-## 下载预训练模型
+## 语义索引预训练模型下载
 以下模型结构参数为:
 `TrasformerLayer:12, Hidden:768, Heads:12, OutputEmbSize: 256`
 
 |Model|训练参数配置|MD5|
 | ------------ | ------------ | ------------ |
-|[batch_neg_v1.0]()|<div style="width: 200pt">margin:0.2 scale:30 epoch:3 lr:5E-5</div>|da1bb1487bd3fd6a53b8ef95c278f3e6|
-|[hardest_neg_v1.0]()|margin:0.2 epoch:3 lr:5E-5|b535d890110ea608c8562c525a0b84b5|
+|[batch_neg_v1.0](https://paddlenlp.bj.bcebos.com/models/semantic_index/batch_neg_v1.0.tar)|<div style="width: 200pt">margin:0.2 scale:30 epoch:3 lr:5E-5</div>|da1bb1487bd3fd6a53b8ef95c278f3e6|
+|[hardest_neg_v1.0](https://paddlenlp.bj.bcebos.com/models/semantic_index/hardest_neg_v1.0.tar)|margin:0.2 epoch:3 lr:5E-5|b535d890110ea608c8562c525a0b84b5|
 
 
 ## 数据下载
 |数据|描述|数量|MD5|
 | ------------ | ------------ | ------------ | -------- |
-|<div style="width: 180pt">[训练集(semantic_pair_train.tsv)]()</div>|<div style="width: 220pt">每行为语义相似的文本 Pair 构成的训练集</div>|222546|590286f695200160350cc5838cb34f00|
-|[评估集(same_semantic.tsv)]()|每行为语义相似文本 Pair 构成的评估集|10255|86ec1fd5234d944177574372dcf780c5|
-|[召回库(corpus_file）]()|每行为单条文本构成的召回库|313714|a3fbc3421b5aeb939809876fc7beeaa8|
+|<div style="width: 180pt">[训练集(semantic_pair_train.tsv)](https://paddlenlp.bj.bcebos.com/models/semantic_index/semantic_pair_train.tsv)</div>|<div style="width: 220pt">每行为语义相似的文本 Pair 构成的训练集</div>|222546|590286f695200160350cc5838cb34f00|
+|[评估集(same_semantic.tsv)](https://paddlenlp.bj.bcebos.com/models/semantic_index/same_semantic.tsv)|每行为语义相似文本 Pair 构成的评估集|10255|86ec1fd5234d944177574372dcf780c5|
+|[召回库(corpus_file）](https://paddlenlp.bj.bcebos.com/models/semantic_index/corpus_file)|每行为单条文本构成的召回库|313714|a3fbc3421b5aeb939809876fc7beeaa8|
 
 ## 快速开始
 快速基于 BatchNeg 策略和 HadestNeg 策略训练产出语义索引模型。
@@ -44,7 +44,7 @@ BatchNeg 策略的训练数据每一行由 `tab` 分隔的语义相似的文本 
 学日语软件手机上的        手机学日语的软件
 ```
 
-您可以按照上述格式组织自己的训练数据，也可以`点击这里`下载我们基于开源语义相似度任务评测数据集构造生成的的训练数据 `semantic_pair_train.tsv`。
+您可以按照上述格式组织自己的训练数据，或者下载我们基于开源语义相似度任务评测数据集([LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html)、[BQ Corpus](http://icrc.hitsz.edu.cn/Article/show/175.html)、[PAWS-X](    https://github.com/google-research-datasets/paws/tree/master/pawsx))构造生成的的训练数据 [semantic_pair_train.tsv(https://paddlenlp.bj.bcebos.com/models/semantic_index/semantic_pair_train.tsv)。
 
 #### 开始训练
 以我们提供的语义相似度训练数据为例，通过如下命令，指定 GPU 0,1,2,3 卡, 开始模型训练
@@ -69,10 +69,10 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 
 ##### 评估数据
 1. 评估集:
-我们从开源语义相似度数据集([LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html)、[BQ Corpus](http://icrc.hitsz.edu.cn/Article/show/175.html)、[PAWS-X](https://github.com/google-research-datasets/paws/tree/master/pawsx)) 的验证集中抽取出正例文本 Pair 生成评估集（共 1.4 万) `same_semantic.tsv`，其中第 1 列文本作为输入模型的源文本 *Source Text*、第 2 列文本作为语义相似的目标文本 *Target Text*
+我们从开源语义相似度数据集([LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html)、[BQ Corpus](http://icrc.hitsz.edu.cn/Article/show/175.html)、[PAWS-X](https://github.com/google-research-datasets/paws/tree/master/pawsx)) 的验证集中抽取出正例文本 Pair 生成评估集 [same_semantic.tsv](https://paddlenlp.bj.bcebos.com/models/semantic_index/same_semantic.tsv)，其中第 1 列文本作为输入模型的源文本 *Source Text*、第 2 列文本作为语义相似的目标文本 *Target Text*
 
 2. 召回库:
-抽取出开源语义相似度数据集([LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html)、[BQ Corpus](http://icrc.hitsz.edu.cn/Article/show/175.html)、[PAWS-X](https://github.com/google-research-datasets/paws/tree/master/pawsx))训练集中的所有文本和验证集中所有文本 Pair 的第 2 列 *Target Text* 作为召回库(共 33.4 万)
+抽取出开源语义相似度数据集([LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html)、[BQ Corpus](http://icrc.hitsz.edu.cn/Article/show/175.html)、[PAWS-X](https://github.com/google-research-datasets/paws/tree/master/pawsx))训练集中的所有文本和验证集中所有文本 Pair 的第 2 列 *Target Text* 生成召回库 [corpus_file](https://paddlenlp.bj.bcebos.com/models/semantic_index/corpus_file)
 
 ##### 评估指标
 采用 Recall@10 和 Recall@50 指标来评估语义索引模型的召回效果
@@ -86,7 +86,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 2. 召回
 基于语义索引模型抽取出评估集 *Source Text* 的文本向量，在第 1 步中建立的索引库中进行 ANN 查询召回 Top50 最相似的 *Target Text*, 产出评估集中 *Source text* 的召回结果 `recall_result` 文件
 
-3. 评估： 基于评估集 `same_semantic.tsv` 和 召回结果 `recall_result` 计算评估指标 R@10 和 R@50
+3. 评估： 基于评估集 [same_semantic.tsv](https://paddlenlp.bj.bcebos.com/models/semantic_index/same_semantic.tsv) 和召回结果 `recall_result` 计算评估指标 R@10 和 R@50
 
 运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
 
