@@ -4,7 +4,7 @@
 
 覆盖中文全词类的知识库和知识标注工具能够帮助你面对更加多元的应用场景，方便地融合自有知识体系，显著提升中文文本解析和挖掘效果，并能够更容易地利用知识增强机器学习模型效果。
 
-![image-20210429195529388](doc/img/image-20210429195529388.png)
+![text_to_knowledge](doc/img/text_to_knowledge.png)
 
 [TermTree：能够描述所有中文词汇的百科知识树](./termtree) ：词类体系全面覆盖**百度百科词条、搜索query**，经过大规模工业应用验证，适合通用领域文本理解。
 
@@ -20,7 +20,7 @@
 
 中文文本知识标注工具（WordTag）整合了传统中文解析的**分词**、**词性标注**、**命名实体识别**的能力，能够将任意中文句子解析为**完整的词类序列**。结合百科知识树（TermTree），可为应用提供一套通用的知识关联（term-linking）框架，方便应用适配关联自己的应用知识图谱，更好地将知识用于中文自然语言处理（NLP）任务。
 
-![image-20210428185751727](doc/img/image-20210428185751727.png)
+![text_to_knowledge_example](doc/img/text_to_knowledge_example.png)
 
 
 
@@ -39,42 +39,42 @@
         {
             "item": "美人鱼",
             "offset": 0,
-            "WordTag_label": "作品类_实体",
+            "wordtag_label": "作品类_实体",
             "length": 3,
             "termid": "作品与出版物_eb_美人鱼"
         },
         {
             "item": "是",
             "offset": 3,
-            "WordTag_label": "肯定词",
+            "wordtag_label": "肯定词",
             "length": 1,
             "termid": "肯定否定词_cb_是"
         },
         {
             "item": "周星驰",
             "offset": 4,
-            "WordTag_label": "人物类_实体",
+            "wordtag_label": "人物类_实体",
             "length": 3,
             "termid": "人物_eb_周星驰"
         },
         {
             "item": "执导",
             "offset": 7,
-            "WordTag_label": "场景事件",
+            "wordtag_label": "场景事件",
             "length": 2,
             "termid": "场景事件_cb_执导"
         },
         {
             "item": "的",
             "offset": 9,
-            "WordTag_label": "助词",
+            "wordtag_label": "助词",
             "length": 1,
             "termid": "助词_cb_的"
         },
         {
             "item": "电影",
             "offset": 10,
-            "WordTag_label": "作品类_概念",
+            "wordtag_label": "作品类_概念",
             "length": 2,
             "termid": "影视作品_cb_电影"
         }
