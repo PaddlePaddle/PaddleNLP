@@ -52,7 +52,7 @@ class XLNetTokenizer(PretrainedTokenizer):
             **does not** lowercase the input.
         remove_space (bool, optional):
             Whether or not to strip the text when tokenizing. Defaults to `True` and
-            removing excess spaces before and after the string.
+            removes excess spaces before and after the string.
         keep_accents (bool, optional):
             Whether or not to keep accents when tokenizing. Defaults to `False` and **does not** keep accents.
         bos_token (str, optional):
@@ -69,14 +69,14 @@ class XLNetTokenizer(PretrainedTokenizer):
             A special token separating two different sentences in the same input.
             Defaults to `"<sep>"`.
         pad_token (str, optional):
-            A special token used to make arrays of tokens the same size for batching purpose.
+            A special token used to make arrays of tokens the same size for batching purposes.
             Defaults to `"<pad>"`.
         cls_token (str, optional):
             A special token used for sequence classification. It is the last token
             of the sequence when built with special tokens. Defaults to `"<cls>"`.
         mask_token (str, optional):
             A special token representing a masked token. This is the token used
-            in the masked language modeling task which the model will try to predict the original unmasked ones.
+            in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to `"<mask>"`.
         additional_special_tokens (List[str], optional):
             A list of additional special tokens to be used by the tokenizer.
