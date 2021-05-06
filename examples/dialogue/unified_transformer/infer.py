@@ -1,11 +1,40 @@
 import time
+import argparse
 
 import paddle
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 from paddlenlp.metrics import BLEU, Distinct
 
-from utils import parse_args, print_args, set_seed, create_data_loader, select_response
+from utils import print_args, set_seed, create_data_loader, select_response
+
+
+# yapf: disable
+def parse_args():
+    parser = argparse.ArgumentParser(__doc__)
+    parser.add_argument('--model_name_or_path', type=str, default='unified_transformer-12L-cn-luge', help='The path or shortcut name of the pre-trained model.')
+    parser.add_argument('--output_path', type=str, default='./predict.txt', help='The file path where the infer result will be saved.')
+    parser.add_argument('--logging_steps', type=int, default=100, help='Log every X updates steps.')
+    parser.add_argument('--seed', type=int, default=2021, help='Random seed for initialization.')
+    parser.add_argument('--batch_size', type=int, default=16, help='Batch size per GPU/CPU for training.')
+    parser.add_argument('--max_seq_len', type=int, default=512, help='The maximum sequence length of training.')
+    parser.add_argument('--max_response_len', type=int, default=128, help='The maximum response sequence length of training.')
+    parser.add_argument('--max_knowledge_len', type=int, default=256, help='The maximum knowledge sequence length of training.')
+    parser.add_argument('--min_dec_len', type=int, default=1, help='The minimum sequence length of generation.')
+    parser.add_argument('--max_dec_len', type=int, default=64, help='The maximum sequence length of generation.')
+    parser.add_argument('--num_return_sequences', type=int, default=20, help='The numbers of returned sequences for one input in generation.')
+    parser.add_argument('--decode_strategy', type=str, default='sampling', help='The decode strategy in generation.')
+    parser.add_argument('--top_k', type=int, default=0, help='The number of highest probability vocabulary tokens to keep for top-k sampling.')
+    parser.add_argument('--temperature', type=float, default=1.0, help='The value used to module the next token probabilities.')
+    parser.add_argument('--top_p', type=float, default=1.0, help='The cumulative probability for top-p sampling.')
+    parser.add_argument('--num_beams', type=int, default=0, help='The number of beams for beam search.')
+    parser.add_argument('--length_penalty', type=float, default=1.0, help='The exponential penalty to the sequence length for beam search.')
+    parser.add_argument('--early_stopping', type=eval, default=False, help='Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.')
+    parser.add_argument('--device', type=str, default='gpu', help='The device to select for training the model.')
+
+    args = parser.parse_args()
+    return args
+# yapf: enable
 
 
 def calc_bleu_and_distinct(preds, targets):
@@ -69,7 +98,7 @@ def infer(args):
             num_beams=args.num_beams,
             length_penalty=args.length_penalty,
             early_stopping=args.early_stopping,
-            num_return_sequences=args.num_samples)
+            num_return_sequences=args.num_return_sequences)
 
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
@@ -77,7 +106,7 @@ def infer(args):
                   (step, total_time / args.logging_steps))
             total_time = 0.0
         results = select_response(ids, scores, tokenizer, args.max_dec_len,
-                                  args.num_samples)
+                                  args.num_return_sequences)
         pred_responses.extend(results)
 
         start_time = time.time()
