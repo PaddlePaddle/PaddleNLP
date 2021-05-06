@@ -29,6 +29,26 @@
 
 ## 快速开始
 快速基于 BatchNeg 策略和 HadestNeg 策略训练产出语义索引模型。
+
+### 项目依赖:
+- [hnswlib](https://github.com/nmslib/hnswlib)
+
+### 代码结构及说明
+```
+|—— train_batch_neg.py # BatchNeg 策略的训练主脚本
+|—— train_hardest_neg.py # HardestNeg 策略的训练主脚本
+|—— batch_negative
+    |—— model.py # BatchNeg 策略核心网络结构
+|——hardest_negative
+    |—— model.py # HardestNeg 策略核心网络结构
+|—— ann_util.py # Ann 建索引库相关函数
+|—— base_model.py # 语义索引模型基类
+|—— data.py # 数据读取、数据转换等预处理逻辑
+|—— evaluate.py # 根据召回结果和评估集计算评估指标
+|—— predict.py # 给定输入文件，计算文本 pair 的相似度
+|—— recall.py # 基于训练好的语义索引模型，从召回库中召回给定文本的相似文本
+```
+
 ### BatchNeg
 
 #### 准备训练数据
@@ -60,6 +80,14 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --margin 0.2 \
     --train_set_file semantic_pair_train.tsv \
 ```
+
+参数含义说明
+* `device`: 使用 cpu/gpu 进行训练
+* `save_dir`: 模型存储路径
+* `output_emb_size`: Transformer 顶层输出的文本向量维度
+* `save_steps`： 模型存储 checkpoint 的间隔 steps 个数
+* `margin`: 正样本相似度与负样本之间的目标 Gap
+* `train_set_file`: 训练集文件
 
 #### 效果评估
 语义索引模型的目标是: 给定输入文本，模型可以从海量候选召回库中快速、准确地召回一批语义相关文本。我们基于开源的语义相似度数据集构造了语义索引模型的评估集与召回库数据。
@@ -104,6 +132,18 @@ python -u -m paddle.distributed.launch --gpus "0" --log_dir "recall_log/" \
         --corpus_file "corpus_file" \
 ```
 
+参数含义说明
+* `device`: 使用 cpu/gpu 进行训练
+* `recall_result_dir`: 召回结果存储目录
+* `recall_result_file`: 召回结果的文件名
+* `params_path`： 待评估模型的参数文件名
+* `hnsw_m`: hnsw 算法相关参数，保持默认即可
+* `hnsw_ef`: hnsw 算法相关参数，保持默认即可
+* `output_emb_size`: Transformer 顶层输出的文本向量维度
+* `recall_num`: 对 1 个文本召回的相似文本数量
+* `similar_text_pair`: 由相似文本对构成的评估集 semantic_similar_pair.tsv
+* `corpus_file`: 召回库数据 corpus_file
+
 成功运行结束后，会在 `./recall_result_dir/` 目录下产出 `recall_result.txt` 文件，部分召回示例结果如下:
 ```
 开初婚未育证明怎么弄？  初婚未育证明怎么开？        0.9878678917884827
@@ -119,6 +159,11 @@ python -u -m paddle.distributed.launch --gpus "0" --log_dir "recall_log/" \
         --recall_result_file "./recall_result_dir/recall_result.txt" \
         --recall_num 50
 ```
+
+参数含义说明
+* `similar_text_pair`: 由相似文本对构成的评估集 semantic_similar_pair.tsv
+* `recall_result_file`: 针对评估集中第一列文本 *Source Text* 的召回结果
+* `recall_num`: 对 1 个文本召回的相似文本数量
 
 成功运行结束后，会输出如下评估指标, 分别为 R@10 和 R@50
 ```
@@ -149,6 +194,13 @@ python -u -m paddle.distributed.launch --gpus "0" \
     --max_seq_length 64 \
     --text_pair_file ${your_input_file}
 ```
+
+参数含义说明
+* `device`: 使用 cpu/gpu 进行训练
+* `params_path`： 预训练模型的参数文件名
+* `output_emb_size`: Transformer 顶层输出的文本向量维度
+* `text_pair_file`: 由文本 Pair 构成的待预测数据集
+
 产出如下结果
 ```
 0.8121148943901062
