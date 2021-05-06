@@ -112,7 +112,7 @@ if __name__ == "__main__":
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
 
-    query_embedding = model.get_semantic_embedding(query_data_loader).numpy()
+    query_embedding = model.get_semantic_embedding(query_data_loader)
 
     if not os.path.exists(args.recall_result_dir):
         os.mkdir(args.recall_result_dir)
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     with open(recall_result_file, 'w') as f:
         for batch_index, batch_query_embedding in enumerate(query_embedding):
             recalled_idx, cosine_sims = final_index.knn_query(
-                batch_query_embedding, args.recall_num)
+                batch_query_embedding.numpy(), args.recall_num)
 
             batch_size = len(cosine_sims)
 
