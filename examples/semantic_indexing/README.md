@@ -44,7 +44,7 @@ BatchNeg 策略的训练数据每一行由 `tab` 分隔的语义相似的文本 
 学日语软件手机上的        手机学日语的软件
 ```
 
-您可以按照上述格式组织自己的训练数据，或者下载我们基于开源语义相似度任务评测数据集([LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html)、[BQ Corpus](http://icrc.hitsz.edu.cn/Article/show/175.html)、[PAWS-X](    https://github.com/google-research-datasets/paws/tree/master/pawsx))构造生成的的训练数据 [semantic_pair_train.tsv(https://paddlenlp.bj.bcebos.com/models/semantic_index/semantic_pair_train.tsv)。
+您可以按照上述格式组织自己的训练数据，或者下载我们基于开源语义相似度任务评测数据集([LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html)、[BQ Corpus](http://icrc.hitsz.edu.cn/Article/show/175.html)、[PAWS-X](https://github.com/google-research-datasets/paws/tree/master/pawsx))构造生成的的训练数据 [semantic_pair_train.tsv](https://paddlenlp.bj.bcebos.com/models/semantic_index/semantic_pair_train.tsv)。
 
 #### 开始训练
 以我们提供的语义相似度训练数据为例，通过如下命令，指定 GPU 0,1,2,3 卡, 开始模型训练
