@@ -17,7 +17,8 @@
 |[ELECTRA](https://arxiv.org/abs/2003.10555) | ElectraTokenizer| ElectraModel<br>ElectraForSequenceClassification<br>ElectraForTokenClassification<br>|`electra-small`<br> `electra-base`<br> `electra-large`<br> `chinese-electra-small`<br> `chinese-electra-base`<br>|
 |[XLNet](https://arxiv.org/abs/1906.08237)| XLNetTokenizer| XLNetModel<br> XLNetForSequenceClassification<br> XLNetForTokenClassification |`xlnet-base-cased`<br> `xlnet-large-cased`<br> `chinese-xlnet-base`<br> `chinese-xlnet-mid`<br> `chinese-xlnet-large`|
 |[UnifiedTransformer](https://arxiv.org/abs/2006.16779)| UnifiedTransformerTokenizer| UnifiedTransformerModel<br> UnifiedTransformerLMHeadModel |`unified_transformer-12L-cn`<br> `unified_transformer-12L-cn-luge` |
-|[Transformer](https://arxiv.org/abs/1706.03762) |- | TransformerModel | - |
+|[DistilBERT](https://arxiv.org/abs/1910.01108) |DistilBertTokenizer|DistilBertModel<br>DistilBertForSequenceClassification<br>DistilBertForQuestionAnswering<br>DistilBertForTokenClassification<br>DistilBertForMaskedLM | `distilbert-base-uncased`<br>`distilbert-base-cased` |
+|[TinyBERT](https://arxiv.org/abs/1909.10351) |TinyBertTokenizer | TinyBertModel<br>TinyBertForPretraining<br>TinyBertForSequenceClassification | `tinybert-4l-312d`<br>`tinybert-6l-768d`<br>`tinybert-4l-312d-v2`<br>`tinybert-6l-768d-v2` |
 
 **NOTE**：其中中文的预训练模型有`bert-base-chinese, bert-wwm-chinese, bert-wwm-ext-chinese, ernie-1.0, ernie-tiny, gpt2-base-cn, roberta-wwm-ext, roberta-wwm-ext-large, rbt3, rbtl3, chinese-electra-base, chinese-electra-small, chinese-xlnet-base, chinese-xlnet-mid, chinese-xlnet-large, unified_transformer-12L-cn, unified_transformer-12L-cn-luge`。
 
@@ -76,9 +77,9 @@ for input_ids, token_type_ids, labels in train_data_loader():
 
 |任务|模型|应用场景|预训练权重|
 |---|---|---|---|
-|文本分类<br>SequenceClassification |BertForSequenceClassification <br> ErnieForSequenceClassification <br> RobertaForSequenceClassification <br> ElectraForSequenceClassification <br> XLNetForSequenceClassification | [文本分类](../examples/text_classification/pretrained_models/)、[阅读理解](../examples/machine_reading_comprehension/DuReader-yesno/)等| [见上表](#Transformer预训练模型汇总)|
-|序列标注<br>TokenClassification|BertForTokenClassification <br> ErnieForTokenClassification <br> RobertaForTokenClassification <br> ElectraForTokenClassification <br> XLNetForTokenClassification | [命名实体标注](../examples/information_extraction/msra_ner/)等|[见上表](#Transformer预训练模型汇总)|
-|问答任务<br>QuestionAnswering|BertForQuestionAnswering <br> ErnieForQuestionAnswering <br> RobertaForQuestionAnswering| [阅读理解](../examples/machine_reading_comprehension/SQuAD/)等|[见上表](#Transformer预训练模型汇总)|
+|文本分类<br>SequenceClassification |BertForSequenceClassification <br> ErnieForSequenceClassification <br> RobertaForSequenceClassification <br> ElectraForSequenceClassification <br> XLNetForSequenceClassification <br> DistilBertForSequenceClassification <br> TinyBertForSequenceClassification | [文本分类](../examples/text_classification/pretrained_models/)、[阅读理解](../examples/machine_reading_comprehension/DuReader-yesno/)等| [见上表](#Transformer预训练模型汇总)|
+|序列标注<br>TokenClassification|BertForTokenClassification <br> ErnieForTokenClassification <br> RobertaForTokenClassification <br> ElectraForTokenClassification <br> XLNetForTokenClassification <br> DistilBertForTokenClassification | [命名实体标注](../examples/information_extraction/msra_ner/)等|[见上表](#Transformer预训练模型汇总)|
+|问答任务<br>QuestionAnswering|BertForQuestionAnswering <br> ErnieForQuestionAnswering <br> RobertaForQuestionAnswering <br> DistilBertForQuestionAnswering| [阅读理解](../examples/machine_reading_comprehension/SQuAD/)等|[见上表](#Transformer预训练模型汇总)|
 |文本生成<br>TextGeneration | ErnieForGeneration <br> GPT2ForGreedyGeneration |[文本生成](../examples/text_generation/ernie-gen)等|[见上表](#Transformer预训练模型汇总)|
 |机器翻译<br>MachineTranslation| TransformerModel | [机器翻译](../examples/machine_translation/transformer/)|[见上表](#Transformer预训练模型汇总)|
 
