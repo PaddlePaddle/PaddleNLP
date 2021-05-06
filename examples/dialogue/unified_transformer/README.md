@@ -4,7 +4,7 @@
 
 近年来，人机对话系统受到了学术界和产业界的广泛关注并取得了不错的发展。开放域对话系统旨在建立一个开放域的多轮对话系统，使得机器可以流畅自然地与人进行语言交互，既可以进行日常问候类的闲聊，又可以完成特定功能，以使得开放域对话系统具有实际应用价值。具体的说，开放域对话可以继续拆分为支持不同功能的对话形式，例如对话式推荐，知识对话技术等，如何解决并有效融合以上多个技能面临诸多挑战。
 
-[UnifiedTransformer](https://arxiv.org/abs/2006.16779)以[Transformer](https://arxiv.org/abs/1706.03762) 编码器为网络基本组件，采用灵活的注意力机制，十分适合文本生成任务，并在模型输入中加入了标识不同对话技能的special token，使得模型能同时支持闲聊对话、推荐对话和知识对话。
+[UnifiedTransformer](https://arxiv.org/abs/2006.16779)以[Transformer](https://arxiv.org/abs/1706.03762) 编码器为网络基本组件，采用灵活的注意力机制，十分适合对话生成任务。
 
 本项目是UnifiedTransformer在 Paddle 2.0上的开源实现，包含了在[DuConv](https://www.aclweb.org/anthology/P19-1369/)数据集上微调和预测的代码。
 
@@ -13,8 +13,9 @@
 ### 环境依赖
 
 - sentencepiece
+- termcolor
 
-安装方式：`pip install sentencepiece`
+安装方式：`pip install sentencepiece termcolor`
 
 ### 代码结构说明
 
@@ -38,6 +39,12 @@ DuConv是百度发布的基于知识图谱的主动聊天任务数据集，让�
 from paddlenlp.datasets import load_dataset
 train_ds, dev_ds, test1_ds, test2_ds = load_dataset('duconv', splits=('train', 'dev', 'test_1', 'test_2'))
 ```
+
+### 预训练模型
+
+* unified_transformer-12L-cn: 12-layers, 12-heads, 768-hidden, 在千万级别的中文会话数据上进行预训练。
+* unified_transformer-12L-cn-luge: 12-layers, 12-heads, 768-hidden, 由unified_transformer-12L-cn预训练模型在千言对话数据集上进行微调。并且模型输入中加入了标识不同对话技能的special token，使得模型能同时支持闲聊对话、推荐对话和知识对话。
+* plato-mini: 6-layers, 12-heads, 768-hidden, 在十亿级别的中文对话数据上进行预训练。参数量更小，但效果更好。
 
 ### 模型训练
 
