@@ -26,7 +26,7 @@ ERNIE-CTM的模型结构大体与BERT相同，都是双向transformer结构。�
 
 ERNIE-CTM以字粒度建模，英文区分大小写，其输入表示如下：
 
-![ernie_ctm_inputs](../doc/img/ernie_ctm_inputs.png)
+![ERNIE-CTM输入](../doc/img/ernie_ctm_inputs.png)
 
 其中，`[CLS{n}]`是ERNIE-CTM预留出的全局观察位，其中`n`从0开始计数，该全局观察位用于不同的训练任务，建模不同的语义特征，在下游任务中，可以结合使用，如使用attention筛选/融合特征，以达到更好的效果。而在灵活使用`[CLS{n}]`的时候，为中途增减任务token时不影响文本输入，所有的`[CLS{n}]`的位置编码均为0，且可以使用可见性矩阵（visible matrix）控制`[CLS{n}]`位置的特征对序列中其他位置，以及其他的全局观察位的可见性，以获得更加灵活、独立的特征表示。
 
@@ -40,7 +40,7 @@ ERNIE-CTM使用的预训练任务为掩码语言模型（Masked Language Model�
 
 `[CLS1]`做为全局的监督信号，应用于MLM任务中。训练MLM任务前，将`[CLS1]`特征表示拼接在所有的序列表示之后，通过线性层融合，成为最终的序列表示，之后预测MLM任务。所以，ERNIE-CTM最终输出的文本序列表示中，都融合了`[CLS1]`的特征表示。最终的序列表示中，带有全句的特征，一定程度可避免序列中全局特征捕捉不足，同时，`[CLS1]`最终的表示中也充分融合了句子内容的信息，弥补了SOP任务对文本主题信息捕捉不足的缺陷。
 
-![ernie_ctm_model](../doc/img/ernie_ctm_model.png)
+![ERNIE-CTM模型结构](../doc/img/ernie_ctm_model.png)
 
 
 

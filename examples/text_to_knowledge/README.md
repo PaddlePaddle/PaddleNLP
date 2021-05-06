@@ -4,7 +4,7 @@
 
 覆盖中文全词类的知识库和知识标注工具能够帮助你面对更加多元的应用场景，方便地融合自有知识体系，显著提升中文文本解析和挖掘效果，并能够更容易地利用知识增强机器学习模型效果。解语经过大规模工业应用验证，在实际业务中取得了良好的应用效果，适合通用领域中文文本理解任务。
 
-![text_to_knowledge](doc/img/text_to_knowledge.png)
+![解语框架结构](doc/img/text_to_knowledge.png)
 
 **解语由以下三部分构成：** 
 
@@ -26,7 +26,7 @@
 
 中文词类知识标注工具（WordTag）整合了传统中文解析的**分词**、**词性标注**、**命名实体识别**的能力，能够将任意中文句子解析为**完整的词类序列**。结合百科知识树（TermTree），可为应用提供一套通用的知识关联（term-linking）框架，方便应用适配关联自己的应用知识图谱，更好地将知识用于中文自然语言处理（NLP）任务。
 
-![text_to_knowledge_example](doc/img/text_to_knowledge_example.png)
+![解语示例](doc/img/text_to_knowledge_example.png)
 
 
 

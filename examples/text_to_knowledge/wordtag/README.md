@@ -2,7 +2,7 @@
 
 WordTag（中文词类知识标注工具）是首个能够覆盖所有中文词汇的词类知识标注工具，旨在为中文文本解析提供全面、丰富的知识标注结果，可以应用于模板（挖掘模板、解析模板）生成与匹配、知识挖掘(新词发现、关系挖掘)等自然语言处理任务中，提升文本解析与挖掘精度；也可以作为中文文本特征生成器，为各类机器学习模型提供文本特征。
 
-![wordtag_example](../doc/img/wordtag_example.png)
+![wordtag示例](../doc/img/wordtag_example.png)
 
 ## WordTag特点
 
@@ -115,7 +115,7 @@ python -u predict.py \
 
 模型使用[ERNIE-CTM](../ernie-ctm)+CRF训练而成，预测时使用viterbi解码，模型结构如下：
 
-<img src="../doc/img/wordtag_model.png" alt="wordtag_model.png"  />
+<img src="../doc/img/wordtag_model.png" alt="wordtag模型结构"  />
 
 
 
