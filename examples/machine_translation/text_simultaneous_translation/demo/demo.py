@@ -11,13 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import os
 import argparse
 from tkinter import Label, Tk, PhotoImage, Entry, LEFT, W, END, Button, N, E
 import yaml
 from attrdict import AttrDict
 
+import _locale
 import jieba
 import paddle
 from paddlenlp.data import Vocab
@@ -25,6 +25,11 @@ from paddlenlp.transformers import position_encoding_init
 from subword_nmt import subword_nmt
 
 from model_for_demo import SimultaneousTransformer
+
+# By default, the Windows system opens the file with GBK code,
+# and the subword_nmt package does not support setting open encoding,
+# so it is set to UTF-8 uniformly.
+_locale._getdefaultlocale = (lambda *args: ['en_US', 'utf8'])
 
 
 class STACLTokenizer:
@@ -412,11 +417,15 @@ if __name__ == "__main__":
     yaml_file = args.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
-    if args.use_cuda:
+
+    if args.device == 'gpu':
         place = "gpu:0"
-    else:
+    elif args.device == 'xpu':
+        place = "xpu:0"
+    elif args.device == 'cpu':
         place = "cpu"
     paddle.set_device(place)
+
     tokenizer = STACLTokenizer(args, is_chinese=True)
     waitks = [1, 3, 5, -1]
 

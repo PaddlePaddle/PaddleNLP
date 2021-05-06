@@ -27,8 +27,8 @@ trg_vocab_fpath: "data/nist2m/nist.10k.en.vocab"
 # The <bos>, <eos> and <unk> tokens in the dictionary.
 special_token: ["<s>", "<e>", "<unk>"]
 
-# Whether to use cuda
-use_cuda: True
+# Use which device to train or predict(cpu,gpu,xpu)
+device: gpu
 
 # Args for reader, see reader.py for details
 pool_size: 200000

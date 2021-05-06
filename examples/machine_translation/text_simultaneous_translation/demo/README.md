@@ -35,7 +35,7 @@
 - `src_bpe_dict`配置源语言（这里是中文）的BPE词表，[中文BPE词表下载](https://paddlenlp.bj.bcebos.com/models/stacl/2M.zh2en.dict4bpe.zh)
 - `src_vocab_fpath`配置源语言（这里是中文）词表，[source vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.20k.zh.vocab)
 - `trg_vocab_fpath`配置目标语言（这里是英文）词表，[target vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.10k.en.vocab)
-- `use_cuda`表示是否使用GPU，默认为False
+- `device`选择预测用的设备，支持cpu/gpu/xpu，默认为cpu
 
 ### 环境依赖
 
