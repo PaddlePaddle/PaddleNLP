@@ -50,7 +50,7 @@ def build_index(args, data_loader, model):
     all_embeddings = []
 
     for text_embeddings in model.get_semantic_embedding(data_loader):
-        all_embeddings.append(text_embeddings)
+        all_embeddings.append(text_embeddings.numpy())
 
     all_embeddings = np.concatenate(all_embeddings, axis=0)
     index.add_items(all_embeddings)

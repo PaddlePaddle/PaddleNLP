@@ -69,7 +69,7 @@ def predict(model, data_loader):
                 query_input_ids=query_input_ids,
                 title_input_ids=title_input_ids,
                 query_token_type_ids=query_token_type_ids,
-                title_token_type_ids=title_token_type_ids)
+                title_token_type_ids=title_token_type_ids).numpy()
 
             cosine_sims.append(batch_cosine_sim)
 

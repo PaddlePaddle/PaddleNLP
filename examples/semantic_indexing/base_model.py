@@ -65,7 +65,7 @@ class SemanticIndexBase(nn.Layer):
                 text_embeddings = self.get_pooled_embedding(
                     input_ids, token_type_ids=token_type_ids)
 
-                yield text_embeddings.numpy()
+                yield text_embeddings
 
     def cosine_sim(self,
                    query_input_ids,
@@ -86,7 +86,7 @@ class SemanticIndexBase(nn.Layer):
             title_attention_mask)
 
         cosine_sim = paddle.sum(query_cls_embedding * title_cls_embedding,
-                                axis=-1).numpy()
+                                axis=-1)
         return cosine_sim
 
     @abc.abstractmethod

@@ -112,7 +112,7 @@ if __name__ == "__main__":
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
 
-    query_embedding = model.get_semantic_embedding(query_data_loader)
+    query_embedding = model.get_semantic_embedding(query_data_loader).numpy()
 
     if not os.path.exists(args.recall_result_dir):
         os.mkdir(args.recall_result_dir)
