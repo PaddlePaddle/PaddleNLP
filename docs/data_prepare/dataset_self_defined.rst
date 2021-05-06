@@ -35,7 +35,7 @@
 
 .. note::
 
-    需要注意的是，只有从 :class:`DatasetBuilder` 初始化的数据集具有将数据中的label自动转为id的功能（详细条件参见 :doc:`如何贡献数据集 <../community/contribute_dataset>`）。
+    需要注意的是，只有PaddleNLP内置的数据集具有将数据中的label自动转为id的功能（详细条件参见 :doc:`创建DatasetBuilder <../community/contribute_datasets/how_to_write_a_DatasetBuilder>`）。
     
     像上例中的自定义数据集需要在自定义的convert to feature方法中添加label转id的功能。
 
