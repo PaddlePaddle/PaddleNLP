@@ -81,7 +81,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 首先基于语义索引模型抽取出召回库的文本向量，然后使用 ANN 引擎建索引库(当前基于 [hnswlib](https://github.com/nmslib/hnswlib) 进行 ANN 索引)
 
 2. 召回
-基于语义索引模型抽取出评估集 *Source Text* 的文本向量，在第 1 步中建立的索引库中进行 ANN 查询召回 Top50 最相似的 *Target Text*, 产出评估集中 *Source text* 的召回结果 `recall_result` 文件
+基于语义索引模型抽取出评估集 *Source Text* 的文本向量，在第 1 步中建立的索引库中进行 ANN 查询召回 Top50 最相似的 *Target Text*, 产出评估集中 *Source Text* 的召回结果 `recall_result` 文件
 
 3. 评估： 基于评估集 [same_semantic.tsv](https://paddlenlp.bj.bcebos.com/models/semantic_index/same_semantic.tsv) 和召回结果 `recall_result` 计算评估指标 R@10 和 R@50
 
