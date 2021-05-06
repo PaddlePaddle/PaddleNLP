@@ -7,7 +7,7 @@ init_from_checkpoint: ""
 # Path of the pretrain model, to better solve the current task
 init_from_pretrain_model: ""
 # Path of trained parameter, to make prediction
-init_from_params: "./trained_models/step_20000/"
+init_from_params: "./trained_models/step_final/"
 # The directory for saving model
 save_model: "trained_models"
 # The directory for saving inference model 
