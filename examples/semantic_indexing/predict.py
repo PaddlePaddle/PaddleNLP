@@ -47,13 +47,8 @@ def predict(model, data_loader):
     Predicts the data labels.
 
     Args:
-        model (obj:`paddle.nn.Layer`): A model to classify texts.
-        data (obj:`List(Example)`): The processed data whose each element is a Example (numedtuple) object.
-            A Example object contains `text`(word_ids) and `se_len`(sequence length).
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
-            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        batch_size(obj:`int`, defaults to 1): The number of batch.
-
+        model (obj:`SemanticIndexBase`): A model to extract text embedding or calculate similarity of text pair.
+        data_loaer (obj:`List(Example)`): The processed data ids of text pair: [query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids]
     Returns:
         results(obj:`List`): cosine similarity of text pairs.
     """

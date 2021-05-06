@@ -43,7 +43,7 @@ def recall(rs, N=10):
     Args:
         rs: Iterator of recalled flag()
     Returns:
-        Mean reciprocal rank
+        Recall@N
     """
 
     recall_flags = [np.sum(r[0:N]) for r in rs]
@@ -76,7 +76,7 @@ if __name__ == "__main__":
                 relevance_labels.append(0)
 
     recall_N = []
-    for topN in (10, 50, 100):
+    for topN in (10, 50):
         #logger.info("Recall@{}: {}".format(topN, 100 * recall(rs, N=topN)))
         R = round(100 * recall(rs, N=topN), 3)
         recall_N.append(str(R))
