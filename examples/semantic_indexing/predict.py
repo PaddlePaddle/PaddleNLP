@@ -36,6 +36,7 @@ parser.add_argument("--params_path", type=str, required=True, help="The path to 
 parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--output_emb_size", default=None, type=int, help="output_embedding_size")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
@@ -112,7 +113,8 @@ if __name__ == "__main__":
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         "ernie-1.0")
 
-    model = SemanticIndexBase(pretrained_model)
+    model = SemanticIndexBase(
+        pretrained_model, output_emb_size=args.output_emb_size)
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
