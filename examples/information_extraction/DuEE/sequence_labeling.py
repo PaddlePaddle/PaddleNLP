@@ -163,7 +163,7 @@ def do_train():
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]), # input ids
         Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]), # token type ids
-        Stack(), # sequence lens
+        Stack(dtype='int64'), # sequence lens
         Pad(axis=0, pad_val=ignore_label) # labels
     ): fn(list(map(trans_func, samples)))
 

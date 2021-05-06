@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import _locale
 import jieba
-
 from subword_nmt import subword_nmt
+
+# By default, the Windows system opens the file with GBK code,
+# and the subword_nmt package does not support setting open encoding,
+# so it is set to UTF-8 uniformly.
+_locale._getdefaultlocale = (lambda *args: ['en_US', 'utf8'])
 
 
 class STACLTokenizer:
