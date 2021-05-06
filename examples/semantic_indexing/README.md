@@ -12,6 +12,24 @@
 |  BatchNeg | 51.20(**+4.21**)  | 67.24(**+6.4**)  |
 |   HardestNeg|  50.22(**+3.23**) |  65.17(**+4.33**) |
 
+
+## 下载预训练模型
+以下模型结构参数为:
+`TrasformerLayer:12, Hidden:768, Heads:12, OutputEmbSize: 256`
+
+|Model|训练参数配置|MD5|
+| ------------ | ------------ | ------------ |
+|[batch_neg_v1.0]()|<div style="width: 200pt">margin:0.2 scale:30 epoch:3 lr:5E-5</div>|da1bb1487bd3fd6a53b8ef95c278f3e6|
+|[hardest_neg_v1.0]()|margin:0.2 epoch:3 lr:5E-5|b535d890110ea608c8562c525a0b84b5|
+
+
+## 数据下载
+|数据|描述|数量|MD5|
+| ------------ | ------------ | ------------ | -------- |
+|<div style="width: 180pt">[训练集(semantic_pair_train.tsv)]()</div>|<div style="width: 220pt">每行为语义相似的文本 Pair 构成的训练集</div>|222546|590286f695200160350cc5838cb34f00|
+|[评估集(same_semantic.tsv)]()|每行为语义相似文本 Pair 构成的评估集|10255|86ec1fd5234d944177574372dcf780c5|
+|[召回库(corpus_file）]()|每行为单条文本构成的召回库|313714|a3fbc3421b5aeb939809876fc7beeaa8|
+
 ## 快速开始
 快速基于 BatchNeg 策略和 HadestNeg 策略训练产出语义索引模型。
 ### BatchNeg
@@ -163,9 +181,9 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --train_set_file semantic_pair_train.tsv \
 
 ```
-#### 模型评估
+#### 效果评估
 [请参考 BatchNeg 策略效果评估](####效果评估)
-#### 预测
+#### 开始预测
 [请参考 BatchNeg 策略开始预测](####开始预测)
 
 
