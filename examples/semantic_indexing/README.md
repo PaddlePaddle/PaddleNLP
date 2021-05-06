@@ -163,9 +163,9 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --train_set_file semantic_pair_train.tsv \
 
 ```
-#### 效果评估
+#### 模型评估
 [请参考 BatchNeg 策略效果评估](####效果评估)
-#### 开始预测
+#### 预测
 [请参考 BatchNeg 策略开始预测](####开始预测)
 
 
@@ -194,10 +194,7 @@ HardestNeg 策略核心是在 1 个 Batch 内的所有负样本中先挖掘出�
 正例的 Similarity 比 Hardest 负样本的 Similarity 高出 1 个 margin, 一般采用 rank_marigin_loss。
 
 ## Reference
-[1] Xin Liu, Qingcai Chen, Chong Deng, Huajun Zeng, Jing Chen, Dongfang Li, Buzhou Tang, LCQMC: A Large-scale Chinese Question Matching Corpus,COLING2018.
-
-[2] Jing Chen, Qingcai Chen, Xin Liu, Haijun Yang, Daohe Lu, Buzhou Tang, The BQ Corpus: A Large-scale Domain-specific Chinese Corpus For Sentence Semantic Equivalence Identification EMNLP2018.
-
-[3] Yang, Y., Zhang, Y., Tar, C., and Baldridge, J., “PAWS-X: A Cross-lingual Adversarial Dataset for Paraphrase Identification”, <i>arXiv e-prints</i>, 2019.
-
+[1] Xin Liu, Qingcai Chen, Chong Deng, Huajun Zeng, Jing Chen, Dongfang Li, Buzhou Tang, LCQMC: A Large-scale Chinese Question Matching Corpus,COLING2018.  
+[2] Jing Chen, Qingcai Chen, Xin Liu, Haijun Yang, Daohe Lu, Buzhou Tang, The BQ Corpus: A Large-scale Domain-specific Chinese Corpus For Sentence Semantic Equivalence Identification EMNLP2018.  
+[3] Yang, Y., Zhang, Y., Tar, C., and Baldridge, J., “PAWS-X: A Cross-lingual Adversarial Dataset for Paraphrase Identification”, <i>arXiv e-prints</i>, 2019.  
 [4] Vladimir Karpukhin, Barlas Oğuz, Sewon Min, Patrick Lewis, Ledell Wu, Sergey Edunov, Danqi Chen, Wen-tau Yih, Dense Passage Retrieval for Open-Domain Question Answering, Preprint 2020.
