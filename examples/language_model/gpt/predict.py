@@ -20,18 +20,18 @@ import argparse
 import numpy as np
 
 import paddle
-from paddlenlp.transformers import GPT2Model, GPT2ForGreedyGeneration
-from paddlenlp.transformers import GPT2ChineseTokenizer, GPT2Tokenizer
+from paddlenlp.transformers import GPTModel, GPTForGreedyGeneration
+from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "gpt2-base-cn": (GPT2ForGreedyGeneration, GPT2ChineseTokenizer),
-    "gpt2-medium-en": (GPT2ForGreedyGeneration, GPT2Tokenizer),
+    "gpt-base-cn": (GPTForGreedyGeneration, GPTChineseTokenizer),
+    "gpt-medium-en": (GPTForGreedyGeneration, GPTTokenizer),
 }
 
 
 class Demo:
-    def __init__(self, model_name_or_path="gpt2-base-cn", max_predict_len=32):
+    def __init__(self, model_name_or_path="gpt-base-cn", max_predict_len=32):
         model_class, tokenizer_class = MODEL_CLASSES[model_name_or_path]
         self.tokenizer = tokenizer_class.from_pretrained(model_name_or_path)
         logger.info('Loading the model parameters, please wait...')
@@ -59,11 +59,11 @@ class Demo:
 
 
 if __name__ == "__main__":
-    # demo = Demo("gpt2-base-cn")
+    # demo = Demo("gpt-base-cn")
     # demo.ask_question("苹果的CEO是谁?")
     # demo.dictation_poetry("举杯邀明月，")
     # del demo
-    demo = Demo("gpt2-medium-en")
+    demo = Demo("gpt-medium-en")
     demo.predict(
         "Question: Where is the capital of China? Answer: Beijing. \nQuestion: Who is the CEO of Apple? Answer:"
     )

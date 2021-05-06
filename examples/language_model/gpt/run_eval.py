@@ -21,16 +21,16 @@ import argparse
 import numpy as np
 import paddle
 from paddle.io import DataLoader, Dataset
-from paddlenlp.transformers import GPT2Model, GPT2ForPretraining
-from paddlenlp.transformers import GPT2Tokenizer
-from paddlenlp.transformers import GPT2Model
+from paddlenlp.transformers import GPTModel, GPTForPretraining
+from paddlenlp.transformers import GPTTokenizer
+from paddlenlp.transformers import GPTModel
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "gpt2-small-en": (GPT2ForPretraining, GPT2Tokenizer),
-    "gpt2-medium-en": (GPT2ForPretraining, GPT2Tokenizer),
-    "gpt2-large-en": (GPT2ForPretraining, GPT2Tokenizer),
+    "gpt-small-en": (GPTForPretraining, GPTTokenizer),
+    "gpt-medium-en": (GPTForPretraining, GPTTokenizer),
+    "gpt-large-en": (GPTForPretraining, GPTTokenizer),
 }
 
 # yapf: disable
@@ -196,7 +196,7 @@ def create_eval_dataset(args):
     eval_batch_size = args.batch_size
     seq_len = args.seq_length
 
-    tokenizer = GPT2Tokenizer.from_pretrained(args.model_name)
+    tokenizer = GPTTokenizer.from_pretrained(args.model_name)
     pad_token = tokenizer.command_name_map["pad"].Id
 
     if not args.cloze_eval:
@@ -242,8 +242,8 @@ def do_eval(args):
     tokenizer = tokenizer_class.from_pretrained(args.model_name)
 
     if args.init_checkpoint_path is not None:
-        model = GPT2ForPretraining(
-            GPT2Model(**model_class.pretrained_init_configuration[
+        model = GPTForPretraining(
+            GPTModel(**model_class.pretrained_init_configuration[
                 args.model_name]))
 
         logger.info("Load model checkpoint from %s" % args.init_checkpoint_path)

@@ -30,12 +30,12 @@ from .. import PretrainedModel, register_base_model
 import paddlenlp.ops as ops
 
 __all__ = [
-    'GPT2Model',
-    "GPT2PretrainedModel",
-    'GPT2ForPretraining',
-    'GPT2PretrainingCriterion',
-    'GPT2ForGreedyGeneration',
-    'GPT2ForTopKPGeneration',
+    'GPTModel',
+    "GPTPretrainedModel",
+    'GPTForPretraining',
+    'GPTPretrainingCriterion',
+    'GPTForGreedyGeneration',
+    'GPTForTopKPGeneration',
 ]
 
 
@@ -410,7 +410,7 @@ class TransformerDecoderLayer(nn.Layer):
         return incremental_cache
 
 
-class GPT2EmbeddingsStatic:
+class GPTEmbeddingsStatic:
     """
     Include embeddings from word, position and token_type embeddings
     """
@@ -423,7 +423,7 @@ class GPT2EmbeddingsStatic:
                  type_vocab_size=16,
                  initializer_range=0.02,
                  topo=None):
-        super(GPT2EmbeddingsStatic, self).__init__()
+        super(GPTEmbeddingsStatic, self).__init__()
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.hidden_dropout_prob = hidden_dropout_prob
@@ -466,7 +466,7 @@ class GPT2EmbeddingsStatic:
         return embeddings
 
 
-class GPT2Embeddings(nn.Layer):
+class GPTEmbeddings(nn.Layer):
     """
     Include embeddings from word, position and token_type embeddings
     """
@@ -479,7 +479,7 @@ class GPT2Embeddings(nn.Layer):
                  type_vocab_size=16,
                  initializer_range=0.02,
                  topo=None):
-        super(GPT2Embeddings, self).__init__()
+        super(GPTEmbeddings, self).__init__()
         # TODO @ZHUI Use ParallelEmbedding
         #if topo is None or topo.mp.size == 1:
         self.word_embeddings = nn.Embedding(
@@ -520,9 +520,9 @@ class GPT2Embeddings(nn.Layer):
         return embeddings
 
 
-class GPT2PretrainedModel(PretrainedModel):
+class GPTPretrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained GPT2 models. It provides GPT2 related
+    An abstract class for pretrained GPT models. It provides GPT related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
     `pretrained_init_configuration`, `base_model_prefix` for downloading and
     loading pretrained models. See `PretrainedModel` for more details.
@@ -530,7 +530,7 @@ class GPT2PretrainedModel(PretrainedModel):
 
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
-        "gpt2-base-cn": {
+        "gpt-base-cn": {
             "vocab_size": 30000,
             "hidden_size": 2560,
             "num_hidden_layers": 32,
@@ -557,7 +557,7 @@ class GPT2PretrainedModel(PretrainedModel):
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
         },
-        "gpt2-xlarge-en": { ## 1.3B
+        "gpt-xlarge-en": { ## 1.3B
             "vocab_size": 50304,
             "hidden_size": 2048,
             "num_hidden_layers": 24,
@@ -570,7 +570,7 @@ class GPT2PretrainedModel(PretrainedModel):
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
         },
-        "gpt2-large-en": {
+        "gpt-large-en": {
             "vocab_size": 50304,
             "hidden_size": 4096,
             "num_hidden_layers": 50,
@@ -583,7 +583,7 @@ class GPT2PretrainedModel(PretrainedModel):
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
         },
-        "gpt2-medium-en": {
+        "gpt-medium-en": {
             "vocab_size": 50304,
             "hidden_size": 1024,
             "num_hidden_layers": 24,
@@ -596,7 +596,7 @@ class GPT2PretrainedModel(PretrainedModel):
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
         },
-        "gpt2-small-en": {
+        "gpt-small-en": {
             "vocab_size": 50304,
             "hidden_size": 1024,
             "num_hidden_layers": 4,
@@ -613,13 +613,13 @@ class GPT2PretrainedModel(PretrainedModel):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "gpt2-base-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-base-cn.pdparams",
-            "gpt2-medium-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-medium-en.pdparams",
+            "gpt-base-cn":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-base-cn.pdparams",
+            "gpt-medium-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-medium-en.pdparams",
         }
     }
-    base_model_prefix = "gpt2"
+    base_model_prefix = "gpt"
 
     def init_weights(self, layer):
         """ Initialization hook """
@@ -634,14 +634,14 @@ class GPT2PretrainedModel(PretrainedModel):
                         mean=0.0,
                         std=self.initializer_range
                         if hasattr(self, "initializer_range") else
-                        self.gpt2.config["initializer_range"],
+                        self.gpt.config["initializer_range"],
                         shape=layer.weight.shape))
 
 
 @register_base_model
-class GPT2Model(GPT2PretrainedModel):
+class GPTModel(GPTPretrainedModel):
     """
-    The base model of gpt2.
+    The base model of gpt.
     """
 
     def __init__(self,
@@ -658,7 +658,7 @@ class GPT2Model(GPT2PretrainedModel):
                  initializer_range=0.02,
                  pad_token_id=0,
                  topo=None):
-        super(GPT2Model, self).__init__()
+        super(GPTModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         self.topo = topo
@@ -669,7 +669,7 @@ class GPT2Model(GPT2PretrainedModel):
         if self.pipline_mode:
             self.layer_per_stage = num_hidden_layers // self.topo.pp.size
 
-        self.embeddings = GPT2Embeddings(
+        self.embeddings = GPTEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
             max_position_embeddings, type_vocab_size, self.initializer_range,
             topo)
@@ -758,16 +758,16 @@ class GPT2Model(GPT2PretrainedModel):
         return encoder_outputs
 
 
-class GPT2ForPretraining(GPT2PretrainedModel):
+class GPTForPretraining(GPTPretrainedModel):
     """
-    The pretraining model of GPT2.
+    The pretraining model of GPT.
 
     It returns some logits and cached_kvs.
     """
 
-    def __init__(self, gpt2):
-        super(GPT2ForPretraining, self).__init__()
-        self.gpt2 = gpt2
+    def __init__(self, gpt):
+        super(GPTForPretraining, self).__init__()
+        self.gpt = gpt
         self.apply(self.init_weights)
 
     def forward(self,
@@ -777,12 +777,11 @@ class GPT2ForPretraining(GPT2PretrainedModel):
                 masked_positions=None,
                 use_cache=False,
                 cache=None):
-        outputs = self.gpt2(
-            input_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            use_cache=use_cache,
-            cache=cache)
+        outputs = self.gpt(input_ids,
+                           position_ids=position_ids,
+                           attention_mask=attention_mask,
+                           use_cache=use_cache,
+                           cache=cache)
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
         else:
@@ -790,7 +789,7 @@ class GPT2ForPretraining(GPT2PretrainedModel):
         # TODO @ZHUI Use all_to_all to 
         logits = paddle.matmul(
             encoder_outputs,
-            self.gpt2.embeddings.word_embeddings.weight,
+            self.gpt.embeddings.word_embeddings.weight,
             transpose_y=True)
 
         if use_cache:
@@ -799,15 +798,15 @@ class GPT2ForPretraining(GPT2PretrainedModel):
             return logits
 
 
-class GPT2PretrainingCriterion(paddle.nn.Layer):
+class GPTPretrainingCriterion(paddle.nn.Layer):
     """
-    Criterion for GPT2.
+    Criterion for GPT.
 
     It calculates the final loss.
     """
 
     def __init__(self):
-        super(GPT2PretrainingCriterion, self).__init__()
+        super(GPTPretrainingCriterion, self).__init__()
         self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
@@ -819,15 +818,15 @@ class GPT2PretrainingCriterion(paddle.nn.Layer):
         return loss
 
 
-class GPT2ForGreedyGeneration(GPT2PretrainedModel):
+class GPTForGreedyGeneration(GPTPretrainedModel):
     """
     The generate model for GPT-2.
     It use the greedy stategy and generate the next word with highest probablity.
     """
 
-    def __init__(self, gpt2, max_predict_len):
-        super(GPT2ForGreedyGeneration, self).__init__()
-        self.gpt2 = gpt2
+    def __init__(self, gpt, max_predict_len):
+        super(GPTForGreedyGeneration, self).__init__()
+        self.gpt = gpt
         self.max_predict_len = max_predict_len
         self.apply(self.init_weights)
 
@@ -838,19 +837,18 @@ class GPT2ForGreedyGeneration(GPT2PretrainedModel):
               masked_positions=None,
               use_cache=False,
               cache=None):
-        outputs = self.gpt2(
-            input_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            use_cache=use_cache,
-            cache=cache)
+        outputs = self.gpt(input_ids,
+                           position_ids=position_ids,
+                           attention_mask=attention_mask,
+                           use_cache=use_cache,
+                           cache=cache)
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
         logits = paddle.matmul(
             encoder_outputs,
-            self.gpt2.embeddings.word_embeddings.weight,
+            self.gpt.embeddings.word_embeddings.weight,
             transpose_y=True)
 
         if use_cache:
@@ -878,15 +876,15 @@ class GPT2ForGreedyGeneration(GPT2PretrainedModel):
         return src_ids
 
 
-class GPT2ForTopKPGeneration(GPT2PretrainedModel):
+class GPTForTopKPGeneration(GPTPretrainedModel):
     """
     The generate model for GPT-2.
     It use the topk topk stategy to generation.
     """
 
-    def __init__(self, gpt2, max_predict_len):
-        super(GPT2ForTopKPGeneration, self).__init__()
-        self.gpt2 = gpt2
+    def __init__(self, gpt, max_predict_len):
+        super(GPTForTopKPGeneration, self).__init__()
+        self.gpt = gpt
         self.max_predict_len = max_predict_len
         self.apply(self.init_weights)
 
@@ -897,19 +895,18 @@ class GPT2ForTopKPGeneration(GPT2PretrainedModel):
               masked_positions=None,
               use_cache=False,
               cache=None):
-        outputs = self.gpt2(
-            input_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            use_cache=use_cache,
-            cache=cache)
+        outputs = self.gpt(input_ids,
+                           position_ids=position_ids,
+                           attention_mask=attention_mask,
+                           use_cache=use_cache,
+                           cache=cache)
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
         logits = paddle.matmul(
             encoder_outputs,
-            self.gpt2.embeddings.word_embeddings.weight,
+            self.gpt.embeddings.word_embeddings.weight,
             transpose_y=True)
 
         if use_cache:

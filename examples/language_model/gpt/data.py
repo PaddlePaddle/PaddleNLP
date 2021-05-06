@@ -223,11 +223,11 @@ def create_pretrained_dataset(
             len(sample_lens), splits[-1])
 
     def build_dataset(index, name, num_samples):
-        dataset = GPT2Dataset(
+        dataset = GPTDataset(
             file_path=input_path,
             topo=topo,
             micro_bsz=args.micro_bsz,
-            name="gpt2" + name,
+            name="gpt" + name,
             max_seq_len=max_seq_len,
             num_samples=num_samples,
             documents=np.arange(splits[index], splits[index + 1]),
@@ -281,7 +281,7 @@ def create_pretrained_dataset(
     return train_data_loader, valid_data_loader, test_data_loader
 
 
-class GPT2Dataset(paddle.io.Dataset):
+class GPTDataset(paddle.io.Dataset):
     def __init__(self,
                  file_path,
                  topo,
@@ -291,7 +291,7 @@ class GPT2Dataset(paddle.io.Dataset):
                  sample_ids,
                  sample_lens,
                  documents=None,
-                 name="gpt2",
+                 name="gpt",
                  max_seq_len=1024,
                  mode="train",
                  seed=1234):

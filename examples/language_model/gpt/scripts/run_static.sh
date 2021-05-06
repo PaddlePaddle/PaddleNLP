@@ -13,14 +13,14 @@ rm -rf start_sharding*
 rm -rf main_sharding*
 fuser -kv /dev/nvidia*
 
-task_name="gpt2-mp-sharding"
+task_name="gpt-mp-sharding"
 rm -rf output/$task_name/log
 
 PYTHONPATH=../../../ python -u  -m paddle.distributed.fleet.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name/log" run_pretrain_static.py \
-    --model_type "gpt2" \
-    --model_name_or_path "gpt2-small-en" \
+    --model_type "gpt" \
+    --model_name_or_path "gpt-small-en" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --max_lr 0.00015 \

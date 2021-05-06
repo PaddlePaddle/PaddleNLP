@@ -35,8 +35,8 @@ import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
 from paddle.distributed.fleet.meta_optimizers.sharding.utils import save_persistables
-from paddlenlp.transformers import GPT2Model, GPT2ForPretraining, GPT2PretrainingCriterion
-from paddlenlp.transformers import GPT2Tokenizer, GPT2ChineseTokenizer
+from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCriterion
+from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.ops import guard, Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger
 from tensorboardX import SummaryWriter
@@ -45,8 +45,8 @@ from data import create_pretrained_dataset
 import lr
 
 MODEL_CLASSES = {
-    "gpt2": (GPT2ForPretraining, GPT2Tokenizer),
-    "gpt2-cn": (GPT2ForPretraining, GPT2ChineseTokenizer),
+    "gpt": (GPTForPretraining, GPTTokenizer),
+    "gpt-cn": (GPTForPretraining, GPTChineseTokenizer),
 }
 
 
@@ -396,12 +396,12 @@ def do_train(args):
                     pipeline_mode=False, )
 
                 # create the model for the gpt model
-                model = guard(f'gpu:{args.pp_degree -1}')(GPT2ForPretraining)(
-                    guard(f'gpu:0')(GPT2Model)(**model_config))
+                model = guard(f'gpu:{args.pp_degree -1}')(GPTForPretraining)(
+                    guard(f'gpu:0')(GPTModel)(**model_config))
                 preds = model(tokens, position_ids, attention_mask)
 
                 criterion = guard(f'gpu:{args.pp_degree -1}')(
-                    GPT2PretrainingCriterion)()
+                    GPTPretrainingCriterion)()
                 loss = criterion(preds, labels, loss_mask)
 
             # Create the learning_rate sheduler and optimizer
@@ -441,7 +441,7 @@ def do_train(args):
             if args.use_recompute:
                 dist_strategy.recompute = True
                 dist_strategy.recompute_configs = {
-                    "checkpoints": model.gpt2.checkpoints
+                    "checkpoints": model.gpt.checkpoints
                 }
 
             # Use the fleet api to compile the distributed optimizer

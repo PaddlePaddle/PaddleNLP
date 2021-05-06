@@ -16,11 +16,11 @@ import argparse
 import os
 
 import paddle
-from paddlenlp.transformers import GPT2ForGreedyGeneration, GPT2ChineseTokenizer, GPT2Tokenizer
+from paddlenlp.transformers import GPTForGreedyGeneration, GPTChineseTokenizer, GPTTokenizer
 
 MODEL_CLASSES = {
-    "gpt2-cn": (GPT2ForGreedyGeneration, GPT2ChineseTokenizer),
-    "gpt2": (GPT2ForGreedyGeneration, GPT2Tokenizer),
+    "gpt-cn": (GPTForGreedyGeneration, GPTChineseTokenizer),
+    "gpt": (GPTForGreedyGeneration, GPTTokenizer),
 }
 
 

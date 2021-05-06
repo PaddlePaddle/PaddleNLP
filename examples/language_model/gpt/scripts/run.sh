@@ -2,8 +2,8 @@ export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=1.0
 
 PYTHONPATH=../../../ python -u run_pretrain.py \
-    --model_type "gpt2"\
-    --model_name_or_path "gpt2-small-en"\
+    --model_type "gpt"\
+    --model_name_or_path "gpt-small-en"\
     --input_dir "./data"\
     --output_dir "output"\
     --max_lr 0.00015\

@@ -20,8 +20,8 @@ import time
 
 import numpy as np
 import paddle
-from paddlenlp.transformers import GPT2Model, GPT2ForPretraining, GPT2PretrainingCriterion
-from paddlenlp.transformers import GPT2Tokenizer, GPT2ChineseTokenizer
+from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCriterion
+from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.utils.log import logger
 from tensorboardX import SummaryWriter
 
@@ -31,8 +31,8 @@ import lr
 from utils.topo import Topology
 
 MODEL_CLASSES = {
-    "gpt2": (GPT2ForPretraining, GPT2Tokenizer),
-    "gpt2-cn": (GPT2ForPretraining, GPT2ChineseTokenizer),
+    "gpt": (GPTForPretraining, GPTTokenizer),
+    "gpt-cn": (GPTForPretraining, GPTChineseTokenizer),
 }
 
 
@@ -122,12 +122,12 @@ def do_train(args):
     if args.model_name_or_path in pretrained_models_list:
         model_config = model_class.pretrained_init_configuration[
             args.model_name_or_path]
-        model = GPT2ForPretraining(GPT2Model(**model_config))
+        model = GPTForPretraining(GPTModel(**model_config))
     else:
-        model = GPT2ForPretraining.from_pretrained(args.model_name_or_path)
+        model = GPTForPretraining.from_pretrained(args.model_name_or_path)
 
     # creat the critrion for the gpt model
-    criterion = GPT2PretrainingCriterion()
+    criterion = GPTPretrainingCriterion()
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)

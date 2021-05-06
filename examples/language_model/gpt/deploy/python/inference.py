@@ -20,11 +20,11 @@ import paddle
 import numpy as np
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import GPT2ForGreedyGeneration, GPT2ChineseTokenizer, GPT2Tokenizer
+from paddlenlp.transformers import GPTForGreedyGeneration, GPTChineseTokenizer, GPTTokenizer
 
 MODEL_CLASSES = {
-    "gpt2-cn": (GPT2ForGreedyGeneration, GPT2ChineseTokenizer),
-    "gpt2": (GPT2ForGreedyGeneration, GPT2Tokenizer),
+    "gpt-cn": (GPTForGreedyGeneration, GPTChineseTokenizer),
+    "gpt": (GPTForGreedyGeneration, GPTTokenizer),
 }
 
 
@@ -131,7 +131,7 @@ def main():
         os.path.dirname(args.model_path))
     ds = ["问题：中国的首都是哪里？答案：北京。\n问题：苹果的CEO是谁? 答案："]
     end_id = 3
-    if args.model_type == "gpt2":
+    if args.model_type == "gpt":
         ds = [
             "Question: Who is the CEO of Apple? Answer:",
             "Question: Who is the CEO of Facebook? Answer:",

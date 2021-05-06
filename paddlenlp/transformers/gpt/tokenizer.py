@@ -27,8 +27,8 @@ from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize,\
     _is_whitespace, _is_control, _is_punctuation
 
 __all__ = [
-    'GPT2Tokenizer',
-    'GPT2ChineseTokenizer',
+    'GPTTokenizer',
+    'GPTChineseTokenizer',
 ]
 
 COMMAND_TUPLE = namedtuple('CommandToken', ('name', 'token', 'Id'))
@@ -83,9 +83,9 @@ def get_pairs(word):
     return pairs
 
 
-class GPT2ChineseTokenizer(PretrainedTokenizer):
+class GPTChineseTokenizer(PretrainedTokenizer):
     """
-    Constructs a GPT2 Chinese tokenizer. It uses a basic tokenizer to do punctuation
+    Constructs a GPT Chinese tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
     """
@@ -95,15 +95,15 @@ class GPT2ChineseTokenizer(PretrainedTokenizer):
     }  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "gpt2-base-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-base-cn-vocab.json",
+            "gpt-base-cn":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-base-cn-vocab.json",
         },
         "model_file": {
-            "gpt2-base-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-base-cn-sentencepiece.model"
+            "gpt-base-cn":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-base-cn-sentencepiece.model"
         }
     }
-    pretrained_init_configuration = {"gpt2-base-cn": {"do_lower_case": True}, }
+    pretrained_init_configuration = {"gpt-base-cn": {"do_lower_case": True}, }
 
     def __init__(self,
                  vocab_file,
@@ -119,7 +119,7 @@ class GPT2ChineseTokenizer(PretrainedTokenizer):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = GPT2Tokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
+                "`tokenizer = GPTTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(vocab_file))
         self.max_len = max_len if max_len is not None else int(1e12)
         self.encoder = json.load(open(vocab_file))
@@ -163,38 +163,38 @@ class GPT2ChineseTokenizer(PretrainedTokenizer):
             shutil.copyfile(getattr(self, "_%s" % name), save_path)
 
 
-class GPT2Tokenizer(PretrainedTokenizer):
+class GPTTokenizer(PretrainedTokenizer):
     resource_files_names = {
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt"
     }  # for save_pretrained
-    gpt_vocab_link = "http://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-large-en-vocab.json"
-    gpt_merges_link = "http://paddlenlp.bj.bcebos.com/models/transformers/gpt2/gpt2-large-en-merges.txt"
+    gpt_vocab_link = "http://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-large-en-vocab.json"
+    gpt_merges_link = "http://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-large-en-merges.txt"
     pretrained_resource_files_map = {
         "vocab_file": {
-            "gpt2-xlarge-en": gpt_vocab_link,
-            "gpt2-large-en": gpt_vocab_link,
-            "gpt2-medium-en": gpt_vocab_link,
-            "gpt2-small-en": gpt_vocab_link,
+            "gpt-xlarge-en": gpt_vocab_link,
+            "gpt-large-en": gpt_vocab_link,
+            "gpt-medium-en": gpt_vocab_link,
+            "gpt-small-en": gpt_vocab_link,
         },
         "merges_file": {
-            "gpt2-xlarge-en": gpt_merges_link,
-            "gpt2-large-en": gpt_merges_link,
-            "gpt2-medium-en": gpt_merges_link,
-            "gpt2-small-en": gpt_merges_link,
+            "gpt-xlarge-en": gpt_merges_link,
+            "gpt-large-en": gpt_merges_link,
+            "gpt-medium-en": gpt_merges_link,
+            "gpt-small-en": gpt_merges_link,
         }
     }
     pretrained_init_configuration = {
-        "gpt2-xlarge-en": {
+        "gpt-xlarge-en": {
             "do_lower_case": True
         },
-        "gpt2-large-en": {
+        "gpt-large-en": {
             "do_lower_case": True
         },
-        "gpt2-medium-en": {
+        "gpt-medium-en": {
             "do_lower_case": True
         },
-        "gpt2-small-en": {
+        "gpt-small-en": {
             "do_lower_case": True
         },
     }

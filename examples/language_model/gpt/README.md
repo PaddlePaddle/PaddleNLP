@@ -50,7 +50,7 @@ bash decompress.sh
 
 ```shell
 python process_data.py --input_path raw_data \
- --model_name gpt2-medium-en \
+ --model_name gpt-medium-en \
  --append_eod \
  --workers 8
 ```
@@ -58,7 +58,7 @@ python process_data.py --input_path raw_data \
 运行命令后，产出`raw_data_ids.npz`文件。为了方便用户运行测试本模型，本项目提供了处理好的300M的训练样本：
 
 ```shell
-wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt2/train.data.json_ids.npz
+wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/train.data.json_ids.npz
 ```
 
 将所有预处理得到的npz文件统一放入一个文件夹中，以备训练使用：
@@ -74,8 +74,8 @@ mv train.data.json_ids.npz data
 
 ```shell
 CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
-    --model_type gpt2 \
-    --model_name_or_path gpt2-small-en \
+    --model_type gpt \
+    --model_name_or_path gpt-small-en \
     --input_dir "./data"\
     --output_dir "output"\
     --weight_decay 0.01\
@@ -108,8 +108,8 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
-    --model_type gpt2 \
-    --model_name_or_path gpt2-small-en \
+    --model_type gpt \
+    --model_name_or_path gpt-small-en \
     --input_dir "./data"\
     --output_dir "output"\
     --weight_decay 0.01\
@@ -130,7 +130,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
 
 1. WikiText数据集评估
 ```bash
-python run_eval.py --model_name gpt2-medium-en \
+python run_eval.py --model_name gpt-medium-en \
     --eval_path ./wikitext-103/wiki.valid.tokens \
     --overlapping_eval 32 \
     --init_checkpoint_path ./output/model_100000/model_state.pdparams \
@@ -140,7 +140,7 @@ python run_eval.py --model_name gpt2-medium-en \
 
 2. LAMBADA数据集评估
 ```bash
-python run_eval.py --model_name gpt2-medium-en \
+python run_eval.py --model_name gpt-medium-en \
     --eval_path ./lambada_test.jsonl \
     --cloze_eval \
     --init_checkpoint_path ./output/model_100000/model_state.pdparams \
@@ -148,7 +148,7 @@ python run_eval.py --model_name gpt2-medium-en \
     --device gpu
 ```
 其中参数释义如下：
-`model_name` 使用的模型名称，如gpt2-samll-en等。
+`model_name` 使用的模型名称，如gpt-samll-en等。
 `eval_path` 数据集地址。
 `init_checkpoint_path` 模型参数地址
 `batch_size` batch size大小。
@@ -186,26 +186,26 @@ python generate_sample.py
 
 导出中文模型
 ```"shell
-python export_model.py --model_type=gpt2-cn \
-    --model_path=gpt2-base-cn \
+python export_model.py --model_type=gpt-cn \
+    --model_path=gpt-base-cn \
     --output_path=./infer_model/model
 ```
 用户在`infer_model`中可以看到导出的文件。
 
 对于导出的模型，我们提供了Python的infer脚本，调用预测库对简单的例子进行预测。
 ```shell
-python infer.py --model_type gpt2-cn \
+python infer.py --model_type gpt-cn \
     --model_path ./infer_model/model
 ```
 
 
 导出英文模型
 ```"shell
-python export_model.py --model_type=gpt2 \
-    --model_path=gpt2-medium-en \
+python export_model.py --model_type=gpt \
+    --model_path=gpt-medium-en \
     --output_path=./infer_model/model
 
-python deploy/python/inference.py --model_type gpt2 \
+python deploy/python/inference.py --model_type gpt \
     --model_path ./infer_model/model
 ```
 

@@ -21,15 +21,15 @@ paddle.set_device("cpu")
 
 def trans_name(key):
     k = key
-    k = k.replace("transformer", "gpt2.decoder")
+    k = k.replace("transformer", "gpt.decoder")
     k = k.replace("mlp.dense_h_to_4h", "linear1")
     k = k.replace("mlp.dense_4h_to_h", "linear2")
     k = k.replace("attention.dense", "self_attn.out_proj")
     k = k.replace("input_layernorm", "norm1")
     k = k.replace("post_attention_layernorm", "norm2")
     k = k.replace("final_layernorm", "norm")
-    k = k.replace("word_embeddings", "gpt2.embeddings.word_embeddings")
-    k = k.replace("position_embeddings", "gpt2.embeddings.position_embeddings")
+    k = k.replace("word_embeddings", "gpt.embeddings.word_embeddings")
+    k = k.replace("position_embeddings", "gpt.embeddings.position_embeddings")
     return k
 
 
@@ -80,4 +80,4 @@ for key in sorted(list(state.keys())):
 print("all shape numel:{}".format(all_num))
 for key, value in new_state_dict.items():
     print("key:{}, shape:{}, dtype:{}".format(key, value.shape, value.dtype))
-#paddle.save(new_state_dict, './gpt2-medium-en.pdparams')
+#paddle.save(new_state_dict, './gpt-medium-en.pdparams')
