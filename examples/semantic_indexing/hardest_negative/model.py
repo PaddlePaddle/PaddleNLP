@@ -59,7 +59,7 @@ class SemanticIndexHardestNeg(SemanticIndexBase):
         mask_socre = paddle.full(
             shape=[query_cls_embedding.shape[0]],
             fill_value=10000,
-            dtype='float32')
+            dtype=paddle.get_default_dtype())
         tmp_cosin_sim = cosine_sim - paddle.diag(mask_socre)
         hardest_negative_sim = paddle.max(tmp_cosin_sim, axis=-1)
 

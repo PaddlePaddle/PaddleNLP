@@ -60,7 +60,7 @@ class SemanticIndexBatchNeg(SemanticIndexBase):
         margin_diag = paddle.full(
             shape=[query_cls_embedding.shape[0]],
             fill_value=self.margin,
-            dtype='float32')
+            dtype=paddle.get_default_dtype())
 
         cosine_sim = cosine_sim - paddle.diag(margin_diag)
 

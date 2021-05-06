@@ -70,7 +70,7 @@ class SemanticIndexANCE(SemanticIndexBase):
         labels = paddle.full(
             shape=[text_cls_embedding.shape[0]],
             fill_value=1.0,
-            dtype='float32')
+            dtype=paddle.get_default_dtype())
 
         loss = F.margin_ranking_loss(
             pos_sample_sim, global_neg_sample_sim, labels, margin=self.margin)
