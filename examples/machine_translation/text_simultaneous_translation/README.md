@@ -142,6 +142,8 @@ perl mosesdecoder/scripts/generic/multi-bleu.perl newstest2017.tok.en < predict.
 | Wait_-1(整句模型)   |[下载](https://paddlenlp.bj.bcebos.com/models/stacl/nist_zhen_full_sent.tar.gz) |41.41 |
 词表下载：[source vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.20k.zh.vocab) ，[target vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.10k.en.vocab)
 
+## Demo展示
+通过GUI界面的Demo来模拟STACL实时翻译的效果，可查看[demo](./demo)
 
 ## 参考文献
 1. Vaswani A, Shazeer N, Parmar N, et al. [Attention is all you need](http://papers.nips.cc/paper/7181-attention-is-all-you-need.pdf)[C]//Advances in Neural Information Processing Systems. 2017: 6000-6010.

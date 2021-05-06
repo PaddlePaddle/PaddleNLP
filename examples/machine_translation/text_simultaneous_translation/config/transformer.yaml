@@ -17,7 +17,7 @@ training_file: "data/nist2m/train.zh-en.bpe"
 # The pattern to match validation data files.
 validation_file: "data/nist2m/dev.zhen.bpe"
 # The pattern to match test data files.
-predict_file: "data/nist2m/testdata/test_08.zh"
+predict_file: "data/nist2m/test_08.zh.bpe"
 # The file to output the translation results of predict_file to.
 output_file: "predict.txt"
 # The path of vocabulary file of source language.

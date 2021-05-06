@@ -5,6 +5,8 @@
 <img src="images/demo_show.gif" height=350 hspace='10'/> <br />
 图 1. 效果展示
 </p>
+用户通过Chinese input文本框进行输入，通过Jieba和BPE得到分词结果。Simultaneous Translation (wait 1)是读取1个token（分词后）后开始实时翻译，同理，Simultaneous Translation (wait 3)是读取3个token后开始实时翻译，Simultaneous Translation (wait 5)是读取5个token后开始实时翻译。最后，Full Sentence Translation(wait -1)是读取所有的token即整句后开始翻译。
+由上图可见，waitk越大(waitk=-1可看作waitk=∞)，读入的信息越多，实时翻译效果越好。
 
 ### 目录结构
 
@@ -47,6 +49,7 @@
 安装命令：`pip install -r requirements.txt`
 
 ### 使用说明
+
 1. 下载好预训练模型，并放在对应的目录下；
 2. 下载好词表（源语言词表，目标语言词表，BPE词表），并在配置文件`transformer_demo.yaml`中修改相应的参数；
 3. 运行`demo.py`；
