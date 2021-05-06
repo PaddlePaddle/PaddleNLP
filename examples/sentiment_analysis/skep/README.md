@@ -25,21 +25,13 @@
         <td><strong><center>数据集地址</strong></td>
     </tr>
     <tr>
-        <td rowspan="4"><center>句子级情感<br /><center>分类</td>
+        <td rowspan="2"><center>句子级情感<br /><center>分类</td>
         <td><center>SST-2</td>
         <td><center>英文</td>
         <td><center>ACC</td>
         <td><center>97.50</td>
         <td><center>97.60</td>
         <td><center><a href="https://gluebenchmark.com/tasks" >下载地址</a></td>
-    </tr>
-    <tr>
-        <td><center>Amazon-2</td>
-        <td><center>英文</td>
-        <td><center>ACC</td>
-        <td><center>97.37</td>
-        <td><center>97.61</td>
-        <td><center><a href="https://www.kaggle.com/bittlingmayer/amazonreviews/data#" >下载地址</a></td>
     </tr>
     <tr>
         <td><center>ChnSentiCorp</td>
@@ -50,31 +42,7 @@
         <td><center><a href="https://ernie.bj.bcebos.com/task_data_zh.tgz" >下载地址</a></td>
     </tr>
     <tr>
-        <td><center>NLPCC2014-SC</td>
-        <td><center>中文</td>
-        <td><center>ACC</td>
-        <td><center>78.72</td>
-        <td><center>83.53</td>
-        <td><center><a href="https://github.com/qweraqq/NLPCC2014_sentiment" >下载地址</a></td>
-    </tr>
-    <tr>
-        <td rowspan="4"><center>评价对象级的<br /><center>情感分类</td>
-        <td><center>Sem-L</td>
-        <td><center>英文</td>
-        <td><center>ACC</td>
-        <td><center>81.35</td>
-        <td><center>81.62</td>
-        <td><center><a href="http://alt.qcri.org/semeval2014/task4/index.php?id=data-and-tools" >下载地址</a></td>
-    </tr>
-    <tr>
-        <td><center>Sem-R</td>
-        <td><center>英文</td>
-        <td><center>ACC</td>
-        <td><center>87.89</td>
-        <td><center>88.36</td>
-        <td><center><a href="http://alt.qcri.org/semeval2014/task4/index.php?id=data-and-tools" >下载地址</a></td>
-    </tr>
-    <tr>
+        <td rowspan="1"><center>评价对象级的<br /><center>情感分类</td>
         <td><center>SE-ABSA16_PHNS</td>
         <td><center>中文</td>
         <td><center>ACC</td>
@@ -83,47 +51,7 @@
         <td><center><a href="http://alt.qcri.org/semeval2016/task5/" >下载地址</a></td>
     </tr>
     <tr>
-        <td><center>SE-ABSA16_CAME</td>
-        <td><center>中文</td>
-        <td><center>ACC</td>
-        <td><center>87.11</td>
-        <td><center>90.06</td>
-        <td><center><a href="http://alt.qcri.org/semeval2016/task5/" >下载地址</a></td>
-    </tr>
-    <tr>
-        <td rowspan="5"><center>观点<br /><center>抽取</td>
-        <td><center>MPQA-H</td>
-        <td><center>英文</td>
-        <td><center>b-F1/p-F1</td>
-        <td><center>83.67/77.12</td>
-        <td><center>86.32/81.11</td>
-        <td><center><a href="https://mpqa.cs.pitt.edu/corpora/mpqa_corpus/mpqa_corpus_2_0/" >下载地址</a></td>
-    </tr>
-    <tr>
-        <td><center>MPQA-T</td>
-        <td><center>英文</td>
-        <td><center>b-F1/p-F1</td>
-        <td><center>81.59/73.16</td>
-        <td><center>83.67/77.53</td>
-        <td><center><a href="https://mpqa.cs.pitt.edu/corpora/mpqa_corpus/mpqa_corpus_2_0/" >下载地址</a></td>
-    </tr>
-    <tr>
-        <td><center>COTE_BD</td>
-        <td><center>中文</td>
-        <td><center>F1</td>
-        <td><center>82.17</td>
-        <td><center>84.50</td>
-        <td><center><a href="https://github.com/lsvih/chinese-customer-review" >下载地址</a></td>
-    </tr>
-    <tr>
-        <td><center>COTE_MFW</td>
-        <td><center>中文</td>
-        <td><center>F1</td>
-        <td><center>86.18</td>
-        <td><center>87.90</td>
-        <td><center><a href="https://github.com/lsvih/chinese-customer-review" >下载地址</a></td>
-    </tr>
-    <tr>
+        <td rowspan="1"><center>观点<br /><center>抽取</td>
         <td><center>COTE_DP</td>
         <td><center>中文</td>
         <td><center>F1</td>
@@ -158,12 +86,37 @@ skep/
 
 以句子级情感分类任务为例，详细说明SKEP模型在下游任务中该如何使用，其他任务（对象级的情感分类任务、观点抽取任务）使用方式以此类推。
 
+
+### 数据下载
+
+句子级情感分类数据集，本示例采用常用开源数据集ChnSenticorp中文数据集、GLUE-SST2英文数据集。这两个数据集PaddleNLP已经内置。
+通过以下方式即可实现加载。
+
+```python
+from paddlenlp.datasets import load_dataset
+
+# chnsenticorp dataset
+train_ds, dev_ds, test_ds = load_dataset(
+    "chnsenticorp", splits=["train", "dev", "test"])
+
+# sst-2 dataset
+train_ds, dev_ds, test_ds = load_dataset(
+    "glue", "sst-2", splits=["train", "dev", "test"])
+```
+
+对象级情感分类数据集，本示例采用[SemEval-2016 Task 5](https://alt.qcri.org/semeval2016/task5/)评测中文数据集SE-ABSA16_PHNS，原数据下载地址：https://alt.qcri.org/semeval2016/task5/
+
+
+观点抽取数据集，本示例采用[点评用户评论数据集](https://github.com/lsvih/chinese-customer-review)，原数据下载地址：https://github.com/lsvih/chinese-customer-review/tree/master/dianping
+
+
+
 ### 模型训练
 
 我们以情感分类公开数据集ChnSentiCorp（中文）、SST-2（英文）为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 ```shell
-$ unset CUDA_VISIBLE_DEVICES
-$ python -m paddle.distributed.launch --gpus "0" sentence_sentiment_analysis_train.py --model_name "skep_ernie_1.0_large_ch" --device gpu --save_dir ./checkpoints
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" sentence_sentiment_analysis_train.py --model_name "skep_ernie_1.0_large_ch" --device gpu --save_dir ./checkpoints
 ```
 
 可支持配置的参数：

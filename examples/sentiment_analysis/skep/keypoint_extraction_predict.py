@@ -19,8 +19,8 @@ from functools import partial
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.transformers import SkepCrfForTokenClassification, SkepModel, SkepTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -159,12 +159,9 @@ if __name__ == "__main__":
     # `ignore_label` is using to pad input labels.
     ignore_label = -1
 
-    skep = ppnlp.transformers.SkepModel.from_pretrained(
-        'skep_ernie_1.0_large_ch')
-    model = ppnlp.transformers.SkepCrfForTokenClassification(
-        skep, num_classes=len(label_map))
-    tokenizer = ppnlp.transformers.SkepTokenizer.from_pretrained(
-        'skep_ernie_1.0_large_ch')
+    skep = SkepModel.from_pretrained('skep_ernie_1.0_large_ch')
+    model = SkepCrfForTokenClassification(skep, num_classes=len(label_map))
+    tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)

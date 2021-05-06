@@ -21,11 +21,10 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import SkepCrfForTokenClassification, SkepModel, SkepTokenizer
 
 from data import read_cote_dp_dataset
 
@@ -181,12 +180,9 @@ if __name__ == "__main__":
     ignore_label = -1
 
     set_seed(args.seed)
-    skep = ppnlp.transformers.SkepModel.from_pretrained(
-        'skep_ernie_1.0_large_ch')
-    model = ppnlp.transformers.SkepCrfForTokenClassification(
-        skep, num_classes=len(label_map))
-    tokenizer = ppnlp.transformers.SkepTokenizer.from_pretrained(
-        'skep_ernie_1.0_large_ch')
+    skep = SkepModel.from_pretrained('skep_ernie_1.0_large_ch')
+    model = SkepCrfForTokenClassification(skep, num_classes=len(label_map))
+    tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
 
     trans_func = partial(
         convert_example_to_feature,

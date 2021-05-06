@@ -19,8 +19,8 @@ from functools import partial
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -140,10 +140,9 @@ if __name__ == "__main__":
     ]
     label_map = {0: 'negative', 1: 'positive'}
 
-    model = ppnlp.transformers.SkepForSequenceClassification.from_pretrained(
+    model = SkepForSequenceClassification.from_pretrained(
         args.model_name, num_classes=len(label_map))
-    tokenizer = ppnlp.transformers.SkepTokenizer.from_pretrained(
-        args.model_name)
+    tokenizer = SkepTokenizer.from_pretrained(args.model_name)
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)

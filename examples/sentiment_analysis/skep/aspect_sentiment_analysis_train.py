@@ -21,10 +21,9 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 
 from data import read_semeval2016_phone_dataset
 
@@ -175,10 +174,9 @@ if __name__ == "__main__":
     label_map = {"0": 0, "1": 1}
 
     set_seed(args.seed)
-    model = ppnlp.transformers.SkepForSequenceClassification.from_pretrained(
+    model = SkepForSequenceClassification.from_pretrained(
         'skep_ernie_1.0_large_ch', num_classes=len(label_map))
-    tokenizer = ppnlp.transformers.SkepTokenizer.from_pretrained(
-        'skep_ernie_1.0_large_ch')
+    tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
 
     trans_func = partial(
         convert_example,

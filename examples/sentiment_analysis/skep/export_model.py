@@ -19,8 +19,8 @@ from functools import partial
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.transformers import SkepForSequenceClassification
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -37,7 +37,7 @@ args = parser.parse_args()
 if __name__ == "__main__":
     # The number of labels should be in accordance with the training dataset.
     label_map = {0: 'negative', 1: 'positive'}
-    model = ppnlp.transformers.SkepForSequenceClassification.from_pretrained(
+    model = SkepForSequenceClassification.from_pretrained(
         args.model_name, num_classes=len(label_map))
 
     if args.params_path and os.path.isfile(args.params_path):

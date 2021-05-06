@@ -21,11 +21,9 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -183,10 +181,9 @@ if __name__ == "__main__":
             "glue", dataset_name, splits=["train", "dev", "test"])
     label_map = {0: 'negative', 1: 'positive'}
 
-    model = ppnlp.transformers.SkepForSequenceClassification.from_pretrained(
+    model = SkepForSequenceClassification.from_pretrained(
         args.model_name, num_classes=len(label_map))
-    tokenizer = ppnlp.transformers.SkepTokenizer.from_pretrained(
-        args.model_name)
+    tokenizer = SkepTokenizer.from_pretrained(args.model_name)
 
     trans_func = partial(
         convert_example,
