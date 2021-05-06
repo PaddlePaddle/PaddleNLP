@@ -34,17 +34,15 @@ os.path.expanduser('~')
 import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
+from paddle.distributed.fleet.meta_optimizers.sharding.utils import save_persistables
 from paddlenlp.transformers import GPT2Model, GPT2ForPretraining, GPT2PretrainingCriterion
 from paddlenlp.transformers import GPT2Tokenizer, GPT2ChineseTokenizer
-from paddlenlp.transformers.gpt2 import guard
+from paddlenlp.ops import guard, Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger
 from tensorboardX import SummaryWriter
-from paddle.distributed.fleet.meta_optimizers.sharding.utils import save_persistables
 
 from data import create_pretrained_dataset
 import lr
-from utils.topo import Topology
-from utils.random import get_rng_state_tracker
 
 MODEL_CLASSES = {
     "gpt2": (GPT2ForPretraining, GPT2Tokenizer),

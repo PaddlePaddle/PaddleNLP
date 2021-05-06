@@ -27,6 +27,7 @@ from paddle.fluid.initializer import Normal, Constant, NumpyArrayInitializer
 from paddle.distributed.fleet import fleet
 
 from .. import PretrainedModel, register_base_model
+import paddlenlp.ops as ops
 
 __all__ = [
     'GPT2Model',
@@ -35,226 +36,7 @@ __all__ = [
     'GPT2PretrainingCriterion',
     'GPT2ForGreedyGeneration',
     'GPT2ForTopKPGeneration',
-    'guard',
 ]
-
-
-def guard(device):
-    def decorator(Layer):
-        class WrapperClass(Layer):
-            def __init__(self, *args, **kw):
-                with paddle.static.device_guard(device):
-                    print("Init {} on {}".format(Layer.__name__, device))
-                    return super().__init__(*args, **kw)
-
-            def forward(self, *args, **kw):
-                with paddle.static.device_guard(device):
-                    print("Forward {} on {}".format(Layer.__name__, device))
-                    return super().forward(*args, **kw)
-
-        return WrapperClass
-
-    return decorator
-
-
-class ParallelEmbedding(nn.Layer):
-    """
-    Parallel Embedding
-    """
-
-    def __init__(self,
-                 num_embeddings,
-                 embedding_dim,
-                 num_partitions,
-                 padding_idx=None,
-                 weight_attr=None,
-                 name=None):
-        super().__init__()
-        size = (num_embeddings, embedding_dim)
-        if in_dygraph_mode():
-            rank = paddle.distributed.get_rank()
-            nranks = paddle.distributed.get_world_size()
-        else:
-            assert fleet._role_maker, ("To use paddle.distributed.split, "
-                                       "you must call fleet.init() firstly.")
-            rank = fleet.worker_index()
-            nranks = fleet.worker_num()
-
-        # rank within a model parallel group
-        inner_rank = rank % num_partitions
-        self.inner_rank = inner_rank
-        self.num_partitions = num_partitions
-
-        per_part_size = (size[0] + num_partitions - 1) // num_partitions
-        last_part_size = size[0] - per_part_size * (num_partitions - 1)
-        if inner_rank == num_partitions - 1: per_part_size = last_part_size
-        per_part_size += 1  # make the last row as the padding index
-
-        self.origin_size = size
-        if not name:
-            self.name = "emb_rank_%d" % inner_rank
-        else:
-            self.name = name + "_rank_%d" % inner_rank
-        self.per_part_embeddings = per_part_size
-        self.origin_num_embeddings = self.origin_size[0]
-        self.weight_attr = weight_attr
-
-        self.embedding = paddle.nn.Embedding(
-            self.per_part_embeddings,
-            self.origin_size[1],
-            padding_idx=self.per_part_embeddings - 1,
-            sparse=False,
-            weight_attr=self.weight_attr,
-            name=self.name)
-
-        self.embedding.weight.is_distributed = True
-        # Alias for nn.Embedding
-        self.weight = self.embedding.weight
-        startup_block = paddle.static.default_startup_program().global_block()
-        main_block = paddle.static.default_main_program().global_block()
-        startup_block.vars[self.embedding.weight.name].is_distributed = True
-        main_block.vars[self.embedding.weight.name].is_distributed = True
-
-    def forward(self, x):
-        origin_input_shape = x.shape
-        if len(origin_input_shape) == 2:
-            x = paddle.unsqueeze(x, axis=-1)
-        else:
-            assert origin_input_shape[-1] == 1, (
-                "The last dimension size of x must be 1.")
-
-        x_shard = paddle.shard_index(x, self.origin_num_embeddings,
-                                     self.num_partitions, self.inner_rank,
-                                     self.per_part_embeddings - 1)
-        if len(origin_input_shape) == 2:
-            x_shard = paddle.squeeze(x_shard, axis=-1)
-
-        emb_out = self.embedding(x_shard)
-
-        paddle.distributed.all_reduce(emb_out, group=None)
-        return emb_out
-
-
-class ParallelLinear(nn.Layer):
-    """
-    Parallel Linear
-    """
-
-    def __init__(self,
-                 size,
-                 axis,
-                 num_partitions=1,
-                 gather_out=True,
-                 param_attr=None,
-                 bias_attr=None,
-                 name=None):
-        super().__init__()
-
-        if in_dygraph_mode():
-            rank = paddle.distributed.get_rank()
-            nranks = paddle.distributed.get_world_size()
-        else:
-            assert fleet._role_maker, ("To use paddle.distributed.split, "
-                                       "you must call fleet.init() firstly.")
-            rank = fleet.worker_index()
-            nranks = fleet.worker_num()
-
-        # rank within a model parallel group
-        inner_rank = rank % num_partitions
-        self.axis = axis
-        if axis == 0:
-            assert size[0] % num_partitions == 0, (
-                "Number of rows of the weight for linear ({}) must be"
-                " divisible by num_partitions ({})".format(size[0],
-                                                           num_partitions))
-            self.per_part_size = size[0] // num_partitions
-            linear_size = (self.per_part_size, size[1])
-
-        elif axis == 1:
-            assert size[1] % num_partitions == 0, (
-                "Number of column of the weight for linear ({}) must be"
-                " divisible by num_partitions ({})".format(size[1],
-                                                           num_partitions))
-            self.per_part_size = size[1] // num_partitions
-            linear_size = (size[0], self.per_part_size)
-        else:
-            raise ValueError("The value of axis must be 0 or 1, but the value "
-                             "given is {}.".format(axis))
-
-        num_rows, num_cols = linear_size
-
-        self.gather_out = gather_out
-        self.axis = axis
-        if not name:
-            name = "fc_by_row_rank_%d" % inner_rank if axis == 0 else "fc_by_col_rank_%d" % inner_rank
-        else:
-            name = name + "_by_row_rank_%d" % inner_rank if axis == 0 else name + "_by_col_rank_%d" % inner_rank
-        self.linear = paddle.nn.Linear(
-            num_rows,
-            num_cols,
-            weight_attr=param_attr,
-            bias_attr=bias_attr,
-            name=name)
-
-        weight = self.linear.weight
-        weight.is_distributed = True
-        self.weight = self.linear.weight
-
-        startup_block = paddle.static.default_startup_program().global_block()
-        main_block = paddle.static.default_main_program().global_block()
-        startup_block.vars[weight.name].is_distributed = True
-        main_block.vars[weight.name].is_distributed = True
-
-    def forward(self, x):
-        if self.axis == 0:
-            assert x.shape[-1] == self.per_part_size, (
-                "The width ({}) of the input "
-                "x must be equal to the height ({}) of the weight. Maybe you "
-                "should split the input x using paddle.split.".format(
-                    x.shape[-1], self.per_part_size))
-
-        linear_out = self.linear(x)
-        if self.gather_out:
-            if self.axis == 0:
-                paddle.distributed.all_reduce(linear_out)
-            else:
-                output = []
-                paddle.distributed.all_gather(output, linear_out)
-                linear_out = paddle.concat(
-                    output, axis=len(linear_out.shape) - 1)
-        return linear_out
-
-
-class ColumnParallelLiner(ParallelLinear):
-    def __init__(self,
-                 size,
-                 num_partitions,
-                 param_attr=None,
-                 bias_attr=None,
-                 name=None):
-        super().__init__(
-            size,
-            axis=1,
-            num_partitions=num_partitions,
-            gather_out=False,
-            param_attr=param_attr,
-            bias_attr=bias_attr)
-
-
-class RowParallelLiner(ParallelLinear):
-    def __init__(self,
-                 size,
-                 num_partitions,
-                 param_attr=None,
-                 bias_attr=None,
-                 name=None):
-        super().__init__(
-            size,
-            axis=0,
-            num_partitions=num_partitions,
-            gather_out=True,
-            param_attr=param_attr,
-            bias_attr=bias_attr)
 
 
 class MultiHeadAttention(nn.Layer):
@@ -299,22 +81,22 @@ class MultiHeadAttention(nn.Layer):
             self.out_proj = nn.Linear(
                 embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
         else:
-            self.q_proj = ColumnParallelLiner(
+            self.q_proj = ops.ColumnParallelLiner(
                 (embed_dim, embed_dim),
                 topo.mp.size,
                 weight_attr,
                 bias_attr=bias_attr)
-            self.k_proj = ColumnParallelLiner(
+            self.k_proj = ops.ColumnParallelLiner(
                 (self.kdim, embed_dim),
                 topo.mp.size,
                 weight_attr,
                 bias_attr=bias_attr)
-            self.v_proj = ColumnParallelLiner(
+            self.v_proj = ops.ColumnParallelLiner(
                 (self.vdim, embed_dim),
                 topo.mp.size,
                 weight_attr,
                 bias_attr=bias_attr)
-            self.out_proj = RowParallelLiner(
+            self.out_proj = ops.RowParallelLiner(
                 (embed_dim, embed_dim),
                 topo.mp.size,
                 weight_attr,
@@ -577,12 +359,12 @@ class TransformerDecoderLayer(nn.Layer):
                 weight_attrs[2],
                 bias_attr=bias_attrs[2])
         else:
-            self.linear1 = ColumnParallelLiner(
+            self.linear1 = ops.ColumnParallelLiner(
                 (d_model, dim_feedforward),
                 topo.mp.size,
                 weight_attrs[2],
                 bias_attr=bias_attrs[2])
-            self.linear2 = RowParallelLiner(
+            self.linear2 = ops.RowParallelLiner(
                 (dim_feedforward, d_model),
                 topo.mp.size,
                 weight_attrs[2],
@@ -708,7 +490,7 @@ class GPT2Embeddings(nn.Layer):
                 initializer=nn.initializer.Normal(
                     mean=0.0, std=initializer_range)))
         #else:
-        #    self.word_embeddings = ParallelEmbedding(
+        #    self.word_embeddings = ops.ParallelEmbedding(
         #        vocab_size,
         #        hidden_size,
         #        topo.mp.size,
@@ -896,7 +678,7 @@ class GPT2Model(GPT2PretrainedModel):
         for i in range(num_hidden_layers):
             DecoderLayer = TransformerDecoderLayer
             if self.pipline_mode:
-                DecoderLayer = guard(f'gpu:{i//self.layer_per_stage}')(
+                DecoderLayer = ops.guard(f'gpu:{i//self.layer_per_stage}')(
                     TransformerDecoderLayer)
             decoder_layers.append(
                 DecoderLayer(
@@ -914,7 +696,8 @@ class GPT2Model(GPT2PretrainedModel):
                     topo=topo))
 
         if self.pipline_mode:
-            Decoder = guard(f'gpu:{self.topo.pp.size-1}')(TransformerDecoder)
+            Decoder = ops.guard(f'gpu:{self.topo.pp.size-1}')(
+                TransformerDecoder)
         else:
             Decoder = TransformerDecoder
 
