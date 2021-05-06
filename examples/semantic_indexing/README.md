@@ -4,7 +4,7 @@
 
 语义索引库提供了前沿语义索引策略的训练、语义索引模型的效果评估方案、支持用户基于我们开源的语义索引模型进行文本 Pair 的相似度计算或者 Embedding 语义表示抽取。
 
-我们基于 ERNIE1.0 热启，分别采用 BatchNeg 策略和 HardestNeg 策略开源了 [batch_neg_v1.0]((https://paddlenlp.bj.bcebos.com/models/semantic_index/batch_neg_v1.0.tar)) 和 [hardest_neg_v1.0](https://paddlenlp.bj.bcebos.com/models/semantic_index/hardest_neg_v1.0.tar) 模型，相比 Baseline 模型效果有显著提升:
+我们基于 ERNIE1.0 热启，分别采用 BatchNeg 策略和 HardestNeg 策略开源了 [batch_neg_v1.0](https://paddlenlp.bj.bcebos.com/models/semantic_index/batch_neg_v1.0.tar) 和 [hardest_neg_v1.0](https://paddlenlp.bj.bcebos.com/models/semantic_index/hardest_neg_v1.0.tar) 模型，相比 Baseline 模型效果有显著提升:
 
 ## 效果评估
 |  模型 |  Recall@10 | Recall@50  |策略简要说明|
