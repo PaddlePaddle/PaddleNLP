@@ -21,14 +21,14 @@ import time
 import paddle
 import paddlenlp as ppnlp
 from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
-from paddlenlp.datasets import LCQMC
+from paddlenlp.datasets import load_dataset
 
 from utils import convert_example
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")
-parser.add_argument('--use_gpu', type=eval, default=False, help="Whether use GPU for training, input should be True or False")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate used to train.")
 parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
@@ -43,7 +43,6 @@ def create_dataloader(dataset,
                       trans_fn=None,
                       mode='train',
                       batch_size=1,
-                      use_gpu=False,
                       batchify_fn=None):
     """
     Creats dataloader.
@@ -53,7 +52,6 @@ def create_dataloader(dataset,
         trans_fn(obj:`callable`, optional, defaults to `None`): function to convert a data sample to input ids, etc.
         mode(obj:`str`, optional, defaults to obj:`train`): If mode is 'train', it will shuffle the dataset randomly.
         batch_size(obj:`int`, optional, defaults to 1): The sample number of a mini-batch.
-        use_gpu(obj:`bool`, optional, defaults to obj:`False`): Whether to use gpu to run.
         batchify_fn(obj:`callable`, optional, defaults to `None`): function to generate mini-batch data by merging
             the sample list, None for only stack each fields of sample in axis
             0(same as :attr::`np.stack(..., axis=0)`).
@@ -62,13 +60,13 @@ def create_dataloader(dataset,
         dataloader(obj:`paddle.io.DataLoader`): The dataloader which generates batches.
     """
     if trans_fn:
-        dataset = dataset.apply(trans_fn, lazy=True)
+        dataset = dataset.map(trans_fn)
 
-    if mode == 'train' and use_gpu:
+    shuffle = True if mode == 'train' else False
+    if mode == "train":
         sampler = paddle.io.DistributedBatchSampler(
             dataset=dataset, batch_size=batch_size, shuffle=True)
     else:
-        shuffle = True if mode == 'train' else False
         sampler = paddle.io.BatchSampler(
             dataset=dataset, batch_size=batch_size, shuffle=shuffle)
     dataloader = paddle.io.DataLoader(
@@ -80,7 +78,7 @@ def create_dataloader(dataset,
 
 
 if __name__ == "__main__":
-    paddle.set_device('gpu') if args.use_gpu else paddle.set_device('cpu')
+    paddle.set_device(args.device)
 
     # Loads vocab.
     if not os.path.exists(args.vocab_path):
@@ -90,18 +88,15 @@ if __name__ == "__main__":
         args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
 
     # Loads dataset.
-    train_ds, dev_ds, test_ds = LCQMC.get_datasets(['train', 'dev', 'test'])
+    train_ds, dev_ds, test_ds = load_dataset(
+        "lcqmc", splits=["train", "dev", "test"])
 
     # Constructs the newtork.
-    label_list = train_ds.get_labels()
     model = ppnlp.models.SimNet(
         network=args.network,
         vocab_size=len(vocab),
-        num_classes=len(label_list))
+        num_classes=len(train_ds.label_list))
     model = paddle.Model(model)
-    new_vocab_file = open("./new_simnet_word_dict.txt", 'w', encoding='utf8')
-    for token, index in vocab.token_to_idx.items():
-        new_vocab_file.write(token + "\n")
 
     # Reads data and generates mini-batches.
     batchify_fn = lambda samples, fn=Tuple(
@@ -118,21 +113,18 @@ if __name__ == "__main__":
         trans_fn=trans_fn,
         batch_size=args.batch_size,
         mode='train',
-        use_gpu=args.use_gpu,
         batchify_fn=batchify_fn)
     dev_loader = create_dataloader(
         dev_ds,
         trans_fn=trans_fn,
         batch_size=args.batch_size,
         mode='validation',
-        use_gpu=args.use_gpu,
         batchify_fn=batchify_fn)
     test_loader = create_dataloader(
         test_ds,
         trans_fn=trans_fn,
         batch_size=args.batch_size,
         mode='test',
-        use_gpu=args.use_gpu,
         batchify_fn=batchify_fn)
 
     optimizer = paddle.optimizer.Adam(

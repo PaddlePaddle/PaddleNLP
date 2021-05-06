@@ -21,7 +21,7 @@ ELMo(Embeddings from Language Models) 是重要的通用语义表示模型之一
 | Task | 评估指标 | Baseline | +ELMo |
 | :------| :------: | :------: |:------: |
 | [LAC](https://github.com/baidu/lac) | F1 | 87.3% | **88.4%** |
-| [阅读理解](https://github.com/PaddlePaddle/models/tree/develop/PaddleNLP/unarchived/machine_reading_comprehension) | Rouge-L | 39.4% | **40.4%** |
+| [阅读理解](../../../examples/machine_reading_comprehension/SQuAD) | Rouge-L | 39.4% | **40.4%** |
 
 **Note**:
 

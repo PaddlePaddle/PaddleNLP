@@ -20,19 +20,20 @@ import numpy as np
 import paddle
 import paddlenlp as ppnlp
 from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
-from paddlenlp.datasets import ChnSentiCorp
+from paddlenlp.datasets import load_dataset
 
 from utils import convert_example
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")
-parser.add_argument('--use_gpu', type=eval, default=False, help="Whether use GPU for training, input should be True or False")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate used to train.")
 parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
 parser.add_argument("--vocab_path", type=str, default="./senta_word_dict.txt", help="The directory to dataset.")
-parser.add_argument('--network', type=str, default="bilstm", help="Which network you would like to choose bow, lstm, bilstm, gru, bigru, rnn, birnn, bilstm_attn and textcnn?")
+parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru', 'rnn', 'birnn', 'bilstm_attn', 'cnn', 'textcnn'],
+    default="bilstm", help="Select which network to train, defaults to bilstm.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 args = parser.parse_args()
 # yapf: enable
@@ -49,7 +50,6 @@ def create_dataloader(dataset,
                       trans_fn=None,
                       mode='train',
                       batch_size=1,
-                      use_gpu=False,
                       batchify_fn=None):
     """
     Creats dataloader.
@@ -59,7 +59,6 @@ def create_dataloader(dataset,
         trans_fn(obj:`callable`, optional, defaults to `None`): function to convert a data sample to input ids, etc.
         mode(obj:`str`, optional, defaults to obj:`train`): If mode is 'train', it will shuffle the dataset randomly.
         batch_size(obj:`int`, optional, defaults to 1): The sample number of a mini-batch.
-        use_gpu(obj:`bool`, optional, defaults to obj:`False`): Whether to use gpu to run.
         batchify_fn(obj:`callable`, optional, defaults to `None`): function to generate mini-batch data by merging
             the sample list, None for only stack each fields of sample in axis
             0(same as :attr::`np.stack(..., axis=0)`).
@@ -68,26 +67,24 @@ def create_dataloader(dataset,
         dataloader(obj:`paddle.io.DataLoader`): The dataloader which generates batches.
     """
     if trans_fn:
-        dataset = dataset.apply(trans_fn, lazy=True)
+        dataset = dataset.map(trans_fn)
 
-    if mode == 'train' and use_gpu:
+    shuffle = True if mode == 'train' else False
+    if mode == "train":
         sampler = paddle.io.DistributedBatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=True)
+            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
     else:
-        shuffle = True if mode == 'train' else False
         sampler = paddle.io.BatchSampler(
             dataset=dataset, batch_size=batch_size, shuffle=shuffle)
     dataloader = paddle.io.DataLoader(
-        dataset,
-        batch_sampler=sampler,
-        return_list=True,
-        collate_fn=batchify_fn)
+        dataset, batch_sampler=sampler, collate_fn=batchify_fn)
     return dataloader
 
 
 if __name__ == "__main__":
+
+    paddle.set_device(args.device)
     set_seed()
-    paddle.set_device('gpu') if args.use_gpu else paddle.set_device('cpu')
 
     # Loads vocab.
     if not os.path.exists(args.vocab_path):
@@ -97,15 +94,14 @@ if __name__ == "__main__":
     vocab = Vocab.load_vocabulary(
         args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
     # Loads dataset.
-    train_ds, dev_ds, test_ds = ChnSentiCorp.get_datasets(
-        ['train', 'dev', 'test'])
+    train_ds, dev_ds, test_ds = load_dataset(
+        "chnsenticorp", splits=["train", "dev", "test"])
 
     # Constructs the newtork.
-    label_list = train_ds.get_labels()
     model = ppnlp.models.Senta(
         network=args.network,
         vocab_size=len(vocab),
-        num_classes=len(label_list))
+        num_classes=len(train_ds.label_list))
     model = paddle.Model(model)
 
     # Reads data and generates mini-batches.
@@ -121,21 +117,18 @@ if __name__ == "__main__":
         trans_fn=trans_fn,
         batch_size=args.batch_size,
         mode='train',
-        use_gpu=args.use_gpu,
         batchify_fn=batchify_fn)
     dev_loader = create_dataloader(
         dev_ds,
         trans_fn=trans_fn,
         batch_size=args.batch_size,
         mode='validation',
-        use_gpu=args.use_gpu,
         batchify_fn=batchify_fn)
     test_loader = create_dataloader(
         test_ds,
         trans_fn=trans_fn,
         batch_size=args.batch_size,
         mode='test',
-        use_gpu=args.use_gpu,
         batchify_fn=batchify_fn)
 
     optimizer = paddle.optimizer.Adam(

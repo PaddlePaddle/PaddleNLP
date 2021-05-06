@@ -1,7 +1,23 @@
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 The HuggingFace Inc. team.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import random
 import time
 import json
+import math
 
 from functools import partial
 import numpy as np
@@ -22,6 +38,113 @@ MODEL_CLASSES = {
     "bert": (BertForQuestionAnswering, BertTokenizer),
     "ernie": (ErnieForQuestionAnswering, ErnieTokenizer)
 }
+
+
+def prepare_train_features(examples, tokenizer, args):
+    # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
+    # in one example possible giving several features when a context is long, each of those features having a
+    # context that overlaps a bit the context of the previous feature.
+    #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
+    # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
+    contexts = [examples[i]['context'] for i in range(len(examples))]
+    questions = [examples[i]['question'] for i in range(len(examples))]
+
+    tokenized_examples = tokenizer(
+        questions,
+        contexts,
+        stride=args.doc_stride,
+        max_seq_len=args.max_seq_length)
+
+    # Let's label those examples!
+    for i, tokenized_example in enumerate(tokenized_examples):
+        # We will label impossible answers with the index of the CLS token.
+        input_ids = tokenized_example["input_ids"]
+        cls_index = input_ids.index(tokenizer.cls_token_id)
+
+        # The offset mappings will give us a map from token to character position in the original context. This will
+        # help us compute the start_positions and end_positions.
+        offsets = tokenized_example['offset_mapping']
+
+        # Grab the sequence corresponding to that example (to know what is the context and what is the question).
+        sequence_ids = tokenized_example['token_type_ids']
+
+        # One example can give several spans, this is the index of the example containing this span of text.
+        sample_index = tokenized_example['overflow_to_sample']
+        answers = examples[sample_index]['answers']
+        answer_starts = examples[sample_index]['answer_starts']
+
+        # If no answers are given, set the cls_index as answer.
+        if len(answer_starts) == 0:
+            tokenized_examples[i]["start_positions"] = cls_index
+            tokenized_examples[i]["end_positions"] = cls_index
+        else:
+            # Start/end character index of the answer in the text.
+            start_char = answer_starts[0]
+            end_char = start_char + len(answers[0])
+
+            # Start token index of the current span in the text.
+            token_start_index = 0
+            while sequence_ids[token_start_index] != 1:
+                token_start_index += 1
+
+            # End token index of the current span in the text.
+            token_end_index = len(input_ids) - 1
+            while sequence_ids[token_end_index] != 1:
+                token_end_index -= 1
+            # Minus one more to reach actual text
+            token_end_index -= 1
+
+            # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
+            if not (offsets[token_start_index][0] <= start_char and
+                    offsets[token_end_index][1] >= end_char):
+                tokenized_examples[i]["start_positions"] = cls_index
+                tokenized_examples[i]["end_positions"] = cls_index
+            else:
+                # Otherwise move the token_start_index and token_end_index to the two ends of the answer.
+                # Note: we could go after the last offset if the answer is the last word (edge case).
+                while token_start_index < len(offsets) and offsets[
+                        token_start_index][0] <= start_char:
+                    token_start_index += 1
+                tokenized_examples[i]["start_positions"] = token_start_index - 1
+                while offsets[token_end_index][1] >= end_char:
+                    token_end_index -= 1
+                tokenized_examples[i]["end_positions"] = token_end_index + 1
+
+    return tokenized_examples
+
+
+def prepare_validation_features(examples, tokenizer, args):
+    # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
+    # in one example possible giving several features when a context is long, each of those features having a
+    # context that overlaps a bit the context of the previous feature.
+    #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
+    # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
+    contexts = [examples[i]['context'] for i in range(len(examples))]
+    questions = [examples[i]['question'] for i in range(len(examples))]
+
+    tokenized_examples = tokenizer(
+        questions,
+        contexts,
+        stride=args.doc_stride,
+        max_seq_len=args.max_seq_length)
+
+    # For validation, there is no need to compute start and end positions
+    for i, tokenized_example in enumerate(tokenized_examples):
+        # Grab the sequence corresponding to that example (to know what is the context and what is the question).
+        sequence_ids = tokenized_example['token_type_ids']
+
+        # One example can give several spans, this is the index of the example containing this span of text.
+        sample_index = tokenized_example['overflow_to_sample']
+        tokenized_examples[i]["example_id"] = examples[sample_index]['id']
+
+        # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
+        # position is part of the context or not.
+        tokenized_examples[i]["offset_mapping"] = [
+            (o if sequence_ids[k] == 1 else None)
+            for k, o in enumerate(tokenized_example["offset_mapping"])
+        ]
+
+    return tokenized_examples
 
 
 def set_seed(args):
@@ -93,16 +216,16 @@ class CrossEntropyLossForSQuAD(paddle.nn.Layer):
 
 
 def run(args):
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-
+    rank = paddle.distributed.get_rank()
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     set_seed(args)
-    if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+    if rank == 0:
         if os.path.exists(args.model_name_or_path):
             print("init checkpoint from %s" % args.model_name_or_path)
 
@@ -111,79 +234,6 @@ def run(args):
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    def prepare_train_features(examples):
-        # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
-        # in one example possible giving several features when a context is long, each of those features having a
-        # context that overlaps a bit the context of the previous feature.
-        #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is 
-        # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
-        contexts = [examples[i]['context'] for i in range(len(examples))]
-        questions = [examples[i]['question'] for i in range(len(examples))]
-
-        tokenized_examples = tokenizer(
-            questions,
-            contexts,
-            stride=args.doc_stride,
-            max_seq_len=args.max_seq_length)
-
-        # Let's label those examples!
-        for i, tokenized_example in enumerate(tokenized_examples):
-            # We will label impossible answers with the index of the CLS token.
-            input_ids = tokenized_example["input_ids"]
-            cls_index = input_ids.index(tokenizer.cls_token_id)
-
-            # The offset mappings will give us a map from token to character position in the original context. This will
-            # help us compute the start_positions and end_positions.
-            offsets = tokenized_example['offset_mapping']
-
-            # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-            sequence_ids = tokenized_example['token_type_ids']
-
-            # One example can give several spans, this is the index of the example containing this span of text.
-            sample_index = tokenized_example['overflow_to_sample']
-            answers = examples[sample_index]['answers']
-            answer_starts = examples[sample_index]['answer_starts']
-
-            # If no answers are given, set the cls_index as answer.
-            if len(answer_starts) == 0:
-                tokenized_examples[i]["start_positions"] = cls_index
-                tokenized_examples[i]["end_positions"] = cls_index
-            else:
-                # Start/end character index of the answer in the text.
-                start_char = answer_starts[0]
-                end_char = start_char + len(answers[0])
-
-                # Start token index of the current span in the text.
-                token_start_index = 0
-                while sequence_ids[token_start_index] != 1:
-                    token_start_index += 1
-
-                # End token index of the current span in the text.
-                token_end_index = len(input_ids) - 1
-                while sequence_ids[token_end_index] != 1:
-                    token_end_index -= 1
-                # Minus one more to reach actual text
-                token_end_index -= 1
-
-                # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
-                if not (offsets[token_start_index][0] <= start_char and
-                        offsets[token_end_index][1] >= end_char):
-                    tokenized_examples[i]["start_positions"] = cls_index
-                    tokenized_examples[i]["end_positions"] = cls_index
-                else:
-                    # Otherwise move the token_start_index and token_end_index to the two ends of the answer.
-                    # Note: we could go after the last offset if the answer is the last word (edge case).
-                    while token_start_index < len(offsets) and offsets[
-                            token_start_index][0] <= start_char:
-                        token_start_index += 1
-                    tokenized_examples[i][
-                        "start_positions"] = token_start_index - 1
-                    while offsets[token_end_index][1] >= end_char:
-                        token_end_index -= 1
-                    tokenized_examples[i]["end_positions"] = token_end_index + 1
-
-        return tokenized_examples
-
     if args.do_train:
         if args.train_file:
             train_ds = load_dataset('sqaud', data_files=args.train_file)
@@ -191,7 +241,9 @@ def run(args):
             train_ds = load_dataset('squad', splits='train_v2')
         else:
             train_ds = load_dataset('squad', splits='train_v1')
-        train_ds.map(prepare_train_features, lazy=False)
+        train_ds.map(partial(
+            prepare_train_features, tokenizer=tokenizer, args=args),
+                     batched=True)
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
         train_batchify_fn = lambda samples, fn=Dict({
@@ -209,24 +261,29 @@ def run(args):
 
         num_training_steps = args.max_steps if args.max_steps > 0 else len(
             train_data_loader) * args.num_train_epochs
+        num_train_epochs = math.ceil(num_training_steps /
+                                     len(train_data_loader))
 
         lr_scheduler = LinearDecayWithWarmup(
             args.learning_rate, num_training_steps, args.warmup_proportion)
 
+        # Generate parameter names needed to perform weight decay.
+        # All bias and LayerNorm parameters are excluded.
+        decay_params = [
+            p.name for n, p in model.named_parameters()
+            if not any(nd in n for nd in ["bias", "norm"])
+        ]
         optimizer = paddle.optimizer.AdamW(
             learning_rate=lr_scheduler,
             epsilon=args.adam_epsilon,
             parameters=model.parameters(),
             weight_decay=args.weight_decay,
-            apply_decay_param_fun=lambda x: x in [
-                p.name for n, p in model.named_parameters()
-                if not any(nd in n for nd in ["bias", "norm"])
-            ])
+            apply_decay_param_fun=lambda x: x in decay_params)
         criterion = CrossEntropyLossForSQuAD()
 
         global_step = 0
         tic_train = time.time()
-        for epoch in range(args.num_train_epochs):
+        for epoch in range(num_train_epochs):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
                 input_ids, token_type_ids, start_positions, end_positions = batch
@@ -238,17 +295,16 @@ def run(args):
                 if global_step % args.logging_steps == 0:
                     print(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                        % (global_step, epoch, step, loss,
+                        % (global_step, epoch + 1, step + 1, loss,
                            args.logging_steps / (time.time() - tic_train)))
                     tic_train = time.time()
                 loss.backward()
                 optimizer.step()
                 lr_scheduler.step()
-                optimizer.clear_gradients()
+                optimizer.clear_grad()
 
                 if global_step % args.save_steps == 0 or global_step == num_training_steps:
-                    if (not args.n_gpu > 1
-                        ) or paddle.distributed.get_rank() == 0:
+                    if rank == 0:
                         output_dir = os.path.join(args.output_dir,
                                                   "model_%d" % global_step)
                         if not os.path.exists(output_dir):
@@ -259,41 +315,10 @@ def run(args):
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
                         print('Saving checkpoint to:', output_dir)
+                    if global_step == num_training_steps:
+                        break
 
-    def prepare_validation_features(examples):
-        # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
-        # in one example possible giving several features when a context is long, each of those features having a
-        # context that overlaps a bit the context of the previous feature.
-        #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is 
-        # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
-        contexts = [examples[i]['context'] for i in range(len(examples))]
-        questions = [examples[i]['question'] for i in range(len(examples))]
-
-        tokenized_examples = tokenizer(
-            questions,
-            contexts,
-            stride=args.doc_stride,
-            max_seq_len=args.max_seq_length)
-
-        # For validation, there is no need to compute start and end positions
-        for i, tokenized_example in enumerate(tokenized_examples):
-            # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-            sequence_ids = tokenized_example['token_type_ids']
-
-            # One example can give several spans, this is the index of the example containing this span of text.
-            sample_index = tokenized_example['overflow_to_sample']
-            tokenized_examples[i]["example_id"] = examples[sample_index]['id']
-
-            # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
-            # position is part of the context or not.
-            tokenized_examples[i]["offset_mapping"] = [
-                (o if sequence_ids[k] == 1 else None)
-                for k, o in enumerate(tokenized_example["offset_mapping"])
-            ]
-
-        return tokenized_examples
-
-    if args.do_predict:
+    if args.do_predict and rank == 0:
         if args.predict_file:
             dev_ds = load_dataset('sqaud', data_files=args.predict_file)
         elif args.version_2_with_negative:
@@ -301,7 +326,9 @@ def run(args):
         else:
             dev_ds = load_dataset('squad', splits='dev_v1')
 
-        dev_ds.map(prepare_validation_features, lazy=False)
+        dev_ds.map(partial(
+            prepare_validation_features, tokenizer=tokenizer, args=args),
+                   batched=True)
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.batch_size, shuffle=False)
 
@@ -316,13 +343,9 @@ def run(args):
             collate_fn=dev_batchify_fn,
             return_list=True)
 
-        if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
-            evaluate(model, dev_data_loader, args)
+        evaluate(model, dev_data_loader, args)
 
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(run, args=(args, ), nprocs=args.n_gpu)
-    else:
-        run(args)
+    run(args)

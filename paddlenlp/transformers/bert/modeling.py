@@ -54,7 +54,8 @@ class BertEmbeddings(Layer):
     def forward(self, input_ids, token_type_ids=None, position_ids=None):
         if position_ids is None:
             ones = paddle.ones_like(input_ids, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=1)
+            seq_length = paddle.cumsum(ones, axis=-1)
+
             position_ids = seq_length - ones
             position_ids.stop_gradient = True
         if token_type_ids is None:
@@ -421,7 +422,7 @@ class BertLMPredictionHead(Layer):
         self.decoder_weight = self.create_parameter(
             shape=[hidden_size, vocab_size],
             dtype=self.transform.weight.dtype,
-            is_bias=True) if embedding_weights is None else embedding_weights
+            is_bias=False) if embedding_weights is None else embedding_weights
         self.decoder_bias = self.create_parameter(
             shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
 

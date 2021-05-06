@@ -12,23 +12,14 @@
 4. CRF 以 GRU 学习到的特征为输入，以标记序列为监督信号，实现序列标注。
 
 
-## 2. 快速开始
+## 快速开始
 
-### 2.1 环境配置
-
-- Python >= 3.6
-
-- paddlepaddle >= 2.0.0，安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp\>=2.0.0rc`
-
-### 2.2 数据准备
+### 数据准备
 
 我们提供了少数样本用以示例输入数据格式。执行以下命令，下载并解压示例数据集：
 
 ```bash
-wget https://paddlenlp.bj.bcebos.com/datasets/lexical_analysis_dataset_tiny.tar.gz
-tar xvf lexical_analysis_dataset_tiny.tar.gz
+python download.py --data_dir ./  
 ```
 
 训练使用的数据可以由用户根据实际的应用场景，自己组织数据。除了第一行是 `text_a\tlabel` 固定的开头，后面的每行数据都是由两列组成，以制表符分隔，第一列是 utf-8 编码的中文文本，以 `\002` 分割，第二列是对应每个字的标注，以 `\002` 分隔。我们采用 IOB2 标注体系，即以 X-B 作为类型为 X 的词的开始，以 X-I 作为类型为 X 的词的持续，以 O 表示不关注的字（实际上，在词性、专名联合标注中，不存在 O ）。示例如下：
@@ -49,15 +40,11 @@ tar xvf lexical_analysis_dataset_tiny.tar.gz
 | c    | 连词     | u    | 助词     | xc   | 其他虚词 | w    | 标点符号 |
 | PER  | 人名     | LOC  | 地名     | ORG  | 机构名   | TIME | 时间     |
 
-### 2.3 模型训练
+### 模型训练
 
-模型训练支持 CPU 和 GPU，使用 GPU 之前应指定使用的显卡卡号：
+#### 单卡训练
 
-```bash
-export CUDA_VISIBLE_DEVICES=0 # 支持多卡训练，如使用双卡，可以设置为0,1
-```
-
-训练启动方式如下：
+启动方式如下：
 
 ```bash
 python train.py \
@@ -65,30 +52,69 @@ python train.py \
         --model_save_dir ./save_dir \
         --epochs 10 \
         --batch_size 32 \
-        --n_gpu 1 \
+        --device gpu \
         # --init_checkpoint ./save_dir/final
 ```
 
-其中 data_dir 是数据集所在文件夹路径，init_checkpoint 是模型加载路径，通过设置init_checkpoint可以启动增量训练。
+其中参数释义如下：
+- `data_dir`: 数据集所在文件夹路径.
+- `model_save_dir`: 训练期间模型保存路径。
+- `epochs`: 模型训练迭代轮数。
+- `batch_size`: 表示每次迭代**每张卡**上的样本数目。
+- `device`: 训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `init_checkpoint`: 模型加载路径，通过设置init_checkpoint可以启动增量训练。
 
-### 2.4 模型评估
+#### 多卡训练
+
+启动方式如下：
+
+```bash
+python -m paddle.distributed.launch --gpus "0,1"  train.py \
+        --data_dir ./lexical_analysis_dataset_tiny \
+        --model_save_dir ./save_dir \
+        --epochs 10 \
+        --batch_size 32 \
+        --device gpu \
+        # --init_checkpoint ./save_dir/final
+```
+
+### 模型评估
 
 通过加载训练保存的模型，可以对测试集数据进行验证，启动方式如下：
 
 ```bash
 python eval.py --data_dir ./lexical_analysis_dataset_tiny \
-        --init_checkpoint ./save_dir/final \
+        --init_checkpoint ./save_dir/model_100.pdparams \
         --batch_size 32 \
-        --use_gpu True
+        --device gpu
 ```
 
-### 2.5 模型预测
+其中`./save_dir/model_100.pdparams`是训练过程中保存的参数文件，请更换为实际得到的训练保存路径。
+
+### 模型预测
 
 对无标签数据可以启动模型预测：
 
 ```bash
 python predict.py --data_dir ./lexical_analysis_dataset_tiny \
-        --init_checkpoint ./save_dir/final \
+        --init_checkpoint ./save_dir/model_100.pdparams \
         --batch_size 32 \
-        --use_gpu True
+        --device gpu
 ```
+
+得到类似以下输出：
+
+```txt
+(大学, n)(学籍, n)(证明, n)(怎么, r)(开, v)
+(电车, n)(的, u)(英文, nz)
+(什么, r)(是, v)(司法, n)(鉴定人, vn)
+```
+
+
+## 预训练模型
+
+如果您希望使用已经预训练好了的LAC模型完成词法分析任务，请参考：
+
+[Lexical Analysis of Chinese](https://github.com/baidu/lac)
+
+[PaddleHub分词模型](https://www.paddlepaddle.org.cn/hubdetail?name=lac&en_category=LexicalAnalysis)

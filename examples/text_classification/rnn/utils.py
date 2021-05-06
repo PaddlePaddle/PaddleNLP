@@ -30,12 +30,12 @@ def convert_example(example, tokenizer, is_test=False):
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
 
-    input_ids = tokenizer.encode(example[0])
+    input_ids = tokenizer.encode(example["text"])
     valid_length = np.array(len(input_ids), dtype='int64')
     input_ids = np.array(input_ids, dtype='int64')
 
     if not is_test:
-        label = np.array(example[-1], dtype="int64")
+        label = np.array(example["label"], dtype="int64")
         return input_ids, valid_length, label
     else:
         return input_ids, valid_length

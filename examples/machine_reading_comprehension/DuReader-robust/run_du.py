@@ -1,7 +1,23 @@
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 The HuggingFace Inc. team.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import random
 import time
 import json
+import math
 
 from functools import partial
 import numpy as np
@@ -93,16 +109,17 @@ class CrossEntropyLossForSQuAD(paddle.nn.Layer):
 
 
 def run(args):
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
+    rank = paddle.distributed.get_rank()
 
     task_name = args.task_name.lower()
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     set_seed(args)
-    if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+    if rank == 0:
         if os.path.exists(args.model_name_or_path):
             print("init checkpoint from %s" % args.model_name_or_path)
 
@@ -115,7 +132,7 @@ def run(args):
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
         # in one example possible giving several features when a context is long, each of those features having a
         # context that overlaps a bit the context of the previous feature.
-        # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is 
+        # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
         # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
         contexts = [examples[i]['context'] for i in range(len(examples))]
         questions = [examples[i]['question'] for i in range(len(examples))]
@@ -183,7 +200,7 @@ def run(args):
             train_ds = load_dataset(task_name, data_files=args.train_file)
         else:
             train_ds = load_dataset(task_name, splits='train')
-        train_ds.map(prepare_train_features, lazy=False)
+        train_ds.map(prepare_train_features, batched=True)
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
         train_batchify_fn = lambda samples, fn=Dict({
@@ -201,23 +218,29 @@ def run(args):
 
         num_training_steps = args.max_steps if args.max_steps > 0 else len(
             train_data_loader) * args.num_train_epochs
+        num_train_epochs = math.ceil(num_training_steps /
+                                     len(train_data_loader))
+
         lr_scheduler = LinearDecayWithWarmup(
             args.learning_rate, num_training_steps, args.warmup_proportion)
 
+        # Generate parameter names needed to perform weight decay.
+        # All bias and LayerNorm parameters are excluded.
+        decay_params = [
+            p.name for n, p in model.named_parameters()
+            if not any(nd in n for nd in ["bias", "norm"])
+        ]
         optimizer = paddle.optimizer.AdamW(
             learning_rate=lr_scheduler,
             epsilon=args.adam_epsilon,
             parameters=model.parameters(),
             weight_decay=args.weight_decay,
-            apply_decay_param_fun=lambda x: x in [
-                p.name for n, p in model.named_parameters()
-                if not any(nd in n for nd in ["bias", "norm"])
-            ])
+            apply_decay_param_fun=lambda x: x in decay_params)
         criterion = CrossEntropyLossForSQuAD()
 
         global_step = 0
         tic_train = time.time()
-        for epoch in range(args.num_train_epochs):
+        for epoch in range(num_train_epochs):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
                 input_ids, token_type_ids, start_positions, end_positions = batch
@@ -228,17 +251,16 @@ def run(args):
                 if global_step % args.logging_steps == 0:
                     print(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                        % (global_step, epoch, step, loss,
+                        % (global_step, epoch + 1, step + 1, loss,
                            args.logging_steps / (time.time() - tic_train)))
                     tic_train = time.time()
                 loss.backward()
                 optimizer.step()
                 lr_scheduler.step()
-                optimizer.clear_gradients()
+                optimizer.clear_grad()
 
                 if global_step % args.save_steps == 0 or global_step == num_training_steps:
-                    if (not args.n_gpu > 1
-                        ) or paddle.distributed.get_rank() == 0:
+                    if rank == 0:
                         output_dir = os.path.join(args.output_dir,
                                                   "model_%d" % global_step)
                         if not os.path.exists(output_dir):
@@ -249,12 +271,14 @@ def run(args):
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
                         print('Saving checkpoint to:', output_dir)
+                    if global_step == num_training_steps:
+                        break
 
     def prepare_validation_features(examples):
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
         # in one example possible giving several features when a context is long, each of those features having a
         # context that overlaps a bit the context of the previous feature.
-        # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is 
+        # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
         # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
         contexts = [examples[i]['context'] for i in range(len(examples))]
         questions = [examples[i]['question'] for i in range(len(examples))]
@@ -283,13 +307,14 @@ def run(args):
 
         return tokenized_examples
 
-    if args.do_predict:
+    if args.do_predict and rank == 0:
+
         if args.predict_file:
             dev_ds = load_dataset(task_name, data_files=args.predict_file)
         else:
             dev_ds = load_dataset(task_name, splits='dev')
 
-        dev_ds.map(prepare_validation_features, lazy=False)
+        dev_ds.map(prepare_validation_features, batched=True)
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.batch_size, shuffle=False)
 
@@ -304,13 +329,9 @@ def run(args):
             collate_fn=dev_batchify_fn,
             return_list=True)
 
-        if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
-            evaluate(model, dev_data_loader, args)
+        evaluate(model, dev_data_loader, args)
 
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(run, args=(args, ), nprocs=args.n_gpu)
-    else:
-        run(args)
+    run(args)

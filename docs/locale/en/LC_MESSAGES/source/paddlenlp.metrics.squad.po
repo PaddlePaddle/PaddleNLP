@@ -1,0 +1,95 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.metrics.squad.rst:2
+msgid "squad"
+msgstr ""
+
+#: of paddlenlp.metrics.squad.compute_prediction:1
+msgid ""
+"Post-processes the predictions of a question-answering model to convert "
+"them to answers that are substrings of the original contexts. This is the"
+" base postprocessing functions for models that only return start and end "
+"logits."
+msgstr ""
+
+#: of paddlenlp.metrics.squad.compute_prediction
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.metrics.squad.compute_prediction:4
+msgid "The non-preprocessed dataset (see the main script for more information)."
+msgstr ""
+
+#: of paddlenlp.metrics.squad.compute_prediction:5
+msgid "The processed dataset (see the main script for more information)."
+msgstr ""
+
+#: of paddlenlp.metrics.squad.compute_prediction:6
+msgid ""
+"The predictions of the model: two arrays containing the start logits and "
+"the end logits respectively. Its first dimension must match the number of"
+" elements of :obj:`features`."
+msgstr ""
+
+#: of paddlenlp.metrics.squad.compute_prediction:9
+msgid "Whether or not the underlying dataset contains examples with no answers."
+msgstr ""
+
+#: of paddlenlp.metrics.squad.compute_prediction:11
+msgid ""
+"The total number of n-best predictions to generate when looking for an "
+"answer."
+msgstr ""
+
+#: of paddlenlp.metrics.squad.compute_prediction:13
+msgid ""
+"The maximum length of an answer that can be generated. This is needed "
+"because the start and end predictions are not conditioned on one another."
+msgstr ""
+
+#: of paddlenlp.metrics.squad.compute_prediction:16
+msgid ""
+"The threshold used to select the null answer: if the best answer has a "
+"score that is less than the score of the null answer minus this "
+"threshold, the null answer is selected for this example (note that the "
+"score of the null answer for an example giving several features is the "
+"minimum of the scores for the null answer on each feature: all features "
+"must be aligned on the fact they `want` to predict a null answer).  Only "
+"useful when :obj:`version_2_with_negative` is :obj:`True`."
+msgstr ""
+
+#: of paddlenlp.metrics.squad.compute_prediction:16
+msgid ""
+"The threshold used to select the null answer: if the best answer has a "
+"score that is less than the score of the null answer minus this "
+"threshold, the null answer is selected for this example (note that the "
+"score of the null answer for an example giving several features is the "
+"minimum of the scores for the null answer on each feature: all features "
+"must be aligned on the fact they `want` to predict a null answer)."
+msgstr ""
+
+#: of paddlenlp.metrics.squad.compute_prediction:21
+msgid "Only useful when :obj:`version_2_with_negative` is :obj:`True`."
+msgstr ""
+
+#: of paddlenlp.metrics.squad.normalize_answer:1
+msgid "Lower text and remove punctuation, articles and extra whitespace."
+msgstr ""
+

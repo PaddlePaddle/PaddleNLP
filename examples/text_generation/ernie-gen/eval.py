@@ -24,7 +24,7 @@ from tqdm import tqdm
 from paddle.io import DataLoader
 from paddlenlp.transformers import ErnieForGeneration
 from paddlenlp.transformers import ErnieTokenizer, ErnieTinyTokenizer, BertTokenizer, ElectraTokenizer, RobertaTokenizer
-from paddlenlp.datasets import Poetry
+from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.metrics import Rouge1, Rouge2
 from paddlenlp.utils.log import logger
@@ -41,14 +41,14 @@ parser.add_argument("--batch_size", default=50, type=int, help="Batch size per G
 parser.add_argument('--beam_width', type=int, default=1, help="Beam search width")
 parser.add_argument('--length_penalty', type=float, default=1.0, help="The length penalty during decoding")
 parser.add_argument('--init_checkpoint', type=str, default=None, help='Checkpoint to warm start from')
-parser.add_argument('--use_gpu', action='store_true', help='If set, use gpu to excute')
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
 # yapf: enable
 
 args = parser.parse_args()
 
 
 def evaluate():
-    paddle.set_device("gpu" if args.use_gpu else "cpu")
+    paddle.set_device(args.device)
 
     model = ErnieForGeneration.from_pretrained(args.model_name_or_path)
     if "ernie-tiny" in args.model_name_or_path:
@@ -62,7 +62,7 @@ def evaluate():
     else:
         tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
 
-    dev_dataset = Poetry.get_datasets(['dev'])
+    dev_dataset = load_dataset('poetry', splits=('dev'), lazy=False)
     attn_id = tokenizer.vocab[
         '[ATTN]'] if '[ATTN]' in tokenizer.vocab else tokenizer.vocab['[MASK]']
     tgt_type_id = model.sent_emb.weight.shape[0] - 1
@@ -85,7 +85,7 @@ def evaluate():
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_labels
     ): after_padding(fn(samples))
 
-    dev_dataset = dev_dataset.apply(trans_func, lazy=True)
+    dev_dataset = dev_dataset.map(trans_func)
     dev_batch_sampler = paddle.io.BatchSampler(
         dev_dataset, batch_size=args.batch_size, shuffle=False)
     data_loader = DataLoader(

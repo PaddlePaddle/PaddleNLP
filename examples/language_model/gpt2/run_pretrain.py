@@ -82,9 +82,6 @@ def run_evaluate(data_loader,
 
 
 def do_train(args):
-    assert args.device in [
-        "cpu", "gpu", "xpu"
-    ], "Invalid device! Available device should be cpu, gpu, or xpu."
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -148,6 +145,8 @@ def do_train(args):
     if args.grad_clip > 0:
         clip = paddle.nn.ClipGradByNorm(clip_norm=args.grad_clip)
 
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
     decay_params = [
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
@@ -159,8 +158,6 @@ def do_train(args):
         weight_decay=args.weight_decay,
         grad_clip=clip,
         apply_decay_param_fun=lambda x: x in decay_params)
-
-    # Load checkpoint for path
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from ", args.model_name_or_path)
         opt_dict = paddle.load(

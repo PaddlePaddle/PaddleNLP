@@ -14,6 +14,7 @@
 
 from .model_utils import PretrainedModel, register_base_model
 from .tokenizer_utils import PretrainedTokenizer
+from .attention_utils import create_bigbird_rand_mask_idx_list
 
 from .bert.modeling import *
 from .bert.tokenizer import *
@@ -28,3 +29,11 @@ from .electra.tokenizer import *
 from .transformer.modeling import *
 from .ernie_gen.modeling import ErnieForGeneration
 from .optimization import *
+from .bigbird.modeling import *
+from .bigbird.tokenizer import *
+from .unified_transformer.modeling import *
+from .unified_transformer.tokenizer import *
+from .ernie_ctm.modeling import *
+from .ernie_ctm.tokenizer import *
+from .distilbert.modeling import *
+from .distilbert.tokenizer import *

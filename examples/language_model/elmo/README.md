@@ -1,6 +1,7 @@
 # ELMo
 
 ## 模型简介
+
 ELMo(Embeddings from Language Models)是重要的通用语义表示模型之一，以双向LSTM为网络基本组件，以Language Model为训练目标，通过预训练得到通用的语义表示，ELMo能够学习到复杂的特征，比如语法、语义，并且能够学习在不同上下文情况下的词汇多义性。将ELMo得到的语义表示作为Feature迁移到下游NLP任务中，会显著提升下游任务的模型性能，比如问答、文本蕴含和情感分析等。ELMo模型的细节可以[参阅论文](https://arxiv.org/abs/1802.05365)。
 
 本项目是ELMo在Paddle上的开源实现, 基于1 Billion Word Language Model Benchmark进行预训练，并接入了简单的下游任务作为示例程序。
@@ -12,14 +13,12 @@ ELMo(Embeddings from Language Models)是重要的通用语义表示模型之一�
 | word2vec + BoW  | 0.7769   |
 | ELMo + BoW  | 0.7760   |
 
-## 快速开始
+## 环境依赖
 
-### 环境配置
+- sklearn
+- gensim
 
-- python >= 3.6
-- paddlepaddle >= 2.0.0, 安装方式请参考 [快速安装](https://www.paddlepaddle.org.cn/install/quick)。
-- paddlenlp >= 2.0.0rc, 安装方式：`pip install paddlenlp==2.0.0rc`
-- sklearn gensim, 安装方式：`pip install sklearn gensim`
+安装方式：`pip install sklearn gensim`
 
 ### 代码结构说明
 
@@ -30,10 +29,10 @@ ELMo(Embeddings from Language Models)是重要的通用语义表示模型之一�
 ├── args.py # 运行参数配置文件
 ├── dataset.py # 数据读取
 ├── elmo.py # 模型组网
-├── train.py # 训练模型主程序入口
-├── eval.py # 评估模型主程序入口
-├── base.py # 下游二分类任务base模型训练测试主程序入口
-├── example.py # 下游二分类任务训练测试主程序入口
+├── run_pretrain.py # 训练模型主程序入口
+├── run_eval.py # 评估模型主程序入口
+├── word2vec_base.py # 下游二分类任务base模型训练测试主程序入口
+├── run_finetune.py # 下游二分类任务训练测试主程序入口
 ├── download_data.sh # 数据下载脚本
 └── README.md # 文档说明
 ```
@@ -68,9 +67,9 @@ sentence-polarity-dataset-v1目录结构：
 
 基于1-billion-word数据集，可以运行下面的命令，在训练集上进行模型训练
 ```shell
-# GPU启动
-# CUDA_VISIBLE_DEVICES指定想要使用的GPU卡号，可以是单卡，也可以多卡
-CUDA_VISIBLE_DEVICES=0,1,2 python -m paddle.distributed.launch train.py --train_data_path='./1-billion-word/training-tokenized-shuffled/*' --vocab_file='./1-billion-word/vocab-15w.txt' --save_dir='./checkpoints'
+# GPU启动, 支持单卡和多卡
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus '0' run_pretrain.py --train_data_path='./1-billion-word/training-tokenized-shuffled/*' --vocab_file='./1-billion-word/vocab-15w.txt' --save_dir='./checkpoints' --device='gpu'
 ```
 
 其他可选参数和参数的默认值请参考`args.py`。
@@ -94,8 +93,9 @@ checkpoints/
 
 基于1-billion-word数据集，可以运行下面的命令，在评测集上进行模型评估
 ```shell
-# GPU启动
-python eval.py --dev_data_path='./1-billion-word/heldout-tokenized-shuffled/*' --vocab_file='./1-billion-word/vocab-15w.txt' --init_from_ckpt='./checkpoints/10000'
+# GPU启动，仅支持单卡
+export CUDA_VISIBLE_DEVICES=0
+python run_eval.py --dev_data_path='./1-billion-word/heldout-tokenized-shuffled/*' --vocab_file='./1-billion-word/vocab-15w.txt' --init_from_ckpt='./checkpoints/10000' --device='gpu'
 ```
 
 ### 下游任务
@@ -106,14 +106,37 @@ python eval.py --dev_data_path='./1-billion-word/heldout-tokenized-shuffled/*' -
 
 base模型可以运行下面的命令，在训练集上进行模型训练评估
 ```shell
-python base.py
+# GPU启动, 支持单卡和多卡
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus '0' word2vec_base.py --data_dir='./sentence-polarity-dataset-v1/' --pretrained_word2vec_file='./sentence-polarity-dataset-v1/GoogleNews-vectors-negative300.bin' --device='gpu'
 ```
 
 #### ELMo finetune
 
 ELMo finetune可以运行下面的命令，在训练集上进行模型训练评估
 ```shell
-python example.py --init_from_ckpt='./checkpoints/10000'
+# GPU启动, 支持单卡和多卡
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus '0' run_finetune.py --data_dir='./sentence-polarity-dataset-v1/' --init_from_ckpt='./checkpoints/10000' --device='gpu'
 ```
 
-**NOTE:** 可以通过构建模型时的trainable参数设置ELMo参与或不参与下游任务的训练。另外，预训练的ELMo也可以作为文本词向量编码器单独使用，即输入文本内容，输出每个词对应的词向量。ELMo接入下游任务的具体用法请参考`example.py`中示例`example_of_using_ELMo_as_finetune()`和`example_of_using_ELMo_as_embedder()`。
+**NOTE:** 可以通过构建模型时的trainable参数设置ELMo参与或不参与下游任务的训练。ELMo接入下游任务的具体用法请参考`run_finetune.py`。
+
+另外，预训练的ELMo也可以作为文本词向量编码器单独使用，即输入文本内容，输出每个词对应的词向量。用法示例如下：
+
+```python
+from elmo import ELMoEmbedder
+
+embedder = ELMoEmbedder(params_file)
+sentences = [['The', 'first', 'sentence', '.'], ['Second', 'one', '.']]
+
+embeddings = embedder.encode(sentences)
+for i, (text, emb) in enumerate(zip(sentences, embeddings)):
+    print(text)
+    print(emb.shape)
+    print()
+```
+
+## Reference
+
+- [Deep contextualized word representations](https://arxiv.org/abs/1802.05365)

@@ -31,7 +31,7 @@ Sequence to Sequence (Seq2Seq)，使用编码器-解码器（Encoder-Decoder）�
 本教程使用[IWSLT'15 English-Vietnamese data ](https://nlp.stanford.edu/projects/nmt/)数据集中的英语到越南语的数据作为训练语料，tst2012的数据作为开发集，tst2013的数据作为测试集。
 
 ### 数据获取
-如果用户在初始化数据集时没有提供路径，数据集会自动下载到`paddlenlp.utils.env.DATA_HOME`的`/machine_translation/IWSLT15/`路径下，例如在linux系统下，默认存储路径是`~/.paddlenlp/datasets/machine_translation/IWSLT15`。
+如果用户在初始化数据集时没有提供路径，数据集会自动下载到`paddlenlp.utils.env.DATA_HOME`的`IWSLT15/`路径下，例如在linux系统下，默认存储路径是`~/.paddlenlp/datasets/IWSLT15`。
 
 ## 模型训练
 
@@ -45,7 +45,7 @@ python train.py \
     --dropout 0.2 \
     --init_scale  0.1 \
     --max_grad_norm 5.0 \
-    --select_device gpu \
+    --device gpu \
     --model_path ./attention_models
 ```
 
@@ -68,13 +68,13 @@ python predict.py \
      --init_from_ckpt attention_models/9 \
      --infer_output_file infer_output.txt \
      --beam_size 10 \
-     --select_device gpu
+     --device gpu
 ```
 
 各参数的具体说明请参阅 `args.py` ，注意预测时所用模型超参数需和训练时一致。
 
 ## 预测效果评价
-取第10个epoch的结果，用取beam_size为10的beam search解码，`predict.py`脚本在生成翻译结果之后，会调用`paddlenlp.metrics.BLEU`计算翻译结果的BLEU指标，最终计算出的BLEU分数为0.24074304399683688。
+取第10个epoch的结果，用取beam_size为10的beam search解码，`predict.py`脚本在生成翻译结果之后，会调用`paddlenlp.metrics.BLEU`计算翻译结果的BLEU指标，最终计算出的BLEU分数为0.24329954822714048
 
 ## 保存预测模型
 这里指定的参数`export_path` 表示导出预测模型文件的前缀。保存时会添加后缀（`pdiparams`，`pdiparams.info`，`pdmodel`）。
@@ -92,13 +92,13 @@ python export_model.py \
 ```
 
 ## 基于预测引擎推理
-然后按照如下的方式对IWSLT15数据集中的测试集（有标注的）进行预测（基于Paddle的[Python预测API](https://www.paddlepaddle.org.cn/documentation/docs/zh/2.0-rc1/guides/05_inference_deployment/inference/python_infer_cn.html)）：
+然后按照如下的方式对IWSLT15数据集中的测试集（有标注的）进行预测（基于Paddle的[Python预测API](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/python_infer_cn.html)）：
 
 ```shell
 cd deploy/python
 python infer.py \
     --export_path ../../infer_model/model \
-    --select_device gpu \
+    --device gpu \
     --batch_size 128 \
     --infer_output_file infer_output.txt
 ```

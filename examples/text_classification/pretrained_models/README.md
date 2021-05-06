@@ -46,28 +46,15 @@
 
 ## 快速开始
 
-### 环境依赖
-
-* PaddlePaddle 安装
-
-   本项目依赖于 PaddlePaddle 2.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* PaddleNLP 安装
-
-   ```shell
-   pip install paddlenlp\>=2.0.0rc
-   ```
-
-* 环境依赖
-
-   Python的版本要求 3.6+，其它环境请参考 PaddlePaddle [安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/1.5/beginners_guide/install/index_cn.html) 部分的内容
-
 ### 代码结构说明
 
 以下是本项目主要代码结构及说明：
 
 ```text
 pretrained_models/
+├── deploy # 部署
+│   └── python
+│       └── predict.py # python预测部署示例
 ├── export_model.py # 动态图参数导出静态图参数脚本
 ├── predict.py # 预测脚本
 ├── README.md # 使用说明
@@ -78,9 +65,8 @@ pretrained_models/
 
 我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 ```shell
-# 设置使用的GPU卡号
-CUDA_VISIBLE_DEVICES=0
-python train.py --n_gpu 1 --save_dir ./checkpoints
+$ unset CUDA_VISIBLE_DEVICES
+$ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_dir ./checkpoints
 ```
 
 可支持配置的参数：
@@ -94,7 +80,7 @@ python train.py --n_gpu 1 --save_dir ./checkpoints
 * `warmup_proption`：可选，学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.1。
 * `init_from_ckpt`：可选，模型参数路径，热启动模型训练；默认为None。
 * `seed`：可选，随机种子，默认为1000.
-* `n_gpu`：可选，训练过程中使用GPU卡数量，默认为1。若n_gpu=0，则使用CPU训练。
+* `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 
 代码示例中使用的预训练模型是ERNIE，如果想要使用其他预训练模型如BERT，RoBERTa，Electra等，只需更换`model` 和 `tokenizer`即可。
 
@@ -159,12 +145,18 @@ python export_model.py --params_path=./checkpoint/model_900/model_state.pdparams
 ```
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 
+导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式：
+
+```shell
+python deploy/python/predict.py --model_file=static_graph_params.pdmodel --params_file=static_graph_params.pdiparams
+```
+
 ### 模型预测
 
 启动预测：
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python predict.py --params_path checkpoints/model_900/model_state.pdparams
+python predict.py --device 'gpu' --params_path checkpoints/model_900/model_state.pdparams
 ```
 
 将待预测数据如以下示例：
@@ -184,21 +176,3 @@ Data: 这个宾馆比较陈旧了，特价的房间也很一般。总体来说�
 Data: 怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片      Label: negative
 Data: 作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。      Label: positive
 ```
-
-## 线上体验教程
-
-- [使用seq2vec模块进行句子情感分类](https://aistudio.baidu.com/aistudio/projectdetail/1283423)
-
-- [如何将预训练模型Fine-tune下游任务](https://aistudio.baidu.com/aistudio/projectdetail/1294333)
-
-- [使用Bi-GRU+CRF完成快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1317771)
-
-- [使用预训练模型ERNIE优化快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1329361)
-
-- [使用Seq2Seq模型完成自动对联模型](https://aistudio.baidu.com/aistudio/projectdetail/1321118)
-
-- [使用预训练模型ERNIE-GEN实现智能写诗](https://aistudio.baidu.com/aistudio/projectdetail/1339888)
-
-- [使用TCN网络完成新冠疫情病例数预测](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
-
-更多教程参见[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。

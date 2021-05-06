@@ -12,18 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
-import random
-import time
+from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-
-from paddlenlp.data import Stack, Tuple, Pad
 import paddlenlp as ppnlp
+from paddlenlp.data import Stack, Tuple, Pad
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -31,7 +28,7 @@ parser.add_argument("--params_path", type=str, required=True, help="The path to 
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--n_gpu", type=int, default=1, help="Number of GPUs to use, 0 for CPU.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -70,13 +67,12 @@ def convert_example(example,
 
     Returns:
         input_ids(obj:`list[int]`): The list of token ids.
-        segment_ids(obj: `list[int]`): List of sequence pair mask.
+        token_type_ids(obj: `list[int]`): List of sequence pair mask.
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
-    text = example
-    encoded_inputs = tokenizer.encode(text=text, max_seq_len=max_seq_length)
+    encoded_inputs = tokenizer(text=example, max_seq_len=max_seq_length)
     input_ids = encoded_inputs["input_ids"]
-    segment_ids = encoded_inputs["segment_ids"]
+    token_type_ids = encoded_inputs["token_type_ids"]
 
     if not is_test:
         # create label maps
@@ -86,9 +82,9 @@ def convert_example(example,
 
         label = label_map[label]
         label = np.array([label], dtype="int64")
-        return input_ids, segment_ids, label
+        return input_ids, token_type_ids, label
     else:
-        return input_ids, segment_ids
+        return input_ids, token_type_ids
 
 
 def predict(model, data, tokenizer, label_map, batch_size=1):
@@ -109,13 +105,13 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
     """
     examples = []
     for text in data:
-        input_ids, segment_ids = convert_example(
+        input_ids, token_type_ids = convert_example(
             text,
             tokenizer,
             label_list=label_map.values(),
             max_seq_length=args.max_seq_length,
             is_test=True)
-        examples.append((input_ids, segment_ids))
+        examples.append((input_ids, token_type_ids))
 
     # Seperates data into some batches.
     batches = [
@@ -130,10 +126,10 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
     results = []
     model.eval()
     for batch in batches:
-        input_ids, segment_ids = batchify_fn(batch)
+        input_ids, token_type_ids = batchify_fn(batch)
         input_ids = paddle.to_tensor(input_ids)
-        segment_ids = paddle.to_tensor(segment_ids)
-        logits = model(input_ids, segment_ids)
+        token_type_ids = paddle.to_tensor(token_type_ids)
+        logits = model(input_ids, token_type_ids)
         probs = F.softmax(logits, axis=1)
         idx = paddle.argmax(probs, axis=1).numpy()
         idx = idx.tolist()
@@ -143,7 +139,7 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
 
 
 if __name__ == "__main__":
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
     tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(

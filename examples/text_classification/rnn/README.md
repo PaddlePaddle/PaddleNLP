@@ -24,8 +24,6 @@ PaddleNLP提供了一系列的文本表示技术，如`seq2vec`模块。
 
 ## 模型简介
 
-
-
 本项目通过调用[seq2vec](../../../paddlenlp/seq2vec/)中内置的模型进行序列建模，完成句子的向量表示。包含最简单的词袋模型和一系列经典的RNN类模型。
 
 `seq2vec`模块
@@ -98,32 +96,8 @@ PaddleNLP提供了一系列的文本表示技术，如`seq2vec`模块。
 </p>
 
 
-关于CNN、LSTM、GRU、RNN等更多信息参考：
-
-* https://canvas.stanford.edu/files/1090785/download
-* https://colah.github.io/posts/2015-08-Understanding-LSTMs/
-* https://arxiv.org/abs/1412.3555
-* https://arxiv.org/pdf/1506.00019
-* https://arxiv.org/abs/1404.2188
-
 
 ## 快速开始
-
-### 环境依赖
-
-* PaddlePaddle 安装
-
-   本项目依赖于 PaddlePaddle 2.0 及以上版本，请参考 [安装指南](http://www.paddlepaddle.org/#quick-start) 进行安装
-
-* PaddleNLP 安装
-
-   ```shell
-   pip install paddlenlp\>=2.0.0rc
-   ```
-
-* 环境依赖
-
-   Python的版本要求 3.6+，其它环境请参考 PaddlePaddle [安装说明](https://www.paddlepaddle.org.cn/documentation/docs/zh/1.5/beginners_guide/install/index_cn.html) 部分的内容
 
 ### 代码结构说明
 
@@ -131,6 +105,9 @@ PaddleNLP提供了一系列的文本表示技术，如`seq2vec`模块。
 
 ```text
 rnn/
+├── deploy # 部署
+│   └── python
+│       └── predict.py # python预测部署示例
 ├── export_model.py # 动态图参数导出静态图参数脚本
 ├── predict.py # 模型预测
 ├── utils.py # 数据处理工具
@@ -143,10 +120,11 @@ rnn/
 #### 使用PaddleNLP内置数据集
 
 ```python
-from paddlenlp.datasets import ChnSentiCorp
+from paddlenlp.datasets import load_dataset
 
-train_ds, dev_ds, test_ds = ChnSentiCorp.get_datasets(['train', 'dev', 'test'])
+train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
 ```
+
 
 ### 模型训练
 
@@ -156,24 +134,53 @@ train_ds, dev_ds, test_ds = ChnSentiCorp.get_datasets(['train', 'dev', 'test'])
 wget https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt
 ```
 
+**NOTE:** 词表的选择和实际应用数据相关，需根据实际数据选择词表。
+
+
 我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 
 CPU 启动：
 
 ```shell
-python train.py --vocab_path='./senta_word_dict.txt' --use_gpu=False --network=bilstm --lr=5e-4 --batch_size=64 --epochs=10 --save_dir='./checkpoints'
+python train.py --vocab_path='./senta_word_dict.txt' \
+    --device=cpu \
+    --network=bilstm \
+    --lr=5e-4 \
+    --batch_size=64 \
+    --epochs=10 \
+    --save_dir='./checkpoints'
 ```
 
 GPU 启动：
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python train.py --vocab_path='./senta_word_dict.txt' --use_gpu=True --network=bilstm --lr=5e-4 --batch_size=64 --epochs=10 --save_dir='./checkpoints'
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" train.py \
+    --vocab_path='./senta_word_dict.txt' \
+    --device=gpu \
+    --network=bilstm \
+    --lr=5e-4 \
+    --batch_size=64 \
+    --epochs=10 \
+    --save_dir='./checkpoints'
+```
+
+XPU 启动：
+
+```shell
+python train.py --vocab_path='./senta_word_dict.txt' \
+    --device=xpu \
+    --network=lstm \
+    --lr=5e-4 \
+    --batch_size=64 \
+    --epochs=10 \
+    --save_dir='./checkpoints'
 ```
 
 以上参数表示：
 
 * `vocab_path`: 词汇表文件路径。
-* `use_gpu`: 是否使用GPU进行训练， 默认为`False`。
+* `device`: 选用什么设备进行训练，可选cpu、gpu或者xpu。如使用gpu训练则参数gpus指定GPU卡号。目前xpu只支持模型网络设置为lstm。
 * `network`: 模型网络名称，默认为`bilstm_attn`， 可更换为bilstm, bigru, birnn，bow，lstm，rnn，gru，bilstm_attn，textcnn等。
 * `lr`: 学习率， 默认为5e-5。
 * `batch_size`: 运行一个batch大小，默认为64。
@@ -206,6 +213,12 @@ python export_model.py --vocab_path=./senta_word_dict.txt --network=bilstm --par
 
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 
+导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式：
+
+```shell
+python deploy/python/predict.py --model_file=static_graph_params.pdmodel --params_file=static_graph_params.pdiparams --network=bilstm
+```
+
 ### 模型预测
 
 启动预测：
@@ -213,13 +226,29 @@ python export_model.py --vocab_path=./senta_word_dict.txt --network=bilstm --par
 CPU启动：
 
 ```shell
-python predict.py --vocab_path='./senta_word_dict.txt' --use_gpu=False --network=bilstm --params_path=checkpoints/final.pdparams
+python predict.py --vocab_path='./senta_word_dict.txt' \
+    --device=cpu \
+    --network=bilstm \
+    --params_path=checkpoints/final.pdparams
 ```
 
 GPU启动：
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python predict.py --vocab_path='./senta_word_dict.txt' --use_gpu=True --network=bilstm --params_path='./checkpoints/final.pdparams'
+export CUDA_VISIBLE_DEVICES=0
+python predict.py --vocab_path='./senta_word_dict.txt' \
+    --device=gpu \
+    --network=bilstm \
+    --params_path='./checkpoints/final.pdparams'
+```
+
+XPU启动：
+
+```shell
+python predict.py --vocab_path='./senta_word_dict.txt' \
+    --device=xpu \
+    --network=lstm \
+    --params_path=checkpoints/final.pdparams
 ```
 
 将待预测数据分词完毕后，如以下示例：
@@ -240,20 +269,12 @@ Data: 怀着十分激动的心情放映，可是看着看着发现，在放映�
 Data: 作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。      Lable: positive
 ```
 
-## 线上体验教程
+## Reference
 
-- [使用seq2vec模块进行句子情感分类](https://aistudio.baidu.com/aistudio/projectdetail/1283423)
+关于LSTM、GRU、CNN更多信息参考：
 
-- [如何将预训练模型Fine-tune下游任务](https://aistudio.baidu.com/aistudio/projectdetail/1294333)
-
-- [使用Bi-GRU+CRF完成快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1317771)
-
-- [使用预训练模型ERNIE优化快递单信息抽取](https://aistudio.baidu.com/aistudio/projectdetail/1329361)
-
-- [使用Seq2Seq模型完成自动对联模型](https://aistudio.baidu.com/aistudio/projectdetail/1321118)
-
-- [使用预训练模型ERNIE-GEN实现智能写诗](https://aistudio.baidu.com/aistudio/projectdetail/1339888)
-
-- [使用TCN网络完成新冠疫情病例数预测](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
-
-更多教程参见[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
+- https://canvas.stanford.edu/files/1090785/download
+- https://colah.github.io/posts/2015-08-Understanding-LSTMs/
+- https://arxiv.org/abs/1412.3555
+- https://arxiv.org/pdf/1506.00019
+- https://arxiv.org/abs/1404.2188

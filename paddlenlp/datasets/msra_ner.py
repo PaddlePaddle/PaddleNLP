@@ -20,53 +20,45 @@ from paddle.io import Dataset
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
-
-from .dataset import TSVDataset
+from . import DatasetBuilder
 
 __all__ = ['MSRA_NER']
 
 
-class MSRA_NER(TSVDataset):
+class MSRA_NER(DatasetBuilder):
     URL = "https://paddlenlp.bj.bcebos.com/datasets/msra_ner.tar.gz"
     MD5 = None
-    META_INFO = collections.namedtuple(
-        'META_INFO', ('file', 'md5', 'field_indices', 'num_discard_samples'))
+    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('msra_ner', 'train.tsv'),
-            '67d3c93a37daba60ef43c03271f119d7',
-            (0, 1),
-            1, ),
-        'test': META_INFO(
-            os.path.join('msra_ner', 'test.tsv'),
-            '2f27ae68b5f61d6553ffa28bb577c8a7',
-            (0, 1),
-            1, ),
+        'train': META_INFO(os.path.join('msra_ner', 'train.tsv'), None),
+        'test': META_INFO(os.path.join('msra_ner', 'test.tsv'), None)
     }
 
-    def __init__(self, mode='train', root=None, **kwargs):
-        default_root = os.path.join(DATA_HOME, 'msra')
-        filename, data_hash, field_indices, num_discard_samples = self.SPLITS[
-            mode]
-        fullname = os.path.join(default_root,
-                                filename) if root is None else os.path.join(
-                                    os.path.expanduser(root), filename)
+    def _get_data(self, mode, **kwargs):
+        default_root = os.path.join(DATA_HOME, self.__class__.__name__)
+        filename, data_hash = self.SPLITS[mode]
+        fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-            if root is not None:  # not specified, and no need to warn
-                warnings.warn(
-                    'md5 check failed for {}, download {} data to {}'.format(
-                        filename, self.__class__.__name__, default_root))
-            path = get_path_from_url(self.URL, default_root, self.MD5)
-            fullname = os.path.join(default_root, filename)
-        super(MSRA_NER, self).__init__(
-            fullname,
-            field_indices=field_indices,
-            num_discard_samples=num_discard_samples,
-            **kwargs)
+
+            get_path_from_url(self.URL, default_root, self.MD5)
+
+        return fullname
+
+    def _read(self, filename, *args):
+        with open(filename, 'r', encoding='utf-8') as f:
+            for line in f:
+                line_stripped = line.strip().split('\t')
+                if not line_stripped:
+                    break
+                if len(line_stripped) == 2:
+                    tokens = line_stripped[0].split("\002")
+                    tags = line_stripped[1].split("\002")
+                else:
+                    tokens = line_stripped.split("\002")
+                    tags = []
+                yield {"tokens": tokens, "labels": tags}
 
     def get_labels(self):
-        """
-        Return labels of the GlueCoLA object.
-        """
+
         return ["B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "O"]

@@ -21,6 +21,7 @@ import io
 import random
 import time
 import json
+import copy
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
@@ -149,10 +150,11 @@ def parse_args():
     parser.add_argument(
         "--eager_run", type=bool, default=True, help="Use dygraph mode.")
     parser.add_argument(
-        "--n_gpu",
-        type=int,
-        default=1,
-        help="number of gpus to use, 0 for cpu.")
+        "--device",
+        default="gpu",
+        type=str,
+        choices=["cpu", "gpu"],
+        help="The device to select to train the model, is must be cpu/gpu.")
     args = parser.parse_args()
     return args
 
@@ -409,7 +411,7 @@ def create_dataloader(dataset,
 
 def do_train(args):
     paddle.enable_static() if not args.eager_run else None
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -496,7 +498,7 @@ def do_train(args):
         train_dataset,
         batch_size=args.train_batch_size,
         mode='train',
-        use_gpu=True if args.n_gpu else False,
+        use_gpu=True if args.device in "gpu" else False,
         data_collator=data_collator)
 
     num_training_steps = args.max_steps if args.max_steps > 0 else (
@@ -506,16 +508,19 @@ def do_train(args):
                                          args.warmup_steps)
 
     clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=1.0)
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         grad_clip=clip,
-        apply_decay_param_fun=lambda x: x in [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ])
+        apply_decay_param_fun=lambda x: x in decay_params)
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=1024)
 
@@ -572,10 +577,10 @@ def do_train(args):
                 t_loss += loss.detach()
                 optimizer.step()
             lr_scheduler.step()
-            optimizer.clear_gradients()
+            optimizer.clear_grad()
             if global_step % args.logging_steps == 0:
                 local_loss = (t_loss - log_loss) / args.logging_steps
-                if (args.n_gpu > 1):
+                if (paddle.distributed.get_world_size() > 1):
                     paddle.distributed.all_gather(loss_list, local_loss)
                     if paddle.distributed.get_rank() == 0:
                         log_str = (
@@ -602,14 +607,17 @@ def do_train(args):
                 log_loss = t_loss
                 tic_train = time.time()
             if global_step % args.save_steps == 0:
-                if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+                if paddle.distributed.get_rank() == 0:
                     output_dir = os.path.join(args.output_dir,
                                               "model_%d.pdparams" % global_step)
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
-                    config_to_save = model_to_save.discriminator.electra.config
+                    config_to_save = copy.deepcopy(
+                        model_to_save.discriminator.electra.config)
+                    if 'self' in config_to_save:
+                        del config_to_save['self']
                     run_states = {
                         "model_name": model_name
                         if args.init_from_ckpt else args.model_name_or_path,
@@ -637,6 +645,8 @@ def do_train(args):
                             for log in log_list:
                                 if len(log.strip()) > 0:
                                     f.write(log.strip() + '\n')
+            if global_step >= num_training_steps:
+                return
 
 
 def print_arguments(args):
@@ -650,7 +660,8 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_gpu)
+    n_gpu = len(os.getenv("CUDA_VISIBLE_DEVICES", "").split(","))
+    if args.device in "gpu" and n_gpu > 1:
+        paddle.distributed.spawn(do_train, args=(args, ), nprocs=n_gpu)
     else:
         do_train(args)

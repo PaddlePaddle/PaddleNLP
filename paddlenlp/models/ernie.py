@@ -27,28 +27,28 @@ class Ernie(nn.Layer):
         if self.task == 'seq-cls':
             required_names = list(ErnieForSequenceClassification.
                                   pretrained_init_configuration.keys())
-            assert model_name in required_names, "model_name must be in %s, unknown %s ." (
+            assert model_name in required_names, "model_name must be in {}, unknown {}.".format(
                 required_names, model_name)
             self.model = ErnieForSequenceClassification.from_pretrained(
                 model_name, num_classes=num_classes, **kwargs)
         elif self.task == 'token-cls':
             required_names = list(ErnieForTokenClassification.
                                   pretrained_init_configuration.keys())
-            assert model_name in required_names, "model_name must be in %s, unknown %s ." (
+            assert model_name in required_names, "model_name must be in {}, unknown {}.".format(
                 required_names, model_name)
             self.model = ErnieForTokenClassification.from_pretrained(
                 model_name, num_classes=num_classes, **kwargs)
         elif self.task == 'qa':
             required_names = list(
                 ErnieForQuestionAnswering.pretrained_init_configuration.keys())
-            assert model_name in required_names, "model_name must be in %s, unknown %s ." (
+            assert model_name in required_names, "model_name must be in {}, unknown {}.".format(
                 required_names, model_name)
             self.model = ErnieForQuestionAnswering.from_pretrained(model_name,
                                                                    **kwargs)
         elif self.task is None:
             required_names = list(ErnieModel.pretrained_init_configuration.keys(
             ))
-            assert model_name in required_names, "model_name must be in %s, unknown %s ." (
+            assert model_name in required_names, "model_name must be in {}, unknown {}.".format(
                 required_names, model_name)
             self.model = ErnieModel.from_pretrained(model_name)
         else:
