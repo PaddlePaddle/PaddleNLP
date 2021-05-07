@@ -32,7 +32,8 @@ class SeAbsa16(DatasetBuilder):
     """
 
     BUILDER_CONFIGS = {
-        'phones': {
+        # phns is short for phones.
+        'phns': {
             'url':
             "https://dataset-bj.cdn.bcebos.com/qianyan/SE-ABSA16_PHNS.zip",
             'md5': "f5a62548f2fcf73892cacf2cdf159671",
