@@ -14,7 +14,7 @@ from pprint import pprint
 
 from paddlenlp.transformers import TransformerModel
 from paddlenlp.transformers import position_encoding_init
-from paddlenlp.ext_op import FasterTransformer
+from paddlenlp.ops import FasterTransformer
 
 sys.path.append("../")
 import reader
@@ -29,7 +29,7 @@ def parse_args():
         help="Path of the config file. ")
     parser.add_argument(
         "--decoding-lib",
-        default="../../../../paddlenlp/ext_op/build/lib/libdecoding_op.so",
+        default="../../../../paddlenlp/ops/build/lib/libdecoding_op.so",
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(

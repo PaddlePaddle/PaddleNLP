@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = '2.0.0rc3'
+__version__ = '2.0.0'
 
 from . import data
 from . import datasets
 from . import embeddings
-from . import ext_op
+from . import ops
 from . import layers
 from . import metrics
 from . import models
