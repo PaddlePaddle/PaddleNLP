@@ -148,8 +148,10 @@ class PretrainedModel(Layer, GenerationMixin):
                 raise ValueError(
                     "Calling {}.from_pretrained() with a model identifier or the "
                     "path to a directory instead. The supported model "
-                    "identifiers are as follows: {}".format(
-                        cls.__name__, cls.pretrained_init_configuration.keys()))
+                    "identifiers are as follows: {}, but got: {}".format(
+                        cls.__name__,
+                        cls.pretrained_init_configuration.keys(
+                        ), pretrained_model_name_or_path))
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
 
