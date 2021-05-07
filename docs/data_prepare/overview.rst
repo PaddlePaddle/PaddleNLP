@@ -11,9 +11,9 @@
 核心API
 ----------
 
-- :func:`load_dataset` ：数据集快速加载接口，通过传入数据集读取脚本的名称和其他参数调用 :class:`DatasetBuilder` 子类的相关方法生成数据集。关于加载数据集的详细方法，请移步 :doc:`加载数据集 <./dataset_load>` 。
-- :class:`DatasetBuilder` ： :class:`DatasetBuilder` 是一个基类，所有的内置数据集都继承自该类，该类的主要功能是下载和读取数据集文件并生成Dataset。其中大部分方法已经封装，不对贡献者暴露。贡献者通过重写 :func:`_get_data` 和 :func:`_read` 等方法像社区贡献数据集。详细信息请移步 :doc:`如何贡献数据集 </community/contribute_dataset>` 。
-- :class:`MapDataset/IterDataset` ：PaddleNLP内置数据集类型，分别是对 :class:`paddle.io.Dataset` 和 :class:`paddle.io.IterableDataset` 的扩展。内置诸如 :func:`map` , :func:`filter` 等适用于NLP任务的数据处理功能。同时还能帮助用户简单创建自定义数据集。详细信息请移步***和 :doc:`如何自定义数据集 <./dataset_self_defined>` 。
+- :func:`load_dataset` ：数据集快速加载接口，通过传入数据集读取脚本的名称和其他参数调用 :class:`DatasetBuilder` 子类的相关方法生成数据集。关于加载数据集的详细方法，请查阅 :doc:`加载数据集 <./dataset_load>` 。
+- :class:`DatasetBuilder` ： :class:`DatasetBuilder` 是一个基类，所有的内置数据集都继承自该类，该类的主要功能是下载和读取数据集文件并生成Dataset。其中大部分方法已经封装，不对贡献者暴露。贡献者通过重写 :func:`_get_data` 和 :func:`_read` 等方法像社区贡献数据集。详细信息请查阅 :doc:`如何贡献数据集 </community/contribute_dataset>` 。
+- :class:`MapDataset/IterDataset` ：PaddleNLP内置数据集类型，分别是对 :class:`paddle.io.Dataset` 和 :class:`paddle.io.IterableDataset` 的扩展。内置诸如 :func:`map` , :func:`filter` 等适用于NLP任务的数据处理功能。同时还能帮助用户简单创建自定义数据集。详细信息请查阅***和 :doc:`如何自定义数据集 <./dataset_self_defined>` 。
 
 数据处理流程设计
 -----------------
@@ -29,4 +29,4 @@
 
 .. image:: /imgs/data_preprocess_pipline.png
 
-关于数据处理的详细信息，请移步 :doc:`./data_preprocess` 。
+关于数据处理的详细信息，请查阅 :doc:`./data_preprocess` 。
