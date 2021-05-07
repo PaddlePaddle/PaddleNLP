@@ -30,6 +30,8 @@ parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--model_name', choices=['skep_ernie_1.0_large_ch', 'skep_ernie_2.0_large_en'],
+    default="skep_ernie_1.0_large_ch", help="Select which model to train, defaults to skep_ernie_1.0_large_ch.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -172,10 +174,11 @@ if __name__ == "__main__":
     predictor = Predictor(args.model_file, args.params_file, args.device,
                           args.max_seq_length)
 
-    # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
-        'ernie-tiny')
+    tokenizer = ppnlp.transformers.SkepTokenizer.from_pretrained(
+        args.model_name)
 
+    # These data samples is in Chinese.
+    # If you use the english model, you should change the test data in English.
     data = [
         '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
         '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',

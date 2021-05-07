@@ -82,7 +82,6 @@ def create_dataloader(dataset,
 
 
 if __name__ == "__main__":
-
     paddle.set_device(args.device)
     set_seed()
 
