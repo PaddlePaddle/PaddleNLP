@@ -133,7 +133,7 @@ if __name__ == "__main__":
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    train_ds = load_dataset("seabsa16phones", splits=["train"])
+    train_ds = load_dataset("seabsa16", "phones", splits=["train"])
 
     model = SkepForSequenceClassification.from_pretrained(
         'skep_ernie_1.0_large_ch', num_classes=len(train_ds.label_list))

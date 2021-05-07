@@ -139,7 +139,7 @@ def create_dataloader(dataset,
 
 if __name__ == "__main__":
 
-    test_ds = load_dataset("seabsa16phones", splits=["test"])
+    test_ds = load_dataset("seabsa16", "phones", splits=["test"])
     label_map = {0: 'negative', 1: 'positive'}
 
     model = SkepForSequenceClassification.from_pretrained(

@@ -135,7 +135,7 @@ def create_dataloader(dataset,
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    test_ds = load_dataset("cotedp", splits=['test'])
+    test_ds = load_dataset("cote", "dp", splits=['test'])
     # The COTE_DP dataset labels with "BIO" schema.
     label_map = {0: "B", 1: "I", 2: "O"}
     # `no_entity_label` represents that the token isn't an entity. 

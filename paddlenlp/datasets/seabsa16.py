@@ -20,16 +20,35 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['SeAbsa16Phones']
+__all__ = ['SeAbsa16']
 
 
-class SeAbsa16Phones(DatasetBuilder):
+class SeAbsa16(DatasetBuilder):
     """
     SE-ABSA16_PHNS dataset for Aspect-level Sentiment Classification task.
     More information please refer to 
     https://aistudio.baidu.com/aistudio/competition/detail/50/?isFromLuge=1.
 
     """
+
+    BUILDER_CONFIGS = {
+        'phones': {
+            'url':
+            "https://dataset-bj.cdn.bcebos.com/qianyan/SE-ABSA16_PHNS.zip",
+            'md5': "f5a62548f2fcf73892cacf2cdf159671",
+            'splits': {
+                'train': [
+                    os.path.join('SE-ABSA16_PHNS', 'train.tsv'),
+                    'cb4f65aaee59fa76526a0c79b7c12689', (0, 1, 2), 1
+                ],
+                'test': [
+                    os.path.join('SE-ABSA16_PHNS', 'test.tsv'),
+                    '7ad80f284e0eccc059ece3ce3d3a173f', (1, 2), 1
+                ],
+            },
+            'labels': ["0", "1"]
+        },
+    }
 
     URL = "https://dataset-bj.cdn.bcebos.com/qianyan/SE-ABSA16_PHNS.zip"
     MD5 = "f5a62548f2fcf73892cacf2cdf159671"
@@ -46,8 +65,9 @@ class SeAbsa16Phones(DatasetBuilder):
 
     def _get_data(self, mode, **kwargs):
         """Downloads dataset."""
+        builder_config = self.BUILDER_CONFIGS[self.name]
         default_root = os.path.join(DATA_HOME, 'SE-ABSA16_PHNS')
-        filename, data_hash, _, _ = self.SPLITS[mode]
+        filename, data_hash, _, _ = builder_config['splits'][mode]
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
@@ -57,7 +77,8 @@ class SeAbsa16Phones(DatasetBuilder):
 
     def _read(self, filename, split):
         """Reads data"""
-        _, _, field_indices, num_discard_samples = self.SPLITS[split]
+        _, _, field_indices, num_discard_samples = self.BUILDER_CONFIGS[
+            self.name]['splits'][split]
         with open(filename, 'r', encoding='utf-8') as f:
             for idx, line in enumerate(f):
                 if idx < num_discard_samples:
@@ -77,6 +98,6 @@ class SeAbsa16Phones(DatasetBuilder):
 
     def get_labels(self):
         """
-        Return labels of the SE_ABSA16_PHNS.
+        Return labels of the SE_ABSA16.
         """
-        return ["0", "1"]
+        return self.BUILDER_CONFIGS[self.name]['labels']

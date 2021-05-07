@@ -137,7 +137,7 @@ if __name__ == "__main__":
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    train_ds = load_dataset("cotedp", splits=['train'])
+    train_ds = load_dataset("cote", "dp", splits=['train'])
     # The COTE_DP dataset labels with "BIO" schema.
     label_map = {label: idx for idx, label in enumerate(train_ds.label_list)}
     # `no_entity_label` represents that the token isn't an entity. 
