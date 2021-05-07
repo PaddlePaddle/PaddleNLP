@@ -73,7 +73,7 @@ class ErnieSageV2Conv(nn.Layer):
                  input_size,
                  hidden_size,
                  learning_rate,
-                 cls_token_id=int(1),
+                 cls_token_id=1,
                  aggr_func='sum'):
         """ErnieSageV2: Ernie is applied to the EDGE of the text graph.
 
