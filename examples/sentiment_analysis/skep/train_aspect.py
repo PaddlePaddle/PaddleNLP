@@ -23,23 +23,20 @@ import paddle
 import paddle.nn.functional as F
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.transformers import SkepCrfForTokenClassification, SkepModel, SkepTokenizer
+from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 
-from data import read_cote_dp_dataset
+from data import read_semeval2016_phone_dataset
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
+parser.add_argument("--max_seq_length", default=400, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--learning_rate", default=5e-7, type=float, help="The initial learning rate for Adam.")
+parser.add_argument("--batch_size", default=6, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--learning_rate", default=3e-6, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
+parser.add_argument("--epochs", default=50, type=int, help="Total number of training epochs to perform.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
-parser.add_argument("--train_data_path", type=str, default='cote_dp/train.txt', help="The path to train dataset.")
-parser.add_argument("--dev_data_path", type=str, default='cote_dp/test.txt', help="The path to dev dataset.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
@@ -53,38 +50,11 @@ def set_seed(seed):
     paddle.seed(seed)
 
 
-@paddle.no_grad()
-def evaluate(model, metric, data_loader):
-    """
-    Given a dataset, it evals model and computes the metric.
-
-    Args:
-        model(obj:`paddle.nn.Layer`): A model to classify texts.
-        metric(obj:`paddle.metric.Metric`): The evaluation metric.
-        data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
-    """
-    model.eval()
-    metric.reset()
-    avg_loss, precision, recall, f1_score = 0, 0, 0, 0
-    for batch in data_loader:
-        input_ids, token_type_ids, seq_lens, labels = batch
-        preds = model(input_ids, token_type_ids, seq_lens=seq_lens)
-        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            seq_lens, preds, labels)
-        metric.update(num_infer_chunks.numpy(),
-                      num_label_chunks.numpy(), num_correct_chunks.numpy())
-        precision, recall, f1_score = metric.accumulate()
-    print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
-          (avg_loss, precision, recall, f1_score))
-    model.train()
-
-
-def convert_example_to_feature(example,
-                               tokenizer,
-                               label_map,
-                               max_seq_len=512,
-                               no_entity_label="O",
-                               is_test=False):
+def convert_example(example,
+                    tokenizer,
+                    max_seq_length=512,
+                    is_test=False,
+                    dataset_name="chnsenticorp"):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
@@ -102,41 +72,37 @@ def convert_example_to_feature(example,
         | first sequence    | second sequence |
 
     If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
+    
+    note: There is no need token type ids for skep_roberta_large_ch model.
+
 
     Args:
         example(obj:`list[str]`): List of input data, containing text and label if it have label.
         tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        label_map(obj:`dict`): The label string maps a label index.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
             Sequences longer than this will be truncated, sequences shorter will be padded.
-        no_entity_label(obj:`str`, defaults to "O"): The label represents that the token isn't an entity. 
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
+        dataset_name((obj:`str`, defaults to "chnsenticorp"): The dataset name, "chnsenticorp" or "sst-2".
 
     Returns:
         input_ids(obj:`list[int]`): The list of token ids.
         token_type_ids(obj: `list[int]`): List of sequence pair mask.
-        label(obj:`list[int]`, optional): The input label if not test data.
+        label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
-    tokens = example['tokens']
-    labels = example['labels']
-    tokenized_input = tokenizer(
-        tokens,
-        return_length=True,
-        is_split_into_words=True,
-        max_seq_len=max_seq_len)
+    encoded_inputs = tokenizer(
+        text=example["text"],
+        text_pair=example["text_pair"],
+        max_seq_len=max_seq_length)
 
-    input_ids = tokenized_input['input_ids']
-    token_type_ids = tokenized_input['token_type_ids']
-    seq_len = tokenized_input['seq_len']
+    input_ids = encoded_inputs["input_ids"]
+    token_type_ids = encoded_inputs["token_type_ids"]
 
-    if is_test:
-        return input_ids, token_type_ids, seq_len
+    if not is_test:
+        label = np.array([example["label"]], dtype="int64")
+        return input_ids, token_type_ids, label
     else:
-        labels = labels[:(max_seq_len - 2)]
-        encoded_label = [no_entity_label] + labels + [no_entity_label]
-        encoded_label = [label_map[x] for x in encoded_label]
-        return input_ids, token_type_ids, seq_len, encoded_label
+        return input_ids, token_type_ids
 
 
 def create_dataloader(dataset,
@@ -163,50 +129,31 @@ def create_dataloader(dataset,
 
 
 if __name__ == "__main__":
+    set_seed(args.seed)
     paddle.set_device(args.device)
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    train_ds = load_dataset(
-        read_cote_dp_dataset, file_path=args.train_data_path, lazy=False)
-    dev_ds = load_dataset(
-        read_cote_dp_dataset, file_path=args.dev_data_path, lazy=False)
-    # The COTE_DP dataset labels with "BIO" schema.
-    label_map = {"B": 0, "I": 1, "O": 2}
-    # `no_entity_label` represents that the token isn't an entity. 
-    no_entity_label = "O"
-    # `ignore_label` is using to pad input labels.
-    ignore_label = -1
+    train_ds = load_dataset("seabsa16phones", splits=["train"])
 
-    set_seed(args.seed)
-    skep = SkepModel.from_pretrained('skep_ernie_1.0_large_ch')
-    model = SkepCrfForTokenClassification(skep, num_classes=len(label_map))
+    model = SkepForSequenceClassification.from_pretrained(
+        'skep_ernie_1.0_large_ch', num_classes=len(train_ds.label_list))
     tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
 
     trans_func = partial(
-        convert_example_to_feature,
+        convert_example,
         tokenizer=tokenizer,
-        label_map=label_map,
-        max_seq_len=args.max_seq_length,
-        no_entity_label=no_entity_label,
-        is_test=False)
+        max_seq_length=args.max_seq_length)
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input ids
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # token type ids
-        Stack(dtype='int64'),  # sequence lens
-        Pad(axis=0, pad_val=ignore_label)  # labels
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
+        Stack(dtype="int64")  # labels
     ): [data for data in fn(samples)]
 
     train_data_loader = create_dataloader(
         train_ds,
         mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
-    dev_data_loader = create_dataloader(
-        dev_ds,
-        mode='dev',
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
@@ -228,31 +175,35 @@ if __name__ == "__main__":
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
-    metric = ChunkEvaluator(label_list=label_map.keys(), suffix=True)
+    criterion = paddle.nn.loss.CrossEntropyLoss()
+    metric = paddle.metric.Accuracy()
 
     global_step = 0
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
-            input_ids, token_type_ids, seq_lens, labels = batch
-            loss = model(
-                input_ids, token_type_ids, seq_lens=seq_lens, labels=labels)
-            avg_loss = paddle.mean(loss)
+            input_ids, token_type_ids, labels = batch
+            logits = model(input_ids, token_type_ids)
+            loss = criterion(logits, labels)
+            probs = F.softmax(logits, axis=1)
+            correct = metric.compute(probs, labels)
+            metric.update(correct)
+            acc = metric.accumulate()
+
             global_step += 1
             if global_step % 10 == 0 and rank == 0:
                 print(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, avg_loss,
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, step, loss, acc,
                        10 / (time.time() - tic_train)))
                 tic_train = time.time()
             loss.backward()
             optimizer.step()
             optimizer.clear_grad()
             if global_step % 100 == 0 and rank == 0:
-                evaluate(model, metric, dev_data_loader)
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                file_name = os.path.join(save_dir, "model_state.pdparam")
                 # Need better way to get inner model of DataParallel
-                paddle.save(model._layers.state_dict(), file_name)
+                model._layers.save_pretrained(save_dir)
+                tokenizer.save_pretrained(save_dir)

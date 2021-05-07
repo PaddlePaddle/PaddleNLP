@@ -70,17 +70,17 @@
 
 ```text
 skep/
-├── aspect_sentiment_analysis_predict.py # 对象级的情感分类任务预测脚本
-├── aspect_sentiment_analysis_train.py # 评价对象级的情感分类任务训练脚本
 ├── deploy # 部署
 │   └── python
 │       └── predict.py # python预测部署示例
 ├── export_model.py # 动态图参数导出静态图参数脚本
-├── keypoint_extraction_predict.py # 观点抽取任务预测脚本
-├── keypoint_extraction_train.py # 观点抽取任务训练脚本
+├── predict_aspect.py # 对象级的情感分类任务预测脚本
+├── predict_opinion.py # 观点抽取任务预测脚本
+├── predict_sentence.py # 句子级情感分类任务预测脚本
 ├── README.md # 使用说明
-├── sentence_sentiment_analysis_predict.py # 句子级情感分类任务预测脚本
-└── sentence_sentiment_analysis_train.py # 句子级情感分类任务训练脚本
+├── train_aspect.py # 对象级的情感分类任务训练脚本
+├── train_opinion.py # 观点抽取任务训练脚本
+└── train_sentence.py  # 句子级情感分类任务训练脚本
 ```
 
 
@@ -92,31 +92,13 @@ skep/
 句子级情感分类数据集，本示例采用常用开源数据集ChnSenticorp中文数据集、GLUE-SST2英文数据集。这两个数据集PaddleNLP已经内置。
 通过以下方式即可实现加载。
 
-```python
-from paddlenlp.datasets import load_dataset
-
-# chnsenticorp dataset
-train_ds, dev_ds, test_ds = load_dataset(
-    "chnsenticorp", splits=["train", "dev", "test"])
-
-# sst-2 dataset
-train_ds, dev_ds, test_ds = load_dataset(
-    "glue", "sst-2", splits=["train", "dev", "test"])
-```
-
-对象级情感分类数据集，本示例采用[SemEval-2016 Task 5](https://alt.qcri.org/semeval2016/task5/)评测中文数据集SE-ABSA16_PHNS，原数据下载地址：https://alt.qcri.org/semeval2016/task5/
-
-
-观点抽取数据集，本示例采用[点评用户评论数据集](https://github.com/lsvih/chinese-customer-review)，原数据下载地址：https://github.com/lsvih/chinese-customer-review/tree/master/dianping
-
-
 
 ### 模型训练
 
 我们以情感分类公开数据集ChnSentiCorp（中文）、SST-2（英文）为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" sentence_sentiment_analysis_train.py --model_name "skep_ernie_1.0_large_ch" --device gpu --save_dir ./checkpoints
+python -m paddle.distributed.launch --gpus "0" train_sentence.py --model_name "skep_ernie_1.0_large_ch" --device gpu --save_dir ./checkpoints
 ```
 
 可支持配置的参数：
@@ -179,7 +161,7 @@ python deploy/python/predict.py --model_name="skep_ernie_1.0_large_ch" --model_f
 启动预测：
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python sentence_sentiment_analysis_predict.py --model_name "skep_ernie_1.0_large_ch" --device 'gpu' --params_path checkpoints/model_900/model_state.pdparams
+python predict_sentence.py --model_name "skep_ernie_1.0_large_ch" --device 'gpu' --params_path checkpoints/model_900/model_state.pdparams
 ```
 
 将待预测数据如以下示例：
