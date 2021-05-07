@@ -124,7 +124,6 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
     args.benchmark = ARGS.benchmark
-    args.use_all_vocab = not ARGS.benchmark
     args.profile = ARGS.profile
     args.device = ARGS.device
     if ARGS.model_dir != "":

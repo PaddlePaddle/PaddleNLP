@@ -70,8 +70,7 @@ python train.py --config ./configs/transformer.base.yaml
 
 可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中设置相应的参数。如果执行不提供 `--config` 选项，程序将默认使用 big model 的配置。
 
-需要注意的是，单卡下的超参设置与多卡下的超参设置有些不同，单卡执行需要修改 `configs/transformer.big.yaml` 或是 `configs/transformer.base.yaml` 中：
-* `warmup_steps` 参数为 `16000`。
+如果是在单卡下进行训练，可能需要适当调整下参数，比如考虑增大 `warmup_steps` 参数为 `16000`，相关的设置可以参考 `configs/transformer.big.yaml` 或是 `configs/transformer.base.yaml` 配置文件中各个选项。
 
 #### 单机多卡
 

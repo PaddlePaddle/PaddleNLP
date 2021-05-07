@@ -181,7 +181,6 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
     args.benchmark = ARGS.benchmark
-    args.use_all_vocab = not ARGS.benchmark
     args.device = ARGS.device
     args.use_mkl = ARGS.use_mkl
     args.threads = ARGS.threads

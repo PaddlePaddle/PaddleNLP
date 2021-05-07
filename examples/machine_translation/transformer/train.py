@@ -56,8 +56,7 @@ def do_train(args):
         paddle.seed(random_seed)
 
     # Define data loader
-    (train_loader), (eval_loader) = reader.create_data_loader(
-        args, use_all_vocab=args.use_all_vocab)
+    (train_loader), (eval_loader) = reader.create_data_loader(args)
 
     # Define model
     transformer = TransformerModel(
@@ -249,7 +248,6 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
     args.benchmark = ARGS.benchmark
-    args.use_all_vocab = not ARGS.benchmark
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
 

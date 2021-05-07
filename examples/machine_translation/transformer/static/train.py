@@ -71,7 +71,7 @@ def do_train(args):
 
     # Define data loader
     (train_loader), (eval_loader) = reader.create_data_loader(
-        args, places=places, use_all_vocab=args.use_all_vocab)
+        args, places=places)
 
     train_program = paddle.static.Program()
     startup_program = paddle.static.Program()
@@ -275,7 +275,6 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
     args.benchmark = ARGS.benchmark
-    args.use_all_vocab = not ARGS.benchmark
     args.is_distributed = ARGS.distributed
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter

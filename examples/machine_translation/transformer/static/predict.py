@@ -71,8 +71,7 @@ def do_predict(args):
         place = paddle.set_device("cpu")
 
     # Define data loader
-    test_loader, to_tokens = reader.create_infer_loader(
-        args, use_all_vocab=args.use_all_vocab)
+    test_loader, to_tokens = reader.create_infer_loader(args)
 
     test_program = paddle.static.Program()
     startup_program = paddle.static.Program()
@@ -138,6 +137,5 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
     args.benchmark = ARGS.benchmark
-    args.use_all_vocab = not ARGS.benchmark
 
     do_predict(args)

@@ -33,7 +33,7 @@ def min_max_filer(data, max_len, min_len=0):
     return (data_min_len >= min_len) and (data_max_len <= max_len)
 
 
-def create_data_loader(args, places=None, use_all_vocab=True):
+def create_data_loader(args, places=None):
     data_files = None
     if args.root != "None" and os.path.exists(args.root):
         data_files = {
@@ -45,7 +45,7 @@ def create_data_loader(args, places=None, use_all_vocab=True):
 
     datasets = load_dataset(
         'wmt14ende', data_files=data_files, splits=('train', 'dev'))
-    if use_all_vocab:
+    if not args.benchmark:
         src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
     else:
         src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["benchmark"])
@@ -101,7 +101,7 @@ def create_data_loader(args, places=None, use_all_vocab=True):
     return data_loaders
 
 
-def create_infer_loader(args, use_all_vocab=True):
+def create_infer_loader(args):
     data_files = None
     if args.root != "None" and os.path.exists(args.root):
         data_files = {
@@ -110,7 +110,7 @@ def create_infer_loader(args, use_all_vocab=True):
         }
 
     dataset = load_dataset('wmt14ende', data_files=data_files, splits=('test'))
-    if use_all_vocab:
+    if not args.benchmark:
         src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
     else:
         src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
