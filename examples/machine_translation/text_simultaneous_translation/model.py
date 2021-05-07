@@ -99,6 +99,36 @@ class DecoderLayer(nn.TransformerDecoderLayer):
         return tgt if cache is None else (tgt, (incremental_cache, ))
 
 
+class Decoder(nn.TransformerDecoder):
+    """
+    PaddlePaddle 2.1 casts memory_mask.dtype to memory.dtype, but in STACL,
+    type of memory is list, having no dtype attribute.
+    """
+
+    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, cache=None):
+        output = tgt
+        new_caches = []
+        for i, mod in enumerate(self.layers):
+            if cache is None:
+                output = mod(output,
+                             memory,
+                             tgt_mask=tgt_mask,
+                             memory_mask=memory_mask,
+                             cache=None)
+            else:
+                output, new_cache = mod(output,
+                                        memory,
+                                        tgt_mask=tgt_mask,
+                                        memory_mask=memory_mask,
+                                        cache=cache[i])
+                new_caches.append(new_cache)
+
+        if self.norm is not None:
+            output = self.norm(output)
+
+        return output if cache is None else (output, new_caches)
+
+
 class SimultaneousTransformer(nn.Layer):
     """
     model
@@ -165,7 +195,7 @@ class SimultaneousTransformer(nn.Layer):
             normalize_before=True,
             bias_attr=[False, False, True])
         decoder_norm = nn.LayerNorm(d_model)
-        self.decoder = nn.TransformerDecoder(
+        self.decoder = Decoder(
             decoder_layer=decoder_layer, num_layers=n_layer, norm=decoder_norm)
 
         if weight_sharing:
