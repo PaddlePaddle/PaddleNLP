@@ -74,6 +74,7 @@ class DuReaderChecklist(DatasetBuilder):
                     answer_starts = []
                     answers = []
                     is_impossible = False
+                    qa_type = qa.get('type', '')
 
                     if "is_impossible" in qa.keys():
                         is_impossible = qa["is_impossible"]
@@ -90,6 +91,7 @@ class DuReaderChecklist(DatasetBuilder):
                     yield {
                         'id': qas_id,
                         'title': title,
+                        'type': qa_type,
                         'context': context,
                         'question': question,
                         'answers': answers,
