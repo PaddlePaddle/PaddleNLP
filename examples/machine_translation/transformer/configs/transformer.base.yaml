@@ -18,8 +18,6 @@ random_seed: None
 output_file: "predict.txt"
 # The <bos>, <eos> and <unk> tokens in the dictionary.
 special_token: ["<s>", "<e>", "<unk>"]
-# The directory to store data.
-root: None
 
 # Device to use. 
 device: "gpu"
