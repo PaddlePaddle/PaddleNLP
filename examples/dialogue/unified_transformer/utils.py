@@ -1,5 +1,4 @@
 import random
-import argparse
 from functools import partial
 
 import numpy as np
@@ -8,41 +7,6 @@ import paddle
 import paddle.distributed as dist
 from paddle.io import DataLoader, DistributedBatchSampler, BatchSampler
 from paddlenlp.data import Pad
-
-
-# yapf: disable
-def parse_args():
-    parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument('--model_name_or_path', type=str, default='unified_transformer-12L-cn-luge', help='The path or shortcut name of the pre-trained model.')
-    parser.add_argument('--save_dir', type=str, default='./checkpoints', help='The directory where the checkpoints will be saved.')
-    parser.add_argument('--output_path', type=str, default='./predict.txt', help='The file path where the infer result will be saved.')
-    parser.add_argument('--logging_steps', type=int, default=100, help='Log every X updates steps.')
-    parser.add_argument('--save_steps', type=int, default=1000, help='Save checkpoint every X updates steps.')
-    parser.add_argument('--seed', type=int, default=2021, help='Random seed for initialization.')
-    parser.add_argument('--batch_size', type=int, default=16, help='Batch size per GPU/CPU for training.')
-    parser.add_argument('--lr', type=float, default=5e-5, help='The initial learning rate.')
-    parser.add_argument('--weight_decay', type=float, default=0.01, help='The weight decay for optimizer.')
-    parser.add_argument('--epochs', type=int, default=3, help='Total number of training epochs to perform.')
-    parser.add_argument('--warmup_steps', type=int, default=2500, help='The number of warmup steps.')
-    parser.add_argument('--max_grad_norm', type=float, default=0.1, help='The max value of grad norm.')
-    parser.add_argument('--max_seq_len', type=int, default=512, help='The maximum sequence length of training.')
-    parser.add_argument('--max_response_len', type=int, default=128, help='The maximum response sequence length of training.')
-    parser.add_argument('--max_knowledge_len', type=int, default=256, help='The maximum knowledge sequence length of training.')
-    parser.add_argument('--min_dec_len', type=int, default=1, help='The minimum sequence length of generation.')
-    parser.add_argument('--max_dec_len', type=int, default=64, help='The maximum sequence length of generation.')
-    parser.add_argument('--num_samples', type=int, default=1, help='The decode numbers in generation.')
-    parser.add_argument('--decode_strategy', type=str, default='sampling', help='The decode strategy in generation.')
-    parser.add_argument('--top_k', type=int, default=0, help='The number of highest probability vocabulary tokens to keep for top-k sampling.')
-    parser.add_argument('--temperature', type=float, default=1.0, help='The value used to module the next token probabilities.')
-    parser.add_argument('--top_p', type=float, default=1.0, help='The cumulative probability for top-p sampling.')
-    parser.add_argument('--num_beams', type=int, default=0, help='The number of beams for beam search.')
-    parser.add_argument('--length_penalty', type=float, default=1.0, help='The exponential penalty to the sequence length for beam search.')
-    parser.add_argument('--early_stopping', type=eval, default=False, help='Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.')
-    parser.add_argument('--device', type=str, default='gpu', help='The device to select for training the model.')
-
-    args = parser.parse_args()
-    return args
-# yapf: enable
 
 
 def print_args(args):
@@ -222,21 +186,29 @@ def get_in_turn_repetition(pred, is_cn=False):
     return False
 
 
-def select_response(ids, scores, tokenizer, max_dec_len=None, num_samples=1):
+def select_response(ids,
+                    scores,
+                    tokenizer,
+                    max_dec_len=None,
+                    num_return_sequences=1,
+                    keep_space=True):
     ids = ids.numpy().tolist()
     scores = scores.numpy()
 
-    if len(ids) != len(scores) or (len(ids) % num_samples) != 0:
+    if len(ids) != len(scores) or (len(ids) % num_return_sequences) != 0:
         raise ValueError(
-            "the length of `ids` is {}, but the `num_samples` is {}".format(
-                len(ids), num_samples))
+            "the length of `ids` is {}, but the `num_return_sequences` is {}".
+            format(len(ids), num_return_sequences))
 
     group = []
     tmp = []
     for pred, score in zip(ids, scores):
         pred_token_ids, pred_tokens = post_process_response(pred, tokenizer)
         num_token = len(pred_token_ids)
-        response = " ".join(pred_tokens)
+        if keep_space:
+            response = " ".join(pred_tokens)
+        else:
+            response = "".join(pred_tokens)
 
         in_turn_repetition = get_in_turn_repetition(
             pred_tokens, True) or get_in_turn_repetition(pred_token_ids)
@@ -247,7 +219,7 @@ def select_response(ids, scores, tokenizer, max_dec_len=None, num_samples=1):
             score -= 1e3
 
         tmp.append([response, score])
-        if len(tmp) == num_samples:
+        if len(tmp) == num_return_sequences:
             group.append(tmp)
             tmp = []
 
