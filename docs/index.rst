@@ -76,7 +76,7 @@
    :maxdepth: 2
    :caption: 社区交流共建
 
-   如何贡献数据集 <community/contribute_dataset>
+   如何贡献数据集 <community/contribute_datasets/index>
    如何贡献模型 <community/contribute_models>
    如何贡献文档案例 <community/contribute_docs>
    如何加入兴趣小组 <community/join_in_PaddleNLP-SIG>
