@@ -1,7 +1,7 @@
 简体中文 | [English](./README_en.md)
 
 <p align="center">
-  <img src="./docs/imgs/paddlenlp.png" width="520" height ="100" />
+  <img src="./docs/imgs/paddlenlp.png" width="720" height ="100" />
 </p>
 
 ------------------------------------------------------------------------------------------
