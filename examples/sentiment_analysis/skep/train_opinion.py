@@ -26,8 +26,6 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.transformers import SkepCrfForTokenClassification, SkepModel, SkepTokenizer
 
-from data import read_cote_dp_dataset
-
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
@@ -49,32 +47,6 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     paddle.seed(seed)
-
-
-@paddle.no_grad()
-def evaluate(model, metric, data_loader):
-    """
-    Given a dataset, it evals model and computes the metric.
-
-    Args:
-        model(obj:`paddle.nn.Layer`): A model to classify texts.
-        metric(obj:`paddle.metric.Metric`): The evaluation metric.
-        data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
-    """
-    model.eval()
-    metric.reset()
-    avg_loss, precision, recall, f1_score = 0, 0, 0, 0
-    for batch in data_loader:
-        input_ids, token_type_ids, seq_lens, labels = batch
-        preds = model(input_ids, token_type_ids, seq_lens=seq_lens)
-        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            seq_lens, preds, labels)
-        metric.update(num_infer_chunks.numpy(),
-                      num_label_chunks.numpy(), num_correct_chunks.numpy())
-        precision, recall, f1_score = metric.accumulate()
-    print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
-          (avg_loss, precision, recall, f1_score))
-    model.train()
 
 
 def convert_example_to_feature(example,

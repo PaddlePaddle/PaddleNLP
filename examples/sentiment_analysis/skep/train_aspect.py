@@ -25,8 +25,6 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 
-from data import read_semeval2016_phone_dataset
-
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")

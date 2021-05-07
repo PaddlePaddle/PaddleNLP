@@ -25,8 +25,6 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 
-from data import read_semeval2016_phone_dataset
-
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True, help="The path to model parameters to be loaded.")

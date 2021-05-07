@@ -77,6 +77,7 @@ def convert_example(example,
     return input_ids, token_type_ids
 
 
+@paddle.no_grad()
 def predict(model, data, tokenizer, label_map, batch_size=1):
     """
     Predicts the data labels.
