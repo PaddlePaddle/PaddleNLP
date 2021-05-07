@@ -16,7 +16,7 @@ __all__ = [
 
 def position_encoding_init(n_position, d_pos_vec, dtype="float32"):
     """
-    Generate the initial values for the sinusoidal position encoding table.
+    Generates the initial values for the sinusoidal position encoding table.
     This method follows the implementation in tensor2tensor, but is slightly
     different from the description in "Attention Is All You Need".
 
@@ -28,6 +28,19 @@ def position_encoding_init(n_position, d_pos_vec, dtype="float32"):
             The size of positional embedding vector. 
         dtype (`str`): 
             The output `numpy.array`'s data type. 
+
+    Returns：
+        `numpy.array`: 
+            The embedding table of sinusoidal position encoding with shape
+            `[n_position, d_pos_vec]`.
+
+    Example:
+        .. code-block::
+            from paddlenlp.transformers import position_encoding_init
+
+            max_length = 256
+            emb_dim = 512
+            pos_table = position_encoding_init(max_length, emb_dim)
     """
     channels = d_pos_vec
     position = np.arange(n_position)
@@ -84,7 +97,30 @@ class WordEmbedding(nn.Layer):
 
         Args:
             word (`Tensor`):
-                The input ids which means the sequences' words. 
+                The input ids which indicates the sequences' words with shape
+                `[batch_size, sequence_length]` whose data type can be
+                `int` or `int64`.
+
+        Returns:
+            `Tensor`:
+                The (scaled) embedding tensor of shape
+                `(batch_size, sequence_length, emb_dim)` whose data type can be
+                `float32` or `float64`.
+
+        Example:
+            .. code-block::
+                import paddle
+                from paddlenlp.transformers import WordEmbedding
+
+                word_embedding = WordEmbedding(
+                    vocab_size=30000,
+                    emb_dim=512,
+                    bos_idx=0)
+
+                batch_size = 5
+                sequence_length = 10
+                src_words = paddle.randint(low=3, high=30000, shape=[batch_size, sequence_length])
+                src_emb = word_embedding(src_words)
         """
         word_emb = self.emb_dim**0.5 * self.word_embedding(word)
         return word_emb
@@ -115,11 +151,31 @@ class PositionalEmbedding(nn.Layer):
 
     def forward(self, pos):
         r"""
-        Compute positional embedding.
+        Computes positional embedding.
 
         Args:
             pos (`Tensor`):
-                The input position ids. 
+                The input position ids with shape `[batch_size, sequence_length]` whose
+                data type can be `int` or `int64`.
+
+        Returns:
+            `Tensor`:
+                The positional embedding tensor of shape
+                `(batch_size, sequence_length, emb_dim)` whose data type can be
+                `float32` or `float64`.
+        
+        Example:
+            .. code-block::
+                import paddle
+                from paddlenlp.transformers import PositionalEmbedding
+
+                pos_embedding = PositionalEmbedding(
+                    emb_dim=512,
+                    max_length=256)
+
+                batch_size = 5
+                pos = paddle.tile(paddle.arange(start=0, end=50), repeat_times=[batch_size, 1])
+                pos_emb = pos_embedding(pos)
         """
         pos_emb = self.pos_encoder(pos)
         pos_emb.stop_gradient = True
@@ -128,14 +184,14 @@ class PositionalEmbedding(nn.Layer):
 
 class CrossEntropyCriterion(nn.Layer):
     """
-    Compute the cross entropy loss for given input.
+    Computes the cross entropy loss for given input with or without label smoothing.
 
     Args:
         label_smooth_eps (`float`):
             The weight used to mix up the original ground-truth distribution
             and the fixed distribution. Default is None. If given, label smoothing
             will be applied on `label`.
-        pad_idx (`int`):
+        pad_idx (`int`, optional):
             The token id used to pad variant sequence. Default is 0. 
     """
 
@@ -146,13 +202,50 @@ class CrossEntropyCriterion(nn.Layer):
 
     def forward(self, predict, label):
         r"""
-        Compute loss. 
+        Computes cross entropy loss with or without label smoothing. 
 
         Args:
             predict (`Tensor`):
-                The predict results of `TransformerModel`.
+                The predict results of `TransformerModel` with shape
+                `[batch_size, sequence_length, vocab_size]`.
             label (`Tensor`):
-                The true label for correspoding results. 
+                The label for correspoding results with shape
+                `[batch_size, sequence_length, 1]`.
+
+        Returns:
+            tuple:
+                A tuple with items: (`sum_cost`, `avg_cost`, `token_num`).
+
+                With the corresponding fields:
+
+                - `sum_cost` (`Tensor`):
+                    The sum of loss of current batch whose data type can be `float32`, `float64`.
+                - `avg_cost` (`Tensor`):
+                    The average loss of current batch whose data type can be `float32`, `float64`.
+                    The relation between `sum_cost` and `avg_cost` can be described as:
+
+                    .. math:
+                        avg_cost = sum_cost / token_num
+
+                - `token_num` (`Tensor`):
+                    The number of tokens of current batch. 
+
+        Example:
+            .. code-block::
+                import paddle
+                from paddlenlp.transformers import CrossEntropyCriterion
+
+                criterion = CrossEntropyCriterion(label_smooth_eps=0.1, pad_idx=0)
+                batch_size = 1
+                seq_len = 2
+                vocab_size = 30000
+                predict = paddle.rand(shape=[batch_size, seq_len, vocab_size])
+                label = paddle.randint(
+                    low=3,
+                    high=vocab_size,
+                    shape=[batch_size, seq_len, vocab_size])
+
+                criterion(predict, label)
         """
         weights = paddle.cast(
             label != self.pad_idx, dtype=paddle.get_default_dtype())
@@ -182,22 +275,23 @@ class TransformerDecodeCell(nn.Layer):
 
     Args:
         decoder (`callable`):
-            A `paddle.nn.TransformerDecoder` instance. Or a wrapper that includes an
+            Can be a `paddle.nn.TransformerDecoder` instance. Or a wrapper that includes an
             embedding layer accepting ids and positions and includes an
             output layer transforming decoder output to logits.
         word_embedding (`callable`, optional):
-            A `WordEmbedding` instance or a callable that accepts ids as
+            Can be a `WordEmbedding` instance or a callable that accepts ids as
             arguments and return embeddings. It can be None if `decoder`
             includes a embedding layer. Default is None.
         pos_embedding (`callable`, optional):
-            A `PositionalEmbedding` instance or a callable that accepts position
+            Can be a `PositionalEmbedding` instance or a callable that accepts position
             as arguments and return embeddings. It can be None if `decoder`
             includes a positional embedding layer. Default is None.
         linear (`callable`, optional):
-            A `paddle.nn.Linear` instance or a callable to transform decoder
+            Can be a `paddle.nn.Linear` instance or a callable to transform decoder
             output to logits.
         dropout (`float`, optional):
             The dropout rate for the results of `word_embedding` and `pos_embedding`.
+            Default is 0.1.
     """
 
     def __init__(self,
@@ -237,6 +331,36 @@ class TransformerDecodeCell(nn.Layer):
             memory (`Tensor`):
                 The output of Transformer encoder. It is a tensor with shape
                 `[batch_size, source_length, d_model]`.
+
+        Returns:
+            tuple: 
+                A tuple with items: `(outputs, new_states)`
+                
+                With the corresponding fields:
+
+                - `outputs` (`Tensor`):
+                    A float32 or float64 3D tensor representing logits shaped
+                    `[batch_size, sequence_length, vocab_size]`.
+                - `new_states` (`Tensor`):
+                    This output has the same structure and data type with `states`
+                    while the length is one larger since concatanating the
+                    intermediate results of current step.
+
+        Example:
+            .. code-block::
+                import paddle
+                from paddlenlp.transformers import TransformerDecodeCell
+                from paddlenlp.transformers import TransformerBeamSearchDecoder
+
+                def decoder():
+                    # do decoder
+                    pass
+
+                cell = TransformerDecodeCell(decoder())
+
+                self.decode = TransformerBeamSearchDecoder(
+                    cell, start_token=0, end_token=1, beam_size=4,
+                    var_dim_in_state=2)
         """
 
         if states and static_cache:
@@ -333,6 +457,19 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
                 A tensor with shape `[batch_size, ...]`.
             beam_size (`int`):
                 The beam width used in beam search.
+
+        Returns:
+            `Tensor`:
+                A tensor with shape `[batch_size * beam_size, ...]`, whose
+                data type is same as `t`.
+
+        Example:
+            .. code-block::
+                import paddle
+                from paddlenlp.transformers import TransformerBeamSearchDecoder
+
+                t = paddle.rand(shape=[10, 10])
+                TransformerBeamSearchDecoder.tile_beam_merge_with_batch(t, beam_size=4)
         """
         return map_structure(
             lambda x: nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(x, beam_size),
@@ -395,7 +532,7 @@ class TransformerModel(nn.Layer):
         d_inner_hid (`int`):
             Size of the hidden layer in position-wise feed-forward networks.
         dropout (`float`):
-            Dropout rates.
+            Dropout rates. Used for pre-process, activation and inside attention.
         weight_sharing (`bool`):
             Whether to use weight sharing. 
         bos_id (`int`, optional):
@@ -461,13 +598,43 @@ class TransformerModel(nn.Layer):
 
     def forward(self, src_word, trg_word):
         r"""
-        The Transformer forward methods. 
+        The Transformer forward methods. The input are source/target sequences, and
+        returns logits.
 
         Args:
             src_word (`Tensor`):
                 The ids of source sequences words.
             trg_word (`Tensor`):
                 The ids of target sequences words. 
+
+        Returns:
+            `Tensor`:
+                Output tensor of the final layer of the model whose data
+                type can be float32 or float64.
+
+        Example:
+            .. code-block::
+                import paddle
+                from paddlenlp.transformers import TransformerModel
+
+                transformer = TransformerModel(
+                    src_vocab_size=30000,
+                    trg_vocab_size=30000,
+                    max_length=257,
+                    n_layer=6,
+                    n_head=8,
+                    d_model=512,
+                    d_inner_hid=2048,
+                    dropout=0.1,
+                    weight_sharing=True,
+                    bos_id=0,
+                    eos_id=1)
+
+                batch_size = 5
+                seq_len = 10
+                predict = transformer(
+                    src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]),
+                    trg_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
         """
         src_max_len = paddle.shape(src_word)[-1]
         trg_max_len = paddle.shape(trg_word)[-1]
@@ -534,7 +701,7 @@ class InferTransformerModel(TransformerModel):
         d_inner_hid (`int`):
             Size of the hidden layer in position-wise feed-forward networks.
         dropout (`float`):
-            Dropout rates.
+            Dropout rates. Used for pre-process, activation and inside attention.
         weight_sharing (`bool`):
             Whether to use weight sharing. 
         bos_id (`int`, optional):
@@ -583,6 +750,36 @@ class InferTransformerModel(TransformerModel):
         Args:
             src_word (`Tensor`):
                 The ids of source sequence words. 
+        
+        Returns:
+            `Tensor`:
+                An `int64` tensor shaped `[time_step, batch_size, beam_size]` indicated
+                the predict ids.
+        
+        Example:
+            .. code-block::
+                import paddle
+                from paddlenlp.transformers import InferTransformerModel
+
+                transformer = InferTransformerModel(
+                    src_vocab_size=30000,
+                    trg_vocab_size=30000,
+                    max_length=256,
+                    n_layer=6,
+                    n_head=8,
+                    d_model=512,
+                    d_inner_hid=2048,
+                    dropout=0.1,
+                    weight_sharing=True,
+                    bos_id=0,
+                    eos_id=1,
+                    beam_size=4,
+                    max_out_len=256)
+
+                batch_size = 5
+                seq_len = 10
+                transformer(
+                    src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
         """
         src_max_len = paddle.shape(src_word)[-1]
         src_slf_attn_bias = paddle.cast(
