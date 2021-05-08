@@ -42,13 +42,9 @@ def parse_args():
 
 
 def do_train(args):
-    if args.use_cuda:
-        rank = dist.get_rank()
-        trainer_count = dist.get_world_size()
-    else:
-        rank = 0
-        trainer_count = 1
-        paddle.set_device("cpu")
+    paddle.set_device(args.device)
+    trainer_count = dist.get_world_size()
+    rank = dist.get_rank()
 
     if trainer_count > 1:
         dist.init_parallel_env()

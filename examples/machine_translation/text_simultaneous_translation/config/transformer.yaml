@@ -17,7 +17,7 @@ training_file: "data/nist2m/train.zh-en.bpe"
 # The pattern to match validation data files.
 validation_file: "data/nist2m/dev.zhen.bpe"
 # The pattern to match test data files.
-predict_file: "data/nist2m/testdata/test_08.zh"
+predict_file: "data/nist2m/test_08.zh.bpe"
 # The file to output the translation results of predict_file to.
 output_file: "predict.txt"
 # The path of vocabulary file of source language.
@@ -27,8 +27,8 @@ trg_vocab_fpath: "data/nist2m/nist.10k.en.vocab"
 # The <bos>, <eos> and <unk> tokens in the dictionary.
 special_token: ["<s>", "<e>", "<unk>"]
 
-# Whether to use cuda
-use_cuda: True
+# Use which device to train or predict(cpu,gpu,xpu)
+device: gpu
 
 # Args for reader, see reader.py for details
 pool_size: 200000
