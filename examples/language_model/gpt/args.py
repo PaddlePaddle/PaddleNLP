@@ -36,6 +36,8 @@ def parse_args(MODEL_CLASSES):
                 for classes in MODEL_CLASSES.values()
             ], [])), )
     parser.add_argument(
+        "--max_seq_len", type=int, default=1024, help="Max sequence length.")
+    parser.add_argument(
         "--input_dir",
         default=None,
         type=str,
@@ -49,7 +51,7 @@ def parse_args(MODEL_CLASSES):
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
-        "--batch_size",
+        "--micro_bsz",
         default=8,
         type=int,
         help="Batch size per GPU/CPU for training.", )
@@ -102,12 +104,21 @@ def parse_args(MODEL_CLASSES):
         default=0.01,
         type=float,
         help="Linear warmup over warmup_steps.")
-
     parser.add_argument(
         "--logging_steps",
         type=int,
         default=1,
         help="Log every X updates steps.")
+    parser.add_argument(
+        "--eval_steps",
+        type=int,
+        default=500,
+        help="Evaluate for every X updates steps.")
+    parser.add_argument(
+        "--eval_iters",
+        type=int,
+        default=10,
+        help="Evaluate for every X updates steps.")
     parser.add_argument(
         "--save_steps",
         type=int,
@@ -122,4 +133,5 @@ def parse_args(MODEL_CLASSES):
         choices=["cpu", "gpu", "xpu"],
         help="select cpu, gpu, xpu devices.")
     args = parser.parse_args()
+    args.test_iters = args.eval_iters
     return args

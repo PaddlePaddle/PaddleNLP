@@ -19,7 +19,7 @@ import json
 import multiprocessing
 
 import numpy as np
-from paddlenlp.transformers import GPT2Tokenizer
+from paddlenlp.transformers import GPTTokenizer
 from tqdm import tqdm
 
 
@@ -45,7 +45,7 @@ def get_args():
 class Converter(object):
     def __init__(self, model_name, append_eod):
         self.append_eod = append_eod
-        tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+        tokenizer = GPTTokenizer.from_pretrained(model_name)
         Converter.tokenizer = tokenizer
         self.eod_id = tokenizer.command_name_map["eod"].Id
         self.vocab_size = len(tokenizer)
