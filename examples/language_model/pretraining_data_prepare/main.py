@@ -14,6 +14,7 @@
 
 import argparse
 import os
+import subprocess
 
 from paddlenlp.utils.log import logger
 
@@ -68,7 +69,7 @@ def create_record_worker(shardingfile_prefix,
                          max_predictions_per_seq,
                          random_seed=10000,
                          dupe_factor=10):
-    bert_preprocessing_command = 'python ./data/create_pretraining_data.py'
+    bert_preprocessing_command = 'python create_pretraining_data.py'
     bert_preprocessing_command += ' --input_file=' + shardingfile_prefix \
         + '_' + str(shard_id) + '.txt'
     bert_preprocessing_command += ' --output_file=' + outputfile_prefix \
@@ -151,17 +152,19 @@ def do_text_sharding(model_name, formatted_files, output_dir, n_train_shards,
     logger.info("End to text sharding. Sharding files save as {}".format(
         sharding_path))
 
+    return sharding_output_name_prefix
+
 
 def create_data(do_lower_case, max_seq_length, max_predictions_per_seq,
                 masked_lm_prob, random_seed, dupe_factor, output_dir,
-                n_train_shards, n_test_shards):
+                n_train_shards, n_test_shards, sharding_output_name_prefix):
     logger.info("=" * 50)
     logger.info("Start to create pretrainging data and save it to hdf5 files.")
     hdf5_folder = "hdf5_lower_case_" + str(do_lower_case) + "_seq_len_" + str(max_seq_length) \
         + "_max_pred_" + str(max_predictions_per_seq) + "_masked_lm_prob_" + str(masked_lm_prob) \
         + "_random_seed_" + str(random_seed) + "_dupe_factor_" + str(dupe_factor)
     if not os.path.exists(os.path.join(output_dir, hdf5_folder)):
-        os.makedirs(output_dir, hdf5_folder)
+        os.makedirs(os.path.join(output_dir, hdf5_folder))
     hdf5_folder_prefix = os.path.join(output_dir, hdf5_folder, "pretraing")
 
     for i in range(n_train_shards):
@@ -181,7 +184,7 @@ def create_data(do_lower_case, max_seq_length, max_predictions_per_seq,
     last_process.wait()
 
     logger.info(
-        f"End to create pretrainging data and save it to hdf5 files"
+        f"End to create pretrainging data and save it to hdf5 files "
         f"{sharding_output_name_prefix}_train and {sharding_output_name_prefix}_test ."
     )
 
@@ -195,11 +198,12 @@ if __name__ == "__main__":
                     args.formatted_file)
         formatted_files = args.formatted_file
 
-    do_text_sharding(args.model_name, formatted_files, args.output_dir,
-                     args.n_train_shards, args.n_test_shards,
-                     args.fraction_test_set)
+    sharding_output_name_prefix = do_text_sharding(
+        args.model_name, formatted_files, args.output_dir, args.n_train_shards,
+        args.n_test_shards, args.fraction_test_set)
 
     create_data(args.do_lower_case, args.max_seq_length,
                 args.max_predictions_per_seq, args.masked_lm_prob,
                 args.random_seed, args.dupe_factor, args.output_dir,
-                args.n_train_shards, args.n_test_shards)
+                args.n_train_shards, args.n_test_shards,
+                sharding_output_name_prefix)

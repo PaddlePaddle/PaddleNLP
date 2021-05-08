@@ -17,6 +17,7 @@
 import argparse
 import collections
 import h5py
+import os
 import random
 import re
 
@@ -118,8 +119,8 @@ def write_instance_to_example_file(instances, tokenizer, max_seq_length,
 
         total_written += 1
 
-    logging.info("Writing the processed pretrainingf data in file %s" %
-                 output_file)
+    logger.info("Writing the processed pretraining data in file %s" %
+                output_file)
     f = h5py.File(output_file, 'w')
     f.create_dataset(
         "input_ids", data=features["input_ids"], dtype='i4', compression='gzip')
@@ -166,11 +167,10 @@ def create_training_instances(input_files, tokenizer, model_name,
     # (2) Blank lines between documents. Document boundaries are needed so
     # that the "next sentence prediction" task doesn't span between documents.
     for input_file in input_files:
-        logging.info("creating instance from {}".format(input_file))
+        logger.info("creating instance from {}".format(input_file))
         with open(input_file, "r") as reader:
             while True:
                 line = reader.readline()
-                #line = tokenizer.convert_to_unicode(line)
                 if not line:
                     break
                 line = line.strip()
@@ -178,21 +178,20 @@ def create_training_instances(input_files, tokenizer, model_name,
                 # Empty lines are used as document delimiters
                 if not line:
                     all_documents.append([])
-                tokens = tokenizer.tokenize(line)
 
+                tokens = tokenizer.tokenize(line)
+                # basic masking defaultly when words is None
+                words = None
                 if model_name == "bert-wwm-chinese":
-                    tokens = get_whole_word_mask_tokens(
-                        tokens,
-                        max_word_length,
-                        chinese_word_segmentation_fn=lac_cws.run)
+                    # do chinese word segmentation normally
+                    words = lac_cws.run(line)
+                    tokens = get_whole_word_mask_tokens(tokens, words,
+                                                        max_seq_length)
                 elif model_name == "ernie-1.0":
-                    entity_words = get_entity_words(
-                        line, lexical_analysis_fn=lac.run)
-                    tokens = get_whole_word_mask_tokens(
-                        tokens,
-                        max_word_length,
-                        chinese_word_segmentation_fn=lac_cws.run,
-                        entity_words=entity_words)
+                    # do chinese word segmentation with entity words
+                    words, tag = lac.run(line)
+                    tokens = get_whole_word_mask_tokens(tokens, words,
+                                                        max_seq_length)
 
                 if tokens:
                     all_documents[-1].append(tokens)
@@ -216,46 +215,7 @@ def create_training_instances(input_files, tokenizer, model_name,
     return instances
 
 
-def get_entity_words(text, lexical_analysis_fn=None):
-    """
-    Get the entity words in `text` by lexical analysis function (`lexical_analysis_fn`).
-
-    Args:
-        text(str) : The input text.
-        lexical_analysis_fn(callable, optional):
-            The chinese word segmentation function. Default as `None`.
-            It must be inputted the chinese text and return the segmentation results as a list.
-            like: 
-                ```
-                words , entity_labels = lexical_analysis_fn('哈尔滨是黑龙江的省会')
-                # words: ['哈尔滨', '是', '黑龙江', '的', '省会'],
-                # entity_labels: ['LOC', 'v', 'LOC', 'u', 'n']
-                # return entity words as ['哈尔滨', '黑龙江']
-                ```
-            Defaults to `None`and do lexical analysis via LAC.
-            More information about LAC, please refers to https://github.com/baidu/lac.
-
-    
-    Returns:
-        entity_word(list(str)): The words labeled on "PER", "LOC", "ORG" or "TIME".
-
-    """
-    if lexical_analysis_fn is None:
-        lexical_analysis_fn = lac.run
-
-    words, entities = lexical_analysis_fn(text)
-    entity_words = []
-    for word, entity in zip(words, entities):
-        if entity in ["PER", "LOC", "ORG", "TIME"]:
-            entity_words.append(word)
-
-    return entity_words
-
-
-def get_whole_word_mask_tokens(tokens,
-                               max_word_length=4,
-                               chinese_word_segmentation_fn=None,
-                               entity_words=None):
+def get_whole_word_mask_tokens(tokens, words, max_word_length=4):
     """
     Do whole word mask on chinese word.
     First, we do chinese word segmentation on the sequence of tokens, which are from the WordPiece tokenization.
@@ -282,46 +242,11 @@ def get_whole_word_mask_tokens(tokens,
         max_word_length(int, optional): 
             The maximum chinese character in chinese words. It avoids too long chinese word to be masked.
             Defaults as 4.
-        chinese_word_segmentation_fn(callable, optional):
-            The chinese word segmentation function. Default as `None` and do segment via LAC.
-            More information about LAC, please refers to https://github.com/baidu/lac.
-
-            It must be inputted the chinese text and return the segmentation results as a list.
-            like:
-                ```
-                res = chinese_word_segmentation_fn("百度是一家高科技公司")
-                # res: [百度, 是, 一家, 高科技, 公司]
-                ```
-        entity_words(list(str), optional):
-            The entity word in the input sequence of tokens. Defaults as None.
-            When we do whole word masking (wwm), the entity word is prior to the words via chinese_word_segmentation_fn.
-            like:
-                - input text: "中华人命共和国是中国的简称。"
-                - entity word: ["中华人命共和国", "中国"]
-                - words (by chinese_word_segmentation_fn) : ["中华", "人民", "共和国", "是", "中国", "的", "简称", "。"]
-                - final words (will be performed wwm): ["中华人民共和国", "是", "中国", "的", "简称", "。"]
 
     Returns:
          new_tokens(list(str)): The new token will be done with whole word masking strategy.
 
     """
-    if chinese_word_segmentation_fn is None:
-        chinese_word_segmentation_fn = lac_cws.run
-
-    if entity_words is not None:
-        text = "".join(tokens)
-        for entity_word in entity_words:
-            text = text.replace(entity_word, "entity", 1)
-
-        words = chinese_word_segmentation_fn(text)
-        for entity_word in entity_words:
-            for index, word in enumerate(words):
-                if word == "entity":
-                    words[index] = entity_word
-    else:
-        words = chinese_word_segmentation_fn("".join(tokens))
-
-    words_dict = {x: 1 for x in words}
 
     new_tokens = []
     i = 0
@@ -339,7 +264,7 @@ def get_whole_word_mask_tokens(tokens,
         for length in range(max_word_length, 0, -1):
             if i + length > len(tokens):
                 continue
-            if ''.join(tokens[i:i + length]) in words_dict:
+            if ''.join(tokens[i:i + length]) in words:
                 new_tokens.append(tokens[i])
                 for l in range(1, length):
                     new_tokens.append('##' + tokens[i + l])
@@ -500,7 +425,11 @@ def create_masked_lm_predictions(model_name, tokens, masked_lm_prob,
 
     rng.shuffle(cand_indexes)
 
-    output_tokens = list(tokens)
+    # drop the additional "##" flag in chinese word piece
+    output_tokens = [
+        t[2:] if len(re.findall('##[\u4E00-\u9FA5]', t)) > 0 else t
+        for t in tokens
+    ]
 
     num_to_predict = min(max_predictions_per_seq,
                          max(1, int(round(len(tokens) * masked_lm_prob))))
@@ -531,7 +460,10 @@ def create_masked_lm_predictions(model_name, tokens, masked_lm_prob,
         else:
             # 10% of the time, keep original
             if rng.random() < 0.5:
-                masked_token = tokens[index]
+                # drop the additional "##" flag in chinese word piece
+                masked_token = tokens[index][2:] if len(
+                    re.findall('##[\u4E00-\u9FA5]', tokens[
+                        index])) > 0 else tokens[index]
             # 10% of the time, replace with random word
             else:
                 masked_token = vocab_words[rng.randint(0, len(vocab_words) - 1)]
@@ -601,6 +533,11 @@ def main():
         help="The maximum total input sequence length after WordPiece tokenization. \n"
         "Sequences longer than this will be truncated, and sequences shorter \n"
         "than this will be padded.")
+    parser.add_argument(
+        "--max_word_length",
+        default=4,
+        type=int,
+        help="The maximum total chinese character length in a word.")
     parser.add_argument(
         "--dupe_factor",
         default=10,
