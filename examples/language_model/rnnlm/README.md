@@ -30,7 +30,8 @@
 任务训练启动命令如下：
 
 ```
-python train.py
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" train.py \
 ```
 
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存模型到checkpoint、中。

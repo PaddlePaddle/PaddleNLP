@@ -22,6 +22,8 @@ import paddle.nn.functional as F
 from paddle.fluid.data_feeder import convert_dtype
 from paddle.fluid.layers.utils import map_structure
 
+__all__ = ["GenerationMixin"]
+
 
 class BeamHypotheses:
     def __init__(self, num_beams, length_penalty, early_stopping):
@@ -263,7 +265,12 @@ class BeamSearchScorer(object):
 
 
 class GenerationMixin(object):
-    r"""The class which implements the interface for generation task."""
+    r"""
+    This class implements the interface for generation task. 
+    
+    It's used as the base class of `paddlenlp.transformers.PretrainedModel 
+    <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.model_utils.html>`__.
+    """
 
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id):
@@ -327,6 +334,12 @@ class GenerationMixin(object):
 
     @staticmethod
     def update_model_kwargs_for_generation(outputs, model_kwargs):
+        # Update the model inputs during generation. 
+        # Note that If `token_type_ids` and `attention_mask` in `model_kwargs` 
+        # and they contain pad value, the result vectors updated by this method 
+        # may be different from expected. In this case, you need to rewrite the 
+        # method.
+
         # update cache
         if isinstance(outputs, tuple):
             model_kwargs["cache"] = outputs[1]
@@ -341,22 +354,29 @@ class GenerationMixin(object):
         if "position_ids" in model_kwargs:
             position_ids = model_kwargs["position_ids"]
             model_kwargs["position_ids"] = paddle.concat(
-                [position_ids, position_ids[:, -1].unsqueeze(-1) + 1], axis=-1)
+                [
+                    position_ids,
+                    paddle.max(position_ids, axis=-1, keepdim=True) + 1
+                ],
+                axis=-1)
 
         # update attention_mask
         if "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
-            # TODO
+            # nn.Pad2D don't support the data type `bool`
+            if convert_dtype(attention_mask.dtype) == 'bool':
+                attention_mask = paddle.cast(attention_mask, 'int64')
             attention_mask = nn.Pad2D(
                 [0, 0, 0, 1], mode='replicate')(attention_mask)
             attention_mask = nn.Pad2D([0, 1, 0, 0], value=-1e9)(attention_mask)
             dtype = convert_dtype(attention_mask.dtype)
-            if dtype == 'bool':
-                attention_mask[:, :, -1, -1] = True
-            elif 'int' in dtype:
+            if 'int' in dtype:
                 attention_mask[:, :, -1, -1] = 1
-            else:
+            elif 'float' in dtype:
                 attention_mask[:, :, -1, -1] = 0.0
+            else:
+                raise ValueError('The data type of input `attention_mask` must '
+                                 'be bool, int or float')
             model_kwargs["attention_mask"] = attention_mask
 
         return model_kwargs
@@ -365,15 +385,21 @@ class GenerationMixin(object):
     def update_scores_for_generation(scores, next_scores, length,
                                      unfinished_flag):
         # update scores
+
         unfinished_scores = (scores * length + next_scores) / (length + 1)
         scores = paddle.where(unfinished_flag, unfinished_scores, scores)
         return scores
 
+    def prepare_inputs_for_generation(self, input_ids, **kwargs):
+        # Implement in subclasses for custom behavior to prepare inputs in the
+        # generate method.
+
+        return {"input_ids": input_ids}
+
     def adjust_logits_during_generation(self, logits):
-        """
-        Implement in subclasses for custom behavior to adjust the logits in the
-        generate method.
-        """
+        # Implement in subclasses for custom behavior to adjust the logits in 
+        # the generate method.
+
         return logits
 
     @paddle.no_grad()
@@ -395,53 +421,152 @@ class GenerationMixin(object):
                  use_cache=True,
                  **model_kwargs):
         r"""
-        The interface to generate sequences in generation task.
+        The interface for generation task. This method can generate sequences 
+        by using decoding strategy. Currently, there are three decoding 
+        strategies supported: "greedy_search", "sampling" and "beam_search".
 
-        Parameters:
-            input_ids (Tensor, optional): The input sequence ids for the generation. 
-                It is a tensor with shape `[batch_size, sequence_length]`. The 
-                data type should be int32 or int64. If None, use the function 
-                `prepare_input_ids_for_generation` as initialization. Default None.
+        Args:
+            input_ids (Tensor, optional): The input sequence ids for the 
+                generation. It is a Tensor with shape [batch_size, sequence_length]. 
+                The data type should be int32 or int64. Default to None, which 
+                we will initialize it as a Tensor with shape [1, 1], filled 
+                with the value `bos_token_id`.
             max_length (int, optional): The maximum length of the sequence to 
-                be generated. Default 20.
+                be generated. Default to 20.
             min_length (int, optional): The minimum length of the sequence to 
-                be generated. Default 0.
-            decode_strategy (str, optional): The decode strategy in generation.
-                There has three decode strategies: 'greedy_search', 'sampling', 
-                'beam_search'. Default 'greedy_search'.
+                be generated. Default to 0.
+            decode_strategy (str, optional): The decoding strategy in generation.
+                Currently, there are three decoding strategies supported: 
+                "greedy_search", "sampling" and "beam_search". Default to 
+                "greedy_search".
             temperature (float, optional): The value used to module the next 
-                token probabilities. Default 1.0.
+                token probabilities in the "sampling" strategy. Default to 1.0, 
+                which means no effect.
             top_k (int, optional): The number of highest probability tokens to 
-                keep for top-k-filtering. Default 0.
-            top_p (float, optional): The cumulative probability for top-p-filtering. 
-                The value should satisfy :math:`0 <= top_p < 1`. Default 1.0.
-            num_beams (int, optional): The number of beams for beam search. Default 1.
+                keep for top-k-filtering in the "sampling" strategy. Default to 
+                0, which means no effect.
+            top_p (float, optional): The cumulative probability for 
+                top-p-filtering in the "sampling" strategy. The value should 
+                satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no 
+                effect.
+            num_beams (int, optional): The number of beams in the "beam_search"
+                strategy. Default to 1.
             length_penalty (float, optional): The exponential penalty to the 
-                sequence length for beam search. :math:`length_penalty = 1.0` 
-                means no penalty. If :math:`length_penalty < 1.0`, the model will 
-                generate shorter sequences. If :math:`length_penalty > 1.0`, the 
-                model will generate longer sequences. Default 1.0.
-            early_stopping (bool, optional): Whether to stop the beam search when 
-                at least `num_beams` sentences are finished per batch or not.
-            bos_token_id (int, optional): The id of the bos_token. Default None.
-            eos_token_id (int, optional): The id of the eos_token. Default None.
-            pad_token_id (int, optional): The id of the pad_token. Default None.
-            num_return_sequences (int, optional): The number of independently 
-                computed returned sequences for each element in the batch. 
-                Default 1.
-            use_cache: (bool, optional): Whether or not the model should use the 
-                cache to speed up decoding. Default True.
+                sequence length in the "beam_search" strategy. If 
+                :math:`length\_penalty < 1.0`, the model will generate shorter 
+                sequences. If :math:`length\_penalty > 1.0`, the model will 
+                generate longer sequences. Default to 1.0, which means no 
+                penalty.
+            early_stopping (bool, optional): Whether to stop searching in the 
+                "beam_search" strategy when at least `num_beams` sentences are 
+                finished per batch or not. Default to False.
+            bos_token_id (int, optional): The id of the `bos_token`. Default to 
+                None.
+            eos_token_id (int, optional): The id of the `eos_token`. Default to 
+                None.
+            pad_token_id (int, optional): The id of the `pad_token`. Default to 
+                None.
+            num_return_sequences (int, optional): The number of returned 
+                sequences for each sequence in the batch. Default to 1.
+            use_cache: (bool, optional): Whether or not use the model cache to 
+                speed up decoding. Default to True.
             model_kwargs (dict): It can be used to specify additional kwargs 
                 passed to the model.
 
         Returns:
-            tuple (Tensor): It is a tuple includes generated sequence ids and 
-                scores. The generated sequence ids is a tensor with shape 
-                `[batch_size * num_return_sequences, sequence_length]`. The 
-                data type is same as the input `input_ids`. The scores is a 
-                tensor with shape `[batch_size * num_return_sequences, 1]`. The 
-                data type is float32 or float64, as same as the parameters of 
-                the model.
+            tuple[Tensor]: It is a tuple contains two elements: ids and scores. 
+            Each element is a Tensor.
+
+            With the fields:
+
+            - ids (Tensor): 
+                The ids of the generated sequences. It is a Tensor with shape 
+                [batch_size * num_return_sequences, sequence_length]. The data 
+                type is same as the input `input_ids`.
+            - scores (Tensor): 
+                The scores of the generated sequences. It is a Tensor with shape 
+                [batch_size * num_return_sequences, 1]. The data type is float32 
+                or float64, which is the same as the parameters in the model.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import (
+                    UnifiedTransformerLMHeadModel, 
+                    UnifiedTransformerTokenizer
+                )
+
+                paddle.seed(2)
+
+                # Initialize the model and tokenizer
+                model_name_or_path = 'unified_transformer-12L-cn-luge'
+                model = UnifiedTransformerLMHeadModel.from_pretrained(model_name_or_path)
+                tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name_or_path)
+
+                # Prepare the model inputs.
+                history = "早上好，今天空气质量不错。"
+                inputs = tokenizer.dialogue_encode(history, task_type='chitchat', 
+                    add_start_token_as_response=True, return_tensors=True)
+                
+            .. code-block::
+
+                # Generate the sequence by using "greedy_search" strategy
+                ids, scores = model.generate(
+                    input_ids=inputs['input_ids'],
+                    token_type_ids=inputs['token_type_ids'],
+                    position_ids=inputs['position_ids'],
+                    attention_mask=inputs['attention_mask'],
+                    decode_strategy="greedy_search")
+                print(ids.shape, scores.shape)
+                # [1, 3] [1, 1]
+                sequence_ids = ids.numpy().tolist()[0]
+                sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
+                response = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
+                print(response)
+                # 是的
+
+            .. code-block::
+            
+                # Generate 2 sequences by using "sampling" strategy (top_k=5)
+                ids, scores = model.generate(
+                    input_ids=inputs['input_ids'],
+                    token_type_ids=inputs['token_type_ids'],
+                    position_ids=inputs['position_ids'],
+                    attention_mask=inputs['attention_mask'],
+                    decode_strategy="sampling",
+                    top_k=5,
+                    num_return_sequences=2)
+                print(ids.shape, scores.shape)
+                # [2, 7] [2, 1]
+                response = []
+                for sequence_ids in ids.numpy().tolist():
+                    sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
+                    text = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
+                    response.append(text)
+                print(response)
+                # ['天气好,心情也好', '你也是']
+
+            .. code-block::
+            
+                # Generate 2 sequences by using "beam_search" strategy (num_beams=5)
+                ids, scores = model.generate(
+                    input_ids=inputs['input_ids'],
+                    token_type_ids=inputs['token_type_ids'],
+                    position_ids=inputs['position_ids'],
+                    attention_mask=inputs['attention_mask'],
+                    decode_strategy="beam_search",
+                    num_beams=5,
+                    num_return_sequences=2)
+                print(ids.shape, scores.shape)
+                # [2, 3] [2, 1]
+                response = []
+                for sequence_ids in ids.numpy().tolist():
+                    sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
+                    text = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
+                    response.append(text)
+                print(response)
+                # ['是的', '嗯嗯']
         """
 
         # params check

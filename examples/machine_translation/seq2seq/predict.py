@@ -48,8 +48,6 @@ def do_predict(args):
         args)
     tgt_vocab = Vocab.load_vocabulary(**test_loader.dataset.vocab_info['vi'])
 
-    trg_idx2word = tgt_vocab.idx_to_token
-
     model = paddle.Model(
         Seq2SeqAttnInferModel(
             src_vocab_size,
@@ -81,7 +79,7 @@ def do_predict(args):
             for ins in finished_seq:
                 for beam_idx, beam in enumerate(ins):
                     id_list = post_process_seq(beam, bos_id, eos_id)
-                    word_list = [trg_idx2word[id] for id in id_list]
+                    word_list = [tgt_vocab.to_tokens(id) for id in id_list]
                     sequence = " ".join(word_list) + "\n"
                     f.write(sequence)
                     cand_list.append(word_list)

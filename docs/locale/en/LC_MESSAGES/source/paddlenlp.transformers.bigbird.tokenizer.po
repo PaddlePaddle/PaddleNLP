@@ -1,0 +1,101 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.transformers.bigbird.tokenizer.rst:2
+msgid "tokenizer"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:1
+msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:1
+msgid ""
+"Constructs a BigBird tokenizer. It uses a basic tokenizer to do "
+"punctuation splitting, lower casing and so on, and follows a WordPiece "
+"tokenizer to tokenize as subwords. :param sentencepiece_model_file: file "
+"path of the vocabulary :type sentencepiece_model_file: str :param "
+"do_lower_case: Whether the text strips accents and convert to"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:7
+msgid ""
+"lower case. If you use the BigBird pretrained model, lower is set to "
+"False when using the cased model, otherwise it is set to True. Default: "
+"True."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:11
+msgid "The special token for unkown words. Default: \"[UNK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:13
+msgid "The special token for separator token . Default: \"[SEP]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:15
+msgid "The special token for padding. Default: \"[PAD]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:17
+msgid "The special token for cls. Default: \"[CLS]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:19
+msgid "The special token for mask. Default: \"[MASK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:22
+msgid "Examples:"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.vocab_size:1
+msgid ""
+"return the size of vocabulary. :returns: the size of vocabulary. :rtype: "
+"int"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string:1
+msgid ""
+"Converts a sequence of tokens (list of string) in a single string. Since "
+"the usage of WordPiece introducing `##` to concat subwords, also remove "
+"`##` when converting. :param tokens: A list of string representing tokens"
+" to be converted. :type tokens: list"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string
+msgid "返回"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string:7
+msgid "Converted string from tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string
+msgid "返回类型"
+msgstr ""
+

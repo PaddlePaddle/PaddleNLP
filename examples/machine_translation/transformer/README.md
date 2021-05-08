@@ -48,15 +48,17 @@ Decoder 具有和 Encoder 类似的结构，只是相比于组成 Encoder 的 la
 
 公开数据集：WMT 翻译大赛是机器翻译领域最具权威的国际评测大赛，其中英德翻译任务提供了一个中等规模的数据集，这个数据集是较多论文中使用的数据集，也是 Transformer 论文中用到的一个数据集。我们也将[WMT'14 EN-DE 数据集](http://www.statmt.org/wmt14/translation-task.html)作为示例提供。
 
-同时，我们提供了一份已经处理好的数据集，可以编写如下代码，对应的数据集将会自动下载并且解压到 `~/.paddlenlp/datasets/machine_translation/WMT14ende/`。
+同时，我们提供了一份已经处理好的数据集，可以编写如下代码，对应的数据集将会自动下载并且解压到 `~/.paddlenlp/datasets/WMT14ende/`。
 
 ``` python
 datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
 ```
 
-## 单机训练
+## 动态图
 
-### 单机单卡
+### 单机训练
+
+#### 单机单卡
 
 以提供的英德翻译数据为例，可以执行以下命令进行模型训练：
 
@@ -68,7 +70,9 @@ python train.py --config ./configs/transformer.base.yaml
 
 可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中设置相应的参数。如果执行不提供 `--config` 选项，程序将默认使用 big model 的配置。
 
-### 单机多卡
+如果是在单卡下进行训练，可能需要适当调整下参数，比如考虑增大 `warmup_steps` 参数为 `16000`，相关的设置可以参考 `configs/transformer.big.yaml` 或是 `configs/transformer.base.yaml` 配置文件中各个选项。
+
+#### 单机多卡
 
 同样，可以执行如下命令实现八卡训练：
 
@@ -79,9 +83,9 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train.py --config .
 
 与上面的情况相似，可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中设置相应的参数。如果执行不提供 `--config` 选项，程序将默认使用 big model 的配置。
 
-## 模型推断
+### 模型推断
 
-### 使用动态图预测
+#### 使用动态图预测
 
 以英德翻译数据为例，模型训练完成后可以执行以下命令对指定文件中的文本进行翻译：
 
@@ -95,7 +99,7 @@ python predict.py --config ./configs/transformer.base.yaml
 
  需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
-### 导出静态图预测模型与预测引擎预测
+#### 导出静态图预测模型与预测引擎预测
 
 Transformer 同时提供了将训练的动态图的 checkpoint 转成静态图模型功能，并提供了对应的使用预测引擎进行预测推理的方法。具体的使用方式如下：
 
@@ -107,13 +111,67 @@ python export_model.py --config ./configs/transformer.base.yaml
 
 模型默认保存在 `infer_model/` 路径下面。可以在 `configs/` 路径下的配置文件中更改 `inference_model_dir` 配置，从而保存至自定义的路径。
 
-其次，对于完成动转静的静态图的模型，可以使用 `inference.py` 实现使用预测引擎进行高性能预测的功能。此时，因为保存静态图模型本身已经包括了模型结构，所以，指定的配置文件将只用于 `reader` 以及指定预测使用的设备（gpu/cpu/xpu），模型结构相关的配置将不再起作用。
+#### 使用 Paddle Inference API 进行推理
 
-``` sh
-python deploy/python/inference.py  --config ./configs/transformer.base.yaml
+准备好以上模型之后，可以使用预测引擎 Paddle Inference API 进行推理。
+
+如果使用 Paddle Inference Python API，可以参考[使用 Paddle Inference Python API 推理](./deploy/python/README.md)。
+
+如果使用 Paddle Inference C++ API，可以参考[使用 Paddle Inference C++ API 推理](./deploy/cpp/README.md)。
+
+#### 使用 Paddle Serving 进行推理
+
+除了使用 Paddle Inference API 进行本地推理外，还可以使用 Paddle Serving 实现在服务器上部署推理模型，客户端发送数据进行推理。可以参考[使用 Paddle Serving 推理](./deploy/serving/README.md)。
+
+## 静态图
+
+### 单机训练
+
+#### 单机单卡
+
+如果是需要单机单卡训练，则使用下面的命令进行训练：
+``` shell
+cd static/
+export CUDA_VISIBLE_DEVICES=0
+python train.py --config ../configs/transformer.base.yaml
 ```
 
-翻译结果同样将会保存在 `predict.txt` 文件中，可以在配置文件中自定义更改 `output_file` 来指定预测结果写入到的文件的名称。
+我们建议可以在单卡执行的时候，尝试增大 `warmup_steps`。可以修改 `configs/transformer.big.yaml` 或是 `configs/transformer.base.yaml` 中对应参数。
+
+#### 单机多卡
+
+如果是需要单机多卡训练，则使用下面的命令进行训练：
+
+##### PE 的方式启动单机多卡：
+``` shell
+cd static/
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+python train.py --config ../configs/transformer.base.yaml
+```
+
+##### fleet 的方式启动单机多卡：
+``` shell
+cd static/
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+python -m paddle.distributed.launch --gpus="0,1,2,3,4,5,6,7" train.py --config ../configs/transformer.base.yaml --distributed
+```
+
+需要注意的是，使用 fleet 的方式启动单机多卡务必设置 `--distributed`。
+
+#### 模型推断
+
+同样，以英德翻译数据为例，在静态图模式下，模型训练完成后可以执行以下命令对指定文件中的文本进行翻译：
+
+``` sh
+# setting visible devices for prediction
+cd static/
+export CUDA_VISIBLE_DEVICES=0
+python predict.py --config ../configs/transformer.base.yaml
+```
+
+ 由 `predict_file` 指定的文件中文本的翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 big model 的配置。
+
+ 需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
 ## 使用 Faster Transformer 实现预测
 
@@ -129,7 +187,7 @@ sed -r 's/(@@ )|(@@ ?$)//g' predict.txt > predict.tok.txt
 # 若无 BLEU 评估工具，需先进行下载
 git clone https://github.com/moses-smt/mosesdecoder.git
 # 以英德翻译 newstest2014 测试数据为例
-perl mosesdecoder/scripts/generic/multi-bleu.perl ~/.paddlenlp/datasets/machine_translation/WMT14ende/WMT14.en-de/wmt14_ende_data/newstest2014.tok.de < predict.tok.txt
+perl mosesdecoder/scripts/generic/multi-bleu.perl ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data/newstest2014.tok.de < predict.tok.txt
 ```
 
 执行上述操作之后，可以看到类似如下的结果，此处结果是 big model 在 newstest2014 上的 BLEU 结果：

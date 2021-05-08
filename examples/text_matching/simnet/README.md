@@ -46,9 +46,9 @@ simnet/
 #### 使用PaddleNLP内置数据集
 
 ```python
-from paddlenlp.datasets import LCQMC
+from paddlenlp.datasets import load_dataset
 
-train_ds, dev_dataset, test_ds = LCQMC.get_datasets(['train', 'dev', 'test'])
+train_ds, dev_ds, test_ds = load_dataset("lcqmc", splits=["train", "dev", "test"])
 ```
 
 部分样例数据如下：
@@ -78,9 +78,8 @@ wget https://paddlenlp.bj.bcebos.com/data/simnet_vocab.txt
 CPU启动：
 
 ```shell
-CPU启动
 python train.py --vocab_path='./simnet_vocab.txt' \
-   --use_gpu=False \
+   --device=cpu \
    --network=lstm \
    --lr=5e-4 \
    --batch_size=64 \
@@ -91,9 +90,9 @@ python train.py --vocab_path='./simnet_vocab.txt' \
 GPU启动：
 
 ```shell
-CUDA_VISIBLE_DEVICES=0
-python train.py --vocab_path='./simnet_vocab.txt' \
-   --use_gpu=True \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" train.py --vocab_path='./simnet_vocab.txt' \
+   --device=gpu \
    --network=lstm \
    --lr=5e-4 \
    --batch_size=64 \
@@ -104,7 +103,7 @@ python train.py --vocab_path='./simnet_vocab.txt' \
 以上参数表示：
 
 * `vocab_path`: 词汇表文件路径。
-* `use_gpu`: 是否使用GPU进行训练， 默认为`False`。
+* `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 * `network`: 模型网络名称，默认为`lstm`， 可更换为lstm, gru, rnn，bow，cnn等。
 * `lr`: 学习率， 默认为5e-4。
 * `batch_size`: 运行一个batch大小，默认为64。
@@ -135,7 +134,7 @@ CPU启动：
 
 ```shell
 python predict.py --vocab_path='./simnet_vocab.txt' \
-   --use_gpu=False \
+   --device=cpu \
    --network=lstm \
    --params_path=checkpoints/final.pdparams
 ```
@@ -144,7 +143,7 @@ GPU启动：
 
 ```shell
 CUDA_VISIBLE_DEVICES=0 python predict.py --vocab_path='./simnet_vocab.txt' \
-   --use_gpu=True \
+   --device=gpu \
    --network=lstm \
    --params_path='./checkpoints/final.pdparams'
 ```

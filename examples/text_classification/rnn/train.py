@@ -27,12 +27,13 @@ from utils import convert_example
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")
-parser.add_argument('--select_devices', type=str, default="gpu", help="Which device do you wanna use to training, CPU or CPU ?")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate used to train.")
 parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
 parser.add_argument("--vocab_path", type=str, default="./senta_word_dict.txt", help="The directory to dataset.")
-parser.add_argument('--network', type=str, default="bilstm", help="Which network you would like to choose bow, lstm, bilstm, gru, bigru, rnn, birnn, bilstm_attn and textcnn?")
+parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru', 'rnn', 'birnn', 'bilstm_attn', 'cnn', 'textcnn'],
+    default="bilstm", help="Select which network to train, defaults to bilstm.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 args = parser.parse_args()
 # yapf: enable
@@ -49,7 +50,6 @@ def create_dataloader(dataset,
                       trans_fn=None,
                       mode='train',
                       batch_size=1,
-                      use_gpu=False,
                       batchify_fn=None):
     """
     Creats dataloader.
@@ -59,7 +59,6 @@ def create_dataloader(dataset,
         trans_fn(obj:`callable`, optional, defaults to `None`): function to convert a data sample to input ids, etc.
         mode(obj:`str`, optional, defaults to obj:`train`): If mode is 'train', it will shuffle the dataset randomly.
         batch_size(obj:`int`, optional, defaults to 1): The sample number of a mini-batch.
-        use_gpu(obj:`bool`, optional, defaults to obj:`False`): Whether to use gpu to run.
         batchify_fn(obj:`callable`, optional, defaults to `None`): function to generate mini-batch data by merging
             the sample list, None for only stack each fields of sample in axis
             0(same as :attr::`np.stack(..., axis=0)`).
@@ -70,25 +69,21 @@ def create_dataloader(dataset,
     if trans_fn:
         dataset = dataset.map(trans_fn)
 
-    if mode == 'train' and use_gpu:
+    shuffle = True if mode == 'train' else False
+    if mode == "train":
         sampler = paddle.io.DistributedBatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=True)
+            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
     else:
-        shuffle = True if mode == 'train' else False
         sampler = paddle.io.BatchSampler(
             dataset=dataset, batch_size=batch_size, shuffle=shuffle)
     dataloader = paddle.io.DataLoader(
-        dataset,
-        batch_sampler=sampler,
-        return_list=True,
-        collate_fn=batchify_fn)
+        dataset, batch_sampler=sampler, collate_fn=batchify_fn)
     return dataloader
 
 
 if __name__ == "__main__":
+    paddle.set_device(args.device)
     set_seed()
-    use_gpu = True if args.select_devices.lower() == "gpu" else False
-    paddle.set_device("gpu") if use_gpu else paddle.set_device('cpu')
 
     # Loads vocab.
     if not os.path.exists(args.vocab_path):
@@ -121,21 +116,18 @@ if __name__ == "__main__":
         trans_fn=trans_fn,
         batch_size=args.batch_size,
         mode='train',
-        use_gpu=use_gpu,
         batchify_fn=batchify_fn)
     dev_loader = create_dataloader(
         dev_ds,
         trans_fn=trans_fn,
         batch_size=args.batch_size,
         mode='validation',
-        use_gpu=use_gpu,
         batchify_fn=batchify_fn)
     test_loader = create_dataloader(
         test_ds,
         trans_fn=trans_fn,
         batch_size=args.batch_size,
         mode='test',
-        use_gpu=use_gpu,
         batchify_fn=batchify_fn)
 
     optimizer = paddle.optimizer.Adam(

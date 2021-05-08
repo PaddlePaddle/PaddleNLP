@@ -1,0 +1,119 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../../source/paddlenlp.data.collate.rst:2
+msgid "collate"
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict:1 paddlenlp.data.collate.Pad:1
+#: paddlenlp.data.collate.Stack:1 paddlenlp.data.collate.Tuple:1
+msgid "基类：:class:`object`"
+msgstr ""
+
+#: of paddlenlp.data.collate.Stack:1
+msgid ""
+"Stack the input data samples to construct the batch. The N input samples "
+"must have the same shape/length and will be stacked to construct a batch."
+" :param axis: The axis in the result data along which the input"
+msgstr ""
+
+#: of paddlenlp.data.collate.Stack:4
+msgid "data are stacked. Default: 0."
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad paddlenlp.data.collate.Stack
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad:16 paddlenlp.data.collate.Stack:6
+msgid ""
+"The value type of the output. If it is set to None, the input data type "
+"is used. Default: None."
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict:14 paddlenlp.data.collate.Pad:25
+#: paddlenlp.data.collate.Stack:11 paddlenlp.data.collate.Tuple:16
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad:1
+msgid ""
+"Return a callable that pads and stacks data. :param pad_val: The padding "
+"value. Default: 0. :type pad_val: float|int, optional :param axis: The "
+"axis to pad the arrays. The arrays will be"
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad:5
+msgid ""
+"padded to the largest dimension at axis. For example, assume the input "
+"arrays have shape (10, 8, 5), (6, 8, 5), (3, 8, 5) and the axis is 0. "
+"Each input will be padded into (10, 8, 5) and then stacked to form the "
+"final output, which has shape（3, 10, 8, 5). Default: 0."
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad:11
+msgid ""
+"If it is bool, indicate whether to return the valid length in the output,"
+" and the data type of returned length is int32 if True. If it is "
+"numpy.dtype, indicate the data type of returned length. Default: False."
+msgstr ""
+
+#: of paddlenlp.data.collate.Pad:19
+msgid ""
+"Boolean argument indicating whether the padding direction is right-side. "
+"If True, it indicates we pad to the right side, while False indicates we "
+"pad to the left side. Default: True."
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict:1 paddlenlp.data.collate.Tuple:1
+msgid ""
+"Wrap multiple batchify functions together. The input functions will be "
+"applied to the corresponding input fields."
+msgstr ""
+
+#: of paddlenlp.data.collate.Tuple:4
+msgid ""
+"Each sample should be a list or tuple containing multiple fields. The "
+"i'th batchify function stored in Tuple will be applied on the i'th field."
+msgstr ""
+
+#: of paddlenlp.data.collate.Tuple:7
+msgid ""
+"For example, when data sample is (nd_data, label), you can wrap two "
+"batchify functions using `Tuple(DataBatchify, LabelBatchify)` to batchify"
+" nd_data and label correspondingly. :param fn: The batchify functions to "
+"wrap. :type fn: list|tuple|callable :param \\*args: The additional "
+"batchify functions to wrap. :type \\*args: tuple of callable"
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict:4
+msgid ""
+"Each sample should be a dictionary containing multiple fields. Each "
+"batchify function with key stored in Dict will be applied on the field "
+"which has the same key."
+msgstr ""
+
+#: of paddlenlp.data.collate.Dict:7
+msgid ""
+"For example, when data sample is {'tokens': tokens, 'labels': labels), "
+"you can wrap two batchify functions using `Dict({'tokens': DataBatchify, "
+"'labels': LabelBatchify})` to batchify tokens and labels correspondingly."
+" :param fn: The batchify functions to wrap. :type fn: dict of callable"
+msgstr ""
+

@@ -21,7 +21,7 @@ import paddle.nn as nn
 import paddlenlp
 from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.embeddings import TokenEmbedding
-from paddlenlp.data import JiebaTokenizer, Vocab
+from paddlenlp.data import JiebaTokenizer, Vocab, Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
 
 import data
@@ -64,11 +64,18 @@ def create_dataloader(dataset,
     shuffle = True if mode == 'train' else False
     sampler = paddle.io.BatchSampler(
         dataset=dataset, batch_size=batch_size, shuffle=shuffle)
+
+    batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=vocab.get('[PAD]', 0)),  # input_ids
+        Stack(dtype="int32"),  # seq len
+        Stack(dtype="int64")  # label
+    ): [data for data in fn(samples)]
+
     dataloader = paddle.io.DataLoader(
         dataset,
         batch_sampler=sampler,
         return_list=True,
-        collate_fn=lambda batch: data.generate_batch(batch, pad_token_id=pad_token_id))
+        collate_fn=batchify_fn)
     return dataloader
 
 
