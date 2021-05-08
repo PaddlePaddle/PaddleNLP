@@ -29,8 +29,17 @@ SPIECE_UNDERLINE = "▁"
 
 class AlbertTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "spiece.model"}
-    pretrained_resource_files_map = {}
-    pretrained_init_configuration = {}
+    pretrained_resource_files_map = {
+        "vocab_file": {
+            "albert-base-v2":
+            "./spiece.model",
+        }
+    }
+    pretrained_init_configuration = {
+        "albert-base-v2": {
+            "do_lower_case": False
+        },
+    }
     pretrained_positional_embedding_sizes = {}
     max_model_input_sizes = pretrained_positional_embedding_sizes
 

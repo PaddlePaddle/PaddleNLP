@@ -15,16 +15,17 @@
 """Modeling classes for ALBERT model."""
 
 import math
-import re
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
+
+from paddlenlp.ops import einsum
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    "AlbertModel",
     "AlbertPretrainedModel",
+    "AlbertModel",
     "AlbertForPretraining",
     "AlbertForMaskedLM",
     "AlbertForSequenceClassification",
@@ -55,42 +56,24 @@ def swish(x):
     return x * F.sigmoid(x)
 
 
+def gelu_new(x):
+    """
+    Implementation of the GELU activation function currently in Google BERT repo (identical to OpenAI GPT). Also see
+    the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
+    """
+    return 0.5 * x * (1.0 + paddle.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * paddle.pow(x, 3.0))))
+
+
 ACT2FN = {
     "relu": F.relu,
     "gelu": F.gelu,
+    "gelu_new": gelu_new,
     "tanh": F.tanh,
     "sigmoid": F.sigmoid,
     "mish": mish,
     "linear": linear_act,
     "swish": swish,
 }
-
-
-def einsum4x4(equation, x, y):
-    """
-    Only works for 4D x 4D.
-    """
-    idx_x, idx_y, idx_z = re.split(",|->", equation)
-    # Compute repeated index
-    repeated_idx = list(set(idx_x + idx_y) - set(idx_z))
-
-    unique_idx_x = list(set(idx_x) - set(idx_y))
-    unique_idx_y = list(set(idx_y) - set(idx_x))
-    common_idx = list(set(idx_x) & set(idx_y) - set(repeated_idx))
-
-    new_idx_x = common_idx + unique_idx_x + repeated_idx
-    new_idx_y = common_idx + unique_idx_y + repeated_idx
-    new_idx_z = common_idx + unique_idx_x + unique_idx_y
-
-    perm_x = [idx_x.index(i) for i in new_idx_x]
-    perm_y = [idx_y.index(i) for i in new_idx_y]
-    perm_z = [new_idx_z.index(i) for i in idx_z]
-
-    x = paddle.transpose(x, perm=perm_x)
-    y = paddle.transpose(y, perm=perm_y)
-    z = paddle.matmul(x=x, y=y, transpose_y=True)
-    z = paddle.transpose(z, perm=perm_z)
-    return z
 
 
 class AlbertEmbeddings(Layer):
@@ -122,7 +105,6 @@ class AlbertEmbeddings(Layer):
         self.register_buffer("position_ids", paddle.arange(max_position_embeddings).expand((1, -1)))
         self.position_embedding_type = position_embedding_type
 
-    # Copied from transformers.models.bert.modeling_bert.BertEmbeddings.forward
     def forward(
             self,
             input_ids,
@@ -192,28 +174,27 @@ class AlbertAttention(Layer):
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
         self.pruned_heads = set()
 
-        self.position_embedding_type = position_embedding_type
+        self.position_embedding_type = position_embedding_type if not position_embedding_type else "absolute"
         if self.position_embedding_type == "relative_key" or self.position_embedding_type == "relative_key_query":
             self.max_position_embeddings = max_position_embeddings
             self.distance_embedding = nn.Embedding(2 * max_position_embeddings - 1, self.attention_head_size)
 
     # Copied from transformers.models.bert.modeling_bert.BertSelfAttention.transpose_for_scores
     def transpose_for_scores(self, x):
-        new_x_shape = x.shape[:-1] + (self.num_attention_heads, self.attention_head_size)
+        new_x_shape = x.shape[:-1] + [self.num_attention_heads, self.attention_head_size]
         x = x.reshape(new_x_shape)
         return x.transpose([0, 2, 1, 3])
 
+    # todo
     def prune_heads(self, heads):
-        if len(heads) == 0:
-            return
-        # todo
+        pass
 
     def forward(self,
                 hidden_states,
                 attention_mask=None,
                 head_mask=None,
                 output_attentions=False,
-    ):
+                ):
         mixed_query_layer = self.query(hidden_states)
         mixed_key_layer = self.key(hidden_states)
         mixed_value_layer = self.value(hidden_states)
@@ -241,11 +222,11 @@ class AlbertAttention(Layer):
 
             positional_embedding = paddle.stack([positional_embedding] * query_layer.shape[0], axis=0)
             if self.position_embedding_type == "relative_key":
-                relative_position_scores = einsum4x4("bhld,blrd->bhlr", query_layer, positional_embedding)
+                relative_position_scores = einsum("bhld,blrd->bhlr", query_layer, positional_embedding)
                 attention_scores = attention_scores + relative_position_scores
             elif self.position_embedding_type == "relative_key_query":
-                relative_position_scores_query = einsum4x4("bhld,blrd->bhlr", query_layer, positional_embedding)
-                relative_position_scores_key = einsum4x4("bhrd,blrd->bhlr", key_layer, positional_embedding)
+                relative_position_scores_query = einsum("bhld,blrd->bhlr", query_layer, positional_embedding)
+                relative_position_scores_key = einsum("bhrd,blrd->bhlr", key_layer, positional_embedding)
                 attention_scores = attention_scores + relative_position_scores_query + relative_position_scores_key
 
         # Normalize the attention scores to probabilities.
@@ -261,7 +242,6 @@ class AlbertAttention(Layer):
 
         context_layer = paddle.matmul(attention_probs, value_layer)
         context_layer = context_layer.transpose([0, 2, 1, 3])
-
         context_layer = context_layer.reshape([0, 0, -1])
 
         # dense layer shape to be checked
@@ -318,7 +298,7 @@ class AlbertLayer(Layer):
             output_attentions=output_attentions,
         )
 
-        ffn_output = self.ffn(attention_output)
+        ffn_output = self.ffn(attention_output[0])
         ffn_output = self.activation(ffn_output)
         ffn_output = self.ffn_output(ffn_output)
 
@@ -364,7 +344,7 @@ class AlbertLayerGroup(Layer):
                 head_mask=None,
                 output_attentions=False,
                 output_hidden_states=False,
-    ):
+                ):
         layer_hidden_states = ()
         layer_attentions = ()
 
@@ -479,10 +459,10 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            "down_scale_factor": 1,
+            # "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            "gap_size": 0,
+            # "gap_size": 0,
             "hidden_act": "gelu_new",
             "hidden_dropout_prob": 0,
             "hidden_size": 768,
@@ -491,12 +471,12 @@ class AlbertPretrainedModel(PretrainedModel):
             "intermediate_size": 3072,
             "layer_norm_eps": 1e-12,
             "max_position_embeddings": 512,
-            "model_type": "albert",
-            "net_structure_type": 0,
+            # "model_type": "albert",
+            # "net_structure_type": 0,
             "num_attention_heads": 12,
             "num_hidden_groups": 1,
             "num_hidden_layers": 12,
-            "num_memory_blocks": 0,
+            # "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 30000
@@ -579,10 +559,10 @@ class AlbertModel(AlbertPretrainedModel):
                  pad_token_id=0,
                  bos_token_id=2,
                  eos_token_id=3,
-                 add_pooling_layer=True,
-        ):
+                 add_pooling_layer=True,):
         super(AlbertModel, self).__init__()
-
+        self.initializer_range = initializer_range
+        self.num_hidden_layers = num_hidden_layers
         self.embeddings = AlbertEmbeddings(
             vocab_size,
             embedding_size,
@@ -601,6 +581,7 @@ class AlbertModel(AlbertPretrainedModel):
             num_attention_heads,
             intermediate_size,
             inner_group_num,
+            hidden_act,
             hidden_dropout_prob,
             attention_probs_dropout_prob,
             max_position_embeddings,
@@ -622,8 +603,30 @@ class AlbertModel(AlbertPretrainedModel):
     def set_input_embeddings(self, value):
         self.embeddings.word_embeddings = value
 
+    # todo
     def _prune_heads(self, heads_to_prune):
         pass
+
+    def _convert_head_mask_to_5d(self, head_mask, num_hidden_layers):
+        """-> [num_hidden_layers x batch x num_heads x seq_length x seq_length]"""
+        if head_mask.dim() == 1:
+            head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+            head_mask = head_mask.expand(num_hidden_layers, -1, -1, -1, -1)
+        elif head_mask.dim() == 2:
+            head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)  # We can specify head_mask for each layer
+        assert head_mask.dim() == 5, f"head_mask.dim != 5, instead {head_mask.dim()}"
+        head_mask = paddle.cast(head_mask, dtype=dtype_float)
+        return head_mask
+
+    def get_head_mask(self, head_mask, num_hidden_layers, is_attention_chunked=False):
+        if head_mask is not None:
+            head_mask = self._convert_head_mask_to_5d(head_mask, num_hidden_layers)
+            if is_attention_chunked is True:
+                head_mask = head_mask.unsqueeze(-1)
+        else:
+            head_mask = [None] * num_hidden_layers
+
+        return head_mask
 
     def forward(
             self,
@@ -645,8 +648,6 @@ class AlbertModel(AlbertPretrainedModel):
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        device = input_ids.place if input_ids is not None else inputs_embeds.place
-
         if attention_mask is None:
             attention_mask = paddle.ones(shape=input_shape)
         if token_type_ids is None:
@@ -655,14 +656,12 @@ class AlbertModel(AlbertPretrainedModel):
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
         extended_attention_mask = paddle.cast(extended_attention_mask, dtype=dtype_float)
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-        # todo: get head mask
-        # head_mask = self.get_head_mask(head_mask, num_hidden_layers)
-        head_mask = [None] * self.config["num_hidden_layers"]
+        head_mask = self.get_head_mask(head_mask, self.num_hidden_layers)
 
         embedding_output = self.embeddings(
             input_ids,
-            position_ids=position_ids,
             token_type_ids=token_type_ids,
+            position_ids=position_ids,
             inputs_embeds=inputs_embeds,
         )
 
@@ -710,7 +709,7 @@ class AlbertForPretraining(AlbertPretrainedModel):
                 sentence_order_label=None,
                 output_attentions=False,
                 output_hidden_states=False,
-    ):
+                ):
         outputs = self.albert(
             input_ids,
             attention_mask=attention_mask,
@@ -908,6 +907,7 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
 
 class AlbertForQuestionAnswering(AlbertPretrainedModel):
     def __init__(self, albert, num_labels):
+        super(AlbertForQuestionAnswering, self).__init__()
         self.num_labels = num_labels
         self.transformer = albert
 
@@ -947,7 +947,8 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
 
 
 class AlbertForMultipleChoice(AlbertPretrainedModel):
-    def __init__(self, albert, num_labels):
+    def __init__(self, albert):
+        super(AlbertForMultipleChoice, self).__init__()
         self.transformer = albert
         self.dropout = nn.Dropout(self.transformer.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.transformer.config["hidden_size"], 1)
