@@ -212,7 +212,8 @@ class CrossEntropyCriterion(nn.Layer):
         Args:
             predict (Tensor):
                 The predict results of `TransformerModel` with shape
-                `[batch_size, sequence_length, vocab_size]`.
+                `[batch_size, sequence_length, vocab_size]` whose data type can
+                be float32 or float64.
             label (Tensor):
                 The label for correspoding results with shape
                 `[batch_size, sequence_length, 1]`.
@@ -337,7 +338,8 @@ class TransformerDecodeCell(nn.Layer):
                 have 0 values.
             memory (Tensor):
                 The output of Transformer encoder. It is a tensor with shape
-                `[batch_size, source_length, d_model]`.
+                `[batch_size, source_length, d_model]` and its data type can be
+                float32 or float64.
 
         Returns:
             tuple: 
@@ -612,9 +614,13 @@ class TransformerModel(nn.Layer):
 
         Args:
             src_word (Tensor):
-                The ids of source sequences words.
+                The ids of source sequences words. It is a tensor with shape
+                `[batch_size, source_sequence_length]` and its data type can be
+                int or int64.
             trg_word (Tensor):
-                The ids of target sequences words. 
+                The ids of target sequences words. It is a tensor with shape
+                `[batch_size, target_sequence_length]` and its data type can be
+                int or int64.
 
         Returns:
             Tensor:
