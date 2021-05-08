@@ -43,6 +43,14 @@ More information about PaddlePaddle installation please refer to [PaddlePaddle I
 pip install --upgrade paddlenlp -i https://pypi.org/simple
 ```
 
+### Install from Source
+
+```
+pip install --upgrade git+https://github.com/PaddlePaddle/PaddleNLP.git
+
+pip install --upgrade git+https://gitee.com/PaddlePaddle/PaddleNLP.git
+```
+
 ## Quick Start
 
 ### Quick Dataset Loading

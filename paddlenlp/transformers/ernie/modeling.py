@@ -177,6 +177,8 @@ class ErniePretrainedModel(PretrainedModel):
                         if hasattr(self, "initializer_range") else
                         self.ernie.config["initializer_range"],
                         shape=layer.weight.shape))
+        elif isinstance(layer, nn.LayerNorm):
+            layer._epsilon = 1e-5
 
 
 @register_base_model

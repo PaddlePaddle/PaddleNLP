@@ -24,10 +24,16 @@ import yaml
 import paddle
 import pgl
 from easydict import EasyDict as edict
+from paddlenlp.transformers import ErnieTokenizer, ErnieTinyTokenizer
 from paddlenlp.utils.log import logger
 
 from models import ErnieSageForLinkPrediction
 from data import TrainData, PredictData, GraphDataLoader, batch_fn
+
+MODEL_CLASSES = {
+    "ernie-tiny": (ErnieSageForLinkPrediction, ErnieTinyTokenizer),
+    "ernie-1.0": (ErnieSageForLinkPrediction, ErnieTokenizer),
+}
 
 
 def set_seed(config):
@@ -58,7 +64,12 @@ def do_train(config):
 
     mode = 'train'
     train_ds = TrainData(config.graph_work_path)
-    model = ErnieSageForLinkPrediction.from_pretrained(
+
+    model_class, tokenizer_class = MODEL_CLASSES[config.model_name_or_path]
+    tokenizer = tokenizer_class.from_pretrained(config.model_name_or_path)
+    config.cls_token_id = tokenizer.cls_token_id
+
+    model = model_class.from_pretrained(
         config.model_name_or_path, config=config)
     model = paddle.DataParallel(model)
 
@@ -124,8 +135,11 @@ def do_predict(config):
         base_graph=base_graph,
         term_ids=term_ids)
 
-    model = ErnieSageForLinkPrediction.from_pretrained(
-        config.infer_model, config=config)
+    model_class, tokenizer_class = MODEL_CLASSES[config.model_name_or_path]
+    tokenizer = tokenizer_class.from_pretrained(config.model_name_or_path)
+    config.cls_token_id = tokenizer.cls_token_id
+
+    model = model_class.from_pretrained(config.infer_model, config=config)
 
     model = paddle.DataParallel(model)
     predict_ds = PredictData(num_nodes)

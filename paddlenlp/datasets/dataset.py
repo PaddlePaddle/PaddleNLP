@@ -19,6 +19,7 @@ import os
 import warnings
 import sys
 import inspect
+from multiprocess import Pool, RLock
 
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset
@@ -35,7 +36,8 @@ DATASETS_MODULE_PATH = "paddlenlp.datasets."
 
 
 def import_main_class(module_path):
-    """Import a module at module_path and return its main class.
+    """
+    Import a module at module_path and return its DatasetBuilder class.
 
     """
     module_path = DATASETS_MODULE_PATH + module_path
@@ -60,6 +62,36 @@ def load_dataset(path_or_read_func,
                  splits=None,
                  lazy=None,
                  **kwargs):
+    """
+    This method will load a dataset, either form PaddleNLP library or from a 
+    self-defined data loading script, by calling functions in `DatasetBuilder`.
+
+    For all the names of datasets in PaddleNLP library, see here:  `dataset_list 
+    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html>`__.
+
+    Args:
+        path_or_read_func (str|callable): Name of the dataset processing script 
+            in PaddleNLP library or a custom data reading function.
+        name (str, optional): Additional name to select a more specific dataset.
+            Default to None.
+        data_files (str|list|tuple|dict, optional): Defineing the path of dataset 
+            files. Default to None.
+        splits (str|list|tuple, optional): Which split of the data to load.
+            Default to None.
+        lazy (bool, optional): Wheather to return `MapDataset` or an `IterDataset`.
+            True for `IterDataset`. False for `MapDataset`. If None, return the 
+            default type of this dataset.
+        kwargs (dict): Other keyword arguments to be passed to the `DatasetBuilder`.
+
+    Returns:
+        A `MapDataset` or `IterDataset` or a tuple of those.
+
+    For how to use this function, please see `dataset_load 
+    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html>`__
+    and `dataset_self_defined 
+    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html>`__
+
+    """
     if inspect.isfunction(path_or_read_func):
         assert lazy is not None, "lazy can not be None in custom mode."
         kwargs['name'] = name
@@ -74,10 +106,35 @@ def load_dataset(path_or_read_func,
         return reader_instance.read(**custom_kwargs)
     else:
         reader_cls = import_main_class(path_or_read_func)
-        if not name:
-            reader_instance = reader_cls(lazy=lazy, **kwargs)
+        reader_instance = reader_cls(lazy=lazy, name=name, **kwargs)
+
+        # Check if selected name and split is valid in this DatasetBuilder
+        if hasattr(reader_instance, 'BUILDER_CONFIGS'):
+            if name in reader_cls.BUILDER_CONFIGS.keys():
+                split_names = reader_cls.BUILDER_CONFIGS[name]['splits'].keys()
+            else:
+                raise ValueError(
+                    'Invalid name "{}". Should be one of {}.'.format(
+                        name, list(reader_cls.BUILDER_CONFIGS.keys())))
+        elif hasattr(reader_instance, 'SPLITS'):
+            split_names = reader_instance.SPLITS.keys()
         else:
-            reader_instance = reader_cls(lazy=lazy, name=name, **kwargs)
+            raise AttributeError(
+                "Either 'SPLITS' or 'BUILDER_CONFIGS' must be implemented for DatasetBuilder."
+            )
+
+        selected_splits = []
+        selected_splits += data_files.keys() if isinstance(
+            data_files, dict) else selected_splits
+        if isinstance(splits, list) or isinstance(splits, tuple):
+            selected_splits.extend(splits)
+        else:
+            selected_splits += [splits]
+
+        for split_name in selected_splits:
+            if split_name not in split_names and split_name != None:
+                raise ValueError('Invalid split "{}". Should be one of {}.'.
+                                 format(split_name, list(split_names)))
 
         datasets = reader_instance.read_datasets(
             data_files=data_files, splits=splits)
@@ -86,12 +143,18 @@ def load_dataset(path_or_read_func,
 
 class MapDataset(Dataset):
     """
-    Wraps a dataset-like object as a instance of Dataset, and equips it with
-    `map` and other utility methods. All non-magic methods of the raw object
-    also accessible.
+    Wraps a map-style dataset-like object as an instance of `MapDataset`, and equips it 
+    with `map` and other utility methods. All non-magic methods of the raw object
+    are also accessible.
+
     Args:
-        data (list|Dataset): A dataset-like object. It can be a list or a
-            subclass of Dataset.
+        data (list|Dataset): An object with `__getitem__` and `__len__` methods. It could 
+            be a list or a subclass of `paddle.io.Dataset`.
+        kwargs (dict, optional): Other information to be passed to the dataset. 
+
+    For examples of this class, please see `dataset_self_defined 
+    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html>`__.
+
     """
 
     def __init__(self, data, **kwargs):
@@ -108,68 +171,154 @@ class MapDataset(Dataset):
         return data
 
     def __getitem__(self, idx):
+        """
+        Basic function of `MapDataset` to get sample from dataset with a given 
+        index.
+        """
         return self._transform(self.new_data[
             idx]) if self._transform_pipline else self.new_data[idx]
 
     def __len__(self):
+        """
+        Returns the number of samples in dataset.
+        """
         return len(self.new_data)
 
-    def filter(self, fn):
+    def filter(self, fn, num_workers=0):
         """
         Filters samples by the filter function and uses the filtered data to
         update this dataset.
+
         Args:
             fn (callable): A filter function that takes a sample as input and
-                returns a boolean. Samples that return False are discarded.
+                returns a boolean. Samples that return False would be discarded.
+            num_workers(int, optional): Number of processes for multiprocessing. If 
+                set to 0, it doesn't use multiprocessing. Defalt: 0.
         """
+        assert num_workers >= 0, "num_workers should be a non-negative value"
+        if num_workers > 0:
+            with Pool(num_workers, initargs=(RLock(), )) as pool:
 
+                def filter_shard(num_workers, index, fn):
+                    self.shard(
+                        num_shards=num_workers, index=index, contiguous=True)
+                    self._filter(fn=fn)
+                    return self
+
+                kwds_per_shard = [
+                    dict(
+                        num_workers=num_workers, index=rank, fn=fn)
+                    for rank in range(num_workers)
+                ]
+                results = [
+                    pool.apply_async(
+                        filter_shard, kwds=kwds) for kwds in kwds_per_shard
+                ]
+                transformed_shards = [r.get() for r in results]
+
+                self.new_data = []
+                for i in range(num_workers):
+                    self.new_data += transformed_shards[i].new_data
+            return self
+        else:
+            return self._filter(fn)
+
+    def _filter(self, fn):
         self.new_data = [
             self.new_data[idx] for idx in range(len(self.new_data))
             if fn(self.new_data[idx])
         ]
         return self
 
-    def shard(self, num_shards=None, index=None):
+    def shard(self, num_shards=None, index=None, contiguous=False):
         """
-        Use samples whose indices mod `index` equals 0 to update this dataset.
+        Split the dataset into `num_shards` pieces. Note that the size of each
+        shard might be different because the original dataset may not be evenly
+        divisible.
+
         Args:
-            num_shards (int, optional): A integer representing the number of
+            num_shards (int, optional): An integer representing the number of
                 data shards. If None, `num_shards` would be number of trainers.
                 Default: None
-            index (int, optional): A integer representing the index of the
-                current shard. If None, index` would be the current trainer rank
+            index (int, optional): An integer representing the index of the
+                current shard. If None, `index` would be the current trainer rank
                 id. Default: None.
+            contiguous: (bool, optional): If true, contiguous chunks of data 
+                will be select for sharding. And total number of examples will 
+                be the same. Otherwise each shard will contain all examples of 
+                dataset whose index mod `num_shards` = `index`. Default: False.
         """
         if num_shards is None:
             num_shards = dist.get_world_size()
         if index is None:
             index = dist.get_rank()
 
-        num_samples = int(math.ceil(len(self.new_data) * 1.0 / num_shards))
-        # add extra samples to make it evenly divisible
-        self.new_data = [
-            self.new_data[idx] for idx in range(len(self.new_data))
-            if idx % num_shards == index
-        ]
-        if len(self.new_data) < num_samples:
-            self.new_data.append(self.new_data[index + 1 - num_shards])
+        if contiguous:
+            div = len(self) // num_shards
+            mod = len(self) % num_shards
+            start = div * index + min(index, mod)
+            end = start + div + (1 if index < mod else 0)
+            self.new_data = self.new_data[start:end]
+        else:
+            num_samples = int(math.ceil(len(self.new_data) * 1.0 / num_shards))
+            self.new_data = [
+                self.new_data[idx] for idx in range(len(self.new_data))
+                if idx % num_shards == index
+            ]
 
         return self
 
-    def map(self, fn, lazy=True, batched=False):
+    def map(self, fn, lazy=True, batched=False, num_workers=0):
         """
         Performs specific function on the dataset to transform and update every sample.
+
         Args:
             fn (callable): Transformations to be performed. It receives single
                 sample as argument if batched is False. Else it receives all examples.
             lazy (bool, optional): If True, transformations would be delayed and
-                performed on demand. Otherwise, transforms all samples at once. Note that if `fn` is
-                stochastic, `lazy` should be True or you will get the same
+                performed on demand. Otherwise, transforms all samples at once. Note that 
+                if `fn` is stochastic, `lazy` should be True or you will get the same
                 result on all epochs. Defalt: False.
-            batched(bool, optional): If True, transformations would take all examples as input and 
-                return a collection of transformed examples. Note that if set True, `lazy` option 
-                would be ignored. 
+            batched(bool, optional): If True, transformations would take all examples as 
+                input and return a collection of transformed examples. Note that if set 
+                True, `lazy` option would be ignored. Defalt: False.
+            num_workers(int, optional): Number of processes for multiprocessing. If 
+                set to 0, it doesn't use multiprocessing. Note that if set to positive
+                value, `lazy` option would be ignored. Defalt: 0.
         """
+
+        assert num_workers >= 0, "num_workers should be a non-negative value"
+        if num_workers > 0:
+            with Pool(num_workers, initargs=(RLock(), )) as pool:
+
+                def map_shard(num_workers, index, fn, batched):
+                    self.shard(
+                        num_shards=num_workers, index=index, contiguous=True)
+                    self._map(fn=fn, lazy=False, batched=batched)
+                    return self
+
+                kwds_per_shard = [
+                    dict(
+                        num_workers=num_workers,
+                        index=rank,
+                        fn=fn,
+                        batched=batched) for rank in range(num_workers)
+                ]
+                results = [
+                    pool.apply_async(
+                        map_shard, kwds=kwds) for kwds in kwds_per_shard
+                ]
+                transformed_shards = [r.get() for r in results]
+
+                self.new_data = []
+                for i in range(num_workers):
+                    self.new_data += transformed_shards[i].new_data
+
+            return self
+        else:
+            return self._map(fn, lazy=lazy, batched=batched)
+
+    def _map(self, fn, lazy=True, batched=False):
         if batched:
             self.new_data = fn(self.new_data)
         elif lazy:
@@ -178,21 +327,22 @@ class MapDataset(Dataset):
             self.new_data = [
                 fn(self.new_data[idx]) for idx in range(len(self.new_data))
             ]
-
         return self
-
-    def __getattr__(self, name):
-        return getattr(self.data, name)
 
 
 class IterDataset(IterableDataset):
     """
-    Wraps a dataset-like object as a instance of Dataset, and equips it with
+    Wraps a dataset-like object as an instance of `IterDataset`, and equips it with
     `map` and other utility methods. All non-magic methods of the raw object
     also accessible.
+
     Args:
-        data (Iterable): A dataset-like object. It can be a Iterable or a
-            subclass of Dataset.
+        data (Iterable): An object with `__iter__` function. It can be a Iterable or a
+            subclass of `paddle.io.IterableDataset`.
+        kwargs (dict, optional): Other information to be passed to the dataset. 
+
+    For examples of this class, please see `dataset_self_defined 
+    <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html>`__.
     """
 
     def __init__(self, data, **kwargs):
@@ -218,6 +368,9 @@ class IterDataset(IterableDataset):
         return True
 
     def __iter__(self):
+        """
+        yields sample sequentially.
+        """
         num_samples = 0
         if inspect.isfunction(self.data):
             for example in self.data():
@@ -244,6 +397,7 @@ class IterDataset(IterableDataset):
         """
         Filters samples by the filter function and uses the filtered data to
         update this dataset.
+
         Args:
             fn (callable): A filter function that takes a sample as input and
                 returns a boolean. Samples that return False are discarded.
@@ -255,13 +409,14 @@ class IterDataset(IterableDataset):
 
     def shard(self, num_shards=None, index=None):
         """
-        Use samples whose indices mod `index` equals 0 to update this dataset.
+        Split the dataset into `num_shards` pieces.
+
         Args:
-            num_shards (int, optional): A integer representing the number of
+            num_shards (int, optional): An integer representing the number of
                 data shards. If None, `num_shards` would be number of trainers.
                 Default: None
-            index (int, optional): A integer representing the index of the
-                current shard. If None, index` would be the current trainer rank
+            index (int, optional): An integer representing the index of the
+                current shard. If None, `index` would be the current trainer rank
                 id. Default: None.
         """
         if num_shards is None:
@@ -282,6 +437,7 @@ class IterDataset(IterableDataset):
     def map(self, fn):
         """
         Performs specific function on the dataset to transform and update every sample.
+
         Args:
             fn (callable): Transformations to be performed. It receives single
                 sample as argument.
@@ -291,9 +447,6 @@ class IterDataset(IterableDataset):
 
         return self
 
-    def __getattr__(self, name):
-        return getattr(self.data, name)
-
 
 class DatasetBuilder:
     """
@@ -302,6 +455,9 @@ class DatasetBuilder:
 
     `_get_data()` function and `_read()` function should be implemented to download
     data file and read data file into a `Iterable` of the examples.
+
+    For how to define a custom `DatasetBuilder`, please see `contribute_dataset 
+    <https://paddlenlp.readthedocs.io/zh/latest/community/contribute_dataset.html>`__.
     """
     lazy = False
 
@@ -320,7 +476,7 @@ class DatasetBuilder:
                 data_files, dict
             ) or isinstance(data_files, tuple) or isinstance(
                 data_files, list
-            ), "`data_files` should be a string or tuple or list or a dictionary whose key is split name ande value is a path of data file."
+            ), "`data_files` should be a string or tuple or list or a dictionary whose key is split name and value is the path of data file."
             if isinstance(data_files, str):
                 split = 'train'
                 datasets.append(self.read(filename=data_files, split=split))
@@ -356,13 +512,24 @@ class DatasetBuilder:
 
     def read(self, filename, split='train'):
         """
-        Returns an dataset containing all the examples that can be read from the file path.
-        If `self.lazy` is `False`, this eagerly reads all instances from `self._read()`
-        and returns an `MapDataset`.
-        If `self.lazy` is `True`, this returns an `IterDataset`, which internally
+        Returns a dataset containing all the examples that can be read from the file path.
+
+        If `self.lazy` is False, this eagerly reads all instances from `self._read()`
+        and returns a `MapDataset`.
+
+        If `self.lazy` is True, this returns an `IterDataset`, which internally
         relies on the generator created from `self._read()` to lazily produce examples.
         In this case your implementation of `_read()` must also be lazy
         (that is, not load all examples into memory at once).
+
+        Args:
+            filename (str): Path of data file to read, usually provided by `_get_data` 
+                function.
+            split (str, optional): The split name of selected dataset. This only makes
+                a different when data files of different splits have different structures.
+        
+        Returns:
+            A `MapDataset|IterDataset`.
         """
 
         label_list = self.get_labels()
@@ -451,25 +618,30 @@ class DatasetBuilder:
     def _read(self, filename: str, *args):
         """
         Reads examples from the given file_path and returns them as an
-        `Iterable` (which could be a list or could be a generator).
+        `Iterable` (which could be a list or a generator).
+
+        This method must be implemented in self-defined `DatasetBuilder`.
         """
         raise NotImplementedError
 
     def _get_data(self, mode: str):
         """
-        Download examples from the given URL and customized split informations and returns a filepath.
+        Downloads examples from the given URL and customized split 
+        informations and returns a filepath.
+
+        This method must be implemented in self-defined `DatasetBuilder`.
         """
         raise NotImplementedError
 
     def get_labels(self):
         """
-        Return list of class labels of the dataset if specified.
+        Returns list of class labels of the dataset if specified.
         """
         return None
 
     def get_vocab(self):
         """
-        Return vocab file path of the dataset if specified.
+        Returns vocab file path of the dataset if specified.
         """
         return None
 
