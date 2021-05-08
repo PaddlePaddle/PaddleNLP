@@ -26,8 +26,8 @@ def position_encoding_init(n_position, d_pos_vec, dtype="float32"):
             of source or target sequences.
         d_pos_vec (int): 
             The size of positional embedding vector. 
-        dtype (str): 
-            The output `numpy.array`'s data type. 
+        dtype (str, optional): 
+            The output `numpy.array`'s data type. Defaults to "float32".
 
     Returns：
         `numpy.array`: 
@@ -62,33 +62,35 @@ class WordEmbedding(nn.Layer):
     """
     Word Embedding layer of Transformer. 
 
-    This layer is used to construct a callable object of the Embedding class for Word
-    Embedding in Transformer. This layer lookups embeddings vector of ids provided
-    by input `word`. It automatically constructs a 2D embedding matrix based on the
+    This layer automatically constructs a 2D embedding matrix based on the
     input the size of vocabulary (`vocab_size`) and the size of each embedding
-    vector (`emb_dim`).
+    vector (`emb_dim`). This layer lookups embeddings vector of ids provided
+    by input `word`. 
 
     After the embedding, those weights are multiplied by `sqrt(d_model)` which is
     `sqrt(emb_dim)` in the interface. 
 
     .. math::
+
         Out = embedding(word) * sqrt(emb_dim)
 
     Args:
         vocab_size (int):
             The size of vocabulary. 
         emb_dim (int):
-            The size of each embedding vector.
+            Dimensionality of each embedding vector.
+        bos_id (int, optional):
+            The start token id and also is used as padding id. Defaults to 0.
     """
 
-    def __init__(self, vocab_size, emb_dim, bos_idx=0):
+    def __init__(self, vocab_size, emb_dim, bos_id=0):
         super(WordEmbedding, self).__init__()
         self.emb_dim = emb_dim
 
         self.word_embedding = nn.Embedding(
             num_embeddings=vocab_size,
             embedding_dim=emb_dim,
-            padding_idx=bos_idx,
+            padding_idx=bos_id,
             weight_attr=paddle.ParamAttr(
                 initializer=nn.initializer.Normal(0., emb_dim**-0.5)))
 
@@ -97,13 +99,13 @@ class WordEmbedding(nn.Layer):
         Compute word embedding.
 
         Args:
-            word (`Tensor`):
+            word (Tensor):
                 The input ids which indicates the sequences' words with shape
                 `[batch_size, sequence_length]` whose data type can be
                 int or int64.
 
         Returns:
-            `Tensor`:
+            Tensor:
                 The (scaled) embedding tensor of shape
                 `(batch_size, sequence_length, emb_dim)` whose data type can be
                 float32 or float64.
@@ -117,7 +119,7 @@ class WordEmbedding(nn.Layer):
                 word_embedding = WordEmbedding(
                     vocab_size=30000,
                     emb_dim=512,
-                    bos_idx=0)
+                    bos_id=0)
 
                 batch_size = 5
                 sequence_length = 10
@@ -156,12 +158,12 @@ class PositionalEmbedding(nn.Layer):
         Computes positional embedding.
 
         Args:
-            pos (`Tensor`):
+            pos (Tensor):
                 The input position ids with shape `[batch_size, sequence_length]` whose
                 data type can be int or int64.
 
         Returns:
-            `Tensor`:
+            Tensor:
                 The positional embedding tensor of shape
                 `(batch_size, sequence_length, emb_dim)` whose data type can be
                 float32 or float64.
@@ -190,12 +192,12 @@ class CrossEntropyCriterion(nn.Layer):
     Computes the cross entropy loss for given input with or without label smoothing.
 
     Args:
-        label_smooth_eps (float):
+        label_smooth_eps (float, optional):
             The weight used to mix up the original ground-truth distribution
-            and the fixed distribution. Default is None. If given, label smoothing
+            and the fixed distribution. Defaults to None. If given, label smoothing
             will be applied on `label`.
         pad_idx (int, optional):
-            The token id used to pad variant sequence. Default is 0. 
+            The token id used to pad variant sequence. Defaults to 0. 
     """
 
     def __init__(self, label_smooth_eps=None, pad_idx=0):
@@ -208,10 +210,10 @@ class CrossEntropyCriterion(nn.Layer):
         Computes cross entropy loss with or without label smoothing. 
 
         Args:
-            predict (`Tensor`):
+            predict (Tensor):
                 The predict results of `TransformerModel` with shape
                 `[batch_size, sequence_length, vocab_size]`.
-            label (`Tensor`):
+            label (Tensor):
                 The label for correspoding results with shape
                 `[batch_size, sequence_length, 1]`.
 
@@ -221,16 +223,17 @@ class CrossEntropyCriterion(nn.Layer):
 
                 With the corresponding fields:
 
-                - `sum_cost` (`Tensor`):
+                - `sum_cost` (Tensor):
                     The sum of loss of current batch whose data type can be float32, float64.
-                - `avg_cost` (`Tensor`):
+                - `avg_cost` (Tensor):
                     The average loss of current batch whose data type can be float32, float64.
                     The relation between `sum_cost` and `avg_cost` can be described as:
 
                     .. math:
+
                         avg_cost = sum_cost / token_num
 
-                - `token_num` (`Tensor`):
+                - `token_num` (Tensor):
                     The number of tokens of current batch. 
 
         Example:
@@ -278,24 +281,24 @@ class TransformerDecodeCell(nn.Layer):
     layer and output layer to produce logits from ids and position.
 
     Args:
-        decoder (`callable`):
+        decoder (callable):
             Can be a `paddle.nn.TransformerDecoder` instance. Or a wrapper that includes an
             embedding layer accepting ids and positions and includes an
             output layer transforming decoder output to logits.
-        word_embedding (`callable`, optional):
+        word_embedding (callable, optional):
             Can be a `WordEmbedding` instance or a callable that accepts ids as
             arguments and return embeddings. It can be None if `decoder`
-            includes a embedding layer. Default is None.
-        pos_embedding (`callable`, optional):
+            includes a embedding layer. Defaults to None.
+        pos_embedding (callable, optional):
             Can be a `PositionalEmbedding` instance or a callable that accepts position
             as arguments and return embeddings. It can be None if `decoder`
-            includes a positional embedding layer. Default is None.
-        linear (`callable`, optional):
+            includes a positional embedding layer. Defaults to None.
+        linear (callable, optional):
             Can be a `paddle.nn.Linear` instance or a callable to transform decoder
             output to logits.
         dropout (float, optional):
             The dropout rate for the results of `word_embedding` and `pos_embedding`.
-            Default is 0.1.
+            Defaults to 0.1.
     """
 
     def __init__(self,
@@ -316,23 +319,23 @@ class TransformerDecodeCell(nn.Layer):
         Produces logits.
 
         Args:
-            inputs (`Tensor`|`tuple`|`list`):
+            inputs (Tensor|tuple|list):
                 A tuple/list includes target ids and positions. If `word_embedding` is None,
-                then it should be a `Tensor` which means the input for decoder.
-            states (`list`):
+                then it should be a Tensor which means the input for decoder.
+            states (list):
                 It is a list and each element of the list is an instance
                 of `paddle.nn.MultiheadAttention.Cache` for corresponding decoder
                 layer. It can be produced by `paddle.nn.TransformerDecoder.gen_cache`.
-            static_cache (`list`):
+            static_cache (list):
                 It is a list and each element of the list is an instance of
                 `paddle.nn.MultiheadAttention.StaticCache` for corresponding
                 decoder layer. It can be produced by `paddle.nn.TransformerDecoder.gen_cache`.
-            trg_src_attn_bias (`Tensor`):
+            trg_src_attn_bias (Tensor):
                 A tensor used in self attention to prevents attention to some unwanted
                 positions, usually the the subsequent positions
                 where the unwanted positions have `-inf` values and the others
                 have 0 values.
-            memory (`Tensor`):
+            memory (Tensor):
                 The output of Transformer encoder. It is a tensor with shape
                 `[batch_size, source_length, d_model]`.
 
@@ -342,10 +345,10 @@ class TransformerDecodeCell(nn.Layer):
                 
                 With the corresponding fields:
 
-                - `outputs` (`Tensor`):
+                - `outputs` (Tensor):
                     A float32 or float64 3D tensor representing logits shaped
                     `[batch_size, sequence_length, vocab_size]`.
-                - `new_states` (`Tensor`):
+                - `new_states` (Tensor):
                     This output has the same structure and data type with `states`
                     while the length is one larger since concatanating the
                     intermediate results of current step.
@@ -450,7 +453,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
     @staticmethod
     def tile_beam_merge_with_batch(t, beam_size):
         r"""
-        Tile the batch dimension of a tensor. Specifically, this function takes
+        Tiles the batch dimension of a tensor. Specifically, this function takes
         a tensor t shaped `[batch_size, s0, s1, ...]` composed of minibatch 
         entries `t[0], ..., t[batch_size - 1]` and tiles it to have a shape
         `[batch_size * beam_size, s0, s1, ...]` composed of minibatch entries
@@ -458,13 +461,13 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         `beam_size` times.
 
         Args:
-            t (`Tensor`):
+            t (Tensor):
                 A tensor with shape `[batch_size, ...]`.
             beam_size (int):
                 The beam width used in beam search.
 
         Returns:
-            `Tensor`:
+            Tensor:
                 A tensor with shape `[batch_size * beam_size, ...]`, whose
                 data type is same as `t`.
 
@@ -539,12 +542,12 @@ class TransformerModel(nn.Layer):
             Size of the hidden layer in position-wise feed-forward networks.
         dropout (float):
             Dropout rates. Used for pre-process, activation and inside attention.
-        weight_sharing (`bool`):
+        weight_sharing (bool):
             Whether to use weight sharing. 
         bos_id (int, optional):
-            The start token id and also be used as padding id. Default is 0.
+            The start token id and also be used as padding id. Defaults to 0.
         eos_id (int, optional):
-            The end token id. Default is 1.
+            The end token id. Defaults to 1.
     """
 
     def __init__(self,
@@ -567,7 +570,7 @@ class TransformerModel(nn.Layer):
         self.dropout = dropout
 
         self.src_word_embedding = WordEmbedding(
-            vocab_size=src_vocab_size, emb_dim=d_model, bos_idx=self.bos_id)
+            vocab_size=src_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
         self.src_pos_embedding = PositionalEmbedding(
             emb_dim=d_model, max_length=max_length)
         if weight_sharing:
@@ -578,7 +581,7 @@ class TransformerModel(nn.Layer):
             self.trg_pos_embedding = self.src_pos_embedding
         else:
             self.trg_word_embedding = WordEmbedding(
-                vocab_size=trg_vocab_size, emb_dim=d_model, bos_idx=self.bos_id)
+                vocab_size=trg_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
             self.trg_pos_embedding = PositionalEmbedding(
                 emb_dim=d_model, max_length=max_length)
 
@@ -608,13 +611,13 @@ class TransformerModel(nn.Layer):
         returns logits.
 
         Args:
-            src_word (`Tensor`):
+            src_word (Tensor):
                 The ids of source sequences words.
-            trg_word (`Tensor`):
+            trg_word (Tensor):
                 The ids of target sequences words. 
 
         Returns:
-            `Tensor`:
+            Tensor:
                 Output tensor of the final layer of the model whose data
                 type can be float32 or float64.
 
@@ -688,7 +691,7 @@ class TransformerModel(nn.Layer):
 
 class InferTransformerModel(TransformerModel):
     """
-    The Transformer model for inference auto-regression generation.
+    The Transformer model for auto-regressive generation.
 
     Args:
         src_vocab_size (int):
@@ -709,16 +712,16 @@ class InferTransformerModel(TransformerModel):
             Size of the hidden layer in position-wise feed-forward networks.
         dropout (float):
             Dropout rates. Used for pre-process, activation and inside attention.
-        weight_sharing (`bool`):
+        weight_sharing (bool):
             Whether to use weight sharing. 
         bos_id (int, optional):
-            The start token id and also is used as padding id. Default is 0.
+            The start token id and also is used as padding id. Defaults to 0.
         eos_id (int, optional):
-            The end token id. Default is 1.
+            The end token id. Defaults to 1.
         beam_size (int, optional):
-            The beam width for beam search. Default is 4. 
+            The beam width for beam search. Defaults to 4. 
         max_out_len (int, optional):
-            The maximum output length. Default is 256.
+            The maximum output length. Defaults to 256.
     """
 
     def __init__(self,
@@ -755,12 +758,12 @@ class InferTransformerModel(TransformerModel):
         The Transformer forward method.
 
         Args:
-            src_word (`Tensor`):
+            src_word (Tensor):
                 The ids of source sequence words. 
         
         Returns:
-            `Tensor`:
-                An int64 tensor shaped `[time_step, batch_size, beam_size]` indicated
+            Tensor:
+                An int64 tensor shaped `[time_step, batch_size, beam_size]` indicating
                 the predict ids.
         
         Example:
