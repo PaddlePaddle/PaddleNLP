@@ -36,6 +36,7 @@ def position_encoding_init(n_position, d_pos_vec, dtype="float32"):
 
     Example:
         .. code-block::
+
             from paddlenlp.transformers import position_encoding_init
 
             max_length = 256
@@ -109,6 +110,7 @@ class WordEmbedding(nn.Layer):
 
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import WordEmbedding
 
@@ -166,6 +168,7 @@ class PositionalEmbedding(nn.Layer):
         
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import PositionalEmbedding
 
@@ -232,6 +235,7 @@ class CrossEntropyCriterion(nn.Layer):
 
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import CrossEntropyCriterion
 
@@ -348,6 +352,7 @@ class TransformerDecodeCell(nn.Layer):
 
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import TransformerDecodeCell
                 from paddlenlp.transformers import TransformerBeamSearchDecoder
@@ -465,6 +470,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
 
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import TransformerBeamSearchDecoder
 
@@ -614,6 +620,7 @@ class TransformerModel(nn.Layer):
 
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import TransformerModel
 
@@ -758,6 +765,7 @@ class InferTransformerModel(TransformerModel):
         
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import InferTransformerModel
 
