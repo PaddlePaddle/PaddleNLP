@@ -14,7 +14,7 @@
 
 from functools import partial
 from paddle.io import DataLoader
-from paddlenlp.data import Vocab
+from paddlenlp.data import Vocab, Pad
 from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.datasets import load_dataset
 
@@ -169,20 +169,10 @@ def prepare_train_input(insts, pad_idx):
     """
     Put all padded data needed by training into a list.
     """
-    src_max_len = max([len(inst[0]) for inst in insts])
-    trg_max_len = max([len(inst[1]) for inst in insts]) - 1
-    src_word = [
-        inst[0] + [pad_idx] * (src_max_len - len(inst[0])) for inst in insts
-    ]
-    trg_word = [
-        inst[1][:-1] + [pad_idx] * (trg_max_len - len(inst[1][:-1]))
-        for inst in insts
-    ]
-    lbl_word = [
-        inst[1][1:] + [pad_idx] * (trg_max_len - len(inst[1][1:]))
-        for inst in insts
-    ]
-
+    word_pad = Pad(pad_idx)
+    src_word = word_pad([inst[0] for inst in insts])
+    trg_word = word_pad(inst[1][:-1] for inst in insts)
+    lbl_word = word_pad([inst[1][1:] for inst in insts])
     data_inputs = [src_word, trg_word, lbl_word]
 
     return data_inputs
@@ -192,14 +182,10 @@ def prepare_infer_input(insts, pad_idx):
     """
     Put all padded data needed by beam search decoder into a list.
     """
-    src_max_len = max([len(inst[0]) for inst in insts])
-    src_word = [
-        inst[0] + [pad_idx] * (src_max_len - len(inst[0])) for inst in insts
-    ]
+    word_pad = Pad(pad_idx)
+    src_word = word_pad(inst[0] for inst in insts)
 
-    trg_word = [inst[1] for inst in insts]
-
-    return [src_word, trg_word]
+    return [src_word, ]
 
 
 class SortType(object):
