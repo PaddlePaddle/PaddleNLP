@@ -17,7 +17,6 @@
 import os
 import unicodedata
 from shutil import copyfile
-from typing import List, Optional
 
 from paddle.utils import try_import
 from .. import PretrainedTokenizer
@@ -31,16 +30,61 @@ class AlbertTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "spiece.model"}
     pretrained_resource_files_map = {
         "vocab_file": {
+            "albert-base-v1":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v1-spiece.model",
+            "albert-large-v1":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v1-spiece.model",
+            "albert-xlarge-v1":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v1-spiece.model",
+            "albert-xxlarge-v1":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v1-spiece.model",
             "albert-base-v2":
-            "./spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v2-spiece.model",
+            "albert-large-v2":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v2-spiece.model",
+            "albert-xlarge-v2":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v2-spiece.model",
+            "albert-xxlarge-v2":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v2-spiece.model",
         }
     }
     pretrained_init_configuration = {
+        "albert-base-v1": {
+            "do_lower_case": False
+        },
+        "albert-large-v1": {
+            "do_lower_case": False
+        },
+        "albert-xlarge-v1": {
+            "do_lower_case": False
+        },
+        "albert-xxlarge-v1": {
+            "do_lower_case": False
+        },
         "albert-base-v2": {
             "do_lower_case": False
         },
+        "albert-large-v2": {
+            "do_lower_case": False
+        },
+        "albert-xlarge-v2": {
+            "do_lower_case": False
+        },
+        "albert-xxlarge-v2": {
+            "do_lower_case": False
+        },
     }
-    pretrained_positional_embedding_sizes = {}
+    pretrained_positional_embedding_sizes = {
+        "albert-base-v1": None,
+        "albert-large-v1": None,
+        "albert-xlarge-v1": None,
+        "albert-xxlarge-v1": None,
+        "albert-base-v2": None,
+        "albert-large-v2": None,
+        "albert-xlarge-v2": None,
+        "albert-xxlarge-v2": None,
+    }
+
     max_model_input_sizes = pretrained_positional_embedding_sizes
 
     def __init__(
