@@ -21,12 +21,12 @@ def position_encoding_init(n_position, d_pos_vec, dtype="float32"):
     different from the description in "Attention Is All You Need".
 
     Args:
-        n_position (`int`): 
+        n_position (int): 
             The largest position for sequences, that is, the maximum length
             of source or target sequences.
-        d_pos_vec (`int`): 
+        d_pos_vec (int): 
             The size of positional embedding vector. 
-        dtype (`str`): 
+        dtype (str): 
             The output `numpy.array`'s data type. 
 
     Returns：
@@ -75,9 +75,9 @@ class WordEmbedding(nn.Layer):
         Out = embedding(word) * sqrt(emb_dim)
 
     Args:
-        vocab_size (`int`):
+        vocab_size (int):
             The size of vocabulary. 
-        emb_dim (`int`):
+        emb_dim (int):
             The size of each embedding vector.
     """
 
@@ -100,13 +100,13 @@ class WordEmbedding(nn.Layer):
             word (`Tensor`):
                 The input ids which indicates the sequences' words with shape
                 `[batch_size, sequence_length]` whose data type can be
-                `int` or `int64`.
+                int or int64.
 
         Returns:
             `Tensor`:
                 The (scaled) embedding tensor of shape
                 `(batch_size, sequence_length, emb_dim)` whose data type can be
-                `float32` or `float64`.
+                float32 or float64.
 
         Example:
             .. code-block::
@@ -134,9 +134,9 @@ class PositionalEmbedding(nn.Layer):
     lookups embeddings vector of ids provided by input `pos`.
 
     Args:
-        emb_dim (`int`):
+        emb_dim (int):
             The size of each embedding vector.
-        max_length (`int`):
+        max_length (int):
             The maximum length of sequences.
     """
 
@@ -158,13 +158,13 @@ class PositionalEmbedding(nn.Layer):
         Args:
             pos (`Tensor`):
                 The input position ids with shape `[batch_size, sequence_length]` whose
-                data type can be `int` or `int64`.
+                data type can be int or int64.
 
         Returns:
             `Tensor`:
                 The positional embedding tensor of shape
                 `(batch_size, sequence_length, emb_dim)` whose data type can be
-                `float32` or `float64`.
+                float32 or float64.
         
         Example:
             .. code-block::
@@ -190,11 +190,11 @@ class CrossEntropyCriterion(nn.Layer):
     Computes the cross entropy loss for given input with or without label smoothing.
 
     Args:
-        label_smooth_eps (`float`):
+        label_smooth_eps (float):
             The weight used to mix up the original ground-truth distribution
             and the fixed distribution. Default is None. If given, label smoothing
             will be applied on `label`.
-        pad_idx (`int`, optional):
+        pad_idx (int, optional):
             The token id used to pad variant sequence. Default is 0. 
     """
 
@@ -222,9 +222,9 @@ class CrossEntropyCriterion(nn.Layer):
                 With the corresponding fields:
 
                 - `sum_cost` (`Tensor`):
-                    The sum of loss of current batch whose data type can be `float32`, `float64`.
+                    The sum of loss of current batch whose data type can be float32, float64.
                 - `avg_cost` (`Tensor`):
-                    The average loss of current batch whose data type can be `float32`, `float64`.
+                    The average loss of current batch whose data type can be float32, float64.
                     The relation between `sum_cost` and `avg_cost` can be described as:
 
                     .. math:
@@ -293,7 +293,7 @@ class TransformerDecodeCell(nn.Layer):
         linear (`callable`, optional):
             Can be a `paddle.nn.Linear` instance or a callable to transform decoder
             output to logits.
-        dropout (`float`, optional):
+        dropout (float, optional):
             The dropout rate for the results of `word_embedding` and `pos_embedding`.
             Default is 0.1.
     """
@@ -404,13 +404,13 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
     Args:
         cell (`TransformerDecodeCell`):
             An instance of `TransformerDecoderCell`.
-        start_token (`int`):
+        start_token (int):
             The start token id.
-        end_token (`int`):
+        end_token (int):
             The end token id.
-        beam_size (`int`):
+        beam_size (int):
             The beam width used in beam search.
-        var_dim_in_state (`int`):
+        var_dim_in_state (int):
             Indicate which dimension of states is variant.
     """
 
@@ -460,7 +460,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         Args:
             t (`Tensor`):
                 A tensor with shape `[batch_size, ...]`.
-            beam_size (`int`):
+            beam_size (int):
                 The beam width used in beam search.
 
         Returns:
@@ -521,29 +521,29 @@ class TransformerModel(nn.Layer):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        src_vocab_size (`int`):
+        src_vocab_size (int):
             The size of source vocabulary.
-        trg_vocab_size (`int`):
+        trg_vocab_size (int):
             The size of target vocabulary.
-        max_length (`int`):
+        max_length (int):
             The maximum length of input sequences.
-        n_layer (`int`):
+        n_layer (int):
             The number of sub-layers to be stacked in the encoder and decoder.
-        n_head (`int`):
+        n_head (int):
             The number of head used in multi-head attention.
-        d_model (`int`):
+        d_model (int):
             The dimension for word embeddings, which is also the last dimension of
             the input and output of multi-head attention, position-wise feed-forward
             networks, encoder and decoder.
-        d_inner_hid (`int`):
+        d_inner_hid (int):
             Size of the hidden layer in position-wise feed-forward networks.
-        dropout (`float`):
+        dropout (float):
             Dropout rates. Used for pre-process, activation and inside attention.
         weight_sharing (`bool`):
             Whether to use weight sharing. 
-        bos_id (`int`, optional):
+        bos_id (int, optional):
             The start token id and also be used as padding id. Default is 0.
-        eos_id (`int`, optional):
+        eos_id (int, optional):
             The end token id. Default is 1.
     """
 
@@ -691,33 +691,33 @@ class InferTransformerModel(TransformerModel):
     The Transformer model for inference auto-regression generation.
 
     Args:
-        src_vocab_size (`int`):
+        src_vocab_size (int):
             The size of source vocabulary.
-        trg_vocab_size (`int`):
+        trg_vocab_size (int):
             The size of target vocabulary.
-        max_length (`int`):
+        max_length (int):
             The maximum length of input sequences.
-        n_layer (`int`):
+        n_layer (int):
             The number of sub-layers to be stacked in the encoder and decoder.
-        n_head (`int`):
+        n_head (int):
             The number of head used in multi-head attention.
-        d_model (`int`):
+        d_model (int):
             The dimension for word embeddings, which is also the last dimension of
             the input and output of multi-head attention, position-wise feed-forward
             networks, encoder and decoder.
-        d_inner_hid (`int`):
+        d_inner_hid (int):
             Size of the hidden layer in position-wise feed-forward networks.
-        dropout (`float`):
+        dropout (float):
             Dropout rates. Used for pre-process, activation and inside attention.
         weight_sharing (`bool`):
             Whether to use weight sharing. 
-        bos_id (`int`, optional):
+        bos_id (int, optional):
             The start token id and also is used as padding id. Default is 0.
-        eos_id (`int`, optional):
+        eos_id (int, optional):
             The end token id. Default is 1.
-        beam_size (`int`, optional):
+        beam_size (int, optional):
             The beam width for beam search. Default is 4. 
-        max_out_len (`int`, optional):
+        max_out_len (int, optional):
             The maximum output length. Default is 256.
     """
 
@@ -760,7 +760,7 @@ class InferTransformerModel(TransformerModel):
         
         Returns:
             `Tensor`:
-                An `int64` tensor shaped `[time_step, batch_size, beam_size]` indicated
+                An int64 tensor shaped `[time_step, batch_size, beam_size]` indicated
                 the predict ids.
         
         Example:
