@@ -177,6 +177,8 @@ class ErniePretrainedModel(PretrainedModel):
                         if hasattr(self, "initializer_range") else
                         self.ernie.config["initializer_range"],
                         shape=layer.weight.shape))
+        elif isinstance(layer, nn.LayerNorm):
+            layer._epsilon = 1e-5
 
 
 @register_base_model
@@ -337,7 +339,7 @@ class ErnieLMPredictionHead(nn.Layer):
         self.decoder_weight = self.create_parameter(
             shape=[hidden_size, vocab_size],
             dtype=self.transform.weight.dtype,
-            is_bias=True) if embedding_weights is None else embedding_weights
+            is_bias=False) if embedding_weights is None else embedding_weights
         self.decoder_bias = self.create_parameter(
             shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
 

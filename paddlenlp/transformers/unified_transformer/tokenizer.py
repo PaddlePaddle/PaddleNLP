@@ -21,6 +21,9 @@ import re
 import unicodedata
 from shutil import copyfile
 
+import numpy as np
+import jieba
+import paddle
 from paddle.utils import try_import
 
 from .. import PretrainedTokenizer
@@ -41,12 +44,16 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-vocab.txt",
             "unified_transformer-12L-cn-luge":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-vocab.txt",
+            "plato-mini":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/plato-mini-vocab.txt",
         },
         "sentencepiece_model_file": {
             "unified_transformer-12L-cn":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-spm.model",
             "unified_transformer-12L-cn-luge":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-spm.model",
+            "plato-mini":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/plato-mini-spm.model",
         },
     }
     pretrained_init_configuration = {
@@ -56,6 +63,15 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         "unified_transformer-12L-cn-luge": {
             "do_lower_case": False
         },
+        "plato-mini": {
+            "do_lower_case": False
+        },
+    }
+
+    TASK_TO_SPECIAL_TOKEN = {
+        'chitchat': "[CHAT]",
+        'knowledge': "[KNOW]",
+        'recommend': "[RECO]",
     }
 
     def __init__(self,
@@ -113,8 +129,14 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         """
         return len(self.vocab)
 
-    def preprocess_text(self, inputs, remove_space=True, lower=False):
+    def preprocess_text(self,
+                        inputs,
+                        remove_space=True,
+                        lower=False,
+                        is_split_into_words=True):
         """preprocess data by removing extra space and normalize data."""
+        if not is_split_into_words:
+            inputs = " ".join(jieba.lcut(inputs))
         outputs = inputs
         if remove_space:
             outputs = " ".join(inputs.strip().split())
@@ -151,7 +173,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             pieces = spm_model.SampleEncodeAsPieces(text, 64, 0.1)
         return pieces
 
-    def _tokenize(self, text):
+    def _tokenize(self, text, is_split_into_words=True):
         """
         End-to-end tokenization for BERT models.
         Args:
@@ -160,7 +182,10 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         Returns:
             list: A list of string representing converted tokens.
         """
-        text = self.preprocess_text(text, lower=self.do_lower_case)
+        text = self.preprocess_text(
+            text,
+            lower=self.do_lower_case,
+            is_split_into_words=is_split_into_words)
         tokens = []
         for match in self.pat.finditer(text):
             part_text = match.group(0)
@@ -171,16 +196,18 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             tokens.extend(part_tokens)
         return tokens
 
-    def tokenize(self, text):
+    def tokenize(self, text, is_split_into_words=True):
         """
         End-to-end tokenization for BERT models.
         Args:
             text (str): The text to be tokenized.
+            is_split_into_words(bool, optinal): Whether or not the input `text` 
+                has been pretokenized. Default True.
         
         Returns:
             list: A list of string representing converted tokens.
         """
-        return self._tokenize(text)
+        return self._tokenize(text, is_split_into_words=is_split_into_words)
 
     def merge_subword(self, tokens):
         """Merge subword."""
@@ -197,7 +224,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         ret = [token for token in ret if token]
         return ret
 
-    def convert_tokens_to_string(self, tokens):
+    def convert_tokens_to_string(self, tokens, keep_space=True):
         """
         Converts a sequence of tokens (list of string) in a single string. Since
         the usage of WordPiece introducing `__` to concat subwords, also remove
@@ -208,15 +235,18 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             str: Converted string from tokens.
         """
         tokens = self.merge_subword(tokens)
-        out_string = " ".join(tokens).replace("<s>", "")
+        if keep_space:
+            out_string = " ".join(tokens).replace("<s>", "")
+        else:
+            out_string = "".join(tokens).replace("<s>", "")
         out_string = out_string.replace("</s>", "\n").replace("\n ",
                                                               "\n").strip()
         return out_string
 
-    def convert_ids_to_string(self, ids):
+    def convert_ids_to_string(self, ids, keep_space=True):
         """Convert ids to string."""
         tokens = self.convert_ids_to_tokens(ids)
-        out_string = self.convert_tokens_to_string(tokens)
+        out_string = self.convert_tokens_to_string(tokens, keep_space)
         return out_string
 
     def num_special_tokens_to_add(self, pair=False):
@@ -417,3 +447,213 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             idx_to_token[idx] for idx in sorted(idx_to_token.keys())
         ]
         return vocab
+
+    def dialogue_encode(self,
+                        history,
+                        response=None,
+                        knowledge=None,
+                        task_type=None,
+                        max_seq_len=512,
+                        max_response_len=128,
+                        max_knowledge_len=128,
+                        return_position_ids=True,
+                        return_token_type_ids=True,
+                        return_attention_mask=True,
+                        return_length=False,
+                        add_start_token_as_response=False,
+                        pad_to_max_seq_len=False,
+                        return_tensors=False,
+                        is_split_into_words=True):
+        """
+        Main method to encode the single-turn or multi-turn dialogue conversation. 
+        It will return a dictionary containing the encoded sequence and other 
+        relative informations which meets the input format requirements of the 
+        UnifiedTransformer model. 
+        See detail at 
+        https://github.com/PaddlePaddle/Knover/tree/luge-dialogue/luge-dialogue
+
+        Args:
+            history (str|list|tuple): The history of dialogue conversation. It 
+                is an utterance or list of utterances to be encoded. Each 
+                utterance is a string. 
+            response (str, optional): The response of dialogue conversation. 
+                It should be set when training the model. It should not be set 
+                when running inference. Default None.
+            knowledge (str, optional): The knowledge information of dialogue 
+                conversation. It should be set if the `task_type` is "knowledge" 
+                or "recommend". Default None.
+            task_type (str, optional): The type of dialogue conversation. It is 
+                one of "chitchat", "knowledge" and "recommend". They represent 
+                the chitchat dialogue, knowledge grounded dialogue and 
+                conversational recommendation respectively. Default None, which 
+                means there is no `special_token` added in output sequence for 
+                identifying different conversation types.
+            max_seq_len (int, optional): The maximum encoded sequence length.
+                Default 512.
+            max_response_len (int, optional): The maximum encoded sequence 
+                length of the input `response`. Default 128.
+            max_knowledge_len (int, optional): The maximum encoded sequence 
+                length of the input `knowledge`. Default 128.
+            return_position_ids (bool, optional): Whether to return the 
+                position_ids. Default True.
+            return_token_type_ids (bool, optional): Whether to return the 
+                token_type_ids. Default True.
+            return_attention_mask (bool, optional): Whether to return the 
+                attention_mask. Default True.
+            return_length (bool, optional): Whether to return the length of the
+                encoded sequence. Default False.
+            add_start_token_as_response (bool, optional): Whether to add the 
+                special token [CLS] at the end of sequence as the begining of 
+                the response when running inference to force the model to start 
+                generating response sequence. Default False.
+            pad_to_max_seq_len (bool, optional): Whether to pad the returned 
+                sequences to the `max_seq_len`. Note that, in this method, 
+                returned sequences will be padded on the left. Default False.
+            return_tensors (bool, optional): Whether to convert the returned 
+                sequences to Tensor. Default False.
+            is_split_into_words(bool, optinal): Whether or not the input text 
+                (`history`, `response` and `knowledge`) has been pretokenized. 
+                Default True.
+        """
+        # Input type checking for clearer error
+        assert isinstance(history, str) or (
+            isinstance(history, (list, tuple)) and
+            (len(history) == 0 or len(history) != 0 and
+             isinstance(history[0], str))), (
+                 "The input `history` must be with type `str` (single context) "
+                 "or `List[str]` (multi-turn context). But received: {}".format(
+                     history))
+        assert response is None or isinstance(response, str), (
+            "The input `response` must of be with type `str`. But received: {}".
+            format(response))
+        assert knowledge is None or isinstance(knowledge, str), (
+            "The input `knowledge` must of be with type `str`. But received: {}".
+            format(knowledge))
+        assert task_type is None or task_type in self.TASK_TO_SPECIAL_TOKEN, (
+            "The input `task_type` must be None or one of {}.".format(", ".join(
+                self.TASK_TO_SPECIAL_TOKEN.keys())))
+        assert max_seq_len > max_response_len + max_knowledge_len, (
+            "`max_seq_len` must be greater than the sum of `max_response_len` "
+            "and `max_knowledge_len`. But received `max_seq_len` is {}, "
+            "`max_response_len` is {}, `max_knowledge_len` is {}.".format(
+                max_seq_len, max_response_len, max_knowledge_len))
+        assert response is None or not add_start_token_as_response, (
+            "`add_start_token_as_response` only works when `response` is "
+            "`None`. But received `add_start_token_as_response`: `{}`, "
+            "`response`: {}.".format(add_start_token_as_response, response))
+
+        knowledge_ids = []
+        if knowledge is not None:
+            tokens = self._tokenize(knowledge, is_split_into_words)
+            knowledge_ids = self.convert_tokens_to_ids(tokens)
+            if len(knowledge_ids) > max_knowledge_len - 1:
+                knowledge_ids = knowledge_ids[:max_knowledge_len - 1]
+            knowledge_ids += [self.sep_token_id]
+
+        response_ids = []
+        if response is not None:
+            tokens = self._tokenize(response, is_split_into_words)
+            response_ids = [self.cls_token_id] + self.convert_tokens_to_ids(
+                tokens)
+            if len(response_ids) > max_response_len - 1:
+                response_ids = response_ids[:max_response_len - 1]
+            response_ids += [self.sep_token_id]
+        elif add_start_token_as_response:
+            response_ids = [self.cls_token_id]
+
+        if task_type is not None:
+            special_token = self.TASK_TO_SPECIAL_TOKEN[task_type]
+            assert special_token in self.vocab._token_to_idx, (
+                "The vocab file should contain the special token corresponding "
+                "to the task: {}.".format(task_type))
+            special_token_id = self.vocab._token_to_idx[special_token]
+            knowledge_ids = [self.cls_token_id, special_token_id
+                             ] + knowledge_ids
+        else:
+            knowledge_ids = [self.cls_token_id] + knowledge_ids
+
+        max_history_len = max_seq_len - len(knowledge_ids) - len(response_ids)
+        if isinstance(history, str):
+            history = [history]
+        history_ids = []
+        for i in range(len(history) - 1, -1, -1):
+            tokens = self._tokenize(history[i], is_split_into_words)
+            if len(history_ids) + len(tokens) + 1 > max_history_len:
+                if i == len(history) - 1:
+                    tokens = tokens[1 - max_history_len:]
+                    history_ids = (self.convert_tokens_to_ids(tokens) +
+                                   [self.sep_token_id])
+                break
+            history_ids = (self.convert_tokens_to_ids(tokens) +
+                           [self.sep_token_id]) + history_ids
+
+        history_ids = knowledge_ids + history_ids
+        # Build output dictionnary
+        encoded_inputs = {}
+        encoded_inputs["input_ids"] = history_ids + response_ids
+        # Check lengths
+        sequence_length = len(encoded_inputs["input_ids"])
+        assert sequence_length <= max_seq_len
+
+        # Considering that the logits at the last time step in the API of 
+        # generative task are taken to generate the next token. In order to 
+        # avoid the last time step being a pad, so take padding on the left.
+        pad_length = max_seq_len - sequence_length if pad_to_max_seq_len else 0
+        if pad_length > 0:
+            encoded_inputs["input_ids"] = [
+                self.pad_token_id
+            ] * pad_length + encoded_inputs["input_ids"]
+        if return_tensors:
+            # Add dimention for batch_size
+            encoded_inputs["input_ids"] = paddle.to_tensor(encoded_inputs[
+                "input_ids"]).unsqueeze(0)
+
+        if return_token_type_ids:
+            encoded_inputs["token_type_ids"] = [0] * len(
+                history_ids) + [1] * len(response_ids)
+            if pad_length > 0:
+                encoded_inputs["token_type_ids"] = [
+                    self.pad_token_id
+                ] * pad_length + encoded_inputs["token_type_ids"]
+            if return_tensors:
+                # Add dimention for batch_size
+                encoded_inputs["token_type_ids"] = paddle.to_tensor(
+                    encoded_inputs["token_type_ids"]).unsqueeze(0)
+
+        if return_length:
+            encoded_inputs["seq_len"] = sequence_length
+
+        if return_position_ids:
+            encoded_inputs["position_ids"] = list(range(sequence_length))
+            if pad_length > 0:
+                encoded_inputs["position_ids"] = [
+                    self.pad_token_id
+                ] * pad_length + encoded_inputs["position_ids"]
+            if return_tensors:
+                # Add dimention for batch_size
+                encoded_inputs["position_ids"] = paddle.to_tensor(
+                    encoded_inputs["position_ids"]).unsqueeze(0)
+
+        if return_attention_mask:
+            attention_mask = np.ones(
+                (sequence_length, sequence_length), dtype='float32') * -1e9
+            start = len(history_ids)
+            end = sequence_length
+            attention_mask[:end, :start] = 0.0
+            # Generate the lower triangular matrix using the slice of matrix
+            tmp = np.triu(
+                np.ones(
+                    [end - start, end - start], dtype='float32') * -1e9, 1)
+            attention_mask[start:end, start:end] = tmp
+            encoded_inputs["attention_mask"] = attention_mask
+            if pad_length > 0:
+                new_mask = np.ones(
+                    (max_seq_len, max_seq_len), dtype='float32') * -1e9
+                new_mask[-sequence_length:, -sequence_length:] = attention_mask
+                encoded_inputs["attention_mask"] = new_mask
+            if return_tensors:
+                # Add dimentions for batch_size and num_heads
+                encoded_inputs["attention_mask"] = paddle.to_tensor(
+                    encoded_inputs["attention_mask"]).unsqueeze((0, 1))
+
+        return encoded_inputs

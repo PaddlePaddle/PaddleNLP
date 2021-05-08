@@ -26,8 +26,7 @@ def default_trans_func(output, label, seq_mask, vocab):
             if seq_mask[i][j][0] == 0:
                 break
             token_list.append(vocab[idx[i][j]])
-
-        ref_list.append([token_list])
+        cand.append(token_list)
 
     label = np.squeeze(label, axis=2)
     for i in range(label.shape[0]):
@@ -37,5 +36,5 @@ def default_trans_func(output, label, seq_mask, vocab):
                 break
             token_list.append(vocab[label[i][j]])
 
-        cand.append(token_list)
+        ref_list.append([token_list])
     return cand, ref_list

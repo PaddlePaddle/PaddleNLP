@@ -76,7 +76,7 @@ def set_seed(args):
 
 
 def create_dataloader(input_file, tokenizer, worker_init, batch_size,
-                      max_encoder_length, max_pred_length):
+                      max_encoder_length, max_pred_length, config):
     pretrain_dataset = PretrainingDataset(input_file, tokenizer,
                                           max_encoder_length, max_pred_length)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
@@ -125,10 +125,6 @@ def create_dataloader(input_file, tokenizer, worker_init, batch_size,
 
 
 def do_train(args):
-    assert args.device in [
-        "cpu", "gpu", "xpu"
-    ], "Invalid device! Available device should be cpu, gpu, or xpu."
-
     # Initialization for the parallel enviroment
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -155,11 +151,9 @@ def do_train(args):
                 args.model_name_or_path]))
     else:
         model = BigBirdForPretraining.from_pretrained(args.model_name_or_path)
-
-    criterion = BigBirdPretrainingCriterion(
-        getattr(model,
-                BigBirdForPretraining.base_model_prefix).config["vocab_size"],
-        args.use_nsp)
+    # Get bigbird config for generate random attention mask
+    config = getattr(model, BigBirdForPretraining.base_model_prefix).config
+    criterion = BigBirdPretrainingCriterion(config["vocab_size"], args.use_nsp)
     if worker_num > 1:
         model = paddle.DataParallel(model)
 
@@ -180,9 +174,6 @@ def do_train(args):
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
 
-    # Get bigbird config for generate random attention mask
-    global config
-    config = getattr(model, BigBirdForPretraining.base_model_prefix).config
     global_step = 0
     tic_train = time.time()
     for epoch in range(args.epochs):
@@ -194,7 +185,7 @@ def do_train(args):
         for f_id in range(num_files):
             train_data_loader = create_dataloader(
                 files[f_id], tokenizer, worker_init, args.batch_size,
-                args.max_encoder_length, args.max_pred_length)
+                args.max_encoder_length, args.max_pred_length, config)
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
                 (input_ids, segment_ids, masked_lm_positions, masked_lm_ids,

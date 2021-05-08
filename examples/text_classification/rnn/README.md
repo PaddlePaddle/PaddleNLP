@@ -105,6 +105,9 @@ PaddleNLP提供了一系列的文本表示技术，如`seq2vec`模块。
 
 ```text
 rnn/
+├── deploy # 部署
+│   └── python
+│       └── predict.py # python预测部署示例
 ├── export_model.py # 动态图参数导出静态图参数脚本
 ├── predict.py # 模型预测
 ├── utils.py # 数据处理工具
@@ -140,7 +143,7 @@ CPU 启动：
 
 ```shell
 python train.py --vocab_path='./senta_word_dict.txt' \
-    --select_devices=cpu \
+    --device=cpu \
     --network=bilstm \
     --lr=5e-4 \
     --batch_size=64 \
@@ -151,9 +154,23 @@ python train.py --vocab_path='./senta_word_dict.txt' \
 GPU 启动：
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python train.py --vocab_path='./senta_word_dict.txt' \
-    --select_devices=gpu \
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" train.py \
+    --vocab_path='./senta_word_dict.txt' \
+    --device=gpu \
     --network=bilstm \
+    --lr=5e-4 \
+    --batch_size=64 \
+    --epochs=10 \
+    --save_dir='./checkpoints'
+```
+
+XPU 启动：
+
+```shell
+python train.py --vocab_path='./senta_word_dict.txt' \
+    --device=xpu \
+    --network=lstm \
     --lr=5e-4 \
     --batch_size=64 \
     --epochs=10 \
@@ -163,7 +180,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py --vocab_path='./senta_word_dict.txt' \
 以上参数表示：
 
 * `vocab_path`: 词汇表文件路径。
-* `use_gpu`: 是否使用GPU进行训练， 默认为`False`。
+* `device`: 选用什么设备进行训练，可选cpu、gpu或者xpu。如使用gpu训练则参数gpus指定GPU卡号。目前xpu只支持模型网络设置为lstm。
 * `network`: 模型网络名称，默认为`bilstm_attn`， 可更换为bilstm, bigru, birnn，bow，lstm，rnn，gru，bilstm_attn，textcnn等。
 * `lr`: 学习率， 默认为5e-5。
 * `batch_size`: 运行一个batch大小，默认为64。
@@ -196,6 +213,12 @@ python export_model.py --vocab_path=./senta_word_dict.txt --network=bilstm --par
 
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 
+导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式：
+
+```shell
+python deploy/python/predict.py --model_file=static_graph_params.pdmodel --params_file=static_graph_params.pdiparams --network=bilstm
+```
+
 ### 模型预测
 
 启动预测：
@@ -204,7 +227,7 @@ CPU启动：
 
 ```shell
 python predict.py --vocab_path='./senta_word_dict.txt' \
-    --select_devices=cpu \
+    --device=cpu \
     --network=bilstm \
     --params_path=checkpoints/final.pdparams
 ```
@@ -212,10 +235,20 @@ python predict.py --vocab_path='./senta_word_dict.txt' \
 GPU启动：
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python predict.py --vocab_path='./senta_word_dict.txt' \
-    --select_devices=gpu \
+export CUDA_VISIBLE_DEVICES=0
+python predict.py --vocab_path='./senta_word_dict.txt' \
+    --device=gpu \
     --network=bilstm \
     --params_path='./checkpoints/final.pdparams'
+```
+
+XPU启动：
+
+```shell
+python predict.py --vocab_path='./senta_word_dict.txt' \
+    --device=xpu \
+    --network=lstm \
+    --params_path=checkpoints/final.pdparams
 ```
 
 将待预测数据分词完毕后，如以下示例：

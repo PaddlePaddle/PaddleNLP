@@ -26,7 +26,38 @@ __all__ = ['AccuracyAndF1', 'Mcc', 'PearsonAndSpearman']
 
 class AccuracyAndF1(Metric):
     """
-    Encapsulates Accuracy, Precision, Recall and F1 metric logic.
+    This class encapsulates Accuracy, Precision, Recall and F1 metric logic,
+    and `accumulate` function returns accuracy, precision, recall and f1.
+    The overview of all metrics could be seen at the document of `paddle.metric
+    <https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/metric/Overview_cn.html>`_ 
+    for details.
+
+    Args:
+        topk (int or tuple(int), optional):
+            Number of top elements to look at for computing accuracy.
+            Defaults to (1,).
+        pos_label (int, optional): The positive label for calculating precision
+            and recall.
+            Defaults to 1.
+        name (str, optional):
+            String name of the metric instance. Defaults to 'acc_and_f1'.
+
+    Example:
+
+        .. code-block::
+
+            import paddle
+            from paddlenlp.metrics import AccuracyAndF1
+
+            x = paddle.to_tensor([[0.1, 0.9], [0.5, 0.5], [0.6, 0.4], [0.7, 0.3]])
+            y = paddle.to_tensor([[1], [0], [1], [1]])
+
+            m = AccuracyAndF1()
+            correct = m.compute(x, y)
+            m.update(correct)
+            res = m.accumulate()
+            print(res) # (0.5, 0.5, 0.3333333333333333, 0.4, 0.45)
+
     """
 
     def __init__(self,
@@ -45,16 +76,67 @@ class AccuracyAndF1(Metric):
         self.reset()
 
     def compute(self, pred, label, *args):
+        """
+        Accepts network's output and the labels, and calculates the top-k
+        (maximum value in topk) indices for accuracy.
+
+        Args:
+            pred (Tensor): 
+                Predicted tensor, and its dtype is float32 or float64, and
+                has a shape of [batch_size, num_classes].
+            label (Tensor):
+                The ground truth tensor, and its dtype is is int64, and has a
+                shape of [batch_size, 1] or [batch_size, num_classes] in one
+                hot representation.
+
+        Returns:
+            Tensor: Correct mask, each element indicates whether the prediction
+            equals to the label. Its' a tensor with a data type of float32 and
+            has a shape of [batch_size, topk].
+
+        """
         self.label = label
         self.preds_pos = paddle.nn.functional.softmax(pred)[:, self.pos_label]
         return self.acc.compute(pred, label)
 
     def update(self, correct, *args):
+        """
+        Updates the metrics states (accuracy, precision and recall), in order to
+        calculate accumulated accuracy, precision and recall of all instances.
+
+        Args:
+            correct (Tensor):
+                Correct mask for calculating accuracy, and it's a tensor with
+                shape [batch_size, topk] and has a dtype of
+                float32.
+
+        """
         self.acc.update(correct)
         self.precision.update(self.preds_pos, self.label)
         self.recall.update(self.preds_pos, self.label)
 
     def accumulate(self):
+        """
+        Calculates and returns the accumulated metric.
+
+        Returns:
+            tuple: The accumulated metric. A tuple of shape (acc, precision,
+            recall, f1, average_of_acc_and_f1)
+
+            With the fields:
+
+            - acc (numpy.float64):
+                The accumulated accuracy.
+            - precision (numpy.float64):
+                The accumulated precision.
+            - recall (numpy.float64):
+                The accumulated recall.
+            - f1 (numpy.float64):
+                The accumulated f1.
+            - average_of_acc_and_f1 (numpy.float64):
+                The average of accumulated accuracy and f1.
+
+        """
         acc = self.acc.accumulate()
         precision = self.precision.accumulate()
         recall = self.recall.accumulate()
@@ -71,6 +153,9 @@ class AccuracyAndF1(Metric):
             (acc + f1) / 2, )
 
     def reset(self):
+        """
+        Resets all metric states.
+        """
         self.acc.reset()
         self.precision.reset()
         self.recall.reset()
@@ -79,15 +164,39 @@ class AccuracyAndF1(Metric):
 
     def name(self):
         """
-        Return name of metric instance.
+        Returns name of the metric instance.
+
+        Returns:
+           str: The name of the metric instance.
+
         """
         return self._name
 
 
 class Mcc(Metric):
     """
-    Matthews correlation coefficient
-    https://en.wikipedia.org/wiki/Matthews_correlation_coefficient.
+    This class calculates `Matthews correlation coefficient <https://en.wikipedia.org/wiki/Matthews_correlation_coefficient>`_ .
+
+    Args:
+        name (str, optional):
+            String name of the metric instance. Defaults to 'mcc'.
+
+    Example:
+
+        .. code-block::
+
+            import paddle
+            from paddlenlp.metrics import Mcc
+
+            x = paddle.to_tensor([[-0.1, 0.12], [-0.23, 0.23], [-0.32, 0.21], [-0.13, 0.23]])
+            y = paddle.to_tensor([[1], [0], [1], [1]])
+
+            m = Mcc()
+            (preds, label) = m.compute(x, y)
+            m.update((preds, label))
+            res = m.accumulate()
+            print(res) # (0.0,)
+
     """
 
     def __init__(self, name='mcc', *args, **kwargs):
@@ -99,10 +208,37 @@ class Mcc(Metric):
         self.fn = 0  # false negative
 
     def compute(self, pred, label, *args):
+        """
+        Processes the pred tensor, and returns the indices of the maximum of each
+        sample.
+
+        Args:
+            pred (Tensor):
+                The predicted value is a Tensor with dtype float32 or float64.
+                Shape is [batch_size, 1].
+            label (Tensor):
+                The ground truth value is Tensor with dtype int64, and its
+                shape is [batch_size, 1].
+
+        Returns:
+            tuple: A tuple of preds and label. Each shape is
+            [batch_size, 1], with dtype float32 or float64.
+
+        """
         preds = paddle.argsort(pred, descending=True)[:, :1]
         return (preds, label)
 
     def update(self, preds_and_labels):
+        """
+        Calculates states, i.e. the number of true positive, false positive,
+        true negative and false negative samples.
+
+        Args:
+            preds_and_labels (tuple[Tensor]):
+                Tuple of predicted value and the ground truth label, with dtype
+                float32 or float64. Each shape is [batch_size, 1].
+
+        """
         preds = preds_and_labels[0]
         labels = preds_and_labels[1]
         if isinstance(preds, paddle.Tensor):
@@ -125,6 +261,18 @@ class Mcc(Metric):
                     self.fn += 1
 
     def accumulate(self):
+        """
+        Calculates and returns the accumulated metric.
+
+        Returns:
+            tuple: The accumulated metric. A tuple of shape (mcc,)
+
+            With the fields:
+
+            - mcc (numpy.float64):
+                The accumulated mcc.
+                
+        """
         if self.tp == 0 or self.fp == 0 or self.tn == 0 or self.fn == 0:
             mcc = 0.0
         else:
@@ -135,6 +283,9 @@ class Mcc(Metric):
         return (mcc, )
 
     def reset(self):
+        """
+        Resets all metric states.
+        """
         self.tp = 0  # true positive
         self.fp = 0  # false positive
         self.tn = 0  # true negative
@@ -142,26 +293,59 @@ class Mcc(Metric):
 
     def name(self):
         """
-        Return name of metric instance.
+        Returns name of the metric instance.
+
+        Returns:
+            str: The name of the metric instance.
+
         """
         return self._name
 
 
 class PearsonAndSpearman(Metric):
     """
-    Pearson correlation coefficient
-    https://en.wikipedia.org/wiki/Pearson_correlation_coefficient
-    Spearman's rank correlation coefficient
-    https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient.
+    The class calculates `Pearson correlation coefficient <https://en.wikipedia.org/wiki/Pearson_correlation_coefficient>`_
+    and `Spearman's rank correlation coefficient <https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient>`_ .
+
+
+    Args:
+        name (str, optional):
+            String name of the metric instance. Defaults to 'pearson_and_spearman'.
+
+    Example:
+
+        .. code-block::
+
+            import paddle
+            from paddlenlp.metrics import PearsonAndSpearman
+
+            x = paddle.to_tensor([[0.1], [1.0], [2.4], [0.9]])
+            y = paddle.to_tensor([[0.0], [1.0], [2.9], [1.0]])
+
+            m = PearsonAndSpearman()
+            m.update((x, y))
+            res = m.accumulate()
+            print(res) # (0.9985229081857804, 1.0, 0.9992614540928901)
+
     """
 
-    def __init__(self, name='mcc', *args, **kwargs):
+    def __init__(self, name='pearson_and_spearman', *args, **kwargs):
         super(PearsonAndSpearman, self).__init__(*args, **kwargs)
         self._name = name
         self.preds = []
         self.labels = []
 
     def update(self, preds_and_labels):
+        """
+        Ensures the type of preds and labels is numpy.ndarray and reshapes them
+        into [-1, 1].
+
+        Args:
+            preds_and_labels (tuple[Tensor] or list[Tensor]):
+                Tuple of predicted value and the ground truth label, with dtype
+                float32 or float64. Each shape is [batch_size, d0, ..., dN].
+
+        """
         preds = preds_and_labels[0]
         labels = preds_and_labels[1]
         if isinstance(preds, paddle.Tensor):
@@ -174,9 +358,26 @@ class PearsonAndSpearman(Metric):
         self.labels.append(labels)
 
     def accumulate(self):
+        """
+        Calculates and returns the accumulated metric.
+
+        Returns:
+            tuple: The accumulated metric. A tuple of (pearson, spearman,
+            the_average_of_pearson_and_spearman)
+
+            With the fields:
+
+            - pearson (numpy.float64):
+                The accumulated pearson.
+            - spearman (numpy.float64):
+                The accumulated spearman.
+            - the_average_of_pearson_and_spearman (numpy.float64):
+                The average of accumulated pearson and spearman correlation
+                coefficient.
+
+        """
         preds = [item for sublist in self.preds for item in sublist]
         labels = [item for sublist in self.labels for item in sublist]
-        #import pdb; pdb.set_trace()
         pearson = self.pearson(preds, labels)
         spearman = self.spearman(preds, labels)
         return (
@@ -222,11 +423,18 @@ class PearsonAndSpearman(Metric):
         return r_x
 
     def reset(self):
+        """
+        Resets all metric states.
+        """
         self.preds = []
         self.labels = []
 
     def name(self):
         """
-        Return name of metric instance.
+        Returns name of the metric instance.
+
+        Returns:
+           str: The name of the metric instance.
+
         """
         return self._name

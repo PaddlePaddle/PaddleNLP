@@ -172,9 +172,9 @@ python -u ./export_model.py \
 其中参数释义如下：
 - `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
 - `model_path` 表示训练模型的保存路径，与训练时的`output_dir`一致。
-- `output_path` 表示导出预测模型文件的前缀。保存时会添加后缀（`pdiparams`，`pdiparams.info`，`pdmodel`）；除此之外，还会在`model_path`包含的目录下保存tokenizer相关内容。
+- `output_path` 表示导出预测模型文件的前缀。保存时会添加后缀（`pdiparams`，`pdiparams.info`，`pdmodel`）；除此之外，还会在`output_path`包含的目录下保存tokenizer相关内容。
 
-然后按照如下的方式进行GLUE中的评测任务进行预测（基于Paddle的[Python预测API](https://www.paddlepaddle.org.cn/documentation/docs/zh/2.0-rc1/guides/05_inference_deployment/inference/python_infer_cn.html)）：
+然后按照如下的方式进行GLUE中的评测任务进行预测（基于Paddle的[Python预测API](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/python_infer_cn.html)）：
 
 ```shell
 python -u ./predict_glue.py \

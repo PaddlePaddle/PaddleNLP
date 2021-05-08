@@ -43,7 +43,7 @@ parser.add_argument("--output_dir", type=str, default='checkpoints/', help="Dire
 parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")
 parser.add_argument("--attn_dropout", type=float, default=0.0, help="Attention ffn model dropout.")
 parser.add_argument("--hidden_dropout_prob", type=float, default=0.0, help="The dropout rate for the embedding pooler.")
-parser.add_argument("--device", type=str, default="gpu", help="Select cpu, gpu, xpu devices to train model.")
+parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
 parser.add_argument("--seed", type=int, default=8, help="Random seed for initialization.")
 # yapf: enable
 args = parser.parse_args()
@@ -55,7 +55,11 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
-def create_dataloader(batch_size, max_encoder_length, tokenizer, pad_val=0):
+def create_dataloader(batch_size,
+                      max_encoder_length,
+                      tokenizer,
+                      config,
+                      pad_val=0):
     def _tokenize(text):
         input_ids = [tokenizer.cls_id]
         input_ids.extend(
@@ -103,25 +107,24 @@ def create_dataloader(batch_size, max_encoder_length, tokenizer, pad_val=0):
 
 def main():
     # Initialization for the parallel enviroment
-    assert args.device in [
-        "cpu", "gpu", "xpu"
-    ], "Invalid device! Available device should be cpu, gpu, or xpu."
-
     paddle.set_device(args.device)
     set_seed(args)
     # Define the model and metric 
+    # In finetune task, bigbird performs better when setting dropout to zero.
     model = BigBirdForSequenceClassification.from_pretrained(
-        args.model_name_or_path)
+        args.model_name_or_path,
+        attn_dropout=args.attn_dropout,
+        hidden_dropout_prob=args.hidden_dropout_prob)
+
     criterion = nn.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
 
     # Define the tokenizer and dataloader
     tokenizer = BigBirdTokenizer.from_pretrained(args.model_name_or_path)
-    global config
     config = getattr(model,
                      BigBirdForSequenceClassification.base_model_prefix).config
     train_data_loader, test_data_loader = \
-            create_dataloader(args.batch_size, args.max_encoder_length, tokenizer)
+            create_dataloader(args.batch_size, args.max_encoder_length, tokenizer, config)
 
     # Define the Adam optimizer 
     optimizer = paddle.optimizer.Adam(
@@ -146,7 +149,7 @@ def do_train(model, criterion, metric, optimizer, train_data_loader, tokenizer):
             input_ids, labels = batch[:2]
             rand_mask_idx_list = batch[2:]
 
-            output = model(input_ids, None, rand_mask_idx_list)
+            output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
             loss = criterion(output, labels)
             loss.backward()
             optimizer.step()
@@ -173,7 +176,6 @@ def do_train(model, criterion, metric, optimizer, train_data_loader, tokenizer):
 
             if global_steps >= args.max_steps:
                 return
-        metric.reset()
 
 
 @paddle.no_grad()
@@ -184,7 +186,7 @@ def do_evalute(model, criterion, metric, test_data_loader):
         global_steps += 1
         input_ids, labels = batch[:2]
         rand_mask_idx_list = batch[2:]
-        output = model(input_ids, None, rand_mask_idx_list)
+        output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
         loss = criterion(output, labels)
         correct = metric.compute(output, labels)
         metric.update(correct)

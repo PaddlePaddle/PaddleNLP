@@ -333,7 +333,7 @@ class ELMoEmbedder(object):
         self._elmo = get_elmo_layer(params_file, batch_size, trainable=False)
         self._vocab = load_vocab()
 
-    def encoder(self, sentences: List[List[str]]):
+    def encode(self, sentences: List[List[str]]):
         """
         Each sentence is a list of tokens without <s> or </s>, e.g.
         [['The', 'first', 'sentence', '.'], ['Second', '.']]

@@ -71,7 +71,7 @@ def create_data_loader(batch_size, num_steps, data_path):
 
 
 def train(args):
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
     data_path = args.data_path
     train_loader, valid_loader, test_loader, vocab_size = create_data_loader(
         batch_size=args.batch_size,
@@ -121,7 +121,4 @@ def train(args):
 
 if __name__ == '__main__':
     args = parse_args()
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(train, args=(args, ), nprocs=args.n_gpu)
-    else:
-        train(args)
+    train(args)

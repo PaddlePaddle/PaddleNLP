@@ -15,6 +15,7 @@
 import os
 
 import numpy as np
+import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.io import Dataset, IterableDataset
@@ -32,8 +33,8 @@ __all__ = [
 
 class TrainData(Dataset):
     def __init__(self, graph_work_path):
-        trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))
-        trainer_count = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
+        trainer_id = paddle.distributed.get_rank()
+        trainer_count = paddle.distributed.get_world_size()
         print("trainer_id: %s, trainer_count: %s." %
               (trainer_id, trainer_count))
 
@@ -63,8 +64,8 @@ class TrainData(Dataset):
 
 class PredictData(Dataset):
     def __init__(self, num_nodes):
-        trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))
-        trainer_count = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
+        trainer_id = paddle.distributed.get_rank()
+        trainer_count = paddle.distributed.get_world_size()
         self.data = np.arange(trainer_id, num_nodes, trainer_count)
 
     def __getitem__(self, index):

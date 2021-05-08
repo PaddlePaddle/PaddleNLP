@@ -33,3 +33,9 @@ from .bigbird.modeling import *
 from .bigbird.tokenizer import *
 from .unified_transformer.modeling import *
 from .unified_transformer.tokenizer import *
+from .ernie_ctm.modeling import *
+from .ernie_ctm.tokenizer import *
+from .skep.modeling import *
+from .skep.tokenizer import *
+from .distilbert.modeling import *
+from .distilbert.tokenizer import *
