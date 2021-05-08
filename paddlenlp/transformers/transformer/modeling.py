@@ -30,7 +30,7 @@ def position_encoding_init(n_position, d_pos_vec, dtype="float32"):
             The output `numpy.array`'s data type. Defaults to "float32".
 
     Returns：
-        `numpy.array`: 
+        numpy.array: 
             The embedding table of sinusoidal position encoding with shape
             `[n_position, d_pos_vec]`.
 
@@ -132,8 +132,9 @@ class WordEmbedding(nn.Layer):
 
 class PositionalEmbedding(nn.Layer):
     """
-    This layer produces sinusoidal positional embeddings of any length and
-    lookups embeddings vector of ids provided by input `pos`.
+    This layer produces sinusoidal positional embeddings of any length.
+    While in `forward()` method, this layer lookups embeddings vector of
+    ids provided by input `pos`.
 
     Args:
         emb_dim (int):
