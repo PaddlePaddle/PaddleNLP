@@ -29,7 +29,7 @@ def position_encoding_init(n_position, d_pos_vec, dtype="float32"):
         dtype (str, optional): 
             The output `numpy.array`'s data type. Defaults to "float32".
 
-    Returns：
+    Returns:
         numpy.array: 
             The embedding table of sinusoidal position encoding with shape
             `[n_position, d_pos_vec]`.
@@ -72,7 +72,7 @@ class WordEmbedding(nn.Layer):
 
     .. math::
 
-        Out = embedding(word) * sqrt(emb_dim)
+        Out = embedding(word) * sqrt(emb\_dim)
 
     Args:
         vocab_size (int):
@@ -96,7 +96,7 @@ class WordEmbedding(nn.Layer):
 
     def forward(self, word):
         r"""
-        Compute word embedding.
+        Computes word embedding.
 
         Args:
             word (Tensor):
@@ -334,9 +334,11 @@ class TransformerDecodeCell(nn.Layer):
                 decoder layer. It can be produced by `paddle.nn.TransformerDecoder.gen_cache`.
             trg_src_attn_bias (Tensor):
                 A tensor used in self attention to prevents attention to some unwanted
-                positions, usually the the subsequent positions
-                where the unwanted positions have `-inf` values and the others
-                have 0 values.
+                positions, usually the subsequent positions. It is a tensor with shape
+                broadcasted to `[batch_size, n_head, target_length, target_length]`,
+                where the unwanted positions have `-INF` values and the others
+                have 0 values. The data type should be float32 or float64. It can
+                be None when nothing wanted or needed to be prevented attention to.
             memory (Tensor):
                 The output of Transformer encoder. It is a tensor with shape
                 `[batch_size, source_length, d_model]` and its data type can be
@@ -464,8 +466,8 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         `beam_size` times.
 
         Args:
-            t (Tensor):
-                A tensor with shape `[batch_size, ...]`.
+            t (list|tuple):
+                A list of tensor with shape `[batch_size, ...]`.
             beam_size (int):
                 The beam width used in beam search.
 
@@ -626,7 +628,8 @@ class TransformerModel(nn.Layer):
         Returns:
             Tensor:
                 Output tensor of the final layer of the model whose data
-                type can be float32 or float64.
+                type can be float32 or float64 with shape
+                `[batch_size, sequence_length, vocab_size]`.
 
         Example:
             .. code-block::
@@ -766,12 +769,14 @@ class InferTransformerModel(TransformerModel):
 
         Args:
             src_word (Tensor):
-                The ids of source sequence words. 
+                The ids of source sequence words. It is a tensor with shape
+                `[batch_size, source_sequence_length]` and its data type can be
+                int or int64.
         
         Returns:
             Tensor:
                 An int64 tensor shaped `[time_step, batch_size, beam_size]` indicating
-                the predict ids.
+                the predicted ids.
         
         Example:
             .. code-block::
