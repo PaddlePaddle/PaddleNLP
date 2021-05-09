@@ -280,17 +280,14 @@ class PretrainedModel(Layer, GenerationMixin):
             return model
         return model, state_to_load
 
-    def save_pretrained(self, save_directory):
+    def save_model_config(self, save_directory):
         """
-        Save model configuration and related resources (model state) to files
+        Save model configuration to files
         under `save_directory`.
         Args:
             save_directory (str): Directory to save files into.
         """
-        assert os.path.isdir(
-            save_directory
-        ), "Saving directory ({}) should be a directory".format(save_directory)
-        # save model config
+        # Save model config
         model_config_file = os.path.join(save_directory, self.model_config_file)
         model_config = self.init_config
         # If init_config contains a Layer, use the layer's init_config to save
@@ -306,7 +303,20 @@ class PretrainedModel(Layer, GenerationMixin):
                 model_config[key] = value.init_config
         with io.open(model_config_file, "w", encoding="utf-8") as f:
             f.write(json.dumps(model_config, ensure_ascii=False))
-        # save model
+
+    def save_pretrained(self, save_directory):
+        """
+        Save model configuration and related resources (model state) to files
+        under `save_directory`.
+        Args:
+            save_directory (str): Directory to save files into.
+        """
+        assert os.path.isdir(
+            save_directory
+        ), "Saving directory ({}) should be a directory".format(save_directory)
+        # Save model config 
+        self.save_model_config(save_directory)
+        # Save model
         file_name = os.path.join(save_directory,
                                  list(self.resource_files_names.values())[0])
         paddle.save(self.state_dict(), file_name)
