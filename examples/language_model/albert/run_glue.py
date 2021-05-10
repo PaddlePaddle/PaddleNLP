@@ -146,9 +146,9 @@ def convert_example(example,
 
 
 def do_train(args):
-    # paddle.set_device(args.device)
-    # if paddle.distributed.get_world_size() > 1:
-    #     paddle.distributed.init_parallel_env()
+    paddle.set_device(args.device)
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.init_parallel_env()
 
     set_seed(args)
     global final_res
@@ -166,8 +166,8 @@ def do_train(args):
         label_list=train_ds.label_list,
         max_seq_length=args.max_seq_length)
     train_ds = train_ds.map(trans_func, lazy=True)
-    train_batch_sampler = paddle.io.BatchSampler(
-        train_ds, batch_size=args.batch_size, shuffle=False)
+    train_batch_sampler = paddle.io.DistributedBatchSampler(
+        train_ds, batch_size=args.batch_size, shuffle=True)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
@@ -218,14 +218,8 @@ def do_train(args):
             return_list=True)
 
     num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
-
-    # model = AlbertForSequenceClassification.from_pretrained(
-    #     args.model_name_or_path, num_classes=num_classes)
-
-    ###
-    model = AlbertForMaskedLM(
-        AlbertModel(**model_class.pretrained_init_configuration[
-            args.model_name_or_path]))
+    model = AlbertForSequenceClassification.from_pretrained(
+        args.model_name_or_path, num_classes=num_classes)
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -261,54 +255,45 @@ def do_train(args):
     loss_fct = paddle.nn.loss.CrossEntropyLoss(
     ) if train_ds.label_list else paddle.nn.loss.MSELoss()
 
-    metric = metric_class()
-
     # load converted model and run once to compare
-    model.eval()
-    keys = list(model.state_dict().keys())
-    for k, v in model.state_dict().items():
-        print(k)
-    # print("token_type:")
-    # print(model.state_dict()["transformer.embeddings.token_type_embeddings.weight"])
-    #     print(v.shape)
-    #     print(v)
-    import pickle
-    with open('./params.pd', "rb") as f:
-        values = pickle.load(f)
-    print(values[3])
-    model.set_state_dict(dict(zip(keys, values)))
+    # model.eval()
+    # keys = list(model.state_dict().keys())
+    # for k, v in model.state_dict().items():
+    #     print(k)
+    #
+    # import pickle
+    # with open('./params.pd', "rb") as f:
+    #     values = pickle.load(f)
+
+    # model.set_state_dict(dict(zip(keys, values)))
     # paddle.save(model.state_dict(), "%s.pdparams" % args.model_name_or_path)
     # for data in train_data_loader():
     #     print(data)
     #     print(model(*data[:-1]))
     #     exit(0)
 
+    metric = metric_class()
+
     global_step = 0
     tic_train = time.time()
-    model.eval()
-    # for k, v in model.state_dict().items():
-    #     print(k)
-    #     print(v.shape)
-    #     print(v)
+    model.train()
     for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
-            # print(batch)
             input_ids, attention_mask, token_type_ids, labels = batch
-            input_ids = paddle.to_tensor([[2, 90, 2654, 16, 1619, 5203, 216, 19, 4903, 768, 9, 3,
-                                           2654, 16, 1619, 5203, 216, 19, 4903, 9, 3]])
-            token_type_ids = paddle.to_tensor([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
-            attention_mask = paddle.to_tensor([[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
-            model.train()
-            model.eval()
-            # print(model.transformer.config)
-            print(model.state_dict()["transformer.embeddings.token_type_embeddings.weight"])
-            logits = model(input_ids, attention_mask, token_type_ids)[0]
-            print(logits)
 
+            # special case for compare with huggingface
+            # input_ids = paddle.to_tensor([[2, 90, 2654, 16, 1619, 5203, 216, 19, 4903, 768, 9, 3,
+            #                                2654, 16, 1619, 5203, 216, 19, 4903, 9, 3]])
+            # token_type_ids = paddle.to_tensor([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+            # attention_mask = paddle.to_tensor([[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+            # labels = paddle.to_tensor([1])
+
+            logits = model(input_ids, attention_mask, token_type_ids)[0]
             loss = loss_fct(logits, labels)
+            print(logits)
             print(loss)
-            exit(0)
+            # exit(0)
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
@@ -366,17 +351,3 @@ if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
     do_train(args)
-
-
-# python -m paddle.distributed.launch --gpus "0"  $CONVERT_MODEL/run_glue_pp.py \
-#      --model_type bert \
-#      --model_name_or_path $MODEL \
-#      --task_name QNLI \
-#      --max_seq_length 128 \
-#      --batch_size 32   \
-#      --learning_rate 2e-5 \
-#      --num_train_epochs 1 \
-#      --logging_steps 1 \
-#      --save_steps 500 \
-#      --output_dir ./tmp/$MODEL/ \
-#      --params_pd_path params.pd

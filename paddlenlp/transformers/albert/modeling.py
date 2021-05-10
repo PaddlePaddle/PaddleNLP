@@ -836,6 +836,8 @@ class AlbertPretrainedModel(PretrainedModel):
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v1.pdparams",
             "albert-base-v2":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v2.pdparams",
+            "albert-base-v2":
+                "./albert-base-v2.pdparams",
             "albert-large-v2":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v2.pdparams",
             "albert-xlarge-v2":
@@ -1041,7 +1043,7 @@ class AlbertForPretraining(AlbertPretrainedModel):
     def __init__(self, albert, lm_head, sop_head, vocab_size):
         super(AlbertForPretraining, self).__init__()
 
-        self.albert = albert
+        self.transformer = albert
         self.predictions = lm_head
         self.sop_classifier = sop_head
         self.init_weights()
@@ -1054,7 +1056,7 @@ class AlbertForPretraining(AlbertPretrainedModel):
         self.predictions.decoder = new_embeddings
 
     def get_input_embeddings(self):
-        return self.albert.embeddings.word_embeddings
+        return self.transformer.embeddings.word_embeddings
 
     def forward(self,
                 input_ids,
@@ -1067,7 +1069,7 @@ class AlbertForPretraining(AlbertPretrainedModel):
                 output_attentions=False,
                 output_hidden_states=False,
                 ):
-        outputs = self.albert(
+        outputs = self.transformer(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -1338,7 +1340,7 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
             if inputs_embeds is not None
             else None
         )
-        outputs = self.albert(
+        outputs = self.transformer(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,

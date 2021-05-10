@@ -40,12 +40,20 @@ class AlbertTokenizer(PretrainedTokenizer):
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v1-spiece.model",
             "albert-base-v2":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v2-spiece.model",
+            "albert-base-v2":
+                "./spiece.model",
             "albert-large-v2":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v2-spiece.model",
             "albert-xlarge-v2":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v2-spiece.model",
             "albert-xxlarge-v2":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v2-spiece.model",
+            "albert-chinese-tiny": "",
+            "albert-chinese-small": "",
+            "albert-chinese-base": "",
+            "albert-chinese-large": "",
+            "albert-chinese-xlarge": "",
+            "albert-chinese-xxlarge": "",
         }
     }
     pretrained_init_configuration = {
@@ -73,6 +81,24 @@ class AlbertTokenizer(PretrainedTokenizer):
         "albert-xxlarge-v2": {
             "do_lower_case": False
         },
+        "albert-chinese-tiny": {
+            "do_lower_case": False
+        },
+        "albert-chinese-small": {
+            "do_lower_case": False
+        },
+        "albert-chinese-base": {
+            "do_lower_case": False
+        },
+        "albert-chinese-large": {
+            "do_lower_case": False
+        },
+        "albert-chinese-xlarge": {
+            "do_lower_case": False
+        },
+        "albert-chinese-xxlarge": {
+            "do_lower_case": False
+        },
     }
     pretrained_positional_embedding_sizes = {
         "albert-base-v1": None,
@@ -83,6 +109,12 @@ class AlbertTokenizer(PretrainedTokenizer):
         "albert-large-v2": None,
         "albert-xlarge-v2": None,
         "albert-xxlarge-v2": None,
+        "albert-chinese-tiny": None,
+        "albert-chinese-small": None,
+        "albert-chinese-base": None,
+        "albert-chinese-large": None,
+        "albert-chinese-xlarge": None,
+        "albert-chinese-xxlarge": None,
     }
 
     max_model_input_sizes = pretrained_positional_embedding_sizes
