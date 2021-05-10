@@ -240,7 +240,7 @@ class WordtagPredictor(object):
                             self._split_long_text2short_text_list([temp_text]))
         return short_input_texts
 
-    def _convert_short_text2long_result(self, input_texts, results):
+    def _convert_short_text2long_text_result(self, input_texts, results):
         long_text_lens = [len(text) for text in input_texts]
         concat_results = []
         single_results = {}
@@ -371,7 +371,8 @@ class WordtagPredictor(object):
                                                                 seq_len)
                 all_pred_tags += pred_tags.numpy().tolist()
         results = self._decode(short_input_texts, all_pred_tags)
-        results = self._convert_short_text2long_result(input_texts, results)
+        results = self._convert_short_text2long_text_result(input_texts,
+                                                            results)
         if self.linking is True:
             for res in results:
                 self._term_linking(res)
