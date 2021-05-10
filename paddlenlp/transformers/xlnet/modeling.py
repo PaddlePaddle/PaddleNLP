@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Modeling classes for XLNet model."""
+"""Modeling classes for XLNet model."""
 
 import re
 import paddle
@@ -22,8 +22,8 @@ from paddle.nn import Layer
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    "XLNetModel",
     "XLNetPretrainedModel",
+    "XLNetModel",
     "XLNetForSequenceClassification",
     "XLNetForTokenClassification",
 ]
@@ -468,10 +468,11 @@ class XLNetLayer(Layer):
 
 class XLNetPretrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained XLNet models. It provides XLNet related ``model_config_file``,
-    ``resource_files_names``, ``pretrained_resource_files_map``, ``pretrained_init_configuration``,
-    ``base_model_prefix`` for downloading and loading pretrained models.
-    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+    An abstract class for pretrained XLNet models. It provides XLNet related `model_config_file`,
+    `resource_files_names`, `pretrained_resource_files_map`, `pretrained_init_configuration` and
+    `base_model_prefix` for downloading and loading pretrained models.
+
+    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -642,64 +643,80 @@ class XLNetPretrainedModel(PretrainedModel):
 @register_base_model
 class XLNetModel(XLNetPretrainedModel):
     """
-    The bare XLNet Model transformer outputting raw hidden-states without any specific head on top.
+    The bare XLNet Model outputting raw hidden-states without any specific head on top.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
-    Check the superclass documentation for the generic methods and the library implements for all its model.
+    Refer to the superclass documentation for the generic methods.
 
-    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    This model is also a `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
     /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (`int`):
-            Vocabulary size of the XLNet model. Defines the number of different tokens that can
-            be represented by the `inputs_ids` passed when calling XLNetModel.
-        mem_len (`int` or `None`, optional):
-            The number of tokens to cache. The key/value pairs that have already been pre-computed in a previous
-            forward pass won't be re-computed. Defaults to ``None``.
-        reuse_len (`int` or `None`, optional):
-            The number of tokens in the current batch to be cached and reused in the future. Defaults to ``None``.
-        d_model (`int`, optional):
-            Dimensionality of the encoder layers and the pooler layer. Defaults to ``768``.
-        same_length (`bool`, optional):
-            Whether or not to use the same attention length for each token. Defaults to ``False``.
-        attn_type (`str`, optional):
-            The attention type used by the model. Set `"bi"` for XLNet, `"uni"` for Transformer-XL.
-            Defaults to ``"bi"``.
-        bi_data (`bool`, optional):
-            Whether or not to use bidirectional input pipeline. Usually set to `True` during pretraining and
-            `False` during fine-tuning. Defaults to ``False``.
-        clamp_len (`int`, optional):
-            Clamp all relative distances larger than clamp_len. Setting this attribute to -1 means no clamping.
-            Defaults to ``-1``.
-        n_layer (`int`, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to ``12``.
-        dropout (`float`, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to ``0.1``.
-        classifier_dropout (`float`, optional):
-            The dropout probability for all fully connected layers in the pooler.
-            Defaults to ``0.1``.
-        n_head (`int`, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to ``12``.
-        d_head (`int`, optional):
-            Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
-            Defaults to ``64``.
-        layer_norm_eps (`float`, optional):
-            The epsilon used by the layer normalization layers.
-            Defaults to ``1e-12``.
-        d_inner (`int`, optional):
-            Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
-            Defaults to ``3072``.
-        ff_activation (`str`, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"``, ``"silu"`` and ``"gelu_new"`` are supported.
-            Defaults to ``"gelu"``.
-        initializer_range (`float`, optional):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-            Defaults to ``0.02``.
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in `XLNetModel`.
+            Also is the vocab size of token embedding matrix.
+        mem_len (int or None, optional):
+            The number of tokens to cache. If not 0 or None, the last `mem_len` hidden states
+            in each layer will be cached into memory. Defaults to `None`.
+        reuse_len (int or None, optional):
+            The number of tokens in the current batch to be cached. If positive, then at most
+            `reuse_len` tokens can be cached in the current batch. Otherwise, there is
+            no limit to the number of tokens. Defaults to `None`.
+
+            .. note::
+                The difference between `mem_len` and `reuse_len` is that `mem_len` defines
+                **the total number** of tokens to cache while `reuse_len` defines the number of tokens
+                in **the current batch** to be cached.
+        d_model (int, optional):
+            Dimensionality of the embedding layers, encoder layers and pooler layer.
+            Defaults to 768.
+        same_length (bool, optional):
+            Whether or not to use the same attention length for each token.
+            Defaults to `False`.
+        attn_type (str, optional):
+            The attention type used in the attention layer. Set **"bi"** for ``XLNet``,
+            **"uni"** for ``Transformer-XL``. Defaults to **"bi"**.
+        bi_data (bool, optional):
+            Whether or not to use bidirectional input pipeline. Set to `True` during pretraining and
+            `False` during fine-tuning. Defaults to `False`.
+        clamp_len (int, optional):
+            Maximum relative distance supported. All relative distances larger than `clamp_len` will be clamped.
+            Setting this attribute to -1 means no clamping. Defaults to -1.
+        n_layer (int, optional):
+            The number of hidden layers in the encoder. Defaults to 12.
+        dropout (float, optional):
+            The dropout ratio for all fully connected layers in the embeddings and encoder.
+            Defaults to 0.1.
+        classifier_dropout (float, optional):
+            The dropout ratio for all fully connected layers in the pooler (classification head).
+            Defaults to 0.1.
+        n_head (int, optional):
+            Number of attention heads in each attention layer.
+            Defaults to 12.
+        d_head (int, optional):
+            Dimensionality of each attention head. Defaults to 64.
+
+            .. note::
+                `d_head` should be equal to `d_model` divided by `n_head`.
+        layer_norm_eps (float, optional):
+            The `epsilon` parameter used in :class:`paddle.nn.LayerNorm` for
+            initializing layer normalization layers. Defaults to 1e-12.
+        d_inner (int, optional):
+            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
+            to ff layers are firstly projected from `d_model` to `d_inner`,
+            and then projected back to `d_model`. Typically `d_inner` is larger than `d_model`.
+            Defaults to 3072.
+        ff_activation (str, optional):
+            The non-linear activation function in the feed-forward layers in the encoder.
+            Choose from the following supported activation functions: `["relu", "gelu", "tanh",
+            "sigmoid", "mish", "swish"]`. Defaults to `"gelu"`.
+        initializer_range (float, optional):
+            The standard deviation of the normal initializer. Defaults to 0.02.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`XLNetPretrainedModel._init_weights()` for how weights are initialized in `XLNetModel`.
     """
 
     def __init__(
@@ -857,112 +874,123 @@ class XLNetModel(XLNetPretrainedModel):
             output_hidden_states=False,
             return_dict=False, ):
         r"""
-        The XLNetModel forward method, overrides the __call__() special method.
+        The XLNetModel forward method, overrides the `__call__()` special method.
 
         Args:
-            input_ids (`Tensor`):
-                Indices of input sequence tokens in the vocabulary.
-                It's data type should be int64 and it has a shape of [batch_size, sequence_length].
-            token_type_ids (`Tensor`, optional):
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
                 Segment token indices to indicate first and second portions of the inputs.
-                Indices can either be 0 or 1:
+                Indices can be either 0 or 1:
 
-                - 0 corresponds to a *sentence A* token,
-                - 1 corresponds to a *sentence B* token.
+                - 0 corresponds to a **sentence A** token,
+                - 1 corresponds to a **sentence B** token.
 
-                It's data type should be `int64` and it has a shape of [batch_size, sequence_length].
-                Defaults to ``None``, which means we don't add segment embeddings.
-            attention_mask (`Tensor`, optional):
-                Mask to avoid performing attention on padding token indices with values being either 0 or 1:
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                Defaults to None, which means no segment embeddings is added to token embeddings.
+            attention_mask (Tensor, optional):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set
+                to **-infinity** for any positions in the mask that are **0**, and will be
+                **unchanged** for positions that are **1**.
 
-                - 1 for tokens that are **not masked**,
-                - 0 for tokens that are **masked**.
+                - **1** for tokens that are **not masked**,
+                - **0** for tokens that are **masked**.
 
-                It's data type should be `float32` and it has a shape of [batch_size, sequence_length].
-                Defaults to ``None``.
-            mems (`List[Tensor]`, optional):
-                Contains pre-computed hidden-states. Can be used to speed up sequential decoding.
-                It's a list (has a length of n_layers) of Tensors (has a data type of `float32`).
-                `use_mems` has to be set to `True` to make use of `mems`.
-                Defaults to ``None``, and we don't use mems.
-            perm_mask (`Tensor`, optional):
-                Mask to indicate the attention pattern for each input token with values being either 0 or 1.
+                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+                Defaults to `None`.
+            mems (List[Tensor], optional):
+                A list of length `n_layers` with each Tensor being a pre-computed hidden-state for each layer.
+                Each Tensor has a dtype `float32` and a shape of [batch_size, sequence_length, hidden_size].
+                Defaults to None, and we don't use mems.
 
-                - if ``perm_mask[k, i, j] = 0``, i attend to j in batch k;
-                - if ``perm_mask[k, i, j] = 1``, i does not attend to j in batch k.
+                .. note::
+                    `use_mems` has to be set to `True` in order to make use of `mems`.
+            perm_mask (Tensor, optional):
+                Mask to indicate the permutation pattern of the input sequence with values being either 0 or 1.
 
-                Only used during pretraining (to define factorization order) or for sequential decoding (generation).
-                It's data type should be `float32` and it has a shape of [batch_size, sequence_length, sequence_length].
-                Defaults to ``None``, and each token attends to all the others (full bidirectional attention).
-            target_mapping (`Tensor`, optional):
+                - if ``perm_mask[k, i, j] = 0``, i **attend** to j in batch k;
+                - if ``perm_mask[k, i, j] = 1``, i **does not attend** to j in batch k.
+
+                Only used during pretraining (to define factorization order) or
+                for sequential decoding (generation). It's data type should be `float32` and
+                has a shape of [batch_size, sequence_length, sequence_length].
+                Defaults to `None`, then each token attends to all the other tokens (full bidirectional attention).
+            target_mapping (Tensor, optional):
                 Mask to indicate the output tokens to use with values being either 0 or 1.
                 If ``target_mapping[k, i, j] = 1``, the i-th predict in batch k is on the j-th token.
+                It's data type should be `float32` and has a shape of [batch_size, num_predict, sequence_length].
                 Only used during pretraining for partial prediction or for sequential decoding (generation).
-                It's data type should be `float32` and it has a shape of [batch_size, num_predict, sequence_length].
-                Defaults to ``None``.
-            input_mask (`Tensor`, optional):
-                Mask to avoid performing attention on padding token indices.
-                Negative of `attention_mask`, i.e. with 0 for real tokens and 1 for padding.
-                Mask values can either be 0 or 1:
+                Defaults to `None`.
+            input_mask (Tensor, optional):
+                Mask to avoid performing attention on padding token with values being either 0 or 1.
+                It's data type should be `float32` and it has a shape of [batch_size, sequence_length].
+                This mask is negative of `attention_mask`:
 
                 - 1 for tokens that are **masked**,
                 - 0 for tokens that are **not masked**.
 
-                You can only uses one of `input_mask` and `attention_mask`.
-                It's data type should be `float32` and it has a shape of [batch_size, sequence_length].
-                Defaults to ``None``.
-            head_mask (`Tensor`, optional):
-                Mask to nullify selected heads of the self-attention modules.
-                Mask values can either be 0 or 1:
+                You should use only one of `input_mask` and `attention_mask`. Defaults to `None`.
+            head_mask (Tensor, optional):
+                Mask to nullify selected heads of the self-attention layers with values being either 0 or 1.
 
                 - 1 indicates the head is **not masked**,
                 - 0 indicates the head is **masked**.
 
                 It's data type should be `float32` and has a shape of [num_heads] or [num_layers, num_heads].
-                Defaults to ``None``, which means we keep all heads.
-            inputs_embeds (`Tensor`, optional):
+                Defaults to `None`, which means we keep all heads.
+            inputs_embeds (Tensor, optional):
                 An embedded representation tensor which is an alternative of `input_ids`.
-                You should only specify one of them to avoid contradiction. It's data type should be `float32`
-                and has a shape of [batch_size, sequence_length, hidden_size].
-                Defaults to ``None``, which means we only specify `input_ids`.
-            use_mems_train (`bool`, optional):
+                You should specify only either one of them to avoid contradiction.
+                It's data type should be `float32` and has a shape of [batch_size, sequence_length, hidden_size].
+                Defaults to `None`, which means we only specify `input_ids`.
+            use_mems_train (bool, optional):
                 Whether or not to use recurrent memory mechanism during training.
-                Defaults to ``False`` and we don't use recurrent memory mechanism in training mode.
-            use_mems_eval (`bool`, optional):
+                Defaults to `False` and we don't use recurrent memory mechanism in training mode.
+            use_mems_eval (bool, optional):
                 Whether or not to use recurrent memory mechanism during evaluation.
-                Defaults to ``False`` and we don't use recurrent memory mechanism in evaluation mode.
-            output_attentions (`bool`, optional):
+                Defaults to `False` and we don't use recurrent memory mechanism in evaluation mode.
+            output_attentions (bool, optional):
                 Whether or not to return the attentions tensors of all attention layers.
-                Defaults to ``False`` and we don't return the attentions tensors.
-            output_hidden_states (`bool`, optional):
+                Defaults to `False` and do not return the attentions tensors.
+            output_hidden_states (bool, optional):
                 Whether or not to return the hidden states of all layers.
-                Defaults to ``False`` and we don't return the hidden states.
-            return_dict (`bool`, optional):
-                Whether or not to format the output as a `dict`.
-                Defaults to ``False``, and the default output is a `tuple`.
+                Defaults to `False` and do not return the hidden states.
+            return_dict (bool, optional):
+                Whether or not to format the output as a dict.
+                If True, the output will be formatted as a dict, else returns a plain tuple.
+                Defaults to False.
 
         Returns:
-            A `tuple` or a `dict`: A tuple of shape (``output``, ``new_mems``, ``hidden_states``, ``attentions``)
-            or a dict of shape {"last_hidden_state": ``output``, "mems": ``new_mems``,
-            "hidden_states": ``hidden_states``, "attentions": ``attentions``}.
+            tuple or dict: A tuple with items: (`output`, `new_mems`, `hidden_states`, `attentions`)
+            or a dict with key-value pairs: {"last_hidden_state": `output`, "mems": `new_mems`,
+            "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
-            With the fields:
+            With the corresponding fields:
 
-            - output (`Tensor`):
-                Sequence of hidden-states at the last layer of the model.
-                It's data type should be float32 and has a shape of [batch_size, num_predict, hidden_size].
-                ``num_predict`` corresponds to ``target_mapping.shape[1]``. If ``target_mapping`` is ``None``,
-                then ``num_predict`` corresponds to ``sequence_length``.
-            - mems (`List[Tensor]`):
-                A Tensor list of length 'n_layers' containing pre-computed hidden-states.
-            - hidden_states (`List[Tensor]`, optional):
-                A Tensor list containing hidden-states of the model at the output of each layer plus
-                the initial embedding outputs. Each Tensor has a data type of `float32` and
+            - `output` (Tensor):
+                Output of the final layer of the model.
+                It's a Tensor of dtype `float32` and has a shape of [batch_size, num_predict, hidden_size].
+
+                .. note::
+                    `num_predict` corresponds to `target_mapping.shape[1]`.
+                    If `target_mapping` is `None`, then `num_predict` equals to `sequence_length`.
+            - `mems` (List[Tensor]):
+                A list of pre-computed hidden-states. The length of the list is `n_layers`.
+                Each element in the list is a Tensor with dtype `float32` and has a shape of
+                [batch_size, sequence_length, hidden_size].
+            - `hidden_states` (List[Tensor], optional):
+                A list of Tensor containing hidden-states of the model at the output of each layer
+                plus the initial embedding outputs. Each Tensor has a data type of `float32` and
                 has a shape of [batch_size, sequence_length, hidden_size].
-            - attentions (`List[Tensor]`, optional):
-                A Tensor list containing attentions weights after the attention softmax, used to compute
-                the weighted average in the self-attention heads. Each Tensor (one for each layer) has a data type
-                of `float32` and has a shape of [batch_size, num_heads, sequence_length, sequence_length].
+                Being returned when `output_hidden_states` is set to `True`.
+            - `attentions` (List[Tensor], optional):
+                A list of Tensor containing attentions weights of each hidden layer.
+                Each Tensor (one for each layer) has a data type of `float32` and
+                has a shape of [batch_size, num_heads, sequence_length, sequence_length].
+                Being returned when `output_attentions` is set to `True`.
 
         Example:
             .. code-block::
@@ -1229,14 +1257,14 @@ class XLNetClassificationHead(Layer):
 
 class XLNetForSequenceClassification(XLNetPretrainedModel):
     """
-    XLNet Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
-    for GLUE tasks.
+    XLNet Model with a sequence classification/regression head on top
+    (a linear layer on top of the pooled output) e.g. for GLUE tasks.
 
     Args:
         xlnet (:class:`XLNetModel`):
             An instance of :class:`XLNetModel`.
-        num_classes (`int`, optional):
-            The number of classes. Defaults to ``2``.
+        num_classes (int, optional):
+            The number of classes. Defaults to 2.
     """
 
     def __init__(self, xlnet, num_classes=2):
@@ -1265,53 +1293,53 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
             output_hidden_states=False,
             return_dict=False, ):
         r"""
-        The XLNetForSequenceClassification forward method, overrides the __call__() special method.
+        The XLNetForSequenceClassification forward method, overrides the `__call__()` special method.
 
         Args:
-            input_ids (`Tensor`):
+            input_ids (Tensor):
                 See :class:`XLNetModel`.
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 See :class:`XLNetModel`.
-            attention_mask (`Tensor`, optional):
+            attention_mask (Tensor, optional):
                 See :class:`XLNetModel`.
-            mems (`Tensor`, optional):
+            mems (Tensor, optional):
                 See :class:`XLNetModel`.
-            perm_mask (`Tensor`, optional):
+            perm_mask (Tensor, optional):
                 See :class:`XLNetModel`.
-            target_mapping (`Tensor`, optional):
+            target_mapping (Tensor, optional):
                 See :class:`XLNetModel`.
-            input_mask (`Tensor`, optional):
+            input_mask (Tensor, optional):
                 See :class:`XLNetModel`.
-            head_mask (`Tensor`, optional):
+            head_mask (Tensor, optional):
                 See :class:`XLNetModel`.
-            inputs_embeds (`Tensor`, optional):
+            inputs_embeds (Tensor, optional):
                 See :class:`XLNetModel`.
-            use_mems_train (`bool`, optional):
+            use_mems_train (bool, optional):
                 See :class:`XLNetModel`.
-            use_mems_eval (`bool`, optional):
+            use_mems_eval (bool, optional):
                 See :class:`XLNetModel`.
-            output_attentions (`bool`, optional):
+            output_attentions (bool, optional):
                 See :class:`XLNetModel`.
-            output_hidden_states (`bool`, optional):
+            output_hidden_states (bool, optional):
                 See :class:`XLNetModel`.
-            return_dict (`bool`, optional):
+            return_dict (bool, optional):
                 See :class:`XLNetModel`.
 
         Returns:
-            A `tuple` or a `dict`: A tuple of shape (``output``, ``new_mems``, ``hidden_states``, ``attentions``)
-            or a dict of shape {"last_hidden_state": ``output``, "mems": ``new_mems``,
-            "hidden_states": ``hidden_states``, "attentions": ``attentions``}.
+            tuple or dict: A tuple with items: (`output`, `new_mems`, `hidden_states`, `attentions`)
+            or a dict with key-value pairs: {"last_hidden_state": `output`, "mems": `new_mems`,
+            "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
-            With the fields:
+            With the corresponding fields:
 
-            output (`Tensor`):
-                Classification scores before SoftMax (also called logits). It's data type should be float32
+            - `output` (Tensor):
+                Classification scores before SoftMax (also called logits). It's data type should be `float32`
                 and has a shape of [batch_size, num_classes].
-            mems (`List[Tensor]`):
+            - `mems` (List[Tensor]):
                 See :class:`XLNetModel`.
-            hidden_states (`List[Tensor]`, optional):
+            - `hidden_states` (List[Tensor], optional):
                 See :class:`XLNetModel`.
-            attentions (`List[Tensor]`, optional):
+            - `attentions` (List[Tensor], optional):
                 See :class:`XLNetModel`.
 
         Example:
@@ -1367,8 +1395,8 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
     Args:
         xlnet (:class:`XLNetModel`):
             An instance of :class:`XLNetModel`.
-        num_classes (`int`, optional):
-            The number of classes. Defaults to ``2``.
+        num_classes (int, optional):
+            The number of classes. Defaults to 2.
     """
 
     def __init__(self, xlnet, num_classes=2):
@@ -1397,53 +1425,53 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
             output_hidden_states=False,
             return_dict=False, ):
         r"""
-        The XLNetForTokenClassification forward method, overrides the __call__() special method.
+        The XLNetForTokenClassification forward method, overrides the `__call__()` special method.
 
         Args:
-            input_ids (`Tensor`):
+            input_ids (Tensor):
                 See :class:`XLNetModel`.
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 See :class:`XLNetModel`.
-            attention_mask (`Tensor`, optional):
+            attention_mask (Tensor, optional):
                 See :class:`XLNetModel`.
-            mems (`Tensor`, optional):
+            mems (Tensor, optional):
                 See :class:`XLNetModel`.
-            perm_mask (`Tensor`, optional):
+            perm_mask (Tensor, optional):
                 See :class:`XLNetModel`.
-            target_mapping (`Tensor`, optional):
+            target_mapping (Tensor, optional):
                 See :class:`XLNetModel`.
-            input_mask (`Tensor`, optional):
+            input_mask (Tensor, optional):
                 See :class:`XLNetModel`.
-            head_mask (`Tensor`, optional):
+            head_mask (Tensor, optional):
                 See :class:`XLNetModel`.
-            inputs_embeds (`Tensor`, optional):
+            inputs_embeds (Tensor, optional):
                 See :class:`XLNetModel`.
-            use_mems_train (`bool`, optional):
+            use_mems_train (bool, optional):
                 See :class:`XLNetModel`.
-            use_mems_eval (`bool`, optional):
+            use_mems_eval (bool, optional):
                 See :class:`XLNetModel`.
-            output_attentions (`bool`, optional):
+            output_attentions (bool, optional):
                 See :class:`XLNetModel`.
-            output_hidden_states (`bool`, optional):
+            output_hidden_states (bool, optional):
                 See :class:`XLNetModel`.
-            return_dict (`bool`, optional):
+            return_dict (bool, optional):
                 See :class:`XLNetModel`.
 
         Returns:
-            A `tuple` or a `dict`: A tuple of shape (``output``, ``new_mems``, ``hidden_states``, ``attentions``)
-            or a dict of shape {"last_hidden_state": ``output``, "mems": ``new_mems``,
-            "hidden_states": ``hidden_states``, "attentions": ``attentions``}.
+            tuple or dict: A tuple with items: (`output`, `new_mems`, `hidden_states`, `attentions`)
+            or a dict with key-value pairs: {"last_hidden_state": `output`, "mems": `new_mems`,
+            "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
-            With the fields:
+            With the corresponding fields:
 
-            - output (`Tensor`):
-                Classification scores before SoftMax (also called logits). It's data type should be float32
+            - `output` (Tensor):
+                Classification scores before SoftMax (also called logits). It's data type should be `float32`
                 and has a shape of [batch_size, sequence_length, num_classes].
-            - mems (`List[Tensor]`):
+            - `mems` (List[Tensor]):
                 See :class:`XLNetModel`.
-            - hidden_states (`List[Tensor]`, optional):
+            - `hidden_states` (List[Tensor], optional):
                 See :class:`XLNetModel`.
-            - attentions (`List[Tensor]`, optional):
+            - `attentions` (List[Tensor], optional):
                 See :class:`XLNetModel`.
 
         Example:

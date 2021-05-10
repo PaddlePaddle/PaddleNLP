@@ -1,6 +1,6 @@
 # Faster Transformer 预测
 
-在这里我们集成了 Nvidia [Faster Transformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer) 用于预测加速。同时集成了 Faster Transformer float32 以及 float16 预测。以下是使用 Faster Transformer 的说明。
+在这里我们集成了 Nvidia [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。同时集成了 Faster Transformer float32 以及 float16 预测。以下是使用 Faster Transformer 的说明。
 
 ## 使用环境说明
 
@@ -9,7 +9,7 @@
 * CUDA 10.1（需要 PaddlePaddle 框架一致）
 * gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
 * 推荐使用 Python3
-* [Faster Transformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer/v3.1#setup) 使用必要的环境
+* [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#setup) 使用必要的环境
 * 环境依赖
   - attrdict
   - pyyaml
@@ -127,17 +127,17 @@ export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
 cp -rf ../../../../paddlenlp/ops/build/third-party/build/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 0
-python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding-lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so
+python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --decoding_strategy beam_search --beam_size 5
 ```
 
-其中，`--config` 选项用于指明配置文件的位置，而 `--decoding-lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。
+其中，`--config` 选项用于指明配置文件的位置，而 `--decoding_lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。
 
 翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `./sample/config/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 base model 的配置。
 
 
 #### 使用动态图预测(使用 float16 decoding 预测)
 
-float16 与 float32 预测的基本流程相同，不过在使用 float16 的 decoding 进行预测的时候，需要再加上 `--use-fp16-decoding` 选项。后按照与之前相同的方式执行即可。具体执行方式如下：
+float16 与 float32 预测的基本流程相同，不过在使用 float16 的 decoding 进行预测的时候，需要再加上 `--use_fp16_decoding` 选项。后按照与之前相同的方式执行即可。具体执行方式如下：
 
 ``` sh
 # setting visible devices for prediction
@@ -145,10 +145,10 @@ export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
 cp -rf ../../../../paddlenlp/ops/build/third-party/build/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 1
-python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding-lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --use-fp16-decoding
+python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --use_fp16_decoding --decoding_strategy beam_search --beam_size 5
 ```
 
-其中，`--config` 选项用于指明配置文件的位置，而 `--decoding-lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。
+其中，`--config` 选项用于指明配置文件的位置，而 `--decoding_lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。
 
 翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `./sample/config/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 base model 的配置。
 
@@ -239,8 +239,8 @@ cd bin/
 
 使用 C++ 预测库，首先，我们需要做的是将动态图的 checkpoint 导出成预测库能使用的模型文件和参数文件。可以执行 `export_model.py` 实现这个过程。
 
-``` python
-python export_model.py --config ../configs/transformer.base.yaml --decoding-lib ../../../../paddlenlp/ops/src/build/lib/libdecoding_op.so
+``` sh
+python export_model.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/src/build/lib/libdecoding_op.so  --decoding_strategy beam_search --beam_size 5
 ```
 
 注意：这里的 `libdecoding_op.so` 的动态库是参照前文 **`Python 动态图使用自定义 op`** 编译出来的 lib，当前 **`C++ 预测库使用自定义 op`** 不包含编译的动态库。因此，如果在使用预测库前，还需要额外导出模型，需要编译两次：
@@ -270,10 +270,12 @@ cd bin/
 ``` sh
 cd bin/
 ../third-party/build/bin/decoding_gemm 8 5 8 64 38512 256 512 0
-./transformer_e2e 8 0 ./infer_model/ /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 /root/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
+./transformer_e2e 8 0 ./infer_model/ DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
-其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer/v3.1#execute-the-decoderdecoding-demos)。
+其中：
+* `decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。
+* `DATA_HOME` 则是 `paddlenlp.utils.env.DATA_HOME` 返回的路径。
 
 ## 模型评估
 
