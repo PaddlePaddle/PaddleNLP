@@ -33,24 +33,24 @@ class ErnieTokenizer(PretrainedTokenizer):
     tokenize as subwords.
 
     Args:
-        vocab_file (`str`): 
+        vocab_file (str): 
             file path of the vocabulary.
-        do_lower_case (`bool`, optional): 
+        do_lower_case (str, optional): 
             Whether the text strips accents and convert to lower case. 
             Defaults to `True`.
-        unk_token (`str`, optional): 
+        unk_token (str, optional): 
             The special token for unknown words. 
             Defaults to "[UNK]".
-        sep_token (`str`, optional): 
+        sep_token (str, optional): 
             The special token for separator token. 
             Defaults to "[SEP]".
-        pad_token (`str`, optional): 
+        pad_token (str, optional): 
             The special token for padding. 
             Defaults to "[PAD]".
-        cls_token (`str`, optional): 
+        cls_token (str, optional): 
             The special token for cls. 
             Defaults to "[CLS]".
-        mask_token (`str`, optional): 
+        mask_token (str, optional): 
             The special token for mask.
             Defaults to "[MASK]".
     
@@ -129,8 +129,9 @@ class ErnieTokenizer(PretrainedTokenizer):
     def vocab_size(self):
         r"""
         return the size of vocabulary.
+
         Returns:
-            `int`: the size of vocabulary.
+            int: the size of vocabulary.
         """
         return len(self.vocab)
 
@@ -139,10 +140,10 @@ class ErnieTokenizer(PretrainedTokenizer):
         End-to-end tokenization for ERNIE models.
 
         Args:
-            text (`str`): The text to be tokenized.
+            text (str): The text to be tokenized.
         
         Returns:
-            List[`str`]: A list of string representing converted tokens.
+            List[str]: A list of string representing converted tokens.
         """
         split_tokens = []
         for token in self.basic_tokenizer.tokenize(text):
@@ -155,10 +156,10 @@ class ErnieTokenizer(PretrainedTokenizer):
         End-to-end tokenization for ERNIE models.
 
         Args:
-            text (`str`): The text to be tokenized.
+            text (str): The text to be tokenized.
         
         Returns:
-            List[`str`]: A list of string representing converted tokens.
+            List[str]: A list of string representing converted tokens.
         """
         return self._tokenize(text)
 
@@ -169,10 +170,10 @@ class ErnieTokenizer(PretrainedTokenizer):
         `##` when converting.
 
         Args:
-            tokens (`List[str]`): A list of string representing tokens to be converted.
+            tokens (List[str]): A list of string representing tokens to be converted.
 
         Returns:
-            `str`: Converted string from tokens.
+            str: Converted string from tokens.
         """
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
@@ -186,7 +187,7 @@ class ErnieTokenizer(PretrainedTokenizer):
             Do not put this inside your training loop.
 
         Args:
-            pair (`bool`, optional): Returns the number of added tokens in the case of a sequence 
+            pair (str, optional): Returns the number of added tokens in the case of a sequence 
                 pair if set to True, returns the number of added tokens in the case of a single sequence 
                 if set to False. Defaults to False.
 
@@ -210,14 +211,14 @@ class ErnieTokenizer(PretrainedTokenizer):
             - pair of sequences: ``[CLS] A [SEP] B [SEP]``
 
         Args:
-            token_ids_0 (`List[int]`):
+            token_ids_0 (List[int]):
                 List of IDs to which the special tokens will be added.
-            token_ids_1 (`List[int]`, optional):
+            token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs.
                 Defaults to `None`.
 
         Returns:
-            `List[int]`: List of input_id with the appropriate special tokens.
+            List[int]: List of input_id with the appropriate special tokens.
         """
         if token_ids_1 is None:
             return [self.cls_token_id] + token_ids_0 + [self.sep_token_id]
@@ -237,14 +238,14 @@ class ErnieTokenizer(PretrainedTokenizer):
             - pair of sequences: `(0,0) A (0,0) B (0,0)``
         
         Args:
-            offset_mapping_ids_0 (`List[tuple]`):
+            offset_mapping_ids_0 (List[tuple]):
                 List of char offsets to which the special tokens will be added.
-            offset_mapping_ids_1 (`List[tuple]`, optional):
+            offset_mapping_ids_1 (List[tuple], optional):
                 Optional second list of char offsets for offset mapping pairs.
                 Defaults to `None`.
 
         Returns:
-            `List[tuple]`: List of char offsets with the appropriate offsets of special tokens.
+            List[tuple]: List of char offsets with the appropriate offsets of special tokens.
         """
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
@@ -267,14 +268,14 @@ class ErnieTokenizer(PretrainedTokenizer):
         If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
 
         Args:
-            token_ids_0 (`List[int]`):
+            token_ids_0 (List[int]):
                 List of IDs.
-            token_ids_1 (`List[int]`, optional):
+            token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs. 
                 Defaults to `None`.
 
         Returns:
-            `List[int]`: List of token_type_id according to the given sequence(s).
+            List[int]: List of token_type_id according to the given sequence(s).
         """
         _sep = [self.sep_token_id]
         _cls = [self.cls_token_id]
@@ -290,29 +291,29 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
     use the `sentencepiece` tools to cut the words to sub-words.
 
     Args:
-        vocab_file (`str`): 
+        vocab_file (str): 
             The file path of the vocabulary.
-        sentencepiece_model_file (`str`):
+        sentencepiece_model_file (str):
             The file path of sentencepice model.
-        word_dict(`str`):
+        word_dict(str):
             The file path of word vocabulary, 
             which is used to do chinese word segmentation.
-        do_lower_case (`bool`, optional): 
+        do_lower_case (str, optional): 
             Whether the text strips accents and convert to lower case. 
             Defaults to `True`.
-        unk_token (`str`, optional): 
+        unk_token (str, optional): 
             The special token for unknown words. 
             Defaults to "[UNK]".
-        sep_token (`str`, optional): 
+        sep_token (str, optional): 
             The special token for separator token. 
             Defaults to "[SEP]".
-        pad_token (`str`, optional): 
+        pad_token (str, optional): 
             The special token for padding. 
             Defaults to "[PAD]".
-        cls_token (`str`, optional): 
+        cls_token (str, optional): 
             The special token for cls. 
             Defaults to "[CLS]".
-        mask_token (`str`, optional): 
+        mask_token (str, optional): 
             The special token for mask.
             Defaults to "[MASK]".
 
@@ -388,6 +389,7 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
     def vocab_size(self):
         r"""
         return the size of vocabulary.
+
         Returns:
             int: the size of vocabulary.
         """
@@ -417,11 +419,11 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         End-to-end tokenization for ErnieTiny models.
 
         Args:
-            text (`str`): 
+            text (str): 
                 The text to be tokenized.
         
         Returns:
-            List(`str`): 
+            List(str): 
                 A list of string representing converted tokens.
         """
         if len(text) == 0:
@@ -448,11 +450,11 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         End-to-end tokenization for ERNIE Tiny models.
 
         Args:
-            text (`str`): 
+            text (str): 
                 The text to be tokenized.
         
         Returns:
-            List(`str`): 
+            List(str): 
                 A list of string representing converted tokens.
         """
         return self._tokenize(text)
@@ -467,7 +469,7 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             tokens (list): 
                 A list of string representing tokens to be converted.
         Returns:
-            `str`: 
+            str: 
                 Converted string from tokens.
         """
         out_string = " ".join(tokens).replace(" ##", "").strip()
@@ -476,6 +478,7 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
     def save_resources(self, save_directory):
         r"""
         Save tokenizer related resources to files under `save_directory`.
+
         Args:
             save_directory (str): Directory to save files into.
         """
@@ -495,13 +498,13 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             inside your training loop.
 
         Args:
-            pair(`bool`, optional): 
+            pair(str, optional): 
                 Returns the number of added tokens in the case of a sequence pair if set to True, returns the
                 number of added tokens in the case of a single sequence if set to False.
                 Defaults to `Fasle`.
 
         Returns:
-            `int`: Number of tokens added to sequences.
+            int: Number of tokens added to sequences.
         """
         token_ids_0 = []
         token_ids_1 = []
@@ -520,14 +523,14 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             - pair of sequences: ``[CLS] A [SEP] B [SEP]``
 
         Args:
-            token_ids_0 (`List[int]`):
+            token_ids_0 (List[int]):
                 List of IDs to which the special tokens will be added.
-            token_ids_1 (`List[int]`, optional):
+            token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs.
                 Defaults to `None`.
 
         Returns:
-            `List[int]`: List of input_id with the appropriate special tokens.
+            List[int]: List of input_id with the appropriate special tokens.
         """
         if token_ids_1 is None:
             return [self.cls_token_id] + token_ids_0 + [self.sep_token_id]
@@ -547,14 +550,14 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             - pair of sequences: `(0,0) A (0,0) B (0,0)``
         
         Args:
-            offset_mapping_ids_0 (`List[tuple]`):
+            offset_mapping_ids_0 (List[tuple]):
                 List of char offsets to which the special tokens will be added.
-            offset_mapping_ids_1 (`List[tuple]`, optional):
+            offset_mapping_ids_1 (List[tuple], optional):
                 Optional second list of char offsets for offset mapping pairs.
                 Defaults to `None`.
 
         Returns:
-            `List[tuple]`: List of char offsets with the appropriate offsets of special tokens.
+            List[tuple]: List of char offsets with the appropriate offsets of special tokens.
         """
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
@@ -577,14 +580,14 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
 
         Args:
-            token_ids_0 (`List[int]`):
+            token_ids_0 (List[int]):
                 List of IDs.
-            token_ids_1 (`List[int]`, optional):
+            token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs.
                 Defaults to `None`.
 
         Returns:
-            `List[int]`: List of token_type_id according to the given sequence(s).
+            List[int]: List of token_type_id according to the given sequence(s).
         """
         _sep = [self.sep_token_id]
         _cls = [self.cls_token_id]
@@ -602,17 +605,17 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         special tokens using the tokenizer ``encode`` methods.
 
         Args:
-            token_ids_0 (`List[int]`): 
+            token_ids_0 (List[int]): 
                 List of ids of the first sequence.
-            token_ids_1 (`List[int]`, optinal): 
+            token_ids_1 (List[int], optinal): 
                 List of ids of the second sequence.
                 Defaults to `None`.
-            already_has_special_tokens (`bool`, optional): 
+            already_has_special_tokens (str, optional): 
                 Whether or not the token list is already formatted with special tokens for the model. 
                 Defaults to `False`.
 
         Returns:
-            results (`List[int]`): 
+            List[int]: 
                 The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
         """
 
