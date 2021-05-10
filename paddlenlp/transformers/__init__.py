@@ -35,12 +35,10 @@ from .unified_transformer.modeling import *
 from .unified_transformer.tokenizer import *
 from .ernie_ctm.modeling import *
 from .ernie_ctm.tokenizer import *
-<<<<<<< HEAD
-from .xlnet.modeling import *
-from .xlnet.tokenizer import *
-=======
 from .skep.modeling import *
 from .skep.tokenizer import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
->>>>>>> abd7d859602e49981f6520b86bd37bd83752bc50
+from .xlnet.modeling import *
+from .xlnet.tokenizer import *
+
