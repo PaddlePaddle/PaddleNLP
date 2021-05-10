@@ -114,7 +114,7 @@ python -u predict.py \
 
 模型使用[ERNIE-CTM](../ernie-ctm)+CRF训练而成，预测时使用viterbi解码，模型结构如下：
 
-<img src="../doc/img/wordtag_model.png" alt="wordtag模型结构"  />
+![WordTag模型结构](../doc/img/wordtag_model.png)
 
 
 ## Term-Linking实现
