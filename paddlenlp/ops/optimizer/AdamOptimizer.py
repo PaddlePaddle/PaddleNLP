@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import Callable
+try:
+    from collections.abc import Callable  # noqa
+except ImportError:
+    from collections import Callable  # noqa
 
 import paddle
 from paddle.fluid.framework import Variable
@@ -31,7 +34,7 @@ class AdamOptimizer(Optimizer):
     of section 2 of `Adam paper <https://arxiv.org/abs/1412.6980>`_ ,
     it can dynamically adjusts the learning rate of each parameter using
     the 1st moment estimates and the 2nd moment estimates of the gradient.
-    
+
     The parameter ``param_out`` update rule with gradient ``grad``:
     .. math::
         t & = t + 1
@@ -60,9 +63,9 @@ class AdamOptimizer(Optimizer):
             regularizer using :ref:`api_fluid_ParamAttr` already, the regularization setting here in optimizer will be \
             ignored for this parameter. Otherwise, the regularization setting here in optimizer will take effect.  \
             Default None, meaning there is no regularization.
-        grad_clip (GradientClipBase, optional): Gradient cliping strategy, it's an instance of 
-            some derived class of ``GradientClipBase`` . There are three cliping strategies 
-            ( :ref:`api_fluid_clip_GradientClipByGlobalNorm` , :ref:`api_fluid_clip_GradientClipByNorm` , 
+        grad_clip (GradientClipBase, optional): Gradient cliping strategy, it's an instance of
+            some derived class of ``GradientClipBase`` . There are three cliping strategies
+            ( :ref:`api_fluid_clip_GradientClipByGlobalNorm` , :ref:`api_fluid_clip_GradientClipByNorm` ,
             :ref:`api_fluid_clip_GradientClipByValue` ). Default None, meaning there is no gradient clipping.
         name (str, optional): Normally there is no need for user to set this property.
             For more information, please refer to :ref:`api_guide_Name`.
@@ -223,7 +226,7 @@ class AdamOptimizer(Optimizer):
 
         # create the adam optimize op
         if self._apply_decay_param_fun is not None \
-            and not self._apply_decay_param_fun(param_and_grad[0]):
+            and not self._apply_decay_param_fun(param_and_grad[0].name):
             weight_decay = 0.0
         else:
             weight_decay = self._weight_decay

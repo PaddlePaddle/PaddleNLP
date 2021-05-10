@@ -57,12 +57,12 @@ def main():
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
-    # build model and load trained parameters
+    # Suild model and load trained parameters
     model = model_class.from_pretrained(args.model_path, max_predict_len=32)
     tokenizer = tokenizer_class.from_pretrained(args.model_path)
-    # switch to eval model
+    # Switch to eval model
     model.eval()
-    # convert to static graph with specific input description
+    # Convert to static graph with specific input description
     model = paddle.jit.to_static(
         model,
         input_spec=[
@@ -72,9 +72,9 @@ def main():
                 shape=[1], dtype="int32"),  # end_id
         ])
 
-    # save converted static graph model
+    # Save converted static graph model
     paddle.jit.save(model, args.output_path)
-    # also save tokenizer for inference usage
+    # Also save tokenizer for inference usage
     tokenizer.save_pretrained(os.path.dirname(args.output_path))
 
 

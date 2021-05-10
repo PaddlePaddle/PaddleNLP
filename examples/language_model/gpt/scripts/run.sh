@@ -6,17 +6,18 @@ PYTHONPATH=../../../ python -u run_pretrain.py \
     --model_name_or_path "gpt-small-en"\
     --input_dir "./data"\
     --output_dir "output"\
+    --max_seq_len 1024 \
+    --micro_batch_size 16\
     --max_lr 0.00015\
     --min_lr 0.00001\
-    --weight_decay 0.01\
-    --grad_clip 1.0\
     --max_steps 70000\
     --save_steps 70000\
-    --eval_steps 500\
-    --logging_steps 1\
     --decay_steps 320000\
+    --weight_decay 0.01\
     --warmup_rate 0.01\
-    --micro_bsz 16\
+    --grad_clip 1.0\
+    --logging_freq 1\
+    --eval_freq 500\
     --device "gpu"
 
 

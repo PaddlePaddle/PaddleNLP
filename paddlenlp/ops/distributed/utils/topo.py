@@ -19,37 +19,61 @@ GroupInfo = namedtuple('GroupInfo', ['size', 'rank', 'world'])
 
 
 class Topology:
-    def __init__(self, rank, world_size, dp, pp, sharding, mp):
-        arr = np.arange(0, dp * pp * sharding * mp).reshape(
-            [dp, pp, sharding, mp])
+    def __init__(self,
+                 device_rank,
+                 world_size,
+                 dp_degree=None,
+                 pp_degree=1,
+                 sharding_degree=1,
+                 mp_degree=1):
+        arr = np.arange(0, dp_degree * pp_degree * sharding_degree *
+                        mp_degree).reshape(
+                            [dp_degree, pp_degree, sharding_degree, mp_degree])
 
-        idp, ipp, isharding, imp = np.where(arr == rank)
-        idp = idp[0]
-        ipp = ipp[0]
-        isharding = isharding[0]
-        imp = imp[0]
+        dp_rank, pp_rank, sharding_rank, mp_rank = np.where(arr == device_rank)
+        dp_rank = dp_rank[0]
+        pp_rank = pp_rank[0]
+        sharding_rank = sharding_rank[0]
+        mp_rank = mp_rank[0]
 
         self.world = GroupInfo(
-            size=world_size, rank=rank, world=list(range(0, world_size)))
+            size=world_size, rank=device_rank,
+            world=list(range(0, world_size)))
 
-        mp = arr[idp, ipp, isharding, :]
-        self.mp = GroupInfo(size=len(mp), rank=imp, world=mp.tolist())
+        mp_world = arr[dp_rank, pp_rank, sharding_rank, :]
+        self.mp_info = GroupInfo(
+            size=len(mp_world), rank=mp_rank, world=mp_world.tolist())
 
-        sharding = arr[idp, ipp, :, imp]
-        self.sharding = GroupInfo(
-            size=len(sharding), rank=isharding, world=sharding.tolist())
+        sharding_world = arr[dp_rank, pp_rank, :, mp_rank]
+        self.sharding_info = GroupInfo(
+            size=len(sharding_world),
+            rank=sharding_rank,
+            world=sharding_world.tolist())
 
-        pp = arr[idp, :, isharding, imp]
-        self.pp = GroupInfo(size=len(pp), rank=ipp, world=pp.tolist())
+        pp_world = arr[dp_rank, :, sharding_rank, mp_rank]
+        self.pp_info = GroupInfo(
+            size=len(pp_world), rank=pp_rank, world=pp_world.tolist())
 
-        dp = arr[:, ipp, isharding, imp]
-        self.dp = GroupInfo(size=len(dp), rank=idp, world=dp.tolist())
+        dp_world = arr[:, pp_rank, sharding_rank, mp_rank]
+        self.dp_info = GroupInfo(
+            size=len(dp_world), rank=dp_rank, world=dp_world.tolist())
 
-        self.is_last = self.pp.rank == self.pp.size - 1
+        self.is_last = self.pp_info.rank == self.pp_info.size - 1
 
-        self.data_worldsize = self.dp.size * self.sharding.size
-        self.data_inner_times = self.world.size // self.data_worldsize
-        self.data_rank = self.dp.rank * self.sharding.size + self.sharding.rank
+        data_arr = np.arange(0, dp_degree * sharding_degree).reshape(
+            [dp_degree, sharding_degree])
+        data_arr = np.expand_dims(data_arr, axis=1).repeat(pp_degree, axis=1)
+        data_arr = np.expand_dims(data_arr, axis=3).repeat(mp_degree, axis=3)
+
+        self.data_info = GroupInfo(
+            size=self.dp_info.size * self.sharding_info.size,
+            rank=self.dp_info.rank * self.sharding_info.size +
+            self.sharding_info.rank,
+            world=data_arr.reshape(-1).tolist())
+
+        assert self.data_info.world[
+            device_rank] == self.data_info.rank, "Data rank caculate error!"
+        self.data_inner_times = self.world.size // self.data_info.size
 
     def __repr__(self):
-        return f'dp:\n\t {self.dp}, \npp:\n\t {self.pp}, \nsharding:\n\t {self.sharding}, \nmp:\n\t {self.mp}'
+        return f'dp_info:\n\t {self.dp_info}, \npp_info:\n\t {self.pp_info}, \nsharding_info:\n\t {self.sharding_info}, \nmp_info:\n\t {self.mp_info}'

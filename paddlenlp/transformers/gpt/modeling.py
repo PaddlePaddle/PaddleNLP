@@ -35,7 +35,6 @@ __all__ = [
     'GPTForPretraining',
     'GPTPretrainingCriterion',
     'GPTForGreedyGeneration',
-    'GPTForTopKPGeneration',
 ]
 
 
@@ -83,22 +82,22 @@ class MultiHeadAttention(nn.Layer):
         else:
             self.q_proj = ops.ColumnParallelLiner(
                 (embed_dim, embed_dim),
-                topo.mp.size,
+                topo.mp_info.size,
                 weight_attr,
                 bias_attr=bias_attr)
             self.k_proj = ops.ColumnParallelLiner(
                 (self.kdim, embed_dim),
-                topo.mp.size,
+                topo.mp_info.size,
                 weight_attr,
                 bias_attr=bias_attr)
             self.v_proj = ops.ColumnParallelLiner(
                 (self.vdim, embed_dim),
-                topo.mp.size,
+                topo.mp_info.size,
                 weight_attr,
                 bias_attr=bias_attr)
             self.out_proj = ops.RowParallelLiner(
                 (embed_dim, embed_dim),
-                topo.mp.size,
+                topo.mp_info.size,
                 weight_attr,
                 bias_attr=bias_attr)
 
@@ -346,7 +345,7 @@ class TransformerDecoderLayer(nn.Layer):
             weight_attr=weight_attrs[0],
             bias_attr=bias_attrs[0])
 
-        if topo is None or topo.mp.size == 1:
+        if topo is None or topo.mp_info.size == 1:
             self.linear1 = nn.Linear(
                 d_model,
                 dim_feedforward,
@@ -360,12 +359,12 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             self.linear1 = ops.ColumnParallelLiner(
                 (d_model, dim_feedforward),
-                topo.mp.size,
+                topo.mp_info.size,
                 weight_attrs[2],
                 bias_attr=bias_attrs[2])
             self.linear2 = ops.RowParallelLiner(
                 (dim_feedforward, d_model),
-                topo.mp.size,
+                topo.mp_info.size,
                 weight_attrs[2],
                 bias_attr=bias_attrs[2])
 
@@ -424,7 +423,7 @@ class GPTEmbeddings(nn.Layer):
                  topo=None):
         super(GPTEmbeddings, self).__init__()
         # TODO @ZHUI Use ParallelEmbedding
-        #if topo is None or topo.mp.size == 1:
+        #if topo is None or topo.mp_info.size == 1:
         self.word_embeddings = nn.Embedding(
             vocab_size,
             hidden_size,
@@ -436,7 +435,7 @@ class GPTEmbeddings(nn.Layer):
         #    self.word_embeddings = ops.ParallelEmbedding(
         #        vocab_size,
         #        hidden_size,
-        #        topo.mp.size,
+        #        topo.mp_info.size,
         #        weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
         #            mean=0.0, std=initializer_range)))
         self.position_embeddings = nn.Embedding(
@@ -457,7 +456,6 @@ class GPTEmbeddings(nn.Layer):
 
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
-        # paddle.static.Print(self.word_embeddings.weight, message="embedding table")
         embeddings = input_embedings + position_embeddings
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -608,9 +606,9 @@ class GPTModel(GPTPretrainedModel):
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
 
-        self.pipline_mode = topo is not None and topo.pp.size > 1
+        self.pipline_mode = topo is not None and topo.pp_info.size > 1
         if self.pipline_mode:
-            self.layer_per_stage = num_hidden_layers // self.topo.pp.size
+            self.layer_per_stage = num_hidden_layers // self.topo.pp_info.size
 
         self.embeddings = GPTEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
@@ -639,7 +637,7 @@ class GPTModel(GPTPretrainedModel):
                     topo=topo))
 
         if self.pipline_mode:
-            Decoder = ops.guard(f'gpu:{self.topo.pp.size-1}')(
+            Decoder = ops.guard(f'gpu:{self.topo.pp_info.size-1}')(
                 TransformerDecoder)
         else:
             Decoder = TransformerDecoder
@@ -663,12 +661,7 @@ class GPTModel(GPTPretrainedModel):
         self.checkpoints = []
         if attention_mask is None:
             length = paddle.shape(input_ids)[1]
-            # attention_mask = paddle.tensor.triu(
-            #     (paddle.ones(
-            #         (length, length),
-            #         dtype=self.embeddings.word_embeddings.weight.dtype) * -1e9),
-            #     1)
-            # use bool mask
+            # Use bool mask
             attention_mask = paddle.tensor.tril(
                 paddle.ones(
                     (length, length),
@@ -688,8 +681,6 @@ class GPTModel(GPTPretrainedModel):
                                                          input_ids)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
-
-        # paddle.fluid.layers.Print(embedding_output, message="embedding_output")
 
         encoder_outputs = self.decoder(
             embedding_output,
@@ -729,7 +720,7 @@ class GPTForPretraining(GPTPretrainedModel):
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        # TODO @ZHUI Use all_to_all to 
+        # TODO @ZHUI Use all_to_all to
         logits = paddle.matmul(
             encoder_outputs,
             self.gpt.embeddings.word_embeddings.weight,
@@ -805,70 +796,11 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         nid = paddle.argmax(output[0, -1]).reshape([1, -1])
         src_ids = paddle.concat([src_ids, nid], axis=1)
         cur_len = 0
-        # for i in range(max_predict_len):
         while (cur_len < self.max_predict_len):
             output, cached_kvs = self.model(
                 nid, use_cache=True, cache=cached_kvs)
 
             nid = paddle.argmax(output[0, -1]).reshape([1, -1])
-            src_ids = paddle.concat([src_ids, nid], axis=1)
-            cur_len += 1
-            if paddle.max(nid) == end_id:
-                break
-
-        return src_ids
-
-
-class GPTForTopKPGeneration(GPTPretrainedModel):
-    """
-    The generate model for GPT-2.
-    It use the topk topk stategy to generation.
-    """
-
-    def __init__(self, gpt, max_predict_len):
-        super(GPTForTopKPGeneration, self).__init__()
-        self.gpt = gpt
-        self.max_predict_len = max_predict_len
-        self.apply(self.init_weights)
-
-    def model(self,
-              input_ids,
-              position_ids=None,
-              attention_mask=None,
-              masked_positions=None,
-              use_cache=False,
-              cache=None):
-        outputs = self.gpt(input_ids,
-                           position_ids=position_ids,
-                           attention_mask=attention_mask,
-                           use_cache=use_cache,
-                           cache=cache)
-        if use_cache:
-            encoder_outputs, cached_kvs = outputs[:2]
-        else:
-            encoder_outputs = outputs
-        logits = paddle.matmul(
-            encoder_outputs,
-            self.gpt.embeddings.word_embeddings.weight,
-            transpose_y=True)
-
-        if use_cache:
-            return logits, cached_kvs
-        else:
-            return logits
-
-    def forward(self, input_ids, end_id):
-        output, cached_kvs = self.model(input_ids, use_cache=True, cache=None)
-        src_ids = input_ids
-        nid = paddle.argmax(output[0, -1]).reshape([1, -1])
-        src_ids = paddle.concat([src_ids, nid], axis=1)
-        cur_len = 0
-        # for i in range(max_predict_len):
-        while (cur_len < self.max_predict_len):
-            output, cached_kvs = self.model(
-                nid, use_cache=True, cache=cached_kvs)
-            #TODO @zhui add topk topp support.
-            #nid = paddle.argmax(output[0, -1]).reshape([1, -1])
             src_ids = paddle.concat([src_ids, nid], axis=1)
             cur_len += 1
             if paddle.max(nid) == end_id:

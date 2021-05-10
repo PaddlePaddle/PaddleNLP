@@ -8,11 +8,13 @@
 ```text
 .
 ├── args.py                 # 训练参数配置
-├── data.py                 # 数据处理
+├── dataset.py              # 数据处理
 ├── decompress.sh           # 数据集解压脚本
-├── generate_sample.py      # 生成文本示例demo
+├── deploy/                 # 模型部署的inference脚本
+├── export_model.py         # 导出预测部署的模型脚本
+├── predict.py              # 生成文本示例demo
 ├── lr.py                   # 学习率控制
-├── process_data.py         # 数据预处理脚本
+├── create_pretraining_data.py         # 数据预处理脚本
 ├── README.md               # 文档
 ├── run_pretrain.py         # 预训练入口
 ├── run_eval.py             # 评估入口
@@ -49,7 +51,7 @@ bash decompress.sh
 为了提升训练速度，我们在训练前将文本数据转成相应的id，并保存为npz格式：
 
 ```shell
-python process_data.py --input_path raw_data \
+python create_pretraining_data.py --input_path raw_data \
  --model_name gpt-medium-en \
  --append_eod \
  --workers 8
@@ -211,7 +213,15 @@ python deploy/python/inference.py --model_type gpt \
 
 用户可以看到屏幕输出预测结果。
 
+## 飞桨4D混合并行训练
+飞桨4D混合并行，使用sharding、模型并行、流水线并行和数据并行策略，使得训练千亿参数规模的模型成为可能。在本示例中，我们提供了基于飞桨最新混合并行策略的GPT预训练模型。运行下面脚本，即可进行模型预训练：
+```shell
+sh scripts/run_static.sh
+```
+用户可以根据自己的机器资源，灵活调整并行策略，选择最合适的策略来训练模型。更多关于混合并行策略的的例子详见[飞桨4D混合并行训练使用指南](https://fleet-x.readthedocs.io/en/latest/paddle_fleet_rst/collective/collective_mp/hybrid_parallelism.html)
 
 ## 参考文献
 - [Language Models are Unsupervised Multitask Learners](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
 - [CPM: A Large-scale Generative Chinese Pre-trained Language Model](https://arxiv.org/abs/2012.00413)
+- [Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism](https://arxiv.org/abs/1909.08053)
+- [Efficient Large-Scale Language Model Training on GPU Clusters](https://arxiv.org/abs/2104.04473)

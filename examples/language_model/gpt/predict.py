@@ -16,6 +16,7 @@
 # https://github.com/TsinghuaAI/CPM-Generate
 # https://github.com/jm12138/CPM-Generate-Paddle
 
+import sys
 import argparse
 import numpy as np
 
@@ -25,14 +26,17 @@ from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "gpt-base-cn": (GPTForGreedyGeneration, GPTChineseTokenizer),
-    "gpt-medium-en": (GPTForGreedyGeneration, GPTTokenizer),
+    "gpt-cn": (GPTForGreedyGeneration, GPTChineseTokenizer),
+    "gpt": (GPTForGreedyGeneration, GPTTokenizer),
 }
 
 
 class Demo:
-    def __init__(self, model_name_or_path="gpt-base-cn", max_predict_len=32):
-        model_class, tokenizer_class = MODEL_CLASSES[model_name_or_path]
+    def __init__(self,
+                 model_type="gpt-cn",
+                 model_name_or_path="gpt-base-cn",
+                 max_predict_len=32):
+        model_class, tokenizer_class = MODEL_CLASSES[model_type]
         self.tokenizer = tokenizer_class.from_pretrained(model_name_or_path)
         logger.info('Loading the model parameters, please wait...')
         self.model = model_class.from_pretrained(
@@ -42,28 +46,32 @@ class Demo:
 
     # prediction function
     def predict(self, text):
-        ids = self.tokenizer.encode(text)
+        ids = self.tokenizer(text)["input_ids"]
         input_ids = paddle.to_tensor(
             np.array(ids).reshape(1, -1).astype('int64'))
-        out = self.model(input_ids, self.tokenizer.command_name_map["stop"].Id)
+        out = self.model(input_ids, self.tokenizer.stop_token_id)
         out = [int(x) for x in out.numpy().reshape([-1])]
-        logger.info(self.tokenizer.decode(out))
+        logger.info(self.tokenizer.convert_ids_to_string(out))
 
     # One shot example
-    def ask_question(self, question):
+    def ask_question_cn(self, question):
         self.predict("问题：中国的首都是哪里？答案：北京。\n问题：%s 答案：" % question)
 
+    def ask_question_en(self, question):
+        self.predict(
+            "Question: Where is the capital of China? Answer: Beijing. \nQuestion: %s  "
+            % question)
+
     # dictation poetry
-    def dictation_poetry(self, front):
+    def dictation_poetry_cn(self, front):
         self.predict('''默写古诗: 大漠孤烟直，长河落日圆。\n%s''' % front)
 
 
 if __name__ == "__main__":
-    # demo = Demo("gpt-base-cn")
-    # demo.ask_question("苹果的CEO是谁?")
-    # demo.dictation_poetry("举杯邀明月，")
-    # del demo
-    demo = Demo("gpt-medium-en")
-    demo.predict(
-        "Question: Where is the capital of China? Answer: Beijing. \nQuestion: Who is the CEO of Apple? Answer:"
-    )
+    if len(sys.argv) > 1 and sys.argv[1] == "gpt-cn":
+        demo = Demo("gpt-cn", "gpt-base-cn")
+        demo.ask_question_cn("苹果的CEO是谁?")
+        demo.dictation_poetry_cn("举杯邀明月，")
+    else:
+        demo = Demo("gpt", "gpt-medium-en")
+        demo.ask_question_en("Who is the CEO of Apple?")

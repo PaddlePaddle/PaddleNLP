@@ -82,7 +82,7 @@ class LM_Eval_Dataset(paddle.io.Dataset):
         position_ids = np.arange(0, seq_length, dtype="int64")
 
         # -INF mask value as default
-        attention_mask = (attention_mask - 1.0) * 1e9
+        # attention_mask = (attention_mask - 1.0) * 1e9
         # Bool mask of attention
         attention_mask = attention_mask.astype("float32")
         return [tokens, loss_mask, attention_mask, position_ids, labels]
@@ -127,7 +127,7 @@ class Lambada_Eval_Dataset(paddle.io.Dataset):
         position_ids = np.arange(0, seq_length, dtype="int64")
 
         # -INF mask value as default
-        attention_mask = (attention_mask - 1.0) * 1e9
+        #attention_mask = (attention_mask - 1.0) * 1e9
         # Bool mask of attention
         attention_mask = attention_mask.astype("float32")
         return [tokens, attention_mask, position_ids, labels]
@@ -182,12 +182,12 @@ def wikitext_detokenizer(string):
 
 def get_tokens(tokenizer, text, strict=True):
     if not strict:
-        tokens = tokenizer.encode(text)
+        tokens = tokenizer.get_input_ids(text)
         return tokens[:-1], [tokens[-1]]
     last_token = text.split()[-1]
     start_idx = text.rfind(last_token)
-    beginning_tokens = tokenizer.encode(text[:start_idx].strip())
-    last_token = tokenizer.encode(' ' + last_token)
+    beginning_tokens = tokenizer.get_input_ids(text[:start_idx].strip())
+    last_token = tokenizer.get_input_ids(' ' + last_token)
     return beginning_tokens, last_token
 
 
@@ -197,18 +197,17 @@ def create_eval_dataset(args):
     seq_len = args.seq_length
 
     tokenizer = GPTTokenizer.from_pretrained(args.model_name)
-    pad_token = tokenizer.command_name_map["pad"].Id
-
     if not args.cloze_eval:
         with open(args.eval_path, "rb") as reader:
             entire_data = reader.read().decode('utf-8')
         num_original_tokens = len(entire_data.strip().split(" "))
         entire_data = wikitext_detokenizer(entire_data)
-        tokenized_data = tokenizer.encode(entire_data)
+        tokenized_data = tokenizer.get_input_ids(entire_data)
         num_tokenized_tokens = len(tokenized_data)
         print('Original Tokens: %d, Detokenized tokens: %d' %
               (num_tokenized_tokens, num_original_tokens))
-        val_dataset = LM_Eval_Dataset(tokenized_data, seq_len, pad_token,
+        val_dataset = LM_Eval_Dataset(tokenized_data, seq_len,
+                                      tokenizer.pad_token_id,
                                       args.overlapping_eval)
     else:
         tokenized_data = []
@@ -220,7 +219,7 @@ def create_eval_dataset(args):
                 tokenized_data.append(tokens)
                 tokenized_label.append(labels)
         val_dataset = Lambada_Eval_Dataset(tokenized_data, tokenized_label,
-                                           seq_len, pad_token)
+                                           seq_len, tokenizer.pad_token_id)
         num_tokenized_tokens = 0
         num_original_tokens = 0
 

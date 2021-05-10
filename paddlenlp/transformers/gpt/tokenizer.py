@@ -20,6 +20,7 @@ import json
 import jieba
 import shutil
 from paddle.utils import try_import
+from paddlenlp.data import Vocab
 from paddlenlp.utils.log import logger
 
 from .. import PretrainedTokenizer
@@ -30,19 +31,6 @@ __all__ = [
     'GPTTokenizer',
     'GPTChineseTokenizer',
 ]
-
-COMMAND_TUPLE = namedtuple('CommandToken', ('name', 'token', 'Id'))
-TYPE_TUPLE = namedtuple('TypeToken', ('name', 'token', 'Id'))
-
-
-class CommandToken(object):
-    def __init__(self, name, token, Id):
-        self.name = name
-        self.token = token
-        self.Id = Id
-
-    def __str__(self):
-        return str(COMMAND_TUPLE(self.name, self.token, self.Id))
 
 
 @lru_cache()
@@ -103,16 +91,18 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-base-cn-sentencepiece.model"
         }
     }
-    pretrained_init_configuration = {"gpt-base-cn": {"do_lower_case": True}, }
+    pretrained_init_configuration = {"gpt-base-cn": {}, }
 
-    def __init__(self,
-                 vocab_file,
-                 model_file,
-                 do_lower_case=True,
-                 max_len=512,
-                 bod_id="<bod>",
-                 eod_id="<eod>",
-                 max_length=None):
+    def __init__(
+            self,
+            vocab_file,
+            model_file,
+            max_len=512,
+            unk_token='<unk>',
+            bod_token='<bod>',
+            eod_token='<eod>',
+            stop_token='\u2583',  # The token of newline.
+    ):
         self._vocab_file = vocab_file
         self._model_file = model_file
         if not os.path.isfile(vocab_file):
@@ -127,27 +117,63 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         mod = try_import("sentencepiece")
         self.sp = mod.SentencePieceProcessor(model_file=model_file)
         self.translator = str.maketrans(" \n", "\u2582\u2583")
+        vocab_dict = {}
+        for id in range(self.sp.get_piece_size()):
+            vocab_dict[self.sp.id_to_piece(id)] = id
+        self.vocab = Vocab.from_dict(vocab_dict, unk_token=unk_token)
 
     def tokenize(self, text):
+        """
+        End-to-end tokenization for GPT models.
+        Args:
+            text (str):
+                The text to be tokenized.
+
+        Returns:
+            list[str]: A list of string representing converted tokens.
+        Example:
+            .. code-block::
+                from paddlenlp.transformers import GPTChineseTokenizer
+                tokenizer = GPTChineseTokenizer.from_pretrained('gpt-base-cn')
+                print(tokenizer.tokenize('我爱祖国'))
+        """
+        return self._tokenize(text)
+
+    def _tokenize(self, text):
         """ Tokenize a string. """
         seg_list = [
             x.translate(self.translator) for x in jieba.cut(text, cut_all=False)
         ]
         new_seg = " ".join(seg_list)
-        return self.sp.encode(new_seg)
+        return self.sp.encode(new_seg, out_type=str)
 
-    def encode(self, text):
-        return self.convert_tokens_to_ids(text)
+    def get_input_ids(self, text):
+        tokens = self._tokenize(text)
+        return self.convert_tokens_to_ids(tokens)
 
-    def decode(self, tokens):
-        return self.convert_ids_to_tokens(tokens)
+    @property
+    def vocab_size(self):
+        """
+        Returns the size of vocabulary.
+        Example:
+            .. code-block::
+                from paddlenlp.transformers import GPTChineseTokenizer
+                tokenizer = GPTChineseTokenizer.from_pretrained('gpt-base-cn')
+                print(tokenizer.vocab_size)
+        """
+        return len(self.vocab)
 
-    def convert_tokens_to_ids(self, text):
-        res = self.tokenize(text)
-        return res
-
-    def convert_ids_to_tokens(self, tokens):
-        text = self.sp.decode(tokens)
+    def convert_ids_to_string(self, ids):
+        """
+        Converts a single index or a sequence of indices to a token or a
+        sequence of tokens.
+        Args:
+            ids (int|list[int]):
+                The token id (or token ids) to be converted to token(s).
+        Returns:
+            str|list[str]: The decoded token(s).
+        """
+        text = self.sp.decode(ids)
         text = text.replace(' ', '').replace('\u2582', ' ').replace('\u2583',
                                                                     '\n')
         return text
@@ -168,8 +194,8 @@ class GPTTokenizer(PretrainedTokenizer):
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt"
     }  # for save_pretrained
-    gpt_vocab_link = "http://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-large-en-vocab.json"
-    gpt_merges_link = "http://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-large-en-merges.txt"
+    gpt_vocab_link = "http://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-en-vocab.json"
+    gpt_merges_link = "http://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-en-merges.txt"
     pretrained_resource_files_map = {
         "vocab_file": {
             "gpt-xlarge-en": gpt_vocab_link,
@@ -185,27 +211,23 @@ class GPTTokenizer(PretrainedTokenizer):
         }
     }
     pretrained_init_configuration = {
-        "gpt-xlarge-en": {
-            "do_lower_case": True
-        },
-        "gpt-large-en": {
-            "do_lower_case": True
-        },
-        "gpt-medium-en": {
-            "do_lower_case": True
-        },
-        "gpt-small-en": {
-            "do_lower_case": True
-        },
+        "gpt-xlarge-en": {},
+        "gpt-large-en": {},
+        "gpt-medium-en": {},
+        "gpt-small-en": {},
     }
 
-    def __init__(self,
-                 vocab_file,
-                 merges_file,
-                 errors='replace',
-                 special_tokens=None,
-                 max_len=None,
-                 do_lower_case=True):
+    def __init__(
+            self,
+            vocab_file,
+            merges_file,
+            errors='replace',
+            max_len=None,
+            special_tokens=None,
+            pad_token='<|endoftext|>',
+            eod_token='<|endoftext|>',
+            stop_token='\u010a',  # The token of newline.
+    ):
         self._vocab_file = vocab_file
         self._merges_file = merges_file
         self.max_len = max_len if max_len is not None else int(1e12)
@@ -214,19 +236,6 @@ class GPTTokenizer(PretrainedTokenizer):
 
         self.encoder = json.load(open(vocab_file))
         self.decoder = {v: k for k, v in self.encoder.items()}
-
-        # construct the command tokens
-        self._command_tokens = [
-            CommandToken('pad', '<|endoftext|>', self.encoder['<|endoftext|>']),
-            CommandToken('eod', '<|endoftext|>', self.encoder['<|endoftext|>']),
-            CommandToken('stop', '.', self.encoder['.']),
-        ]
-        self.command_name_map = {tok.name: tok for tok in self._command_tokens}
-        self.command_token_map = {
-            tok.token: tok
-            for tok in self._command_tokens
-        }
-        self.command_id_map = {tok.Id: tok for tok in self._command_tokens}
 
         self.num_tokens = len(self.encoder)
         self.num_text_tokens = self.num_tokens - 1
@@ -311,6 +320,10 @@ class GPTTokenizer(PretrainedTokenizer):
 
     def tokenize(self, text):
         """ Tokenize a string. """
+        return self._tokenize(text)
+
+    def _tokenize(self, text):
+        """ Tokenize a string. """
         bpe_tokens = []
         re = try_import("regex")
         for token in re.findall(self.pat, text):
@@ -350,16 +363,16 @@ class GPTTokenizer(PretrainedTokenizer):
                 tokens.append(self.decoder[i])
         return tokens
 
-    def encode(self, text, fn=None):
+    def get_input_ids(self, text, fn=None):
         processed_text = text
         if fn is not None:
             processed_text = fn(text)
         ids = self.convert_tokens_to_ids(self.tokenize(processed_text))
         return ids
 
-    def decode(self, tokens):
+    def convert_ids_to_string(self, ids):
         # TODO
-        text = ''.join([self.decoder[token] for token in tokens])
+        text = ''.join([self.decoder[id] for id in ids])
         text = bytearray([self.byte_decoder[c] for c in text]).decode(
             'utf-8', errors=self.errors)
         return text

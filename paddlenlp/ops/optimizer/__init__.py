@@ -17,23 +17,29 @@ from paddle.utils.cpp_extension import load
 from .adam import Adam
 from .AdamOptimizer import AdamOptimizer
 
-try:
-    load(
-        name="custom_jit_ops",
-        sources=[
-            os.path.join(os.path.dirname(__file__), x)
-            for x in [
-                "adam_custom.cc",
-                "adam_custom.cu",
-            ]
-        ])
-except RuntimeError:
-    import sys
-    sys.stderr.write(
-        '''Warning with compile custom ops: compile custom adam op failed. \nIf you do not use custom ops, please ignore this warning! \n'''
-    )
+
+def _jit_compile():
+    try:
+        load(
+            name="custom_jit_ops",
+            sources=[
+                os.path.join(os.path.dirname(__file__), x)
+                for x in [
+                    "adam_custom.cc",
+                    "adam_custom.cu",
+                ]
+            ])
+        return True
+    except RuntimeError:
+        import sys
+        sys.stderr.write(
+            '''Warning with compile custom ops: compile custom adam op failed. \nIf you do not use custom ops, please ignore this warning! \n'''
+        )
+        return False
+
 
 __all__ = [
+    '_jit_compile',
     'Adam',
     'AdamOptimizer',
 ]

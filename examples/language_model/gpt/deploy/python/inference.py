@@ -16,8 +16,8 @@ import argparse
 import os
 from functools import partial
 
-import paddle
 import numpy as np
+import paddle
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import GPTForGreedyGeneration, GPTChineseTokenizer, GPTTokenizer
@@ -30,37 +30,12 @@ MODEL_CLASSES = {
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    # yapf: disable
+    parser.add_argument("--model_type", default=None, type=str, required=True, help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
+    parser.add_argument("--model_path", default=None, type=str, required=True, help="The path prefix of inference model to be used.")
+    parser.add_argument("--select_device", default="gpu", choices=["gpu", "cpu", "xpu"], help="Device selected for inference.")
+    # yapf: enable
 
-    # Required parameters
-    parser.add_argument(
-        "--model_type",
-        default=None,
-        type=str,
-        required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
-    parser.add_argument(
-        "--model_path",
-        default=None,
-        type=str,
-        required=True,
-        help="The path prefix of inference model to be used.", )
-    parser.add_argument(
-        "--select_device",
-        default="gpu",
-        choices=["gpu", "cpu", "xpu"],
-        help="Device selected for inference.", )
-    parser.add_argument(
-        "--batch_size",
-        default=32,
-        type=int,
-        help="Batch size for predict.", )
-    parser.add_argument(
-        "--max_seq_length",
-        default=128,
-        type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
     args = parser.parse_args()
     return args
 
@@ -76,14 +51,14 @@ class Predictor(object):
         config = paddle.inference.Config(args.model_path + ".pdmodel",
                                          args.model_path + ".pdiparams")
         if args.select_device == "gpu":
-            # set GPU configs accordingly
+            # Set GPU configs accordingly
             config.enable_use_gpu(100, 0)
         elif args.select_device == "cpu":
-            # set CPU configs accordingly,
+            # Set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             config.disable_gpu()
         elif args.select_device == "xpu":
-            # set XPU configs accordingly
+            # Set XPU configs accordingly
             config.enable_xpu(100)
         config.switch_use_feed_fetch_ops(False)
         predictor = paddle.inference.create_predictor(config)
@@ -91,7 +66,6 @@ class Predictor(object):
             predictor.get_input_handle(name)
             for name in predictor.get_input_names()
         ]
-        #print("input_handles", predictor.get_input_names())
         output_handles = [
             predictor.get_input_handle(name)
             for name in predictor.get_output_names()
@@ -100,8 +74,6 @@ class Predictor(object):
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
-            # print(data)
-            # print(data.shape)
             input_handle.copy_from_cpu(input_field.numpy() if isinstance(
                 input_field, paddle.Tensor) else input_field)
         self.predictor.run()
@@ -113,12 +85,8 @@ class Predictor(object):
     def predict(self, dataset, batch_size=1):
         outputs = []
         for data in dataset:
-            #print(data[0], data[1])
             output = self.predict_batch(data)
-            #print(output)
             outputs.append(output)
-        # print(outputs)
-        #print(outputs[0])
         return outputs
 
 
@@ -129,8 +97,6 @@ def main():
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(
         os.path.dirname(args.model_path))
-    ds = ["问题：中国的首都是哪里？答案：北京。\n问题：苹果的CEO是谁? 答案："]
-    end_id = 3
     if args.model_type == "gpt":
         ds = [
             "Question: Who is the CEO of Apple? Answer:",
@@ -139,17 +105,23 @@ def main():
             "Question: Who is the president of the united states? Answer:",
             "Question: Where is the capital of France? Answer:",
             "Question: What is the largest animal in the ocean? Answer:",
-            "Question: How many hours in a day? Answer:",
             "Question: Who is the chancellor of Germany? Answer:",
         ]
-        end_id = tokenizer.command_name_map["stop"].Id
+    elif args.model_type == "gpt-cn":
+        ds = [
+            "问题：苹果的CEO是谁? 答案：",
+            "问题：中国的首都是哪里？答案：",
+            "问题：世界上最高的山峰是? 答案：",
+        ]
+    end_id = tokenizer.stop_token_id
+
     dataset = [[
-        np.array(tokenizer.encode(text)).astype("int64").reshape([1, -1]),
-        np.array(end_id).astype("int32").reshape([1])
+        np.array(tokenizer.get_input_ids(text)).astype("int64").reshape(
+            [1, -1]), np.array(end_id).astype("int32").reshape([1])
     ] for text in ds]
     outs = predictor.predict(dataset)
     for res in outs:
-        print(tokenizer.decode(list(res[0].reshape([-1]))))
+        print(tokenizer.convert_ids_to_string(list(res[0].reshape([-1]))))
 
 
 if __name__ == "__main__":

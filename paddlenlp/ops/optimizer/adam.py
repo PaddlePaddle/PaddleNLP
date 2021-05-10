@@ -276,7 +276,7 @@ class Adam(Optimizer):
 
         # create the adam optimize op
         if self._apply_decay_param_fun is not None \
-            and not self._apply_decay_param_fun(param_and_grad[0]):
+            and not self._apply_decay_param_fun(param_and_grad[0].name):
             weight_decay = 0.0
         else:
             weight_decay = self._weight_decay
@@ -387,7 +387,7 @@ class Adam(Optimizer):
             .. code-block:: python
 
                 import paddle
-                
+
                 a = paddle.rand([2,13], dtype="float32")
                 linear = paddle.nn.Linear(13, 5)
                 # This can be any optimizer supported by dygraph.
