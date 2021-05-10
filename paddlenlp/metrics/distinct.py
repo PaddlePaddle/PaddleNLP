@@ -25,23 +25,26 @@ class Distinct(paddle.metric.Metric):
     the value of n-grams, the higher the diversity of the text. See detail at 
     https://arxiv.org/abs/1510.03055
 
-    `Distinct` could be used as `paddle.metric.Metric` class, or an ordinary 
-    class. When `Distinct` is used as `paddle.metric.Metric` class. A function is
-    needed that transforms the network output to string list. It should be noted 
-    that the `Distinct` here is different from the `Distinct` calculated in 
-    prediction, and it is only for observation during training and evaluation.
+    :class:`Distinct` could be used as :class:`paddle.metric.Metric` class, or 
+    an ordinary class. When :class:`Distinct` is used as 
+    :class:`paddle.metric.Metric` class, a function is needed that transforms 
+    the network output to string list. It should be noted that the 
+    :class:`Distinct` here is different from the :class:`Distinct` calculated 
+    in prediction, and it is only for observation during training and evaluation.
 
     Args:
         trans_func (callable, optional): `trans_func` transforms the network
-            output to string list. Default None. When `Distinct` is used as 
-            `paddle.metric.Metric` class, `trans_func` must be provided. Please
-            note that the input of `trans_func` is numpy array.
-        n_size (int, optional): Number of gram for `Distinct` metric. Default: 2.
-        name (str, optional): Name of `paddle.metric.Metric` instance.
+            output to string list. Default None. When :class:`Distinct` is used 
+            as :class:`paddle.metric.Metric` class, `trans_func` must be 
+            provided. Please note that the input of `trans_func` is numpy array.
+        n_size (int, optional): Number of gram for :class:`Distinct` metric. 
+            Default: 2.
+        name (str, optional): Name of :class:`paddle.metric.Metric` instance.
             Default: "distinct".
 
     Examples:
         1. Using as a general evaluation object.
+
         .. code-block:: python
 
             from paddlenlp.metrics import Distinct
@@ -117,6 +120,7 @@ class Distinct(paddle.metric.Metric):
             self.diff_ngram.add(ngram)
 
     def reset(self):
+        """Reset states and result."""
         self.diff_ngram = set()
         self.count = 0.0
 
@@ -126,7 +130,9 @@ class Distinct(paddle.metric.Metric):
         return distinct
 
     def score(self):
+        """The function is the same as :meth:`accumulate` method."""
         return self.accumulate()
 
     def name(self):
+        """Returns the metric name."""
         return self._name
