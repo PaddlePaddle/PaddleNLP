@@ -186,4 +186,4 @@ if __name__ == "__main__":
     results = predictor.predict(
         data, tokenizer, label_map, batch_size=args.batch_size)
     for idx, text in enumerate(data):
-        print('Data: {} \t Lable: {}'.format(text, results[idx]))
+        print('Data: {} \t Label: {}'.format(text, results[idx]))

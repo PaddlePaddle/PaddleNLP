@@ -31,6 +31,20 @@ def parse_args():
         default="../configs/transformer.big.yaml",
         type=str,
         help="Path of the config file. ")
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+    )
+    parser.add_argument(
+        "--distributed",
+        action="store_true",
+        help="Whether to use fleet to launch. ")
+    parser.add_argument(
+        "--max_iter",
+        default=None,
+        type=int,
+        help="The maximum iteration for training. ")
     args = parser.parse_args()
     return args
 
@@ -40,10 +54,10 @@ def do_train(args):
     if args.is_distributed:
         fleet.init(is_collective=True)
         places = [paddle.set_device("gpu")] if \
-                 args.use_gpu else paddle.static.cpu_places()
+                 args.device == "gpu" else paddle.static.cpu_places()
         trainer_count = len(places)
     else:
-        if args.use_gpu:
+        if args.device == "gpu":
             places = paddle.static.cuda_places()
         else:
             places = paddle.static.cpu_places()
@@ -56,7 +70,8 @@ def do_train(args):
         paddle.seed(random_seed)
 
     # Define data loader
-    (train_loader), (eval_loader) = reader.create_data_loader(args, places)
+    (train_loader), (eval_loader) = reader.create_data_loader(
+        args, places=places)
 
     train_program = paddle.static.Program()
     startup_program = paddle.static.Program()
@@ -200,7 +215,9 @@ def do_train(args):
             reader_cost_avg.record(train_reader_cost)
             batch_cost_avg.record(train_batch_cost)
 
-            if step_idx % args.print_step == 0:
+            if step_idx % args.print_step == 0 and (args.benchmark or (
+                    args.is_distributed and dist.get_rank() == 0) or
+                                                    not args.is_distributed):
                 sum_cost_val, token_num_val = np.array(outs[0]), np.array(outs[
                     1])
                 # Sum the cost from multi-devices
@@ -257,5 +274,9 @@ if __name__ == "__main__":
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
+    args.benchmark = ARGS.benchmark
+    args.is_distributed = ARGS.distributed
+    if ARGS.max_iter:
+        args.max_iter = ARGS.max_iter
 
     do_train(args)
