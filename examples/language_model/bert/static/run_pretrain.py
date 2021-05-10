@@ -160,7 +160,7 @@ def parse_args():
 def select_dataset_file_for_each_worker(files, f_start_id, worker_num,
                                         worker_index):
     """  
-    Spliting the the train file according to the worker index.
+    Spliting the train file according to the worker index.
     """
     num_files = len(files)
     if worker_num > num_files:

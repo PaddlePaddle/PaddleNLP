@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Create masked LM/next sentence masked_lm TF examples for BERT."""
+"""Create masked LM/next sentence masked_lm examples for BERT."""
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import argparse
@@ -49,7 +49,7 @@ class TrainingInstance(object):
 def write_instance_to_example_file(instances, tokenizer, max_seq_length,
                                    max_predictions_per_seq, output_file):
     """
-    Create TF example files from `TrainingInstance`s.
+    Create example files from `TrainingInstance`s.
     """
 
     total_written = 0
