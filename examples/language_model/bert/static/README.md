@@ -13,7 +13,7 @@
 
 `create_pretraining_data.py` 是创建预训练程序所需数据的脚本。其以文本文件（使用换行符换行和空白符分隔，data目录下提供了部分示例数据）为输入，经由BERT tokenizer进行tokenize后再做生成sentence pair正负样本、掩码token等处理，最后输出hdf5格式的数据文件。使用方式如下：
 
-```python
+```shell
 python create_pretraining_data.py \
   --input_file=data/sample_text.txt \
   --output_file=data/training_data.hdf5 \
@@ -38,7 +38,7 @@ python create_pretraining_data.py \
 使用以上预训练数据生成程序可以用于处理领域垂类数据后进行二次预训练。若需要使用BERT论文中预训练使用的英文Wiki和BookCorpus数据，可以参考[这里](https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/LanguageModeling/BERT)进行处理，得到的数据可以直接接入本项目中的预训练程序使用。
 
 #### Fine-tuning数据准备
-Fine-tuning的数据集已经被PaddleNLP框架集成，只需要填写相应的数据集的名称，PaddleNLP会自动下载数据集，具体的使用方法可以参考 'run_glue.py' 脚本。
+Fine-tuning的数据集已经被PaddleNLP框架集成，只需要填写相应的数据集的名称，PaddleNLP会自动下载数据集，具体的使用方法可以参考 `run_glue.py` 脚本。
 
 ##### GLUE评测任务数据
 
