@@ -70,6 +70,50 @@ class BoWEncoder(nn.Layer):
             `Tensor`: 
                 Shape as `(batch_size, emb_dim)`, and dtype is same as `inputs`. The result vector of BagOfEmbedding.
 
+
+        Example:
+            .. code-block::
+
+                import paddle
+                import paddle.nn as nn
+                import paddlenlp as nlp
+
+                class BoWModel(nn.Layer):
+                    def __init__(self,
+                                vocab_size,
+                                num_classes,
+                                emb_dim=128,
+                                padding_idx=0,
+                                hidden_size=128,
+                                fc_hidden_size=96):
+                        super().__init__()
+                        self.embedder = nn.Embedding(
+                            vocab_size, emb_dim, padding_idx=padding_idx)
+                        self.bow_encoder = nlp.seq2vec.BoWEncoder(emb_dim)
+                        self.fc1 = nn.Linear(self.bow_encoder.get_output_dim(), hidden_size)
+                        self.fc2 = nn.Linear(hidden_size, fc_hidden_size)
+                        self.output_layer = nn.Linear(fc_hidden_size, num_classes)
+
+                    def forward(self, text):
+                        # Shape: (batch_size, num_tokens, embedding_dim)
+                        embedded_text = self.embedder(text)
+
+                        # Shape: (batch_size, embedding_dim)
+                        summed = self.bow_encoder(embedded_text)
+                        encoded_text = paddle.tanh(summed)
+
+                        # Shape: (batch_size, hidden_size)
+                        fc1_out = paddle.tanh(self.fc1(encoded_text))
+                        # Shape: (batch_size, fc_hidden_size)
+                        fc2_out = paddle.tanh(self.fc2(fc1_out))
+                        # Shape: (batch_size, num_classes)
+                        logits = self.output_layer(fc2_out)
+                        return logits
+
+                model = BoWModel(vocab_size=100, num_classes=2)
+
+                text = paddle.randint(low=1, high=10, shape=[1,10], dtype='int32')
+                logits = model(text)
         """
         if mask is not None:
             inputs = inputs * mask
@@ -119,6 +163,48 @@ class CNNEncoder(nn.Layer):
             giving an output of shape `len(ngram_filter_sizes) * num_filter`.
             Defaults to `None`.
 
+        Example:
+            .. code-block::
+
+                import paddle
+                import paddle.nn as nn
+                import paddlenlp as nlp
+
+                class CNNModel(nn.Layer):
+                    def __init__(self,
+                                vocab_size,
+                                num_classes,
+                                emb_dim=128,
+                                padding_idx=0,
+                                num_filter=128,
+                                ngram_filter_sizes=(3, ),
+                                fc_hidden_size=96):
+                        super().__init__()
+                        self.embedder = nn.Embedding(
+                            vocab_size, emb_dim, padding_idx=padding_idx)
+                        self.encoder = nlp.seq2vec.CNNEncoder(
+                            emb_dim=emb_dim,
+                            num_filter=num_filter,
+                            ngram_filter_sizes=ngram_filter_sizes)
+                        self.fc = nn.Linear(self.encoder.get_output_dim(), fc_hidden_size)
+                        self.output_layer = nn.Linear(fc_hidden_size, num_classes)
+
+                    def forward(self, text):
+                        # Shape: (batch_size, num_tokens, embedding_dim)
+                        embedded_text = self.embedder(text)
+                        # Shape: (batch_size, len(ngram_filter_sizes)*num_filter)
+                        encoder_out = self.encoder(embedded_text)
+                        encoder_out = paddle.tanh(encoder_out)
+                        # Shape: (batch_size, fc_hidden_size)
+                        fc_out = self.fc(encoder_out)
+                        # Shape: (batch_size, num_classes)
+                        logits = self.output_layer(fc_out)
+                        return logits
+
+                model = CNNModel(vocab_size=100, num_classes=2)
+
+                text = paddle.randint(low=1, high=10, shape=[1,10], dtype='int32')
+                logits = model(text)
     """
 
     def __init__(self,
@@ -251,6 +337,58 @@ class GRUEncoder(nn.Layer):
             step at last layer) to create a single vector.
             Defaults to `None`
 
+        Example:
+            .. code-block::
+
+                import paddle
+                import paddle.nn as nn
+                import paddlenlp as nlp
+
+                class GRUModel(nn.Layer):
+                    def __init__(self,
+                                vocab_size,
+                                num_classes,
+                                emb_dim=128,
+                                padding_idx=0,
+                                gru_hidden_size=198,
+                                direction='forward',
+                                gru_layers=1,
+                                dropout_rate=0.0,
+                                pooling_type=None,
+                                fc_hidden_size=96):
+                        super().__init__()
+                        self.embedder = nn.Embedding(
+                            num_embeddings=vocab_size,
+                            embedding_dim=emb_dim,
+                            padding_idx=padding_idx)
+                        self.gru_encoder = nlp.seq2vec.GRUEncoder(
+                            emb_dim,
+                            gru_hidden_size,
+                            num_layers=gru_layers,
+                            direction=direction,
+                            dropout=dropout_rate,
+                            pooling_type=pooling_type)
+                        self.fc = nn.Linear(self.gru_encoder.get_output_dim(), fc_hidden_size)
+                        self.output_layer = nn.Linear(fc_hidden_size, num_classes)
+
+                    def forward(self, text, seq_len):
+                        # Shape: (batch_size, num_tokens, embedding_dim)
+                        embedded_text = self.embedder(text)
+                        # Shape: (batch_size, num_tokens, num_directions*gru_hidden_size)
+                        # num_directions = 2 if direction is 'bidirect'
+                        # if not, num_directions = 1
+                        text_repr = self.gru_encoder(embedded_text, sequence_length=seq_len)
+                        # Shape: (batch_size, fc_hidden_size)
+                        fc_out = paddle.tanh(self.fc(text_repr))
+                        # Shape: (batch_size, num_classes)
+                        logits = self.output_layer(fc_out)
+                        return logits
+
+                model = GRUModel(vocab_size=100, num_classes=2)
+
+                text = paddle.randint(low=1, high=10, shape=[1,10], dtype='int32')
+                seq_len = paddle.to_tensor([10])
+                logits = model(text, seq_len)
     """
 
     def __init__(self,
@@ -385,6 +523,58 @@ class LSTMEncoder(nn.Layer):
             Then it will be pooled on the LSTM output (the hidden state of every 
             time step at last layer) to create a single vector.
 
+        Example:
+            .. code-block::
+
+                import paddle
+                import paddle.nn as nn
+                import paddlenlp as nlp
+
+                class LSTMModel(nn.Layer):
+                    def __init__(self,
+                                vocab_size,
+                                num_classes,
+                                emb_dim=128,
+                                padding_idx=0,
+                                lstm_hidden_size=198,
+                                direction='forward',
+                                lstm_layers=1,
+                                dropout_rate=0.0,
+                                pooling_type=None,
+                                fc_hidden_size=96):
+                        super().__init__()
+                        self.embedder = nn.Embedding(
+                            num_embeddings=vocab_size,
+                            embedding_dim=emb_dim,
+                            padding_idx=padding_idx)
+                        self.lstm_encoder = nlp.seq2vec.LSTMEncoder(
+                            emb_dim,
+                            lstm_hidden_size,
+                            num_layers=lstm_layers,
+                            direction=direction,
+                            dropout=dropout_rate,
+                            pooling_type=pooling_type)
+                        self.fc = nn.Linear(self.lstm_encoder.get_output_dim(), fc_hidden_size)
+                        self.output_layer = nn.Linear(fc_hidden_size, num_classes)
+
+                    def forward(self, text, seq_len):
+                        # Shape: (batch_size, num_tokens, embedding_dim)
+                        embedded_text = self.embedder(text)
+                        # Shape: (batch_size, num_tokens, num_directions*lstm_hidden_size)
+                        # num_directions = 2 if direction is 'bidirect'
+                        # if not, num_directions = 1
+                        text_repr = self.lstm_encoder(embedded_text, sequence_length=seq_len)
+                        # Shape: (batch_size, fc_hidden_size)
+                        fc_out = paddle.tanh(self.fc(text_repr))
+                        # Shape: (batch_size, num_classes)
+                        logits = self.output_layer(fc_out)
+                        return logits
+
+                model = LSTMModel(vocab_size=100, num_classes=2)
+
+                text = paddle.randint(low=1, high=10, shape=[1,10], dtype='int32')
+                seq_len = paddle.to_tensor([10])
+                logits = model(text, seq_len)
     """
 
     def __init__(self,
@@ -522,6 +712,58 @@ class RNNEncoder(nn.Layer):
             step at last layer) to create a single vector.
             Defaults to `None`.
 
+        Example:
+            .. code-block::
+
+                import paddle
+                import paddle.nn as nn
+                import paddlenlp as nlp
+
+                class RNNModel(nn.Layer):
+                    def __init__(self,
+                                vocab_size,
+                                num_classes,
+                                emb_dim=128,
+                                padding_idx=0,
+                                rnn_hidden_size=198,
+                                direction='forward',
+                                rnn_layers=1,
+                                dropout_rate=0.0,
+                                pooling_type=None,
+                                fc_hidden_size=96):
+                        super().__init__()
+                        self.embedder = nn.Embedding(
+                            num_embeddings=vocab_size,
+                            embedding_dim=emb_dim,
+                            padding_idx=padding_idx)
+                        self.rnn_encoder = nlp.seq2vec.RNNEncoder(
+                            emb_dim,
+                            rnn_hidden_size,
+                            num_layers=rnn_layers,
+                            direction=direction,
+                            dropout=dropout_rate,
+                            pooling_type=pooling_type)
+                        self.fc = nn.Linear(self.rnn_encoder.get_output_dim(), fc_hidden_size)
+                        self.output_layer = nn.Linear(fc_hidden_size, num_classes)
+
+                    def forward(self, text, seq_len):
+                        # Shape: (batch_size, num_tokens, embedding_dim)
+                        embedded_text = self.embedder(text)
+                        # Shape: (batch_size, num_tokens, num_directions*rnn_hidden_size)
+                        # num_directions = 2 if direction is 'bidirect'
+                        # if not, num_directions = 1
+                        text_repr = self.rnn_encoder(embedded_text, sequence_length=seq_len)
+                        # Shape: (batch_size, fc_hidden_size)
+                        fc_out = paddle.tanh(self.fc(text_repr))
+                        # Shape: (batch_size, num_classes)
+                        logits = self.output_layer(fc_out)
+                        return logits
+
+                model = RNNModel(vocab_size=100, num_classes=2)
+
+                text = paddle.randint(low=1, high=10, shape=[1,10], dtype='int32')
+                seq_len = paddle.to_tensor([10])
+                logits = model(text, seq_len)
     """
 
     def __init__(self,
