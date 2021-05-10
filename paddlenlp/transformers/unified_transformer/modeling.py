@@ -112,7 +112,7 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
     base_model_prefix = "unified_transformer"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        # Initialization hook
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
