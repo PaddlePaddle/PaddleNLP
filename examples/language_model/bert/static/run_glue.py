@@ -188,7 +188,7 @@ def reset_program_state_dict(args, model, state_dict, pretrained_state_dict):
                 dtype_str = "float64"
             reset_state_dict[p.name] = np.random.normal(
                 loc=0.0, scale=scale, size=p.shape).astype(dtype_str)
-    logger.info("the following paramster had reset, please check. {}".format(
+    logger.info("the following parameter had reset, please check. {}".format(
         reset_parameter_names))
     return reset_state_dict
 
