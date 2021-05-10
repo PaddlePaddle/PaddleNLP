@@ -14,7 +14,7 @@
 
 `create_pretraining_data.py` 是创建预训练程序所需数据的脚本。其以文本文件（使用换行符换行和空白符分隔，data目录下提供了部分示例数据）为输入，经由BERT tokenizer进行tokenize后再做生成sentence pair正负样本、掩码token等处理，最后输出hdf5格式的数据文件。使用方式如下：
 
-```python
+```shell
 python create_pretraining_data.py \
   --input_file=data/sample_text.txt \
   --output_file=data/training_data.hdf5 \
