@@ -86,7 +86,8 @@ class ErniePretrainedModel(PretrainedModel):
     An abstract class for pretrained ERNIE models. It provides ERNIE related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
     `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    loading pretrained models. 
+    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
 
     """
 
@@ -193,38 +194,38 @@ class ErnieModel(ErniePretrainedModel):
 
     Args:
 
-        vocab_size (`int`):
+        vocab_size (int):
             Vocabulary size of the ERNIE model. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling ERNIE.
-        hidden_size (`int`, optional):
+        hidden_size (int, optional):
             Dimension of the encoder layers and the pooler layer. Defaults to ``768``.
-        num_hidden_layers (`int`, optional):
+        num_hidden_layers (int, optional):
             Number of hidden layers in the Transformer encoder. Defaults to ``12``.
-        num_attention_heads (`int`, optional):
+        num_attention_heads (int, optional):
             Number of attention heads for each attention layer in the Transformer encoder.
             Defaults to ``12``.
-        intermediate_size (`int`, optional):
+        intermediate_size (int, optional):
             Dimension of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
             Defaults to ``3072``.
-        hidden_act (`str`, optional):
+        hidden_act (str, optional):
             The non-linear activation function in the feed-forward layer.
             ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
             are supported. Defaults to ``"gelu"``.
-        hidden_dropout_prob (`float`, optional):
+        hidden_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the embeddings and encoder.
             Defaults to ``0.1``.
-        attention_probs_dropout_prob (`float`, optional):
+        attention_probs_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the pooler.
             Defaults to ``0.1``.
-        max_position_embeddings (`int`, optional):
+        max_position_embeddings (int, optional):
             The max position index of an input sequence. Defaults to ``512``.
-        type_vocab_size (`int`, optional):
+        type_vocab_size (int, optional):
             The vocabulary size of the `token_type_ids` passed when calling `~transformers.ErnieModel`.
-            Defaults to 2
-        initializer_range (`float`, optional):
+            Defaults to ``2``.
+        initializer_range (float, optional):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
             Defaults to ``0.02``.
-        pad_token_id(`int`, optional):
+        pad_token_id(int, optional):
             The pad token index in the token vocabulary.
 
     """
@@ -267,37 +268,38 @@ class ErnieModel(ErniePretrainedModel):
                 attention_mask=None):
         r"""
         Args:
-            input_ids (`Tensor`):
-                Indices of input sequence tokens in the vocabulary.
-                Indices can be obtained using :class:`~transformers.BertTokenizer`. See
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                Indices can be obtained using :class:`~transformers.ErnieTokenizer`. See
                 :meth:`paddlenlp.transformers.PreTrainedTokenizer.tokenize` and :meth:`transformers.PreTrainedTokenizer.__call__` for
                 details.
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 Segment token indices to indicate first and second portions of the inputs. Indices are selected in ``[0,
                 1]``:
                 - 0 corresponds to a `sentence A` token,
                 - 1 corresponds to a `sentence B` token.
-                Defaults to `None`.
-            position_ids (`Tensor`, `optional`):
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            position_ids (Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
                 config.max_position_embeddings - 1]``.
-                Defaults to `None`.
-            attention_mask (`Tensor`, optional):
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attention_mask (Tensor, optional):
                 Mask to avoid performing attention on padding token indices. Mask values selected in ``[0, 1]``:
                 - 1 for tokens that are **not masked**,
                 - 0 for tokens that are **masked**.
-                Defaults to `None`.
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
 
         Returns:
             A tuple of shape (``sequence_output``, ``pooled_output``).
 
             With the fields:
-            - sequence_output (`Tensor`):
+            - sequence_output (Tensor):
                 Sequence of hidden-states at the last layer of the model.
-                It's data type should be float32 and has a shape of (batch_size, seq_lens, hidden_size].
+                It's data type should be `float` and has a shape of `(batch_size, seq_lens, hidden_size)`.
                 ``seq_lens`` corresponds to the length of input sequence.
-            - pooled_output (`Tensor`):
+            - pooled_output (Tensor):
                 A Tensor of the first token representation.
+                It's data type should be `float` and has a shape of `(batch_size, hidden_size]`.
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
 
         Example:
@@ -334,14 +336,14 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
     Model for sentence (pair) classification task with ERNIE.
 
     Args:
-        ernie (`ErnieModel`): 
-            An instance of `ErnieModel`.
-        num_classes (`int`, optional): 
+        ernie (ErnieModel): 
+            An instance of `paddlenlp.transformers.ErnieModel`.
+        num_classes (int, optional): 
             The number of classes. Default to `2`.
-        dropout (`float`, optional): 
+        dropout (float, optional): 
             The dropout probability for output of ERNIE. 
             If None, use the same value as `hidden_dropout_prob` 
-            of `ErnieModel` instance `Ernie`. Defaults to `None`.
+            of `paddlenlp.transformers.ErnieModel` instance. Defaults to `None`.
     """
 
     def __init__(self, ernie, num_classes=2, dropout=None):
@@ -361,30 +363,31 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 attention_mask=None):
         r"""
         Args:
-            input_ids (`Tensor`):
-                Indices of input sequence tokens in the vocabulary.
-                Indices can be obtained using :class:`~transformers.BertTokenizer`. See
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                Indices can be obtained using :class:`~transformers.ErnieTokenizer`. See
                 :meth:`paddlenlp.transformers.PreTrainedTokenizer.tokenize` and :meth:`transformers.PreTrainedTokenizer.__call__` for
                 details.
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 Segment token indices to indicate first and second portions of the inputs. Indices are selected in ``[0,
                 1]``:
                 - 0 corresponds to a `sentence A` token,
                 - 1 corresponds to a `sentence B` token.
-                Defaults to `None`.
-            position_ids (`Tensor`, `optional`):
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            position_ids (Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
                 config.max_position_embeddings - 1]``.
-                Defaults to `None`.
-            attention_mask (`Tensor`, optional):
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attention_mask (Tensor, optional):
                 Mask to avoid performing attention on padding token indices. Mask values selected in ``[0, 1]``:
                 - 1 for tokens that are **not masked**,
                 - 0 for tokens that are **masked**.
-                Defaults to `None`.
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
 
         Returns:
-            logits (`Tensor`):
-                A Tensor of the input text classification logits, shape as (batch_size, `num_classes`).
+            logits (Tensor):
+                A Tensor of the input text classification logits.
+                Shape as `(batch_size, num_classes)` and dtype as `float`.
 
         Example:
             .. code-block::
@@ -434,37 +437,33 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
                 attention_mask=None):
         r"""
         Args:
-            input_ids (`Tensor`):
-                Indices of input sequence tokens in the vocabulary. Shape as (batch_size, seq_lens), whose
-                seq_lens mean the number of tokens of the input sequence.
-                Indices can be obtained using :class:`~transformers.BertTokenizer`. See
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                Indices can be obtained using :class:`~transformers.ErnieTokenizer`. See
                 :meth:`paddlenlp.transformers.PreTrainedTokenizer.tokenize` and :meth:`transformers.PreTrainedTokenizer.__call__` for
                 details.
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 Segment token indices to indicate first and second portions of the inputs. Indices are selected in ``[0,
                 1]``:
                 - 0 corresponds to a `sentence A` token,
                 - 1 corresponds to a `sentence B` token.
-                Shape as (batch_size, seq_lens), whose
-                seq_lens mean the number of tokens of the input sequence. Defaults to `None`.
-            position_ids (`Tensor`, `optional`):
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            position_ids (Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
                 config.max_position_embeddings - 1]``.
-                Shape as (batch_size, seq_lens), whose
-                seq_lens mean the number of tokens of the input sequence. Defaults to `None`.
-            attention_mask (`Tensor`, optional):
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attention_mask (Tensor, optional):
                 Mask to avoid performing attention on padding token indices. Mask values selected in ``[0, 1]``:
                 - 1 for tokens that are **not masked**,
                 - 0 for tokens that are **masked**.
-                Shape as (batch_size, seq_lens), whose
-                seq_lens mean the number of tokens of the input sequence. Defaults to `None`.
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
 
         Returns:
             A tuple of shape (``start_logits``, ``end_logits``).
 
             With the fields:
-            - start_logits(`Tensor`): The logits of start position of prediction answer.
-            - end_logits(`Tensor`): The logits of end position of prediction answer.
+            - start_logits(Tensor): The logits of start position of prediction answer.
+            - end_logits(Tensor): The logits of end position of prediction answer.
 
         Example:
             .. code-block::
@@ -502,9 +501,9 @@ class ErnieForTokenClassification(ErniePretrainedModel):
     Args:
         ernie (`ErnieModel`): 
             An instance of `ErnieModel`.
-        num_classes (`int`, optional): 
+        num_classes (int, optional): 
             The number of classes. Default to `2`.
-        dropout (`float`, optional): 
+        dropout (float, optional): 
             The dropout probability for output of ERNIE. 
             If None, use the same value as `hidden_dropout_prob` 
             of `ErnieModel` instance `Ernie`. Defaults to `None`.
@@ -527,32 +526,29 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 attention_mask=None):
         r"""
         Args:
-            input_ids (`Tensor`):
-                Indices of input sequence tokens in the vocabulary. Shape as (batch_size, seq_lens), whose
-                seq_lens mean the number of tokens of the input sequence.
-                Indices can be obtained using :class:`~transformers.BertTokenizer`. See
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                Indices can be obtained using :class:`~transformers.ErnieTokenizer`. See
                 :meth:`paddlenlp.transformers.PreTrainedTokenizer.tokenize` and :meth:`transformers.PreTrainedTokenizer.__call__` for
                 details.
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 Segment token indices to indicate first and second portions of the inputs. Indices are selected in ``[0,
                 1]``:
                 - 0 corresponds to a `sentence A` token,
                 - 1 corresponds to a `sentence B` token.
-                Shape as (batch_size, seq_lens), whose
-                seq_lens mean the number of tokens of the input sequence. Defaults to `None`.
-            position_ids (`Tensor`, `optional`):
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            position_ids (Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
                 config.max_position_embeddings - 1]``.
-                Shape as (batch_size, seq_lens). Defaults to `None`.
-            attention_mask (`Tensor`, optional):
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attention_mask (Tensor, optional):
                 Mask to avoid performing attention on padding token indices. Mask values selected in ``[0, 1]``:
                 - 1 for tokens that are **not masked**,
                 - 0 for tokens that are **masked**.
-                Shape as (batch_size, seq_lens), whose
-                seq_lens mean the number of tokens of the input sequence. Defaults to `None`.
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
 
         Returns:
-            logits (`Tensor`):
+            logits (Tensor):
                 A Tensor of the input text classification logits, shape as (batch_size, seq_lens, `num_classes`).
                 seq_lens mean the number of tokens of the input sequence.
 
@@ -661,36 +657,33 @@ class ErnieForPretraining(ErniePretrainedModel):
                 masked_positions=None):
         r"""
         Args:
-            input_ids (`Tensor`):
-                Indices of input sequence tokens in the vocabulary. Shape as (batch_size, seq_lens), whose
-                seq_lens mean the number of tokens of the input sequence.
-                Indices can be obtained using :class:`~transformers.BertTokenizer`. See
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                Indices can be obtained using :class:`~transformers.ErnieTokenizer`. See
                 :meth:`paddlenlp.transformers.PreTrainedTokenizer.tokenize` and :meth:`transformers.PreTrainedTokenizer.__call__` for
                 details.
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 Segment token indices to indicate first and second portions of the inputs. Indices are selected in ``[0,
                 1]``:
                 - 0 corresponds to a `sentence A` token,
                 - 1 corresponds to a `sentence B` token.
-                Shape as (batch_size, seq_lens), whose
-                seq_lens mean the number of tokens of the input sequence. Defaults to `None`.
-            position_ids (`Tensor`, `optional`):
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            position_ids (Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
                 config.max_position_embeddings - 1]``.
-                Shape as (batch_size, seq_lens). Defaults to `None`.
-            attention_mask (`Tensor`, optional):
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attention_mask (Tensor, optional):
                 Mask to avoid performing attention on padding token indices. Mask values selected in ``[0, 1]``:
                 - 1 for tokens that are **not masked**,
                 - 0 for tokens that are **masked**.
-                Shape as (batch_size, seq_lens), whose
-                seq_lens mean the number of tokens of the input sequence. Defaults to `None`.
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
 
         Returns:
             A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
 
             With the fields:
-            - prediction_scores(`Tensor`): The scores of prediction on masked token.
-            - seq_relationship_score(`Tensor`): The scores of next sentence prediction.
+            - prediction_scores(Tensor): The scores of prediction on masked token.
+            - seq_relationship_score(Tensor): The scores of next sentence prediction.
 
         Example:
             .. code-block::
