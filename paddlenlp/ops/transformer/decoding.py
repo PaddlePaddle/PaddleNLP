@@ -22,7 +22,7 @@ from paddle.fluid.layer_helper import LayerHelper
 import paddle
 
 
-def infer_transformer_decoder(
+def infer_transformer_decoding(
         enc_output, memory_seq_lens, word_emb, slf_ln_weight, slf_ln_bias,
         slf_q_weight, slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight,
         slf_v_bias, slf_out_weight, slf_out_bias, cross_ln_weight,
@@ -102,6 +102,62 @@ def infer_transformer_decoder(
     return output_ids, parent_ids, sequence_length
 
 
+def infer_gpt2_decoding(
+        input, word_emb, slf_ln_weight, slf_ln_bias, slf_q_weight, slf_q_bias,
+        slf_k_weight, slf_k_bias, slf_v_weight, slf_v_bias, slf_out_weight,
+        slf_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
+        ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
+        decoder_ln_bias, pos_emb, candidate_num, probability_threshold,
+        max_seq_len, head_num, size_per_head, num_layer, bos_id, eos_id,
+        temperature, use_fp16_decoding):
+    helper = LayerHelper('fusion_gpt2', **locals())
+
+    inputs = {
+        "Input": input,
+        "WordEmbedding": word_emb,
+        "SelfLayernormWeight@VECTOR": slf_ln_weight,
+        "SelfLayernormBias@VECTOR": slf_ln_bias,
+        "SelfQueryWeight@VECTOR": slf_q_weight,
+        "SelfQueryBias@VECTOR": slf_q_bias,
+        "SelfKeyWeight@VECTOR": slf_k_weight,
+        "SelfKeyBias@VECTOR": slf_k_bias,
+        "SelfValueWeight@VECTOR": slf_v_weight,
+        "SelfValueBias@VECTOR": slf_v_bias,
+        "SelfOutWeight@VECTOR": slf_out_weight,
+        "SelfOutBias@VECTOR": slf_out_bias,
+        "FFNLayernormWeight@VECTOR": ffn_ln_weight,
+        "FFNLayernormBias@VECTOR": ffn_ln_bias,
+        "FFNInterWeight@VECTOR": ffn_inter_weight,
+        "FFNInterBias@VECTOR": ffn_inter_bias,
+        "FFNOutWeight@VECTOR": ffn_out_weight,
+        "FFNOutBias@VECTOR": ffn_out_bias,
+        "DecoderLayernormWeight": decoder_ln_weight,
+        "DecoderLayernormBias": decoder_ln_bias,
+        "PositionEncEmb": pos_emb
+    }
+
+    attrs = {
+        "candidate_num": candidate_num,
+        "probability_threshold": probability_threshold,
+        "max_seq_len": max_seq_len,
+        "head_num": head_num,
+        "size_per_head": size_per_head,
+        "num_layer": num_layer,
+        "start_id": bos_id,
+        "end_id": eos_id,
+        "temperature": temperature,
+        "use_fp16": use_fp16_decoding
+    }
+
+    output_ids = helper.create_variable(dtype="int32")
+    outputs = {'OutputIds': output_ids}
+
+    helper.append_op(
+        type='fusion_gpt2', inputs=inputs, outputs=outputs, attrs=attrs)
+
+    return output_ids
+
+
 def finalize(beam_size,
              output_ids,
              parent_ids,
@@ -131,7 +187,6 @@ class InferTransformerDecoding(nn.Layer):
                  word_embedding,
                  positional_embedding,
                  linear,
-                 max_length,
                  n_layer,
                  n_head,
                  d_model,
@@ -296,7 +351,7 @@ class InferTransformerDecoding(nn.Layer):
             memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
                 memory_seq_lens, self._beam_size)
 
-        output_ids, parent_ids, sequence_length = infer_transformer_decoder(
+        output_ids, parent_ids, sequence_length = infer_transformer_decoding(
             [enc_output], [memory_seq_lens], self.word_emb, self.slf_ln_weight,
             self.slf_ln_bias, self.slf_q_weight, self.slf_q_bias,
             self.slf_k_weight, self.slf_k_bias, self.slf_v_weight,
@@ -321,3 +376,134 @@ class InferTransformerDecoding(nn.Layer):
             decoding_strategy=self._decoding_strategy)
 
         return ids
+
+
+class InferGpt2Decoding(nn.Layer):
+    def __init__(self,
+                 model,
+                 candidate_num=4,
+                 probability_threshold=0.0,
+                 max_seq_len=256,
+                 temperature=1,
+                 start_id=50256,
+                 end_id=50256,
+                 decoding_lib=None,
+                 use_fp16_decoding=False):
+        if decoding_lib is None:
+            raise ValueError(
+                "The args decoding_lib must be set to use Faster Transformer. ")
+        elif not os.path.exists(decoding_lib):
+            raise ValueError("The path to decoding lib is not exist.")
+
+        paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+            decoding_lib)
+        super(InferGpt2Decoding, self).__init__()
+        self.candidate_num = candidate_num
+        self.probability_threshold = probability_threshold
+        self.max_seq_len = max_seq_len
+        self.temperature = temperature
+        self.use_fp16_decoding = use_fp16_decoding
+        self.model = model
+        self.head_num = self.model.gpt2.config['num_attention_heads']
+        self.size_per_head = int(self.model.gpt2.config['hidden_size'] /
+                                 self.head_num)
+        self.num_layer = self.model.gpt2.config['num_hidden_layers']
+        self.start_id = start_id
+        self.end_id = end_id
+
+        if self.use_fp16_decoding:
+            for mod in self.model.gpt2.decoder.layers:
+                mod.norm1.weight = transfer_param(mod.norm1.weight)
+                mod.norm1.bias = transfer_param(mod.norm1.bias, is_bias=True)
+                mod.self_attn.q_proj.weight = transfer_param(
+                    mod.self_attn.q_proj.weight)
+                mod.self_attn.q_proj.bias = transfer_param(
+                    mod.self_attn.q_proj.bias, is_bias=True)
+                mod.self_attn.k_proj.weight = transfer_param(
+                    mod.self_attn.k_proj.weight)
+                mod.self_attn.k_proj.bias = transfer_param(
+                    mod.self_attn.k_proj.bias, is_bias=True)
+                mod.self_attn.v_proj.weight = transfer_param(
+                    mod.self_attn.v_proj.weight)
+                mod.self_attn.v_proj.bias = transfer_param(
+                    mod.self_attn.v_proj.bias, is_bias=True)
+                mod.self_attn.out_proj.weight = transfer_param(
+                    mod.self_attn.out_proj.weight)
+                mod.self_attn.out_proj.bias = transfer_param(
+                    mod.self_attn.out_proj.bias, is_bias=True)
+
+                mod.norm2.weight = transfer_param(mod.norm2.weight)
+                mod.norm2.bias = transfer_param(mod.norm2.bias, is_bias=True)
+                mod.linear1.weight = transfer_param(mod.linear1.weight)
+                mod.linear1.bias = transfer_param(
+                    mod.linear1.bias, is_bias=True)
+                mod.linear2.weight = transfer_param(mod.linear2.weight)
+                mod.linear2.bias = transfer_param(
+                    mod.linear2.bias, is_bias=True)
+
+            self.model.gpt2.embeddings.word_embeddings.weight = transfer_param(
+                self.model.gpt2.embeddings.word_embeddings.weight)
+            self.model.gpt2.embeddings.position_embeddings.weight = transfer_param(
+                self.model.gpt2.embeddings.position_embeddings.weight)
+            self.model.gpt2.decoder.norm.weight = transfer_param(
+                self.model.gpt2.decoder.norm.weight)
+            self.model.gpt2.decoder.norm.bias = transfer_param(
+                self.model.gpt2.decoder.norm.bias)
+
+        self.slf_ln_weight = []
+        self.slf_ln_bias = []
+        self.slf_q_weight = []
+        self.slf_q_bias = []
+        self.slf_k_weight = []
+        self.slf_k_bias = []
+        self.slf_v_weight = []
+        self.slf_v_bias = []
+        self.slf_out_weight = []
+        self.slf_out_bias = []
+
+        self.ffn_ln_weight = []
+        self.ffn_ln_bias = []
+        self.ffn_inter_weight = []
+        self.ffn_inter_bias = []
+        self.ffn_out_weight = []
+        self.ffn_out_bias = []
+
+        for mod in self.model.gpt2.decoder.layers:
+            self.slf_ln_weight.append(mod.norm1.weight)
+            self.slf_ln_bias.append(mod.norm1.bias)
+            self.slf_q_weight.append(mod.self_attn.q_proj.weight)
+            self.slf_q_bias.append(mod.self_attn.q_proj.bias)
+            self.slf_k_weight.append(mod.self_attn.k_proj.weight)
+            self.slf_k_bias.append(mod.self_attn.k_proj.bias)
+            self.slf_v_weight.append(mod.self_attn.v_proj.weight)
+            self.slf_v_bias.append(mod.self_attn.v_proj.bias)
+            self.slf_out_weight.append(mod.self_attn.out_proj.weight)
+            self.slf_out_bias.append(mod.self_attn.out_proj.bias)
+
+            self.ffn_ln_weight.append(mod.norm2.weight)
+            self.ffn_ln_bias.append(mod.norm2.bias)
+            self.ffn_inter_weight.append(mod.linear1.weight)
+            self.ffn_inter_bias.append(mod.linear1.bias)
+            self.ffn_out_weight.append(mod.linear2.weight)
+            self.ffn_out_bias.append(mod.linear2.bias)
+
+        self.decoder_ln_weight = [self.model.gpt2.decoder.norm.weight]
+        self.decoder_ln_bias = [self.model.gpt2.decoder.norm.bias]
+
+        self.pos_emb = [self.model.gpt2.embeddings.position_embeddings.weight]
+        self.word_emb = [self.model.gpt2.embeddings.word_embeddings.weight]
+
+    def forward(self, input_ids):
+        output_ids = infer_gpt2_decoding(
+            [input_ids], self.word_emb, self.slf_ln_weight, self.slf_ln_bias,
+            self.slf_q_weight, self.slf_q_bias, self.slf_k_weight,
+            self.slf_k_bias, self.slf_v_weight, self.slf_v_bias,
+            self.slf_out_weight, self.slf_out_bias, self.ffn_ln_weight,
+            self.ffn_ln_bias, self.ffn_inter_weight, self.ffn_inter_bias,
+            self.ffn_out_weight, self.ffn_out_bias, self.decoder_ln_weight,
+            self.decoder_ln_bias, self.pos_emb, self.candidate_num,
+            self.probability_threshold, self.max_seq_len, self.head_num,
+            self.size_per_head, self.num_layer, self.start_id, self.end_id,
+            self.temperature, self.use_fp16_decoding)
+
+        return output_ids

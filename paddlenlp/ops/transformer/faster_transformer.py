@@ -18,8 +18,8 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddlenlp.transformers import TransformerModel, WordEmbedding, PositionalEmbedding, position_encoding_init
-from paddlenlp.ops import InferTransformerDecoding
+from paddlenlp.transformers import TransformerModel, WordEmbedding, PositionalEmbedding, position_encoding_init, GPT2Model
+from paddlenlp.ops import InferTransformerDecoding, InferGpt2Decoding
 
 
 class FasterTransformer(TransformerModel):
@@ -71,16 +71,15 @@ class FasterTransformer(TransformerModel):
 
         if weight_sharing:
             self.trg_word_embedding = WordEmbedding(
-                vocab_size=trg_vocab_size, emb_dim=d_model, bos_idx=self.bos_id)
+                vocab_size=trg_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
             self.trg_pos_embedding = PositionalEmbedding(
-                emb_dim=d_model, max_length=max_length, bos_idx=self.bos_id)
+                emb_dim=d_model, max_length=max_length)
 
         self.decoding = InferTransformerDecoding(
             decoder=self.transformer.decoder,
             word_embedding=self.trg_word_embedding.word_embedding,
             positional_embedding=self.trg_pos_embedding.pos_encoder,
             linear=self.decoding_linear,
-            max_length=max_length,
             n_layer=n_layer,
             n_head=n_head,
             d_model=d_model,
@@ -220,3 +219,30 @@ class FasterTransformer(TransformerModel):
             param_name = param.name
             var = paddle.static.global_scope().find_var(param_name).get_tensor()
             var.set(model_dict[item], place)
+
+
+class FasterGPT2(nn.Layer):
+    def __init__(self,
+                 model,
+                 candidate_num=4,
+                 probability_threshold=0.0,
+                 max_seq_len=256,
+                 start_id=50256,
+                 end_id=50256,
+                 temperature=0,
+                 decoding_lib=None,
+                 use_fp16_decoding=False):
+        super(FasterGPT2, self).__init__()
+        self.decoding = InferGpt2Decoding(
+            model=model,
+            candidate_num=candidate_num,
+            probability_threshold=probability_threshold,
+            max_seq_len=max_seq_len,
+            start_id=start_id,
+            end_id=end_id,
+            temperature=temperature,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=use_fp16_decoding)
+
+    def forward(self, input_ids):
+        return self.decoding(input_ids)

@@ -1,0 +1,49 @@
+#pragma once
+
+#include <string>
+#include <vector>
+
+#include "fastertransformer/common.h"
+#include "fastertransformer/gpt2.h"
+#include "fastertransformer/open_decoder.h"
+
+#ifdef PADDLE_ON_INFERENCE
+#include "paddle/include/experimental/ext_all.h"
+#else
+#include "paddle/extension.h"
+#endif
+
+
+std::vector<paddle::Tensor> GPT2CUDAForward(
+    const paddle::Tensor& input,
+    const paddle::Tensor& word_embedding,
+    const std::vector<paddle::Tensor>& self_ln_weight,
+    const std::vector<paddle::Tensor>& self_ln_bias,
+    const std::vector<paddle::Tensor>& self_q_weight,
+    const std::vector<paddle::Tensor>& self_q_bias,
+    const std::vector<paddle::Tensor>& self_k_weight,
+    const std::vector<paddle::Tensor>& self_k_bias,
+    const std::vector<paddle::Tensor>& self_v_weight,
+    const std::vector<paddle::Tensor>& self_v_bias,
+    const std::vector<paddle::Tensor>& self_out_weight,
+    const std::vector<paddle::Tensor>& self_out_bias,
+    const std::vector<paddle::Tensor>& ffn_ln_weight,
+    const std::vector<paddle::Tensor>& ffn_ln_bias,
+    const std::vector<paddle::Tensor>& ffn_inter_weight,
+    const std::vector<paddle::Tensor>& ffn_inter_bias,
+    const std::vector<paddle::Tensor>& ffn_out_weight,
+    const std::vector<paddle::Tensor>& ffn_out_bias,
+    const paddle::Tensor& decoder_ln_weight,
+    const paddle::Tensor& decoder_ln_bias,
+    const paddle::Tensor& positional_embedding_weight,
+    paddle::Tensor& output_ids,
+    const int& candidate_num,
+    const float& probability_threshold,
+    const int& max_seq_len,
+    const int& head_num,
+    const int& size_per_head,
+    const int& num_layer,
+    const int& start_id,
+    const int& end_id,
+    const float& temperature,
+    const bool& use_fp16);
