@@ -11,9 +11,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+from paddle.utils.cpp_extension import load
 
-from .transformer.decoding import *
-from .transformer.faster_transformer import *
-from .einsum import *
-from .distributed import *
-from . import optimizer
+from .adam import Adam
+from .AdamOptimizer import AdamOptimizer
+
+try:
+    load(
+        name="custom_jit_ops",
+        sources=[
+            os.path.join(os.path.dirname(__file__), x)
+            for x in [
+                "adam_custom.cc",
+                "adam_custom.cu",
+            ]
+        ])
+except RuntimeError:
+    import sys
+    sys.stderr.write(
+        '''Warning with compile custom ops: compile custom adam op failed. \nIf you do not use custom ops, please ignore this warning! \n'''
+    )
+
+__all__ = [
+    'Adam',
+    'AdamOptimizer',
+]

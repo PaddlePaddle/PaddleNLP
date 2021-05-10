@@ -39,6 +39,7 @@ from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCr
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.ops import guard, Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger
+import paddlenlp.ops as ops
 from tensorboardX import SummaryWriter
 
 from data import create_pretrained_dataset
@@ -422,19 +423,18 @@ def do_train(args):
                 clip = paddle.fluid.clip.GradientClipByNorm(
                     clip_norm=args.grad_clip)
 
-            decay_param = lambda x: x in [
-                     p.name for n, p in model.named_parameters()
-                     if not any(nd in n for nd in ["bias", "norm"])]
-
+            decay_param = [
+                p.name for n, p in model.named_parameters()
+                if not any(nd in n for nd in ["bias", "norm"])
+            ]
             # TODO @ZHUI Use paddle.optimizer.AdamW
-            optimizer = paddle.fluid.optimizer.Adam(
+            optimizer = ops.optimizer.AdamOptimizer(
                 learning_rate=lr_scheduler,
                 epsilon=args.adam_epsilon,
                 grad_clip=clip,
                 # parameter_list=opt_param,
-                # weight_decay=args.weight_decay,
-                # apply_decay_param_fun=decay_param
-            )
+                weight_decay=args.weight_decay,
+                apply_decay_param_fun=lambda x: x.name in decay_param)
 
             # optimizer.apply_optimize = optimizer._apply_optimize
 
