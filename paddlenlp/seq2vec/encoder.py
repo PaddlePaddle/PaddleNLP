@@ -27,12 +27,12 @@ class BoWEncoder(nn.Layer):
     r"""
     A `BoWEncoder` takes as input a sequence of vectors and returns a
     single vector, which simply sums the embeddings of a sequence across the time dimension. 
-    The input to this module is of shape `(batch_size, num_tokens, emb_dim)`, 
+    The input to this encoder is of shape `(batch_size, num_tokens, emb_dim)`, 
     and the output is of shape `(batch_size, emb_dim)`.
 
     Args:
         emb_dim(`int`): 
-            It is the input dimension to the encoder.
+            The dimension of each vector in the input sequence.
     """
 
     def __init__(self, emb_dim):
@@ -60,15 +60,15 @@ class BoWEncoder(nn.Layer):
 
         Args:
             inputs (`Tensor`):
-                Shape as `(batch_size, num_tokens, emb_dim)`
+                Shape as `(batch_size, num_tokens, emb_dim)` and dtype as `float32` or `float64`.
             mask (`Tensor`, optional): 
                 Shape same as `inputs`. Its each elements identify whether is padding token or not. 
                 If True, not padding token. If False, padding token.
                 Defaults to `None`.
 
         Returns:
-            summed (`Tensor`): 
-                Shape as `(batch_size, emb_dim)`. The result vector of BagOfEmbedding.
+            `Tensor`: 
+                Shape as `(batch_size, emb_dim)`, and dtype is same as `inputs`. The result vector of BagOfEmbedding.
 
         """
         if mask is not None:
@@ -83,7 +83,7 @@ class CNNEncoder(nn.Layer):
     r"""
     A `CNNEncoder` takes as input a sequence of vectors and returns a
     single vector, a combination of multiple convolution layers and max pooling layers.
-    The input to this module is of shape `(batch_size, num_tokens, emb_dim)`, 
+    The input to this encoder is of shape `(batch_size, num_tokens, emb_dim)`, 
     and the output is of shape `(batch_size, ouput_dim)` or `(batch_size, len(ngram_filter_sizes) * num_filter)`.
 
     The CNN has one convolution layer for each ngram filter size. Each convolution operation gives
@@ -102,7 +102,7 @@ class CNNEncoder(nn.Layer):
 
     Args:
         emb_dim(`int`):
-            This is the input dimension to the encoder.
+            The dimension of each vector in the input sequence.
         num_filter(`int`):
             This is the output dim for each convolutional layer, which is the number of "filters"
             learned by that layer.
@@ -172,15 +172,17 @@ class CNNEncoder(nn.Layer):
 
         Args:
             inputs (`Tensor`): 
-                Shape as `(batch_size, num_tokens, emb_dim)`
+                Shape as `(batch_size, num_tokens, emb_dim)` and dtype as `float32` or `float64`.
             mask (`Tensor`, optional): 
-                Shape shoule be same as `inputs`. Its each elements identify whether is padding token or not. 
-                If True, not padding token. If False, padding token.
+                Shape shoule be same as `inputs` and dtype as `int32`, `int64`, `float32` or `float64`. 
+                Its each elements identify whether is padding token or not. 
+                If True, not padding token. If False, padding token. 
                 Defaults to `None`
 
         Returns:
-            result (`Tensor`): 
-                If output_dim is None, the result shape is of `(batch_size, output_dim)`; 
+            `Tensor`: 
+                If output_dim is None, the result shape is of `(batch_size, output_dim)` and 
+                dtype is `float`; 
                 If not, the result shape is of `(batch_size, len(ngram_filter_sizes) * num_filter)`.
 
         """
@@ -210,7 +212,7 @@ class GRUEncoder(nn.Layer):
     r"""
     A GRUEncoder takes as input a sequence of vectors and returns a
     single vector, which is a combination of multiple GRU layers.
-    The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
+    The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
     The output is of shape `(batch_size, hidden_size*2)` if GRU is bidirection;
     If not, output is of shape `(batch_size, hidden_size)`.
 
@@ -294,19 +296,19 @@ class GRUEncoder(nn.Layer):
         r"""
         GRUEncoder takes the a sequence of vectors and and returns a single vector, 
         which is a combination of multiple GRU layers. The input to this 
-        module is of shape `(batch_size, num_tokens, input_size)`, 
+        encoder is of shape `(batch_size, num_tokens, input_size)`, 
         The output is of shape `(batch_size, hidden_size*2)` if GRU is bidirection;
         If not, output is of shape `(batch_size, hidden_size)`.
 
         Args:
             inputs (`Tensor`): 
-                Shape as `(batch_size, num_tokens, input_size)`.
+                Shape as `(batch_size, num_tokens, input_size)` and dtype as `int32` or `int64`.
             sequence_length (`Tensor`): 
-                Shape as `(batch_size)`.
+                Shape as `(batch_size)` and dtype as `int32` or `int64`.
 
         Returns:
-            last_hidden (`Tensor`): 
-                Shape as `(batch_size, hidden_size)`. 
+             `Tensor`: 
+                Shape as `(batch_size, hidden_size)` and dtype is `float`. 
                 The hidden state at the last time step for every layer.
 
         """
@@ -347,7 +349,7 @@ class LSTMEncoder(nn.Layer):
     r"""
     A LSTMEncoder takes as input a sequence of vectors and returns a
     single vector, which is a combination of multiple LSTM layers.
-    The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
+    The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
     The output is of shape `(batch_size, hidden_size*2)` if LSTM is bidirection;
     If not, output is of shape `(batch_size, hidden_size)`.
 
@@ -429,19 +431,19 @@ class LSTMEncoder(nn.Layer):
         r"""
         LSTMEncoder takes the a sequence of vectors and and returns a
         single vector, which is a combination of multiple LSTM layers.
-        The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
+        The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
         The output is of shape `(batch_size, hidden_size*2)` if LSTM is bidirection;
         If not, output is of shape `(batch_size, hidden_size)`.
 
         Args:
             inputs (`Tensor`): 
-                Shape as `(batch_size, num_tokens, input_size)`.
+                Shape as `(batch_size, num_tokens, input_size)` and dtype as `int32` or `int64`.
             sequence_length (`Tensor`): 
-                Shape as `(batch_size)`.
+                Shape as `(batch_size)` and dtype as `int32` or `int64`.
 
         Returns:
             last_hidden (`Tensor`): 
-                Shape as `(batch_size, hidden_size)`.
+                Shape as `(batch_size, hidden_size)` and dtype as `float`.
                 The hidden state at the last time step for every layer.
 
         """
@@ -482,7 +484,7 @@ class RNNEncoder(nn.Layer):
     r"""
     A RNNEncoder takes as input a sequence of vectors and returns a
     single vector, which is a combination of multiple RNN layers.
-    The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
+    The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
     The output is of shape `(batch_size, hidden_size*2)` if RNN is bidirection;
     If not, output is of shape `(batch_size, hidden_size)`.
 
@@ -566,19 +568,19 @@ class RNNEncoder(nn.Layer):
         r"""
         RNNEncoder takes the a sequence of vectors and and returns a
         single vector, which is a combination of multiple RNN layers.
-        The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
+        The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
         The output is of shape `(batch_size, hidden_size*2)` if RNN is bidirection;
         If not, output is of shape `(batch_size, hidden_size)`.
 
         Args:
             inputs (`Tensor`): 
-                Shape as `(batch_size, num_tokens, input_size)`.
+                Shape as `(batch_size, num_tokens, input_size)` and dtype as `int32` or `int64`.
             sequence_length (`Tensor`): 
-                Shape as `(batch_size)`.
+                Shape as `(batch_size)` and dtype as `int32` or `int64`.
 
         Returns:
             last_hidden (`Tensor`): 
-                Shape as `(batch_size, hidden_size)`.
+                Shape as `(batch_size, hidden_size)` and dtype as `float`.
                 The hidden state at the last time step for every layer.
 
         """
@@ -710,7 +712,7 @@ class TCNEncoder(nn.Layer):
     r"""
     A `TCNEncoder` takes as input a sequence of vectors and returns a
     single vector, which is the last one time step in the feature map. 
-    The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
+    The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
     and the output is of shape `(batch_size, num_channels[-1])` with a receptive 
     filed:
     
@@ -770,7 +772,7 @@ class TCNEncoder(nn.Layer):
         r"""
         TCNEncoder takes as input a sequence of vectors and returns a
         single vector, which is the last one time step in the feature map. 
-        The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
+        The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
         and the output is of shape `(batch_size, num_channels[-1])` with a receptive 
         filed:
     
