@@ -31,7 +31,7 @@ class BoWEncoder(nn.Layer):
     and the output is of shape `(batch_size, emb_dim)`.
 
     Args:
-        emb_dim(`int`): 
+        emb_dim(int): 
             The dimension of each vector in the input sequence.
     """
 
@@ -59,15 +59,16 @@ class BoWEncoder(nn.Layer):
         It simply sums the embeddings of a sequence across the time dimension.
 
         Args:
-            inputs (`Tensor`):
+            inputs (Tensor):
                 Shape as `(batch_size, num_tokens, emb_dim)` and dtype as `float32` or `float64`.
-            mask (`Tensor`, optional): 
-                Shape same as `inputs`. Its each elements identify whether is padding token or not. 
+            mask (Tensor, optional): 
+                Shape same as `inputs`. 
+                Its each elements identify whether the corresponding input token is padding or not. 
                 If True, not padding token. If False, padding token.
                 Defaults to `None`.
 
         Returns:
-            `Tensor`: 
+            Tensor: 
                 Shape as `(batch_size, emb_dim)`, and dtype is same as `inputs`. The result vector of BagOfEmbedding.
 
 
@@ -140,14 +141,14 @@ class CNNEncoder(nn.Layer):
     (optionally) projected down to a lower dimensional output, specified by `output_dim`.
 
     We then use a fully connected layer to project in back to the desired output_dim.  For more
-    details, refer to "A Sensitivity Analysis of (and Practitioners’ Guide to) Convolutional Neural
-    Networks for Sentence Classification", Zhang and Wallace 2016, particularly Figure 1.
-    ref: https://arxiv.org/abs/1510.03820
+    details, refer to `A Sensitivity Analysis of (and Practitioners’ Guide to) Convolutional Neural
+    Networks for Sentence Classification <https://arxiv.org/abs/1510.03820>`, 
+    Zhang and Wallace 2016, particularly Figure 1.
 
     Args:
-        emb_dim(`int`):
+        emb_dim(int):
             The dimension of each vector in the input sequence.
-        num_filter(`int`):
+        num_filter(int):
             This is the output dim for each convolutional layer, which is the number of "filters"
             learned by that layer.
         ngram_filter_sizes(`Tuple[int]`, optinal):
@@ -157,7 +158,7 @@ class CNNEncoder(nn.Layer):
         conv_layer_activation(`paddle.nn.Layer`, optional):
             Activation to use after the convolution layers.
             Defaults to `paddle.nn.Tanh()`.
-        output_dim(`int`, optional):
+        output_dim(int, optional):
             After doing convolutions and pooling, we'll project the collected features into a vector of
             this size.  If this value is `None`, we will just return the result of the max pooling,
             giving an output of shape `len(ngram_filter_sizes) * num_filter`.
@@ -257,16 +258,16 @@ class CNNEncoder(nn.Layer):
         The combination of multiple convolution layers and max pooling layers.
 
         Args:
-            inputs (`Tensor`): 
+            inputs (Tensor): 
                 Shape as `(batch_size, num_tokens, emb_dim)` and dtype as `float32` or `float64`.
-            mask (`Tensor`, optional): 
+            mask (Tensor, optional): 
                 Shape shoule be same as `inputs` and dtype as `int32`, `int64`, `float32` or `float64`. 
-                Its each elements identify whether is padding token or not. 
+                Its each elements identify whether the corresponding input token is padding or not. 
                 If True, not padding token. If False, padding token. 
                 Defaults to `None`
 
         Returns:
-            `Tensor`: 
+            Tensor: 
                 If output_dim is None, the result shape is of `(batch_size, output_dim)` and 
                 dtype is `float`; 
                 If not, the result shape is of `(batch_size, len(ngram_filter_sizes) * num_filter)`.
@@ -311,28 +312,28 @@ class GRUEncoder(nn.Layer):
     gru and backward gru layer to create a single vector (shape of `(batch_size, hidden_size*2)`).
 
     Args:
-        input_size (`int`): 
+        input_size (int): 
             The number of expected features in the input (the last dimension).
-        hidden_size (`int`): 
+        hidden_size (int): 
             The number of features in the hidden state.
-        num_layers (`int`, optional): 
+        num_layers (int, optional): 
             Number of recurrent layers. 
             E.g., setting num_layers=2 would mean stacking two GRUs together to form a stacked GRU, 
             with the second GRU taking in outputs of the first GRU and computing the final results.
             Defaults to 1
-        direction (`str`, optional): 
-            The direction of the network. It can be `forward` and `bidirect` 
-            (it means bidirection network). If `biderect`, it is a birectional GRU, 
+        direction (str, optional): 
+            The direction of the network. It can be "forward" and "bidirect" 
+            (it means bidirection network). If "bidirect", it is a birectional GRU, 
             and returns the concat output from both directions.
-            Defaults to `forward`.
-        dropout (`float`, optional): 
+            Defaults to "forward".
+        dropout (float, optional): 
             If non-zero, introduces a Dropout layer on the outputs of each GRU layer 
             except the last layer, with dropout probability equal to dropout.
             Defaults to 0.0.
-        pooling_type ( `str`, optional): 
+        pooling_type ( str, optional): 
             If `pooling_type` is None, then the GRUEncoder will return the hidden state of
             the last time step at last layer as a single vector.
-            If pooling_type is not None, it must be one of `sum`, `max` and `mean`. 
+            If pooling_type is not None, it must be one of "sum", "max" and "mean". 
             Then it will be pooled on the GRU output (the hidden state of every time 
             step at last layer) to create a single vector.
             Defaults to `None`
@@ -439,13 +440,13 @@ class GRUEncoder(nn.Layer):
         If not, output is of shape `(batch_size, hidden_size)`.
 
         Args:
-            inputs (`Tensor`): 
+            inputs (Tensor): 
                 Shape as `(batch_size, num_tokens, input_size)` and dtype as `int32` or `int64`.
-            sequence_length (`Tensor`): 
+            sequence_length (Tensor): 
                 Shape as `(batch_size)` and dtype as `int32` or `int64`.
 
         Returns:
-             `Tensor`: 
+             Tensor: 
                 Shape as `(batch_size, hidden_size)` and dtype is `float`. 
                 The hidden state at the last time step for every layer.
 
@@ -485,7 +486,7 @@ class GRUEncoder(nn.Layer):
 
 class LSTMEncoder(nn.Layer):
     r"""
-    A LSTMEncoder takes as input a sequence of vectors and returns a
+    An LSTMEncoder takes as input a sequence of vectors and returns a
     single vector, which is a combination of multiple LSTM layers.
     The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
     The output is of shape `(batch_size, hidden_size*2)` if LSTM is bidirection;
@@ -500,26 +501,26 @@ class LSTMEncoder(nn.Layer):
     lstm and backward lstm layer to create a single vector (shape of `(batch_size, hidden_size*2)`).
 
     Args:
-        input_size (`int`): 
+        input_size (int): 
             The number of expected features in the input (the last dimension).
-        hidden_size (`int`): 
+        hidden_size (int): 
             The number of features in the hidden state.
-        num_layers (`int`, optional):
+        num_layers (int, optional):
             Number of recurrent layers. 
             E.g., setting num_layers=2 would mean stacking two LSTMs together to form a stacked LSTM, 
             with the second LSTM taking in outputs of the first LSTM and computing the final results.
             Defaults to 1.
-        direction (`str`, optional): 
+        direction (str, optional): 
             The direction of the network. It can be "forward" or "bidirect" (it means bidirection network).
-            If "biderect", it is a birectional LSTM, and returns the concat output from both directions.
+            If "bidirect", it is a birectional LSTM, and returns the concat output from both directions.
             Defaults to "forward".
-        dropout (`float`, optional): 
+        dropout (float, optional): 
             If non-zero, introduces a Dropout layer on the outputs of each LSTM layer 
             except the last layer, with dropout probability equal to dropout.
-        pooling_type (`str`, optional):
+        pooling_type (str, optional):
             If `pooling_type` is None, then the LSTMEncoder will return 
             the hidden state of the last time step at last layer as a single vector.
-            If pooling_type is not None, it must be one of `sum`, `max` and `mean`. 
+            If pooling_type is not None, it must be one of "sum", "max" and "mean". 
             Then it will be pooled on the LSTM output (the hidden state of every 
             time step at last layer) to create a single vector.
 
@@ -626,14 +627,14 @@ class LSTMEncoder(nn.Layer):
         If not, output is of shape `(batch_size, hidden_size)`.
 
         Args:
-            inputs (`Tensor`): 
+            inputs (Tensor): 
                 Shape as `(batch_size, num_tokens, input_size)` and dtype as `int32` or `int64`.
-            sequence_length (`Tensor`): 
+            sequence_length (Tensor): 
                 Shape as `(batch_size)` and dtype as `int32` or `int64`.
 
         Returns:
-            last_hidden (`Tensor`): 
-                Shape as `(batch_size, hidden_size)` and dtype as `float`.
+            last_hidden (Tensor): 
+                Shape as `(batch_size, hidden_size)` and dtype as float.
                 The hidden state at the last time step for every layer.
 
         """
@@ -687,27 +688,27 @@ class RNNEncoder(nn.Layer):
     rnn and backward rnn layer to create a single vector (shape of `(batch_size, hidden_size*2)`).
 
     Args:
-        input_size (`int`): 
+        input_size (int): 
             The number of expected features in the input (the last dimension).
-        hidden_size (`int`): 
+        hidden_size (int): 
             The number of features in the hidden state.
-        num_layers (`int`, optional): 
+        num_layers (int, optional): 
             Number of recurrent layers. 
             E.g., setting num_layers=2 would mean stacking two RNNs together to form a stacked RNN, 
             with the second RNN taking in outputs of the first RNN and computing the final results.
             Defaults to 1.
-        direction (`str`, optional): 
+        direction (str, optional): 
             The direction of the network. It can be "forward" and "bidirect" 
             (it means bidirection network). If `biderect`, it is a birectional RNN, 
-            and returns the concat output from both directions. Defaults to `forward`
-        dropout (`float`, optional): 
+            and returns the concat output from both directions. Defaults to "forward"
+        dropout (float, optional): 
             If non-zero, introduces a Dropout layer on the outputs of each RNN layer 
             except the last layer, with dropout probability equal to dropout.
             Defaults to 0.0.
-        pooling_type ( `str`, optional):
+        pooling_type (str, optional):
             If `pooling_type` is None, then the RNNEncoder will return the hidden state
             of the last time step at last layer as a single vector.
-            If pooling_type is not None, it must be one of `sum`, `max` and `mean`. 
+            If pooling_type is not None, it must be one of "sum", "max" and "mean". 
             Then it will be pooled on the RNN output (the hidden state of every time 
             step at last layer) to create a single vector.
             Defaults to `None`.
@@ -815,13 +816,13 @@ class RNNEncoder(nn.Layer):
         If not, output is of shape `(batch_size, hidden_size)`.
 
         Args:
-            inputs (`Tensor`): 
+            inputs (Tensor): 
                 Shape as `(batch_size, num_tokens, input_size)` and dtype as `int32` or `int64`.
-            sequence_length (`Tensor`): 
+            sequence_length (Tensor): 
                 Shape as `(batch_size)` and dtype as `int32` or `int64`.
 
         Returns:
-            last_hidden (`Tensor`): 
+            last_hidden (Tensor): 
                 Shape as `(batch_size, hidden_size)` and dtype as `float`.
                 The hidden state at the last time step for every layer.
 
@@ -864,7 +865,7 @@ class Chomp1d(nn.Layer):
     Remove the elements on the right.
 
     Args:
-        chomp_size (`int`): The number of elements removed.
+        chomp_size (int): The number of elements removed.
     """
 
     def __init__(self, chomp_size):
