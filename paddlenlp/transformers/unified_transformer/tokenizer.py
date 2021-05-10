@@ -519,6 +519,58 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             is_split_into_words(bool, optinal): Whether or not the input text 
                 (`history`, `response` and `knowledge`) has been pretokenized. 
                 Default True.
+
+        Returns: 
+            Dict: A dictionary containing the encoded sequence and other 
+            relative informations.
+
+            With the corresponding fields:
+
+            - input_ids (List[int]|Tensor):
+                A list of indices of input tokens to be feed to UnifiedTransformer 
+                model. If `return_tensors` is True, it is a Tensor with shape 
+                [1, sequence_length] and data type 'int64'.
+            - token_type_ids (List[int]|Tensor, optional):
+                A list of segment token indices to indicate whether the token 
+                belongs to the dialogue response. If `return_tensors` is True, 
+                it is a Tensor with shape [1, sequence_length] and data type 
+                'int64'. 
+                Being returned when `return_token_type_ids` is set to True.
+            - position_ids (List[int]|Tensor, optional):
+                A list of The position indices. If `return_tensors` is True, 
+                it is a Tensor with shape [1, sequence_length] and data type 
+                'int64'.
+                Being returned when `return_position_ids` is set to True.
+            - attention_mask (numpy.ndarray|Tensor, optional):
+                A numpy.ndarray to prevents attention to some unwanted positions, 
+                with shape [sequence_length, sequence_length] and data type 
+                'float32'. If `return_tensors` is True, it is a Tensor with shape 
+                [1, 1, sequence_length, sequence_length] and data type 'float32'.
+                Being returned when `return_attention_mask` is set to True.
+            - seq_len (int, optional):
+                The actual length of the `input_ids`, excluding the pad token. 
+                Being returned when `return_length` is set to True.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import UnifiedTransformerTokenizer
+
+                tokenizer = UnifiedTransformerTokenizer.from_pretrained('plato-mini')
+
+                inputs = tokenizer.dialogue_encode('我爱祖国')
+                for key in inputs:
+                    print(key + ':')
+                    print(inputs[key])
+                # input_ids: [1, 6, 25445, 26907, 25475, 2]
+                # token_type_ids: [0, 0, 0, 0, 0, 0]
+                # position_ids: [0, 1, 2, 3, 4, 5]
+                # attention_mask: [[0. 0. 0. 0. 0. 0.]
+                # [0. 0. 0. 0. 0. 0.]
+                # [0. 0. 0. 0. 0. 0.]
+                # [0. 0. 0. 0. 0. 0.]
+                # [0. 0. 0. 0. 0. 0.]
+                # [0. 0. 0. 0. 0. 0.]]
         """
 
         # Input type checking for clearer error
