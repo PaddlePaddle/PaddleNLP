@@ -174,11 +174,16 @@ def finalize(beam_size,
     return ids
 
 
-def transfer_param(p, is_bias=False):
+def transfer_param(p, is_bias=False, restore_data=False):
     param_shape = p.shape
+    param_data = p.numpy()
     del p
     return paddle.create_parameter(
-        shape=param_shape, dtype="float16", is_bias=is_bias)
+        shape=param_shape,
+        dtype="float16",
+        is_bias=is_bias,
+        default_initializer=paddle.nn.initializer.Assign(param_data)
+        if restore_data else None)
 
 
 class InferTransformerDecoding(nn.Layer):
@@ -413,42 +418,52 @@ class InferGpt2Decoding(nn.Layer):
 
         if self.use_fp16_decoding:
             for mod in self.model.gpt2.decoder.layers:
-                mod.norm1.weight = transfer_param(mod.norm1.weight)
-                mod.norm1.bias = transfer_param(mod.norm1.bias, is_bias=True)
+                mod.norm1.weight = transfer_param(
+                    mod.norm1.weight, restore_data=True)
+                mod.norm1.bias = transfer_param(
+                    mod.norm1.bias, is_bias=True, restore_data=True)
                 mod.self_attn.q_proj.weight = transfer_param(
-                    mod.self_attn.q_proj.weight)
+                    mod.self_attn.q_proj.weight, restore_data=True)
                 mod.self_attn.q_proj.bias = transfer_param(
-                    mod.self_attn.q_proj.bias, is_bias=True)
+                    mod.self_attn.q_proj.bias, is_bias=True, restore_data=True)
                 mod.self_attn.k_proj.weight = transfer_param(
-                    mod.self_attn.k_proj.weight)
+                    mod.self_attn.k_proj.weight, restore_data=True)
                 mod.self_attn.k_proj.bias = transfer_param(
-                    mod.self_attn.k_proj.bias, is_bias=True)
+                    mod.self_attn.k_proj.bias, is_bias=True, restore_data=True)
                 mod.self_attn.v_proj.weight = transfer_param(
-                    mod.self_attn.v_proj.weight)
+                    mod.self_attn.v_proj.weight, restore_data=True)
                 mod.self_attn.v_proj.bias = transfer_param(
-                    mod.self_attn.v_proj.bias, is_bias=True)
+                    mod.self_attn.v_proj.bias, is_bias=True, restore_data=True)
                 mod.self_attn.out_proj.weight = transfer_param(
-                    mod.self_attn.out_proj.weight)
+                    mod.self_attn.out_proj.weight, restore_data=True)
                 mod.self_attn.out_proj.bias = transfer_param(
-                    mod.self_attn.out_proj.bias, is_bias=True)
+                    mod.self_attn.out_proj.bias,
+                    is_bias=True,
+                    restore_data=True)
 
-                mod.norm2.weight = transfer_param(mod.norm2.weight)
-                mod.norm2.bias = transfer_param(mod.norm2.bias, is_bias=True)
-                mod.linear1.weight = transfer_param(mod.linear1.weight)
+                mod.norm2.weight = transfer_param(
+                    mod.norm2.weight, restore_data=True)
+                mod.norm2.bias = transfer_param(
+                    mod.norm2.bias, is_bias=True, restore_data=True)
+                mod.linear1.weight = transfer_param(
+                    mod.linear1.weight, restore_data=True)
                 mod.linear1.bias = transfer_param(
-                    mod.linear1.bias, is_bias=True)
-                mod.linear2.weight = transfer_param(mod.linear2.weight)
+                    mod.linear1.bias, is_bias=True, restore_data=True)
+                mod.linear2.weight = transfer_param(
+                    mod.linear2.weight, restore_data=True)
                 mod.linear2.bias = transfer_param(
-                    mod.linear2.bias, is_bias=True)
+                    mod.linear2.bias, is_bias=True, restore_data=True)
 
             self.model.gpt2.embeddings.word_embeddings.weight = transfer_param(
-                self.model.gpt2.embeddings.word_embeddings.weight)
+                self.model.gpt2.embeddings.word_embeddings.weight,
+                restore_data=True)
             self.model.gpt2.embeddings.position_embeddings.weight = transfer_param(
-                self.model.gpt2.embeddings.position_embeddings.weight)
+                self.model.gpt2.embeddings.position_embeddings.weight,
+                restore_data=True)
             self.model.gpt2.decoder.norm.weight = transfer_param(
-                self.model.gpt2.decoder.norm.weight)
+                self.model.gpt2.decoder.norm.weight, restore_data=True)
             self.model.gpt2.decoder.norm.bias = transfer_param(
-                self.model.gpt2.decoder.norm.bias)
+                self.model.gpt2.decoder.norm.bias, restore_data=True)
 
         self.slf_ln_weight = []
         self.slf_ln_bias = []
