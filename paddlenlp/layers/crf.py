@@ -21,6 +21,13 @@ from paddlenlp.layers import sequence_mask
 __all__ = ['LinearChainCrf', 'LinearChainCrfLoss', 'ViterbiDecoder']
 
 
+def log_sum_exp(vec, dim=0):
+    # avoid underflow and overflow
+    max_num = paddle.max(vec, dim)
+    max_exp = max_num.unsqueeze(-1)
+    return max_num + paddle.log(paddle.sum(paddle.exp(vec - max_exp), dim))
+
+
 class LinearChainCrf(nn.Layer):
     """
     LinearChainCrf is a linear chain Conditional Random Field layer, it can implement sequential dependencies in the predictions.
@@ -108,11 +115,9 @@ class LinearChainCrf(nn.Layer):
             Tensor: The normalizers tensor, with shape `[batch_size]`.
         """
         batch_size, seq_len, n_labels = inputs.shape
-        inputs_t_exp = inputs.transpose([1, 0, 2]).unsqueeze(-1).expand(
-            [seq_len, batch_size, n_labels, n_labels])
+        inputs_t_exp = inputs.transpose([1, 0, 2]).unsqueeze(-1)
         # trans_exp: batch_size, num_tags, num_tags
-        trans_exp = self.transitions.unsqueeze(0).expand(
-            [batch_size, n_labels, n_labels])
+        trans_exp = self.transitions.unsqueeze(0)
 
         all_alpha = []
         if self.with_start_stop_tag:
@@ -124,11 +129,10 @@ class LinearChainCrf(nn.Layer):
             if i == 0 and not self.with_start_stop_tag:
                 alpha = inputs[:, 0]
             else:
-                alpha_exp = alpha.unsqueeze(1).expand(
-                    [batch_size, n_labels, n_labels])
+                alpha_exp = alpha.unsqueeze(1)
                 # F(n) = logsumexp(F(n-1) + p(y_n) + T(y_{n-1}, y_n))
                 mat = input_exp + trans_exp + alpha_exp
-                alpha = paddle.logsumexp(mat, 2)
+                alpha = log_sum_exp(mat, 2).squeeze(-1)
             all_alpha.append(alpha)
 
         # Get the valid alpha
@@ -141,7 +145,7 @@ class LinearChainCrf(nn.Layer):
         if self.with_start_stop_tag:
             # The last one step
             alpha += self.transitions[self.stop_idx].unsqueeze(0)
-        norm_score = paddle.logsumexp(alpha, 1)
+        norm_score = log_sum_exp(alpha, 1).squeeze(-1)
         return norm_score
 
     def gold_score(self, inputs, labels, lengths):
