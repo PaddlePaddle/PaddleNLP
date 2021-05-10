@@ -21,6 +21,7 @@ from functools import partial
 
 import numpy as np
 import paddle
+import paddle.distributed.fleet as fleet
 from paddle.io import DataLoader
 from paddlenlp.datasets import load_dataset
 
@@ -150,6 +151,9 @@ def parse_args():
 
 
 def create_data_holder(task_name):
+    """
+    Define the input data holder for the glue task.
+    """
     input_ids = paddle.static.data(
         name="input_ids", shape=[-1, -1], dtype="int64")
     token_type_ids = paddle.static.data(
@@ -163,24 +167,37 @@ def create_data_holder(task_name):
 
 
 def reset_program_state_dict(args, model, state_dict, pretrained_state_dict):
+    """
+    Initialize the parameter from the bert config, and set the parameter by 
+    reseting the state dict."
+    """
     reset_state_dict = {}
     scale = model.initializer_range if hasattr(model, "initializer_range")\
         else getattr(model, args.model_type).config["initializer_range"]
+    reset_parameter_names = []
     for n, p in state_dict.items():
-        if n not in pretrained_state_dict:
+        if n in pretrained_state_dict:
+            reset_state_dict[p.name] = pretrained_state_dict[n]
+            reset_parameter_names.append(n)
+        elif p.name in pretrained_state_dict and "bert" in n:
+            reset_state_dict[p.name] = pretrained_state_dict[p.name]
+            reset_parameter_names.append(n)
+        else:
             dtype_str = "float32"
             if str(p.dtype) == "VarType.FP64":
                 dtype_str = "float64"
             reset_state_dict[p.name] = np.random.normal(
                 loc=0.0, scale=scale, size=p.shape).astype(dtype_str)
-        else:
-            reset_state_dict[p.name] = pretrained_state_dict[n]
+    logger.info("the following parameter had reset, please check. {}".format(
+        reset_parameter_names))
     return reset_state_dict
 
 
 def set_seed(args):
-    # Use the same data seed(for data shuffle) for all procs to guarantee data
-    # consistency after sharding.
+    """
+    Use the same data seed(for data shuffle) for all procs to guarantee data
+    consistency after sharding.
+    """
     random.seed(args.seed)
     np.random.seed(args.seed)
     # Maybe different op seeds(for dropout) for different procs is better. By:
@@ -189,6 +206,9 @@ def set_seed(args):
 
 
 def evaluate(exe, metric, loss, correct, dev_program, data_loader):
+    """
+    The evaluate process, calcluate the eval loss and metric. 
+    """
     metric.reset()
     returns = [loss]
     if isinstance(correct, list) or isinstance(correct, tuple):
@@ -212,7 +232,9 @@ def convert_example(example,
                     label_list,
                     max_seq_length=512,
                     is_test=False):
-    """convert a glue example into necessary features"""
+    """
+    Convert a glue example into necessary features.
+    """
     if not is_test:
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
@@ -238,6 +260,7 @@ def do_train(args):
     # Set the paddle execute enviroment
     paddle.enable_static()
     place = paddle.set_device(args.device)
+    fleet.init(is_collective=True)
     set_seed(args)
 
     # Create the main_program for the training and dev_program for the validation
@@ -354,6 +377,7 @@ def do_train(args):
             parameters=model.parameters(),
             weight_decay=args.weight_decay,
             apply_decay_param_fun=lambda x: x in decay_params)
+        optimizer = fleet.distributed_optimizer(optimizer)
         optimizer.minimize(loss)
 
     # Create the metric pass for the validation
@@ -398,7 +422,9 @@ def do_train(args):
                                           "model_%d" % global_step)
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
-                paddle.fluid.io.save_params(exe, output_dir)
+                paddle.static.save_inference_model(
+                    os.path.join(output_dir, "model"),
+                    [input_ids, token_type_ids], [logits], exe)
                 tokenizer.save_pretrained(output_dir)
             if global_step >= num_training_steps:
                 return
