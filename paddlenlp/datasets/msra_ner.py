@@ -22,16 +22,25 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['MSRA_NER']
+__all__ = ['MsraNer']
 
 
-class MSRA_NER(DatasetBuilder):
+class MsraNer(DatasetBuilder):
+    '''
+    Chinese Named Entity Recognition dataset published by Microsoft Research Asia
+    in 2006. The dataset is in the BIO scheme.
+    '''
+
     URL = "https://paddlenlp.bj.bcebos.com/datasets/msra_ner.tar.gz"
-    MD5 = None
+    MD5 = 'f1aadbbf328ea2fa50c9c2b56db0d31e'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(os.path.join('msra_ner', 'train.tsv'), None),
-        'test': META_INFO(os.path.join('msra_ner', 'test.tsv'), None)
+        'train': META_INFO(
+            os.path.join('msra_ner', 'train.tsv'),
+            'e5b4b734ef91861384f441456ad995dd'),
+        'test': META_INFO(
+            os.path.join('msra_ner', 'test.tsv'),
+            '40b26ae09b63af78ea3a91ac8b8ae303')
     }
 
     def _get_data(self, mode, **kwargs):
