@@ -17,8 +17,7 @@
 数据集由约翰·霍普金斯大学系统科学与工程中心提供，每日最新数据可以从 [COVID-19](https://github.com/CSSEGISandData/COVID-19) 仓库中获取，我们在本例中提供了2020年11月24日下载的病例数据。如您需要使用最新数据，请运行：
 
 ```
-wget https://github.com/CSSEGISandData/COVID-19/blob/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv
-```
+wget https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv
 
 ### 模型训练
 
