@@ -171,10 +171,10 @@ class Vocab(object):
         Maps the input indices to token list.
 
         Args:
-            indices (int|List[int]|Tuple[int]): The input indice(s) for mapping.
+            indices (int|list[int]|tuple[int]): The input indice(s) for mapping.
 
         Returns:
-            str|List[str]: Obtained token(s). If `indices` is an integer, it 
+            str|list[str]: Obtained token(s). If `indices` is an integer, it 
             will return a str. If `indices` is a list/tuple of integers, it will 
             return a list of str.
             
@@ -221,11 +221,11 @@ class Vocab(object):
         Maps the input tokens into indices.
 
         Args:
-            tokens (str|List[str]|Tuple[str], optional): The input token(s) for 
+            tokens (str|list[str]|tuple[str], optional): The input token(s) for 
                 mapping.
         
         Returns:
-            int|List[int]: Obationed indice(s). If `tokens` is a str, it will 
+            int|list[int]: Obationed indice(s). If `tokens` is a str, it will 
             return an integer. If `tokens` is a list/tuple of str, it will 
             return a list of integers.
             
