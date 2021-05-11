@@ -13,130 +13,11 @@ WordTag（中文词类知识标注工具）是首个能够覆盖所有中文词�
 - **可定制的词类序列标注框架**
   - WordTag开源版标注使用的词类体系是我们在实践中对**百科文本**解析应用较好的一个版本，不同类型文本（如，搜索query、新闻资讯）的词类分布不同，用户可以利用百科知识树定制自己的词类体系和训练样本，构建自己的WordTag应用版，以获得更好的适配效果。例如，可将自定义的词表按照百科知识树的字段定义好，挂接/整合到百科知识树上，即可使用自己的Term数据定制标注样本和标注任务。
 
-## WordTag应用场景
-
-参见"[解语的应用场景](../)"
-
-
-## 快速开始
-
-### 代码结构说明
-```text
-wordtag/
-├── data.py # 训练数据处理脚本
-├── eval.py # 验证脚本
-├── metric.py # 模型效果验证指标脚本
-├── predictor.py # 预测wordtag需要依赖的脚本
-├── predict.py # 预测worttag的脚本
-├── README.md # 使用说明
-└── train.py  # 训练脚本
-
-```
-
-### 数据准备
-
-我们提供了少数样本用以示例输入数据格式。执行以下命令，下载并解压示例数据集：
-
-```bash
-wget https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/wordtag_dataset.tar.gz && tar -zxvf wordtag_dataset.tar.gz
-```
-解压之后
-```text
-
-data/
-├── classifier_labels.txt # 句子分类集合文本
-├── eval.txt # 验证集
-├── tags.txt # 命名实体集合
-└── train.json  # 训练数据
-```
-
-训练使用的数据可以由用户根据实际的应用场景，自己组织数据。每行数据都由tokens、tags、cls_label组成，tags采用 BIOES 标注体系，cls_label是整个句子的分类，包含"编码/引用/列表","外语句子","古文/古诗句","其他文本"四种，由于目前发布的预训练模型针对的是现代文，因此前三种文本只用于训练文本分类，不用于训练序列标注。
-
-训练样本示例如下：
-
-```text
-{"tokens": ["1", ".", "1", ".", "8", "车", "辆", "自", "动", "驾", "驶", "及", "控", "制", " ", "8"], "tags": ["B-数量词", "I-数量词", "I-数量词", "I-数量词", "E-数量词", "B-物体类", "E-物体类", "B-场景事件", "I-场景事件", "I-场景事件", "E-场景事件", "S-连词", "B-场景事件", "E-场景事件", "S-w", "S-数量词"], "cls_label": "编码/引用/列表"}
-{"tokens": ["亦", "在", "空", "中", "捕", "食", "，", "边", "飞", "翔", "边", "捕", "食", "。"], "tags": ["S-词汇用语", "S-介词", "B-位置方位", "E-位置方位", "B-场景事件", "E-场景事件", "S-w", "S-词汇用语", "B-场景事件", "E-场景事件", "S-词汇用语", "B-场景事件", "E-场景事件", "S-w"], "cls_label": "其他文本"}
-```
-
-
-
-### 模型训练
-
-#### 单卡训练
-
-```bash
-python -u train.py \
-    --max_seq_len 128 \
-    --batch_size 32   \
-    --learning_rate 1e-4 \
-    --num_train_epochs 3 \
-    --logging_steps 10 \
-    --save_steps 100 \
-    --output_dir ./tmp/ \
-    --device "gpu"
-```
-
-#### 多卡训练
-```bash
-python -m paddle.distributed.launch --gpus "0,1"  train.py \
-    --max_seq_len 128 \
-    --batch_size 32   \
-    --learning_rate 1e-4 \
-    --num_train_epochs 3 \
-    --logging_steps 10 \
-    --save_steps 100 \
-    --output_dir ./tmp/ \
-    --device "gpu"
-```
-
-其中参数释义如下：
-- `max_seq_length` 表示最大句子长度，超过该长度将被截断。
-- `batch_size` 表示每次迭代**每张卡**上的样本数目。
-- `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
-- `num_train_epochs` 表示训练轮数。
-- `logging_steps` 表示日志打印间隔。
-- `save_steps` 表示模型保存及评估间隔。
-- `output_dir` 表示模型保存路径。
-- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
-
-
-
-### 模型评估
-
-通过加载训练过程中保存的模型，可以对验证集数据进行验证，启动方式如下：
-
-```bash
-python -u eval.py \
-    --max_seq_len 128 \
-    --batch_size 32   \
-    --init_ckpt_dir ./tmp/ernie_ctm_ft_model_1.pdparams \
-    --device "gpu"
-```
-
-其中 init_ckpt_dir 是模型加载路径，请根据具体的模型路径填写该项。
-
-
-
-### 模型预测
-
-对无标签数据可以启动模型预测：
-
-```bash
-python -u predict.py \
-    --max_seq_len 128 \
-    --batch_size 32   \
-    --init_ckpt_dir ./tmp/ernie_ctm_ft_model_1.pdparams \
-    --device "gpu"
-```
-
-
-
 ## 模型结构
 
 模型使用[ERNIE-CTM](../ernie-ctm)+CRF训练而成，预测时使用viterbi解码，模型结构如下：
 
-![WordTag模型结构](../doc/img/wordtag_model.png)
+<img src="../doc/img/wordtag_model.png" alt="wordtag模型结构"  />
 
 
 ## Term-Linking实现
@@ -155,14 +36,39 @@ WordTag模型对所有的词预测到上位词类之后，会直接根据预测�
 - link到自己定制的term词表：只需将term词表按照TermTree挂接好之后更换数据即可；
 - 调整WordTag预测词类与term词表的映射关系（如，增加自定义类别）：在代码配置中直接调整映射表即可。
 
+## WordTag应用场景
 
+参见"[解语的应用场景](../)"
+
+
+## WordTag示例代码
+下面提供了WordTag模型进行文本到百科知识树链接的示例程序。
+
+### Term-Linking示例程序
+
+Term-Linking示例程序可以对无标签数据可以启动模型预测, 例如想对下面几段文本进行百科知识树的链接解析
+```
+美人鱼是周星驰导演的电影
+小米别熬粥了，加1个苹果，瞬间变小米蛋糕，太香了
+618不要只知道小米、苹果，这三款产品一样是超级爆款
+天鸿美和院地处黄公望国家森林公园山麓
+你好百度
+```
+
+执行下面的脚本即可快速获取上面5段文本的百科知识树链接的结果
+
+```bash
+python -u predict.py \
+    --max_seq_len 128 \
+    --batch_size 32   \
+    --device "gpu"
+```
 
 ## WordTag后续计划
 
 1. 持续优化知识标注模型，获得更加精准的标注结果；
 2. 发布多粒度、多种参数规模的知识标注模型；
 3. 提供细粒度term及subterm消歧的解决方案。
-
 
 
 ## 在论文中引用WordTag
