@@ -62,7 +62,7 @@ def evaluate(model, loss_fct, metric, data_loader, label_num):
         avg_loss = paddle.mean(loss)
         preds = logits.argmax(axis=2)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            None, length, preds, labels)
+            length, preds, labels)
         metric.update(num_infer_chunks.numpy(),
                       num_label_chunks.numpy(), num_correct_chunks.numpy())
         precision, recall, f1_score = metric.accumulate()
@@ -97,7 +97,7 @@ def do_train(args):
 
     # Create dataset, tokenizer and dataloader.
     train_ds, test_ds = load_dataset(
-        'msra_ner', splits=('train', 'test'), lazy=False)
+        'peoples_daily_ner', splits=('train', 'dev'), lazy=False)
 
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
 
