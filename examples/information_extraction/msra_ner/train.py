@@ -97,7 +97,7 @@ def do_train(args):
 
     # Create dataset, tokenizer and dataloader.
     train_ds, test_ds = load_dataset(
-        'peoples_daily_ner', splits=('train', 'dev'), lazy=False)
+        'msra_ner', splits=('train', 'test'), lazy=False)
 
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
 
