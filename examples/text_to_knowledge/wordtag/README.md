@@ -20,17 +20,39 @@ WordTag（中文词类知识标注工具）是首个能够覆盖所有中文词�
 
 ## 快速开始
 
+### 代码结构说明
+```text
+wordtag/
+├── data.py # 训练数据处理脚本
+├── eval.py # 验证脚本
+├── metric.py # 模型效果验证指标脚本
+├── predictor.py # 预测wordtag需要依赖的脚本
+├── predict.py # 预测worttag的脚本
+├── README.md # 使用说明
+└── train.py  # 训练脚本
+
+```
+
 ### 数据准备
 
 我们提供了少数样本用以示例输入数据格式。执行以下命令，下载并解压示例数据集：
 
 ```bash
-python download.py --data_dir ./  
+wget https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/wordtag_dataset.tar.gz && tar -zxvf wordtag_dataset.tar.gz
+```
+解压之后
+```text
+
+data/
+├── classifier_labels.txt # 句子分类集合文本
+├── eval.txt # 验证集
+├── tags.txt # 命名实体集合
+└── train.json  # 训练数据
 ```
 
 训练使用的数据可以由用户根据实际的应用场景，自己组织数据。每行数据都由tokens、tags、cls_label组成，tags采用 BIOES 标注体系，cls_label是整个句子的分类，包含"编码/引用/列表","外语句子","古文/古诗句","其他文本"四种，由于目前发布的预训练模型针对的是现代文，因此前三种文本只用于训练文本分类，不用于训练序列标注。
 
-示例如下：
+训练样本示例如下：
 
 ```text
 {"tokens": ["1", ".", "1", ".", "8", "车", "辆", "自", "动", "驾", "驶", "及", "控", "制", " ", "8"], "tags": ["B-数量词", "I-数量词", "I-数量词", "I-数量词", "E-数量词", "B-物体类", "E-物体类", "B-场景事件", "I-场景事件", "I-场景事件", "E-场景事件", "S-连词", "B-场景事件", "E-场景事件", "S-w", "S-数量词"], "cls_label": "编码/引用/列表"}
@@ -148,8 +170,8 @@ WordTag模型对所有的词预测到上位词类之后，会直接根据预测�
 如果您的工作成果中使用了WordTag，请增加下述引用。我们非常乐于看到WordTag对您的工作带来帮助。
 ```
 @article{zhao2020TermTree,
-	title={TermTree and Knowledge Annotation Framework for Chinese Language Understanding},
-	author={Zhao, Min and Qin, Huapeng and Zhang, Guoxin and Lyu, Yajuan and Zhu, Yong},
+    title={TermTree and Knowledge Annotation Framework for Chinese Language Understanding},
+    author={Zhao, Min and Qin, Huapeng and Zhang, Guoxin and Lyu, Yajuan and Zhu, Yong},
     technical report={Baidu, Inc. TR:2020-KG-TermTree},
     year={2020}
 }

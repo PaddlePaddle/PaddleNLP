@@ -16,12 +16,15 @@ import glob
 import json
 import math
 import os
+import copy
 
 import paddle
 import paddle.nn as nn
 import pandas as pd
 from paddlenlp.datasets import MapDataset
 from paddlenlp.data import Stack, Pad, Tuple
+from paddle.utils.download import get_path_from_url
+from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
 
 LABEL_TO_SCHEMA = {
@@ -89,16 +92,19 @@ LABEL_TO_SCHEMA = {
     "汉语拼音": ["汉语拼音"],
 }
 
+URLS = {
+    "termtree.rawbase":
+    "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree.rawbase",
+    "termtree_type.csv":
+    "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree_type.csv"
+}
+
 
 class WordtagPredictor(object):
     """Predictor of wordtag model.
     """
 
-    def __init__(self,
-                 model_dir,
-                 tag_path,
-                 term_schema_path=None,
-                 term_data_path=None):
+    def __init__(self, model_dir, tag_path):
         """Initialize method of the predictor.
 
         Args:
@@ -106,11 +112,9 @@ class WordtagPredictor(object):
                 The pre-trained model checkpoint dir.
             tag_path (`str`): 
                 The tag vocab path.
-            term_schema_path (`str`, optional): 
-                if you want to use linking mode, you should load term schema. Defaults to ``None``.
-            term_data_path (`str`, optional):
-                if you want to use linking mode, you should load term data. Defaults to ``None``.
         """
+        term_schema_path = self._download_termtree("termtree_type.csv")
+        term_data_path = self._download_termtree("termtree.rawbase")
         self._tags_to_index, self._index_to_tags = self._load_labels(tag_path)
 
         self._model = ErnieCtmWordtagModel.from_pretrained(
@@ -130,6 +134,14 @@ class WordtagPredictor(object):
             self._linking = True
         else:
             self._linking = False
+
+    def _download_termtree(self, filename):
+        default_root = os.path.join(MODEL_HOME, 'ernie-ctm')
+        fullname = os.path.join(default_root, filename)
+        url = URLS[filename]
+        if not os.path.exists(fullname):
+            get_path_from_url(url, default_root)
+        return fullname
 
     @property
     def summary_num(self):
@@ -199,9 +211,65 @@ class WordtagPredictor(object):
                         term_dict[alia][data["termtype"]].append(data["termid"])
         return term_dict
 
+    def _split_long_text2short_text_list(self, input_texts, max_text_len):
+        short_input_texts = []
+        short_input_texts_lens = []
+        for text in input_texts:
+            if len(text) <= max_text_len:
+                short_input_texts.append(text)
+            else:
+                lens = len(text)
+                temp_text_list = text.split("？。！")
+                temp_text_list = [
+                    temp_text for temp_text in temp_text_list
+                    if len(temp_text) > 0
+                ]
+                if len(temp_text_list) <= 1:
+                    temp_text_list = [
+                        text[i:i + max_text_len]
+                        for i in range(0, len(text), max_text_len)
+                    ]
+                    short_input_texts.extend(temp_text_list)
+                else:
+                    count = 0
+                    for temp_text in temp_text_list:
+                        if len(temp_text) + count < lens:
+                            temp_text = text[:len(temp_text) + count + 1]
+                        count += len(temp_text)
+                        short_input_texts.extend(
+                            self._split_long_text2short_text_list([temp_text]))
+        return short_input_texts
+
+    def _convert_short_text2long_text_result(self, input_texts, results):
+        long_text_lens = [len(text) for text in input_texts]
+        concat_results = []
+        single_results = {}
+        count = 0
+        for text in input_texts:
+            text_len = len(text)
+            while True:
+                if len(single_results) == 0 or len(single_results[
+                        "text"]) < text_len:
+                    if len(single_results) == 0:
+                        single_results = copy.deepcopy(results[count])
+                    else:
+                        single_results["text"] += results[count]["text"]
+                        single_results["items"].extend(results[count]["items"])
+                    count += 1
+                elif len(single_results["text"]) == text_len:
+                    concat_results.append(single_results)
+                    single_results = {}
+                    break
+                else:
+                    raise Exception("The len of text must same as raw text.")
+        return concat_results
+
     def _pre_process_text(self, input_texts, max_seq_len=128, batch_size=1):
         infer_data = []
-        for text in input_texts:
+        max_predict_len = max_seq_len - self.summary_num - 1
+        short_input_texts = self._split_long_text2short_text_list(
+            input_texts, max_predict_len)
+        for text in short_input_texts:
             tokens = ["[CLS%i]" % i
                       for i in range(1, self.summary_num)] + list(text)
             tokenized_input = self._tokenizer(
@@ -229,7 +297,7 @@ class WordtagPredictor(object):
             shuffle=False,
             return_list=True)
 
-        return infer_data_loader
+        return infer_data_loader, short_input_texts
 
     def _decode(self, batch_texts, batch_pred_tags):
         batch_results = []
@@ -291,8 +359,8 @@ class WordtagPredictor(object):
             raise TypeError(
                 f"Bad inputs, input text should be str or list of str, {type(input_texts)} found!"
             )
-        infer_data_loader = self._pre_process_text(input_texts, max_seq_len,
-                                                   batch_size)
+        infer_data_loader, short_input_texts = self._pre_process_text(
+            input_texts, max_seq_len, batch_size)
         all_pred_tags = []
         with paddle.no_grad():
             for batch in infer_data_loader:
@@ -302,8 +370,9 @@ class WordtagPredictor(object):
                 scores, pred_tags = self._model.viterbi_decoder(seq_logits,
                                                                 seq_len)
                 all_pred_tags += pred_tags.numpy().tolist()
-
-        results = self._decode(input_texts, all_pred_tags)
+        results = self._decode(short_input_texts, all_pred_tags)
+        results = self._convert_short_text2long_text_result(input_texts,
+                                                            results)
         if self.linking is True:
             for res in results:
                 self._term_linking(res)
