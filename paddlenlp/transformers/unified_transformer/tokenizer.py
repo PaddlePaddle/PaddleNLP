@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Tokenization class for UnifiedTransformer model."""
 
 import copy
 import io
@@ -22,6 +23,7 @@ import unicodedata
 from shutil import copyfile
 
 import numpy as np
+import jieba
 import paddle
 from paddle.utils import try_import
 
@@ -33,6 +35,44 @@ __all__ = ['UnifiedTransformerTokenizer']
 
 
 class UnifiedTransformerTokenizer(PretrainedTokenizer):
+    """
+    Constructs an UnifiedTransformer tokenizer based on 
+    `SentencePiece <https://github.com/google/sentencepiece>`__.
+
+    This tokenizer inherits from 
+    :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer` which 
+    contains most of the main methods. For more information regarding those 
+    methods, please refer to this superclass.
+
+    Args:
+        vocab_file (str):
+            The path of file to construct vocabulary.
+        sentencepiece_model_file (str):
+            The sentencepiece model file required to instantiate a 
+            `SentencePiece <https://github.com/google/sentencepiece>`__.
+        do_lower_case (bool, optional):
+            Whether or not to lowercase the input when tokenizing. Defaults to 
+            False and **does not** lowercase the input.
+        unk_token (str, optional):
+            A special token representing the *unknown (out-of-vocabulary)* token.
+            An unknown token is set to be `unk_token` inorder to be converted 
+            to an ID. Defaults to "[UNK]".
+        pad_token (str, optional):
+            A special token used to make arrays of tokens the same size for 
+            batching purposes. Defaults to "[PAD]".
+        cls_token (str, optional):
+            A special token representing the beginning of a sequence. Defaults 
+            to "[CLS]".
+        sep_token (str, optional):
+            A special token representing the end of a sequence or separating 
+            two different sentences in the same input. Defaults to "[SEP]".
+        mask_token (str, optional):
+            A special token representing a masked token. Defaults to "[MASK]".
+        special_tokens_file (str, optional):
+            The path of file that contains additional special tokens to be used 
+            by the tokenizer. Defaults to "".
+    """
+
     resource_files_names = {
         "vocab_file": "vocab.txt",
         "sentencepiece_model_file": "spm.model",
@@ -43,12 +83,16 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-vocab.txt",
             "unified_transformer-12L-cn-luge":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-vocab.txt",
+            "plato-mini":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/plato-mini-vocab.txt",
         },
         "sentencepiece_model_file": {
             "unified_transformer-12L-cn":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-spm.model",
             "unified_transformer-12L-cn-luge":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-spm.model",
+            "plato-mini":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/plato-mini-spm.model",
         },
     }
     pretrained_init_configuration = {
@@ -58,6 +102,15 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         "unified_transformer-12L-cn-luge": {
             "do_lower_case": False
         },
+        "plato-mini": {
+            "do_lower_case": False
+        },
+    }
+
+    TASK_TO_SPECIAL_TOKEN = {
+        'chitchat': "[CHAT]",
+        'knowledge': "[KNOW]",
+        'recommend': "[RECO]",
     }
 
     def __init__(self,
@@ -69,9 +122,6 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                  cls_token="[CLS]",
                  sep_token="[SEP]",
                  mask_token="[MASK]",
-                 chitchat_token="[CHAT]",
-                 knowledge_token="[KNOW]",
-                 recommend_token="[RECO]",
                  special_tokens_file=""):
         mod = try_import('sentencepiece')
         self.spm_model = mod.SentencePieceProcessor()
@@ -89,10 +139,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             pad_token,
             cls_token,
             sep_token,
-            mask_token=mask_token,
-            chitchat_token=chitchat_token,
-            knowledge_token=knowledge_token,
-            recommend_token=recommend_token)
+            mask_token=mask_token)
 
         # if the sentencepiece_model_file is not exists, just the default sentence-piece model 
         if os.path.isfile(sentencepiece_model_file):
@@ -115,14 +162,27 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
     @property
     def vocab_size(self):
         """
-        return the size of vocabulary.
-        Returns:
-            int: the size of vocabulary.
+        Returns the size of vocabulary.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import UnifiedTransformerTokenizer
+
+                tokenizer = UnifiedTransformerTokenizer.from_pretrained('plato-mini')
+                print(tokenizer.vocab_size)
+                # 30001
         """
         return len(self.vocab)
 
-    def preprocess_text(self, inputs, remove_space=True, lower=False):
-        """preprocess data by removing extra space and normalize data."""
+    def preprocess_text(self,
+                        inputs,
+                        remove_space=True,
+                        lower=False,
+                        is_split_into_words=True):
+        # preprocess data by removing extra space and normalize data.
+        if not is_split_into_words:
+            inputs = " ".join(jieba.lcut(inputs))
         outputs = inputs
         if remove_space:
             outputs = " ".join(inputs.strip().split())
@@ -133,7 +193,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         return outputs
 
     def clean_text(self, text):
-        """Performs invalid character removal and whitespace cleanup on text."""
+        # Performs invalid character removal and whitespace cleanup on text.
         text = text.replace(u"“", u'"')\
             .replace(u'”', u'"')\
             .replace(u'‘', "'")\
@@ -150,7 +210,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         return "".join(output)
 
     def encode_pieces(self, spm_model, text, return_unicode=True, sample=False):
-        """turn sentences into word pieces."""
+        # turn sentences into word pieces.
         # liujiaxiang: add for ernie-albert, mainly consider for “/”/‘/’/— causing too many unk
         text = self.clean_text(text)
         if not sample:
@@ -159,16 +219,21 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             pieces = spm_model.SampleEncodeAsPieces(text, 64, 0.1)
         return pieces
 
-    def _tokenize(self, text):
+    def _tokenize(self, text, is_split_into_words=True):
         """
-        End-to-end tokenization for BERT models.
+        End-to-end tokenization for UnifiedTransformer models.
+
         Args:
-            text (str): The text to be tokenized.
+            text (str): 
+                The text to be tokenized.
         
         Returns:
             list: A list of string representing converted tokens.
         """
-        text = self.preprocess_text(text, lower=self.do_lower_case)
+        text = self.preprocess_text(
+            text,
+            lower=self.do_lower_case,
+            is_split_into_words=is_split_into_words)
         tokens = []
         for match in self.pat.finditer(text):
             part_text = match.group(0)
@@ -179,19 +244,34 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             tokens.extend(part_tokens)
         return tokens
 
-    def tokenize(self, text):
+    def tokenize(self, text, is_split_into_words=True):
         """
-        End-to-end tokenization for BERT models.
+        End-to-end tokenization for UnifiedTransformer models.
+
         Args:
-            text (str): The text to be tokenized.
+            text (str): 
+                The text to be tokenized.
+            is_split_into_words (bool, optinal): 
+                Whether or not the input `text` has been pretokenized. If False, 
+                the input `text` will be pretokenized by `jieba` firstly. 
+                Defaults to True.
         
         Returns:
-            list: A list of string representing converted tokens.
+            list[str]: A list of string representing converted tokens.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import UnifiedTransformerTokenizer
+
+                tokenizer = UnifiedTransformerTokenizer.from_pretrained('plato-mini')
+                print(tokenizer.tokenize('我爱祖国', is_split_into_words=False))
+                # ['▁我', '▁爱', '祖', '国']
         """
-        return self._tokenize(text)
+        return self._tokenize(text, is_split_into_words=is_split_into_words)
 
     def merge_subword(self, tokens):
-        """Merge subword."""
+        # Merge subword.
         ret = []
         for token in tokens:
             if token.startswith(u"▁"):
@@ -210,10 +290,27 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         Converts a sequence of tokens (list of string) in a single string. Since
         the usage of WordPiece introducing `__` to concat subwords, also remove
         `__` when converting.
+
         Args:
-            tokens (list): A list of string representing tokens to be converted.
+            tokens (list[str]): 
+                A list of string representing tokens to be converted.
+            keep_space (bool, optinal): 
+                Whether or not to keep the segmentation with space. Defaults to 
+                True.
+
         Returns:
             str: Converted string from tokens.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import UnifiedTransformerTokenizer
+
+                tokenizer = UnifiedTransformerTokenizer.from_pretrained('plato-mini')
+                print(tokenizer.convert_tokens_to_string(['▁我', '▁爱', '祖', '国']))
+                # 我 爱祖国
+                print(tokenizer.convert_tokens_to_string(['▁我', '▁爱', '祖', '国'], keep_space=False))
+                # 我爱祖国
         """
         tokens = self.merge_subword(tokens)
         if keep_space:
@@ -225,26 +322,41 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         return out_string
 
     def convert_ids_to_string(self, ids, keep_space=True):
-        """Convert ids to string."""
+        """
+        Converts a single index or a sequence of indices to a token or a 
+        sequence of tokens.
+
+        Args:
+            ids (int|list[int]):
+                The token id (or token ids) to be converted to token(s).
+            keep_space (bool, optional):
+                Whether or not to keep the segmentation with space. Defaults to 
+                True.
+
+        Returns:
+            str|list[str]: The decoded token(s).
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import UnifiedTransformerTokenizer
+
+                tokenizer = UnifiedTransformerTokenizer.from_pretrained('plato-mini')
+                tokens = tokenizer.tokenize('我爱祖国', is_split_into_words=False)
+                ids = tokenizer.convert_tokens_to_ids(tokens)
+                print(ids)
+                # [6, 121, 26907, 25475]
+
+                print(tokenizer.convert_ids_to_string(ids))
+                # 我 爱祖国
+                print(tokenizer.convert_ids_to_string(ids, keep_space=False))
+                # 我爱祖国
+        """
         tokens = self.convert_ids_to_tokens(ids)
         out_string = self.convert_tokens_to_string(tokens, keep_space)
         return out_string
 
     def num_special_tokens_to_add(self, pair=False):
-        """
-        Returns the number of added tokens when encoding a sequence with special 
-        tokens. 
-        Note:
-            This encodes inputs and checks the number of added tokens, and is 
-            therefore not efficient. Do not put this inside your training loop.
-        Args:
-            pair (bool, optional): Returns the number of added tokens in the 
-                case of a sequence pair if set to True, returns the number of 
-                added tokens in the case of a single sequence if set to False.
-                Default False.
-        Returns:
-            Number of tokens added to sequences
-        """
         token_ids_0 = []
         token_ids_1 = []
         return len(
@@ -252,21 +364,6 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                                                   if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
-        """
-        Build model inputs from a sequence or a pair of sequence by concatenating 
-        and adding special tokens. 
-        An UnifiedTransformer sequence has the following format:
-        ::
-            - single sequence: ``[CLS] X [SEP]``
-            - pair of sequences: ``[CLS] A [SEP] B [SEP]``
-        Args:
-            token_ids_0 (list): List of IDs to which the special tokens will be 
-                added.
-            token_ids_1 (list, optional): Optional second list of IDs for sequence 
-                pairs. Default None.
-        Returns:
-            list: List of input_ids with the appropriate special tokens.
-        """
         _cls = [self.cls_token_id]
         _sep = [self.sep_token_id]
         if token_ids_1 is None:
@@ -276,24 +373,6 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
     def build_offset_mapping_with_special_tokens(self,
                                                  offset_mapping_0,
                                                  offset_mapping_1=None):
-        """
-        Build offset map from a pair of offset map by concatenating and adding 
-        offsets of special tokens.
-        An UnifiedTransformer offset_mapping has the following format:
-        ::
-            - single sequence: ``(0,0) X (0,0)``
-            - pair of sequences: `(0,0) A (0,0) B (0,0)``
-        
-        Args:
-            offset_mapping_ids_0 (list): List of char offsets to which the special 
-                tokens will be added.
-            offset_mapping_ids_1 (list, optional): Optional second list of char 
-                offsets for offset mapping pairs. Dafault None
-
-        Returns:
-            list: List of char offsets with the appropriate offsets of special 
-                tokens.
-        """
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
@@ -303,25 +382,6 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
     def create_token_type_ids_from_sequences(self,
                                              token_ids_0,
                                              token_ids_1=None):
-        """
-        Create the token_type_ids from the two sequences passed for the model.
-
-        An UnifiedTransformer sequence token_type_ids has the following format:
-        ::
-
-            0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
-            | first sequence    | second sequence |
-
-        If `token_ids_1` is None, this method only returns the first portion (0s).
-
-        Args:
-            token_ids_0 (list): List of IDs.
-            token_ids_1 (list, optional): Optional second list of IDs for sequence 
-                pairs. Default None
-
-        Returns:
-            list: List of token_type_id according to the given sequence(s).
-        """
         _cls = [self.cls_token_id]
         _sep = [self.sep_token_id]
         if token_ids_1 is None:
@@ -333,21 +393,6 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                                 token_ids_0,
                                 token_ids_1=None,
                                 already_has_special_tokens=False):
-        """
-        Retrieve sequence ids from a token list that has no special tokens added. 
-        This method is called when adding special tokens using the tokenizer 
-        ``prepare_for_model`` method.
-        Args:
-            token_ids_0 (list): List of IDs.
-            token_ids_1 (list, optional): Optional second list of IDs for sequence 
-                pairs. Default None.
-            already_has_special_tokens (bool, optional): Whether or not the token 
-                list is already formatted with special tokens for the model. Default
-                False.
-        Returns:
-            list: A list of integers in the range [0, 1]. 1 for a special token, 
-                0 for a sequence token.
-        """
         if already_has_special_tokens:
             if token_ids_1 is not None:
                 raise ValueError(
@@ -364,11 +409,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         return [1] + ([0] * len(token_ids_0)) + [1]
 
     def save_resources(self, save_directory):
-        """
-        Save tokenizer related resources to files under `save_directory`.
-        Args:
-            save_directory (str): Directory to save files into.
-        """
+        # Rewrite the :meth:`save_resources` method of superclass to save 
+        # related resources under `save_directory`.
         for name, file_name in self.resource_files_names.items():
             src_path = getattr(self, name)
             save_path = os.path.join(save_directory, file_name)
@@ -396,24 +438,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                         bos_token=None,
                         eos_token=None,
                         **kwargs):
-        """
-        Instantiate an instance of `Vocab` from a file reserving all tokens by 
-        using `Vocab.from_dict`. The file contains a token and index of the 
-        token per line, separated by '\t'.
-        Args:
-            filepath (str): path of file to construct vocabulary.
-            unk_token (str): special token for unknown token. If no need, it also
-                could be None. Default: None.
-            pad_token (str): special token for padding token. If no need, it also
-                could be None. Default: None.
-            bos_token (str): special token for bos token. If no need, it also
-                could be None. Default: None.
-            eos_token (str): special token for eos token. If no need, it also
-                could be None. Default: None.
-            **kwargs (dict): keyword arguments for `Vocab.from_dict`.
-        Returns:
-            Vocab: An instance of `Vocab`.
-        """
+        # Rewrite the :meth:`load_vocabulary` method of superclass to deal with 
+        # the inconsistency of the vocabulary format.
         token_to_idx = UnifiedTransformerTokenizer.read_file(filepath)
         vocab = Vocab.from_dict(
             token_to_idx,
@@ -433,7 +459,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                         history,
                         response=None,
                         knowledge=None,
-                        task_type='chitchat',
+                        task_type=None,
                         max_seq_len=512,
                         max_response_len=128,
                         max_knowledge_len=128,
@@ -443,7 +469,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                         return_length=False,
                         add_start_token_as_response=False,
                         pad_to_max_seq_len=False,
-                        return_tensors=False):
+                        return_tensors=False,
+                        is_split_into_words=True):
         """
         Main method to encode the single-turn or multi-turn dialogue conversation. 
         It will return a dictionary containing the encoded sequence and other 
@@ -458,39 +485,96 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 utterance is a string. 
             response (str, optional): The response of dialogue conversation. 
                 It should be set when training the model. It should not be set 
-                when running inference. Default None.
+                when running inference. Defaults to None.
             knowledge (str, optional): The knowledge information of dialogue 
                 conversation. It should be set if the `task_type` is "knowledge" 
-                or "recommend". Default None.
+                or "recommend". Defaults to None.
             task_type (str, optional): The type of dialogue conversation. It is 
                 one of "chitchat", "knowledge" and "recommend". They represent 
                 the chitchat dialogue, knowledge grounded dialogue and 
-                conversational recommendation respectively. Default "chitchat".
+                conversational recommendation respectively. Defaults to None, 
+                which means there is no `special_token` added in output sequence 
+                for identifying different conversation types.
             max_seq_len (int, optional): The maximum encoded sequence length.
-                Default 512.
+                Defaults to 512.
             max_response_len (int, optional): The maximum encoded sequence 
-                length of the input `response`. Default 128.
+                length of the input `response`. Defaults to 128.
             max_knowledge_len (int, optional): The maximum encoded sequence 
-                length of the input `knowledge`. Default 128.
+                length of the input `knowledge`. Defaults to 128.
             return_position_ids (bool, optional): Whether to return the 
-                position_ids. Default True.
+                position_ids. Defaults to True.
             return_token_type_ids (bool, optional): Whether to return the 
-                token_type_ids. Default True.
+                token_type_ids. Defaults to True.
             return_attention_mask (bool, optional): Whether to return the 
-                attention_mask. Default True.
+                attention_mask. Defaults to True.
             return_length (bool, optional): Whether to return the length of the
-                encoded sequence. Default False.
+                encoded sequence. Defaults to False.
             add_start_token_as_response (bool, optional): Whether to add the 
-                special token [CLS] at the end of sequence as the begining of 
+                special token "[CLS]" at the end of sequence as the begining of 
                 the response when running inference to force the model to start 
-                generating response sequence. Default False.
+                generating response sequence. Defaults to False.
             pad_to_max_seq_len (bool, optional): Whether to pad the returned 
                 sequences to the `max_seq_len`. Note that, in this method, 
-                returned sequences will be padded on the left. Default False.
+                returned sequences will be padded on the left. Defaults to False.
             return_tensors (bool, optional): Whether to convert the returned 
-                sequences to Tensor. Default False.
+                sequences to Tensor. Defaults to False.
+            is_split_into_words(bool, optinal): Whether or not the input text 
+                (`history`, `response` and `knowledge`) has been pretokenized. 
+                Defaults to True.
+
+        Returns: 
+            dict: A dictionary containing the encoded sequence and other 
+            relative informations.
+
+            With the corresponding fields:
+
+            - input_ids (list[int]|Tensor):
+                A list of indices of input tokens to be feed to UnifiedTransformer 
+                model. If `return_tensors` is True, it is a Tensor with shape 
+                [1, sequence_length] and data type 'int64'.
+            - token_type_ids (list[int]|Tensor, optional):
+                A list of segment token indices to indicate whether the token 
+                belongs to the dialogue response. If `return_tensors` is True, 
+                it is a Tensor with shape [1, sequence_length] and data type 
+                'int64'. 
+                Being returned when `return_token_type_ids` is set to True.
+            - position_ids (list[int]|Tensor, optional):
+                A list of The position indices. If `return_tensors` is True, 
+                it is a Tensor with shape [1, sequence_length] and data type 
+                'int64'.
+                Being returned when `return_position_ids` is set to True.
+            - attention_mask (numpy.ndarray|Tensor, optional):
+                A numpy.ndarray to prevents attention to some unwanted positions, 
+                with shape [sequence_length, sequence_length] and data type 
+                'float32'. If `return_tensors` is True, it is a Tensor with shape 
+                [1, 1, sequence_length, sequence_length] and data type 'float32'.
+                Being returned when `return_attention_mask` is set to True.
+            - seq_len (int, optional):
+                The actual length of the `input_ids`, excluding the pad token. 
+                Being returned when `return_length` is set to True.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import UnifiedTransformerTokenizer
+
+                tokenizer = UnifiedTransformerTokenizer.from_pretrained('plato-mini')
+
+                inputs = tokenizer.dialogue_encode('我爱祖国')
+                for key in inputs:
+                    print(key + ':')
+                    print(inputs[key])
+                # input_ids: [1, 6, 25445, 26907, 25475, 2]
+                # token_type_ids: [0, 0, 0, 0, 0, 0]
+                # position_ids: [0, 1, 2, 3, 4, 5]
+                # attention_mask: [[0. 0. 0. 0. 0. 0.]
+                # [0. 0. 0. 0. 0. 0.]
+                # [0. 0. 0. 0. 0. 0.]
+                # [0. 0. 0. 0. 0. 0.]
+                # [0. 0. 0. 0. 0. 0.]
+                # [0. 0. 0. 0. 0. 0.]]
         """
-        task_type_list = ["chitchat", "knowledge", "recommend"]
+
         # Input type checking for clearer error
         assert isinstance(history, str) or (
             isinstance(history, (list, tuple)) and
@@ -505,9 +589,9 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         assert knowledge is None or isinstance(knowledge, str), (
             "The input `knowledge` must of be with type `str`. But received: {}".
             format(knowledge))
-        assert task_type in task_type_list, (
-            "The input `task_type` must be one of {}.".format(", ".join(
-                task_type_list)))
+        assert task_type is None or task_type in self.TASK_TO_SPECIAL_TOKEN, (
+            "The input `task_type` must be None or one of {}.".format(", ".join(
+                self.TASK_TO_SPECIAL_TOKEN.keys())))
         assert max_seq_len > max_response_len + max_knowledge_len, (
             "`max_seq_len` must be greater than the sum of `max_response_len` "
             "and `max_knowledge_len`. But received `max_seq_len` is {}, "
@@ -520,7 +604,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
 
         knowledge_ids = []
         if knowledge is not None:
-            tokens = self._tokenize(knowledge)
+            tokens = self._tokenize(knowledge, is_split_into_words)
             knowledge_ids = self.convert_tokens_to_ids(tokens)
             if len(knowledge_ids) > max_knowledge_len - 1:
                 knowledge_ids = knowledge_ids[:max_knowledge_len - 1]
@@ -528,7 +612,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
 
         response_ids = []
         if response is not None:
-            tokens = self._tokenize(response)
+            tokens = self._tokenize(response, is_split_into_words)
             response_ids = [self.cls_token_id] + self.convert_tokens_to_ids(
                 tokens)
             if len(response_ids) > max_response_len - 1:
@@ -537,14 +621,23 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         elif add_start_token_as_response:
             response_ids = [self.cls_token_id]
 
-        special_token_id = getattr(self, task_type + '_token_id')
-        knowledge_ids = [self.cls_token_id, special_token_id] + knowledge_ids
+        if task_type is not None:
+            special_token = self.TASK_TO_SPECIAL_TOKEN[task_type]
+            assert special_token in self.vocab._token_to_idx, (
+                "The vocab file should contain the special token corresponding "
+                "to the task: {}.".format(task_type))
+            special_token_id = self.vocab._token_to_idx[special_token]
+            knowledge_ids = [self.cls_token_id, special_token_id
+                             ] + knowledge_ids
+        else:
+            knowledge_ids = [self.cls_token_id] + knowledge_ids
+
         max_history_len = max_seq_len - len(knowledge_ids) - len(response_ids)
         if isinstance(history, str):
             history = [history]
         history_ids = []
         for i in range(len(history) - 1, -1, -1):
-            tokens = self._tokenize(history[i])
+            tokens = self._tokenize(history[i], is_split_into_words)
             if len(history_ids) + len(tokens) + 1 > max_history_len:
                 if i == len(history) - 1:
                     tokens = tokens[1 - max_history_len:]

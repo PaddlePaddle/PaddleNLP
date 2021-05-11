@@ -12,6 +12,12 @@ __all__ = ['WMT14ende']
 
 
 class WMT14ende(DatasetBuilder):
+    '''
+    This dataset is a translation dataset for machine translation task. More 
+    specifically, this dataset is a WMT14 English to German translation dataset 
+    which uses commoncrawl, europarl and news-commentary as train dataset and 
+    uses newstest2014 as test dataset.
+    '''
     URL = "https://paddlenlp.bj.bcebos.com/datasets/WMT14.en-de.tar.gz"
     META_INFO = collections.namedtuple('META_INFO', ('src_file', 'tgt_file',
                                                      'src_md5', 'tgt_md5'))

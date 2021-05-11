@@ -23,6 +23,54 @@ from . import DatasetBuilder
 
 
 class Glue(DatasetBuilder):
+    '''
+    The General Language Understanding Evaluation (GLUE) benchmark is a collection
+    of resources for training, evaluating, and analyzing natural language 
+    understanding systems.
+    From https://gluebenchmark.com/tasks
+
+    CoLA:
+        The Corpus of Linguistic Acceptability (Warstadt et al., 2018) consists of
+        English acceptability judgments drawn from books and journal articles on
+        linguistic theory.
+        Each example is a sequence of words annotated with whether it is a
+        grammatical English sentence. 
+    
+    SST2:
+        The Stanford Sentiment Treebank (Socher et al., 2013) consists of sentences
+        from movie reviews and human annotations of their sentiment.
+    
+    MRPC:
+        The Microsoft Research Paraphrase Corpus dataset.
+    
+    STSB:
+        The Semantic Textual Similarity Benchmark (Cer et al., 2017) is a
+        collection of sentence pairs drawn from news headlines, video and image
+        captions, and natural language inference data. Each pair is human-annotated
+        with a similarity score from 1 to 5.
+    
+    QQP:
+        The Quora Question Pairs dataset is a collection of question pairs from the
+        community question-answering website Quora.
+
+    MNLI:
+        The Multi-Genre Natural Language Inference Corpus (Williams et al., 2018)
+        is a crowdsourced collection of sentence pairs with textual entailment
+        annotations.
+    
+    QNLI:
+        The Question-answering NLI dataset converted from Stanford Question
+        Answering Dataset (Rajpurkar et al. 2016).
+
+    RTE:
+        The Recognizing Textual Entailment (RTE) datasets come from a series of
+        annual textual entailment challenges (RTE1, RTE2, RTE3, and RTE5).
+
+    WNLI:
+        The Winograd NLI dataset converted from the dataset in Winograd Schema
+        Challenge (Levesque et al., 2011).
+    '''
+
     BUILDER_CONFIGS = {
         'cola': {
             'url': "https://dataset.bj.bcebos.com/glue/CoLA.zip",

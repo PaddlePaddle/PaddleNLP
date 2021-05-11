@@ -28,12 +28,17 @@ from easydict import EasyDict as edict
 import pgl
 from pgl.graph_kernel import alias_sample_build_table
 from pgl.utils.logger import log
-from paddlenlp.transformers import ErnieTinyTokenizer
+from paddlenlp.transformers import ErnieTinyTokenizer, ErnieTokenizer
+
+TOKENIZER_CLASSES = {
+    "ernie-tiny": ErnieTinyTokenizer,
+    "ernie-1.0": ErnieTokenizer,
+}
 
 
 def term2id(string, tokenizer, max_seqlen):
     #string = string.split("\t")[1]
-    tokens = tokenizer(string)
+    tokens = tokenizer._tokenize(string)
     ids = tokenizer.convert_tokens_to_ids(tokens)
     ids = ids[:max_seqlen - 1]
     ids = ids + [tokenizer.sep_token_id]
@@ -143,7 +148,8 @@ def dump_node_feat(config):
     ]
     # pool = multiprocessing.Pool()
 
-    tokenizer = ErnieTinyTokenizer.from_pretrained(config.model_name_or_path)
+    tokenizer_class = TOKENIZER_CLASSES[config.model_name_or_path]
+    tokenizer = tokenizer_class.from_pretrained(config.model_name_or_path)
     fn = partial(term2id, tokenizer=tokenizer, max_seqlen=config.max_seqlen)
     term_ids = [fn(x) for x in id2str]
 
