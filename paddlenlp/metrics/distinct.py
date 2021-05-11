@@ -27,7 +27,7 @@ class Distinct(paddle.metric.Metric):
 
     :class:`Distinct` could be used as a :class:`paddle.metric.Metric` class, 
     or an ordinary class. When :class:`Distinct` is used as a 
-    :class:`paddle.metric.Metric` class, a function is needed to transforms 
+    :class:`paddle.metric.Metric` class, a function is needed to transform 
     the network output to a string list.
 
     Args:
