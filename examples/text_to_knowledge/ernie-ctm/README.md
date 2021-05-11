@@ -1,5 +1,5 @@
 
-# W`解语`：ERNIE-CTM（ERNIE for **Chinese Text Mining**）
+# 解语：ERNIE-CTM（ERNIE for **Chinese Text Mining**）
 
 ERNIE-CTM是适用于中文文本挖掘任务的预训练语言模型，拥有更全面的汉字字表集合，更优的中文文本挖掘任务表现，与PaddleNLP深度结合，提供更加便捷的应用实践。
 
@@ -42,6 +42,105 @@ ERNIE-CTM使用的预训练任务为掩码语言模型（Masked Language Model�
 
 ![ERNIE-CTM总体结构](../doc/img/ernie_ctm_model.png)
 
+### Finetune任务
+
+在微调任务中提供了一个百科知识标注的的任务，旨在解析中文词汇的知识标注，在该词性体系中覆盖了所有中文词汇的词类体系，包括各类实体词与非实体词（如概念、实体/专名、语法词等），下面是提供了微调任务的具体的执行流程。
+
+#### 代码结构说明
+
+```text
+wordtag/
+├── data.py # 训练数据处理脚本
+├── download.py # 获取微调数据集脚本
+├── eval.py # 验证脚本
+├── metric.py # 模型效果验证指标脚本
+├── README.md # 使用说明
+└── train.py  # 训练脚本
+
+```
+
+#### 数据准备
+
+我们提供了少数样本用以示例输入数据格式。执行以下命令，下载并解压示例数据集：
+
+```bash
+wget https://paddlenlp.bj.bcebos.com/paddlenlp/datasets/wordtag_dataset.tar.gz && tar -zxvf wordtag_dataset.tar.gz
+```
+解压之后
+
+```text
+
+data/
+├── classifier_labels.txt # 句子分类集合文本
+├── eval.txt # 验证集
+├── tags.txt # 命名实体集合
+└── train.json  # 训练数据
+```
+
+训练使用的数据可以由用户根据实际的应用场景，自己组织数据。每行数据都由tokens、tags、cls_label组成，tags采用 BIOES 标注体系，cls_label是整个句子的分类，包含"编码/引用/列表","外语句子","古文/古诗句","其他文本"四种，由于目前发布的预训练模型针对的是现代文，因此前三种文本只用于训练文本分类，不用于训练序列标注。
+
+训练样本示例如下：
+
+```text
+{"tokens": ["1", ".", "1", ".", "8", "车", "辆", "自", "动", "驾", "驶", "及", "控", "制", " ", "8"], "tags": ["B-数量词", "I-数量词", "I-数量词", "I-数量词", "E-数量词", "B-物体类", "E-物体类", "B-场景事件", "I-场景事件", "I-场景事件", "E-场景事件", "S-连词", "B-场景事件", "E-场景事件", "S-w", "S-数量词"], "cls_label": "编码/引用/列表"}
+{"tokens": ["亦", "在", "空", "中", "捕", "食", "，", "边", "飞", "翔", "边", "捕", "食", "。"], "tags": ["S-词汇用语", "S-介词", "B-位置方位", "E-位置方位", "B-场景事件", "E-场景事件", "S-w", "S-词汇用语", "B-场景事件", "E-场景事件", "S-词汇用语", "B-场景事件", "E-场景事件", "S-w"], "cls_label": "其他文本"}
+```
+
+#### 单卡训练
+
+```bash
+export CUDA_VISIBLE_DEVICES=0
+python -u train.py \
+    --max_seq_len 128 \
+    --batch_size 32   \
+    --learning_rate 1e-4 \
+    --num_train_epochs 3 \
+    --logging_steps 10 \
+    --save_steps 100 \
+    --output_dir ./tmp/ \
+    --device "gpu"
+```
+
+#### 多卡训练
+```bash
+python -m paddle.distributed.launch --gpus "0,1"  train.py \
+    --max_seq_len 128 \
+    --batch_size 32   \
+    --learning_rate 1e-4 \
+    --num_train_epochs 3 \
+    --logging_steps 10 \
+    --save_steps 100 \
+    --output_dir ./tmp/ \
+    --device "gpu"
+```
+
+其中参数释义如下：
+- `max_seq_length` 表示最大句子长度，超过该长度将被截断。
+- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
+- `num_train_epochs` 表示训练轮数。
+- `logging_steps` 表示日志打印间隔。
+- `save_steps` 表示模型保存及评估间隔。
+- `output_dir` 表示模型保存路径。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+
+
+
+### 模型评估
+
+通过加载训练过程中保存的模型，可以对验证集数据进行验证，启动方式如下：
+
+```bash
+python -u eval.py \
+    --max_seq_len 128 \
+    --batch_size 32   \
+    --init_ckpt_dir ./tmp/ernie_ctm_ft_model_93.pdparams \
+    --device "gpu"
+```
+
+其中 init_ckpt_dir 是模型加载路径，请根据具体的模型路径填写该项。
+
+**NOTICE** 由于提供的微调数据集的数据量比较小，微调后的模型效果有限，因此我们也提供专业的WordTag（中文词类知识标注工具），知识标注效果更优详细信息见 [WordTag](../wordtag) 。
 
 
 ## ERNIE-CTM后续计划
