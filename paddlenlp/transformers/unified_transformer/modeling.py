@@ -304,11 +304,11 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 [batch_size, n_head, sequence_length, sequence_length]. 
                 
                 - When the data type is bool, the unwanted positions have 
-                `False` values and the others have `True` values. 
+                    `False` values and the others have `True` values. 
                 - When the data type is int, the unwanted positions have 0 
-                values and the others have 1 values. 
+                    values and the others have 1 values. 
                 - When the data type is float, the unwanted positions have 
-                `-INF` values and the others have 0 values.
+                    `-INF` values and the others have 0 values.
 
             use_cache: (bool, optional): 
                 Whether or not use the model cache to speed up decoding. Defaults 
@@ -321,7 +321,7 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 should be None for training. Defaults to None.
 
         Returns:
-            Tensor|tuple[list]: If `use_cache` is True, it is a tensor 
+            Tensor|tuple: If `use_cache` is False, it is a tensor 
             representing the output of :class:`UnifiedTransformerModel`, with 
             shape [batch_size, sequence_length, hidden_size]. The data type is 
             float32 or float64. Otherwise, it is a tuple, besides the output of 
@@ -440,7 +440,7 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 See :class:`UnifiedTransformerModel`.
 
         Returns:
-            Tensor|tuple[list]: If `use_cache` is True, it is a tensor 
+            Tensor|tuple: If `use_cache` is False, it is a tensor 
             representing the output of :class:`UnifiedTransformerLMHeadModel`, 
             with shape [batch_size, sequence_length, vocab_size]. The data type 
             is float32 or float64. Otherwise, it is a tuple, besides the output 
