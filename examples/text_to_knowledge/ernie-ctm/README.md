@@ -1,5 +1,5 @@
 
-# W`解语`：ERNIE-CTM（ERNIE for **Chinese Text Mining**）
+# 解语：ERNIE-CTM（ERNIE for **Chinese Text Mining**）
 
 ERNIE-CTM是适用于中文文本挖掘任务的预训练语言模型，拥有更全面的汉字字表集合，更优的中文文本挖掘任务表现，与PaddleNLP深度结合，提供更加便捷的应用实践。
 
