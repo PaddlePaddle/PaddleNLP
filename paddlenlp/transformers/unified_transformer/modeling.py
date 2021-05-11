@@ -304,11 +304,11 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 [batch_size, n_head, sequence_length, sequence_length]. 
                 
                 - When the data type is bool, the unwanted positions have 
-                    `False` values and the others have `True` values. 
+                  `False` values and the others have `True` values. 
                 - When the data type is int, the unwanted positions have 0 
-                    values and the others have 1 values. 
+                  values and the others have 1 values. 
                 - When the data type is float, the unwanted positions have 
-                    `-INF` values and the others have 0 values.
+                  `-INF` values and the others have 0 values.
 
             use_cache: (bool, optional): 
                 Whether or not use the model cache to speed up decoding. Defaults 
