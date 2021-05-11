@@ -26,6 +26,10 @@ __all__ = ['PTB']
 
 
 class PTB(DatasetBuilder):
+    '''
+    This is the Penn Treebank Project: Release 2 CDROM, featuring a million
+    words of 1989 Wall Street Journal material.
+    '''
     URL = 'http://www.fit.vutbr.cz/~imikolov/rnnlm/simple-examples.tgz'
     MD5 = "30177ea32e27c525793142b6bf2c8e2d"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))

@@ -19,6 +19,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddlenlp.transformers import WordEmbedding, PositionalEmbedding
 
 
 class CrossEntropyCriterion(nn.Layer):
@@ -46,68 +47,6 @@ class CrossEntropyCriterion(nn.Layer):
         token_num.stop_gradient = True
         avg_cost = sum_cost / token_num
         return sum_cost, avg_cost, token_num
-
-
-def position_encoding_init(n_position, d_pos_vec, dtype="float32"):
-    """
-    Generate the initial values for the sinusoid position encoding table.
-    """
-    channels = d_pos_vec
-    position = np.arange(n_position)
-    num_timescales = channels // 2
-    log_timescale_increment = (np.log(float(1e4) / float(1)) /
-                               (num_timescales - 1))
-    inv_timescales = np.exp(
-        np.arange(num_timescales) * -log_timescale_increment)
-
-    scaled_time = np.expand_dims(position, 1) * np.expand_dims(inv_timescales,
-                                                               0)
-    signal = np.concatenate([np.sin(scaled_time), np.cos(scaled_time)], axis=1)
-    signal = np.pad(signal, [[0, 0], [0, np.mod(channels, 2)]], 'constant')
-    position_enc = signal
-    return position_enc.astype(dtype)
-
-
-class WordEmbedding(nn.Layer):
-    """
-    Word Embedding + Scale
-    """
-
-    def __init__(self, vocab_size, emb_dim, bos_idx=0):
-        super(WordEmbedding, self).__init__()
-        self.emb_dim = emb_dim
-
-        self.word_embedding = nn.Embedding(
-            num_embeddings=vocab_size,
-            embedding_dim=emb_dim,
-            padding_idx=bos_idx,
-            weight_attr=paddle.ParamAttr(
-                initializer=nn.initializer.Normal(0., emb_dim**-0.5)))
-
-    def forward(self, word):
-        word_emb = self.emb_dim**0.5 * self.word_embedding(word)
-        return word_emb
-
-
-class PositionalEmbedding(nn.Layer):
-    """
-    Positional Embedding
-    """
-
-    def __init__(self, emb_dim, max_length, bos_idx=0):
-        super(PositionalEmbedding, self).__init__()
-        self.emb_dim = emb_dim
-
-        self.pos_encoder = nn.Embedding(
-            num_embeddings=max_length,
-            embedding_dim=self.emb_dim,
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Assign(
-                position_encoding_init(max_length, self.emb_dim))))
-
-    def forward(self, pos):
-        pos_emb = self.pos_encoder(pos)
-        pos_emb.stop_gradient = True
-        return pos_emb
 
 
 class DecoderLayer(nn.TransformerDecoderLayer):
@@ -158,6 +97,36 @@ class DecoderLayer(nn.TransformerDecoderLayer):
         if not self.normalize_before:
             tgt = self.norm3(tgt)
         return tgt if cache is None else (tgt, (incremental_cache, ))
+
+
+class Decoder(nn.TransformerDecoder):
+    """
+    PaddlePaddle 2.1 casts memory_mask.dtype to memory.dtype, but in STACL,
+    type of memory is list, having no dtype attribute.
+    """
+
+    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, cache=None):
+        output = tgt
+        new_caches = []
+        for i, mod in enumerate(self.layers):
+            if cache is None:
+                output = mod(output,
+                             memory,
+                             tgt_mask=tgt_mask,
+                             memory_mask=memory_mask,
+                             cache=None)
+            else:
+                output, new_cache = mod(output,
+                                        memory,
+                                        tgt_mask=tgt_mask,
+                                        memory_mask=memory_mask,
+                                        cache=cache[i])
+                new_caches.append(new_cache)
+
+        if self.norm is not None:
+            output = self.norm(output)
+
+        return output if cache is None else (output, new_caches)
 
 
 class SimultaneousTransformer(nn.Layer):
@@ -226,7 +195,7 @@ class SimultaneousTransformer(nn.Layer):
             normalize_before=True,
             bias_attr=[False, False, True])
         decoder_norm = nn.LayerNorm(d_model)
-        self.decoder = nn.TransformerDecoder(
+        self.decoder = Decoder(
             decoder_layer=decoder_layer, num_layers=n_layer, norm=decoder_norm)
 
         if weight_sharing:
