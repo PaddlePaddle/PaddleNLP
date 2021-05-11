@@ -106,7 +106,7 @@ class WordtagPredictor(object):
     """Predictor of wordtag model.
     """
 
-    def __init__(self, model_name, tag_path=None):
+    def __init__(self, model_name="wordtag", term_linking=True, tag_path=None):
         """Initialize method of the predictor.
 
         Args:
@@ -134,7 +134,7 @@ class WordtagPredictor(object):
             self._term_schema = self._load_schema(term_schema_path)
         if term_data_path is not None:
             self._term_dict = self._load_term_tree_data(term_data_path)
-        if term_data_path is not None and term_schema_path is not None:
+        if term_data_path is not None and term_schema_path is not None and term_linking:
             self._linking = True
         else:
             self._linking = False
