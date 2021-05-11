@@ -36,6 +36,7 @@ std::vector<paddle::Tensor> GPT2CUDAForward(
     const paddle::Tensor& decoder_ln_weight,
     const paddle::Tensor& decoder_ln_bias,
     const paddle::Tensor& positional_embedding_weight,
+    const paddle::Tensor& emb_weight,
     paddle::Tensor& output_ids,
     const int& candidate_num,
     const float& probability_threshold,

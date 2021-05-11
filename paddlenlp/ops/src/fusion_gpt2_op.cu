@@ -36,6 +36,7 @@ std::vector<paddle::Tensor> gpt2_kernel(
     const paddle::Tensor& decoder_ln_weight,
     const paddle::Tensor& decoder_ln_bias,
     const paddle::Tensor& positional_embedding_weight,
+    const paddle::Tensor& emb_weight,
     paddle::Tensor& output_ids,
     const int& candidate_num,
     const float& probability_threshold,
@@ -68,12 +69,12 @@ std::vector<paddle::Tensor> gpt2_kernel(
 
   DecodingGpt2<DecodingTraits_::OpType>* gpt2_decoding;
 
+  // input data is on gpu.
   int* h_input_data = new int[batch_size_ * start_len];
   cudaMemcpy(h_input_data,
              input.data<int>(),
              sizeof(int) * batch_size_ * start_len,
              cudaMemcpyDeviceToHost);
-  // input data is on gpu.
   gpt2_decoding =
       new DecodingGpt2<DecodingTraits_::OpType>(allocator_,
                                                 batch_size_,
@@ -98,9 +99,9 @@ std::vector<paddle::Tensor> gpt2_kernel(
     params[i].stream = stream;
     params[i].cublas_handle = cublas_handle_;
 
-    params[i].self_layernorm.beta =
-        reinterpret_cast<const DataType_*>(self_ln_weight[i].data<data_t_>());
     params[i].self_layernorm.gamma =
+        reinterpret_cast<const DataType_*>(self_ln_weight[i].data<data_t_>());
+    params[i].self_layernorm.beta =
         reinterpret_cast<const DataType_*>(self_ln_bias[i].data<data_t_>());
 
     params[i].self_attention.query_weight.kernel =
@@ -121,9 +122,9 @@ std::vector<paddle::Tensor> gpt2_kernel(
     params[i].self_attention.attention_output_weight.bias =
         reinterpret_cast<const DataType_*>(self_out_bias[i].data<data_t_>());
 
-    params[i].ffn_layernorm.beta =
-        reinterpret_cast<const DataType_*>(ffn_ln_weight[i].data<data_t_>());
     params[i].ffn_layernorm.gamma =
+        reinterpret_cast<const DataType_*>(ffn_ln_weight[i].data<data_t_>());
+    params[i].ffn_layernorm.beta =
         reinterpret_cast<const DataType_*>(ffn_ln_bias[i].data<data_t_>());
 
     params[i].ffn.intermediate_weight.kernel =
@@ -136,14 +137,14 @@ std::vector<paddle::Tensor> gpt2_kernel(
         reinterpret_cast<const DataType_*>(ffn_out_bias[i].data<data_t_>());
   }
 
-  decoding_params.layernorm.beta =
-      reinterpret_cast<const DataType_*>(decoder_ln_weight.data<data_t_>());
   decoding_params.layernorm.gamma =
+      reinterpret_cast<const DataType_*>(decoder_ln_weight.data<data_t_>());
+  decoding_params.layernorm.beta =
       reinterpret_cast<const DataType_*>(decoder_ln_bias.data<data_t_>());
   decoding_params.embedding_table =
       reinterpret_cast<const DataType_*>(word_emb.data<data_t_>());
   decoding_params.embedding_kernel =
-      reinterpret_cast<const DataType_*>(word_emb.data<data_t_>());
+      reinterpret_cast<const DataType_*>(emb_weight.data<data_t_>());
   decoding_params.position_encoding_table = reinterpret_cast<const DataType_*>(
       positional_embedding_weight.data<data_t_>());
 
@@ -177,6 +178,7 @@ std::vector<paddle::Tensor> GPT2CUDAForward(
     const paddle::Tensor& decoder_ln_weight,
     const paddle::Tensor& decoder_ln_bias,
     const paddle::Tensor& positional_embedding_weight,
+    const paddle::Tensor& emb_weight,
     paddle::Tensor& output_ids,
     const int& candidate_num,
     const float& probability_threshold,
@@ -215,6 +217,7 @@ std::vector<paddle::Tensor> GPT2CUDAForward(
                                                   decoder_ln_weight,
                                                   decoder_ln_bias,
                                                   positional_embedding_weight,
+                                                  emb_weight,
                                                   output_ids,
                                                   candidate_num,
                                                   probability_threshold,
@@ -249,6 +252,7 @@ std::vector<paddle::Tensor> GPT2CUDAForward(
                                                   decoder_ln_weight,
                                                   decoder_ln_bias,
                                                   positional_embedding_weight,
+                                                  emb_weight,
                                                   output_ids,
                                                   candidate_num,
                                                   probability_threshold,

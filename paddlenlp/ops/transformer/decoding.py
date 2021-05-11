@@ -107,9 +107,9 @@ def infer_gpt2_decoding(
         slf_k_weight, slf_k_bias, slf_v_weight, slf_v_bias, slf_out_weight,
         slf_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
         ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
-        decoder_ln_bias, pos_emb, candidate_num, probability_threshold,
-        max_seq_len, head_num, size_per_head, num_layer, bos_id, eos_id,
-        temperature, use_fp16_decoding):
+        decoder_ln_bias, pos_emb, linear_weight, candidate_num,
+        probability_threshold, max_seq_len, head_num, size_per_head, num_layer,
+        bos_id, eos_id, temperature, use_fp16_decoding):
     helper = LayerHelper('fusion_gpt2', **locals())
 
     inputs = {
@@ -133,7 +133,8 @@ def infer_gpt2_decoding(
         "FFNOutBias@VECTOR": ffn_out_bias,
         "DecoderLayernormWeight": decoder_ln_weight,
         "DecoderLayernormBias": decoder_ln_bias,
-        "PositionEncEmb": pos_emb
+        "PositionEncEmb": pos_emb,
+        "EmbWeight": linear_weight
     }
 
     attrs = {
@@ -416,7 +417,9 @@ class InferGpt2Decoding(nn.Layer):
         self.start_id = start_id
         self.end_id = end_id
 
+        data_type = "float32"
         if self.use_fp16_decoding:
+            data_type = "float16"
             for mod in self.model.gpt2.decoder.layers:
                 mod.norm1.weight = transfer_param(
                     mod.norm1.weight, restore_data=True)
@@ -464,6 +467,14 @@ class InferGpt2Decoding(nn.Layer):
                 self.model.gpt2.decoder.norm.weight, restore_data=True)
             self.model.gpt2.decoder.norm.bias = transfer_param(
                 self.model.gpt2.decoder.norm.bias, restore_data=True)
+
+        emb_data = self.model.gpt2.embeddings.word_embeddings.weight.numpy()
+        self.linear_weight = [
+            paddle.create_parameter(
+                shape=emb_data.shape,
+                dtype=data_type,
+                default_initializer=paddle.nn.initializer.Assign(emb_data))
+        ]
 
         self.slf_ln_weight = []
         self.slf_ln_bias = []
@@ -516,9 +527,9 @@ class InferGpt2Decoding(nn.Layer):
             self.slf_out_weight, self.slf_out_bias, self.ffn_ln_weight,
             self.ffn_ln_bias, self.ffn_inter_weight, self.ffn_inter_bias,
             self.ffn_out_weight, self.ffn_out_bias, self.decoder_ln_weight,
-            self.decoder_ln_bias, self.pos_emb, self.candidate_num,
-            self.probability_threshold, self.max_seq_len, self.head_num,
-            self.size_per_head, self.num_layer, self.start_id, self.end_id,
-            self.temperature, self.use_fp16_decoding)
+            self.decoder_ln_bias, self.pos_emb, self.linear_weight,
+            self.candidate_num, self.probability_threshold, self.max_seq_len,
+            self.head_num, self.size_per_head, self.num_layer, self.start_id,
+            self.end_id, self.temperature, self.use_fp16_decoding)
 
         return output_ids

@@ -27,6 +27,7 @@ std::vector<paddle::Tensor> GPT2Forward(
     const paddle::Tensor& decoder_ln_weight,
     const paddle::Tensor& decoder_ln_bias,
     const paddle::Tensor& positional_embedding_weight,
+    const paddle::Tensor& emb_weight,
     const int& candidate_num,
     const float& probability_threshold,
     const int& max_seq_len,
@@ -63,6 +64,7 @@ std::vector<paddle::Tensor> GPT2Forward(
                            decoder_ln_weight,
                            decoder_ln_bias,
                            positional_embedding_weight,
+                           emb_weight,
                            output_ids,
                            candidate_num,
                            probability_threshold,
@@ -101,6 +103,7 @@ std::vector<std::vector<int64_t>> GPT2InferShape(
     const std::vector<int64_t>& decoder_ln_weight_shape,
     const std::vector<int64_t>& decoder_ln_bias_shape,
     const std::vector<int64_t>& positional_embedding_weight_shape,
+    const std::vector<int64_t>& emb_weight_shape,
     const int& candidate_num,
     const float& probability_threshold,
     const int& max_seq_len,
@@ -137,7 +140,8 @@ std::vector<paddle::DataType> GPT2InferDtype(
     const std::vector<paddle::DataType>& ffn_out_bias_dtype,
     const paddle::DataType& decoder_ln_weight_dtype,
     const paddle::DataType& decoder_ln_bias_dtype,
-    const paddle::DataType& positional_embedding_weight_dtype) {
+    const paddle::DataType& positional_embedding_weight_dtype,
+    const paddle::DataType& emb_weight_dtype) {
   return {paddle::DataType::INT32};
 }
 
@@ -162,7 +166,8 @@ PD_BUILD_OP(fusion_gpt2)
              paddle::Vec("FFNOutBias"),
              "DecoderLayernormWeight",
              "DecoderLayernormBias",
-             "PositionEncEmb"})
+             "PositionEncEmb",
+             "EmbWeight"})
     .Outputs({"OutputIds"})
     .Attrs({"candidate_num: int",
             "probability_threshold: float",

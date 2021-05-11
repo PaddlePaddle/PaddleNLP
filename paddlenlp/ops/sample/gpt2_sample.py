@@ -32,7 +32,6 @@ from paddlenlp.utils.log import logger
 MODEL_CLASSES = {
     "gpt2-base-cn": (GPT2ForPretraining, GPT2ChineseTokenizer),
     "gpt2-medium-en": (GPT2ForPretraining, GPT2Tokenizer),
-    "gpt2-large-en": (GPT2ForPretraining, GPT2Tokenizer),
 }
 
 
@@ -50,7 +49,7 @@ def parse_args():
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(
-        "--batch_size", default=32, type=int, help="Batch size. ")
+        "--batch_size", default=1, type=int, help="Batch size. ")
     parser.add_argument(
         "--candidate_num",
         default=4,
@@ -62,7 +61,7 @@ def parse_args():
         type=float,
         help="The probability threshold to procedure topp sampling. ")
     parser.add_argument(
-        "--max_seq_len", default=32, type=int, help="Maximum output length. ")
+        "--max_seq_len", default=256, type=int, help="Maximum output length. ")
     parser.add_argument(
         "--start_token",
         default="<|endoftext|>",
@@ -74,7 +73,10 @@ def parse_args():
         type=str,
         help="The end token. Defaults to <|endoftext|>. ")
     parser.add_argument(
-        "--temperature", default=1, type=float, help="The temperature to set. ")
+        "--temperature",
+        default=1.0,
+        type=float,
+        help="The temperature to set. ")
     parser.add_argument(
         "--use_fp16_decoding",
         action="store_true",
