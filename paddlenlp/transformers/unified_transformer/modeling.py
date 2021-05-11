@@ -189,20 +189,20 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
             "gelu".
         hidden_dropout_prob(float, optional): 
             The dropout probability used in pre-process and post-precess of MHA 
-            and FFN sub-layer. Default to 0.1.
+            and FFN sub-layer. Defaults to 0.1.
         attention_probs_dropout_prob (float, optional): 
             The dropout probability used in MHA to drop some attention target. 
-            Default to 0.1.
+            Defaults to 0.1.
         normalize_before (bool, optional): 
             Indicate whether to put layer normalization into preprocessing of 
             MHA and FFN sub-layers. If True, pre-process is layer ormalization 
             and post-precess includes dropout, residual connection. Otherwise, 
             no pre-process and post-precess includes dropout, residual 
-            connection, layer normalization. Default to True.
+            connection, layer normalization. Defaults to True.
         max_position_embeddings (int, optional):
-            The maximum length of input `position_ids`. Default to 512.
+            The maximum length of input `position_ids`. Defaults to 512.
         type_vocab_size (int, optional):
-            The size of the input `token_type_ids`. Default to 2.
+            The size of the input `token_type_ids`. Defaults to 2.
         initializer_range (float, optional):
             The standard deviation of the normal initializer. Defaults to 0.02.
 
@@ -213,15 +213,15 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 for how weights are initialized in 
                 :class:`UnifiedTransformerModel`.
         unk_token_id (int, optional):
-            The id of special token `unk_token`. Default to 0.
+            The id of special token `unk_token`. Defaults to 0.
         pad_token_id (int, optional):
-            The id of special token `pad_token`. Default to 0.
+            The id of special token `pad_token`. Defaults to 0.
         bos_token_id (int, optional):
-            The id of special token `bos_token`. Default to 1.
+            The id of special token `bos_token`. Defaults to 1.
         eos_token_id (int, optional):
-            The id of special token `eos_token`. Default to 2.
+            The id of special token `eos_token`. Defaults to 2.
         mask_token_id (int, optional):
-            The id of special token `mask_token`. Default to 30000.
+            The id of special token `mask_token`. Defaults to 30000.
     """
 
     def __init__(
@@ -301,24 +301,27 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 A tensor used in multi-head attention to prevents attention to 
                 some unwanted positions, usually the paddings or the subsequent 
                 positions. It is a tensor with shape broadcasted to 
-                [batch_size, n_head, sequence_length, sequence_length]. When 
-                the data type is bool, the unwanted positions have `False` 
-                values and the others have `True` values. When the data type is 
-                int, the unwanted positions have 0 values and the others have 1 
-                values. When the data type is float, the unwanted positions have 
+                [batch_size, n_head, sequence_length, sequence_length]. 
+                
+                - When the data type is bool, the unwanted positions have 
+                `False` values and the others have `True` values. 
+                - When the data type is int, the unwanted positions have 0 
+                values and the others have 1 values. 
+                - When the data type is float, the unwanted positions have 
                 `-INF` values and the others have 0 values.
+
             use_cache: (bool, optional): 
-                Whether or not use the model cache to speed up decoding. Default 
+                Whether or not use the model cache to speed up decoding. Defaults 
                 to False.
-            cache (List, optional): 
+            cache (list, optional): 
                 It is a list, and each element in the list is `incremental_cache` 
                 produced by :meth:`paddle.nn.TransformerEncoderLayer.gen_cache` 
                 method. See :meth:`paddle.nn.TransformerEncoder.gen_cache` 
                 method for more details. It is only used for inference and 
-                should be None for training. Default None.
+                should be None for training. Defaults to None.
 
         Returns:
-            Tensor|tuple[List]: If `use_cache` is True, it is a tensor 
+            Tensor|tuple[list]: If `use_cache` is True, it is a tensor 
             representing the output of :class:`UnifiedTransformerModel`, with 
             shape [batch_size, sequence_length, hidden_size]. The data type is 
             float32 or float64. Otherwise, it is a tuple, besides the output of 
@@ -326,7 +329,7 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
             cache which is same as input `cache` but `incremental_cache` in it 
             has an incremental length. 
             See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and 
-            :meth:`MultiHeadAttention.forward` method for more details.
+            :meth:`paddle.nn.MultiHeadAttention.forward` method for more details.
 
         Example:
             .. code-block::
@@ -433,11 +436,11 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 See :class:`UnifiedTransformerModel`.
             use_cache: (bool, optional): 
                 See :class:`UnifiedTransformerModel`.
-            cache (List, optional): 
+            cache (list, optional): 
                 See :class:`UnifiedTransformerModel`.
 
         Returns:
-            Tensor|tuple[List]: If `use_cache` is True, it is a tensor 
+            Tensor|tuple[list]: If `use_cache` is True, it is a tensor 
             representing the output of :class:`UnifiedTransformerLMHeadModel`, 
             with shape [batch_size, sequence_length, vocab_size]. The data type 
             is float32 or float64. Otherwise, it is a tuple, besides the output 
@@ -445,7 +448,7 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
             the new cache which is same as input `cache` but `incremental_cache` 
             in it has an incremental length. 
             See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and 
-            :meth:`MultiHeadAttention.forward` method for more details.
+            :meth:`paddle.nn.MultiHeadAttention.forward` method for more details.
 
         Example:
             .. code-block::

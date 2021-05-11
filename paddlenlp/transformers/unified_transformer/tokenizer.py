@@ -228,7 +228,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 The text to be tokenized.
         
         Returns:
-            List: A list of string representing converted tokens.
+            list: A list of string representing converted tokens.
         """
         text = self.preprocess_text(
             text,
@@ -254,10 +254,10 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             is_split_into_words (bool, optinal): 
                 Whether or not the input `text` has been pretokenized. If False, 
                 the input `text` will be pretokenized by `jieba` firstly. 
-                Default True.
+                Defaults to True.
         
         Returns:
-            List[str]: A list of string representing converted tokens.
+            list[str]: A list of string representing converted tokens.
 
         Example:
             .. code-block::
@@ -292,10 +292,11 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         `__` when converting.
 
         Args:
-            tokens (List[str]): 
+            tokens (list[str]): 
                 A list of string representing tokens to be converted.
             keep_space (bool, optinal): 
-                Whether or not to keep the segmentation with space. Default True.
+                Whether or not to keep the segmentation with space. Defaults to 
+                True.
 
         Returns:
             str: Converted string from tokens.
@@ -326,13 +327,14 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         sequence of tokens.
 
         Args:
-            ids (int|List[int]):
+            ids (int|list[int]):
                 The token id (or token ids) to be converted to token(s).
             keep_space (bool, optional):
-                Whether or not to keep the segmentation with space. Default True.
+                Whether or not to keep the segmentation with space. Defaults to 
+                True.
 
         Returns:
-            str|List[str]: The decoded token(s).
+            str|list[str]: The decoded token(s).
 
         Example:
             .. code-block::
@@ -483,60 +485,60 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 utterance is a string. 
             response (str, optional): The response of dialogue conversation. 
                 It should be set when training the model. It should not be set 
-                when running inference. Default None.
+                when running inference. Defaults to None.
             knowledge (str, optional): The knowledge information of dialogue 
                 conversation. It should be set if the `task_type` is "knowledge" 
-                or "recommend". Default None.
+                or "recommend". Defaults to None.
             task_type (str, optional): The type of dialogue conversation. It is 
                 one of "chitchat", "knowledge" and "recommend". They represent 
                 the chitchat dialogue, knowledge grounded dialogue and 
-                conversational recommendation respectively. Default None, which 
-                means there is no `special_token` added in output sequence for 
-                identifying different conversation types.
+                conversational recommendation respectively. Defaults to None, 
+                which means there is no `special_token` added in output sequence 
+                for identifying different conversation types.
             max_seq_len (int, optional): The maximum encoded sequence length.
-                Default 512.
+                Defaults to 512.
             max_response_len (int, optional): The maximum encoded sequence 
-                length of the input `response`. Default 128.
+                length of the input `response`. Defaults to 128.
             max_knowledge_len (int, optional): The maximum encoded sequence 
-                length of the input `knowledge`. Default 128.
+                length of the input `knowledge`. Defaults to 128.
             return_position_ids (bool, optional): Whether to return the 
-                position_ids. Default True.
+                position_ids. Defaults to True.
             return_token_type_ids (bool, optional): Whether to return the 
-                token_type_ids. Default True.
+                token_type_ids. Defaults to True.
             return_attention_mask (bool, optional): Whether to return the 
-                attention_mask. Default True.
+                attention_mask. Defaults to True.
             return_length (bool, optional): Whether to return the length of the
-                encoded sequence. Default False.
+                encoded sequence. Defaults to False.
             add_start_token_as_response (bool, optional): Whether to add the 
-                special token [CLS] at the end of sequence as the begining of 
+                special token "[CLS]" at the end of sequence as the begining of 
                 the response when running inference to force the model to start 
-                generating response sequence. Default False.
+                generating response sequence. Defaults to False.
             pad_to_max_seq_len (bool, optional): Whether to pad the returned 
                 sequences to the `max_seq_len`. Note that, in this method, 
-                returned sequences will be padded on the left. Default False.
+                returned sequences will be padded on the left. Defaults to False.
             return_tensors (bool, optional): Whether to convert the returned 
-                sequences to Tensor. Default False.
+                sequences to Tensor. Defaults to False.
             is_split_into_words(bool, optinal): Whether or not the input text 
                 (`history`, `response` and `knowledge`) has been pretokenized. 
-                Default True.
+                Defaults to True.
 
         Returns: 
-            Dict: A dictionary containing the encoded sequence and other 
+            dict: A dictionary containing the encoded sequence and other 
             relative informations.
 
             With the corresponding fields:
 
-            - input_ids (List[int]|Tensor):
+            - input_ids (list[int]|Tensor):
                 A list of indices of input tokens to be feed to UnifiedTransformer 
                 model. If `return_tensors` is True, it is a Tensor with shape 
                 [1, sequence_length] and data type 'int64'.
-            - token_type_ids (List[int]|Tensor, optional):
+            - token_type_ids (list[int]|Tensor, optional):
                 A list of segment token indices to indicate whether the token 
                 belongs to the dialogue response. If `return_tensors` is True, 
                 it is a Tensor with shape [1, sequence_length] and data type 
                 'int64'. 
                 Being returned when `return_token_type_ids` is set to True.
-            - position_ids (List[int]|Tensor, optional):
+            - position_ids (list[int]|Tensor, optional):
                 A list of The position indices. If `return_tensors` is True, 
                 it is a Tensor with shape [1, sequence_length] and data type 
                 'int64'.
