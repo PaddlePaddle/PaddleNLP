@@ -20,6 +20,7 @@ import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 
+from model import BoWModel, CNNModel, LSTMModel, GRUModel
 from utils import preprocess_prediction_data
 
 # yapf: disable
@@ -88,8 +89,30 @@ if __name__ == "__main__":
     label_map = {0: 'dissimilar', 1: 'similar'}
 
     # Constructs the newtork.
-    model = ppnlp.models.SimNet(
-        network=args.network, vocab_size=len(vocab), num_classes=len(label_map))
+    network = args.network.lower()
+    vocab_size = len(vocab)
+    num_classes = len(label_map)
+    pad_token_id = vocab.to_indices("[PAD]")
+    if network == 'bow':
+        model = BoWModel(vocab_size, num_classes, padding_idx=pad_token_id)
+    elif network == 'cnn':
+        model = CNNModel(vocab_size, num_classes, padding_idx=pad_token_id)
+    elif network == 'gru':
+        model = GRUModel(
+            vocab_size,
+            num_classes,
+            direction='forward',
+            padding_idx=pad_token_id)
+    elif network == 'lstm':
+        model = LSTMModel(
+            vocab_size,
+            num_classes,
+            direction='forward',
+            padding_idx=pad_token_id)
+    else:
+        raise ValueError(
+            "Unknown network: %s, it must be one of bow, cnn, lstm or gru." %
+            network)
 
     # Loads model parameters.
     state_dict = paddle.load(args.params_path)
