@@ -1,5 +1,5 @@
 
-# 解语：ERNIE-CTM（ERNIE for **Chinese Text Mining**）
+# W`解语`：ERNIE-CTM（ERNIE for **Chinese Text Mining**）
 
 ERNIE-CTM是适用于中文文本挖掘任务的预训练语言模型，拥有更全面的汉字字表集合，更优的中文文本挖掘任务表现，与PaddleNLP深度结合，提供更加便捷的应用实践。
 
@@ -40,7 +40,7 @@ ERNIE-CTM使用的预训练任务为掩码语言模型（Masked Language Model�
 
 `[CLS1]`做为全局的监督信号，应用于MLM任务中。训练MLM任务前，将`[CLS1]`特征表示拼接在所有的序列表示之后，通过线性层融合，成为最终的序列表示，之后预测MLM任务。所以，ERNIE-CTM最终输出的文本序列表示中，都融合了`[CLS1]`的特征表示。最终的序列表示中，带有全句的特征，一定程度可避免序列中全局特征捕捉不足，同时，`[CLS1]`最终的表示中也充分融合了句子内容的信息，弥补了SOP任务对文本主题信息捕捉不足的缺陷。
 
-![ERNIE-CTM模型结构](../doc/img/ernie_ctm_model.png)
+![ERNIE-CTM总体结构](../doc/img/ernie_ctm_model.png)
 
 
 

@@ -39,3 +39,5 @@ from .skep.modeling import *
 from .skep.tokenizer import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
+from .xlnet.modeling import *
+from .xlnet.tokenizer import *

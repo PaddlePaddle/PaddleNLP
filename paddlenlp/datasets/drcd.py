@@ -25,16 +25,24 @@ __all__ = ['DRCD']
 
 
 class DRCD(DatasetBuilder):
+    '''
+    Delta Reading Comprehension Dataset is an open domain traditional Chinese 
+    machine reading comprehension (MRC) dataset. The dataset contains 10,014 
+    paragraphs from 2,108 Wikipedia articles and 30,000+ questions generated
+    by annotators.
+    '''
+
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
     SPLITS = {
         'train': META_INFO(
-            os.path.join('DRCD_training.json'), None,
+            os.path.join('DRCD_training.json'),
+            'bbeefc8ad7585ea3e4fef8c677e7643e',
             'https://paddlenlp.bj.bcebos.com/datasets/DRCD/DRCD_training.json'),
         'dev': META_INFO(
-            os.path.join('DRCD_dev.json'), None,
+            os.path.join('DRCD_dev.json'), '42c2f2bca84fc36cf65a86563b0540e6',
             'https://paddlenlp.bj.bcebos.com/datasets/DRCD/DRCD_dev.json'),
         'test': META_INFO(
-            os.path.join('DRCD_test.json'), None,
+            os.path.join('DRCD_test.json'), 'e36a295c1cb8c6b9fb28015907a42d9e',
             'https://paddlenlp.bj.bcebos.com/datasets/DRCD/DRCD_test.json')
     }
 
