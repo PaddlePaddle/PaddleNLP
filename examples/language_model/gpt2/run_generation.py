@@ -6,9 +6,7 @@ import paddle
 from paddlenlp.transformers import (
     GPT2LMHeadModel,
     GPT2Tokenizer,
-    GPT2ChineseTokenizer,
-    UnifiedTransformerLMHeadModel,
-    UnifiedTransformerTokenizer, )
+    GPT2ChineseTokenizer, )
 
 MODEL_CLASSES = {
     "gpt2": (GPT2LMHeadModel, GPT2Tokenizer),
