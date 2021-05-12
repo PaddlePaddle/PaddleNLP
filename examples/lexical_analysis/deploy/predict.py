@@ -198,7 +198,7 @@ class Predictor(object):
             preds = self.output_handle.copy_to_cpu()
             result = parse_result(token_ids, preds, length, word_vocab,
                                   label_vocab)
-            results += result
+            results.extend(result)
         return results
 
 
@@ -221,11 +221,10 @@ if __name__ == "__main__":
         label_vocab,
         normlize_vocab,
         batch_size=args.batch_size)
-
-    for idx, text in enumerate(samples):
-        print('Text: {}'.format(text))
+    for idx, result in enumerate(results):
+        print('Text: {}'.format(samples[idx]))
         sent_tags = []
-        for sent, tags in results:
-            sent_tag = ['(%s, %s)' % (ch, tag) for ch, tag in zip(sent, tags)]
-            sent_tags.append(''.join(sent_tag))
+        sent, tags = result
+        sent_tag = ['(%s, %s)' % (ch, tag) for ch, tag in zip(sent, tags)]
         print('Result: {}'.format(sent_tag))
+        print()
