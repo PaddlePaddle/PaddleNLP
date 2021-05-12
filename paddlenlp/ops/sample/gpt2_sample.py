@@ -52,7 +52,7 @@ def parse_args():
         "--batch_size", default=1, type=int, help="Batch size. ")
     parser.add_argument(
         "--candidate_num",
-        default=4,
+        default=1,
         type=int,
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
@@ -61,7 +61,7 @@ def parse_args():
         type=float,
         help="The probability threshold to procedure topp sampling. ")
     parser.add_argument(
-        "--max_seq_len", default=256, type=int, help="Maximum output length. ")
+        "--max_seq_len", default=12, type=int, help="Maximum output length. ")
     parser.add_argument(
         "--start_token",
         default="<|endoftext|>",
@@ -121,9 +121,12 @@ def do_predict(args):
             # For warmup. 
             if 50 == i:
                 start = time.time()
-            gpt2(input_ids)
+            out_seq = gpt2(input_ids)
         logger.info("Average test time for decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
+    output_sequence = out_seq.numpy().transpose()
+    for i in range(args.batch_size):
+        print(tokenizer.decode(output_sequence[i][1:]))
 
 
 if __name__ == "__main__":
