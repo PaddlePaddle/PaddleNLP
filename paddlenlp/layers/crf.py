@@ -343,8 +343,7 @@ class ViterbiDecoder(nn.Layer):
         """
         batch_size, seq_len, n_labels = inputs.shape
         inputs_t = inputs.transpose([1, 0, 2])
-        trans_exp = self.transitions.unsqueeze(0).expand(
-            [batch_size, n_labels, n_labels])
+        trans_exp = self.transitions.unsqueeze(0)
 
         all_alpha = []
         historys = []
@@ -421,7 +420,5 @@ class ViterbiDecoder(nn.Layer):
                 1] or batch_size > self._batch_seq_index.shape[0]:
             self._batch_seq_index = paddle.cumsum(
                 paddle.ones([batch_size, length + 2], "int64"), axis=1) - 1
-        if self.with_start_stop_tag:
-            return self._batch_seq_index[:batch_size, :length + 2]
-        else:
-            return self._batch_seq_index[:batch_size, :length]
+
+        return self._batch_seq_index[:batch_size, :length]
