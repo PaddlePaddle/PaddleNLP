@@ -40,8 +40,6 @@ class AlbertTokenizer(PretrainedTokenizer):
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v1.spiece.model",
             "albert-base-v2":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v2.spiece.model",
-            "albert-base-v2":
-                "./spiece.model",
             "albert-large-v2":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v2.spiece.model",
             "albert-xlarge-v2":

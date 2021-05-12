@@ -748,8 +748,6 @@ class AlbertPretrainedModel(PretrainedModel):
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v1.pdparams",
             "albert-base-v2":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v2.pdparams",
-            "albert-base-v2":
-                "./albert-base-v2.pdparams",
             "albert-large-v2":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v2.pdparams",
             "albert-xlarge-v2":
