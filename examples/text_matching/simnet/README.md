@@ -35,6 +35,7 @@ SimNet框架在百度各产品上广泛应用，主要包括BOW、CNN、RNN、MM
 
 ```text
 simnet/
+├── model.py # 模型组网
 ├── predict.py # 模型预测
 ├── utils.py # 数据处理工具
 ├── train.py # 训练模型主程序入口，包括训练、评估

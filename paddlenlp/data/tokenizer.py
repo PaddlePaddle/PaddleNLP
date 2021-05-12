@@ -69,7 +69,7 @@ class JiebaTokenizer(BaseTokenizer):
             use_hmm(bool, optional): Whether to use the HMM model. Default: True.
 
         Returns:
-            List[str]: A list of tokens.
+            list[str]: A list of tokens.
             
         Example:
             .. code-block:: python
@@ -108,7 +108,7 @@ class JiebaTokenizer(BaseTokenizer):
             use_hmm(bool, optional): Whether to use the HMM model. Default: True.
 
         Returns:
-            List[int]: A list of ids.
+            list[int]: A list of ids.
             
         Example:
             .. code-block:: python

@@ -282,18 +282,15 @@ class PretrainedModel(Layer, GenerationMixin):
             return model
         return model, state_to_load
 
-    def save_pretrained(self, save_directory):
+    def save_model_config(self, save_dir):
         """
-        Save model configuration and related resources (model state) to files
-        under `save_directory`.
+        Save model configuration to files
+        under `save_dir`.
         Args:
-            save_directory (str): Directory to save files into.
+            save_dir (str): Directory to save files into.
         """
-        assert os.path.isdir(
-            save_directory
-        ), "Saving directory ({}) should be a directory".format(save_directory)
-        # save model config
-        model_config_file = os.path.join(save_directory, self.model_config_file)
+        # Save model config
+        model_config_file = os.path.join(save_dir, self.model_config_file)
         model_config = self.init_config
         # If init_config contains a Layer, use the layer's init_config to save
         for key, value in model_config.items():
@@ -308,7 +305,19 @@ class PretrainedModel(Layer, GenerationMixin):
                 model_config[key] = value.init_config
         with io.open(model_config_file, "w", encoding="utf-8") as f:
             f.write(json.dumps(model_config, ensure_ascii=False))
-        # save model
-        file_name = os.path.join(save_directory,
+
+    def save_pretrained(self, save_dir):
+        """
+        Save model configuration and related resources (model state) to files
+        under `save_dir`.
+        Args:
+            save_dir (str): Directory to save files into.
+        """
+        assert os.path.isdir(
+            save_dir), "save_dir ({}) is not available.".format(save_dir)
+        # Save model config 
+        self.save_model_config(save_dir)
+        # Save model
+        file_name = os.path.join(save_dir,
                                  list(self.resource_files_names.values())[0])
         paddle.save(self.state_dict(), file_name)

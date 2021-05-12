@@ -72,6 +72,21 @@ def match_pooler_parameter(convert_parameter_name_dict):
     return convert_parameter_name_dict
 
 
+def match_mlm_parameter(convert_parameter_name_dict):
+    # convert_parameter_name_dict["cls.predictions.decoder_weight"] = "word_embedding"
+    convert_parameter_name_dict[
+        "cls.predictions.decoder_bias"] = "mask_lm_out_fc.b_0"
+    convert_parameter_name_dict[
+        "cls.predictions.transform.weight"] = "mask_lm_trans_fc.w_0"
+    convert_parameter_name_dict[
+        "cls.predictions.transform.bias"] = "mask_lm_trans_fc.b_0"
+    convert_parameter_name_dict[
+        "cls.predictions.layer_norm.weight"] = "mask_lm_trans_layer_norm_scale"
+    convert_parameter_name_dict[
+        "cls.predictions.layer_norm.bias"] = "mask_lm_trans_layer_norm_bias"
+    return convert_parameter_name_dict
+
+
 def convert_static_to_dygraph_params(dygraph_params_save_path,
                                      static_params_dir,
                                      static_to_dygraph_param_name,
@@ -90,7 +105,11 @@ def convert_static_to_dygraph_params(dygraph_params_save_path,
             continue
         dygraph_para_name = static_to_dygraph_param_name[static_para_name]
         value = np.load(path)
-        state_dict[model_name + '.' + dygraph_para_name] = value
+        if "cls" in dygraph_para_name:
+            # Note: cls.predictions parameters do not need add `model_name.` prefix
+            state_dict[dygraph_para_name] = value
+        else:
+            state_dict[model_name + '.' + dygraph_para_name] = value
 
     with open(dygraph_params_save_path, 'wb') as f:
         pickle.dump(state_dict, f)
@@ -109,22 +128,22 @@ if __name__ == "__main__":
     convert_parameter_name_dict = match_embedding_param(
         convert_parameter_name_dict)
     convert_parameter_name_dict = match_encoder_param(
-        convert_parameter_name_dict, layer_num=24)
+        convert_parameter_name_dict, layer_num=12)
     convert_parameter_name_dict = match_pooler_parameter(
         convert_parameter_name_dict)
-    # for key, value in convert_parameter_name_dict.items():
-    #     print("{}:-------:{}".format(key, value))
+    convert_parameter_name_dict = match_mlm_parameter(
+        convert_parameter_name_dict)
 
     static_to_dygraph_param_name = {
         value: key
         for key, value in convert_parameter_name_dict.items()
     }
 
-    # for static_name, dygraph_name in static_to_dygraph_param_name.items():
-    #     print("{}:-------:{}".format(static_name, dygraph_name))
+    for static_name, dygraph_name in static_to_dygraph_param_name.items():
+        print("{}:-------:{}".format(static_name, dygraph_name))
 
     convert_static_to_dygraph_params(
-        dygraph_params_save_path='ernie_v2_chn_base/dygraph/ernie_v2_chn_base.pdparams',
-        static_params_dir='ernie_v2_chn_base/npz_model_path/',
+        dygraph_params_save_path='./dygraph_model/ernie_v1_chn_base.pdparams',
+        static_params_dir='./ernie1.0_numpy/',
         static_to_dygraph_param_name=static_to_dygraph_param_name,
         model_name='ernie')

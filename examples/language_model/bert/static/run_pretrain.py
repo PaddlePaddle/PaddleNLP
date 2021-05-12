@@ -20,30 +20,25 @@ import random
 import time
 import h5py
 from functools import partial
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
 import distutils.util
 
 import paddle
+import paddle.distributed.fleet as fleet
 from paddle.io import DataLoader, Dataset
-from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion
-from paddlenlp.transformers import ErnieForPretraining, ErnieModel, ErniePretrainingCriterion
-from paddlenlp.transformers import BertTokenizer, ErnieTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from data import create_data_holder, create_pretraining_dataset
 
-MODEL_CLASSES = {
-    "bert": (BertForPretraining, BertTokenizer),
-    "ernie": (ErnieForPretraining, ErnieTokenizer)
-}
+from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion
+from paddlenlp.transformers import BertTokenizer
+from paddlenlp.transformers import LinearDecayWithWarmup
+from dataset import create_data_holder, create_pretraining_dataset
+
+MODEL_CLASSES = {"bert": (BertForPretraining, BertTokenizer)}
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--device",
-        default="gpu",
-        type=str,
-        help="The device that selecting for the training, must be gpu/xpu.")
     parser.add_argument(
         "--model_type",
         default=None,
@@ -147,27 +142,42 @@ def parse_args():
         type=distutils.util.strtobool,
         default=False,
         help="Whether to use pure fp16 training.")
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="gpu",
+        help="Device for selecting for the training.")
+    parser.add_argument(
+        "--gradient_merge_steps",
+        type=int,
+        default=1,
+        help="Number of merge steps before gradient update."
+        "global_batch_size = gradient_merge_steps * batch_size.")
     args = parser.parse_args()
     return args
 
 
-def build_compiled_program(args, main_program, loss):
-    if args.device == "xpu":
-        return main_program
-    exec_strategy = paddle.static.ExecutionStrategy()
-    exec_strategy.num_threads = 1
-    exec_strategy.num_iteration_per_drop_scope = 10000
-    build_strategy = paddle.static.BuildStrategy()
-    build_strategy.enable_addto = args.enable_addto
-    main_program = paddle.static.CompiledProgram(
-        main_program).with_data_parallel(
-            loss_name=loss.name,
-            exec_strategy=exec_strategy,
-            build_strategy=build_strategy)
-    return main_program
+def select_dataset_file_for_each_worker(files, f_start_id, worker_num,
+                                        worker_index):
+    """  
+    Spliting the train file according to the worker index.
+    """
+    num_files = len(files)
+    if worker_num > num_files:
+        remainder = worker_num % num_files
+        data_file = files[(
+            f_start_id * worker_num + worker_index + remainder * f_start_id) %
+                          num_files]
+    else:
+        data_file = files[(f_start_id * worker_num + worker_index) % num_files]
+    return data_file
 
 
 def reset_program_state_dict(model, state_dict):
+    """
+    Initialize the parameter from the bert config, and set the parameter by 
+    reseting the state dict."
+    """
     scale = model.initializer_range if hasattr(model, "initializer_range")\
         else model.bert.config["initializer_range"]
 
@@ -182,24 +192,93 @@ def reset_program_state_dict(model, state_dict):
     return new_state_dict
 
 
+def create_strategy():
+    """
+    Create build strategy and exec strategy.
+    """
+    build_strategy = paddle.static.BuildStrategy()
+    exec_strategy = paddle.static.ExecutionStrategy()
+
+    build_strategy.enable_addto = args.enable_addto
+
+    exec_strategy.num_threads = 1
+    exec_strategy.num_iteration_per_drop_scope = 10000
+    return build_strategy, exec_strategy
+
+
+def dist_optimizer(args, optimizer):
+    """
+    Create a distributed optimizer based on a normal optimizer
+    """
+    build_strategy, exec_strategy = create_strategy()
+
+    dist_strategy = fleet.DistributedStrategy()
+    dist_strategy.execution_strategy = exec_strategy
+    dist_strategy.build_strategy = build_strategy
+
+    dist_strategy.fuse_grad_size_in_MB = 16
+    if args.use_amp:
+        dist_strategy.amp = True
+
+        custom_black_list = ['lookup_table',
+                             'lookup_table_v2'] if args.use_pure_fp16 else None
+        dist_strategy.amp_configs = {
+            'custom_white_list': ['softmax', 'layer_norm', 'gelu'],
+            'init_loss_scaling': args.scale_loss,
+            'custom_black_list': custom_black_list,
+            'use_pure_fp16': args.use_pure_fp16
+        }
+    if args.gradient_merge_steps > 1:
+        dist_strategy.gradient_merge = True
+        dist_strategy.gradient_merge_configs = {
+            'k_steps': args.gradient_merge_steps
+        }
+
+    optimizer = fleet.distributed_optimizer(optimizer, strategy=dist_strategy)
+    return optimizer
+
+
 def set_seed(seed):
+    """
+    Use the same data seed(for data shuffle) for all procs to guarantee data
+    consistency after sharding.
+    """
     random.seed(seed)
     np.random.seed(seed)
     paddle.seed(seed)
 
 
+class WorkerInitObj(object):
+    "Construct the object with different seed, and the Dataloader will generate the data "
+    "with different seed in each worker."
+
+    def __init__(self, seed):
+        self.seed = seed
+
+    def __call__(self, id):
+        np.random.seed(seed=self.seed + id)
+        random.seed(self.seed + id)
+
+
 def do_train(args):
-    # Initialize the paddle execute enviroment
+    # Initialize the paddle and paddle fleet execute enviroment
     paddle.enable_static()
     place = paddle.set_device(args.device)
+    fleet.init(is_collective=True)
 
-    # Set the random seed
+    worker_num = fleet.worker_num()
+    worker_index = fleet.worker_index()
+
+    # Create the random seed for the worker
     set_seed(args.seed)
+    worker_init = WorkerInitObj(args.seed + worker_index)
 
     # Define the input data in the static mode
     main_program = paddle.static.default_main_program()
     startup_program = paddle.static.default_startup_program()
+
     data_holders = create_data_holder(args)
+
     [
         input_ids, segment_ids, input_mask, masked_lm_positions,
         masked_lm_labels, next_sentence_labels, masked_lm_scale
@@ -241,19 +320,10 @@ def do_train(args):
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params,
-        multi_precision=False)
-    if args.use_amp:
-        custom_black_list = (['lookup_table', 'lookup_table_v2']
-                             if args.use_pure_fp16 else None)
-        amp_list = paddle.static.amp.AutoMixedPrecisionLists(
-            custom_white_list=['layer_norm', 'softmax', 'gelu'],
-            custom_black_list=custom_black_list)
-        optimizer = paddle.static.amp.decorate(
-            optimizer,
-            amp_list,
-            init_loss_scaling=args.scale_loss,
-            use_dynamic_loss_scaling=True,
-            use_pure_fp16=args.use_pure_fp16)
+        multi_precision=args.use_pure_fp16)
+
+    # Use the fleet api to compile the distributed optimizer
+    optimizer = dist_optimizer(args, optimizer)
     optimizer.minimize(loss)
 
     # Define the Executor for running the static model
@@ -266,8 +336,8 @@ def do_train(args):
     paddle.static.set_program_state(main_program, reset_state_dict)
     if args.use_amp:
         optimizer.amp_init(place)
-    # Construct the compiled program
-    main_program = build_compiled_program(args, main_program, loss)
+
+    pool = ThreadPoolExecutor(1)
     global_step = 0
     tic_train = time.time()
     epoch = 0
@@ -278,11 +348,25 @@ def do_train(args):
             "training" in f
         ]
         files.sort()
+        num_files = len(files)
         random.Random(args.seed + epoch).shuffle(files)
+        f_start_id = 0
 
-        for f_id in range(0, len(files)):
-            train_data_loader, _ = create_pretraining_dataset(
-                files[f_id], args.max_predictions_per_seq, args, data_holders)
+        # Select one file for each worker and create the DataLoader for the file
+        data_file = select_dataset_file_for_each_worker(
+            files, f_start_id, worker_num, worker_index)
+        train_data_loader, _ = create_pretraining_dataset(
+            data_file, args.max_predictions_per_seq, args, data_holders,
+            worker_init, paddle.static.cuda_places())
+
+        for f_id in range(f_start_id + 1, len(files)):
+            data_file = select_dataset_file_for_each_worker(
+                files, f_id, worker_num, worker_index)
+            dataset_future = pool.submit(create_pretraining_dataset, data_file,
+                                         args.max_predictions_per_seq, args,
+                                         data_holders, worker_init,
+                                         paddle.static.cuda_places())
+
             train_reader_cost = 0.0
             train_run_cost = 0.0
             total_samples = 0
@@ -291,16 +375,16 @@ def do_train(args):
                 train_reader_cost += time.time() - reader_start
                 global_step += 1
                 train_start = time.time()
-                loss_return = exe.run(main_program,\
-                    feed=batch,
-                    fetch_list=[loss])
+                loss_return = exe.run(main_program,
+                                      feed=batch,
+                                      fetch_list=[loss])
                 train_run_cost += time.time() - train_start
                 total_samples += args.batch_size
                 # In the new 2.0 api, must call this function to change the learning_rate
                 lr_scheduler.step()
                 if global_step % args.logging_steps == 0:
                     print(
-                        "global step: %d, epoch: %d, batch: %d, loss: %f, "
+                        "tobal step: %d, epoch: %d, batch: %d, loss: %f, "
                         "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
                         %
                         (global_step, epoch, step, loss_return[0],
@@ -312,19 +396,23 @@ def do_train(args):
                     train_run_cost = 0.0
                     total_samples = 0
                 if global_step % args.save_steps == 0:
-                    output_dir = os.path.join(args.output_dir,
-                                              "model_%d" % global_step)
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    # TODO(fangzeyang): Udpate the save_params to paddle.static
-                    paddle.fluid.io.save_params(exe, output_dir)
-                    tokenizer.save_pretrained(output_dir)
+                    if worker_index == 0:
+                        output_dir = os.path.join(args.output_dir,
+                                                  "model_%d" % global_step)
+                        if not os.path.exists(output_dir):
+                            os.makedirs(output_dir)
+                        model.save_model_config(output_dir)
+                        paddle.static.save(main_program,
+                                           os.path.join(output_dir,
+                                                        "model_state"))
+                        tokenizer.save_pretrained(output_dir)
                 if global_step >= args.max_steps:
                     reader_start = time.time()
                     del train_data_loader
                     return
                 reader_start = time.time()
             del train_data_loader
+            train_data_loader, data_file = dataset_future.result(timeout=None)
         epoch += 1
 
 
