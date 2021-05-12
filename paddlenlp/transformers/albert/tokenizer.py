@@ -54,28 +54,28 @@ class AlbertTokenizer(PretrainedTokenizer):
     }
     pretrained_init_configuration = {
         "albert-base-v1": {
-            "do_lower_case": False
+            "do_lower_case": True
         },
         "albert-large-v1": {
-            "do_lower_case": False
+            "do_lower_case": True
         },
         "albert-xlarge-v1": {
-            "do_lower_case": False
+            "do_lower_case": True
         },
         "albert-xxlarge-v1": {
-            "do_lower_case": False
+            "do_lower_case": True
         },
         "albert-base-v2": {
-            "do_lower_case": False
+            "do_lower_case": True
         },
         "albert-large-v2": {
-            "do_lower_case": False
+            "do_lower_case": True
         },
         "albert-xlarge-v2": {
-            "do_lower_case": False
+            "do_lower_case": True
         },
         "albert-xxlarge-v2": {
-            "do_lower_case": False
+            "do_lower_case": True
         },
     }
 
