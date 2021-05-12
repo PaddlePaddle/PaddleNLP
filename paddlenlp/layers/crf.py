@@ -307,7 +307,7 @@ class ViterbiDecoder(nn.Layer):
         if with_start_stop_tag:
             self.start_idx = -1
             self.stop_idx = -2
-        self.num_tags = transitions.shape[0]
+        self.num_tags = paddle.shape(transitions)[0]
 
         self._initial_alpha = None
         self._index = None
@@ -316,16 +316,17 @@ class ViterbiDecoder(nn.Layer):
 
     def _initialize_alpha(self, batch_size):
         # alpha accumulate the path value to get the different next tag
-        if self._initial_alpha is None or batch_size > self._initial_alpha.shape[
-                0]:
+        if self._initial_alpha is None or batch_size > paddle.shape(
+                self._initial_alpha)[0]:
             # Initialized by a small value.
+            alpha_shape = paddle.concat([batch_size, self.num_tags - 1])
             initial_alpha = paddle.full(
-                (batch_size, self.num_tags - 1),
-                dtype='float32',
-                fill_value=-10000.)
+                alpha_shape, dtype='float32', fill_value=-10000.)
             # alpha_start fill_value = 0. > -10000., means the first one step START gets the most score.
+            start_shape = paddle.full((1, ), dtype='int32', fill_value=1)
+            start_shape = paddle.concat([batch_size, start_shape])
             alpha_start = paddle.full(
-                (batch_size, 1), dtype='float32', fill_value=0.)
+                start_shape, dtype='float32', fill_value=0.)
             self._initial_alpha = paddle.concat(
                 [initial_alpha, alpha_start], axis=1)
         return self._initial_alpha[:batch_size, :]
@@ -341,7 +342,10 @@ class ViterbiDecoder(nn.Layer):
             scores: The scores tensor containing the score for the Viterbi sequence, with shape `[batch_size]`.
             paths: The paths tensor containing the highest scoring tag indices, with shape `[batch_size, sequence_length`].
         """
-        batch_size, seq_len, n_labels = inputs.shape
+        input_shape = paddle.shape(inputs)
+        batch_size = input_shape[0]
+        seq_len = input_shape[1]
+
         inputs_t = inputs.transpose([1, 0, 2])
         trans_exp = self.transitions.unsqueeze(0)
 
@@ -391,17 +395,25 @@ class ViterbiDecoder(nn.Layer):
         # Trace back the best path
         # historys: seq_len, batch_size, n_labels
         historys = paddle.stack(historys)
-        batch_path = [last_ids.unsqueeze(-1)]
-        batch_offset = self._get_batch_index(batch_size) * seq_len
+        batch_path_shape = paddle.concat([seq_len, batch_size])
+        batch_path = paddle.zeros(batch_path_shape, dtype='float32')
+        path_idx = seq_len - 1
+        batch_path = paddle.scatter(
+            batch_path, path_idx,
+            paddle.cast(last_ids.unsqueeze(0), 'float32'), False)
 
-        for hist in reversed(historys):
+        batch_offset = self._get_batch_index(batch_size) * seq_len
+        historys = paddle.reverse(historys, [0])
+        for hist in historys:
             # hist: batch_size, n_labels
+            path_idx = path_idx - 1
             gather_idx = batch_offset + last_ids
             last_ids = paddle.gather(hist.flatten(), gather_idx)
-            batch_path.insert(0, last_ids.unsqueeze(-1))
+            batch_path = paddle.scatter(
+                batch_path, path_idx,
+                paddle.cast(last_ids.unsqueeze(0), 'float32'))
 
-        batch_path = paddle.concat(batch_path, 1)
-
+        batch_path = paddle.transpose(batch_path, [1, 0])
         mask = paddle.cast(
             sequence_mask(
                 self._get_batch_seq_index(batch_size, seq_len), lengths),
@@ -410,15 +422,9 @@ class ViterbiDecoder(nn.Layer):
         return scores, batch_path
 
     def _get_batch_index(self, batch_size):
-        if self._batch_index is None or batch_size != self._batch_index.shape[
-                0]:
-            self._batch_index = paddle.arange(end=batch_size, dtype="int64")
-        return self._batch_index
+        return paddle.arange(end=batch_size, dtype="int64")
 
     def _get_batch_seq_index(self, batch_size, length):
-        if self._batch_seq_index is None or length + 2 > self._batch_seq_index.shape[
-                1] or batch_size > self._batch_seq_index.shape[0]:
-            self._batch_seq_index = paddle.cumsum(
-                paddle.ones([batch_size, length + 2], "int64"), axis=1) - 1
-
-        return self._batch_seq_index[:batch_size, :length]
+        return paddle.cumsum(
+            paddle.ones(paddle.concat([batch_size, length]), "int64"),
+            axis=1) - 1
