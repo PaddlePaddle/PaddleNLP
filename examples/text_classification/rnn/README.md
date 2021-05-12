@@ -182,7 +182,7 @@ python train.py --vocab_path='./senta_word_dict.txt' \
 
 * `vocab_path`: 词汇表文件路径。
 * `device`: 选用什么设备进行训练，可选cpu、gpu或者xpu。如使用gpu训练则参数gpus指定GPU卡号。目前xpu只支持模型网络设置为lstm。
-* `network`: 模型网络名称，默认为`bilstm_attn`， 可更换为bilstm，bigru，birnn，bow，lstm，rnn，gru，bilstm_attn等。
+* `network`: 模型网络名称，默认为`bilstm`， 可更换为bilstm，bigru，birnn，bow，lstm，rnn，gru，bilstm_attn，cnn等。
 * `lr`: 学习率， 默认为5e-5。
 * `batch_size`: 运行一个batch大小，默认为64。
 * `epochs`: 训练轮次，默认为10。

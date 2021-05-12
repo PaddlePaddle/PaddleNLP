@@ -19,6 +19,46 @@ import paddle.nn.functional as F
 import paddlenlp as nlp
 
 
+class SimNet(nn.Layer):
+    def __init__(self,
+                 network,
+                 vocab_size,
+                 num_classes,
+                 emb_dim=128,
+                 pad_token_id=0):
+        super().__init__()
+
+        network = network.lower()
+        if network == 'bow':
+            self.model = BoWModel(
+                vocab_size, num_classes, emb_dim, padding_idx=pad_token_id)
+        elif network == 'cnn':
+            self.model = CNNModel(
+                vocab_size, num_classes, emb_dim, padding_idx=pad_token_id)
+        elif network == 'gru':
+            self.model = GRUModel(
+                vocab_size,
+                num_classes,
+                emb_dim,
+                direction='forward',
+                padding_idx=pad_token_id)
+        elif network == 'lstm':
+            self.model = LSTMModel(
+                vocab_size,
+                num_classes,
+                emb_dim,
+                direction='forward',
+                padding_idx=pad_token_id)
+        else:
+            raise ValueError(
+                "Unknown network: %s, it must be one of bow, cnn, lstm or gru."
+                % network)
+
+    def forward(self, query, title, query_seq_len=None, title_seq_len=None):
+        logits = self.model(query, title, query_seq_len, title_seq_len)
+        return logits
+
+
 class BoWModel(nn.Layer):
     """
     This class implements the Bag of Words Classification Network model to classify texts.
