@@ -51,19 +51,6 @@ class SeAbsa16(DatasetBuilder):
         },
     }
 
-    URL = "https://dataset-bj.cdn.bcebos.com/qianyan/SE-ABSA16_PHNS.zip"
-    MD5 = "f5a62548f2fcf73892cacf2cdf159671"
-    META_INFO = collections.namedtuple(
-        'META_INFO', ('file', 'md5', 'field_indices', 'num_discarded_lines'))
-    SPLITS = {
-        'train': META_INFO(
-            os.path.join('SE-ABSA16_PHNS', 'train.tsv'),
-            'cb4f65aaee59fa76526a0c79b7c12689', (0, 1, 2), 1),
-        'test': META_INFO(
-            os.path.join('SE-ABSA16_PHNS', 'test.tsv'),
-            '7ad80f284e0eccc059ece3ce3d3a173f', (1, 2), 1)
-    }
-
     def _get_data(self, mode, **kwargs):
         """Downloads dataset."""
         builder_config = self.BUILDER_CONFIGS[self.name]
@@ -72,7 +59,9 @@ class SeAbsa16(DatasetBuilder):
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-            get_path_from_url(self.URL, default_root, self.MD5)
+            url = builder_config['url']
+            md5 = builder_config['md5']
+            get_path_from_url(url, DATA_HOME, md5)
 
         return fullname
 
