@@ -1,5 +1,4 @@
-# BERT
-
+# BERT Benchmark with Fleet API
 ## 模型简介
 
 [BERT](https://arxiv.org/abs/1810.04805) （Bidirectional Encoder Representations from Transformers）以[Transformer](https://arxiv.org/abs/1706.03762) 编码器为网络基本组件，使用掩码语言模型（Masked Language Model）和邻接句子预测（Next Sentence Prediction）两个任务在大规模无标注文本语料上进行预训练（pre-train），得到融合了双向内容的通用语义表示模型。以预训练产生的通用语义表示模型为基础，结合任务适配的简单输出层，微调（fine-tune）后即可应用到下游的NLP任务，效果通常也较直接在下游的任务上训练的模型更优。此前BERT即在[GLUE评测任务](https://gluebenchmark.com/tasks)上取得了SOTA的结果。
@@ -38,7 +37,8 @@ python create_pretraining_data.py \
 
 使用以上预训练数据生成程序可以用于处理领域垂类数据后进行二次预训练。若需要使用BERT论文中预训练使用的英文Wiki和BookCorpus数据，可以参考[这里](https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/LanguageModeling/BERT)进行处理，得到的数据可以直接接入本项目中的预训练程序使用。
 
-#### Fine-tunning数据准备
+#### Fine-tuning数据准备
+Fine-tuning的数据集已经被PaddleNLP框架集成，只需要填写相应的数据集的名称，PaddleNLP会自动下载数据集，具体的使用方法可以参考 `run_glue.py` 脚本。
 
 ##### GLUE评测任务数据
 
@@ -58,35 +58,12 @@ python -m paddle.distributed.launch --gpus "0" run_pretrain.py \
     --weight_decay 1e-2 \
     --adam_epsilon 1e-6 \
     --warmup_steps 10000 \
-    --num_train_epochs 3 \
     --input_dir data/ \
     --output_dir pretrained_models/ \
     --logging_steps 1 \
     --save_steps 20000 \
     --max_steps 1000000 \
     --device gpu \
-    --use_amp False
-```
-
-#### XPU训练
-```shell
-unset FLAGS_selected_xpus
-python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
-    --model_type bert \
-    --model_name_or_path bert-base-uncased \
-    --max_predictions_per_seq 20 \
-    --batch_size 32   \
-    --learning_rate 1e-4 \
-    --weight_decay 1e-2 \
-    --adam_epsilon 1e-6 \
-    --warmup_steps 10000 \
-    --num_train_epochs 3 \
-    --input_dir data/ \
-    --output_dir pretrained_models/ \
-    --logging_steps 1 \
-    --save_steps 20000 \
-    --max_steps 1000000 \
-    --device xpu \
     --use_amp False
 ```
 其中参数释义如下：
@@ -106,7 +83,6 @@ python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
 - `max_steps` 表示最大训练步数。若训练`num_train_epochs`轮包含的训练步数大于该值，则达到`max_steps`后就提前结束。
 - `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `use_amp` 指示是否启用自动混合精度训练。
-
 **NOTICE**: 预训练时data目录存放的是经过 `create_pretraining_data.py` 处理后的数据，因此需要通过该数据处理脚本预先处理，否则预训练将会出现报错。
 
 ### 执行Fine-tunning
@@ -126,8 +102,7 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
     --logging_steps 1 \
     --save_steps 500 \
     --output_dir ./tmp/ \
-    --device gpu \
-    --use_amp False
+    --device gpu
 ```
 
 其中参数释义如下：
@@ -142,45 +117,28 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
 - `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
-- `use_amp` 指示是否启用自动混合精度训练。
 
 基于`bert-base-uncased`在GLUE各评测任务上Fine-tuning后，在验证集上有如下结果：
 
-| Task  | Metric                       | Result            |
-|:-----:|:----------------------------:|:-----------------:|
-| SST-2 | Accuracy                     |      0.92660      |
-| QNLI  | Accuracy                     |      0.91707      |
-| CoLA  | Mattehew's corr              |      0.59557      |
-| MRPC  | F1/Accuracy                  |  0.91667/0.88235  |
-| STS-B | Person/Spearman corr         |  0.88847/0.88350  |
-| QQP   | Accuracy/F1                  |  0.90581/0.87347  |
-| MNLI  | Matched acc/MisMatched acc   |  0.84422/0.84825  |
-| RTE   | Accuracy                     |      0.711191     |
-
+| Task  | Metric                       | Result      |
+|-------|------------------------------|-------------|
+| CoLA  | Matthews corr                | 59.90       |
+| SST-2 | Accuracy                     | 92.76       |
+| STS-B | Pearson/Spearman corr        | 89.12       |
+| MNLI  | matched acc./mismatched acc. | 84.45/84.62 |
+| QNLI  | acc.                         | 91.73       |
+| RTE   | acc.                         | 67.15       |
 
 ### 预测
 
 在Fine-tuning完成后，我们可以使用如下方式导出希望用来预测的模型：
-
-```shell
-python -u ./export_model.py \
-    --model_type bert \
-    --model_path bert-base-uncased \
-    --output_path ./infer_model/model
-```
-
-其中参数释义如下：
-- `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
-- `model_path` 表示训练模型的保存路径，与训练时的`output_dir`一致。
-- `output_path` 表示导出预测模型文件的前缀。保存时会添加后缀（`pdiparams`，`pdiparams.info`，`pdmodel`）；除此之外，还会在`output_path`包含的目录下保存tokenizer相关内容。
-
 然后按照如下的方式进行GLUE中的评测任务进行预测（基于Paddle的[Python预测API](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/python_infer_cn.html)）：
 
 ```shell
 python -u ./predict_glue.py \
     --task_name SST-2 \
     --model_type bert \
-    --model_path ./infer_model/model \
+    --model_path ./tmp/model_20/infer_model \
     --batch_size 32 \
     --max_seq_length 128
 ```
@@ -192,6 +150,4 @@ python -u ./predict_glue.py \
 - `batch_size` 表示每个预测批次的样本数目。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 
-## 扩展
-
-上述的介绍是基于动态图的BERT的预训练任务和微调任务以及预测任务的实践过程，同时在我们也提供了基于PaddlePaddle Fleet API的静态图的BERT相关实践，在组网代码层面保持动静统一，在计算速度以及多机联合训练方面有着更优的性能，具体的细节可以参考 [BERT静态图](./static)  。
+**NOTICE**: 预测脚本中的 './tmp/model_20/infer_model' 是 run_glue.py 中保存下来的模型，具体的模型路径可以根据具体的路径来设定。
