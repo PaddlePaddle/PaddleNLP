@@ -47,17 +47,17 @@ class AlbertTokenizer(PretrainedTokenizer):
             "albert-xxlarge-v2":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v2.spiece.model",
             "albert-chinese-tiny":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-tiny.spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-tiny.vocab.txt",
             "albert-chinese-small":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-small.spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-small.vocab.txt",
             "albert-chinese-base":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-base.spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-base.vocab.txt",
             "albert-chinese-large":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-large.spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-large.vocab.txt",
             "albert-chinese-xlarge":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xlarge.spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xlarge.vocab.txt",
             "albert-chinese-xxlarge":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xxlarge.spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xxlarge.vocab.txt",
         }
     }
     pretrained_init_configuration = {
