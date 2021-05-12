@@ -93,12 +93,12 @@ python eval.py --data_dir ./lexical_analysis_dataset_tiny \
 
 ### 模型导出
 
-* 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见export_model.py。静态图参数保存在`output_path`指定路径中。
+使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见export_model.py。静态图参数保存在`output_path`指定路径中。
 
 运行方式：
 
 ```shell
-python export_model.py --vocab_path=./data/lexical_analysis_dataset_tiny --params_path=./save_dir/model_100.pdparams --output_path=./infer_model/static_graph_params
+python export_model.py --data_dir=./lexical_analysis_dataset_tiny --params_path=./save_dir/model_100.pdparams --output_path=./infer_model/static_graph_params
 ```
 
 其中`./save_dir/model_100.pdparams`是训练过程中保存的参数文件，请更换为实际得到的训练保存路径。
