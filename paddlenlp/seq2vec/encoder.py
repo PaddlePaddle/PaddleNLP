@@ -142,7 +142,7 @@ class CNNEncoder(nn.Layer):
 
     We then use a fully connected layer to project in back to the desired output_dim.  For more
     details, refer to `A Sensitivity Analysis of (and Practitioners’ Guide to) Convolutional Neural
-    Networks for Sentence Classification <https://arxiv.org/abs/1510.03820>`, 
+    Networks for Sentence Classification <https://arxiv.org/abs/1510.03820>`__ , 
     Zhang and Wallace 2016, particularly Figure 1.
 
     Args:
