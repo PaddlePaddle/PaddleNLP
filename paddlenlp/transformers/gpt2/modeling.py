@@ -30,6 +30,7 @@ __all__ = [
     "GPT2PretrainedModel",
     'GPT2ForPretraining',
     'GPT2PretrainingCriterion',
+    'GPT2LMHeadModel',
 ]
 
 
@@ -607,3 +608,85 @@ class GPT2PretrainingCriterion(paddle.nn.Layer):
         masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
         loss = masked_lm_loss / loss_mask.sum()
         return loss
+
+
+class GPT2LMHead(nn.Layer):
+    def __init__(self, hidden_size, vocab_size, embedding_weights=None):
+        super(GPT2LMHead, self).__init__()
+        self.decoder_weight = self.create_parameter(
+            shape=[hidden_size, vocab_size],
+            dtype=paddle.get_default_dtype(),
+            is_bias=True) if embedding_weights is None else embedding_weights
+
+    def forward(self, hidden_states):
+        logits = paddle.tensor.matmul(
+            hidden_states, self.decoder_weight, transpose_y=True)
+        return logits
+
+
+class GPT2LMHeadModel(GPT2PretrainedModel):
+    def __init__(self, gpt2):
+        super(GPT2LMHeadModel, self).__init__()
+        self.gpt2 = gpt2
+        self.lm_head = GPT2LMHead(self.gpt2.config["hidden_size"],
+                                  self.gpt2.config["vocab_size"],
+                                  self.gpt2.embeddings.word_embeddings.weight)
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                position_ids=None,
+                attention_mask=None,
+                use_cache=False,
+                cache=None):
+        outputs = self.gpt2(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            use_cache=use_cache,
+            cache=cache)
+        if use_cache:
+            encoder_outputs, cached_kvs = outputs[:2]
+        else:
+            encoder_outputs = outputs
+        logits = self.lm_head(encoder_outputs)
+
+        if use_cache:
+            return logits, cached_kvs
+        else:
+            return logits
+
+    def prepare_inputs_for_generation(self,
+                                      input_ids,
+                                      use_cache=False,
+                                      cache=None,
+                                      **kwargs):
+        # only last token for inputs_ids if cache is defined in kwargs
+        position_ids = kwargs.get("position_ids", None)
+        attention_mask = kwargs.get("attention_mask", None)
+        if cache is not None:
+            input_ids = input_ids[:, -1].unsqueeze(-1)
+            if position_ids is not None:
+                position_ids = position_ids[:, -1].unsqueeze(-1)
+            if attention_mask is not None:
+                attention_mask = attention_mask[:, :, -1, :].unsqueeze(2)
+
+        return {
+            "input_ids": input_ids,
+            "position_ids": position_ids,
+            "attention_mask": attention_mask,
+            "use_cache": use_cache,
+            "cache": cache
+        }
+
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError as e:
+            try:
+                return getattr(getattr(self, self.base_model_prefix), name)
+            except AttributeError:
+                try:
+                    return getattr(self, self.base_model_prefix).config[name]
+                except KeyError:
+                    raise e
