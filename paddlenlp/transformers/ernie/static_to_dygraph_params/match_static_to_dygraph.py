@@ -96,7 +96,6 @@ def convert_static_to_dygraph_params(dygraph_params_save_path,
     state_dict = {}
     model_name = model_name
     for name in files:
-        print("start convert:{}".format(name))
         path = os.path.join(static_params_dir, name)
         # static_para_name = name.replace('@HUB_chinese-roberta-wwm-ext-large@',
         #                                 '')  # for hub module params
@@ -134,8 +133,6 @@ if __name__ == "__main__":
         convert_parameter_name_dict)
     convert_parameter_name_dict = match_mlm_parameter(
         convert_parameter_name_dict)
-    #for key, value in convert_parameter_name_dict.items():
-    #    print("{}:-------:{}".format(key, value))
 
     static_to_dygraph_param_name = {
         value: key
@@ -146,7 +143,7 @@ if __name__ == "__main__":
         print("{}:-------:{}".format(static_name, dygraph_name))
 
     convert_static_to_dygraph_params(
-        dygraph_params_save_path='./dygraph_model/ernie_v1_chn_base_add_mlm.pdparams',
+        dygraph_params_save_path='./dygraph_model/ernie_v1_chn_base.pdparams',
         static_params_dir='./ernie1.0_numpy/',
         static_to_dygraph_param_name=static_to_dygraph_param_name,
         model_name='ernie')
