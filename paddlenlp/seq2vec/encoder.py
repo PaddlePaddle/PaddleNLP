@@ -299,7 +299,9 @@ class CNNEncoder(nn.Layer):
 class GRUEncoder(nn.Layer):
     r"""
     A GRUEncoder takes as input a sequence of vectors and returns a
-    single vector, which is a combination of multiple GRU layers.
+    single vector, which is a combination of multiple `paddle.nn.GRU 
+    <https://www.paddlepaddle.org.cn/documentation/docs/en/api
+    /paddle/nn/layer/rnn/GRU_en.html>`__ subclass.
     The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
     The output is of shape `(batch_size, hidden_size * 2)` if GRU is bidirection;
     If not, output is of shape `(batch_size, hidden_size)`.
@@ -321,7 +323,7 @@ class GRUEncoder(nn.Layer):
             Number of recurrent layers. 
             E.g., setting num_layers=2 would mean stacking two GRUs together to form a stacked GRU, 
             with the second GRU taking in outputs of the first GRU and computing the final results.
-            Defaults to 1
+            Defaults to 1.
         direction (str, optional): 
             The direction of the network. It can be "forward" and "bidirect" 
             (it means bidirection network). If "bidirect", it is a birectional GRU, 
@@ -331,7 +333,7 @@ class GRUEncoder(nn.Layer):
             If non-zero, introduces a Dropout layer on the outputs of each GRU layer 
             except the last layer, with dropout probability equal to dropout.
             Defaults to 0.0.
-        pooling_type ( str, optional): 
+        pooling_type (str, optional): 
             If `pooling_type` is None, then the GRUEncoder will return the hidden state of
             the last time step at last layer as a single vector.
             If pooling_type is not None, it must be one of "sum", "max" and "mean". 
@@ -487,8 +489,10 @@ class GRUEncoder(nn.Layer):
 class LSTMEncoder(nn.Layer):
     r"""
     An LSTMEncoder takes as input a sequence of vectors and returns a
-    single vector, which is a combination of multiple LSTM layers.
-    The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
+    single vector, which is a combination of multiple `paddle.nn.LSTM
+    <https://www.paddlepaddle.org.cn/documentation/docs/en/api
+    /paddle/nn/layer/rnn/LSTM_en.html>`__ subclass.
+    The input to this encoder is of shape `(batch_size, num_tokens, input_size)`.
     The output is of shape `(batch_size, hidden_size * 2)` if LSTM is bidirection;
     If not, output is of shape `(batch_size, hidden_size)`.
 
@@ -517,12 +521,14 @@ class LSTMEncoder(nn.Layer):
         dropout (float, optional): 
             If non-zero, introduces a Dropout layer on the outputs of each LSTM layer 
             except the last layer, with dropout probability equal to dropout.
+            Defaults to 0.0 .
         pooling_type (str, optional):
             If `pooling_type` is None, then the LSTMEncoder will return 
             the hidden state of the last time step at last layer as a single vector.
             If pooling_type is not None, it must be one of "sum", "max" and "mean". 
             Then it will be pooled on the LSTM output (the hidden state of every 
             time step at last layer) to create a single vector.
+            Defaults to `None`.
 
     Example:
         .. code-block::
@@ -633,7 +639,7 @@ class LSTMEncoder(nn.Layer):
                 The sequence length of the input sequence.
 
         Returns:
-            last_hidden (Tensor): 
+            Tensor: 
                 Shape as `(batch_size, hidden_size)` and dtype as float.
                 The hidden state at the last time step for every layer.
 
@@ -674,7 +680,9 @@ class LSTMEncoder(nn.Layer):
 class RNNEncoder(nn.Layer):
     r"""
     A RNNEncoder takes as input a sequence of vectors and returns a
-    single vector, which is a combination of multiple RNN layers.
+    single vector, which is a combination of multiple `paddle.nn.RNN
+    <https://www.paddlepaddle.org.cn/documentation/docs/en/api
+    /paddle/nn/layer/rnn/RNN_en.html>`__ subclass.
     The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
     The output is of shape `(batch_size, hidden_size * 2)` if RNN is bidirection;
     If not, output is of shape `(batch_size, hidden_size)`.
@@ -699,7 +707,7 @@ class RNNEncoder(nn.Layer):
             Defaults to 1.
         direction (str, optional): 
             The direction of the network. It can be "forward" and "bidirect" 
-            (it means bidirection network). If `biderect`, it is a birectional RNN, 
+            (it means bidirection network). If "biderect", it is a birectional RNN, 
             and returns the concat output from both directions. Defaults to "forward"
         dropout (float, optional): 
             If non-zero, introduces a Dropout layer on the outputs of each RNN layer 
@@ -811,7 +819,7 @@ class RNNEncoder(nn.Layer):
         r"""
         RNNEncoder takes the a sequence of vectors and and returns a
         single vector, which is a combination of multiple RNN layers.
-        The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
+        The input to this encoder is of shape `(batch_size, num_tokens, input_size)`.
         The output is of shape `(batch_size, hidden_size * 2)` if RNN is bidirection;
         If not, output is of shape `(batch_size, hidden_size)`.
 
