@@ -23,10 +23,10 @@ import numpy as np
 def compute_prediction(examples,
                        features,
                        predictions,
-                       version_2_with_negative: bool=False,
-                       n_best_size: int=20,
-                       max_answer_length: int=30,
-                       null_score_diff_threshold: float=0.0):
+                       version_2_with_negative=False,
+                       n_best_size=20,
+                       max_answer_length=30,
+                       null_score_diff_threshold=0.0):
     """
     Post-processes the predictions of a question-answering model to convert 
     them to answers that are substrings of the original contexts. This is 
@@ -222,8 +222,7 @@ def make_qid_to_has_ans(examples):
 
 
 def normalize_answer(s):
-    """Lower text and remove punctuation, articles and extra whitespace."""
-
+    #Lower text and remove punctuation, articles and extra whitespace.
     def remove_articles(text):
         regex = re.compile(r'\b(a|an|the)\b', re.UNICODE)
         return re.sub(regex, ' ', text)
