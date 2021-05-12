@@ -62,10 +62,19 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "ernie-ctm":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt",
+            "wordtag":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt"
         }
     }
-    pretrained_init_configuration = {"ernie-ctm": {"do_lower_case": True}}
+    pretrained_init_configuration = {
+        "ernie-ctm": {
+            "do_lower_case": True
+        },
+        "wordtag": {
+            "do_lower_case": True
+        }
+    }
 
     def __init__(self,
                  vocab_file,

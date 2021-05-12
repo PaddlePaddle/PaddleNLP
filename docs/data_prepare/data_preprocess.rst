@@ -25,7 +25,7 @@ Dataset中通常为原始数据，需要经过一定的数据处理并进行采�
     print(tokenizer(text=['天气','不错'])) # [{'input_ids': [101, 1921, 3698, 102], 'token_type_ids': [0, 0, 0, 0]}, 
                                           #  {'input_ids': [101, 679, 7231, 102], 'token_type_ids': [0, 0, 0, 0]}]
  
-关于 :func:`__call__` 方法的其他参数和功能，请移步PreTrainedTokenizer。
+关于 :func:`__call__` 方法的其他参数和功能，请查阅PreTrainedTokenizer。
 
 paddlenlp内置的 :class:`paddlenlp.datasets.MapDataset` 的 :func:`map` 方法支持传入一个函数，对数据集内的数据进行统一转换。下面我们以 :obj:`LCQMC` 的数据处理流程为例：
 
@@ -98,7 +98,9 @@ paddlenlp内置的 :class:`paddlenlp.datasets.MapDataset` 的 :func:`map` 方法
 
 可以看到，在本例中两种实现的结果是相同的。但是在诸如阅读理解，对话等任务中，一条原始数据可能会产生多个 *feature* 的情况（参见 `run_squad.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/machine_reading_comprehension/SQuAD/run_squad.py>`__ ）通常需要将 :attr:`batched` 参数设置为 :obj:`True` 。 
 
-关于 :func:`map` 方法的其他参数和 :class:`paddlenlp.datasets.MapDataset` 的其他数据处理方法，请移步MapDataset。
+:func:`map` 方法还有一个 :attr:`num_workers` 参数，当其大于0时进行多进程数据处理，可以提高处理速度。但是需要注意如果在数据处理的函数中用到了 **数据index** 的相关信息，多进程处理可能会导致错误的结果。
+
+关于 :func:`map` 方法的其他参数和 :class:`paddlenlp.datasets.MapDataset` 的其他数据处理方法，请查阅 :doc:`dataset <../source/paddlenlp.datasets.dataset>` 。
 
 Batchify
 -----------
@@ -132,11 +134,11 @@ PaddleNLP内置了多种collate function，配合 :class:`paddle.io.BatchSampler
 
     train_data_loader = DataLoader(dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=train_batchify_fn)
 
-到此，一个完整的数据准备流程就完成了。关于更多batchify方法，请移步collate。
+到此，一个完整的数据准备流程就完成了。关于更多batchify方法，请查阅 :doc:`collate <../source/paddlenlp.data.collate>`。
 
 .. note::
 
-    - 当需要进行 **单机多卡** 训练时，需要将 :class:`BatchSampler` 更换为 :class:`DistributedBatchSampler` 。更多有关 :class:`paddle.io.BatchSampler` 的信息，请移步 `BatchSampler <https://www.paddlepaddle.org.cn/documentation/docs/zh/api/paddle/fluid/dataloader/batch_sampler/BatchSampler_cn.html>`_。
+    - 当需要进行 **单机多卡** 训练时，需要将 :class:`BatchSampler` 更换为 :class:`DistributedBatchSampler` 。更多有关 :class:`paddle.io.BatchSampler` 的信息，请查阅 `BatchSampler <https://www.paddlepaddle.org.cn/documentation/docs/zh/api/paddle/fluid/dataloader/batch_sampler/BatchSampler_cn.html>`_。
 
     - 当需要诸如batch内排序，按token组batch等更复杂的组batch功能时。可以使用PaddleNLP内置的 :class:`SamplerHelper` 。相关用例请参考 `reader.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/machine_translation/transformer/reader.py>`__。
 
@@ -164,7 +166,7 @@ PaddleNLP内置了多种collate function，配合 :class:`paddle.io.BatchSampler
 
 .. note::
 
-    - :class:`Vocab` 除了可以从本地词典文件初始化之外，还提供多种初始化方法，包括从 :class:`dictionary` 创建、从数据集创建等。详情请移步Vocab。
+    - :class:`Vocab` 除了可以从本地词典文件初始化之外，还提供多种初始化方法，包括从 :class:`dictionary` 创建、从数据集创建等。详情请查阅Vocab。
     - 除了使用内置的 :class:`JiebaTokenizer` 外，用户还可以使用任何自定义的方式或第三方库进行分词，之后使用 :func:`Vocab.to_indices` 方法将token转为id。
 
 之后与基于预训练模型的数据处理流程相似，编写数据处理函数并传入 :func:`map` 方法：

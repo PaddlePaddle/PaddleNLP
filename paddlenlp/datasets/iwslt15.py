@@ -26,6 +26,11 @@ __all__ = ['IWSLT15']
 
 
 class IWSLT15(DatasetBuilder):
+    '''
+    Created by Stanford at 2015, the IWSLT 15 English-Vietnamese Sentence 
+    pairs for translation., in Multi-Lingual language. Containing 133 in Text 
+    file format.
+    '''
 
     URL = "https://paddlenlp.bj.bcebos.com/datasets/iwslt15.en-vi.tar.gz"
     META_INFO = collections.namedtuple('META_INFO', ('src_file', 'tgt_file',
