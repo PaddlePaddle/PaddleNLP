@@ -20,8 +20,12 @@ from shutil import copyfile
 
 from paddle.utils import try_import
 from .. import PretrainedTokenizer
+from .. import BertTokenizer
 
-__all__ = ['AlbertTokenizer']
+__all__ = [
+    'AlbertTokenizer',
+    'AlbertChineseTokenizer',
+]
 
 SPIECE_UNDERLINE = "▁"
 
@@ -284,3 +288,43 @@ class AlbertTokenizer(PretrainedTokenizer):
             save_path = os.path.join(save_directory, file_name)
             if os.path.abspath(self.vocab_file) != os.path.abspath(save_path):
                 copyfile(self.vocab_file, save_path)
+
+
+class AlbertChineseTokenizer(BertTokenizer):
+    resource_files_names = {"vocab_file": "vocab.txt"}
+    pretrained_resource_files_map = {
+        "vocab_file": {
+            "albert-chinese-tiny":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-tiny.vocab.txt",
+            "albert-chinese-small":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-small.vocab.txt",
+            "albert-chinese-base":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-base.vocab.txt",
+            "albert-chinese-large":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-large.vocab.txt",
+            "albert-chinese-xlarge":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xlarge.vocab.txt",
+            "albert-chinese-xxlarge":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xxlarge.vocab.txt",
+        }
+    }
+    pretrained_init_configuration = {
+        "albert-chinese-tiny": {
+            "do_lower_case": False
+        },
+        "albert-chinese-small": {
+            "do_lower_case": False
+        },
+        "albert-chinese-base": {
+            "do_lower_case": False
+        },
+        "albert-chinese-large": {
+            "do_lower_case": False
+        },
+        "albert-chinese-xlarge": {
+            "do_lower_case": False
+        },
+        "albert-chinese-xxlarge": {
+            "do_lower_case": False
+        },
+    }
