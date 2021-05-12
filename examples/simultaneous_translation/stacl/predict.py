@@ -52,9 +52,11 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 
 
 def do_predict(args):
-    if args.use_cuda:
+    if args.device == 'gpu':
         place = "gpu:0"
-    else:
+    elif args.device == 'xpu':
+        place = "xpu:0"
+    elif args.device == 'cpu':
         place = "cpu"
 
     paddle.set_device(place)
