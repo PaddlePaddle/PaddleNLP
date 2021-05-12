@@ -113,7 +113,10 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/faster
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/CMakeLists.txt cmakelists_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/CMakeLists.txt cmakelists_dst)
 
-set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} | cp ${common_src} ${common_dst} | cp ${cmakelists_src} ${cmakelists_dst})
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/topk_kernels.cu topk_kernels_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cu topk_kernels_dst)
+
+set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} | cp ${common_src} ${common_dst} | cp ${cmakelists_src} ${cmakelists_dst} | cp ${topk_kernels_src} ${topk_kernels_dst})
 
 ExternalProject_Add(
   extern_${THIRD_PARTY_NAME}
