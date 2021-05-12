@@ -38,7 +38,7 @@ MODEL_CLASSES = {
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model_name",
+        "--model_name_or_path",
         default="gpt2-medium-en",
         type=str,
         help="The model name to specify the gpt-2 to use. Can be one of [gpt2-base-cn, gpt2-large-en, gpt2-medium-en, gpt2-small-en]."
@@ -89,10 +89,10 @@ def do_predict(args):
     place = "gpu"
     place = paddle.set_device(place)
 
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_name]
-    tokenizer = tokenizer_class.from_pretrained(args.model_name)
+    model_class, tokenizer_class = MODEL_CLASSES[args.model_name_or_path]
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     logger.info('Loading the model parameters, please wait...')
-    model = model_class.from_pretrained(args.model_name)
+    model = model_class.from_pretrained(args.model_name_or_path)
 
     start_id = tokenizer.convert_tokens_to_ids(args.start_token)
     end_id = tokenizer.convert_tokens_to_ids(args.end_token)
