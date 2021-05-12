@@ -31,29 +31,35 @@ class AlbertTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "albert-base-v1":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v1-spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v1.spiece.model",
             "albert-large-v1":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v1-spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v1.spiece.model",
             "albert-xlarge-v1":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v1-spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v1.spiece.model",
             "albert-xxlarge-v1":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v1-spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v1.spiece.model",
             "albert-base-v2":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v2-spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-base-v2.spiece.model",
             "albert-base-v2":
                 "./spiece.model",
             "albert-large-v2":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v2-spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-large-v2.spiece.model",
             "albert-xlarge-v2":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v2-spiece.model",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v2.spiece.model",
             "albert-xxlarge-v2":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v2-spiece.model",
-            "albert-chinese-tiny": "",
-            "albert-chinese-small": "",
-            "albert-chinese-base": "",
-            "albert-chinese-large": "",
-            "albert-chinese-xlarge": "",
-            "albert-chinese-xxlarge": "",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v2.spiece.model",
+            "albert-chinese-tiny":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-tiny.spiece.model",
+            "albert-chinese-small":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-small.spiece.model",
+            "albert-chinese-base":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-base.spiece.model",
+            "albert-chinese-large":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-large.spiece.model",
+            "albert-chinese-xlarge":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xlarge.spiece.model",
+            "albert-chinese-xxlarge":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xxlarge.spiece.model",
         }
     }
     pretrained_init_configuration = {
@@ -100,24 +106,6 @@ class AlbertTokenizer(PretrainedTokenizer):
             "do_lower_case": False
         },
     }
-    pretrained_positional_embedding_sizes = {
-        "albert-base-v1": None,
-        "albert-large-v1": None,
-        "albert-xlarge-v1": None,
-        "albert-xxlarge-v1": None,
-        "albert-base-v2": None,
-        "albert-large-v2": None,
-        "albert-xlarge-v2": None,
-        "albert-xxlarge-v2": None,
-        "albert-chinese-tiny": None,
-        "albert-chinese-small": None,
-        "albert-chinese-base": None,
-        "albert-chinese-large": None,
-        "albert-chinese-xlarge": None,
-        "albert-chinese-xxlarge": None,
-    }
-
-    max_model_input_sizes = pretrained_positional_embedding_sizes
 
     def __init__(
         self,
@@ -260,11 +248,9 @@ class AlbertTokenizer(PretrainedTokenizer):
                                                  offset_mapping_0,
                                                  offset_mapping_1=None):
         if offset_mapping_1 is None:
-            return offset_mapping_0 + [(0, 0)] + [(0, 0)]
+            return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
-        return offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)] + [
-            (0, 0)
-        ]
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)]
 
     def get_special_tokens_mask(self,
                                 token_ids_0,

@@ -143,7 +143,6 @@ class AlbertEmbeddings(Layer):
 class AlbertAttention(Layer):
     def __init__(
             self,
-            embedding_size,
             hidden_size,
             num_attention_heads,
             hidden_dropout_prob,
@@ -153,7 +152,7 @@ class AlbertAttention(Layer):
             position_embedding_type,
     ):
         super(AlbertAttention, self).__init__()
-        if hidden_size % num_attention_heads != 0 and not embedding_size:
+        if hidden_size % num_attention_heads != 0:
             raise ValueError(
                 "The hidden size (%d) is not a multiple of the number of attention "
                 "heads (%d)" % (hidden_size, num_attention_heads)
@@ -172,7 +171,6 @@ class AlbertAttention(Layer):
         self.output_dropout = nn.Dropout(hidden_dropout_prob)
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.pruned_heads = set()
 
         self.position_embedding_type = position_embedding_type if not position_embedding_type else "absolute"
         if self.position_embedding_type == "relative_key" or self.position_embedding_type == "relative_key_query":
@@ -184,10 +182,6 @@ class AlbertAttention(Layer):
         new_x_shape = x.shape[:-1] + [self.num_attention_heads, self.attention_head_size]
         x = x.reshape(new_x_shape)
         return x.transpose([0, 2, 1, 3])
-
-    # todo
-    def prune_heads(self, heads):
-        pass
 
     def forward(self,
                 hidden_states,
@@ -254,7 +248,6 @@ class AlbertAttention(Layer):
 
 class AlbertLayer(Layer):
     def __init__(self,
-                 embedding_size,
                  hidden_size,
                  num_attention_heads,
                  intermediate_size,
@@ -263,13 +256,11 @@ class AlbertLayer(Layer):
                  attention_probs_dropout_prob,
                  max_position_embeddings,
                  layer_norm_eps,
-                 position_embedding_type,
-    ):
+                 position_embedding_type,):
         super(AlbertLayer, self).__init__()
         self.seq_len_dim = 1
         self.full_layer_layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
         self.attention = AlbertAttention(
-            embedding_size,
             hidden_size,
             num_attention_heads,
             hidden_dropout_prob,
@@ -309,7 +300,6 @@ class AlbertLayer(Layer):
 
 class AlbertLayerGroup(Layer):
     def __init__(self,
-                 embedding_size,
                  hidden_size,
                  num_attention_heads,
                  intermediate_size,
@@ -325,7 +315,6 @@ class AlbertLayerGroup(Layer):
 
         self.albert_layers = nn.LayerList([
                 AlbertLayer(
-                    embedding_size,
                     hidden_size,
                     num_attention_heads,
                     intermediate_size,
@@ -390,7 +379,6 @@ class AlbertTransformer(Layer):
         self.embedding_hidden_mapping_in = nn.Linear(embedding_size, hidden_size)
         self.albert_layer_groups = nn.LayerList([
             AlbertLayerGroup(
-                embedding_size,
                 hidden_size,
                 num_attention_heads,
                 intermediate_size,
@@ -455,10 +443,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0.1,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            # "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            # "gap_size": 0,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
             "hidden_size": 768,
@@ -467,12 +453,9 @@ class AlbertPretrainedModel(PretrainedModel):
             "intermediate_size": 3072,
             "layer_norm_eps": 1e-12,
             "max_position_embeddings": 512,
-            # "model_type": "albert",
-            # "net_structure_type": 0,
             "num_attention_heads": 12,
             "num_hidden_groups": 1,
             "num_hidden_layers": 12,
-            # "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 30000
@@ -481,10 +464,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0.1,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            # "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            # "gap_size": 0,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
             "hidden_size": 1024,
@@ -493,12 +474,9 @@ class AlbertPretrainedModel(PretrainedModel):
             "intermediate_size": 4096,
             "layer_norm_eps": 1e-12,
             "max_position_embeddings": 512,
-            # "model_type": "albert",
-            # "net_structure_type": 0,
             "num_attention_heads": 16,
             "num_hidden_groups": 1,
             "num_hidden_layers": 24,
-            # "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 30000
@@ -507,10 +485,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0.1,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            # "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            # "gap_size": 0,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
             "hidden_size": 2048,
@@ -519,12 +495,9 @@ class AlbertPretrainedModel(PretrainedModel):
             "intermediate_size": 8192,
             "layer_norm_eps": 1e-12,
             "max_position_embeddings": 512,
-            # "model_type": "albert",
-            # "net_structure_type": 0,
             "num_attention_heads": 16,
             "num_hidden_groups": 1,
             "num_hidden_layers": 24,
-            # "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 30000
@@ -533,10 +506,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            # "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            # "gap_size": 0,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0,
             "hidden_size": 4096,
@@ -544,14 +515,10 @@ class AlbertPretrainedModel(PretrainedModel):
             "inner_group_num": 1,
             "intermediate_size": 16384,
             "layer_norm_eps": 1e-12,
-            "layers_to_keep": [],
             "max_position_embeddings": 512,
-            # "model_type": "albert",
-            # "net_structure_type": 0,
             "num_attention_heads": 64,
             "num_hidden_groups": 1,
             "num_hidden_layers": 12,
-            # "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 30000
@@ -560,10 +527,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            # "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            # "gap_size": 0,
             "hidden_act": "gelu_new",
             "hidden_dropout_prob": 0,
             "hidden_size": 768,
@@ -572,12 +537,9 @@ class AlbertPretrainedModel(PretrainedModel):
             "intermediate_size": 3072,
             "layer_norm_eps": 1e-12,
             "max_position_embeddings": 512,
-            # "model_type": "albert",
-            # "net_structure_type": 0,
             "num_attention_heads": 12,
             "num_hidden_groups": 1,
             "num_hidden_layers": 12,
-            # "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 30000
@@ -586,10 +548,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            # "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            # "gap_size": 0,
             "hidden_act": "gelu_new",
             "hidden_dropout_prob": 0,
             "hidden_size": 1024,
@@ -598,12 +558,9 @@ class AlbertPretrainedModel(PretrainedModel):
             "intermediate_size": 4096,
             "layer_norm_eps": 1e-12,
             "max_position_embeddings": 512,
-            # "model_type": "albert",
-            # "net_structure_type": 0,
             "num_attention_heads": 16,
             "num_hidden_groups": 1,
             "num_hidden_layers": 24,
-            # "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 30000
@@ -612,10 +569,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            # "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            # "gap_size": 0,
             "hidden_act": "gelu_new",
             "hidden_dropout_prob": 0,
             "hidden_size": 2048,
@@ -624,12 +579,9 @@ class AlbertPretrainedModel(PretrainedModel):
             "intermediate_size": 8192,
             "layer_norm_eps": 1e-12,
             "max_position_embeddings": 512,
-            # "model_type": "albert",
-            # "net_structure_type": 0,
             "num_attention_heads": 16,
             "num_hidden_groups": 1,
             "num_hidden_layers": 24,
-            # "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 30000
@@ -638,10 +590,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            # "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            # "gap_size": 0,
             "hidden_act": "gelu_new",
             "hidden_dropout_prob": 0,
             "hidden_size": 4096,
@@ -649,14 +599,10 @@ class AlbertPretrainedModel(PretrainedModel):
             "inner_group_num": 1,
             "intermediate_size": 16384,
             "layer_norm_eps": 1e-12,
-            "layers_to_keep": [],
             "max_position_embeddings": 512,
-            # "model_type": "albert",
-            # "net_structure_type": 0,
             "num_attention_heads": 64,
             "num_hidden_groups": 1,
             "num_hidden_layers": 12,
-            # "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 30000
@@ -665,10 +611,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0.0,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            "gap_size": 0,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.0,
             "hidden_size": 312,
@@ -677,12 +621,9 @@ class AlbertPretrainedModel(PretrainedModel):
             "intermediate_size": 1248,
             "layer_norm_eps": 1e-12,
             "max_position_embeddings": 512,
-            "model_type": "albert",
-            "net_structure_type": 0,
             "num_attention_heads": 12,
             "num_hidden_groups": 1,
             "num_hidden_layers": 4,
-            "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 21128
@@ -691,10 +632,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0.0,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            "gap_size": 0,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.0,
             "hidden_size": 384,
@@ -703,12 +642,9 @@ class AlbertPretrainedModel(PretrainedModel):
             "intermediate_size": 1536,
             "layer_norm_eps": 1e-12,
             "max_position_embeddings": 512,
-            "model_type": "albert",
-            "net_structure_type": 0,
             "num_attention_heads": 12,
             "num_hidden_groups": 1,
             "num_hidden_layers": 6,
-            "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 21128
@@ -717,10 +653,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            "gap_size": 0,
             "hidden_act": "relu",
             "hidden_dropout_prob": 0,
             "hidden_size": 768,
@@ -728,14 +662,10 @@ class AlbertPretrainedModel(PretrainedModel):
             "inner_group_num": 1,
             "intermediate_size": 3072,
             "layer_norm_eps": 1e-12,
-            "layers_to_keep": [],
             "max_position_embeddings": 512,
-            "model_type": "albert",
-            "net_structure_type": 0,
             "num_attention_heads": 12,
             "num_hidden_groups": 1,
             "num_hidden_layers": 12,
-            "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 21128
@@ -744,10 +674,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            "gap_size": 0,
             "hidden_act": "relu",
             "hidden_dropout_prob": 0,
             "hidden_size": 1024,
@@ -755,14 +683,10 @@ class AlbertPretrainedModel(PretrainedModel):
             "inner_group_num": 1,
             "intermediate_size": 4096,
             "layer_norm_eps": 1e-12,
-            "layers_to_keep": [],
             "max_position_embeddings": 512,
-            "model_type": "albert",
-            "net_structure_type": 0,
             "num_attention_heads": 16,
             "num_hidden_groups": 1,
             "num_hidden_layers": 24,
-            "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 21128
@@ -771,10 +695,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            "gap_size": 0,
             "hidden_act": "relu",
             "hidden_dropout_prob": 0,
             "hidden_size": 2048,
@@ -782,14 +704,10 @@ class AlbertPretrainedModel(PretrainedModel):
             "inner_group_num": 1,
             "intermediate_size": 8192,
             "layer_norm_eps": 1e-12,
-            "layers_to_keep": [],
             "max_position_embeddings": 512,
-            "model_type": "albert",
-            "net_structure_type": 0,
             "num_attention_heads": 16,
             "num_hidden_groups": 1,
             "num_hidden_layers": 24,
-            "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 21128
@@ -798,10 +716,8 @@ class AlbertPretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0,
             "bos_token_id": 2,
             "classifier_dropout_prob": 0.1,
-            "down_scale_factor": 1,
             "embedding_size": 128,
             "eos_token_id": 3,
-            "gap_size": 0,
             "hidden_act": "relu",
             "hidden_dropout_prob": 0,
             "hidden_size": 4096,
@@ -809,14 +725,10 @@ class AlbertPretrainedModel(PretrainedModel):
             "inner_group_num": 1,
             "intermediate_size": 16384,
             "layer_norm_eps": 1e-12,
-            "layers_to_keep": [],
             "max_position_embeddings": 512,
-            "model_type": "albert",
-            "net_structure_type": 0,
             "num_attention_heads": 16,
             "num_hidden_groups": 1,
             "num_hidden_layers": 12,
-            "num_memory_blocks": 0,
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 21128
@@ -961,10 +873,6 @@ class AlbertModel(AlbertPretrainedModel):
 
     def set_input_embeddings(self, value):
         self.embeddings.word_embeddings = value
-
-    # todo
-    def _prune_heads(self, heads_to_prune):
-        pass
 
     def _convert_head_mask_to_5d(self, head_mask, num_hidden_layers):
         """-> [num_hidden_layers x batch x num_heads x seq_length x seq_length]"""
