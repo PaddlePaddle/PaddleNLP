@@ -81,22 +81,22 @@ python -m paddle.distributed.launch --gpus "0" train.py --config ./config/transf
 
 建议：如果为了更好的效果，可先在整句模型(即`waik=-1`)进行预训练，然后在此基础上根据不同的waitk进行微调来训练不同的waitk模型，训练的命令都同上，下面给出具体的流程以及主要的参数配置：
 - Pretrain
-  Pretrain用来训练整句模型(即`waik=-1`)，可在`config/transformer.yaml`文件中配置参数：
+  用来训练整句模型(即`waik=-1`)，可在`config/transformer.yaml`文件中配置参数：
   - `waik`表示waik策略，这里设置为-1
   - `training_file`表示训练集，数据格式同上文
   - `validation_file`表示验证集，数据格式同上文
   - `init_from_checkpoint`表示模型目录，从该checkpoint恢复训练，这里设置为空
   - `init_from_pretrain_model`表示模型目录，从该checkpoint开始finetune下游任务，这里设置为空
-  - `use_cuda`表示是否使用GPU，示例设置为True
+  - `device`选择训练用的设备，支持cpu/gpu/xpu，默认为gpu
   - `use_amp`表示混合精度训练，示例设置为False
 - Finetune
-  Finetune用来训练waik模型(即`waitk=1,2,3,4...`)，可在`config/transformer.yaml`文件中配置参数：
+  用来训练waik模型(即`waitk=1,2,3,4...`)，可在`config/transformer.yaml`文件中配置参数：
   - `waik`表示waik策略，这里设置为3（以wait-3模型为例）
   - `training_file`表示训练集，数据格式同上文
   - `validation_file`表示验证集，数据格式同上文
   - `init_from_checkpoint`表示模型目录，从该checkpoint恢复训练，这里设置`waik=-1`模型的ckeckpoint
   - `init_from_pretrain_model`表示模型目录，从该checkpoint开始finetune下游任务，这里设置为空
-  - `use_cuda`表示是否使用GPU，示例设置为True
+  - `device`选择训练用的设备，支持cpu/gpu/xpu，默认为gpu
   - `use_amp`表示混合精度训练，示例设置为False
 ## 模型推理
 
@@ -142,6 +142,8 @@ perl mosesdecoder/scripts/generic/multi-bleu.perl newstest2017.tok.en < predict.
 | Wait_-1(整句模型)   |[下载](https://paddlenlp.bj.bcebos.com/models/stacl/nist_zhen_full_sent.tar.gz) |41.41 |
 词表下载：[source vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.20k.zh.vocab) ，[target vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.10k.en.vocab)
 
+## Demo展示
+通过GUI界面的Demo来模拟STACL实时翻译的效果，可查看[demo](./demo)
 
 ## 参考文献
 1. Vaswani A, Shazeer N, Parmar N, et al. [Attention is all you need](http://papers.nips.cc/paper/7181-attention-is-all-you-need.pdf)[C]//Advances in Neural Information Processing Systems. 2017: 6000-6010.
