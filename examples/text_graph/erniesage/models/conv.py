@@ -73,6 +73,7 @@ class ErnieSageV2Conv(nn.Layer):
                  input_size,
                  hidden_size,
                  learning_rate,
+                 cls_token_id=1,
                  aggr_func='sum'):
         """ErnieSageV2: Ernie is applied to the EDGE of the text graph.
 
@@ -87,7 +88,7 @@ class ErnieSageV2Conv(nn.Layer):
         assert aggr_func in ["sum", "mean", "max", "min"], \
             "Only support 'sum', 'mean', 'max', 'min' built-in receive function."
         self.aggr_func = "reduce_%s" % aggr_func
-
+        self.cls_token_id = cls_token_id
         self.self_linear = nn.Linear(
             input_size,
             hidden_size,
@@ -114,8 +115,9 @@ class ErnieSageV2Conv(nn.Layer):
         cls = paddle.full(
             shape=[src_feat["term_ids"].shape[0], 1],
             dtype="int64",
-            fill_value=1)
+            fill_value=self.cls_token_id)
         src_ids = paddle.concat([cls, src_feat["term_ids"]], 1)
+
         dst_ids = dst_feat["term_ids"]
 
         # sent_ids
@@ -149,7 +151,9 @@ class ErnieSageV2Conv(nn.Layer):
         neigh_feature = graph.recv(reduce_func=_recv_func, msg=msg)
 
         cls = paddle.full(
-            shape=[term_ids.shape[0], 1], dtype="int64", fill_value=1)
+            shape=[term_ids.shape[0], 1],
+            dtype="int64",
+            fill_value=self.cls_token_id)
         term_ids = paddle.concat([cls, term_ids], 1)
         term_ids.stop_gradient = True
         outputs = self.ernie(term_ids, paddle.zeros_like(term_ids))
