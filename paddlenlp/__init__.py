@@ -20,7 +20,6 @@ from . import embeddings
 from . import ops
 from . import layers
 from . import metrics
-from . import models
 from . import seq2vec
 from . import transformers
 from . import utils
