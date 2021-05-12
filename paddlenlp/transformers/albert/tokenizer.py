@@ -50,18 +50,6 @@ class AlbertTokenizer(PretrainedTokenizer):
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v2.spiece.model",
             "albert-xxlarge-v2":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v2.spiece.model",
-            "albert-chinese-tiny":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-tiny.vocab.txt",
-            "albert-chinese-small":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-small.vocab.txt",
-            "albert-chinese-base":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-base.vocab.txt",
-            "albert-chinese-large":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-large.vocab.txt",
-            "albert-chinese-xlarge":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xlarge.vocab.txt",
-            "albert-chinese-xxlarge":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xxlarge.vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -87,24 +75,6 @@ class AlbertTokenizer(PretrainedTokenizer):
             "do_lower_case": False
         },
         "albert-xxlarge-v2": {
-            "do_lower_case": False
-        },
-        "albert-chinese-tiny": {
-            "do_lower_case": False
-        },
-        "albert-chinese-small": {
-            "do_lower_case": False
-        },
-        "albert-chinese-base": {
-            "do_lower_case": False
-        },
-        "albert-chinese-large": {
-            "do_lower_case": False
-        },
-        "albert-chinese-xlarge": {
-            "do_lower_case": False
-        },
-        "albert-chinese-xxlarge": {
             "do_lower_case": False
         },
     }
