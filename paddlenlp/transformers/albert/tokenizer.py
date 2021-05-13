@@ -24,13 +24,27 @@ from .. import BertTokenizer
 
 __all__ = [
     'AlbertTokenizer',
+    'AlbertEnglishTokenizer',
     'AlbertChineseTokenizer',
 ]
 
 SPIECE_UNDERLINE = "▁"
 
 
-class AlbertTokenizer(PretrainedTokenizer):
+class AlbertTokenizer(object):
+    def __init__(self):
+        raise EnvironmentError("AlbertTokenizer is designed to be instantiated "
+                               "using the `AlbertTokenizer.from_pretrained(pretrained_model_name_or_path)` method.")
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+        if "chinese" in pretrained_model_name_or_path:
+            return AlbertChineseTokenizer.from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+        else:
+            return AlbertEnglishTokenizer.from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+
+
+class AlbertEnglishTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "spiece.model"}
     pretrained_resource_files_map = {
         "vocab_file": {
