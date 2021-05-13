@@ -26,15 +26,6 @@ class BaseInputEncoder(object):
         super(BaseInputEncoder, self).__init__()
 
     def encode(self, inputs):
-        """build inputs for model
-
-        Args:
-            inputs (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
-        """
         raise NotImplementedError
 
 

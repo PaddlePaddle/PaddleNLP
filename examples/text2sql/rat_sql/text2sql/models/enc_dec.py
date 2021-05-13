@@ -32,12 +32,6 @@ class EncDecModel(nn.Layer):
     """Dygraph version of BoomUp Model"""
 
     def __init__(self, config, label_encoder, model_version='v2'):
-        """init of class
-
-        Args:
-            model_configs (TYPE): NULL
-
-        """
         super(EncDecModel, self).__init__()
 
         self._config = config
@@ -53,14 +47,6 @@ class EncDecModel(nn.Layer):
             use_align_loss=True)
 
     def forward(self, inputs, labels=None, db=None, is_train=True):
-        """
-
-        Args:
-            inputs (TYPE): NULL
-            labels (TYPE)
-
-        Returns: TODO
-        """
         if is_train:
             assert labels is not None, "labels should not be None while training"
             return self._train(inputs, labels)
@@ -69,11 +55,6 @@ class EncDecModel(nn.Layer):
             return self._inference(inputs, db)
 
     def _train(self, inputs, labels):
-        """
-        Args:
-            inputs (TYPE): NULL
-            labels (TYPE)
-        """
         enc_results = self.encoder(inputs)
         lst_loss = []
         for orig_inputs, label_info, enc_result in zip(inputs['orig_inputs'],
@@ -85,16 +66,6 @@ class EncDecModel(nn.Layer):
         return paddle.mean(paddle.stack(lst_loss, axis=0), axis=0)
 
     def _inference(self, inputs, db):
-        """
-
-        Args:
-            inputs (TYPE): NULL
-            db (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
-        """
         enc_state = self.encoder(inputs)
         if self._model_version == 'v1':
             return self.decoder.inference(enc_state[0], db)

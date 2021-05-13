@@ -23,10 +23,9 @@ import numpy as np
 
 from text2sql.utils import text_utils
 
-# 匹配时的最大 ngram 数
+# the max matching ngram
 g_linking_ngrams_n = 5
 
-# jieba 分词，从训练集question中统计而来
 STOPWORDS = set([
     "的", "是", "，", "？", "有", "多少", "哪些", "我", "什么", "你", "知道", "啊", "一下", "吗",
     "在", "请问", "或者", "想", "和", "为", "帮", "那个", "你好", "这", "了", "并且", "都", "呢",
@@ -60,24 +59,6 @@ class Relations(object):
                  merge_types=False,
                  sc_link=True,
                  cv_link=True):
-        """init of class
-
-        Args:
-            qq_max_dist (TYPE): Default is 2
-            cc_foreign_key (TYPE): Default is True
-            cc_table_match (TYPE): Default is True
-            cc_max_dist (TYPE): Default is 2
-            ct_foreign_key (TYPE): Default is True
-            ct_table_match (TYPE): Default is True
-            tc_table_match (TYPE): Default is True
-            tc_foreign_key (TYPE): Default is True
-            tt_max_dist (TYPE): Default is 2
-            tt_foreign_key (TYPE): Default is True
-            merge_types (TYPE): Default is False
-            sc_link (TYPE): Default is True
-            cv_link (TYPE): Default is True
-
-        """
         super(Relations, self).__init__()
 
         self.qq_max_dist = qq_max_dist
@@ -237,10 +218,6 @@ RELATIONS = Relations()
 # schema linking, similar to IRNet
 def compute_schema_linking(tokens, db):
     """schema linking
-    
-    Args:
-        tokens (list of str):
-        table (data_struct.Table):
     """
 
     def partial_match(x_list, y_list):
@@ -271,15 +248,6 @@ def compute_schema_linking(tokens, db):
                        relation_tag,
                        force=True):
         """set match relation for question
-
-        Args:
-            q_match_dict (TYPE): [in/out]
-            q_start (TYPE): NULL
-            q_match_len (TYPE): NULL
-            col_id (TYPE): NULL
-            relation_tag (TYPE): NULL
-
-        Returns: None
         """
         for q_id in range(q_start, q_start + q_match_len):
             key = f"{q_id},{other_id}"
@@ -330,10 +298,6 @@ def compute_schema_linking(tokens, db):
 
 def compute_cell_value_linking(tokens, db):
     """cell-value linking
-    
-    Args:
-        tokens (list of str):
-        db (data_struct.Table):
     """
 
     def isnumber(word):
@@ -346,10 +310,6 @@ def compute_cell_value_linking(tokens, db):
 
     def check_cell_match(word, cells):
         """check if word partial/exact match one of values
-        Args:
-            word (TYPE): NULL
-            values_str (TYPE): NULL
-        Returns: bool
         """
         for cell in cells:
             if word in cell:
@@ -374,7 +334,8 @@ def compute_cell_value_linking(tokens, db):
                     rel = 'NUMBER' if column.dtype == 'real' else column.dtype.upper(
                     )
                     num_date_match[f"{q_id},{col_id}"] = rel
-            elif column.dtype.lower() == 'binary':  # 是否类的匹配信号比较复杂，需特殊处理
+            elif column.dtype.lower(
+            ) == 'binary':  # binary condition should use special process
                 continue
             elif check_cell_match(word, column.cells):
                 cell_match[f"{q_id},{col_id}"] = "CELLMATCH"
@@ -384,16 +345,6 @@ def compute_cell_value_linking(tokens, db):
 
 
 def _table_id(db, col):
-    """
-
-    Args:
-        db (TYPE): NULL
-        col (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     if col == 0:
         return None
     else:
@@ -401,16 +352,6 @@ def _table_id(db, col):
 
 
 def _foreign_key_id(db, col):
-    """
-
-    Args:
-        db (TYPE): NULL
-        col (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     foreign_col = db.columns[col].foreign_key_for
     if foreign_col is None:
         return None
@@ -418,17 +359,6 @@ def _foreign_key_id(db, col):
 
 
 def _match_foreign_key(db, col, table):
-    """
-
-    Args:
-        db (TYPE): NULL
-        col (TYPE): NULL
-        table (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     foreign_key_id = _foreign_key_id(db, col)
     if foreign_key_id is None:
         return None
@@ -438,19 +368,6 @@ def _match_foreign_key(db, col, table):
 def build_relation_matrix(other_links, total_length, q_length, c_length,
                           c_boundaries, t_boundaries, db):
     """build relation matrix
-
-    Args:
-        other_links (TYPE): NULL
-        total_length (TYPE): NULL
-        q_length (TYPE): NULL
-        c_length (TYPE): NULL
-        c_boundaries (TYPE): NULL
-        t_boundaries (TYPE): NULL
-        db (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
     """
     sc_link = other_links.get('sc_link', {'q_col_match': {}, 'q_tab_match': {}})
     cv_link = other_links.get('cv_link',

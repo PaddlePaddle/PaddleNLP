@@ -20,7 +20,7 @@ import json
 from collections import namedtuple
 import numpy as np
 
-from ernie import ErnieTokenizer
+from paddlenlp.transformers import ErnieTokenizer
 from paddlenlp.transformers import BertTokenizer
 
 from text2sql.utils import utils
@@ -34,17 +34,13 @@ ErnieInput = namedtuple(
 
 
 class ErnieInputEncoderV2(BaseInputEncoder):
-    """使用ernie的文本类型的field_reader，用户不需要自己分词
-       处理规则是：自动添加padding,mask,position,task,sentence,并返回length
+    """use ernie field_reader to seg, it will automatically add padding,mask,position,task,sentence and return length
     """
 
     padding_id = 0
     truncation_type = 0
 
     def __init__(self, model_config):
-        """
-        :param vocab_path:
-        """
         super(ErnieInputEncoderV2, self).__init__()
 
         self.config = model_config
@@ -53,11 +49,9 @@ class ErnieInputEncoderV2(BaseInputEncoder):
             self.tokenizer = BertTokenizer.from_pretrained(
                 model_config.pretrain_model)
             self.special_token_dict = {
-                # span type
                 'table': '[unused1]',
                 'column': '[unused2]',
                 'value': '[unused3]',
-                # column data type
                 'text': '[unused11]',
                 'real': '[unused12]',
                 'number': '[unused13]',
@@ -70,13 +64,12 @@ class ErnieInputEncoderV2(BaseInputEncoder):
         else:
             self.tokenizer = ErnieTokenizer.from_pretrained(
                 model_config.pretrain_model)
-            # 低频token作为特殊标记 ### 其它候选: overchicstoretvhome
+            # low frequency token will be used as specail token
+            # Other candidate: overchicstoretvhome
             self.special_token_dict = {
-                # span type
                 'table': 'blogabstract',
                 'column': 'wx17house',
                 'value': 'fluke62max',
-                # column data type
                 'text': 'googlemsn',
                 'real': 'sputniknews',
                 'number': 'sputniknews',
@@ -89,16 +82,6 @@ class ErnieInputEncoderV2(BaseInputEncoder):
         self._need_bool_value = True if self.config.grammar_type != 'nl2sql' else False
 
     def check(self, data, db):
-        """check
-
-        Args:
-            data (TYPE): NULL
-            db (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
-        """
         if len(db.columns) > self.config.max_column_num or len(
                 db.tables) > self.config.max_table_num:
             return False
@@ -111,16 +94,6 @@ class ErnieInputEncoderV2(BaseInputEncoder):
                candi_nums=None,
                col_orders=None,
                debug=False):
-        """encode question and columns
-        Arguments:
-            question:
-            db:
-            column_match_cells: 每个 column 下跟 question 匹配度最好的 N 个 cell
-            candi_nums: 预测 limit 的候选值。只要不为none，则长度必须大于0（至少包含0、1）
-            col_orders:
-
-        Returns: ErnieInput
-        """
         question = question.strip()
         if self.config.num_value_col_type != 'q_num':
             orig_question_tokens = text_utils.wordseg(self.question)
@@ -137,7 +110,6 @@ class ErnieInputEncoderV2(BaseInputEncoder):
             if '1' not in candi_nums:
                 candi_nums.append('1')
                 candi_nums_index.append(-1)
-        # schema_indexes = [table_indexes, column_indexes, value_indexes, num_value_indexes]
         tokens, value_list, schema_indexes, token_mapping = \
                 self.tokenize(orig_question_tokens, db, column_match_cells, candi_nums, candi_nums_index, col_orders)
         if debug:
@@ -162,19 +134,10 @@ class ErnieInputEncoderV2(BaseInputEncoder):
                  col_orders=None):
         """
         Tokenize question and columns and concatenate.
-
-        Parameters:
-            question (str): 
-            db (Table): 
-            col_orders (list or numpy.array): For re-ordering the column columns
-
-        Returns:
-            final_tokens: 分3个部分：Question、Schema（含非数字value）、数字value
-                          [CLS] Q tokens [SEP]
-                          [T] table1 [C] col1 [V] value [C] col2 ... [SEP]
-                          [V] number [V] ... [SEP]
-            indexes
-            token_mapping
+        final_tokens will include：Question、Schema（include non digital value）、digital value
+                        [CLS] Q tokens [SEP]
+                        [T] table1 [C] col1 [V] value [C] col2 ... [SEP]
+                        [V] number [V] ... [SEP]
         """
         if col_orders is None:
             col_orders = np.arange(len(db.columns))
@@ -183,7 +146,7 @@ class ErnieInputEncoderV2(BaseInputEncoder):
             q_tokens_tmp = self.tokenizer.tokenize(question)
             token_idx_mapping = [[i] for i in range(len(q_tokens_tmp))]
         else:
-            # question 是经过切词处理的 list
+            # question is tokens list
             q_tokens_tmp, token_idx_mapping = self._resplit_words(question)
 
         final_candi_num_index = []
@@ -194,7 +157,7 @@ class ErnieInputEncoderV2(BaseInputEncoder):
                 else:
                     final_candi_num_index.append(token_idx_mapping[idx][0] + 1)
 
-        ## 处理 question tokens
+        ## handle question tokens
         question_tokens = ['[CLS]'] + q_tokens_tmp
         final_tokens = question_tokens[:self.config.
                                        max_question_len] + ['[SEP]']
@@ -205,7 +168,7 @@ class ErnieInputEncoderV2(BaseInputEncoder):
         else:
             column_match_cells = [None] * len(columns)
 
-        ## 处理 schema tokens
+        ## handle schema tokens
         table_indexes = []
         column_indexes = []
         value_indexes = []
@@ -234,7 +197,7 @@ class ErnieInputEncoderV2(BaseInputEncoder):
                 if column.dtype in ('text', 'time'):
                     if not self.config.predict_value:
                         match_cells = match_cells[:
-                                                  1]  # 模型设置不预测value，则此处仅取1个cell作为column的语义补充
+                                                  1]  # the first cell used to complement senmantics
                     for mcell in match_cells:
                         value_list.append(mcell)
                         toks = [self.special_token_dict['value']
@@ -262,14 +225,13 @@ class ErnieInputEncoderV2(BaseInputEncoder):
                 final_tokens += toks
             final_tokens.append('[SEP]')
 
-            ## 处理 number value tokens: 条件 和 limit 的 number values
+            ## handle number value tokens: condition and limit number values
             num_value_indexes = []
             if candi_nums is not None and len(candi_nums) > 0:
                 value_list += candi_nums
                 for num, index in zip(candi_nums, final_candi_num_index):
                     if self.enc_value_with_col:
-                        # index 是当前 number 在 question 中的下标
-                        # len(final_tokens) 是其在整个序列中单独输入时的下标
+                        # index is the index of current number in question
                         num_value_indexes.extend([index, len(final_tokens)])
                     elif self.config.num_value_col_type == 'q_num':
                         num_value_indexes.append(index)
@@ -278,7 +240,7 @@ class ErnieInputEncoderV2(BaseInputEncoder):
                     final_tokens += [self.special_token_dict['value']
                                      ] + self.tokenizer.tokenize(num)
         else:
-            # 不预测value，则固定用特殊的 value/empty 代替
+            # use fixed special token value/empty
             if self.enc_value_with_col:
                 value_indexes = [0, len(final_tokens), 0, len(final_tokens) + 1]
             else:
@@ -301,13 +263,6 @@ class ErnieInputEncoderV2(BaseInputEncoder):
 
     def _resplit_words(self, words):
         """resplit words by bert_tokenizer
-
-        Args:
-            words (TYPE): NULL
-
-        Returns: (list, dict), resplit result and id mapping
-
-        Raises: NULL
         """
         lst_new_result = []
         token_idx_mapping = []
@@ -324,15 +279,12 @@ class ErnieInputEncoderV2(BaseInputEncoder):
         packed_sents_lens_all = []
         for sents_of_tokens in sents_of_tokens_list:
             packed_sents_lens = []
-            #packed_value_indexes = []
-            #for tokens, value_index in zip(sents_of_tokens, [[]] + value_indexes + [[]]):
             for tokens in sents_of_tokens:
-                #packed_value_indexes.append(utils.list_increment(value_index, len(packed_sents)))
                 packed_tokens = tokens + ['[SEP]']
                 packed_sents += packed_tokens
                 packed_sents_lens.append(len(packed_tokens))
             packed_sents_lens_all.append(packed_sents_lens)
-        return packed_sents, packed_sents_lens_all  #, packed_value_indexes
+        return packed_sents, packed_sents_lens_all
 
 
 if __name__ == "__main__":

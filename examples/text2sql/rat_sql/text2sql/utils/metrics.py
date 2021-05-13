@@ -41,16 +41,6 @@ class MetricSimpleSQLAcc(object):
         self._correctness = []
 
     def update(self, labels, predicts):
-        """
-
-        Args:
-            labels (TYPE): NULL
-            predicts (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
-        """
         preds = nn_utils.tensor2numpy(predicts)
         pred_sqls = sql_label.decode_sqls(preds, labels['header_lens'], None,
                                           labels['limit_nums'])
@@ -58,11 +48,6 @@ class MetricSimpleSQLAcc(object):
         self._pred_list.extend(pred_sqls)
 
     def calc(self):
-        """
-        Returns: TODO
-
-        Raises: NULL
-        """
         conn_correct = 0
         sel_col_agg_correct = 0
         conds_correct = 0
@@ -220,8 +205,6 @@ class MetricDuSQLAcc(object):
 
     def update(self, item, inferred_code):
         """update one instance"""
-        ##if item.orig['question'] == '视频娱乐一年大约400个小时，那么所对应的单价是多少啊':
-        ##    print(item.orig['question'])
         sql_query = item.orig['query'] if 'query' in item.orig else item.orig[
             'sql_query']
         ret_dict = self.evaluator.evaluate_one(item.db.db_id, sql_query,

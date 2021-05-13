@@ -20,9 +20,8 @@ import json
 from collections import defaultdict
 import re
 
-# 在这里 import 只是为了避免使用 TSL 库的 bug
-# 详见 https://github.com/pytorch/pytorch/issues/2575#issuecomment-523657178
 from paddlenlp.transformers import BertTokenizer
+
 from text2sql.dataproc.dusql_dataset_v2 import load_tables
 
 logging.basicConfig(
@@ -38,16 +37,6 @@ g_date_patt = re.compile(
 
 
 def get_char_list(sentence):
-    """
-
-    Args:
-        sentence (TYPE): NULL
-
-    Returns: tuple
-
-    Raises: NULL
-    """
-
     def is_ascii(s):
         """check if s is English album or number
         Args:
@@ -55,7 +44,6 @@ def get_char_list(sentence):
         Returns: bool
         """
         return ord(s) < 128
-        ##return s.isalnum() and ord(s) < 128
 
     if len(sentence) == 0:
         return []
@@ -86,15 +74,6 @@ def get_char_list(sentence):
 
 
 def _format_date_cell(old_cell):
-    """
-
-    Args:
-        old_cell (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     new_cell = old_cell.rstrip('月日')
     new_cell = new_cell.replace('年', '-')
     new_cell = new_cell.replace('月', '-')
@@ -102,11 +81,6 @@ def _format_date_cell(old_cell):
 
 
 def _build(cells):
-    """do build
-    Args:
-        cells (TYPE): NULL
-    Returns: TODO
-    """
     dct_index = defaultdict(set)
     for cell in set(cells):
         if type(cell) is not str:
@@ -117,7 +91,6 @@ def _build(cells):
         cell_chars = get_char_list(cell.lower())
         dct_index[cell.lower()].add((cell, len(cell_chars)))
         for pos in range(len(cell_chars) - 1):
-            ## bigram 用于 ngram 检索，tri_gram、four_gram仅用于切词检索
             bigram = cell_chars[pos:pos + 2]
             ####tri_gram = cell_chars[pos: pos + 3]
             ####four_gram = cell_chars[pos: pos + 4]
@@ -128,19 +101,8 @@ def _build(cells):
 
 
 def build_cell_index(db_dict):
-    """
-
-    Args:
-        db_dict (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     for db in db_dict.values():
         column_cells = []
-        ##if db.db_id == '洗衣机':
-        ##    print(db.db_id)
         for column in db.columns:
             cell_index = _build(column.cells)
             column_cells.append(cell_index)
@@ -148,16 +110,6 @@ def build_cell_index(db_dict):
 
 
 def extract_value_from_sql(sql_json, sql_format='dusql'):
-    """
-
-    Args:
-        sql_json (TYPE): NULL
-        sql_format (str): dusql/nl2sql
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     dct_col_values = defaultdict(list)
     if sql_format == 'nl2sql':
         for col, _, val in item['sql']['conds']:
@@ -202,17 +154,6 @@ def extract_value_from_sql(sql_json, sql_format='dusql'):
 
 
 def search_values(query, db, extra_values):
-    """search cells of col_id
-
-    Args:
-        query (TYPE): NULL
-        db (TYPE): NULL
-        extra_values (TYPE): values from sql if is_train
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     lst_match_values = []
     for column, cell_index in zip(db.columns, db.column_cells_index):
         if column.id == 0:

@@ -219,12 +219,12 @@ class CandidateValueExtractor:
             all_candidate.append(candi_values)
         return all_candidate
 
-    # 替换年份 xx年 为标准表示，如19年或一九年替换为2019年
+    # 19年 or 一九年 will be replaced to 2019年
     @classmethod
     def extract_year_from_text(cls, text):
         """extract year from text"""
         values = []
-        # FIXME trick 年份从2000年后开始算
+        # FIXME trick: yrs is from 2000
         num_year_texts = re.findall(r'[0-9][0-9]年', text)
         values += ['20{}'.format(text[:-1]) for text in num_year_texts]
         cn_year_texts = re.findall(r'[{}][{}]年'.format(cls.CN_NUM, cls.CN_NUM),
@@ -232,8 +232,6 @@ class CandidateValueExtractor:
         cn_year_values = [str_to_year(text) for text in cn_year_texts]
         values += [value for value in cn_year_values if value is not None]
         return values
-
-    # 提取question中的数字，包括中文数字，阿拉伯，混合，返回字符串类型的阿拉伯字符串
 
     @classmethod
     def extract_date_from_text(cls, text):
@@ -266,17 +264,17 @@ class CandidateValueExtractor:
     def extract_num_from_text(cls, text):
         """extract num from text"""
         values = []
-        # 模式1  纯数字
+        # 1. all digital number
         num_values = re.findall(r'[-+]?[0-9]*\.?[0-9]+', text)
         values += num_values
-        # 模式2 包含中文
+        # 2. include chinese word
         cn_num_unit = cls.CN_NUM + cls.CN_UNIT
         cn_num_texts = re.findall(r'[{}]*\.?[{}]+'.format(cn_num_unit,
                                                           cn_num_unit), text)
 
         cn_num_values = [str_to_num(text) for text in cn_num_texts]
         values += [value for value in cn_num_values if value is not None]
-        # 模式3 前面是数字 后面是中文
+        # 3. both number and chinese word
         cn_num_mix = re.findall(r'[0-9]*\.?[{}]+'.format(cls.CN_UNIT), text)
         for word in cn_num_mix:
             num = re.findall(r'[-+]?[0-9]*\.?[0-9]+', word)
@@ -287,7 +285,6 @@ class CandidateValueExtractor:
                 values.append(str_num)
         return values
 
-    # 提取年份和数字
     @classmethod
     def extract_values_from_text(cls, text):
         """extract values from text"""
@@ -299,7 +296,6 @@ class CandidateValueExtractor:
             values += cls.extract_num_from_text(span)
         return list(set(values))
 
-    # 获取col在quesiton中出现的cell
     @classmethod
     def extract_values_from_column(cls, question, table, col_id, col_type):
         """extract values from column"""
@@ -372,12 +368,12 @@ def _extract_num_span(text):
     Raises: NULL
     """
     dct_start2end = defaultdict(set)
-    # 阿拉伯数字
+    # digital number
     spans = re_search(PATT_NUM, text)
     for start, end in spans:
         dct_start2end[start].add((end, text[start:end]))
 
-    # 中文数字
+    # chinese number
     spans = re_search(PATT_CN_NUM, text)
     for start, end in spans:
         num = str_to_num(text[start:end])
@@ -385,7 +381,7 @@ def _extract_num_span(text):
             continue
         dct_start2end[start].add((end, num))
 
-    # 前面是数字 后面是中文
+    # number, chinese
     spans = re_search(PATT_MIX_NUM, text)
     for start, end in spans:
         orig_num = text[start:end]
@@ -396,7 +392,6 @@ def _extract_num_span(text):
             dct_start2end[start].add((end, num))
 
     lst_result = []
-    # 排序、去重、去歧义
     for start, st_end_and_num in sorted(dct_start2end.items()):
         lst_end, lst_num = list(zip(*st_end_and_num))
         end = max(lst_end)
@@ -414,15 +409,6 @@ def _extract_num_span(text):
 
 
 def wordseg_and_extract_num(text):
-    """提取数字和时间
-
-    Args:
-        text (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     lst_span_and_nums = _extract_num_span(text)
     lst_words = []
     pos = 0

@@ -49,22 +49,6 @@ pip3 install paddlepaddle-gpu
 
 ```pip3 install -r requirements.txt```
 
-## 安转ERNIE
-
-从 github 下载 ERNIE 最新代码至 third 目录下：
-```
-mkdir third
-cd third
-git clone https://github.com/PaddlePaddle/ERNIE.git
-cd ERNIE && git checkout develop
-```
-
-下载ERNIE预训练模型
-```
-# 执行完成后会得到 data/ernie/ernie_1.0_base_ch 目录，其中包含ERNIE模型相关的配置、词表和模型参数
-bash data/download_ernie1.0.sh
-```
-详细了解 ERNIE 可进一步参考<https://github.com/PaddlePaddle/ERNIE>。
 
 # 数据准备
 运行前需要自行下载训练、测试数据。

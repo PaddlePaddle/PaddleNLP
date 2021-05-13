@@ -430,15 +430,21 @@ def evaluate_NL2SQL(table, gold, predict, single_equal=False, mode=None):
 
 
 if __name__ == '__main__':
-    # print(query2sql("SELECT 所在省份 , 产线名称 WHERE 日熔量（吨） < 600", []))
-    # print(query2sql("SELECT MAX ( 货币资金（亿元） ) WHERE 总资产（亿元） > 100 or 净资产（亿元） > 100", []))
-    # print(query2sql("SELECT 股价 , EPS17A WHERE 铁路公司 = 广深铁路", ["股价", "铁路公司", "EPS17A"], True))
-    #cols = ["公司", "2014（亿元）", "2015（亿元）", "2016（亿元）"]
-    # print(query2sql("SELECT COUNT ( 公司 ) WHERE 2014（亿元） > 20 and 2015（亿元） > 20 and 2016（亿元） > 20", cols))
+    print(query2sql("SELECT 所在省份 , 产线名称 WHERE 日熔量（吨） < 600", []))
+    print(
+        query2sql(
+            "SELECT MAX ( 货币资金（亿元） ) WHERE 总资产（亿元） > 100 or 净资产（亿元） > 100", []))
+    print(
+        query2sql("SELECT 股价 , EPS17A WHERE 铁路公司 = 广深铁路",
+                  ["股价", "铁路公司", "EPS17A"], True))
+    cols = ["公司", "2014（亿元）", "2015（亿元）", "2016（亿元）"]
+    print(
+        query2sql(
+            "SELECT COUNT ( 公司 ) WHERE 2014（亿元） > 20 and 2015（亿元） > 20 and 2016（亿元） > 20",
+            cols))
 
-    #print(query2sql("SELECT 书名/Title WHERE 索书号/CallNo. == BF637.U53C555=12010 or ISBN == 9.78142212482e+12", ["书名/Title","索书号/CallNo.",'ISBN']))
-    #print(tokenize("SELECT 标称生产企业名称 WHERE 规格(包装规格） == 187.2g/盒 and 标称产品名称 == 富兰克牌西洋参含片", math=False))
+    # print(query2sql("SELECT 书名/Title WHERE 索书号/CallNo. == BF637.U53C555=12010 or ISBN == 9.78142212482e+12", ["书名/Title","索书号/CallNo.",'ISBN']))
+    # print(tokenize("SELECT 标称生产企业名称 WHERE 规格(包装规格） == 187.2g/盒 and 标称产品名称 == 富兰克牌西洋参含片", math=False))
     # print(tokenize("SELECT 设备型号 WHERE 生产企业 == AISINAWCO.,LTD. or 设备名称 == WCDMA无线数据终端", math=False))
     # print(tokenize("SELECT sum(t1.amount_claimed) FROM claim_headers AS t1 JOIN claims_documents AS t2 ON t1.claim_header_id  =  t2.claim_id WHERE t2.created_date  =  ( SELECT created_date FROM claims_documents ORDER BY created_date LIMIT 1 )"))
     # print(query2sql("SELECT 书号（ISBN) WHERE 教材名称 == 线性代数 or 教材名称 == 中级有机化学", ["书号（ISBN)", "教材名称" ]))
-    pass

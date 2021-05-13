@@ -19,9 +19,6 @@ import logging
 import json
 import numpy as np
 
-#from text2sql import g
-#from text2sql.data.data_struct import SQL
-
 g_open_value_predict = False
 g_having_agg_threshold = 0.9
 
@@ -144,12 +141,12 @@ class SQL(object):
 
 def sql2label(sql, num_cols):
     """encode sql"""
-    # 因为是分类任务，label是从0开始的，而没有0这个分类，
-    # 所以sel_num和cond_num都减一，在预测出的label再加一才是真正的数量
+    # because of classification task, label is from 0
+    # so sel_num and cond_num should -1，and label should +1 in prediction phrase
     cond_conn_op_label = sql.cond_conn_op
 
     sel_num_label = sql.sel_num - 1
-    # 新的数据集有 cond_num 为 0 的情况, 不需要减一
+    # the new dataset has cond_num = 0, do not -1
     cond_num_label = len(sql.conds) + len(sql.having)
     sel_label = np.zeros(num_cols, dtype='int32')
     sel_agg_label = np.zeros((num_cols, SQL.num_agg_ops), dtype='int32')
@@ -157,7 +154,7 @@ def sql2label(sql, num_cols):
         assert col_id < num_cols, f"select col_id({col_id}) >= num_cols({num_cols}): {sql}"
         sel_agg_label[col_id][agg_op] = 1
         sel_label[col_id] = 1
-    # len(SQL.op_sql_dict) 超出所有op的ID范围，即默认没有 OP
+    # len(SQL.op_sql_dict) over all op ID range，which means defaults to no OP
     cond_op_label = np.ones(num_cols, dtype='int32') * len(SQL.op_sql_dict)
     having_agg_label = np.zeros((num_cols, SQL.num_agg_ops), dtype='int32')
 
@@ -172,8 +169,6 @@ def sql2label(sql, num_cols):
 
     order_col_label = np.zeros(num_cols, dtype='int32')
     order_agg_label = np.zeros((num_cols, SQL.num_agg_ops), dtype='int32')
-    # TODO
-    ##limit_label = np.zeros(SQL.max_limit_candidates)
 
     order_direction_label = sql.order_direction
     for agg, order_col in sql.order_by:
@@ -200,7 +195,7 @@ def decode(sel_num, sel_col, sel_agg, where_num, where_conn, where_op,
     """decode one instance predicts to sql"""
     if col_value is None:
         col_value = [None] * len(where_op)
-    # 这里通过词典找label对应的数量，其实相当于加1（与encode对应）
+    # use dict to find label number, equals to label+1
     sel_num = SQL.sel_num_dict[int(sel_num)]
     sorted_sel_index = sorted(
         range(len(sel_col)), key=lambda i: sel_col[i], reverse=True)
@@ -265,7 +260,7 @@ def decode(sel_num, sel_col, sel_agg, where_num, where_conn, where_op,
         order_by = [[order_agg[0], order_col[0]]]
         if limit_label < len(candi_limit_nums):
             limit = candi_limit_nums[limit_label]
-            if limit == '0':  # 有 order 了，limit不可能为 0
+            if limit == '0':
                 limit = '1'
         else:
             limit = '1'

@@ -11,13 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""评价工具：计算预估 SQL 的精确匹配 ACCURACY。对于select、where等部分的
-多个成分，如果仅是顺序不同也会算正确。
-本脚本参考了 spider 数据集中公开的 evaluation.py 代码(https://github.com/taoyds/spider)。
-
-Filname: text2sql_evaluation.py
-Authors: ZhangAo(@baidu.com)
-Date: 2020-01-15 10:34:50
+"""
+Calculating the exact accuracy. For select, where and others schema, it will be
+seen as right if has different order. This script refers to https://github.com/taoyds/spider。
 """
 
 from __future__ import division
@@ -181,11 +177,6 @@ def scan_alias(toks):
 
 
 def get_tables_with_alias(schema, toks):
-    """
-    Args:
-
-    Returns:
-    """
     tables = scan_alias(toks)
     for key in schema:
         assert key not in tables, "Alias {} has the same name in table".format(
@@ -195,9 +186,6 @@ def get_tables_with_alias(schema, toks):
 
 
 def parse_col(toks, start_idx, tables_with_alias, schema, default_tables=None):
-    """
-        :returns next idx, column id
-    """
     tok = toks[start_idx]
     if tok == "*":
         return start_idx + 1, schema.id_map[tok]
@@ -230,9 +218,6 @@ def parse_col_unit(toks,
                    tables_with_alias,
                    schema,
                    default_tables=None):
-    """
-        :returns next idx, (agg_op id, col_id)
-    """
     idx = start_idx
     len_ = len(toks)
     isBlock = False
@@ -267,11 +252,6 @@ def parse_val_unit(toks,
                    tables_with_alias,
                    schema,
                    default_tables=None):
-    """
-    Args:
-
-    Returns:
-    """
     idx = start_idx
     len_ = len(toks)
     isBlock = False
@@ -301,9 +281,6 @@ def parse_val_unit(toks,
 
 
 def parse_table_unit(toks, start_idx, tables_with_alias, schema):
-    """
-        :returns next idx, table id, table name
-    """
     idx = start_idx
     len_ = len(toks)
     key = tables_with_alias[toks[idx]]
@@ -318,11 +295,6 @@ def parse_table_unit(toks, start_idx, tables_with_alias, schema):
 
 def parse_value(toks, start_idx, tables_with_alias, schema,
                 default_tables=None):
-    """
-    Args:
-
-    Returns:
-    """
     idx = start_idx
     len_ = len(toks)
 
@@ -380,11 +352,6 @@ def parse_condition(toks,
                     tables_with_alias,
                     schema,
                     default_tables=None):
-    """
-    Args:
-
-    Returns:
-    """
     idx = start_idx
     len_ = len(toks)
     conds = []
@@ -438,11 +405,6 @@ def parse_select(toks,
                  tables_with_alias,
                  schema,
                  default_tables=None):
-    """
-    Args:
-
-    Returns:
-    """
     idx = start_idx
     len_ = len(toks)
 
@@ -521,11 +483,6 @@ def parse_from(toks, start_idx, tables_with_alias, schema):
 
 
 def parse_where(toks, start_idx, tables_with_alias, schema, default_tables):
-    """
-    Args:
-
-    Returns:
-    """
     idx = start_idx
     len_ = len(toks)
 
@@ -539,11 +496,6 @@ def parse_where(toks, start_idx, tables_with_alias, schema, default_tables):
 
 
 def parse_group_by(toks, start_idx, tables_with_alias, schema, default_tables):
-    """
-    Args:
-
-    Returns:
-    """
     idx = start_idx
     len_ = len(toks)
     col_units = []
@@ -569,11 +521,6 @@ def parse_group_by(toks, start_idx, tables_with_alias, schema, default_tables):
 
 
 def parse_order_by(toks, start_idx, tables_with_alias, schema, default_tables):
-    """
-    Args:
-
-    Returns:
-    """
     idx = start_idx
     len_ = len(toks)
     val_units = []
@@ -607,11 +554,6 @@ def parse_order_by(toks, start_idx, tables_with_alias, schema, default_tables):
 
 
 def parse_having(toks, start_idx, tables_with_alias, schema, default_tables):
-    """
-    Args:
-
-    Returns:
-    """
     idx = start_idx
     len_ = len(toks)
 
@@ -625,11 +567,6 @@ def parse_having(toks, start_idx, tables_with_alias, schema, default_tables):
 
 
 def parse_limit(toks, start_idx):
-    """
-    Args:
-
-    Returns:
-    """
     idx = start_idx
     len_ = len(toks)
 
@@ -642,11 +579,6 @@ def parse_limit(toks, start_idx):
 
 
 def parse_sql(toks, start_idx, tables_with_alias, schema):
-    """
-    Args:
-
-    Returns:
-    """
     isBlock = False  # indicate whether this is a block of sql/sub-sql
     len_ = len(toks)
     idx = start_idx
@@ -703,22 +635,12 @@ def parse_sql(toks, start_idx, tables_with_alias, schema):
 
 
 def load_data(fpath):
-    """
-    Args:
-
-    Returns:
-    """
     with open(fpath) as f:
         data = json.load(f)
     return data
 
 
 def get_sql(schema, query):
-    """
-    Args:
-
-    Returns:
-    """
     toks = tokenize(query)
     tables_with_alias = get_tables_with_alias(schema.schema, toks)
     _, sql = parse_sql(toks, 0, tables_with_alias, schema)
@@ -727,11 +649,6 @@ def get_sql(schema, query):
 
 
 def skip_semicolon(toks, start_idx):
-    """
-    Args:
-
-    Returns:
-    """
     idx = start_idx
     while idx < len(toks) and toks[idx] == ";":
         idx += 1
@@ -820,14 +737,6 @@ class Evaluator(object):
     def eval_exact_match(self, pred, gold):
         """wrapper of evaluate examct match, to process
         `SQL1 intersect/union SQL2` vs `SQL2 intersect/union SQL1`
-
-        Args:
-            pred (TYPE): NULL
-            gold (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
         """
         score = self._eval_exact_match(pred, gold)
         if score == 1:
@@ -1124,17 +1033,6 @@ def eval_nested_cond(pred_cond, gold_cond):
 
 
 def eval_cond(pred, gold):
-    """
-
-    Args:
-        pred (TYPE): NULL
-        gold (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
-
     def _equal(p, g):
         if str(p) == str(g):
             return True
@@ -1158,11 +1056,6 @@ def eval_cond(pred, gold):
 
 
 def eval_where(pred, gold):
-    """
-    Args:
-
-    Returns:
-    """
     pred_conds = list(
         sorted(
             [unit for unit in pred['where'][::2]],
@@ -1195,11 +1088,6 @@ def eval_where(pred, gold):
 
 
 def eval_group(pred, gold):
-    """
-    Args:
-
-    Returns:
-    """
     pred_cols = [unit[1] for unit in pred['groupBy']]
     gold_cols = [unit[1] for unit in gold['groupBy']]
     pred_total = len(pred_cols)
@@ -1219,10 +1107,7 @@ def eval_group(pred, gold):
 
 
 def eval_having(pred, gold):
-    """不评估and/or，在其它分支专门评估
-    Args:
-
-    Returns:
+    """and/or will be evaluate in other branch
     """
     if len(pred['having']) != len(gold['having']):
         return [1, 1, 0]
@@ -1239,11 +1124,6 @@ def eval_having(pred, gold):
 
 
 def eval_order(pred, gold):
-    """
-    Args:
-
-    Returns:
-    """
     pred_total = gold_total = cnt = 0
     if len(pred['orderBy']) > 0:
         pred_total = 1
@@ -1258,12 +1138,6 @@ def eval_order(pred, gold):
 
 
 def eval_and_or(pred, gold):
-    """
-    Args:
-
-    Returns:
-    """
-
     def _extract(conds):
         """extract condition and/or"""
         op_set = set()
@@ -1290,11 +1164,6 @@ def eval_and_or(pred, gold):
 
 
 def get_nestedSQL(sql):
-    """
-    Args:
-
-    Returns:
-    """
     nested = []
     for cond_unit in sql['from']['conds'][::2] + sql['where'][::2] + sql[
             'having'][::2]:
@@ -1319,11 +1188,6 @@ def get_nestedSQL(sql):
 
 
 def eval_nested(pred, gold):
-    """
-    Args:
-
-    Returns:
-    """
     gold_total = 0
     pred_total = 0
     cnt = 0
@@ -1338,11 +1202,6 @@ def eval_nested(pred, gold):
 
 
 def eval_IUEN(pred, gold):
-    """
-    Args:
-
-    Returns:
-    """
     lt1, pt1, cnt1 = eval_nested(pred['intersect'], gold['intersect'])
     lt2, pt2, cnt2 = eval_nested(pred['except'], gold['except'])
     lt3, pt3, cnt3 = eval_nested(pred['union'], gold['union'])
@@ -1353,11 +1212,6 @@ def eval_IUEN(pred, gold):
 
 
 def get_keywords(sql):
-    """
-    Args:
-
-    Returns:
-    """
     res = set()
     if len(sql['where']) > 0:
         res.add('where')
@@ -1407,11 +1261,6 @@ def get_keywords(sql):
 
 
 def eval_keywords(pred, gold):
-    """
-    Args:
-
-    Returns:
-    """
     pred_keywords = get_keywords(pred)
     gold_keywords = get_keywords(gold)
     pred_total = len(pred_keywords)
@@ -1426,11 +1275,6 @@ def eval_keywords(pred, gold):
 
 # Rebuild SQL functions for foreign key evaluation
 def build_valid_col_units(table_units, schema):
-    """
-    Args:
-
-    Returns:
-    """
     col_ids = [
         table_unit[1] for table_unit in table_units
         if table_unit[0] == TABLE_TYPE['table_unit']
@@ -1444,11 +1288,6 @@ def build_valid_col_units(table_units, schema):
 
 
 def rebuild_col_unit_col(valid_col_units, col_unit, kmap):
-    """
-    Args:
-
-    Returns:
-    """
     if col_unit is None:
         return col_unit
 
@@ -1459,11 +1298,6 @@ def rebuild_col_unit_col(valid_col_units, col_unit, kmap):
 
 
 def rebuild_val_unit_col(valid_col_units, val_unit, kmap):
-    """
-    Args:
-
-    Returns:
-    """
     if val_unit is None:
         return val_unit
 
@@ -1474,11 +1308,6 @@ def rebuild_val_unit_col(valid_col_units, val_unit, kmap):
 
 
 def rebuild_table_unit_col(valid_col_units, table_unit, kmap, eval_value=True):
-    """
-    Args:
-
-    Returns:
-    """
     if table_unit is None:
         return table_unit
 
@@ -1493,11 +1322,6 @@ def rebuild_table_unit_col(valid_col_units, table_unit, kmap, eval_value=True):
 
 
 def rebuild_cond_unit_col(valid_col_units, cond_unit, kmap, eval_value):
-    """
-    Args:
-
-    Returns:
-    """
     if cond_unit is None:
         return cond_unit
 
@@ -1514,11 +1338,6 @@ def rebuild_cond_unit_col(valid_col_units, cond_unit, kmap, eval_value):
 
 
 def rebuild_condition_col(valid_col_units, condition, kmap, eval_value):
-    """
-    Args:
-
-    Returns:
-    """
     for idx in range(len(condition)):
         if idx % 2 == 0:
             condition[idx] = rebuild_cond_unit_col(
@@ -1527,11 +1346,6 @@ def rebuild_condition_col(valid_col_units, condition, kmap, eval_value):
 
 
 def rebuild_select_col(valid_col_units, sel, kmap):
-    """
-    Args:
-
-    Returns:
-    """
     if sel is None:
         return sel
     new_list = []
@@ -1543,11 +1357,6 @@ def rebuild_select_col(valid_col_units, sel, kmap):
 
 
 def rebuild_from_col(valid_col_units, from_, kmap, eval_value=True):
-    """
-    Args:
-
-    Returns:
-    """
     if from_ is None:
         return from_
 
@@ -1561,11 +1370,6 @@ def rebuild_from_col(valid_col_units, from_, kmap, eval_value=True):
 
 
 def rebuild_group_by_col(valid_col_units, group_by, kmap):
-    """
-    Args:
-
-    Returns:
-    """
     if group_by is None:
         return group_by
 
@@ -1576,11 +1380,6 @@ def rebuild_group_by_col(valid_col_units, group_by, kmap):
 
 
 def rebuild_order_by_col(valid_col_units, order_by, kmap):
-    """
-    Args:
-
-    Returns:
-    """
     if order_by is None or len(order_by) == 0:
         return order_by
 
@@ -1593,11 +1392,6 @@ def rebuild_order_by_col(valid_col_units, order_by, kmap):
 
 
 def rebuild_sql_col(valid_col_units, sql, kmap, eval_value):
-    """
-    Args:
-
-    Returns:
-    """
     if sql is None:
         return sql
 
@@ -1626,11 +1420,6 @@ def rebuild_sql_col(valid_col_units, sql, kmap, eval_value):
 
 
 def build_foreign_key_map(entry):
-    """
-    Args:
-
-    Returns:
-    """
     cols_orig = entry["column_names_original"]
     tables_orig = entry["table_names_original"]
 
@@ -1672,11 +1461,6 @@ def build_foreign_key_map(entry):
 
 
 def build_foreign_key_map_from_json(table):
-    """
-    Args:
-
-    Returns:
-    """
     with open(table) as f:
         data = json.load(f)
     tables = {}

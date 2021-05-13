@@ -167,7 +167,7 @@ class NL2SQLLanguage(object):
             "sql_orderby": filter_nones({
                 '_type': 'sql_orderby',
                 'order_by': None,
-                'limit': 0,
+                'limit': None,
             }),
             'sql_ieu': filter_nones({
                 '_type': 'sql_ieu',
@@ -233,7 +233,7 @@ class NL2SQLLanguage(object):
         ('Column', 'Minus', 'Plus', 'Times', 'Divide'))
 
     AGG_TYPES_F, AGG_TYPES_B = bimap(
-        range(6), ('NoneAggOp', 'Max', 'Min', 'Count', 'Sum', 'Avg'))
+        range(6), ('NoneAggOp', 'Avg', 'Max', 'Min', 'Count', 'Sum'))
 
     ORDERS_F, ORDERS_B = bimap(('asc', 'desc'), ('Asc', 'Desc'))
 
@@ -396,21 +396,21 @@ class NL2SQLUnparser:
         3) Inferring conditions based on tables 
 
         Returns: bool
-            True: 是行计算
-            False: 不是行计算
+            True: row calculation
+            False: not row calculation
         """
 
         # nested query in from clause, recursively use the refinement
         if "from" in tree and tree["from"]["table_units"][0][
                 "_type"] == 'TableUnitSql':
             for table_unit in tree["from"]["table_units"]:
-                # 正常解码的结果中，FROM 中要么全是 sub-sql，要么全是普通的 table_id
+                # during natural decoding, all of FROM is sub-sql or ordinary table_id
                 if 's' not in table_unit:
                     logging.warning('error tree in FROM clause: %s', str(tree))
                     continue
                 subquery_tree = table_unit["s"]
                 self.refine_from(subquery_tree)
-            return len(tree['from']['table_units']) == 2  # 行计算
+            return len(tree['from']['table_units']) == 2  # row calculation
 
         # get predicted tables
         predicted_from_table_ids = set()
@@ -523,51 +523,6 @@ class NL2SQLUnparser:
         if 'where' in target_tree:
             result += ['WHERE', self.unparse_cond(target_tree['where'])]
 
-        tree, target_tree = find_subtree(tree, "sql_groupby")
-        # col_unit* group_by,
-        if 'group_by' in target_tree:
-            result += [
-                'GROUP BY', ', '.join(
-                    self.unparse_col_unit(c) for c in target_tree['group_by'])
-            ]
-
-        tree, target_tree = find_subtree(tree, "sql_orderby")
-        # order_by? order_by,
-        if 'order_by' in target_tree:
-            result.append(self.unparse_order_by(target_tree['order_by']))
-
-        tree, target_tree = find_subtree(tree, "sql_groupby")
-        # cond? having,
-        if 'having' in target_tree:
-            having_block = self.unparse_cond(target_tree['having']).split(' ')
-            if having_block[0] == '*':  # 没有 agg
-                logging.info(
-                    'post process: adding count() for having statement')
-                having_block[0] = 'count(*)'
-            result += ['HAVING', ' '.join(having_block)]
-
-        tree, target_tree = find_subtree(tree, "sql_orderby")
-        # int? limit, 
-        if 'limit' in target_tree:
-            limit_index = int(target_tree['limit'])
-            limit_value = '0'
-            if limit_index < len(self.value_list) and self.value_list[
-                    limit_index].isdigit():
-                limit_value = self.value_list[limit_index]
-            if limit_value != '0':  # 0表示没有limit
-                result += ['LIMIT', str(limit_value)]
-
-        tree, target_tree = find_subtree(tree, "sql_ieu")
-        # sql? intersect,
-        if 'intersect' in target_tree:
-            result += ['INTERSECT', self.unparse_sql(target_tree['intersect'])]
-        # sql? except,
-        if 'except' in target_tree:
-            result += ['EXCEPT', self.unparse_sql(target_tree['except'])]
-        # sql? union
-        if 'union' in target_tree:
-            result += ['UNION', self.unparse_sql(target_tree['union'])]
-
         return ' '.join(result)
 
     def unparse_select(self, select, is_row_calc=False):
@@ -639,9 +594,6 @@ class NL2SQLUnparser:
                         intersperse('AND', (self.unparse_cond(cond)
                                             for cond in conds_to_output)))
         return ' '.join(tokens)
-
-    def unparse_order_by(self, order_by):
-        return f'ORDER BY {", ".join(self.unparse_agg(v) for v in order_by["aggs"])} {order_by["order"]["_type"]}'
 
 
 if __name__ == "__main__":

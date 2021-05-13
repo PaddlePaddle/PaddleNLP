@@ -24,8 +24,6 @@ import random
 import numpy as np
 import paddle
 import paddle.distributed as dist
-# 在这里 import 只是为了避免使用 TSL 库的 bug
-# 详见 https://github.com/pytorch/pytorch/issues/2575#issuecomment-523657178
 from paddlenlp.transformers import BertTokenizer
 
 import text2sql
@@ -45,15 +43,6 @@ g_label_encoder = None
 
 
 def preprocess(config):
-    """pre-process datasets and rules
-
-    Args:
-        config (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     dataset_config = {
         'db_file': config.data.db,
         'input_encoder': g_input_encoder,
@@ -66,7 +55,6 @@ def preprocess(config):
         dataset = DatasetClass(
             name='train', data_file=config.data.train_set, **dataset_config)
         dataset.save(output_base, save_db=True)
-        # label encoder 只能“看到”训练集
         g_label_encoder.save(Path(output_base) / 'label_vocabs')
 
     if config.data.dev_set is not None:
@@ -81,15 +69,6 @@ def preprocess(config):
 
 
 def train(config):
-    """do training
-
-    Args:
-        params (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     logging.info('training arguments: %s', config)
     if config.train.use_data_parallel:
         logging.info("parallel mode. init env...")
@@ -124,13 +103,10 @@ def train(config):
         model.set_state_dict(paddle.load(config.model.init_model_params))
     if config.train.use_data_parallel:
         logging.info("parallel mode. init model...")
-        #strategy = paddle.distributed.prepare_context()
-        #model = paddle.DataParallel(model, strategy)
         model = paddle.DataParallel(model)
 
     optimizer = text2sql.optim.init_optimizer(model, config.train,
                                               max_train_steps)
-    #scale_params_lr=[(model.encoder.ernie, 0.1)])
     if config.model.init_model_optim is not None:
         logging.info("loading model optim from %s",
                      config.model.init_model_optim)
@@ -143,15 +119,6 @@ def train(config):
 
 
 def inference(config):
-    """
-
-    Args:
-        config (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     if config.model.init_model_params is None:
         raise RuntimeError(
             "config.init_model_params should be a valid model path")
@@ -164,7 +131,6 @@ def inference(config):
     }
     test_set = DatasetClass(
         name='test', data_file=config.data.test_set, **dataset_config)
-    # batch_size 恒为 1
     test_reader = DataLoaderClass(config, test_set, batch_size=1, shuffle=False)
 
     model = ModelClass(config.model, g_label_encoder)
@@ -183,15 +149,6 @@ def inference(config):
 
 
 def evaluate(config):
-    """alpha version
-
-    Args:
-        params (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     dataset_config = {
         'db_file': config.data.db,
         'input_encoder': g_input_encoder,
@@ -203,15 +160,7 @@ def evaluate(config):
         name='test', data_file=config.data.test_set, **dataset_config)
     with open(config.data.eval_file) as ifs:
         infer_results = list(ifs)
-    # batch_size 恒为 1
-    #test_reader = DataLoaderClass(config, test_set, batch_size=1, shuffle=False)
-
     model = None
-    #model = text2sql.models.EncDecModel(g.device, None, g_label_encoder)
-    #if config.init_model_params is None:
-    #    raise RuntimeError("config.init_model_params should be a valid model path")
-    #logging.info("loading model param from %s", config.init_model_params)
-    #model.set_dict(paddle.load(config.init_model_params))
 
     logging.info("start of evaluating...")
     launch.eval.evaluate(
@@ -220,15 +169,6 @@ def evaluate(config):
 
 
 def init_env(config):
-    """init system env
-
-    Args:
-        config (obj): NULL
-
-    Returns: None
-
-    Raises: NULL
-    """
     log_level = logging.INFO if not config.general.is_debug else logging.DEBUG
     formater = logging.Formatter(
         '%(levelname)s %(asctime)s %(filename)s:%(lineno)03d * %(message)s')
@@ -276,7 +216,8 @@ def init_env(config):
 
 
 def _set_proc_name(config, tag_base):
-    """set process name on local machine
+    """
+    set process name on local machine
     """
     if config.general.is_cloud:
         return
@@ -288,7 +229,6 @@ def _set_proc_name(config, tag_base):
 
 
 if __name__ == "__main__":
-    # 从命令行和配置文件中生成全局配置
     config = global_config.gen_config()
     init_env(config)
 

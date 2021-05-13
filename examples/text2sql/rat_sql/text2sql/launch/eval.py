@@ -22,18 +22,6 @@ from text2sql.utils import metrics
 
 
 def evaluate(model, dataset, infer_results, name='DuSQL', eval_value=True):
-    """
-
-    Args:
-        model (TYPE): NULL
-        dataset (TYPE): NULL
-        infer_results (TYPE): NULL
-        name (TYPE): Default is 'DuSQL'
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     if name.lower() == 'dusql':
         metric = metrics.MetricDuSQLAcc(dataset, eval_value=eval_value)
     else:
@@ -43,7 +31,6 @@ def evaluate(model, dataset, infer_results, name='DuSQL', eval_value=True):
         qid, pred_query, db_id, detail_result = line.strip().split('\t')
         dct_result = json.loads(detail_result)
         qid = dct_result['question_id']
-        # data[example_id] 返回的是一个二元组 (inputs, labels)
         metric.update(dataset.get_by_qid(qid)[0], pred_query)
 
     eval_result = metric.finalize()

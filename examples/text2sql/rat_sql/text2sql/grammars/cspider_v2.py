@@ -648,7 +648,7 @@ class CSpiderUnparser:
                 limit_value = self.value_list[limit_index]
             if limit_value == 'value':
                 limit_value = '1'
-            if limit_value.isdigit() and limit_value != '0':  # 0表示没有limit
+            if limit_value.isdigit() and limit_value != '0':
                 result += ['LIMIT', str(limit_value)]
 
         tree, target_tree = find_subtree(tree, "sql_ieu")

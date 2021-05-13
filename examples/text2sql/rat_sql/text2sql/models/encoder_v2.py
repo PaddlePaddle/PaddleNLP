@@ -21,7 +21,7 @@ from pathlib import Path
 import attr
 
 import numpy as np
-from ernie import ErnieModel
+from paddlenlp.transformers import ErnieModel
 from paddlenlp.transformers import BertModel
 import paddle
 from paddle import nn
@@ -60,13 +60,6 @@ class Text2SQLEncoderV2(nn.Layer):
     """Encoder for text2sql model"""
 
     def __init__(self, model_config, extra=None):
-        """init of class
-
-        Args:
-            model_config (TYPE): model config
-            extra (TYPE): Default is None
-
-        """
         super(Text2SQLEncoderV2, self).__init__()
         self.enc_value_with_col = model_config.enc_value_with_col
 
@@ -81,7 +74,6 @@ class Text2SQLEncoderV2(nn.Layer):
                 'vocab_size': utils.count_file_lines(vocab_file),
                 'type_vocab_size': 2
             }
-            # TODO 动态判断
             self.hidden_size = 768
         elif model_config.pretrain_model_type == 'ERNIE':
             PretrainModel = ErnieModel
@@ -116,13 +108,6 @@ class Text2SQLEncoderV2(nn.Layer):
 
     def forward(self, inputs):
         """modeling forward stage of encoder
-
-        Args:
-            inputs (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
         """
         cls_hidden, seq_hidden = self.base_encoder(inputs['src_ids'],
                                                    inputs['sent_ids'])
@@ -208,7 +193,6 @@ class Text2SQLEncoderV2(nn.Layer):
                     question_memory=q_enc_new,
                     schema_memory=paddle.concat(
                         schema_memory, axis=1),
-                    # TODO: 使用 bert tokens, 且须匹配 memory
                     words=orig_input.question_tokens,
                     pointer_memories={
                         'table': t_enc_new,
@@ -234,18 +218,6 @@ class Text2SQLEncoderV2(nn.Layer):
                      span_tokens_mask,
                      proj_fn=None):
         """encode spans(like headers, table names) by sequence hidden states
-
-        Args:
-            cls_hidden (TYPE): NULL
-            seq_hidden (TYPE): NULL
-            span_index (TYPE): NULL
-            span_tokens_index (TYPE): NULL
-            span_tokens_mask (TYPE): NULL
-            proj_fn (callable): Default is None.
-
-        Returns: TODO
-
-        Raises: NULL
         """
         batch_size, max_col_nums, max_col_tokens = span_tokens_index.shape
         hidden_size = cls_hidden.shape[-1]

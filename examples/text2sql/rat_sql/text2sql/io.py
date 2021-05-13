@@ -23,14 +23,6 @@ import paddle
 
 def init_ernie_model(model_class, model_dir):
     """init ernie model from static graph checkpoint
-
-    Args:
-        model_class (TYPE): NULL
-        model_dir (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
     """
     with open(os.path.join(model_dir, 'ernie_config.json')) as ifs:
         config = json.load(ifs)
@@ -42,17 +34,6 @@ def init_ernie_model(model_class, model_dir):
 
 
 def save(model, optimzer, save_path):
-    """
-
-    Args:
-        model (TYPE): NULL
-        optimzer (TYPE): NULL
-        save_path (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     try:
         paddle.save(model.state_dict(), save_path + '.pdparams')
         paddle.save(optimzer.state_dict(), save_path + '.pdopt')

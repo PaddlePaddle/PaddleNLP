@@ -142,7 +142,6 @@ class DuSQLLanguageV2(object):
             raise ValueError(val)
 
     def parse_col_unit(self, col_unit):
-        # 忽略可能包含的 is_distinct
         agg_id, col_id = col_unit[:2]
         result = {
             '_type': 'col_unit',

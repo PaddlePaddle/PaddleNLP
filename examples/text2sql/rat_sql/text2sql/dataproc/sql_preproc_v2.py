@@ -75,8 +75,7 @@ class SQLPreproc(object):
                  max_count=5000,
                  use_seq_elem_rules=False,
                  is_cached=False):
-        """init
-
+        """
         Args:
             base_path (TYPE): if is_cached is False, base_path is the asdl grammar file.
                               if is_cached is True, base_path is path to cached directory.
@@ -149,16 +148,8 @@ class SQLPreproc(object):
 
     def transfer_sql_value(self, sql_json, value_dict):
         """transfer value str to int index
-
-        Args:
-            sql_json (TYPE): [in/out]
-            value_dict (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
         """
-        if 'cond_conn_op' in sql_json:  # NL2SQL 的json 格式
+        if 'cond_conn_op' in sql_json:
             self.transfer_simple_sql_value(sql_json, value_dict)
             return
 
@@ -216,16 +207,6 @@ class SQLPreproc(object):
             self.transfer_sql_value(sql_json['except'], value_dict)
 
     def transfer_simple_sql_value(self, sql_json, value_dict):
-        """
-
-        Args:
-            sql_json (TYPE): NULL
-            value_dict (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
-        """
         for cond in sql_json['conds']:
             value = cond[2]
             new_val = self._get_val_index(value, value_dict)
@@ -235,14 +216,6 @@ class SQLPreproc(object):
 
     def fix_sql_value(self, sql_json, value_dict):
         """fix sql value to 'value' token
-
-        Args:
-            sql_json (TYPE): NULL
-            value_dict (TYPE): 
-
-        Returns: TODO
-
-        Raises: NULL
         """
 
         def _fix_cond_value(cond):
@@ -318,15 +291,6 @@ class SQLPreproc(object):
         self.items = collections.defaultdict(list)
 
     def _construct_cache_path(self, root_path):
-        """
-
-        Args:
-            root_path (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
-        """
         root_path = Path(root_path)
         self.vocab_path = root_path / 'dec_vocab.json'
         self.observed_productions_path = root_path / 'observed_productions.json'
@@ -340,13 +304,6 @@ class SQLPreproc(object):
 
         self.vocab = self.vocab_builder.finish()
         self.vocab.save(self.vocab_path)
-        """ sql preproc 不负责存储data部分
-        for section, items in self.items.items():
-            with open(os.path.join(self.data_dir, section + '.jsonl'), 'w') as f:
-                for item in items:
-                    f.write(json.dumps(attr.asdict(item)) + '\n')
-        """
-
         # observed_productions
         self.sum_type_constructors = serialization.to_dict_with_sorted_values(
             self.sum_type_constructors)

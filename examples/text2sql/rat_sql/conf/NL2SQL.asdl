@@ -105,8 +105,8 @@ module NL2SQL
     -- UNIT_OPS = ('none', '-', '+', "*", '/')
     --unit_type = NoneUnitOp | Minus | Plus | Times | Divide
 
-    -- AGG_OPS = ('none', 'max', 'min', 'count', 'sum', 'avg')
-    agg_type = NoneAggOp | Max | Min | Count | Sum | Avg
+    -- AGG_OPS = ('none', 'avg', 'max', 'min', 'count', 'sum')
+    agg_type = NoneAggOp | Avg | Max | Min | Count | Sum
 
     -- TABLE_TYPE = {
     --     'sql': "sql",

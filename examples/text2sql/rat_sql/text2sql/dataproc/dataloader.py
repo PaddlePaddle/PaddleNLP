@@ -26,13 +26,6 @@ from text2sql.utils import nn_utils
 
 def collate_batch_data_v2(origin_batch, config):
     """format origin batch data for model forward
-
-    Args:
-        origin_batch (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
     """
     TOKEN_IDS = []
     SENT_IDS = []
@@ -114,18 +107,6 @@ class DataLoader(object):
                  drop_last=False,
                  use_data_parallel=False,
                  use_multiprocess=False):
-        """init of class
-
-        Args:
-            config (TYPE): NULL
-            dataset (TYPE): NULL
-            batch_size (TYPE): Default is 1
-            collate_fn (TYPE): Default is collate_batch_data_v2
-            shuffle (TYPE): Default is False
-            use_data_parallel (TYPE): Default is False
-            use_multiprocess (TYPE): Default is False
-
-        """
         super(DataLoader, self).__init__()
         assert batch_size > 0, "batch_size must be an interger that > 0"
 

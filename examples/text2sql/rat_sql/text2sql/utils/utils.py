@@ -25,12 +25,6 @@ class Timer(object):
     """Stat Cost Time"""
 
     def __init__(self, msg=""):
-        """init of class
-
-        Args:
-            msg (TYPE): Default is ""
-
-        """
         super(Timer, self).__init__()
 
         self._msg = msg
@@ -39,13 +33,6 @@ class Timer(object):
 
     def reset(self, only_last=False, msg=None):
         """reset all setting
-
-        Args:
-            msg (TYPE): Default is None
-
-        Returns: TODO
-
-        Raises: NULL
         """
         if msg is not None:
             self._msg = msg
@@ -56,13 +43,6 @@ class Timer(object):
 
     def check(self):
         """check cost time from start
-
-        Args:
-            reset_start (TYPE): Default is True
-
-        Returns: TODO
-
-        Raises: NULL
         """
         end = time.time()
         cost = end - self._start
@@ -70,9 +50,6 @@ class Timer(object):
 
     def interval(self):
         """check cost time from lst
-        Returns: TODO
-
-        Raises: NULL
         """
         end = time.time()
         cost = end - self._last
@@ -81,9 +58,6 @@ class Timer(object):
 
     def ending(self):
         """ending checking and log
-        Returns: TODO
-
-        Raises: NULL
         """
         cost = '%.2f' % time.time() - self._start
         if self._msg == "":
@@ -98,14 +72,6 @@ class Timer(object):
 
 def list_increment(lst: list, base: int):
     """increment each element in list
-
-    Args:
-        lst (list): NULL
-        base (int): NULL
-
-    Returns: TODO
-
-    Raises: NULL
     """
     for i in range(len(lst)):
         lst[i] += base
@@ -113,15 +79,6 @@ def list_increment(lst: list, base: int):
 
 
 def count_file_lines(filename):
-    """
-
-    Args:
-        filename (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     cnt = 0
     with open(filename) as ifs:
         for _ in ifs:
@@ -131,13 +88,6 @@ def count_file_lines(filename):
 
 def print_tensors(tag='*', **kwrags):
     """print tensors for debuging
-
-    Args:
-        **kwrags (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
     """
     print(tag * 50)
     for key, value in kwrags.items():

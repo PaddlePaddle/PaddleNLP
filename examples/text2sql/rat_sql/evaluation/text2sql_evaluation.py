@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""评价工具：计算预估 SQL 的精确匹配 ACCURACY。对于select、where等部分的
-多个成分，如果仅是顺序不同也会算正确。
-本脚本参考了 spider 数据集中公开的 evaluation.py 代码(https://github.com/taoyds/spider)。
+"""
+Calculating the exact accuracy. For select, where and others schema, it will be
+seen as right if has different order. This script refers to https://github.com/taoyds/spider。
 """
 
 from __future__ import division

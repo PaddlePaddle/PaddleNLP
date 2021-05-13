@@ -76,16 +76,6 @@ class DB:
 
 
 def _extract_column_cells(table_names, tables_content):
-    """
-
-    Args:
-        table_names (TYPE): NULL
-        tables_content (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     lst_column_cells = [table_names]
 
     for table_name in table_names:
@@ -139,8 +129,8 @@ def load_tables(schema_file, content_file):
                     name=text_utils.wordseg(col_name),
                     orig_name=orig_col_name,
                     dtype=col_type,
-                    # 1. 长度大于 20 的丢弃
-                    # 2. item_ 开头的是 ID 类
+                    # 1. drop data with length > 20
+                    # 2. ID is startswith item_
                     cells=[
                         x for x in set([str(c) for c in lst_column_cells[i]])
                         if len(x) <= 20 or x.startswith('item_')
@@ -190,14 +180,6 @@ class DuSQLExample(object):
     """Define struct of one DuSQL example, and its processing methods"""
 
     def __init__(self, json_example, db, input_encoder):
-        """init of class
-
-        Args:
-            json_example (TYPE): NULL
-            db (TYPE): NULL
-            input_encoder (BaseInputEncoder like class): NULL
-
-        """
         super(DuSQLExample, self).__init__()
 
         self.orig = json_example
@@ -226,13 +208,6 @@ class DuSQLExample(object):
 
     def _filter_match_values(self, match_values_info):
         """filter by match score
-
-        Args:
-            match_values_info (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
         """
         lst_result = []
         for column_values in match_values_info:
@@ -240,17 +215,12 @@ class DuSQLExample(object):
             for value, score in column_values:
                 if score > g_match_score_threshold:
                     filtered_results.append(value)
-                else:  # column_values 是按照 score 排过序的，所以不满足了可以直接break
+                else:  # column_values should ordered by score
                     break
             lst_result.append(filtered_results)
         return lst_result
 
     def _compute_relations(self):
-        """
-        Returns: TODO
-
-        Raises: NULL
-        """
         schema_linking_results = self._linking_wrapper(
             linking_utils.compute_schema_linking)
         cell_value_linking_results = self._linking_wrapper(
@@ -271,13 +241,6 @@ class DuSQLExample(object):
 
     def _linking_wrapper(self, fn_linking):
         """wrapper for linking function, do linking and id convert
-
-        Args:
-            fn_linking (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
         """
         link_result = fn_linking(self.question_tokens, self.db)
 
@@ -295,9 +258,6 @@ class DuSQLExample(object):
 
     def __repr__(self):
         """format for reviewing
-        Returns: TODO
-
-        Raises: NULL
         """
         return str(self.__dict__)
 
@@ -314,16 +274,6 @@ class DuSQLDatasetV2(paddle.io.Dataset):
                  is_cached=False,
                  schema_file=None,
                  has_label=True):
-        """init of class
-
-        Args:
-            name (str): train/dev/test
-            schema_file (TYPE): NULL
-            content_file (TYPE): NULL
-            data_file (TYPE): NULL
-            input_encoder (BaseInputEncoder like class): NULL
-
-        """
         super(DuSQLDatasetV2, self).__init__()
 
         self.name = name
@@ -351,13 +301,6 @@ class DuSQLDatasetV2(paddle.io.Dataset):
 
     def collate_examples(self, orig_examples, match_values):
         """collate examples, and append to self._examples
-
-        Args:
-            orig_examples (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
         """
         for idx, (item, m_val
                   ) in tqdm.tqdm(enumerate(zip(orig_examples, match_values))):
@@ -402,13 +345,6 @@ class DuSQLDatasetV2(paddle.io.Dataset):
 
     def load(self, db_file, data_file):
         """load data from disk
-
-        Args:
-            save_dir (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
         """
         with open(db_file, 'rb') as ifs:
             self.db_dict = pickle.load(ifs)
@@ -417,32 +353,17 @@ class DuSQLDatasetV2(paddle.io.Dataset):
 
     def get_by_qid(self, qid):
         """
-
-        Args:
-            qid (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
         """
         index = self._qid2index[qid]
         return self._examples[index]
 
     def __getitem__(self, idx):
         """get one example
-
-        Args:
-            idx (TYPE): NULL
-
-        Returns: dict
-
-        Raises: IndexOutOfRange
         """
         return self._examples[idx]
 
     def __len__(self):
         """size of data examples
-        Returns: int
         """
         return len(self._examples)
 

@@ -28,18 +28,6 @@ from text2sql.launch import infer
 
 
 def log_train_step(epoch, batch, steps_loss, cost_time):
-    """TODO: Docstring for log_train_step.
-
-    Args:
-        epoch (TYPE): NULL
-        batch (TYPE): NULL
-        steps_loss (TYPE): NULL
-        cost_time (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     if len(steps_loss) == 0:
         return
 
@@ -50,18 +38,6 @@ def log_train_step(epoch, batch, steps_loss, cost_time):
 
 
 def epoch_train(config, model, optimizer, epoch, train_data, is_debug=False):
-    """train for one epoch
-
-    Args:
-        model (TYPE): NULL
-        optimizer (TYPE): NULL
-        epoch (TYPE): NULL
-        train_data (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     model.train()
 
     total_loss = 0
@@ -93,16 +69,6 @@ def epoch_train(config, model, optimizer, epoch, train_data, is_debug=False):
 
 
 def _eval_during_train(model, data, epoch, output_root):
-    """
-
-    Args:
-        model (TYPE): NULL
-        data (TYPE): NULL
-
-    Returns: (loss, acc)
-
-    Raises: NULL
-    """
     if epoch in [1, 2, 3, 4] + \
                 [6, 7, 9, 10, 11, 13, 14, 16, 17, 19] + \
                 list(range(21, 100, 2)):
@@ -118,18 +84,7 @@ def _eval_during_train(model, data, epoch, output_root):
         logging.error(traceback.format_exc())
         return 0, epoch
 
-    #total_loss = 0
-    #total_examples = 0
-    #with paddle.no_grad():
-    #    for inputs, labels in data():
-    #        batch_size = len(inputs['src_ids'])
-    #        loss = model(inputs, labels)
-    #        total_loss += loss * batch_size
-    #        total_examples += batch_size
-
     mean_loss = 0
-    #mean_loss = total_loss / total_examples
-    #mean_loss = mean_loss.numpy().item()
     return mean_loss, epoch
 
 
@@ -140,20 +95,6 @@ def train(config,
           train_data,
           dev_data,
           test_data=None):
-    """
-
-    Args:
-        model (TYPE): NULL
-        optimizer (TYPE): NULL
-        epochs (TYPE): NULL
-        train_data (TYPE): NULL
-        dev_data (TYPE): NULL
-        test_data (TYPE): Default is None
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     best_acc = -1e10
     best_epoch = 0
     timer = utils.Timer()

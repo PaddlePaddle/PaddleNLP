@@ -123,7 +123,6 @@ def sequence_mask(seq_hidden, mask, mode='zero'):
     if mode == 'zero':
         return masked
 
-    # mask 被转为0、-1，所以这里的scale_size的符号是反的
     if mode == '-inf':
         scale_size = +1e5
     elif mode == '+inf':
@@ -167,7 +166,6 @@ def pad_index_sequences(seqs, max_col, max_row, dtype=np.int64):
     padded = []
     for query in seqs:
         new_cols = []
-        # 如果col_token数量超过max_token_num, 则截断
         for col in query[:max_row]:
             temp_cols = col[:max_col] + [0] * (max_col - len(col))
             new_cols.append(temp_cols)
@@ -178,15 +176,6 @@ def pad_index_sequences(seqs, max_col, max_row, dtype=np.int64):
 
 
 def tensor2numpy(inputs):
-    """
-
-    Args:
-        inputs (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     if type(inputs) in (list, tuple):
         return [x.numpy() for x in inputs]
     elif type(inputs) is dict:

@@ -31,18 +31,6 @@ def get_warmup_and_linear_decay(max_steps, warmup_steps):
 
 
 def init_optimizer(model, config, train_steps, scale_params_lr=None):
-    """
-
-    Args:
-        model (TYPE): NULL
-        config (TYPE): NULL
-        train_steps (TYPE): NULL
-        scale_params_lr (list): item is a tuple (model, lr_scale_rate)
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     if scale_params_lr is not None:
         for model, lr_scale in scale_params_lr:
             for param in model.parameters():
@@ -58,13 +46,13 @@ def init_optimizer(model, config, train_steps, scale_params_lr=None):
         weight_decay=config.weight_decay,
         apply_decay_param_fun=lambda n: not param_name_to_exclue_from_weight_decay.match(n),
         grad_clip=paddle.nn.ClipGradByGlobalNorm(config.grad_clip))
-    return optimizer  #, lr_scheduler
+    return optimizer
 
 
 if __name__ == "__main__":
     """run some simple test cases"""
     import types
-    model = paddle.vision.models.LeNet()  # 无特殊意义，仅为测试
+    model = paddle.vision.models.LeNet()
     config = types.SimpleNamespace(
         learning_rate=1e-3,
         warmup_proportion=0.1,

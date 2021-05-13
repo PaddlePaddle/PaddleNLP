@@ -33,17 +33,6 @@ class RelationAwareEncoder(paddle.nn.Layer):
                  hidden_size,
                  has_value=False,
                  dropout=0.1):
-        """init of class
-
-        Args:
-            num_layers (TYPE): NULL
-            num_heads (TYPE): NULL
-            num_relations (TYPE): NULL
-            hidden_size (TYPE): NULL
-            has_value (TYPE): Default is False
-            dropout (TYPE): Default is 0.1
-
-        """
         super(RelationAwareEncoder, self).__init__()
 
         self._num_layers = num_layers
@@ -77,21 +66,6 @@ class RelationAwareEncoder(paddle.nn.Layer):
                 t_boundaries,
                 relations,
                 v_enc=None):
-        """
-
-        Args:
-            q_enc (TYPE): NULL
-            c_enc (TYPE): NULL
-            t_enc (TYPE): NULL
-            c_boundaries (TYPE): NULL
-            t_boundaries (TYPE): NULL
-            relations (TYPE): NULL
-            v_enc (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
-        """
         assert q_enc.shape[0] == 1 and c_enc.shape[0] == 1 and t_enc.shape[
             0] == 1
         return self.forward_unbatched(q_enc, c_enc, t_enc, c_boundaries,
@@ -105,21 +79,6 @@ class RelationAwareEncoder(paddle.nn.Layer):
                           t_boundaries,
                           relations,
                           v_enc=None):
-        """
-
-        Args:
-            q_enc (TYPE): shape = [batch(=1), q_len, hidden]
-            c_enc (TYPE): shape = [batch(=1), c_len, hidden]
-            t_enc (TYPE): shape = [batch(=1), t_len, hidden]
-            c_boundaries (TYPE): NULL
-            t_boundaries (TYPE): NULL
-            relations (TYPE): NULL
-            v_enc (TYPE): NULL
-
-        Returns: TODO
-
-        Raises: NULL
-        """
         enc = paddle.concat((q_enc, c_enc, t_enc), axis=1)
         #enc = enc.transpose([1, 0, 2])
 

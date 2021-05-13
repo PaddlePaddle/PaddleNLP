@@ -27,11 +27,6 @@ def define_args_parser():
 
     def _arg_bool(arg):
         """trans arg to bool type
-
-        Args:
-            arg (TYPE): NULL
-
-        Returns: bool
         """
         if arg is None:
             return arg
@@ -137,7 +132,6 @@ def gen_config(arg_list=None):
     """
     parser = define_args_parser()
     cli_args = parser.parse_args(arg_list)
-    # 根据 data_root 设置自动推出各个文件的具体路径
     if cli_args.data_root is not None:
         root_path = cli_args.data_root
         if cli_args.is_cached or cli_args.is_cached is None:

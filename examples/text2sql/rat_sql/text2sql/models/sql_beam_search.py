@@ -56,13 +56,12 @@ def beam_search_with_heuristics(model,
             for hyp in beam_prefix:
                 if hyp.inference_state.cur_item.state == hyp.inference_state.State.CHILDREN_APPLY \
                         and hyp.inference_state.cur_item.node_type == "from":
-                    # 仅差 from 未填充，单独保存，后续逻辑专门处理
+                    # only from not fill, save it and process in the following code
                     prefixes2fill_from.append(hyp)
                 else:
                     candidates += [(hyp, choice, choice_score.numpy().item(),
                                     hyp.score + choice_score.numpy().item())
                                    for choice, choice_score in hyp.next_choices]
-            # 排序并限定 beam_size 个候选（减去待填充 from 的候选）
             candidates.sort(key=operator.itemgetter(3), reverse=True)
             candidates = candidates[:beam_size - len(prefixes2fill_from)]
 
@@ -77,7 +76,7 @@ def beam_search_with_heuristics(model,
                         hyp.inference_state.cur_item.node_type == "column":
                     column_history = column_history + [choice]
 
-                # beam 内的每个候选执行一次 step()，获取下一步 choices
+                # get next choices
                 next_choices = inference_state.step(choice)
                 assert next_choices is not None
                 beam_prefix.append(

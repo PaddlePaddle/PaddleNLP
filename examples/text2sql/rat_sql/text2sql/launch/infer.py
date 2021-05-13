@@ -94,17 +94,6 @@ def _infer_one(model,
                use_heuristic=True,
                labels=None):
     """inference one example
-
-    Args:
-        model (TYPE): NULL
-        inputs (dict): model input tensors and orig_inputs list
-        beam_size (TYPE): NULL
-        output_history (TYPE): Default is False
-        use_heuristic (TYPE): Default is True
-
-    Returns: TODO
-
-    Raises: NULL
     """
     if use_heuristic:
         # TODO: from_cond should be true from non-bert model
@@ -131,16 +120,6 @@ def _infer_one(model,
 
 
 def _infer_general(model, inputs, labels=None):
-    """
-
-    Args:
-        model (TYPE): NULL
-        inputs (TYPE): NULL
-
-    Returns: TODO
-
-    Raises: NULL
-    """
     output = model(inputs)
     sel_num = np.argmax(output.sel_num.numpy()).item()
     #labels[0].sel_num, labels[0].sel_col

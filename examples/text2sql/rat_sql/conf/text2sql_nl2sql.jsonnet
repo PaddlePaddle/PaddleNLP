@@ -39,7 +39,7 @@ function(data_path='data/NL2SQL/preproc') {
         is_cached: false,
     },
     train: {
-        epochs: 20,
+        epochs: 12,
         log_steps: 100,
         trainer_num: 1,
         # [begin] config for optimizer
