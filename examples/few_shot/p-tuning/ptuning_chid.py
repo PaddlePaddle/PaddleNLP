@@ -29,7 +29,8 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
-from data import read_fn_dict, convert_example, create_dataloader
+from data import read_fn_dict, create_dataloader
+from data import convert_chid_example as convert_example
 from model import ErnieForPretraining, ErnieMLMCriterion
 
 # yapf: disable
@@ -79,7 +80,7 @@ def do_evaluate(model, tokenizer, data_loader, label_normalize_dict):
     label_length = len(normed_labels[0])
 
     for batch in data_loader:
-        src_ids, token_type_ids, masked_positions, masked_lm_labels = batch
+        src_ids, token_type_ids, masked_positions, masked_lm_labels, candidate_label_ids = batch
 
         # [bs * label_length, vocab_size]
         prediction_probs = model.predict(
@@ -94,26 +95,41 @@ def do_evaluate(model, tokenizer, data_loader, label_normalize_dict):
         prediction_probs = paddle.reshape(
             prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
 
-        # [label_num, label_length]
-        label_ids = np.array(
-            [tokenizer(label)["input_ids"][1:-1] for label in normed_labels])
+        candidate_num = candidate_label_ids.shape[1]
 
-        y_pred = np.ones(shape=[batch_size, len(label_ids)])
+        # [batch_size, candidate_num(7)]
+        y_pred = np.ones(shape=[batch_size, candidate_num])
 
-        # calculate joint distribution of candidate labels
-        for index in range(label_length):
-            y_pred *= prediction_probs[:, index, label_ids[:, index]]
+        for label_idx in range(candidate_num):
+
+            # [bathc_size, label_length(4)] 
+            single_candidate_label_ids = candidate_label_ids[:, label_idx, :]
+            # 计算每个候选 label 的联合概率分布
+            for index in range(label_length):
+                # [batch_size,]
+                slice_word_ids = single_candidate_label_ids[:, index].numpy()
+
+                batch_single_token_prob = []
+                for bs_index in range(batch_size):
+                    # [1, 1]
+                    single_token_prob = prediction_probs[
+                        bs_index, index, slice_word_ids[bs_index]]
+                    batch_single_token_prob.append(single_token_prob)
+
+                y_pred[:, label_idx] *= np.array(batch_single_token_prob)
 
         # get max probs label's index
         y_pred_index = np.argmax(y_pred, axis=-1)
 
         y_true_index = []
-        for masked_lm_label in masked_lm_labels.numpy():
-            label_text = "".join(
-                tokenizer.convert_ids_to_tokens(list(masked_lm_label)))
 
-            label_index = normed_labels.index(label_text)
-            y_true_index.append(label_index)
+        for index, masked_lm_label in enumerate(masked_lm_labels.numpy()):
+            # [cantidate_num, label_length]
+            tmp_candidate_label_ids = candidate_label_ids[index, :, :]
+            for idx, label_ids in enumerate(tmp_candidate_label_ids.numpy()):
+                if np.equal(label_ids, masked_lm_label).all():
+                    y_true_index.append(idx)
+                    continue
 
         y_true_index = np.array(y_true_index)
 
@@ -181,6 +197,7 @@ def do_train():
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
         Stack(dtype="int64"),  # masked_positions
         Stack(dtype="int64"),  # masked_lm_labels
+        Stack(dtype="int64"),  # candidate_labels_ids [candidate_num, label_length]
     ): [data for data in fn(samples)]
 
     train_data_loader = create_dataloader(
@@ -233,11 +250,7 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         model.train()
         for step, batch in enumerate(train_data_loader, start=1):
-
-            src_ids = batch[0]
-            token_type_ids = batch[1]
-            masked_positions = batch[2]
-            masked_lm_labels = batch[3]
+            src_ids, token_type_ids, masked_positions, masked_lm_labels, candidate_label_ids = batch
 
             prediction_scores = model(
                 input_ids=src_ids,
