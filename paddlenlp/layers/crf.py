@@ -399,27 +399,29 @@ class ViterbiDecoder(nn.Layer):
         batch_path_shape = paddle.concat([seq_len, batch_size])
         batch_path = paddle.zeros(batch_path_shape, dtype='float32')
         path_idx = seq_len - 1
+        tag_mask = paddle.cast((left_length >= 0), 'int64')
+        last_ids_update = last_ids * tag_mask
         batch_path = paddle.scatter(
             batch_path, path_idx,
-            paddle.cast(last_ids.unsqueeze(0), 'float32'), False)
+            paddle.cast(last_ids_update.unsqueeze(0), 'float32'), False)
 
         batch_offset = self._get_batch_index(batch_size) * seq_len
         historys = paddle.reverse(historys, [0])
         for hist in historys:
             # hist: batch_size, n_labels
+            left_length = left_length + 1
             path_idx = path_idx - 1
             gather_idx = batch_offset + last_ids
-            last_ids = paddle.gather(hist.flatten(), gather_idx)
+            tag_mask = paddle.cast((left_length >= 0), 'int64')
+            last_ids_update = paddle.gather(hist.flatten(),
+                                            gather_idx) * tag_mask
+
             batch_path = paddle.scatter(
                 batch_path, path_idx,
-                paddle.cast(last_ids.unsqueeze(0), 'float32'))
+                paddle.cast(last_ids_update.unsqueeze(0), 'float32'))
+            last_ids = last_ids_update + last_ids * (1 - tag_mask)
 
-        batch_path = paddle.transpose(batch_path, [1, 0])
-        mask = paddle.cast(
-            sequence_mask(
-                self._get_batch_seq_index(batch_size, seq_len), lengths),
-            'int64')
-        batch_path = mask * batch_path
+        batch_path = paddle.cast(paddle.transpose(batch_path, [1, 0]), 'int64')
         return scores, batch_path
 
     def _get_batch_index(self, batch_size):
