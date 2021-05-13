@@ -329,7 +329,8 @@ class ViterbiDecoder(nn.Layer):
                 start_shape, dtype='float32', fill_value=0.)
             self._initial_alpha = paddle.concat(
                 [initial_alpha, alpha_start], axis=1)
-        return self._initial_alpha[:batch_size, :]
+        return paddle.slice(
+            self._initial_alpha, axes=[0], starts=[0], ends=[batch_size])
 
     def forward(self, inputs, lengths):
         """
