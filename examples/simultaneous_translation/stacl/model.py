@@ -159,9 +159,9 @@ class SimultaneousTransformer(nn.Layer):
         self.d_model = d_model
 
         self.src_word_embedding = WordEmbedding(
-            vocab_size=src_vocab_size, emb_dim=d_model, bos_idx=self.bos_id)
+            vocab_size=src_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
         self.src_pos_embedding = PositionalEmbedding(
-            emb_dim=d_model, max_length=max_length, bos_idx=self.bos_id)
+            emb_dim=d_model, max_length=max_length)
         if weight_sharing:
             assert src_vocab_size == trg_vocab_size, (
                 "Vocabularies in source and target should be same for weight sharing."
@@ -170,9 +170,9 @@ class SimultaneousTransformer(nn.Layer):
             self.trg_pos_embedding = self.src_pos_embedding
         else:
             self.trg_word_embedding = WordEmbedding(
-                vocab_size=trg_vocab_size, emb_dim=d_model, bos_idx=self.bos_id)
+                vocab_size=trg_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
             self.trg_pos_embedding = PositionalEmbedding(
-                emb_dim=d_model, max_length=max_length, bos_idx=self.bos_id)
+                emb_dim=d_model, max_length=max_length)
 
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_model,
