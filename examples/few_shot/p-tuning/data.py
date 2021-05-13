@@ -14,6 +14,7 @@
 
 import os
 import json
+import numpy as np
 
 import paddle
 
@@ -66,30 +67,41 @@ def convert_example(example, tokenizer, max_seq_length=512, p_embedding_num=5):
         mask_lm_labels(obj: `list[int]`): The list of mask_lm_labels.
     """
 
+    # Insert "[MASK]" after "[CLS]"
+    start_mask_position = 1
     sentence1 = example["sentence1"]
 
     encoded_inputs = tokenizer(text=sentence1, max_seq_len=max_seq_length)
     src_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
 
-    P_tokens = ["[unused{}]".format(i) for i in range(p_embedding_num)]
-    # insert [MASK] on mask_positions
+    # Step1: gen mask ids
     text_label = example["text_label"]
-    #print("text_label:{}".format(text_label))
     label_length = len(text_label)
-    #print("label_length:{}".format(label_length))
 
-    Mask_tokens = ["[MASK]"] * label_length
+    mask_tokens = ["[MASK]"] * label_length
+    mask_ids = tokenizer.convert_tokens_to_ids(mask_tokens)
 
-    mask_ids = tokenizer.convert_tokens_to_ids(Mask_tokens)
-    p_token_ids = tokenizer.convert_tokens_to_ids(P_tokens)
+    # Step2: gen p_token_ids
+    p_tokens = ["[unused{}]".format(i) for i in range(p_embedding_num)]
+    p_token_ids = tokenizer.convert_tokens_to_ids(p_tokens)
 
-    # add [MASK] at the begin of sentence, and then P-embedding
-    src_ids = [src_ids[0]] + mask_ids + p_token_ids + src_ids[1:]
-    mask_positions = [index + 1 for index in range(label_length)]
+    # Step3: Insert "[MASK]" to src_ids based on start_mask_position
+    src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
+        start_mask_position:]
+
+    # Stpe4: Insert P-tokens at begin of sentence
+    src_ids = p_token_ids + src_ids
+
+    # calculate mask_positions
+    mask_positions = [
+        index + start_mask_position + len(p_token_ids)
+        for index in range(label_length)
+    ]
 
     mask_lm_labels = tokenizer(
         text=text_label, max_seq_len=max_seq_length)["input_ids"][1:-1]
+
     assert len(mask_lm_labels) == len(
         mask_positions
     ) == label_length, "length of mask_lm_labels:{} mask_positions:{} label_length:{} not equal".format(
@@ -98,7 +110,8 @@ def convert_example(example, tokenizer, max_seq_length=512, p_embedding_num=5):
     token_type_ids = [0] * len(src_ids)
 
     if "sentence2" in example:
-        encoded_inputs = tokenizer(text=sentence1, max_seq_len=max_seq_length)
+        encoded_inputs = tokenizer(
+            text=example["sentence2"], max_seq_len=max_seq_length)
         sentence2_src_ids = encoded_inputs["input_ids"][1:]
         src_ids += sentence2_src_ids
         token_type_ids += [1] * len(sentence2_src_ids)
@@ -209,9 +222,6 @@ def read_bustm(data_path, label_normalize_dict=None):
                 # filter illegal example
                 continue
 
-            #example["sentence1"] = "第一个句子是: " + example["sentence1"]
-            #example["sentence2"] = "另一个句子是: " + example["sentence2"]
-
             del example["label"]
 
             examples.append(example)
@@ -230,7 +240,7 @@ def read_ocnli(data_path, label_normalize_dict=None):
             origin_label = example["label"]
 
             if origin_label in label_normalize_dict:
-                # 针对部分 Label 进行标准化， eg. 英文 -> 中文
+                # 针对部分 Label 进行标准化，eg. 英文 -> 中文
                 normalized_label = label_normalize_dict[origin_label]
                 example['text_label'] = normalized_label
             else:
@@ -343,5 +353,5 @@ read_fn_dict = {
     "ocnli": read_ocnli,
     "csl": read_csl,
     "csldcp": read_csldcp,
-    "cluewsc": read_cluewsc
+    "cluewsc": read_cluewsc,
 }

@@ -92,45 +92,31 @@ def do_evaluate(model, tokenizer, data_loader, label_normalize_dict):
         batch_size = len(src_ids)
         vocab_size = prediction_probs.shape[1]
 
-        #print("prediction_scores_before_reshape:{}".format(prediction_probs))
-        # prediction_probs: [batch_size, label_lenght, vocab_size]
+        #prediction_probs: [batch_size, label_lenght, vocab_size]
         prediction_probs = paddle.reshape(
             prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
-        #print("prediction_scores_after_reshape:{}".format(prediction_probs))
 
+        # [label_num, label_length]
         label_ids = np.array(
             [tokenizer(label)["input_ids"][1:-1] for label in normed_labels])
 
-        if label_length == 1:
-            # y_pred: [batch_size, 1, label_num]
-            y_pred = prediction_probs[:, 0, label_ids[:, 0]]
-        elif label_length == 2:
-            # y_pred = [batch_size, 1, label_num]
-            y_pred = prediction_probs[:, 0,
-                                      label_ids[:,
-                                                0]] * prediction_probs[:, 1,
-                                                                       label_ids[:,
-                                                                                 1]]
-        else:
-            raise ValueError("illegal label_lenght:{}".format(label_length))
-        print("y_pred_probs:{}".format(y_pred))
+        y_pred = np.ones(shape=[batch_size, len(label_ids)])
+
+        # 计算预测 label 的联合概率分布
+        for index in range(label_length):
+            y_pred *= prediction_probs[:, index, label_ids[:, index]]
 
         # get max probs label's index
         y_pred_index = np.argmax(y_pred, axis=-1)
-        print("y_pred_max:{}".format(y_pred_index))
 
         y_true_index = []
         for masked_lm_label in masked_lm_labels.numpy():
-            print("masked_lm_label:{}".format(masked_lm_label))
             label_text = "".join(
                 tokenizer.convert_ids_to_tokens(list(masked_lm_label)))
-            print("label_text evaluate:{}".format(label_text))
+
             label_index = normed_labels.index(label_text)
             y_true_index.append(label_index)
-        print("y_true_index:{}".format(y_true_index))
 
-        #y_true_label =  (tokenizer.convert_ids_to_tokens(masked_lm_label.numpy()) for masked_lm_label in masked_lm_labels)
-        #y_true = np.array([labels.index(tokenizer.decode(y)) for y in y_true[:, mask_idxs]]) # 找到标签对应的ID,对应的文本，对应的标签列表中所在的顺序。 labels=['科技','娱乐',...,'汽车']
         y_true_index = np.array(y_true_index)
 
         total_num += len(y_true_index)
@@ -149,14 +135,11 @@ def do_train():
 
     train_set = os.path.join(args.task_data_dir, args.task_name,
                              "train_" + args.train_set_index + ".json")
-    #train_set = os.path.join(args.task_data_dir, args.task_name, "demo.json")
 
     dev_set = os.path.join(args.task_data_dir, args.task_name,
                            "dev_" + args.train_set_index + ".json")
     public_test_set = os.path.join(args.task_data_dir, args.task_name,
                                    "test_public.json")
-
-    #private_test_set = os.path.join(args.task_data_dir, args.task_name, "test.json")
 
     label_normalize_json = os.path.join("./label_normalized",
                                         args.task_name + ".json")
@@ -184,14 +167,7 @@ def do_train():
         lazy=False,
         label_normalize_dict=label_norm_dict)
 
-    #private_test_ds = load_dataset(
-    #    read_json, data_path=private_test_set, lazy=False)
-    #public_test_ds = load_dataset(
-    #    read_json, data_path=public_test_set, lazy=False)
-
     model = ErnieForPretraining.from_pretrained('ernie-1.0')
-    for name, param in model.named_parameters():
-        print("{}\t{}".format(name, param.shape))
 
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
@@ -208,11 +184,6 @@ def do_train():
         Stack(dtype="int64"),  # masked_positions
         Stack(dtype="int64"),  # masked_lm_labels
     ): [data for data in fn(samples)]
-
-    for example in train_ds:
-        print("origin example:{}".format(example))
-        new_example = trans_func(example)
-        print("converted example:{}".format(new_example))
 
     train_data_loader = create_dataloader(
         train_ds,
