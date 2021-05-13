@@ -6,7 +6,6 @@ import json
 import os
 
 import attr
-#import entmax
 import paddle
 import paddle.nn.functional as F
 
