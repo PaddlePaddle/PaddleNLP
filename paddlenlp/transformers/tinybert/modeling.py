@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import math
 
 import paddle
@@ -20,15 +21,37 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import MultiHeadAttention, TransformerEncoderLayer, TransformerEncoder
 
-from ..bert.modeling import BertPooler, BertEmbeddings
-from ..model_utils import PretrainedModel, register_base_model
+from paddlenlp.transformers.bert.modeling import BertPooler, BertEmbeddings
+
+from .. import PretrainedModel, register_base_model
 
 __all__ = [
     'TinyBertModel',
     'TinyBertPretrainedModel',
     'TinyBertForPretraining',
     'TinyBertForSequenceClassification',
+    'to_distill',
 ]
+
+
+def to_distill(self):
+    MultiHeadAttention._forward = attention_forward
+    TransformerEncoderLayer._forward = transformer_encoder_layer_forward
+    TransformerEncoder._forward = transformer_encoder_forward
+
+    def init_forward(layer):
+        if isinstance(layer, (MultiHeadAttention, TransformerEncoderLayer,
+                              TransformerEncoder)):
+            layer.forward = layer._forward
+
+    for layer in self.children():
+        layer.apply(init_forward)
+
+    self.outputs = getattr(self, self.base_model_prefix).encoder
+    self.emb = getattr(self,
+                       self.base_model_prefix).embeddings.word_embeddings.weight
+
+    return self
 
 
 def _convert_attention_mask(attn_mask, dtype):
@@ -52,15 +75,14 @@ def attention_forward(self,
     """
     key = query if key is None else key
     value = query if value is None else value
-    # Compute q ,k ,v
+    # compute q ,k ,v
     if cache is None:
         q, k, v = self._prepare_qkv(query, key, value, cache)
     else:
         q, k, v, cache = self._prepare_qkv(query, key, value, cache)
 
-    # Scale dot product attention
+    # scale dot product attention
     product = tensor.matmul(x=q, y=k, transpose_y=True)
-
     product /= math.sqrt(self.head_dim)
 
     if attn_mask is not None:
@@ -68,6 +90,7 @@ def attention_forward(self,
         attn_mask = _convert_attention_mask(attn_mask, product.dtype)
         product = product + attn_mask
 
+    self.attention_matrix = product
     weights = F.softmax(product)
     if self.dropout:
         weights = F.dropout(
@@ -78,24 +101,19 @@ def attention_forward(self,
 
     out = tensor.matmul(weights, v)
 
-    # Combine heads
+    # combine heads
     out = tensor.transpose(out, perm=[0, 2, 1, 3])
     out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
 
-    # Project to output
+    # project to output
     out = self.out_proj(out)
 
     outs = [out]
     if self.need_weights:
         outs.append(weights)
-
-    # Return attention scores
-    outs.append(product)
-
     if cache is not None:
         outs.append(cache)
-
-    return tuple(outs)
+    return out if len(outs) == 1 else tuple(outs)
 
 
 def transformer_encoder_layer_forward(self, src, src_mask=None, cache=None):
@@ -109,11 +127,10 @@ def transformer_encoder_layer_forward(self, src, src_mask=None, cache=None):
         src = self.norm1(src)
     # Add cache for encoder for the usage like UniLM
     if cache is None:
-        src, layer_att = self.self_attn(src, src, src, src_mask)
+        src = self.self_attn(src, src, src, src_mask)
     else:
-        src, layer_att, incremental_cache = self.self_attn(src, src, src,
-                                                           src_mask, cache)
-
+        src, incremental_cache = self.self_attn(src, src, src, src_mask, cache)
+    self.attention_matrix = self.self_attn.attention_matrix
     src = residual + self.dropout1(src)
     if not self.normalize_before:
         src = self.norm1(src)
@@ -121,15 +138,11 @@ def transformer_encoder_layer_forward(self, src, src_mask=None, cache=None):
     residual = src
     if self.normalize_before:
         src = self.norm2(src)
-
     src = self.linear2(self.dropout(self.activation(self.linear1(src))))
-
     src = residual + self.dropout2(src)
     if not self.normalize_before:
         src = self.norm2(src)
-
-    return (src, layer_att) if cache is None else (src, layer_att,
-                                                   incremental_cache)
+    return src if cache is None else (src, incremental_cache)
 
 
 def transformer_encoder_forward(self, src, src_mask=None, cache=None):
@@ -139,24 +152,23 @@ def transformer_encoder_forward(self, src, src_mask=None, cache=None):
     src_mask = _convert_attention_mask(src_mask, src.dtype)
 
     output = src
-    encoder_layers, encoder_atts, new_caches = [], [], []
+    new_caches = []
+    self.attentions = []
+    self.hidden_states = []
     for i, mod in enumerate(self.layers):
-        encoder_layers.append(output)
         if cache is None:
-            output, layer_att = mod(output, src_mask=src_mask)
+            output = mod(output, src_mask=src_mask)
         else:
-            output, layer_att, new_cache = mod(output,
-                                               src_mask=src_mask,
-                                               cache=cache[i])
+            output, new_cache = mod(output, src_mask=src_mask, cache=cache[i])
             new_caches.append(new_cache)
-        encoder_atts.append(layer_att)
+        self.attentions.append(mod.attention_matrix)
+        self.hidden_states.append(output)
 
     if self.norm is not None:
         output = self.norm(output)
-    encoder_layers.append(output)
+    self.hidden_states.append(output)
 
-    return (encoder_layers, encoder_atts) if cache is None else (
-        encoder_layers, encoder_atts, new_caches)
+    return output if cache is None else (output, new_caches)
 
 
 class TinyBertPretrainedModel(PretrainedModel):
@@ -279,9 +291,6 @@ class TinyBertModel(TinyBertPretrainedModel):
         self.embeddings = BertEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
             max_position_embeddings, type_vocab_size)
-        MultiHeadAttention._forward = attention_forward
-        TransformerEncoderLayer._forward = transformer_encoder_layer_forward
-        TransformerEncoder._forward = transformer_encoder_forward
 
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
@@ -293,38 +302,20 @@ class TinyBertModel(TinyBertPretrainedModel):
             act_dropout=0)
 
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.encoder.forward = self.encoder._forward
-
-        for i in range(len(self.encoder.layers)):
-            self.encoder.layers[i].forward = self.encoder.layers[i]._forward
-            self.encoder.layers[i].self_attn.forward = self.encoder.layers[
-                i].self_attn._forward
         self.pooler = BertPooler(hidden_size)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                attention_mask=None,
-                output_all_encoded_layers=True,
-                output_att=True):
+    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
                  ).astype(self.pooler.dense.weight.dtype) * -1e9,
                 axis=[1, 2])
         embedding_output = self.embeddings(input_ids, token_type_ids)
-        encoded_layers, layer_atts = self.encoder(embedding_output,
-                                                  attention_mask)
-        # "-1" refers to last layer
-        pooled_output = self.pooler(encoded_layers[-1])
-        if not output_all_encoded_layers:
-            encoded_layers = encoded_layers[-1]
+        encoded_layer = self.encoder(embedding_output, attention_mask)
+        pooled_output = self.pooler(encoded_layer)
 
-        if not output_att:
-            return encoded_layers, pooled_output
-
-        return encoded_layers, layer_atts, pooled_output
+        return encoded_layer, pooled_output
 
 
 class TinyBertForPretraining(TinyBertPretrainedModel):
@@ -336,14 +327,14 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
-        sequence_output, att_output, pooled_output = self.tinybert(
+        sequence_output, pooled_output = self.tinybert(
             input_ids, token_type_ids, attention_mask)
         tmp = []
         for sequence_layer in sequence_output:
             tmp.append(self.fit_dense(sequence_layer))
         sequence_output = tmp
 
-        return att_output, sequence_output
+        return sequence_output
 
 
 class TinyBertForSequenceClassification(TinyBertPretrainedModel):
@@ -360,25 +351,9 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
         self.activation = nn.ReLU()
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                attention_mask=None,
-                is_student=False):
-
-        sequence_output, att_output, pooled_output = self.tinybert(
-            input_ids,
-            token_type_ids,
-            attention_mask,
-            output_all_encoded_layers=True,
-            output_att=True)
+    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        sequence_output, pooled_output = self.tinybert(
+            input_ids, token_type_ids, attention_mask)
 
         logits = self.classifier(self.activation(pooled_output))
-
-        tmp = []
-        if is_student:
-            for sequence_layer in sequence_output:
-                tmp.append(self.fit_dense(sequence_layer))
-            sequence_output = tmp
-
-        return logits, att_output, sequence_output
+        return logits
