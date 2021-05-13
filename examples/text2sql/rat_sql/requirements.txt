@@ -1,0 +1,14 @@
+
+paddlepaddle-gpu>=2.0.0
+paddlenlp
+nvgpu
+tqdm
+LAC
+cn2an
+setproctitle
+sentencepiece
+attrs
+asdl
+networkx
+pyrsistent
+jsonnet
