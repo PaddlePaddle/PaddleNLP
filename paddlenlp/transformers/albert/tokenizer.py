@@ -31,7 +31,7 @@ __all__ = [
 SPIECE_UNDERLINE = "▁"
 
 
-class AlbertTokenizer(object):
+class AlbertTokenizer(PretrainedTokenizer):
     def __init__(self):
         raise EnvironmentError("AlbertTokenizer is designed to be instantiated "
                                "using the `AlbertTokenizer.from_pretrained(pretrained_model_name_or_path)` method.")
