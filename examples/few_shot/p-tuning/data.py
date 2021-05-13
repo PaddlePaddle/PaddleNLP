@@ -46,20 +46,13 @@ def create_dataloader(dataset,
 
 def convert_example(example, tokenizer, max_seq_length=512, p_embedding_num=5):
     """
-    Builds model inputs from a sequence.
-        
-    A BERT sequence has the following format:
-
-    - single sequence: ``[CLS] [MASK] [unused1] [unused2] ... [unusedN] X [SEP]``
-
     Args:
         example(obj:`list(str)`): The list of text to be converted to ids.
         tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
         max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
             Sequences longer than this will be truncated, sequences shorter will be padded.
-        is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
-
+        p_embedding_num(obj:`int`) The number of p-embedding.
     Returns:
         input_ids(obj:`list[int]`): The list of query token ids.
         token_type_ids(obj: `list[int]`): List of query sequence pair mask.
@@ -129,8 +122,8 @@ def read_iflytek(data_path, label_normalize_dict=None):
         print("data_path:{}".format(data_path))
         for line in f:
             example = json.loads(line)
-
             origin_label = example['label_des']
+
             if origin_label in label_normalize_dict:
                 # 针对部分 Label 进行标准化， eg. 英文 -> 中文
                 normalized_label = label_normalize_dict[origin_label]
@@ -156,8 +149,8 @@ def read_tnews(data_path, label_normalize_dict=None):
         print("data_path:{}".format(data_path))
         for line in f:
             example = json.loads(line)
-
             origin_label = example['label_desc']
+
             if origin_label in label_normalize_dict:
                 # 针对部分 Label 进行标准化， eg. 英文 -> 中文
                 normalized_label = label_normalize_dict[origin_label]
@@ -183,7 +176,6 @@ def read_eprstmt(data_path, label_normalize_dict=None):
         print("data_path:{}".format(data_path))
         for line in f:
             example = json.loads(line)
-
             origin_label = example["label"]
 
             if origin_label in label_normalize_dict:
@@ -195,7 +187,6 @@ def read_eprstmt(data_path, label_normalize_dict=None):
                 continue
 
             example['sentence1'] = example["sentence"]
-
             del example["sentence"]
             del example["label"]
 
@@ -211,7 +202,6 @@ def read_bustm(data_path, label_normalize_dict=None):
         print("data_path:{}".format(data_path))
         for line in f:
             example = json.loads(line)
-
             origin_label = example["label"]
 
             if origin_label in label_normalize_dict:
@@ -223,7 +213,6 @@ def read_bustm(data_path, label_normalize_dict=None):
                 continue
 
             del example["label"]
-
             examples.append(example)
 
     return examples
@@ -236,7 +225,6 @@ def read_ocnli(data_path, label_normalize_dict=None):
         print("data_path:{}".format(data_path))
         for line in f:
             example = json.loads(line)
-
             origin_label = example["label"]
 
             if origin_label in label_normalize_dict:
@@ -248,7 +236,6 @@ def read_ocnli(data_path, label_normalize_dict=None):
                 continue
 
             del example["label"]
-
             examples.append(example)
 
     return examples
@@ -261,7 +248,6 @@ def read_csl(data_path, label_normalize_dict=None):
         print("data_path:{}".format(data_path))
         for line in f:
             example = json.loads(line)
-
             origin_label = example["label"]
 
             if origin_label in label_normalize_dict:
@@ -278,7 +264,6 @@ def read_csl(data_path, label_normalize_dict=None):
             del example["label"]
             del example["abst"]
             del example["keyword"]
-
             examples.append(example)
 
     return examples
@@ -291,7 +276,6 @@ def read_csldcp(data_path, label_normalize_dict=None):
         print("data_path:{}".format(data_path))
         for line in f:
             example = json.loads(line)
-
             origin_label = example["label"]
 
             if origin_label in label_normalize_dict:
@@ -303,7 +287,6 @@ def read_csldcp(data_path, label_normalize_dict=None):
                 continue
 
             example["sentence1"] = example["content"]
-
             del example["label"]
             del example["content"]
 
@@ -319,7 +302,6 @@ def read_cluewsc(data_path, label_normalize_dict=None):
         print("data_path:{}".format(data_path))
         for line in f:
             example = json.loads(line)
-
             origin_label = example["label"]
 
             if origin_label in label_normalize_dict:
@@ -333,7 +315,6 @@ def read_cluewsc(data_path, label_normalize_dict=None):
             text = example["text"]
             span1_text = example["target"]["span1_text"]
             span2_text = example["target"]["span2_text"]
-
             example["sentence1"] = text + span2_text + "指代" + span1_text
 
             del example["label"]

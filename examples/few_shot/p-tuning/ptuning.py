@@ -265,13 +265,13 @@ def do_train():
         print("epoch:{}\ttest_accuracy:{:.3f}\ttotal_num:{}".format(
             epoch, test_accuracy, total_num))
 
-        # if rank == 0:
-        #     save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
-        #     if not os.path.exists(save_dir):
-        #         os.makedirs(save_dir)
-        #     save_param_path = os.path.join(save_dir, 'model_state.pdparams')
-        #     paddle.save(model.state_dict(), save_param_path)
-        #     tokenizer.save_pretrained(save_dir)
+        if rank == 0:
+            save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            save_param_path = os.path.join(save_dir, 'model_state.pdparams')
+            paddle.save(model.state_dict(), save_param_path)
+            tokenizer.save_pretrained(save_dir)
 
 
 if __name__ == "__main__":

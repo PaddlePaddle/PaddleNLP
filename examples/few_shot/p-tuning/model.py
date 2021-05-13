@@ -52,12 +52,10 @@ class ErnieForPretraining(ErniePretrainedModel):
                 for pos in mask_pos:
                     new_masked_positions.append(bs_index * max_len + pos)
 
-            #print("list_masked_pos:{}".format(new_masked_positions))
             new_masked_positions = np.array(new_masked_positions).astype(
                 'int32')
-            #print("np_masked_pos:{}".format(new_masked_positions))
+
             new_masked_positions = paddle.to_tensor(new_masked_positions)
-            #print("new_masked_pos:{}".format(new_masked_positions))
 
             prediction_scores, seq_relationship_score = self.cls(
                 sequence_output, pooled_output, new_masked_positions)
@@ -86,7 +84,6 @@ class ErnieMLMCriterion(paddle.nn.Layer):
         super(ErnieMLMCriterion, self).__init__()
 
     def forward(self, prediction_scores, masked_lm_labels, masked_lm_scale=1.0):
-        #print("prediction_scores:{}".format(prediction_scores))
 
         masked_lm_labels = paddle.reshape(masked_lm_labels, shape=[-1, 1])
 
