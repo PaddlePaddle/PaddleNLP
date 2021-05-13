@@ -31,7 +31,8 @@ class CMakeExtension(Extension):
         else:
             self.source_dir = os.path.abspath(os.path.expanduser(source_dir))
         self.sources = [
-            os.path.join(self.source_dir, f) for f in os.listdir(source_dir)
+            os.path.join(self.source_dir, f)
+            for f in os.listdir(self.source_dir)
         ]
 
     def build_with_command(self, ext_builder):
