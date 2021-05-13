@@ -109,7 +109,7 @@ class FasterTransformerExtension(CMakeExtension):
                 ext_builder.build_lib)
         except Exception as e:
             # allow fail and use the slower version
-            logger.warn(
+            logger.warning(
                 "FasterTransformer is not available due to build errors.")
 
     def get_target_filename(self):
