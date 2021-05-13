@@ -39,7 +39,7 @@ def parse_args():
 
 def do_eval(args):
     paddle.set_device(args.device)
-    predictor = WordtagPredictor(args.init_ckpt_dir, "./data/tags.txt")
+    predictor = WordtagPredictor(args.init_ckpt_dir, tag_path="./data/tags.txt")
     total_real = 0.0
     total_pred = 0.0
     seg_acc = 0.0
