@@ -28,7 +28,7 @@
 └── transformer_demo.yaml # 参数配置文件
 ```
 
-上述models下的模型可以在这里[下载](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/machine_translation/text_simultaneous_translation/README.md#%E6%A8%A1%E5%9E%8B%E4%B8%8B%E8%BD%BD%E6%9B%B4%E6%96%B0%E4%B8%AD)，下载完后将解压后的`transformer.pdparams`分别放在不同的waitk策略对应的子目录下面。
+上述models下的模型可以在这里[下载](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/simultaneous_translation/stacl/README.md#%E6%A8%A1%E5%9E%8B%E4%B8%8B%E8%BD%BD%E6%9B%B4%E6%96%B0%E4%B8%AD)，下载完后将解压后的`transformer.pdparams`分别放在不同的waitk策略对应的子目录下面。
 
 ### 参数说明与配置
 
