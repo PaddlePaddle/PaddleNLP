@@ -21,17 +21,13 @@ import argparse
 import numpy as np
 import paddle
 from paddle.io import DataLoader, Dataset
-from paddlenlp.transformers import GPT2Model, GPT2ForPretraining
-from paddlenlp.transformers import GPT2Tokenizer
-from paddlenlp.transformers import GPT2Model
+from paddlenlp.transformers import GPTModel, GPTForPretraining
+from paddlenlp.transformers import GPTTokenizer
+from paddlenlp.transformers import GPTModel
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 
-MODEL_CLASSES = {
-    "gpt2-small-en": (GPT2ForPretraining, GPT2Tokenizer),
-    "gpt2-medium-en": (GPT2ForPretraining, GPT2Tokenizer),
-    "gpt2-large-en": (GPT2ForPretraining, GPT2Tokenizer),
-}
+MODEL_CLASSES = {"gpt2-medium-en": (GPTForPretraining, GPTTokenizer), }
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -82,7 +78,7 @@ class LM_Eval_Dataset(paddle.io.Dataset):
         position_ids = np.arange(0, seq_length, dtype="int64")
 
         # -INF mask value as default
-        attention_mask = (attention_mask - 1.0) * 1e9
+        # attention_mask = (attention_mask - 1.0) * 1e9
         # Bool mask of attention
         attention_mask = attention_mask.astype("float32")
         return [tokens, loss_mask, attention_mask, position_ids, labels]
@@ -127,7 +123,7 @@ class Lambada_Eval_Dataset(paddle.io.Dataset):
         position_ids = np.arange(0, seq_length, dtype="int64")
 
         # -INF mask value as default
-        attention_mask = (attention_mask - 1.0) * 1e9
+        #attention_mask = (attention_mask - 1.0) * 1e9
         # Bool mask of attention
         attention_mask = attention_mask.astype("float32")
         return [tokens, attention_mask, position_ids, labels]
@@ -182,12 +178,12 @@ def wikitext_detokenizer(string):
 
 def get_tokens(tokenizer, text, strict=True):
     if not strict:
-        tokens = tokenizer.encode(text)
+        tokens = tokenizer(text)["input_ids"]
         return tokens[:-1], [tokens[-1]]
     last_token = text.split()[-1]
     start_idx = text.rfind(last_token)
-    beginning_tokens = tokenizer.encode(text[:start_idx].strip())
-    last_token = tokenizer.encode(' ' + last_token)
+    beginning_tokens = tokenizer(text[:start_idx].strip())["input_ids"]
+    last_token = tokenizer(' ' + last_token)["input_ids"]
     return beginning_tokens, last_token
 
 
@@ -196,19 +192,18 @@ def create_eval_dataset(args):
     eval_batch_size = args.batch_size
     seq_len = args.seq_length
 
-    tokenizer = GPT2Tokenizer.from_pretrained(args.model_name)
-    pad_token = tokenizer.command_name_map["pad"].Id
-
+    tokenizer = GPTTokenizer.from_pretrained(args.model_name)
     if not args.cloze_eval:
         with open(args.eval_path, "rb") as reader:
             entire_data = reader.read().decode('utf-8')
         num_original_tokens = len(entire_data.strip().split(" "))
         entire_data = wikitext_detokenizer(entire_data)
-        tokenized_data = tokenizer.encode(entire_data)
+        tokenized_data = tokenizer(entire_data)["input_ids"]
         num_tokenized_tokens = len(tokenized_data)
         print('Original Tokens: %d, Detokenized tokens: %d' %
               (num_tokenized_tokens, num_original_tokens))
-        val_dataset = LM_Eval_Dataset(tokenized_data, seq_len, pad_token,
+        val_dataset = LM_Eval_Dataset(tokenized_data, seq_len,
+                                      tokenizer.pad_token_id,
                                       args.overlapping_eval)
     else:
         tokenized_data = []
@@ -220,7 +215,7 @@ def create_eval_dataset(args):
                 tokenized_data.append(tokens)
                 tokenized_label.append(labels)
         val_dataset = Lambada_Eval_Dataset(tokenized_data, tokenized_label,
-                                           seq_len, pad_token)
+                                           seq_len, tokenizer.pad_token_id)
         num_tokenized_tokens = 0
         num_original_tokens = 0
 
@@ -242,8 +237,8 @@ def do_eval(args):
     tokenizer = tokenizer_class.from_pretrained(args.model_name)
 
     if args.init_checkpoint_path is not None:
-        model = GPT2ForPretraining(
-            GPT2Model(**model_class.pretrained_init_configuration[
+        model = GPTForPretraining(
+            GPTModel(**model_class.pretrained_init_configuration[
                 args.model_name]))
 
         logger.info("Load model checkpoint from %s" % args.init_checkpoint_path)
