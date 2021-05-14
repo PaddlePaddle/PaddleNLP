@@ -112,7 +112,11 @@ def do_predict(args):
     with paddle.no_grad():
         for (src_word, ) in test_loader:
             finished_seq = transformer(src_word=src_word)
-            finished_seq = finished_seq.numpy().transpose([1, 2, 0])
+            if args.decoding_strategy == "beam_search":
+                finished_seq = finished_seq.numpy().transpose([1, 2, 0])
+            elif args.decoding_strategy == "topk_sampling" or args.decoding_strategy == "topp_sampling":
+                finished_seq = np.expand_dims(
+                    finished_seq.numpy().transpose([1, 0]), axis=1)
             for ins in finished_seq:
                 for beam_idx, beam in enumerate(ins):
                     if beam_idx >= args.n_best:
@@ -135,5 +139,6 @@ if __name__ == "__main__":
     args.beam_size = ARGS.beam_size
     args.topk = ARGS.topk
     args.topp = ARGS.topp
+    args.benchmark = False
 
     do_predict(args)
