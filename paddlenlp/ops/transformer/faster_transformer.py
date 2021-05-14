@@ -71,9 +71,9 @@ class FasterTransformer(TransformerModel):
 
         if weight_sharing:
             self.trg_word_embedding = WordEmbedding(
-                vocab_size=trg_vocab_size, emb_dim=d_model, bos_idx=self.bos_id)
+                vocab_size=trg_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
             self.trg_pos_embedding = PositionalEmbedding(
-                emb_dim=d_model, max_length=max_length, bos_idx=self.bos_id)
+                emb_dim=d_model, max_length=max_length)
 
         self.decoding = InferTransformerDecoding(
             decoder=self.transformer.decoder,
