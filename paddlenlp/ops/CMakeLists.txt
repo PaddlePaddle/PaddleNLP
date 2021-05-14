@@ -20,19 +20,26 @@ INCLUDE(ExternalProject)
 
 set(CXX_STD "11" CACHE STRING "C++ standard")
 
-option(ON_INFER        "Compile with inference. "                                  OFF)
-option(WITH_GPU        "Compile with GPU/CPU, default use CPU."                    ON)
-option(USE_TENSORRT    "Compile with TensorRT."                                    OFF)
-option(USE_GPT2        "Compile with GPT2"                                         OFF)
+option(ON_INFER         "Compile with inference. "                                OFF)
+option(WITH_GPU         "Compile with GPU/CPU, default use CPU."                  ON)
+option(USE_TENSORRT     "Compile with TensorRT."                                  OFF)
+option(WITH_TRANSFORMER "Compile with Transformer"                                ON)
+option(WITH_GPT2        "Compile with GPT2"                                       OFF)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
 endif()
 
-if(USE_GPT2)
-  set(decoding_op_files fusion_gpt2_op.cc fusion_gpt2_op.cu)
-else()
-  set(decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu)
+if(WITH_TRANSFORMER)
+  list(APPEND decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu)
+endif()
+
+if(WITH_GPT2)
+  list(APPEND decoding_op_files fusion_gpt2_op.cc fusion_gpt2_op.cu)
+endif()
+
+if(NOT WITH_TRANSFORMER AND NOT WITH_GPT2)
+  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT2=ON must be set to use FasterTransformer. ")
 endif()
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})

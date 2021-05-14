@@ -60,7 +60,7 @@ cd ../
 注意：
 * `xx` 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
 * 若未指定 `-DPY_CMD` 将会默认使用系统命令 `python` 对应的 Python。
-* 若使用 GPT-2 高性能推理，需要加上 -DUSE_GPT2=ON。
+* 若使用 GPT-2 高性能推理，需要加上 -DWITH_GPT2=ON。
 
 
 最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 Faster Transformer decoding 执行的库。

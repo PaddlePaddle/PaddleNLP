@@ -224,22 +224,22 @@ class FasterTransformer(TransformerModel):
 class FasterGPT2(nn.Layer):
     def __init__(self,
                  model,
-                 candidate_num=4,
-                 probability_threshold=0.0,
-                 max_seq_len=256,
-                 start_id=50256,
-                 end_id=50256,
+                 topk=4,
+                 topp=0.0,
+                 max_out_len=256,
+                 bos_id=50256,
+                 eos_id=50256,
                  temperature=0,
                  decoding_lib=None,
                  use_fp16_decoding=False):
         super(FasterGPT2, self).__init__()
         self.decoding = InferGpt2Decoding(
             model=model,
-            candidate_num=candidate_num,
-            probability_threshold=probability_threshold,
-            max_seq_len=max_seq_len,
-            start_id=start_id,
-            end_id=end_id,
+            topk=topk,
+            topp=topp,
+            max_out_len=max_out_len,
+            bos_id=bos_id,
+            eos_id=eos_id,
             temperature=temperature,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding)

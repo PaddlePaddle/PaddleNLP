@@ -107,9 +107,9 @@ def infer_gpt2_decoding(
         slf_k_weight, slf_k_bias, slf_v_weight, slf_v_bias, slf_out_weight,
         slf_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
         ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
-        decoder_ln_bias, pos_emb, linear_weight, candidate_num,
-        probability_threshold, max_seq_len, head_num, size_per_head, num_layer,
-        bos_id, eos_id, temperature, use_fp16_decoding):
+        decoder_ln_bias, pos_emb, linear_weight, topk, topp, max_out_len,
+        head_num, size_per_head, num_layer, bos_id, eos_id, temperature,
+        use_fp16_decoding):
     helper = LayerHelper('fusion_gpt2', **locals())
 
     inputs = {
@@ -138,14 +138,14 @@ def infer_gpt2_decoding(
     }
 
     attrs = {
-        "candidate_num": candidate_num,
-        "probability_threshold": probability_threshold,
-        "max_seq_len": max_seq_len,
+        "topk": topk,
+        "topp": topp,
+        "max_out_len": max_out_len,
         "head_num": head_num,
         "size_per_head": size_per_head,
         "num_layer": num_layer,
-        "start_id": bos_id,
-        "end_id": eos_id,
+        "bos_id": bos_id,
+        "eos_id": eos_id,
         "temperature": temperature,
         "use_fp16": use_fp16_decoding
     }
@@ -387,12 +387,12 @@ class InferTransformerDecoding(nn.Layer):
 class InferGpt2Decoding(nn.Layer):
     def __init__(self,
                  model,
-                 candidate_num=4,
-                 probability_threshold=0.0,
-                 max_seq_len=256,
+                 topk=4,
+                 topp=0.0,
+                 max_out_len=256,
+                 bos_id=50256,
+                 eos_id=50256,
                  temperature=1,
-                 start_id=50256,
-                 end_id=50256,
                  decoding_lib=None,
                  use_fp16_decoding=False):
         if decoding_lib is None:
@@ -404,9 +404,9 @@ class InferGpt2Decoding(nn.Layer):
         paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
             decoding_lib)
         super(InferGpt2Decoding, self).__init__()
-        self.candidate_num = candidate_num
-        self.probability_threshold = probability_threshold
-        self.max_seq_len = max_seq_len
+        self.topk = topk
+        self.topp = topp
+        self.max_out_len = max_out_len
         self.temperature = temperature
         self.use_fp16_decoding = use_fp16_decoding
         self.model = model
@@ -414,8 +414,8 @@ class InferGpt2Decoding(nn.Layer):
         self.size_per_head = int(self.model.gpt2.config['hidden_size'] /
                                  self.head_num)
         self.num_layer = self.model.gpt2.config['num_hidden_layers']
-        self.start_id = start_id
-        self.end_id = end_id
+        self.bos_id = bos_id
+        self.eos_id = eos_id
 
         data_type = "float32"
         if self.use_fp16_decoding:
@@ -527,9 +527,9 @@ class InferGpt2Decoding(nn.Layer):
             self.slf_out_weight, self.slf_out_bias, self.ffn_ln_weight,
             self.ffn_ln_bias, self.ffn_inter_weight, self.ffn_inter_bias,
             self.ffn_out_weight, self.ffn_out_bias, self.decoder_ln_weight,
-            self.decoder_ln_bias, self.pos_emb, self.linear_weight,
-            self.candidate_num, self.probability_threshold, self.max_seq_len,
-            self.head_num, self.size_per_head, self.num_layer, self.start_id,
-            self.end_id, self.temperature, self.use_fp16_decoding)
+            self.decoder_ln_bias, self.pos_emb, self.linear_weight, self.topk,
+            self.topp, self.max_out_len, self.head_num, self.size_per_head,
+            self.num_layer, self.bos_id, self.eos_id, self.temperature,
+            self.use_fp16_decoding)
 
         return output_ids
