@@ -49,7 +49,6 @@ pip3 install paddlepaddle-gpu
 
 ```pip3 install -r requirements.txt```
 
-
 # 数据准备
 运行前需要自行下载训练、测试数据。
 
@@ -107,6 +106,7 @@ bash data/download_trained_model.sh
 ```
 ./run.sh ./script/text2sql_main.py \
         --mode preproc \
+        --config conf/text2sql_dusql.jsonnet \
         --data-root data/DuSQL/ \
         --is-cached false \
         --output data/DuSQL/preproc
@@ -180,7 +180,7 @@ bash ./run.sh ./script/text2sql_main.py --mode infer \
 同样以 DuSQL 开发集的预测结果为例。
 
 ```
-./tools/evaluation/text2sql_evaluation.py \
+python ./evaluation/text2sql_evaluation.py \
         -g data/DuSQL/gold_dev.sql \
         -t data/DuSQL/db_schema.json \
         -d DuSQL \
@@ -191,10 +191,11 @@ bash ./run.sh ./script/text2sql_main.py --mode infer \
 
 # 基线效果
 
-使用默认的代码和配置进行模型的训练和预测，开发集效果如下：
+使用默认的代码和配置进行模型的训练和预测，对开发集效果进行评估。用 Exact Match Score 作为评估指标，
+评价模型生成 SQL 的正确率。效果如下：
 
 | 数据集  | 准确率(%) |
 |-------- | ---    |
 | DuSQL   | 64.3   |
-| NL2SQL  | 71.4   |
+| NL2SQL  | 73.0   |
 | CSpider | 33.6   |

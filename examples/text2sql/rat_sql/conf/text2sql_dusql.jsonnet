@@ -10,7 +10,7 @@ function(data_path='data/DuSQL/preproc') {
     },
     model: {
         pretrain_model_type: 'ERNIE',
-        pretrain_model: 'data/ernie/ernie_1.0_base_ch',
+        pretrain_model: 'ernie-1.0',
         init_model_params: null,
         init_model_optim: null,
         model_name: 'seq2tree_v2',
@@ -40,7 +40,7 @@ function(data_path='data/DuSQL/preproc') {
     },
     train: {
         epochs: 30,
-        log_steps: 100,
+        log_steps: 10,
         trainer_num: 1,
         # [begin] config for optimizer
         learning_rate: 1e-05,

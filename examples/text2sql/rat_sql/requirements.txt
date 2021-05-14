@@ -1,6 +1,3 @@
-
-paddlepaddle-gpu>=2.0.0
-paddlenlp
 nvgpu
 tqdm
 LAC

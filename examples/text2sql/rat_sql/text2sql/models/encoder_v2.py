@@ -21,8 +21,7 @@ from pathlib import Path
 import attr
 
 import numpy as np
-from paddlenlp.transformers import ErnieModel
-from paddlenlp.transformers import BertModel
+from paddlenlp.transformers import BertModel, ErnieModel, ErniePretrainedModel
 import paddle
 from paddle import nn
 from paddle.nn import functional as F
@@ -77,9 +76,11 @@ class Text2SQLEncoderV2(nn.Layer):
             self.hidden_size = 768
         elif model_config.pretrain_model_type == 'ERNIE':
             PretrainModel = ErnieModel
-            with open(Path(model_config.pretrain_model) /
-                      'ernie_config.json') as ifs:
-                ernie_config = json.load(ifs)
+            ernie_config = ErniePretrainedModel.pretrained_init_configuration[
+                model_config.pretrain_model]
+            # with open(Path(model_config.pretrain_model) /
+            #           'ernie_config.json') as ifs:
+            #     ernie_config = json.load(ifs)
             args = {'cfg': ernie_config}
             self.hidden_size = ernie_config['hidden_size']
         else:
@@ -91,7 +92,7 @@ class Text2SQLEncoderV2(nn.Layer):
             self.base_encoder = PretrainModel.from_pretrained(
                 model_config.pretrain_model)
         else:
-            self.base_encoder = PretrainModel(**args)
+            self.base_encoder = PretrainModel(**args['cfg'])
         #initializer = nn.initializer.TruncatedNormal(std=0.02)
         self.rel_has_value = True
         self.encs_update = relational_encoder.RelationAwareEncoder(
@@ -109,7 +110,7 @@ class Text2SQLEncoderV2(nn.Layer):
     def forward(self, inputs):
         """modeling forward stage of encoder
         """
-        cls_hidden, seq_hidden = self.base_encoder(inputs['src_ids'],
+        seq_hidden, cls_hidden = self.base_encoder(inputs['src_ids'],
                                                    inputs['sent_ids'])
         if self.pretrain_model_type != 'ERNIE':
             cls_hidden, seq_hidden = seq_hidden, cls_hidden

@@ -40,7 +40,7 @@ function(data_path='data/CSpider/preproc') {
     },
     train: {
         epochs: 50,
-        log_steps: 100,
+        log_steps: 10,
         trainer_num: 1,
         # [begin] config for optimizer
         learning_rate: 1e-05,
