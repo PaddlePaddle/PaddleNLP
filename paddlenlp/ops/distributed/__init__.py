@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .transformer.decoding import *
-from .transformer.faster_transformer import *
-from .einsum import *
-from .distributed import *
-from . import optimizer
+from . import parallel
+from . import utils
+from .parallel import *
+from .utils import *
+
+__all__ = []
+__all__ += parallel.__all__
+__all__ += utils.__all__
