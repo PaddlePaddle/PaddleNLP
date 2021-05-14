@@ -261,8 +261,8 @@ class PretrainingDataset(Dataset):
             index = padded_mask_indices[0].item()
             mask_token_num = index
         else:
-            index = 0
-            mask_token_num = 0
+            index = self.max_pred_length
+            mask_token_num = self.max_pred_length
         # masked_lm_labels = np.full(input_ids.shape, -1, dtype=np.int64)
         # masked_lm_labels[masked_lm_positions[:index]] = masked_lm_ids[:index]
         masked_lm_labels = masked_lm_ids[:index]
