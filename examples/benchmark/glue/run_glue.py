@@ -29,6 +29,7 @@ from paddle.metric import Metric, Accuracy, Precision, Recall
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.data.sampler import SamplerHelper
+from paddlenlp.transformers import AlbertForSequenceClassification, AlbertTokenizer
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
@@ -54,6 +55,7 @@ MODEL_CLASSES = {
     "bert": (BertForSequenceClassification, BertTokenizer),
     "electra": (ElectraForSequenceClassification, ElectraTokenizer),
     "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
+    "albert": (AlbertForSequenceClassification, AlbertTokenizer),
 }
 
 
