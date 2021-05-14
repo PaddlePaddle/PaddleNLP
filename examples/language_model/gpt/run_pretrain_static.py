@@ -274,7 +274,7 @@ def do_train(args):
             ]
             # TODO @ZHUI Use paddle.optimizer.AdamW
             if ops.optimizer._jit_compile():
-                optimizer = ops.optimizer.AdamOptimizer(
+                optimizer = ops.optimizer.AdamwOptimizer(
                     learning_rate=lr_scheduler,
                     beta1=args.adam_beta1,
                     beta2=args.adam_beta2,
@@ -290,7 +290,7 @@ def do_train(args):
                     epsilon=args.adam_epsilon,
                     grad_clip=clip)
                 logger.error(
-                    "Compile custom adam failed, use fluid.Adam and on WEIGHT DECAY!!!!"
+                    "Compile custom adamw failed, use fluid.Adam and on WEIGHT DECAY!!!!"
                 )
 
             if args.use_recompute:
