@@ -8,17 +8,18 @@
 ```text
 .
 ├── args.py                 # 训练参数配置
+├── create_pretraining_data.py         # 数据预处理脚本
 ├── dataset.py              # 数据处理
 ├── decompress.sh           # 数据集解压脚本
 ├── deploy/                 # 模型部署的inference脚本
 ├── export_model.py         # 导出预测部署的模型脚本
 ├── predict.py              # 生成文本示例demo
 ├── lr.py                   # 学习率控制
-├── create_pretraining_data.py         # 数据预处理脚本
 ├── README.md               # 文档
-├── run_pretrain.py         # 预训练入口
 ├── run_eval.py             # 评估入口
-└── scripts                 # 训练脚本
+├── run_pretrain.py         # 预训练入口
+├── run_pretrain_static.py  # 混合并行，预训练脚本
+└── scripts/                # 训练脚本
 ```
 
 ## 快速开始
@@ -52,7 +53,7 @@ bash decompress.sh
 
 ```shell
 python create_pretraining_data.py --input_path raw_data \
- --model_name gpt-medium-en \
+ --model_name gpt2-medium-en \
  --append_eod \
  --workers 8
 ```
@@ -132,7 +133,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
 
 1. WikiText数据集评估
 ```bash
-python run_eval.py --model_name gpt-medium-en \
+python run_eval.py --model_name gpt2-medium-en \
     --eval_path ./wikitext-103/wiki.valid.tokens \
     --overlapping_eval 32 \
     --init_checkpoint_path ./output/model_100000/model_state.pdparams \
@@ -142,7 +143,7 @@ python run_eval.py --model_name gpt-medium-en \
 
 2. LAMBADA数据集评估
 ```bash
-python run_eval.py --model_name gpt-medium-en \
+python run_eval.py --model_name gpt2-medium-en \
     --eval_path ./lambada_test.jsonl \
     --cloze_eval \
     --init_checkpoint_path ./output/model_100000/model_state.pdparams \
@@ -189,7 +190,7 @@ python generate_sample.py
 导出中文模型
 ```"shell
 python export_model.py --model_type=gpt-cn \
-    --model_path=gpt-base-cn \
+    --model_path=gpt-cpm-large-cn \
     --output_path=./infer_model/model
 ```
 用户在`infer_model`中可以看到导出的文件。
@@ -204,7 +205,7 @@ python infer.py --model_type gpt-cn \
 导出英文模型
 ```"shell
 python export_model.py --model_type=gpt \
-    --model_path=gpt-medium-en \
+    --model_path=gpt2-medium-en \
     --output_path=./infer_model/model
 
 python deploy/python/inference.py --model_type gpt \

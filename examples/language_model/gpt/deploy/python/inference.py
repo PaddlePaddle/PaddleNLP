@@ -116,8 +116,8 @@ def main():
     end_id = tokenizer.stop_token_id
 
     dataset = [[
-        np.array(tokenizer.get_input_ids(text)).astype("int64").reshape(
-            [1, -1]), np.array(end_id).astype("int32").reshape([1])
+        np.array(tokenizer(text)["input_ids"]).astype("int64").reshape([1, -1]),
+        np.array(end_id).astype("int32").reshape([1])
     ] for text in ds]
     outs = predictor.predict(dataset)
     for res in outs:

@@ -53,25 +53,23 @@ class Adam(Optimizer):
     Args:
         learning_rate (float|LRScheduler, optional): The learning rate used to update ``Parameter``.
             It can be a float value or a LRScheduler. The default value is 0.001.
-        beta1 (float|Tensor, optional): The exponential decay rate for the 1st moment estimates.
+        beta1 (float, optional): The exponential decay rate for the 1st moment estimates.
             It should be a float number or a Tensor with shape [1] and data type as float32.
             The default value is 0.9.
-        beta2 (float|Tensor, optional): The exponential decay rate for the 2nd moment estimates.
+        beta2 (float, optional): The exponential decay rate for the 2nd moment estimates.
             It should be a float number or a Tensor with shape [1] and data type as float32.
             The default value is 0.999.
-        epsilon (float|Tensor, optional): A small float value for numerical stability.
+        epsilon (float, optional): A small float value for numerical stability.
             It should be a float number or a Tensor with shape [1] and data type as float32.
             The default value is 1e-08.
         parameters (list|tuple, optional): List/Tuple of ``Tensor`` to update to minimize ``loss``. \
             This parameter is required in dygraph mode. \
             The default value is None in static mode, at this time all parameters will be updated.
-        weight_decay (float|WeightDecayRegularizer, optional): The strategy of regularization. \
-            It canbe a float value as coeff of L2 regularization or \
-            :ref:`api_fluid_regularizer_L1Decay`, :ref:`api_fluid_regularizer_L2Decay`.
-            If a parameter has set regularizer using :ref:`api_fluid_ParamAttr` already, \
-            the regularization setting here in optimizer will be ignored for this parameter. \
-            Otherwise, the regularization setting here in optimizer will take effect. \
-            Default None, meaning there is no regularization.
+        weight_decay (float, optional): The weight decay coefficient, it can be float or Tensor. The default value is 0.01.
+        apply_decay_param_fun (function|None, optional): If it is not None,
+            only tensors that makes apply_decay_param_fun(Tensor.name)==True
+            will be updated. It only works when we want to specify tensors.
+            Default: None.
         grad_clip (GradientClipBase, optional): Gradient cliping strategy, it's an instance of
             some derived class of ``GradientClipBase`` . There are three cliping strategies
             ( :ref:`api_fluid_clip_GradientClipByGlobalNorm` , :ref:`api_fluid_clip_GradientClipByNorm` ,
@@ -92,35 +90,14 @@ class Adam(Optimizer):
         .. code-block:: python
 
             import paddle
+            import paddlenlp
 
             linear = paddle.nn.Linear(10, 10)
             inp = paddle.rand([10,10], dtype="float32")
             out = linear(inp)
             loss = paddle.mean(out)
-            adam = paddle.optimizer.Adam(learning_rate=0.1,
+            adam = paddlenlp.ops.optimizer.Adam(learning_rate=0.1,
                     parameters=linear.parameters())
-            out.backward()
-            adam.step()
-            adam.clear_grad()
-
-        .. code-block:: python
-
-            # Adam with beta1/beta2 as Tensor and weight_decay as float
-            import paddle
-
-            linear = paddle.nn.Linear(10, 10)
-            inp = paddle.rand([10,10], dtype="float32")
-            out = linear(inp)
-            loss = paddle.mean(out)
-
-            beta1 = paddle.to_tensor([0.9], dtype="float32")
-            beta2 = paddle.to_tensor([0.99], dtype="float32")
-
-            adam = paddle.optimizer.Adam(learning_rate=0.1,
-                    parameters=linear.parameters(),
-                    beta1=beta1,
-                    beta2=beta2,
-                    weight_decay=0.01)
             out.backward()
             adam.step()
             adam.clear_grad()
@@ -377,27 +354,6 @@ class Adam(Optimizer):
     @imperative_base.no_grad
     @framework.dygraph_only
     def step(self):
-        """
-        Execute the optimizer and update parameters once.
-
-        Returns:
-            None
-
-        Examples:
-            .. code-block:: python
-
-                import paddle
-
-                a = paddle.rand([2,13], dtype="float32")
-                linear = paddle.nn.Linear(13, 5)
-                # This can be any optimizer supported by dygraph.
-                adam = paddle.optimizer.Adam(learning_rate = 0.01,
-                                            parameters = linear.parameters())
-                out = linear(a)
-                out.backward()
-                adam.step()
-                adam.clear_grad()
-        """
         params_grads = []
         for param in self._parameter_list:
             if param.stop_gradient:

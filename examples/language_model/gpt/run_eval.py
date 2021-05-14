@@ -27,11 +27,7 @@ from paddlenlp.transformers import GPTModel
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 
-MODEL_CLASSES = {
-    "gpt-small-en": (GPTForPretraining, GPTTokenizer),
-    "gpt-medium-en": (GPTForPretraining, GPTTokenizer),
-    "gpt-large-en": (GPTForPretraining, GPTTokenizer),
-}
+MODEL_CLASSES = {"gpt2-medium-en": (GPTForPretraining, GPTTokenizer), }
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -182,12 +178,12 @@ def wikitext_detokenizer(string):
 
 def get_tokens(tokenizer, text, strict=True):
     if not strict:
-        tokens = tokenizer.get_input_ids(text)
+        tokens = tokenizer(text)["input_ids"]
         return tokens[:-1], [tokens[-1]]
     last_token = text.split()[-1]
     start_idx = text.rfind(last_token)
-    beginning_tokens = tokenizer.get_input_ids(text[:start_idx].strip())
-    last_token = tokenizer.get_input_ids(' ' + last_token)
+    beginning_tokens = tokenizer(text[:start_idx].strip())["input_ids"]
+    last_token = tokenizer(' ' + last_token)["input_ids"]
     return beginning_tokens, last_token
 
 
@@ -202,7 +198,7 @@ def create_eval_dataset(args):
             entire_data = reader.read().decode('utf-8')
         num_original_tokens = len(entire_data.strip().split(" "))
         entire_data = wikitext_detokenizer(entire_data)
-        tokenized_data = tokenizer.get_input_ids(entire_data)
+        tokenized_data = tokenizer(entire_data)["input_ids"]
         num_tokenized_tokens = len(tokenized_data)
         print('Original Tokens: %d, Detokenized tokens: %d' %
               (num_tokenized_tokens, num_original_tokens))

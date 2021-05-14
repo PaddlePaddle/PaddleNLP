@@ -34,7 +34,7 @@ MODEL_CLASSES = {
 class Demo:
     def __init__(self,
                  model_type="gpt-cn",
-                 model_name_or_path="gpt-base-cn",
+                 model_name_or_path="gpt-cpm-large-cn",
                  max_predict_len=32):
         model_class, tokenizer_class = MODEL_CLASSES[model_type]
         self.tokenizer = tokenizer_class.from_pretrained(model_name_or_path)
@@ -69,9 +69,9 @@ class Demo:
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "gpt-cn":
-        demo = Demo("gpt-cn", "gpt-base-cn")
+        demo = Demo("gpt-cn", "gpt-cpm-large-cn")
         demo.ask_question_cn("苹果的CEO是谁?")
         demo.dictation_poetry_cn("举杯邀明月，")
     else:
-        demo = Demo("gpt", "gpt-medium-en")
+        demo = Demo("gpt", "gpt2-medium-en")
         demo.ask_question_en("Who is the CEO of Apple?")

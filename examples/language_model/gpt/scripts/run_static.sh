@@ -1,7 +1,7 @@
 set -x
 export PADDLE_WITH_GLOO=0
-#export GLOG_v=0
-#export NCCL_DEBUG=INFO
+export GLOG_v=0
+export NCCL_DEBUG=INFO
 export FLAGS_call_stack_level=2
 export FLAGS_allocator_strategy=naive_best_fit
 export FLAGS_fraction_of_gpu_memory_to_use=0.98
@@ -11,7 +11,6 @@ rm -rf *.prototxt
 rm -rf core.*
 rm -rf start_sharding*
 rm -rf main_sharding*
-fuser -kv /dev/nvidia*
 
 task_name="gpt-mp-sharding"
 rm -rf output/$task_name/log
@@ -20,12 +19,12 @@ PYTHONPATH=../../../ python -u  -m paddle.distributed.fleet.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name/log" run_pretrain_static.py \
     --model_type "gpt" \
-    --model_name_or_path "gpt-small-en" \
+    --model_name_or_path "gpt3-1.3B-en" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --max_seq_len 1024 \
-    --micro_batch_size 32 \
-    --global_batch_size 128 \
+    --micro_batch_size 8 \
+    --global_batch_size 32 \
     --sharding_degree 4\
     --mp_degree 2 \
     --dp_degree 1 \
@@ -42,7 +41,7 @@ PYTHONPATH=../../../ python -u  -m paddle.distributed.fleet.launch \
     --warmup_rate 0.01 \
     --grad_clip 1.0 \
     --logging_freq 1\
-    --eval_freq 50 \
+    --eval_freq 1000 \
     --device "gpu"
 
  # Not support pipeline for this version, don't change pp_degree.

@@ -50,7 +50,7 @@ class Converter(object):
         self.vocab_size = len(tokenizer)
 
     def encode(self, text):
-        tokens = self.tokenizer.get_input_ids(text)
+        tokens = self.tokenizer(text)["input_ids"]
         if self.append_eod:
             tokens.append(self.eod_id)
         return tokens, len(tokens)

@@ -78,24 +78,19 @@ class GPTChineseTokenizer(PretrainedTokenizer):
     tokenize as subwords.
     """
     resource_files_names = {
-        "vocab_file": "vocab.json",
         "model_file": "sentencepiece.model"
     }  # for save_pretrained
+
+    cpm_modle_link = "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-cn-sentencepiece.model"
     pretrained_resource_files_map = {
-        "vocab_file": {
-            "gpt-base-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-base-cn-vocab.json",
-        },
         "model_file": {
-            "gpt-base-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-base-cn-sentencepiece.model"
+            "gpt-cpm-large-cn": cpm_modle_link
         }
     }
-    pretrained_init_configuration = {"gpt-base-cn": {}, }
+    pretrained_init_configuration = {"gpt-cpm-large-cn": {}, }
 
     def __init__(
             self,
-            vocab_file,
             model_file,
             max_len=512,
             unk_token='<unk>',
@@ -103,24 +98,17 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             eod_token='<eod>',
             stop_token='\u2583',  # The token of newline.
     ):
-        self._vocab_file = vocab_file
         self._model_file = model_file
-        if not os.path.isfile(vocab_file):
+        if not os.path.isfile(model_file):
             raise ValueError(
-                "Can't find a vocabulary file at path '{}'. To load the "
-                "vocabulary from a pretrained model please use "
+                "Can't find a model file at path '{}'. To load the "
+                "model from a pretrained model please use "
                 "`tokenizer = GPTTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                .format(vocab_file))
+                .format(model_file))
         self.max_len = max_len if max_len is not None else int(1e12)
-        self.encoder = json.load(open(vocab_file))
-        self.decoder = {v: k for k, v in self.encoder.items()}
         mod = try_import("sentencepiece")
         self.sp = mod.SentencePieceProcessor(model_file=model_file)
         self.translator = str.maketrans(" \n", "\u2582\u2583")
-        vocab_dict = {}
-        for id in range(self.sp.get_piece_size()):
-            vocab_dict[self.sp.id_to_piece(id)] = id
-        self.vocab = Vocab.from_dict(vocab_dict, unk_token=unk_token)
 
     def tokenize(self, text):
         """
@@ -134,7 +122,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         Example:
             .. code-block::
                 from paddlenlp.transformers import GPTChineseTokenizer
-                tokenizer = GPTChineseTokenizer.from_pretrained('gpt-base-cn')
+                tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
                 print(tokenizer.tokenize('我爱祖国'))
         """
         return self._tokenize(text)
@@ -147,9 +135,25 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         new_seg = " ".join(seg_list)
         return self.sp.encode(new_seg, out_type=str)
 
-    def get_input_ids(self, text):
-        tokens = self._tokenize(text)
-        return self.convert_tokens_to_ids(tokens)
+    def _convert_token_to_id(self, token):
+        """Converts a token (str) to an id using the vocab. """
+        return self.sp.PieceToId(token)
+
+    def _convert_id_to_token(self, index):
+        """Converts an index (integer) to a token (str) using the vocab."""
+        return self.sp_model.IdToPiece(index)
+
+    def convert_tokens_to_ids(self, tokens):
+        if not isinstance(tokens, (list, tuple)):
+            return self._convert_token_to_id(tokens)
+        else:
+            return [self._convert_token_to_id(token) for token in tokens]
+
+    def convert_ids_to_tokens(self, ids):
+        if not isinstance(ids, (list, tuple)):
+            return self._convert_id_to_token(ids)
+        tokens = [self._convert_id_to_token(_id) for _id in ids]
+        return tokens
 
     @property
     def vocab_size(self):
@@ -158,10 +162,10 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         Example:
             .. code-block::
                 from paddlenlp.transformers import GPTChineseTokenizer
-                tokenizer = GPTChineseTokenizer.from_pretrained('gpt-base-cn')
+                tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
                 print(tokenizer.vocab_size)
         """
-        return len(self.vocab)
+        return len(self.sp)
 
     def convert_ids_to_string(self, ids):
         """
@@ -198,23 +202,20 @@ class GPTTokenizer(PretrainedTokenizer):
     gpt_merges_link = "http://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-en-merges.txt"
     pretrained_resource_files_map = {
         "vocab_file": {
-            "gpt-xlarge-en": gpt_vocab_link,
-            "gpt-large-en": gpt_vocab_link,
-            "gpt-medium-en": gpt_vocab_link,
-            "gpt-small-en": gpt_vocab_link,
+            "gpt3-13B-en": gpt_vocab_link,
+            "gpt3-1.3B-en": gpt_vocab_link,
+            "gpt2-medium-en": gpt_vocab_link,
         },
         "merges_file": {
-            "gpt-xlarge-en": gpt_merges_link,
-            "gpt-large-en": gpt_merges_link,
-            "gpt-medium-en": gpt_merges_link,
-            "gpt-small-en": gpt_merges_link,
+            "gpt3-13B-en": gpt_merges_link,
+            "gpt3-1.3B-en": gpt_merges_link,
+            "gpt2-medium-en": gpt_merges_link,
         }
     }
     pretrained_init_configuration = {
-        "gpt-xlarge-en": {},
-        "gpt-large-en": {},
-        "gpt-medium-en": {},
-        "gpt-small-en": {},
+        "gpt3-13B-en": {},
+        "gpt3-1.3B-en": {},
+        "gpt2-medium-en": {},
     }
 
     def __init__(

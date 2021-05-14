@@ -471,7 +471,7 @@ class GPTPretrainedModel(PretrainedModel):
 
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
-        "gpt-base-cn": {
+        "gpt-cpm-large-cn": { # 2.6B
             "vocab_size": 30000,
             "hidden_size": 2560,
             "num_hidden_layers": 32,
@@ -485,12 +485,12 @@ class GPTPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
         },
-        "gpt-175B-en": { ## 175B
+        "gpt3-13B-en": { # 13B
             "vocab_size": 50304,
-            "hidden_size": 12288,
-            "num_hidden_layers": 96,
-            "num_attention_heads": 96,
-            "intermediate_size": 49152,
+            "hidden_size": 5120,
+            "num_hidden_layers": 40,
+            "num_attention_heads": 128,
+            "intermediate_size": 20480,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
             "attention_probs_dropout_prob": 0.1,
@@ -498,7 +498,7 @@ class GPTPretrainedModel(PretrainedModel):
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
         },
-        "gpt-xlarge-en": { ## 1.3B
+        "gpt3-1.3B-en": { # 1.3B
             "vocab_size": 50304,
             "hidden_size": 2048,
             "num_hidden_layers": 24,
@@ -511,20 +511,7 @@ class GPTPretrainedModel(PretrainedModel):
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
         },
-        "gpt-large-en": {
-            "vocab_size": 50304,
-            "hidden_size": 4096,
-            "num_hidden_layers": 50,
-            "num_attention_heads": 32,
-            "intermediate_size": 16384,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-        },
-        "gpt-medium-en": {
+        "gpt2-medium-en": { #345M
             "vocab_size": 50304,
             "hidden_size": 1024,
             "num_hidden_layers": 24,
@@ -537,27 +524,14 @@ class GPTPretrainedModel(PretrainedModel):
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
         },
-        "gpt-small-en": {
-            "vocab_size": 50304,
-            "hidden_size": 1024,
-            "num_hidden_layers": 4,
-            "num_attention_heads": 4,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "gpt-base-cn":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-base-cn.pdparams",
-            "gpt-medium-en":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-medium-en.pdparams",
+            "gpt-cpm-large-cn":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
+            "gpt2-medium-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-medium-en.pdparams",
         }
     }
     base_model_prefix = "gpt"
