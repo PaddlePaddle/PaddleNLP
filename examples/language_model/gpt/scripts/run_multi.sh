@@ -8,11 +8,11 @@ PYTHONPATH=../../../ python -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
     --log_dir "output/$task_name/log"  run_pretrain.py \
     --model_type "gpt" \
-    --model_name_or_path "gpt-small-en"\
+    --model_name_or_path "gpt2-en"\
     --input_dir "./data"\
     --output_dir "output/$task_name"\
     --max_seq_len 1024 \
-    --micro_batch_size 8\
+    --micro_batch_size 4\
     --max_lr 0.00015\
     --min_lr 0.00001\
     --max_steps 500000\

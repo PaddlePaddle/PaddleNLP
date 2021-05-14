@@ -78,7 +78,7 @@ mv train.data.json_ids.npz data
 ```shell
 CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
     --model_type gpt \
-    --model_name_or_path gpt-small-en \
+    --model_name_or_path gpt2-en \
     --input_dir "./data"\
     --output_dir "output"\
     --weight_decay 0.01\
@@ -87,7 +87,7 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
     --save_steps 100000\
     --decay_steps 320000\
     --warmup_rate 0.01\
-    --batch_size 8\
+    --batch_size 4\
     --device gpu
 ```
 
@@ -112,7 +112,7 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
     --model_type gpt \
-    --model_name_or_path gpt-small-en \
+    --model_name_or_path gpt2-en \
     --input_dir "./data"\
     --output_dir "output"\
     --weight_decay 0.01\
@@ -121,7 +121,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
     --save_steps 100000\
     --decay_steps 320000\
     --warmup_rate 0.01\
-    --batch_size 8\
+    --batch_size 4\
     --device gpu
 ```
 
@@ -151,7 +151,7 @@ python run_eval.py --model_name gpt2-medium-en \
     --device gpu
 ```
 其中参数释义如下：
-`model_name` 使用的模型名称，如gpt-samll-en等。
+`model_name` 使用的模型名称，如gpt2-medium-en等。
 `eval_path` 数据集地址。
 `init_checkpoint_path` 模型参数地址
 `batch_size` batch size大小。
@@ -185,7 +185,7 @@ python generate_sample.py
 
 ## 模型导出预测
 
-本repo提供了简单的示例帮助用户将预训练模型导出成预测的参数。
+下面提供了简单的示例，帮助用户将预训练模型导出成预测部署的参数。
 
 导出中文模型
 ```"shell
@@ -197,7 +197,7 @@ python export_model.py --model_type=gpt-cn \
 
 对于导出的模型，我们提供了Python的infer脚本，调用预测库对简单的例子进行预测。
 ```shell
-python infer.py --model_type gpt-cn \
+python deploy/python/inference.py --model_type gpt-cn \
     --model_path ./infer_model/model
 ```
 

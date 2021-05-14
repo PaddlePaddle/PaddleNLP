@@ -207,17 +207,20 @@ class GPTTokenizer(PretrainedTokenizer):
             "gpt3-13B-en": gpt_vocab_link,
             "gpt3-1.3B-en": gpt_vocab_link,
             "gpt2-medium-en": gpt_vocab_link,
+            "gpt2-en": gpt_vocab_link,
         },
         "merges_file": {
             "gpt3-13B-en": gpt_merges_link,
             "gpt3-1.3B-en": gpt_merges_link,
             "gpt2-medium-en": gpt_merges_link,
+            "gpt2-en": gpt_merges_link,
         }
     }
     pretrained_init_configuration = {
         "gpt3-13B-en": {},
         "gpt3-1.3B-en": {},
         "gpt2-medium-en": {},
+        "gpt2-en": {},
     }
 
     def __init__(
