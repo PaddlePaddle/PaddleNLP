@@ -61,23 +61,6 @@ def compute_align_loss(model, desc_enc, example):
     mv_max_rel_att = mv_att_on_rel_val.max(axis=0)
     mv_max_rel_att = mv_max_rel_att.clip(min=1e-9)
 
-    #c_num = desc_enc.m2c_align_mat.shape[1]
-    #un_rel_cols_t = paddle.to_tensor(sorted(list(set(range(c_num)) - set(rel_cols))), dtype='int64')
-    #mc_att_on_unrel_col = desc_enc.m2c_align_mat.index_select(un_rel_cols_t, axis=1)
-    #mc_max_unrel_att = mc_att_on_unrel_col.max(axis=0)
-    #mc_max_unrel_att = mc_max_unrel_att.clip(min=1e-9)
-    #mc_margin = paddle.log(mc_max_unrel_att).mean() - paddle.log(mc_max_rel_att).mean()
-
-    #t_num = desc_enc.m2t_align_mat.shape[1]
-    #if t_num > len(set(rel_tabs)):
-    #    un_rel_tabs_t = paddle.to_tensor(sorted(list(set(range(t_num)) - set(rel_tabs))), dtype='int64')
-    #    mt_att_on_unrel_tab = desc_enc.m2t_align_mat.index_select(un_rel_tabs_t, axis=1)
-    #    mt_max_unrel_att = mt_att_on_unrel_tab.max(axis=0)
-    #    mt_max_unrel_att = mt_max_unrel_att.clip(min=1e-9)
-    #    mt_margin = paddle.log(mt_max_unrel_att).mean() - paddle.log(mt_max_rel_att).mean()
-    #else:
-    #    mt_margin = paddle.to_tensor([0.0])
-
     value_loss_weight = 2.0
     align_loss = - paddle.log(mc_max_rel_att).mean() \
                  - paddle.log(mt_max_rel_att).mean() \

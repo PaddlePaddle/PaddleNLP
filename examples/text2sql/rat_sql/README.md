@@ -1,5 +1,4 @@
-
-# 简介
+# RAT-SQL
 
 ## Text2SQL 任务
 
