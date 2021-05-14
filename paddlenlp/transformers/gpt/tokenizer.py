@@ -124,6 +124,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
                 from paddlenlp.transformers import GPTChineseTokenizer
                 tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
                 print(tokenizer.tokenize('我爱祖国'))
+                # ['▁我', '▁爱', '祖国']
         """
         return self._tokenize(text)
 
@@ -164,6 +165,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
                 from paddlenlp.transformers import GPTChineseTokenizer
                 tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
                 print(tokenizer.vocab_size)
+                # 50257
         """
         return len(self.sp)
 
@@ -364,15 +366,7 @@ class GPTTokenizer(PretrainedTokenizer):
                 tokens.append(self.decoder[i])
         return tokens
 
-    def get_input_ids(self, text, fn=None):
-        processed_text = text
-        if fn is not None:
-            processed_text = fn(text)
-        ids = self.convert_tokens_to_ids(self.tokenize(processed_text))
-        return ids
-
     def convert_ids_to_string(self, ids):
-        # TODO
         text = ''.join([self.decoder[id] for id in ids])
         text = bytearray([self.byte_decoder[c] for c in text]).decode(
             'utf-8', errors=self.errors)
