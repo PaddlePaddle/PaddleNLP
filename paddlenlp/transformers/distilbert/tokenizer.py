@@ -27,9 +27,9 @@ class DistilBertTokenizer(BertTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "distilbert-base-uncased":
-            "https://paddlenlp.bj.bcebos.com/models/distilbert/distilbert-base-uncased-vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/distilbert/distilbert-base-uncased-vocab.txt",
             "distilbert-base-cased":
-            "https://paddlenlp.bj.bcebos.com/models/distilbert/distilbert-base-cased-vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/distilbert/distilbert-base-cased-vocab.txt",
         }
     }
     pretrained_init_configuration = {

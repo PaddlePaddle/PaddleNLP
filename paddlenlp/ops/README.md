@@ -101,17 +101,17 @@ transformer = FasterTransformer(
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
 ./build/third-party/build/bin/decoding_gemm 32 4 8 64 30000 32 512 0
-python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml --decoding-lib ./build/lib/libdecoding_op.so
+python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so
 ```
 
 使用 PaddlePaddle 仅执行 decoding 测试（float16）：
-执行 float16 的 decoding，需要在执行的时候，加上 `--use-fp16-decoding` 选项。
+执行 float16 的 decoding，需要在执行的时候，加上 `--use_fp16_decoding` 选项。
 
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
 ./build/third-party/build/bin/decoding_gemm 32 4 8 64 30000 32 512 1
-python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml --decoding-lib ./build/lib/libdecoding_op.so --use-fp16-decoding
+python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so --use_fp16_decoding
 ```
 
 其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。

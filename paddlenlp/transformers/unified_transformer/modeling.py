@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Modeling classes for UnifiedTransformer model."""
 
 import paddle
 import paddle.nn as nn
@@ -32,8 +33,11 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
     UnifiedTransformer related `model_config_file`, `resource_files_names`, 
     `pretrained_resource_files_map`, `pretrained_init_configuration`, 
     `base_model_prefix` for downloading and loading pretrained models. 
-    See `PretrainedModel` for more details.
+    
+    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for 
+    more details.
     """
+
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "unified_transformer-12L-cn": {
@@ -74,6 +78,25 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "eos_token_id": 2,
             "mask_token_id": 30000,
         },
+        "plato-mini": {
+            "vocab_size": 30001,
+            "hidden_size": 768,
+            "num_hidden_layers": 6,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": True,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "unk_token_id": 0,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 2,
+            "mask_token_id": 30000,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -82,12 +105,14 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn.pdparams",
             "unified_transformer-12L-cn-luge":
             "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/unified_transformer-12L-cn-luge.pdparams",
+            "plato-mini":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/unified_transformer/plato-mini.pdparams",
         }
     }
     base_model_prefix = "unified_transformer"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        # Initialization hook
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
@@ -102,9 +127,7 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
 
 
 class UnifiedTransformerEmbeddings(nn.Layer):
-    """
-    Include embeddings from word, position and token_type embeddings
-    """
+    #Include embeddings from word, position and token_type.
 
     def __init__(self,
                  vocab_size,
@@ -131,6 +154,76 @@ class UnifiedTransformerEmbeddings(nn.Layer):
 
 @register_base_model
 class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
+    """
+    The bare UnifiedTransformer Model outputting raw hidden-states without any 
+    specific head on top.
+
+    This model inherits from 
+    :class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Refer to the 
+    superclass documentation for the generic methods.
+
+    This model is also a `paddle.nn.Layer <https://www.paddlepaddle.org.cn
+    /documentation/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ 
+    subclass. Use it as a regular Paddle Layer and refer to the Paddle 
+    documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in :class:`UnifiedTransformerModel`. 
+            Also is the vocab size of token embedding matrix.
+        hidden_size (int, optional):
+            Dimensionality of the embedding layers, encoder layers and pooler 
+            layer. Defaults to 768.
+        num_hidden_layers (int, optional):
+            The number of hidden layers in the encoder. Defaults to 12.
+        num_attention_heads (int, optional):
+            The number of heads in multi-head attention(MHA). Defaults to 12.
+        intermediate_size (int, optional):
+            Dimensionality of the feed-forward layer in the encoder. Input 
+            tensors to feed-forward layers are firstly projected from 
+            `hidden_size` to `intermediate_size`, and then projected back to 
+            `hidden_size`. Typically `intermediate_size` is larger than 
+            `hidden_size`. Defaults to 3072.
+        hidden_act (str, optional):
+            The activation function in the feedforward network. Defaults to 
+            "gelu".
+        hidden_dropout_prob(float, optional): 
+            The dropout probability used in pre-process and post-precess of MHA 
+            and FFN sub-layer. Defaults to 0.1.
+        attention_probs_dropout_prob (float, optional): 
+            The dropout probability used in MHA to drop some attention target. 
+            Defaults to 0.1.
+        normalize_before (bool, optional): 
+            Indicate whether to put layer normalization into preprocessing of 
+            MHA and FFN sub-layers. If True, pre-process is layer ormalization 
+            and post-precess includes dropout, residual connection. Otherwise, 
+            no pre-process and post-precess includes dropout, residual 
+            connection, layer normalization. Defaults to True.
+        max_position_embeddings (int, optional):
+            The maximum length of input `position_ids`. Defaults to 512.
+        type_vocab_size (int, optional):
+            The size of the input `token_type_ids`. Defaults to 2.
+        initializer_range (float, optional):
+            The standard deviation of the normal initializer. Defaults to 0.02.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal 
+                distributions. See 
+                :meth:`UnifiedTransformerPretrainedModel.init_weights` method 
+                for how weights are initialized in 
+                :class:`UnifiedTransformerModel`.
+        unk_token_id (int, optional):
+            The id of special token `unk_token`. Defaults to 0.
+        pad_token_id (int, optional):
+            The id of special token `pad_token`. Defaults to 0.
+        bos_token_id (int, optional):
+            The id of special token `bos_token`. Defaults to 1.
+        eos_token_id (int, optional):
+            The id of special token `eos_token`. Defaults to 2.
+        mask_token_id (int, optional):
+            The id of special token `mask_token`. Defaults to 30000.
+    """
+
     def __init__(
             self,
             vocab_size,
@@ -182,6 +275,79 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 attention_mask,
                 use_cache=False,
                 cache=None):
+        r"""
+        The UnifiedTransformerModel forward method, overrides the special 
+        :meth:`__call__` method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input 
+                sequence. It's data type should be `int64` and has a shape of 
+                [batch_size, sequence_length].
+            token_type_ids (Tensor):
+                Segment token indices to indicate first and second portions of 
+                the inputs. Indices can be either 0 or 1:
+
+                - 0 corresponds to a **sentence A** token,
+                - 1 corresponds to a **sentence B** token.
+
+                It's data type should be `int64` and has a shape of 
+                [batch_size, sequence_length].
+            position_ids (Tensor):
+                The position indices of input sequence tokens. It's data type 
+                should be `int64` and has a shape of [batch_size, sequence_length].
+            attention_mask (Tensor): 
+                A tensor used in multi-head attention to prevents attention to 
+                some unwanted positions, usually the paddings or the subsequent 
+                positions. It is a tensor with shape broadcasted to 
+                [batch_size, n_head, sequence_length, sequence_length]. 
+                
+                - When the data type is bool, the unwanted positions have 
+                  `False` values and the others have `True` values. 
+                - When the data type is int, the unwanted positions have 0 
+                  values and the others have 1 values. 
+                - When the data type is float, the unwanted positions have 
+                  `-INF` values and the others have 0 values.
+
+            use_cache: (bool, optional): 
+                Whether or not use the model cache to speed up decoding. Defaults 
+                to False.
+            cache (list, optional): 
+                It is a list, and each element in the list is `incremental_cache` 
+                produced by :meth:`paddle.nn.TransformerEncoderLayer.gen_cache` 
+                method. See :meth:`paddle.nn.TransformerEncoder.gen_cache` 
+                method for more details. It is only used for inference and 
+                should be None for training. Defaults to None.
+
+        Returns:
+            Tensor|tuple: If `use_cache` is False, it is a tensor 
+            representing the output of :class:`UnifiedTransformerModel`, with 
+            shape [batch_size, sequence_length, hidden_size]. The data type is 
+            float32 or float64. Otherwise, it is a tuple, besides the output of 
+            :class:`UnifiedTransformerModel`, the tuple also includes the new 
+            cache which is same as input `cache` but `incremental_cache` in it 
+            has an incremental length. 
+            See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and 
+            :meth:`paddle.nn.MultiHeadAttention.forward` method for more details.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import UnifiedTransformerModel
+                from paddlenlp.transformers import UnifiedTransformerTokenizer
+
+                model = UnifiedTransformerModel.from_pretrained('plato-mini')
+                tokenizer = UnifiedTransformerTokenizer.from_pretrained('plato-mini')
+
+                history = '我爱祖国'
+                inputs = tokenizer.dialogue_encode(
+                    history,
+                    return_tensors=True,
+                    is_split_into_words=False)
+                outputs = model(**inputs)
+        """
+
         embedding_output = self.embeddings(input_ids, token_type_ids,
                                            position_ids)
         if use_cache:
@@ -228,6 +394,15 @@ class UnifiedTransformerLMHead(nn.Layer):
 
 
 class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
+    """
+    The UnifiedTransformer Model with a language modeling head on top (linear 
+    layer with weights tied to the input embeddings) for generation tasks.
+
+    Args:
+        unified_transformer (:class:`UnifiedTransformerModel`):
+            An instance of :class:`UnifiedTransformerModel`.
+    """
+
     def __init__(self, unified_transformer):
         super(UnifiedTransformerLMHeadModel, self).__init__()
         self.unified_transformer = unified_transformer
@@ -246,6 +421,52 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 masked_positions=None,
                 use_cache=False,
                 cache=None):
+        r"""
+        The UnifiedTransformerLMHeadModel forward method, overrides the special 
+        :meth:`__call__` method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`UnifiedTransformerModel`.
+            token_type_ids (Tensor):
+                See :class:`UnifiedTransformerModel`.
+            position_ids (Tensor):
+                See :class:`UnifiedTransformerModel`.
+            attention_mask (Tensor): 
+                See :class:`UnifiedTransformerModel`.
+            use_cache: (bool, optional): 
+                See :class:`UnifiedTransformerModel`.
+            cache (list, optional): 
+                See :class:`UnifiedTransformerModel`.
+
+        Returns:
+            Tensor|tuple: If `use_cache` is False, it is a tensor 
+            representing the output of :class:`UnifiedTransformerLMHeadModel`, 
+            with shape [batch_size, sequence_length, vocab_size]. The data type 
+            is float32 or float64. Otherwise, it is a tuple, besides the output 
+            of :class:`UnifiedTransformerLMHeadModel`, the tuple also includes 
+            the new cache which is same as input `cache` but `incremental_cache` 
+            in it has an incremental length. 
+            See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and 
+            :meth:`paddle.nn.MultiHeadAttention.forward` method for more details.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import UnifiedTransformerLMHeadModel
+                from paddlenlp.transformers import UnifiedTransformerTokenizer
+
+                model = UnifiedTransformerLMHeadModel.from_pretrained('plato-mini')
+                tokenizer = UnifiedTransformerTokenizer.from_pretrained('plato-mini')
+
+                history = '我爱祖国'
+                inputs = tokenizer.dialogue_encode(
+                    history,
+                    return_tensors=True,
+                    is_split_into_words=False)
+                logits = model(**inputs)
+        """
+
         outputs = self.unified_transformer(input_ids, token_type_ids,
                                            position_ids, attention_mask,
                                            use_cache, cache)
@@ -291,5 +512,11 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)
-        except AttributeError:
-            return getattr(getattr(self, self.base_model_prefix), name)
+        except AttributeError as e:
+            try:
+                return getattr(getattr(self, self.base_model_prefix), name)
+            except AttributeError:
+                try:
+                    return getattr(self, self.base_model_prefix).config[name]
+                except KeyError:
+                    raise e

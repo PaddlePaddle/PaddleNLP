@@ -37,12 +37,12 @@ def parse_args():
         type=str,
         help="Path of the config file. ")
     parser.add_argument(
-        "--decoding-lib",
+        "--decoding_lib",
         default="./build/lib/libdecoding_op.so",
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(
-        "--use-fp16-decoding",
+        "--use_fp16_decoding",
         action="store_true",
         help="Whether to use fp16 decoding to predict. ")
     args = parser.parse_args()

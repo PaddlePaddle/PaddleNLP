@@ -79,6 +79,7 @@ class ErnieSageV2Encoder(Encoder):
             ernie.config["hidden_size"],
             self.config.hidden_size,
             learning_rate=fc_lr,
+            cls_token_id=self.config.cls_token_id,
             aggr_func="sum")
         self.convs.append(erniesage_conv)
         for i in range(1, self.config.num_layers):
