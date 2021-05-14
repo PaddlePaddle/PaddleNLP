@@ -177,10 +177,10 @@ def reset_program_state_dict(args, model, state_dict, pretrained_state_dict):
     reset_parameter_names = []
     for n, p in state_dict.items():
         if n in pretrained_state_dict:
-            reset_state_dict[p.name] = pretrained_state_dict[n]
+            reset_state_dict[p.name] = np.array(pretrained_state_dict[n])
             reset_parameter_names.append(n)
         elif p.name in pretrained_state_dict and "bert" in n:
-            reset_state_dict[p.name] = pretrained_state_dict[p.name]
+            reset_state_dict[p.name] = np.array(pretrained_state_dict[p.name])
             reset_parameter_names.append(n)
         else:
             dtype_str = "float32"

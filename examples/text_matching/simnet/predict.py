@@ -20,6 +20,7 @@ import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 
+from model import SimNet
 from utils import preprocess_prediction_data
 
 # yapf: disable
@@ -88,7 +89,7 @@ if __name__ == "__main__":
     label_map = {0: 'dissimilar', 1: 'similar'}
 
     # Constructs the newtork.
-    model = ppnlp.models.SimNet(
+    model = SimNet(
         network=args.network, vocab_size=len(vocab), num_classes=len(label_map))
 
     # Loads model parameters.
