@@ -25,30 +25,21 @@ from paddle.fluid.framework import in_dygraph_mode, _dygraph_tracer
 from paddle.fluid.layer_helper import LayerHelper
 from paddle.fluid.dygraph import base as imperative_base
 
+__all__ = ["AdamW", ]
 
-class Adam(Optimizer):
+
+class AdamW(Optimizer):
     r"""
-    The Adam optimizer uses an optimization described at the end
-    of section 2 of `Adam paper <https://arxiv.org/abs/1412.6980>`_ ,
-    it can dynamically adjusts the learning rate of each parameter using
-    the 1st moment estimates and the 2nd moment estimates of the gradient.
-
-    The parameter ``param_out`` update rule with gradient ``grad``:
-
+    The AdamW optimizer is implemented based on the AdamW Optimization
+    in paper `DECOUPLED WEIGHT DECAY REGULARIZATION <https://arxiv.org/pdf/1711.05101.pdf>`_.
+    it can resolves the problem of L2 regularization failure in the Adam optimizer.
     .. math::
-
         t & = t + 1
-
         moment\_1\_out & = {\\beta}_1 * moment\_1 + (1 - {\\beta}_1) * grad
-
-        moment\_2\_out & = {\\beta}_2 * moment\_2 + (1 - {\\beta}_2) * grad * grad
-
+        moemnt\_2\_out & = {\\beta}_2 * moment\_2 + (1 - {\\beta}_2) * grad * grad
         learning\_rate & = learning\_rate * \\
-                          \\frac{\sqrt{1 - {\\beta}_2^t}}{1 - {\\beta}_1^t}
-
-        param\_out & = param - learning\_rate * \\frac{moment\_1}{\sqrt{moment\_2} + \epsilon}
-
-    Related paper: `Adam: A Method for Stochastic Optimization <https://arxiv.org/abs/1412.6980>`_
+            \\frac{\sqrt{1 - {\\beta}_2^t}}{1 - {beta}_1^t}
+        param\_out & = param - learning\_rate * (\\frac{moment\_1}{\sqrt{moment\_2} + \epsilon} + \lambda * param)
 
     Args:
         learning_rate (float|LRScheduler, optional): The learning rate used to update ``Parameter``.
@@ -96,11 +87,11 @@ class Adam(Optimizer):
             inp = paddle.rand([10,10], dtype="float32")
             out = linear(inp)
             loss = paddle.mean(out)
-            adam = paddlenlp.ops.optimizer.Adam(learning_rate=0.1,
+            adamw = paddlenlp.ops.optimizer.Adam(learning_rate=0.1,
                     parameters=linear.parameters())
             out.backward()
-            adam.step()
-            adam.clear_grad()
+            adamw.step()
+            adamw.clear_grad()
 
     """
     _moment1_acc_str = "moment1"
@@ -142,7 +133,7 @@ class Adam(Optimizer):
             weight_decay=None,
             grad_clip=grad_clip,
             name=name)
-        self.type = "custom_adam"
+        self.type = "adamw"
         self._beta1 = beta1
         self._beta2 = beta2
         self._epsilon = epsilon
@@ -292,7 +283,7 @@ class Adam(Optimizer):
             }
 
             framework._dygraph_tracer().trace_op(
-                type="custom_adam", inputs=ins, outputs=outs, attrs=attrs)
+                type="adamw", inputs=ins, outputs=outs, attrs=attrs)
 
             return None
 
@@ -339,8 +330,8 @@ class Adam(Optimizer):
 
         for name in ["Beta1Tensor", "Beta2Tensor", "MasterParam"]:
             if name in inputs:
-                raise ValueError("Custom Adam should NOT have input: {}".format(
-                    name))
+                raise ValueError(
+                    "Custom AdamW should NOT have input: {}".format(name))
 
         adam_op = block.append_op(
             type=self.type,
@@ -363,7 +354,7 @@ class Adam(Optimizer):
                 if hasattr(grad_var, "_is_sparse") and grad_var._is_sparse(
                 ) and self.regularization is not None:
                     raise RuntimeError(
-                        "Adam don't support weight_decay with sparse parameters, please set it to None."
+                        "AdamW don't support weight_decay with sparse parameters, please set it to None."
                     )
                 params_grads.append((param, grad_var))
 
