@@ -1,6 +1,6 @@
 # Transformers模型预训练数据准备
 
-为了满足各垂类领域（金融、医疗等）继续预训练Tranformers模型，本教程给出如何在垂类领域数据上继续预训练模型（continual pretraining），支持BERT、BERT-WWM、ERNIE等预训练模型在垂类数据上继续预训练。
+为了满足各垂类领域（金融、医疗等）继续预训练Tranformers模型，本教程给出如何在垂类领域构建预训练数据，继续预训练模型（continual pretraining），支持BERT、BERT-WWM、ERNIE等预训练模型在垂类数据上继续预训练。
 
 为了完成继续预训练，需要完成以下几个步骤：
 
