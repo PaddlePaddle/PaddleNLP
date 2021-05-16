@@ -27,7 +27,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.transformers import BertTokenizer, ErnieTokenizer
 from tqdm import tqdm
 
-# chinese word segmentation tool
+# Chinese word segmentation tool
 lac_cws = LAC(mode='seg')
 # chinese lexical analysis tool
 lac = LAC(mode="lac")
@@ -65,8 +65,7 @@ class TrainingInstance(object):
 
 def write_instance_to_example_file(instances, tokenizer, max_seq_length,
                                    max_predictions_per_seq, output_file):
-    """Create TF example files from `TrainingInstance`s."""
-
+    """Save instance data to HDF5 file."""
     total_written = 0
     features = collections.OrderedDict()
 
@@ -153,11 +152,23 @@ def write_instance_to_example_file(instances, tokenizer, max_seq_length,
     f.close()
 
 
-def create_training_instances(input_files, tokenizer, model_name,
-                              max_seq_length, max_word_length, dupe_factor,
-                              short_seq_prob, masked_lm_prob,
-                              max_predictions_per_seq, rng):
+def create_training_instances(input_files,
+                              tokenizer,
+                              model_name,
+                              max_seq_length,
+                              max_word_length,
+                              dupe_factor,
+                              short_seq_prob,
+                              masked_lm_prob,
+                              max_predictions_per_seq,
+                              rng,
+                              chinese_word_segmentation_fn=None,
+                              lexical_analysis_fn=None):
     """Create `TrainingInstance`s from raw text."""
+    if chinese_word_segmentation_fn is None:
+        chinese_word_segmentation_fn = lac_cws.run
+    if lexical_analysis_fn is None:
+        lexical_analysis_fn = lac.run
     all_documents = [[]]
 
     # Input file format:
@@ -183,13 +194,13 @@ def create_training_instances(input_files, tokenizer, model_name,
                 # basic masking defaultly when words is None
                 words = None
                 if model_name == "bert-wwm-chinese":
-                    # do chinese word segmentation normally
-                    words = lac_cws.run(line)
+                    # do Chinese word segmentation normally
+                    words = chinese_word_segmentation_fn(line)
                     tokens = get_whole_word_mask_tokens(tokens, words,
                                                         max_seq_length)
                 elif model_name == "ernie-1.0":
-                    # do chinese word segmentation with entity words
-                    words, tag = lac.run(line)
+                    # do Chinese word segmentation with entity words
+                    words, tag = lexical_analysis_fn(line)
                     tokens = get_whole_word_mask_tokens(tokens, words,
                                                         max_seq_length)
 
@@ -217,9 +228,9 @@ def create_training_instances(input_files, tokenizer, model_name,
 
 def get_whole_word_mask_tokens(tokens, words, max_word_length=4):
     """
-    Do whole word mask on chinese word.
-    First, we do chinese word segmentation on the sequence of tokens, which are from the WordPiece tokenization.
-    Then, we add the '##' mark on chinese characters which are in the middle of chinese words.
+    Do whole word mask on Chinese word.
+    First, we do Chinese word segmentation on the sequence of tokens, which are from the WordPiece tokenization.
+    Then, we add the '##' mark on chinese characters which are in the middle of Chinese words.
     And if the tokens are not chinese characters, we just exploit the results of WordPiece tokenization as words.
     Such as, 
          - text line : 通过利用mercer核，将样本从输入空间映射到高维特征空间，使原来没有显现的特征突现出来，取得了很好的图像分割效果。
@@ -227,7 +238,7 @@ def get_whole_word_mask_tokens(tokens, words, max_word_length=4):
             ['通', '过', '利', '用', 'me', '##rc', '##er', '核', '，', '将', '样', '本', '从', '输', '入', '空', '间', '映', 
             '射', '到', '高', '维', '特', '征', '空', '间', '，', '使', '原', '来', '没', '有', '显', '现', '的', '特', '征', 
             '突', '现', '出', '来', '，', '取', '得', '了', '很', '好', '的', '图', '像', '分', '割', '效', '果', '。']
-        - the chinese words (after chinese word segmentation like jieba)
+        - the Chinese words (after Chinese word segmentation like jieba)
             ['通过', '利用', 'mercer', '核', '，', '将', '样本', '从', '输入', '空间', '映射', '到', '高维', '特征', 
             '空间', '，', '使', '原来', '没有', '显现', '的', '特征', '突现', '出来', '，', '取得', '了', '很', '好', 
             '的', '图像', '分割', '效果', '。']
@@ -239,8 +250,9 @@ def get_whole_word_mask_tokens(tokens, words, max_word_length=4):
 
     Args:
         tokens(list(str)): The sequence of tokens, which are from the WordPiece tokenization.
+        words(list(str)): The sequence of Chinese words.
         max_word_length(int, optional): 
-            The maximum chinese character in chinese words. It avoids too long chinese word to be masked.
+            The maximum chinese character in Chinese words. It avoids too long Chinese word to be masked.
             Defaults as 4.
 
     Returns:
@@ -251,14 +263,13 @@ def get_whole_word_mask_tokens(tokens, words, max_word_length=4):
     new_tokens = []
     i = 0
     while i < len(tokens):
-
         # non-chinese character, then do word piece 
         if len(re.findall('[\u4E00-\u9FA5]', tokens[i])) == 0:
             new_tokens.append(tokens[i])
             i += 1
             continue
 
-        # add "##" mark on the middel tokens of chinese words
+        # add "##" mark on the middel tokens of Chinese words
         # such as ["通过", "利用"] -> ["通", "##过"， "利", "##用"] 
         has_add = False
         for length in range(max_word_length, 0, -1):
@@ -400,10 +411,14 @@ def create_instances_from_document(model_name, all_documents, document_index,
     return instances
 
 
-def create_masked_lm_predictions(model_name, tokens, masked_lm_prob,
-                                 max_predictions_per_seq, vocab_words, rng):
+def create_masked_lm_predictions(model_name,
+                                 tokens,
+                                 masked_lm_prob,
+                                 max_predictions_per_seq,
+                                 vocab_words,
+                                 rng,
+                                 check=False):
     """Creates the predictions for the masked LM objective."""
-
     cand_indexes = []
     for (i, token) in enumerate(tokens):
         if token == "[CLS]" or token == "[SEP]":
@@ -424,8 +439,7 @@ def create_masked_lm_predictions(model_name, tokens, masked_lm_prob,
             cand_indexes.append([i])
 
     rng.shuffle(cand_indexes)
-
-    # drop the additional "##" flag in chinese word piece
+    # drop the additiona;l "##" flag in Chinse word piece
     output_tokens = [
         t[2:] if len(re.findall('##[\u4E00-\u9FA5]', t)) > 0 else t
         for t in tokens
@@ -453,25 +467,28 @@ def create_masked_lm_predictions(model_name, tokens, masked_lm_prob,
         for index in index_set:
             covered_indexes.add(index)
 
-        masked_token = None
-        # 80% of the time, replace with [MASK]
-        if rng.random() < 0.8:
-            masked_token = "[MASK]"
-        else:
-            # 10% of the time, keep original
-            if rng.random() < 0.5:
-                # drop the additional "##" flag in chinese word piece
-                masked_token = tokens[index][2:] if len(
-                    re.findall('##[\u4E00-\u9FA5]', tokens[
-                        index])) > 0 else tokens[index]
-            # 10% of the time, replace with random word
+            masked_token = None
+            # 80% of the time, replace with [MASK]
+            if rng.random() < 0.8:
+                masked_token = "[MASK]"
             else:
-                masked_token = vocab_words[rng.randint(0, len(vocab_words) - 1)]
+                # 10% of the time, keep original
+                if rng.random() < 0.5:
+                    # drop the additiona;l "##" flag in Chinse word piece
+                    masked_token = tokens[index][2:] if len(
+                        re.findall('##[\u4E00-\u9FA5]', tokens[
+                            index])) > 0 else tokens[index]
+                # 10% of the time, replace with random word
+                else:
+                    masked_token = vocab_words[rng.randint(
+                        0, len(vocab_words) - 1)]
 
-        output_tokens[index] = masked_token
+            output_tokens[index] = masked_token
 
-        masked_lms.append(MaskedLmInstance(index=index, label=tokens[index]))
-    assert len(masked_lms) <= num_to_predict
+            masked_lms.append(
+                MaskedLmInstance(
+                    index=index, label=tokens[index]))
+    assert len(masked_lms) <= num_to_predict and len(masked_lms) > 0
     masked_lms = sorted(masked_lms, key=lambda x: x.index)
 
     masked_lm_positions = []
@@ -480,6 +497,11 @@ def create_masked_lm_predictions(model_name, tokens, masked_lm_prob,
         masked_lm_positions.append(p.index)
         masked_lm_labels.append(p.label)
 
+    # Check some data. 
+    if check and rng.random() < 0.005:
+        print("%" * 100)
+        print("raw tokens: ", tokens)
+        print("output tokens: ", output_tokens)
     return (output_tokens, masked_lm_positions, masked_lm_labels)
 
 
@@ -502,7 +524,6 @@ def truncate_seq_pair(tokens_a, tokens_b, max_num_tokens, rng):
 
 
 def main():
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input_file",
@@ -516,7 +537,7 @@ def main():
         default=None,
         type=str,
         required=True,
-        help="The output file where the model checkpoints will be written.")
+        help="The output file where the pretraining data will be written.")
     parser.add_argument(
         "--model_name",
         choices=[
@@ -572,6 +593,11 @@ def main():
         type=int,
         default=10000,
         help="random seed for initialization")
+    parser.add_argument(
+        '--check',
+        action='store_true',
+        default=False,
+        help="Whether to check the pretraining data creation.")
 
     args = parser.parse_args()
 
