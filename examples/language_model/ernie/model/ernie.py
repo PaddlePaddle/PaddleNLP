@@ -12,18 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Ernie model."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import json
-
 import six
+from functools import partial
+
+import numpy as np
 import paddle
 import paddle.fluid as fluid
-import numpy as np
-from functools import partial
 
 from model.transformer_encoder import encoder, pre_process_layer
 from model.transformer_encoder import gelu
@@ -263,80 +258,6 @@ class ErnieModel(object):
                                                 "mean_next_sent_loss")
         return next_sent_acc, mean_next_sent_loss
 
-    #def get_word_order_output(self, word_label, pos):
-    #    pos = fluid.layers.cast(x=pos, dtype='int32')
-
-    #    reshaped_emb_out = fluid.layers.reshape(
-    #        x=self._enc_out, shape=[-1, self._hidden_size])
-
-    #    # extract masked tokens' feature
-    #    mask_feat = fluid.layers.gather(input=reshaped_emb_out, index=pos)
-    #    if self._dtype == "float16":
-    #        mask_feat = fluid.layers.cast(x=mask_feat, dtype=self._emb_dtype)
-
-    #    # transform: fc
-    #    if self._hidden_act == 'gelu' or self._hidden_act == 'gelu.precise':
-    #        _hidden_act = 'gelu'
-    #    else:
-    #        _hidden_act = None
-
-    #    mask_trans_feat = fluid.layers.fc(
-    #        input=mask_feat,
-    #        size=self._emb_size,
-    #        act=_hidden_act,
-    #        param_attr=fluid.ParamAttr(
-    #            name='word_order_trans_fc.w_0',
-    #            initializer=self._param_initializer),
-    #        bias_attr=fluid.ParamAttr(name='word_order_lm_trans_fc.b_0'))
-
-    #    if self._hidden_act == 'gelu' or self._hidden_act == 'gelu.precise':
-    #        pass
-    #    else:
-    #        mask_trans_feat = gelu(mask_trans_feat)
-
-    #    # transform: layer norm 
-    #    mask_trans_feat = fluid.layers.layer_norm(
-    #        mask_trans_feat,
-    #        begin_norm_axis=len(mask_trans_feat.shape) - 1,
-    #        param_attr=fluid.ParamAttr(
-    #            name='word_order_lm_trans_layer_norm_scale',
-    #            initializer=fluid.initializer.Constant(1.)),
-    #        bias_attr=fluid.ParamAttr(
-    #            name='word_order_lm_trans_layer_norm_bias',
-    #            initializer=fluid.initializer.Constant(1.)),
-    #        epsilon=self.config['epsilon'])
-
-    #    mask_lm_out_bias_attr = fluid.ParamAttr(
-    #        name="word_order_lm_out_fc.b_0",
-    #        initializer=fluid.initializer.Constant(value=0.0))
-
-    #    if self._weight_sharing:
-    #        fc_out = fluid.layers.matmul(
-    #            x=mask_trans_feat,
-    #            y=fluid.default_main_program().global_block().var(
-    #                self._word_emb_name),
-    #            transpose_y=True)
-    #        fc_out += fluid.layers.create_parameter(
-    #            shape=[self._voc_size],
-    #            dtype=self._emb_dtype,
-    #            attr=mask_lm_out_bias_attr,
-    #            is_bias=True)
-
-    #    else:
-    #        fc_out = fluid.layers.fc(input=mask_trans_feat,
-    #                                 size=self._voc_size,
-    #                                 param_attr=fluid.ParamAttr(
-    #                                     name="word_order_lm_out_fc.w_0",
-    #                                     initializer=self._param_initializer),
-    #                                 bias_attr=mask_lm_out_bias_attr)
-
-    #    ##############
-    #    # WORD_ORDER
-    #    word_order_ce_loss = fluid.layers.softmax_with_cross_entropy(logits=fc_out, label=word_label)
-    #    mean_word_order_loss = fluid.layers.mean(word_order_ce_loss)
-
-    #    return mean_word_order_loss
-
     def get_lm_output(self, mask_label, mask_pos):
         """Get the loss & accuracy for pretraining"""
         mask_pos = fluid.layers.cast(x=mask_pos, dtype='int32')
@@ -370,7 +291,7 @@ class ErnieModel(object):
         else:
             mask_trans_feat = gelu(mask_trans_feat)
 
-        # transform: layer norm 
+        # transform: layer norm
         mask_trans_feat = fluid.layers.layer_norm(
             mask_trans_feat,
             begin_norm_axis=len(mask_trans_feat.shape) - 1,

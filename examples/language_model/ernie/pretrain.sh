@@ -9,7 +9,6 @@ export FLAGS_allocator_strategy=naive_best_fit
 rm -rf *.prototxt
 rm -rf core.*
 
-fuser -kv /dev/nvidia*
 task_name='gpt3-230B-32pp4dp2mp'
 output_dir=output/${task_name}
 rm -rf ${output_dir}
