@@ -38,8 +38,8 @@ class Stack(object):
         Batchifies the input data by stacking.
 
         Args:
-            data (list): The input data samples. It is a list. Each element is 
-                a numpy.ndarray or list.
+            data (list[numpy.ndarray]): The input data samples. It is a list. 
+                Each element is a numpy.ndarray or list.
 
         Returns:
             numpy.ndarray: Stacked batch data.
@@ -109,15 +109,15 @@ class Pad(object):
         `axis` if `ret_length` is not None or False.
 
         Args:
-            data (list): The input data samples. It is a list. Each element is 
-                a numpy.ndarray or list.
+            data (list[numpy.ndarray|list]): The input data samples. It is a 
+                list. Each element is a numpy.ndarray or list.
 
         Returns:
-            numpy.ndarray|tuple: If `ret_length` is False, it is a numpy.ndarray 
-            representing the padded batch data and the shape is (N, …). 
-            Otherwise, it is a tuple, besides the padded batch data, the tuple 
-            also includes a numpy.ndarray representing original length at 
-            `axis` of all input samples, which shaped `(N,)`. 
+            numpy.ndarray|tuple[numpy.ndarray]: If `ret_length` is False, it 
+            is a numpy.ndarray representing the padded batch data and the 
+            shape is (N, …). Otherwise, it is a tuple, besides the padded batch 
+            data, the tuple also includes a numpy.ndarray representing original 
+            length at `axis` of all input samples, which shaped `(N,)`. 
 
         Example:
             .. code-block:: python
@@ -179,9 +179,9 @@ class Tuple(object):
     label correspondingly.
 
     Args:
-        fn (list|tuple|callable): The batchify functions to wrap. It is a callable
-            function or a list/tuple of callable functions.
-        args (tuple of callable): The additional batchify functions to wrap.
+        fn (callable|list[callable]|tuple[callable]): The batchify functions to 
+            wrap. It is a callable function or a list/tuple of callable functions.
+        args (tuple[callable]): The additional batchify functions to wrap.
     """
 
     def __init__(self, fn, *args):
@@ -283,8 +283,8 @@ class Dict(object):
         with the same key as batchify functions of all samples.
 
         Args:
-            data (list|tuple): The samples to batchfy. Each sample in list/tuple
-                is a dict with `N` key-values.
+            data (list[dict]|tuple[dict]): The samples to batchfy. Each sample 
+                in list/tuple is a dict with `N` key-values.
                 
         Returns:
             tuple: A tuple composed of results from all including batchifying 

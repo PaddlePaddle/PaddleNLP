@@ -1,3 +1,16 @@
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import os
 import numpy as np
 
@@ -5,7 +18,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddlenlp.transformers import TransformerModel, position_encoding_init
+from paddlenlp.transformers import TransformerModel, WordEmbedding, PositionalEmbedding, position_encoding_init
 from paddlenlp.ops import InferTransformerDecoding
 
 
@@ -55,6 +68,12 @@ class FasterTransformer(TransformerModel):
 
         self.decoding_linear = nn.Linear(
             in_features=d_model, out_features=trg_vocab_size)
+
+        if weight_sharing:
+            self.trg_word_embedding = WordEmbedding(
+                vocab_size=trg_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
+            self.trg_pos_embedding = PositionalEmbedding(
+                emb_dim=d_model, max_length=max_length)
 
         self.decoding = InferTransformerDecoding(
             decoder=self.transformer.decoder,
@@ -142,6 +161,10 @@ class FasterTransformer(TransformerModel):
                     model_dict[item] = np.float16(model_dict[item])
             model_dict["decoding_linear.weight"] = np.float16(model_dict[
                 "decoding_linear.weight"])
+            model_dict["trg_word_embedding.word_embedding.weight"] = np.float16(
+                model_dict["trg_word_embedding.word_embedding.weight"])
+            model_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
+                model_dict["trg_pos_embedding.pos_encoder.weight"])
 
         self.load_dict(model_dict)
 
@@ -184,6 +207,10 @@ class FasterTransformer(TransformerModel):
                     model_dict[item] = np.float16(model_dict[item])
             model_dict["decoding_linear.weight"] = np.float16(model_dict[
                 "decoding_linear.weight"])
+            model_dict["trg_word_embedding.word_embedding.weight"] = np.float16(
+                model_dict["trg_word_embedding.word_embedding.weight"])
+            model_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
+                model_dict["trg_pos_embedding.pos_encoder.weight"])
 
         for item in self.state_dict():
             param = self

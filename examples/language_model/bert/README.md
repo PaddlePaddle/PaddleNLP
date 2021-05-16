@@ -14,7 +14,7 @@
 
 `create_pretraining_data.py` 是创建预训练程序所需数据的脚本。其以文本文件（使用换行符换行和空白符分隔，data目录下提供了部分示例数据）为输入，经由BERT tokenizer进行tokenize后再做生成sentence pair正负样本、掩码token等处理，最后输出hdf5格式的数据文件。使用方式如下：
 
-```python
+```shell
 python create_pretraining_data.py \
   --input_file=data/sample_text.txt \
   --output_file=data/training_data.hdf5 \
@@ -97,7 +97,7 @@ python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
 - `weight_decay` 表示AdamW优化器中使用的weight_decay的系数。
 - `adam_epsilon` 表示AdamW优化器中使用的epsilon值。
-- `warmup_steps` 表示。
+- `warmup_steps` 表示动态学习率热启的step数。
 - `num_train_epochs` 表示训练轮数。
 - `input_dir` 表示输入数据的目录，该目录下所有文件名中包含training的文件将被作为训练数据。
 - `output_dir` 表示模型的保存目录。
@@ -191,3 +191,7 @@ python -u ./predict_glue.py \
 - `model_path` 表示预测模型文件的前缀，和上一步导出预测模型中的`output_path`一致。
 - `batch_size` 表示每个预测批次的样本数目。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
+
+## 扩展
+
+上述的介绍是基于动态图的BERT的预训练任务和微调任务以及预测任务的实践过程，同时在我们也提供了基于PaddlePaddle Fleet API的静态图的BERT相关实践，在组网代码层面保持动静统一，在计算速度以及多机联合训练方面有着更优的性能，具体的细节可以参考 [BERT静态图](./static)  。

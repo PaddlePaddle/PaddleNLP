@@ -33,9 +33,12 @@ def min_max_filer(data, max_len, min_len=0):
     return (data_min_len >= min_len) and (data_max_len <= max_len)
 
 
-def create_data_loader(args):
+def create_data_loader(args, places=None):
     datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
-    src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
+    if not args.benchmark:
+        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
+    else:
+        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["benchmark"])
     trg_vocab = src_vocab
 
     padding_vocab = (
@@ -69,25 +72,31 @@ def create_data_loader(args):
             max_length=args.max_length,
             distribute_mode=True if i == 0 else False,
             world_size=dist.get_world_size(),
-            rank=dist.get_rank())
+            rank=dist.get_rank(),
+            pad_seq=args.pad_seq,
+            bsz_multi=args.bsz_multi)
 
         data_loader = DataLoader(
             dataset=dataset,
+            places=places,
             batch_sampler=batch_sampler,
             collate_fn=partial(
                 prepare_train_input,
                 bos_idx=args.bos_idx,
                 eos_idx=args.eos_idx,
-                pad_idx=args.bos_idx),
-            num_workers=0,
-            return_list=True)
+                pad_idx=args.bos_idx,
+                pad_seq=args.pad_seq),
+            num_workers=0)
         data_loaders[i] = (data_loader)
     return data_loaders
 
 
 def create_infer_loader(args):
     dataset = load_dataset('wmt14ende', splits=('test'))
-    src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
+    if not args.benchmark:
+        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
+    else:
+        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
     trg_vocab = src_vocab
 
     padding_vocab = (
@@ -117,7 +126,8 @@ def create_infer_loader(args):
             prepare_infer_input,
             bos_idx=args.bos_idx,
             eos_idx=args.eos_idx,
-            pad_idx=args.bos_idx),
+            pad_idx=args.bos_idx,
+            pad_seq=args.pad_seq),
         num_workers=0,
         return_list=True)
     return data_loader, trg_vocab.to_tokens
@@ -135,27 +145,44 @@ def adapt_vocab_size(args):
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
 
 
-def prepare_train_input(insts, bos_idx, eos_idx, pad_idx):
+def prepare_train_input(insts, bos_idx, eos_idx, pad_idx, pad_seq=1):
     """
     Put all padded data needed by training into a list.
     """
     word_pad = Pad(pad_idx)
-    src_word = word_pad([inst[0] + [eos_idx] for inst in insts])
-    trg_word = word_pad([[bos_idx] + inst[1] for inst in insts])
+    src_max_len = (
+        max([len(inst[0]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
+    trg_max_len = (
+        max([len(inst[1]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
+    src_word = word_pad([
+        inst[0] + [eos_idx] + [pad_idx] * (src_max_len - 1 - len(inst[0]))
+        for inst in insts
+    ])
+    trg_word = word_pad([[bos_idx] + inst[1] + [pad_idx] *
+                         (trg_max_len - 1 - len(inst[1])) for inst in insts])
     lbl_word = np.expand_dims(
-        word_pad([inst[1] + [eos_idx] for inst in insts]), axis=2)
+        word_pad([
+            inst[1] + [eos_idx] + [pad_idx] * (trg_max_len - 1 - len(inst[1]))
+            for inst in insts
+        ]),
+        axis=2)
 
     data_inputs = [src_word, trg_word, lbl_word]
 
     return data_inputs
 
 
-def prepare_infer_input(insts, bos_idx, eos_idx, pad_idx):
+def prepare_infer_input(insts, bos_idx, eos_idx, pad_idx, pad_seq=1):
     """
     Put all padded data needed by beam search decoder into a list.
     """
     word_pad = Pad(pad_idx)
-    src_word = word_pad([inst[0] + [eos_idx] for inst in insts])
+    src_max_len = (
+        max([len(inst[0]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
+    src_word = word_pad([
+        inst[0] + [eos_idx] + [pad_idx] * (src_max_len - 1 - len(inst[0]))
+        for inst in insts
+    ])
 
     return [src_word, ]
 
@@ -180,18 +207,24 @@ class SentenceBatchCreator(object):
 
 
 class TokenBatchCreator(object):
-    def __init__(self, batch_size):
+    def __init__(self, batch_size, bsz_multi=1):
         self._batch = []
         self.max_len = -1
         self._batch_size = batch_size
+        self._bsz_multi = bsz_multi
 
     def append(self, info):
         cur_len = info.max_len
         max_len = max(self.max_len, cur_len)
         if max_len * (len(self._batch) + 1) > self._batch_size:
-            result = self._batch
-            self._batch = [info]
-            self.max_len = cur_len
+            # Make sure the batch size won't be empty. 
+            mode_len = max(
+                len(self._batch) // self._bsz_multi * self._bsz_multi,
+                len(self._batch) % self._bsz_multi)
+            result = self._batch[:mode_len]
+            self._batch = self._batch[mode_len:]
+            self._batch.append(info)
+            self.max_len = max([b.max_len for b in self._batch])
             return result
         else:
             self.max_len = max_len
@@ -203,11 +236,12 @@ class TokenBatchCreator(object):
 
 
 class SampleInfo(object):
-    def __init__(self, i, lens):
+    def __init__(self, i, lens, pad_seq=1):
         self.i = i
         # Take bos and eos into account
-        self.min_len = min(lens[0] + 1, lens[1] + 1)
-        self.max_len = max(lens[0] + 1, lens[1] + 1)
+        self.min_len = min(lens[0], lens[1]) + 1
+        self.max_len = (max(lens[0], lens[1]) + pad_seq) // pad_seq * pad_seq
+        self.seq_max_len = max(lens[0], lens[1]) + 1
         self.src_len = lens[0] + 1
         self.trg_len = lens[1] + 1
 
@@ -227,7 +261,9 @@ class TransformerBatchSampler(BatchSampler):
                  distribute_mode=True,
                  seed=0,
                  world_size=1,
-                 rank=0):
+                 rank=0,
+                 pad_seq=1,
+                 bsz_multi=8):
         for arg, value in locals().items():
             if arg != "self":
                 setattr(self, "_" + arg, value)
@@ -240,7 +276,7 @@ class TransformerBatchSampler(BatchSampler):
         self._sample_infos = []
         for i, data in enumerate(self._dataset):
             lens = [len(data[0]), len(data[1])]
-            self._sample_infos.append(SampleInfo(i, lens))
+            self._sample_infos.append(SampleInfo(i, lens, self._pad_seq))
 
     def __iter__(self):
         # global sort or global shuffle
@@ -261,13 +297,13 @@ class TransformerBatchSampler(BatchSampler):
                     reverse = not reverse
                     infos[i:i + self._pool_size] = sorted(
                         infos[i:i + self._pool_size],
-                        key=lambda x: x.max_len,
+                        key=lambda x: x.seq_max_len,
                         reverse=reverse)
 
         batches = []
         batch_creator = TokenBatchCreator(
-            self.
-            _batch_size) if self._use_token_batch else SentenceBatchCreator(
+            self._batch_size,
+            self._bsz_multi) if self._use_token_batch else SentenceBatchCreator(
                 self._batch_size * self._nranks)
 
         for info in infos:

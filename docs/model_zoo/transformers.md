@@ -12,14 +12,21 @@
 | [BERT](https://arxiv.org/abs/1810.04805) | BertTokenizer|BertModel<br> BertForQuestionAnswering<br> BertForSequenceClassification<br>BertForTokenClassification| `bert-base-uncased`<br> `bert-large-uncased` <br>`bert-base-multilingual-uncased` <br>`bert-base-cased`<br> `bert-base-chinese`<br> `bert-base-multilingual-cased`<br> `bert-large-cased`<br> `bert-wwm-chinese`<br> `bert-wwm-ext-chinese` |
 |[ERNIE](https://arxiv.org/abs/1904.09223)|ErnieTokenizer<br>ErnieTinyTokenizer|ErnieModel<br> ErnieForQuestionAnswering<br> ErnieForSequenceClassification<br> ErnieForTokenClassification | `ernie-1.0`<br> `ernie-tiny`<br> `ernie-2.0-en`<br> `ernie-2.0-large-en`|
 |[ERNIE-GEN](https://arxiv.org/abs/2001.11314)|ErnieTokenizer| ErnieForGeneration|`ernie-gen-base-en`<br>`ernie-gen-large-en`<br>`ernie-gen-large-en-430g`|
-|[GPT-2](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)| GPT2Tokenizer<br> GPT2ChineseTokenizer| GPT2ForGreedyGeneration| `gpt2-base-cn` <br> `gpt2-medium-en`|
+| ERNIE-CTM                                 | ErnieCtmTokenizer | ErnieCtmModel<br> ErnieCtmWordtagModel                       | `ernie-ctm`            |
+|[GPT-2](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)| GPTTokenizer<br> GPTChineseTokenizer| GPTForGreedyGeneration| `gpt-cpm-large-cn` <br> `gpt2-medium-en`|
 |[RoBERTa](https://arxiv.org/abs/1907.11692)|RobertaTokenizer| RobertaModel<br>RobertaForQuestionAnswering<br>RobertaForSequenceClassification<br>RobertaForTokenClassification| `roberta-wwm-ext`<br> `roberta-wwm-ext-large`<br> `rbt3`<br> `rbtl3`|
+| [BigBird](https://arxiv.org/abs/2007.14062) | BigBirdTokenizer  | BigBirdModel<br> BigBirdForSequenceClassification<br> BigBirdForPretraining | `bigbird-base-uncased` |
 |[ELECTRA](https://arxiv.org/abs/2003.10555) | ElectraTokenizer| ElectraModel<br>ElectraForSequenceClassification<br>ElectraForTokenClassification<br>|`electra-small`<br> `electra-base`<br> `electra-large`<br> `chinese-electra-small`<br> `chinese-electra-base`<br>|
 |[XLNet](https://arxiv.org/abs/1906.08237)| XLNetTokenizer| XLNetModel<br> XLNetForSequenceClassification<br> XLNetForTokenClassification |`xlnet-base-cased`<br> `xlnet-large-cased`<br> `chinese-xlnet-base`<br> `chinese-xlnet-mid`<br> `chinese-xlnet-large`|
 |[UnifiedTransformer](https://arxiv.org/abs/2006.16779)| UnifiedTransformerTokenizer| UnifiedTransformerModel<br> UnifiedTransformerLMHeadModel |`unified_transformer-12L-cn`<br> `unified_transformer-12L-cn-luge` |
 |[Transformer](https://arxiv.org/abs/1706.03762) |- | TransformerModel | - |
 
-**NOTE**：其中中文的预训练模型有`bert-base-chinese, bert-wwm-chinese, bert-wwm-ext-chinese, ernie-1.0, ernie-tiny, gpt2-base-cn, roberta-wwm-ext, roberta-wwm-ext-large, rbt3, rbtl3, chinese-electra-base, chinese-electra-small, chinese-xlnet-base, chinese-xlnet-mid, chinese-xlnet-large, unified_transformer-12L-cn, unified_transformer-12L-cn-luge`。
+**NOTE**：
+
+| 其中中文的预训练模型有：|
+|---|
+|`bert-base-chinese, bert-wwm-chinese, bert-wwm-ext-chinese, ernie-1.0, ernie-tiny`,<br> `gpt-cpm-large-cn, roberta-wwm-ext, roberta-wwm-ext-large, rbt3, rbtl3`,<br> `chinese-electra-base, chinese-electra-small, chinese-xlnet-base, chinese-xlnet-mid`, <br>`chinese-xlnet-large, unified_transformer-12L-cn, unified_transformer-12L-cn-luge`  |
+
 
 ## 预训练模型使用方法
 
@@ -68,7 +75,7 @@ for input_ids, token_type_ids, labels in train_dataloader:
 |文本分类<br>SequenceClassification |BertForSequenceClassification <br> ErnieForSequenceClassification <br> RobertaForSequenceClassification <br> ElectraForSequenceClassification <br> XLNetForSequenceClassification | [见上表](#Transformer预训练模型汇总)|
 |序列标注<br>TokenClassification|BertForTokenClassification <br> ErnieForTokenClassification <br> RobertaForTokenClassification <br> ElectraForTokenClassification <br> XLNetForTokenClassification |[见上表](#Transformer预训练模型汇总)|
 |问答任务<br>QuestionAnswering|BertForQuestionAnswering <br> ErnieForQuestionAnswering <br> RobertaForQuestionAnswering|[见上表](#Transformer预训练模型汇总)|
-|文本生成<br>TextGeneration | ErnieForGeneration <br> GPT2ForGreedyGeneration |[见上表](#Transformer预训练模型汇总)|
+|文本生成<br>TextGeneration | ErnieForGeneration <br> GPTForGreedyGeneration |[见上表](#Transformer预训练模型汇总)|
 |机器翻译<br>MachineTranslation| TransformerModel |[见上表](#Transformer预训练模型汇总)|
 
 用户可以切换表格中的不同模型，来处理相同类型的任务。如对于[预训练模型使用方法](#预训练模型使用方法)中的文本分类任务，您可以将`BertForSequenceClassification`换成`ErnieForSequenceClassification`, 来寻找更适合的预训练模型。

@@ -28,14 +28,33 @@ def parse_args():
         type=str,
         help="Path of the config file. ")
     parser.add_argument(
-        "--decoding-lib",
+        "--decoding_lib",
         default="../../../../paddlenlp/ops/build/lib/libdecoding_op.so",
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(
-        "--use-fp16-decoding",
+        "--use_fp16_decoding",
         action="store_true",
         help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument(
+        "--decoding_strategy",
+        default="beam_search",
+        type=str,
+        choices=["beam_search", "topk_sampling", "topp_sampling"],
+        help="Decoding strategy. Can be one of ['beam_search', 'topk_sampling', 'topp_sampling']. "
+    )
+    parser.add_argument("--beam_size", default=5, type=int, help="Beam size. ")
+    parser.add_argument(
+        "--topk",
+        default=4,
+        type=int,
+        help="The k value for topk_sampling. Default is 4. ")
+    parser.add_argument(
+        "--topp",
+        default=0.0,
+        type=float,
+        help="The probability threshold for topp_sampling. Default is 0.0 which means it won't go through topp_sampling. "
+    )
     args = parser.parse_args()
     return args
 
@@ -76,7 +95,7 @@ def do_predict(args):
         weight_sharing=args.weight_sharing,
         bos_id=args.bos_idx,
         eos_id=args.eos_idx,
-        decoding_strategy="beam_search",
+        decoding_strategy=args.decoding_strategy,
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
         decoding_lib=args.decoding_lib,
@@ -93,7 +112,11 @@ def do_predict(args):
     with paddle.no_grad():
         for (src_word, ) in test_loader:
             finished_seq = transformer(src_word=src_word)
-            finished_seq = finished_seq.numpy().transpose([1, 2, 0])
+            if args.decoding_strategy == "beam_search":
+                finished_seq = finished_seq.numpy().transpose([1, 2, 0])
+            elif args.decoding_strategy == "topk_sampling" or args.decoding_strategy == "topp_sampling":
+                finished_seq = np.expand_dims(
+                    finished_seq.numpy().transpose([1, 0]), axis=1)
             for ins in finished_seq:
                 for beam_idx, beam in enumerate(ins):
                     if beam_idx >= args.n_best:
@@ -112,5 +135,10 @@ if __name__ == "__main__":
         pprint(args)
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
+    args.decoding_strategy = ARGS.decoding_strategy
+    args.beam_size = ARGS.beam_size
+    args.topk = ARGS.topk
+    args.topp = ARGS.topp
+    args.benchmark = False
 
     do_predict(args)

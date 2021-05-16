@@ -27,8 +27,14 @@ __all__ = ['DuReaderYesNo']
 
 
 class DuReaderYesNo(DatasetBuilder):
+    '''
+    DuReaderYesNo is a dataset with the judgment of opinion polarity as the 
+    target task. Polarity of opinion is divided into three categories 
+    {Yes, No, Depends}.
+    '''
+
     URL = "https://dataset-bj.cdn.bcebos.com/qianyan/dureader_yesno-data.tar.gz"
-    MD5 = None
+    MD5 = '30c744d65e87fdce00cdc707fd008138'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
         'train': META_INFO(
