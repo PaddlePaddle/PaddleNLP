@@ -18,11 +18,9 @@ random_seed: None
 output_file: "predict.txt"
 # The <bos>, <eos> and <unk> tokens in the dictionary.
 special_token: ["<s>", "<e>", "<unk>"]
-# The directory to store data.
-root: None
 
-# Whether to use cuda
-use_gpu: True
+# Device to use. 
+device: "gpu"
 
 # Args for reader, see reader.py for details
 # The translation task to process.
@@ -52,20 +50,15 @@ beta1: 0.9
 beta2: 0.997
 eps: 1e-9
 # The parameters for learning rate scheduling.
-warmup_steps: 8000
+warmup_steps: 4000
 # The weight used to mix up the ground-truth distribution and the fixed
 # uniform distribution in label smoothing when training.
 # Set this as zero if label smoothing is not wanted.
 label_smooth_eps: 0.1
 
 # Hyparams for generation:
-decoding_strategy: "beam_search"
 # The parameters for beam search.
 beam_size: 5
-# The parameters for topk sampling. 
-topk: 4
-# The parameters for topp sampling. 
-topp: 0.0
 max_out_len: 1024
 # The number of decoded sentences to output.
 n_best: 1
@@ -79,6 +72,10 @@ src_vocab_size: 10000
 trg_vocab_size: 10000
 # Used to pad vocab size to be multiple of pad_factor.
 pad_factor: 8
+# Used to pad sequence length to be multiple of pad_seq.
+pad_seq: 1
+# Used to make batch size to be multiple of bsz_multi.
+bsz_multi: 8
 # Index for <bos> token
 bos_idx: 0
 # Index for <eos> token
@@ -102,3 +99,14 @@ dropout: 0.1
 # The flag indicating whether to share embedding and softmax weights.
 # Vocabularies in source and target should be same for weight sharing.
 weight_sharing: True
+
+# Mixed precision training
+use_amp: False
+use_pure_fp16: False
+scale_loss: 128.0
+
+# Whether to use multi-card/multi-node distributed training.
+# Only works for static graph for now.
+is_distributed: False
+# Maximum iteration for training. 
+max_iter: None
