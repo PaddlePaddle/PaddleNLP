@@ -27,7 +27,7 @@ from paddle.fluid.initializer import Normal, Constant, NumpyArrayInitializer
 from paddle.distributed.fleet import fleet
 
 from .. import PretrainedModel, register_base_model
-import paddlenlp.ops as ops
+import paddlenlp
 
 __all__ = [
     'GPTModel',
@@ -80,22 +80,22 @@ class MultiHeadAttention(nn.Layer):
             self.out_proj = nn.Linear(
                 embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
         else:
-            self.q_proj = ops.ColumnParallelLiner(
+            self.q_proj = paddlenlp.ops.ColumnParallelLiner(
                 (embed_dim, embed_dim),
                 topo.mp_info.size,
                 weight_attr,
                 bias_attr=bias_attr)
-            self.k_proj = ops.ColumnParallelLiner(
+            self.k_proj = paddlenlp.ops.ColumnParallelLiner(
                 (self.kdim, embed_dim),
                 topo.mp_info.size,
                 weight_attr,
                 bias_attr=bias_attr)
-            self.v_proj = ops.ColumnParallelLiner(
+            self.v_proj = paddlenlp.ops.ColumnParallelLiner(
                 (self.vdim, embed_dim),
                 topo.mp_info.size,
                 weight_attr,
                 bias_attr=bias_attr)
-            self.out_proj = ops.RowParallelLiner(
+            self.out_proj = paddlenlp.ops.RowParallelLiner(
                 (embed_dim, embed_dim),
                 topo.mp_info.size,
                 weight_attr,
@@ -357,12 +357,12 @@ class TransformerDecoderLayer(nn.Layer):
                 weight_attrs[2],
                 bias_attr=bias_attrs[2])
         else:
-            self.linear1 = ops.ColumnParallelLiner(
+            self.linear1 = paddlenlp.ops.ColumnParallelLiner(
                 (d_model, dim_feedforward),
                 topo.mp_info.size,
                 weight_attrs[2],
                 bias_attr=bias_attrs[2])
-            self.linear2 = ops.RowParallelLiner(
+            self.linear2 = paddlenlp.ops.RowParallelLiner(
                 (dim_feedforward, d_model),
                 topo.mp_info.size,
                 weight_attrs[2],
@@ -432,7 +432,7 @@ class GPTEmbeddings(nn.Layer):
                 initializer=nn.initializer.Normal(
                     mean=0.0, std=initializer_range)))
         #else:
-        #    self.word_embeddings = ops.ParallelEmbedding(
+        #    self.word_embeddings = paddlenlp.ops.ParallelEmbedding(
         #        vocab_size,
         #        hidden_size,
         #        topo.mp_info.size,
@@ -607,8 +607,8 @@ class GPTModel(GPTPretrainedModel):
         for i in range(num_hidden_layers):
             DecoderLayer = TransformerDecoderLayer
             if self.pipline_mode:
-                DecoderLayer = ops.guard(f'gpu:{i//self.layer_per_stage}')(
-                    TransformerDecoderLayer)
+                DecoderLayer = paddlenlp.ops.guard(
+                    f'gpu:{i//self.layer_per_stage}')(TransformerDecoderLayer)
             decoder_layers.append(
                 DecoderLayer(
                     d_model=hidden_size,
@@ -625,7 +625,7 @@ class GPTModel(GPTPretrainedModel):
                     topo=topo))
 
         if self.pipline_mode:
-            Decoder = ops.guard(f'gpu:{self.topo.pp_info.size-1}')(
+            Decoder = paddlenlp.ops.guard(f'gpu:{self.topo.pp_info.size-1}')(
                 TransformerDecoder)
         else:
             Decoder = TransformerDecoder

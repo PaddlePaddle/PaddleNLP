@@ -13,7 +13,7 @@
 |[ERNIE](https://arxiv.org/abs/1904.09223)|ErnieTokenizer<br>ErnieTinyTokenizer|ErnieModel<br> ErnieForQuestionAnswering<br> ErnieForSequenceClassification<br> ErnieForTokenClassification | `ernie-1.0`<br> `ernie-tiny`<br> `ernie-2.0-en`<br> `ernie-2.0-large-en`|
 |[ERNIE-GEN](https://arxiv.org/abs/2001.11314)|ErnieTokenizer| ErnieForGeneration|`ernie-gen-base-en`<br>`ernie-gen-large-en`<br>`ernie-gen-large-en-430g`|
 | ERNIE-CTM                                 | ErnieCtmTokenizer | ErnieCtmModel<br> ErnieCtmWordtagModel                       | `ernie-ctm`            |
-|[GPT-2](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)| GPTTokenizer<br> GPTChineseTokenizer| GPTForGreedyGeneration| `gpt-cpm-large-cn` <br> `gpt2-medium-en`|
+|[GPT](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)| GPTTokenizer<br> GPTChineseTokenizer| GPTForGreedyGeneration| `gpt-cpm-large-cn` <br> `gpt2-medium-en`|
 |[RoBERTa](https://arxiv.org/abs/1907.11692)|RobertaTokenizer| RobertaModel<br>RobertaForQuestionAnswering<br>RobertaForSequenceClassification<br>RobertaForTokenClassification| `roberta-wwm-ext`<br> `roberta-wwm-ext-large`<br> `rbt3`<br> `rbtl3`|
 | [BigBird](https://arxiv.org/abs/2007.14062) | BigBirdTokenizer  | BigBirdModel<br> BigBirdForSequenceClassification<br> BigBirdForPretraining | `bigbird-base-uncased` |
 |[ELECTRA](https://arxiv.org/abs/2003.10555) | ElectraTokenizer| ElectraModel<br>ElectraForSequenceClassification<br>ElectraForTokenClassification<br>|`electra-small`<br> `electra-base`<br> `electra-large`<br> `chinese-electra-small`<br> `chinese-electra-base`<br>|
