@@ -1,10 +1,7 @@
 set -x
 export PADDLE_WITH_GLOO=0
-export GLOG_v=0
-export NCCL_DEBUG=INFO
 export FLAGS_call_stack_level=2
 export FLAGS_allocator_strategy=naive_best_fit
-export FLAGS_fraction_of_gpu_memory_to_use=0.98
 unset CUDA_VISIBLE_DEVICES
 
 rm -rf *.prototxt
@@ -15,7 +12,7 @@ rm -rf main_sharding*
 task_name="gpt-mp-sharding"
 rm -rf output/$task_name/log
 
-PYTHONPATH=../../../ python -u  -m paddle.distributed.fleet.launch \
+python -u  -m paddle.distributed.fleet.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name/log" run_pretrain_static.py \
     --model_type "gpt" \
@@ -34,8 +31,8 @@ PYTHONPATH=../../../ python -u  -m paddle.distributed.fleet.launch \
     --use_recompute true \
     --max_lr 0.00015 \
     --min_lr 0.00001 \
-    --max_steps 70000 \
-    --save_steps 70000 \
+    --max_steps 500000 \
+    --save_steps 100000 \
     --decay_steps 320000 \
     --weight_decay 0.01\
     --warmup_rate 0.01 \

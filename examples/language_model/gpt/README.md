@@ -1,9 +1,9 @@
-# GPT-2
+# GPT
 
 ## 模型介绍
-[GPT-2](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)(Language Models are Unsupervised Multitask Learners) 以[Transformer](https://arxiv.org/abs/1706.03762) 解码器为网络基本组件，使用自回归的方式在大规模无标注文本语料上进行预训练得到的语言生成模型。
+GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)/[3](https://arxiv.org/pdf/2005.14165.pdf) 是以[Transformer](https://arxiv.org/abs/1706.03762) 解码器为网络基本组件，使用自回归的方式在大规模无标注文本语料上进行预训练得到的语言生成模型。
 
-本项目是语言模型 GPT-2 的 PaddlePaddle 实现， 包含模型训练，预测等内容。下是本例的简要目录结构及说明：
+本项目是语言模型 GPT 的 PaddlePaddle 实现， 包含模型训练，预测等内容。下是本例的简要目录结构及说明：
 
 ```text
 .
@@ -13,8 +13,8 @@
 ├── decompress.sh           # 数据集解压脚本
 ├── deploy/                 # 模型部署的inference脚本
 ├── export_model.py         # 导出预测部署的模型脚本
-├── predict.py              # 生成文本示例demo
 ├── lr.py                   # 学习率控制
+├── predict.py              # 生成文本示例demo
 ├── README.md               # 文档
 ├── run_eval.py             # 评估入口
 ├── run_pretrain.py         # 预训练入口
@@ -42,7 +42,7 @@
 xz -d openwebtext.tar.xz
 tar xf openwebtext.tar
 mkdir raw_data
-bash decompress.sh  
+bash decompress.sh
 ```
 
 解压以后得到的`raw_data`目录大小约为54GB。
@@ -87,7 +87,7 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
     --save_steps 100000\
     --decay_steps 320000\
     --warmup_rate 0.01\
-    --batch_size 4\
+    --micro_batch_size 4\
     --device gpu
 ```
 
@@ -99,7 +99,7 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
 - `grad_clip` 梯度裁剪范围。
 - `max_steps` 最大训练步数
 - `save_steps` 保存模型间隔
-- `batch_size` 训练的batch大小
+- `mirco_batch_size` 训练的batch大小
 - `device` 训练设备
 
 用户也可以使用提供的shell脚本直接训练`sh scripts/run.sh`.
@@ -121,7 +121,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
     --save_steps 100000\
     --decay_steps 320000\
     --warmup_rate 0.01\
-    --batch_size 4\
+    --micro_batch_size 4\
     --device gpu
 ```
 
@@ -153,7 +153,7 @@ python run_eval.py --model_name gpt2-medium-en \
 其中参数释义如下：
 `model_name` 使用的模型名称，如gpt2-medium-en等。
 `eval_path` 数据集地址。
-`init_checkpoint_path` 模型参数地址
+`init_checkpoint_path` 模型参数地址。
 `batch_size` batch size大小。
 `device` 运行设备，cpu，gpu，xpu可选。
 `overlapping_eval` wikitext数据集参数。
@@ -167,20 +167,22 @@ python run_eval.py --model_name gpt2-medium-en \
 本项目提供了简单的文本生成的demo，供用户测试文本生成效果。
 
 ```shell
-python generate_sample.py
+# 中文示例
+python predict.py gpt-cn
+# 英文示例
+python predict.py
 ```
 
 生成效果展示:
 ```text
 问题：中国的首都是哪里？答案：北京。
-问题：苹果的CEO是谁? 答案：
-
-乔布斯。
+问题：苹果的CEO是谁? 答案：乔布斯。
 
 默写古诗: 大漠孤烟直，长河落日圆。
-举杯邀明月，
+举杯邀明月，对影成三人。
 
-对影成三人。
+Question: Who is the CEO of Apple?
+Answer: Tim Cook.
 ```
 
 ## 模型导出预测
@@ -223,6 +225,7 @@ sh scripts/run_static.sh
 
 ## 参考文献
 - [Language Models are Unsupervised Multitask Learners](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
+- [Language Models are Few-Shot Learners](https://arxiv.org/pdf/2005.14165.pdf)
 - [CPM: A Large-scale Generative Chinese Pre-trained Language Model](https://arxiv.org/abs/2012.00413)
 - [Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism](https://arxiv.org/abs/1909.08053)
 - [Efficient Large-Scale Language Model Training on GPU Clusters](https://arxiv.org/abs/2104.04473)
