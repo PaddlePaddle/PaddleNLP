@@ -1,4 +1,4 @@
-#   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,73 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import print_function
-from __future__ import absolute_import
-from __future__ import unicode_literals
 
 import sys
 import io
 import os
 import time
-import numpy as np
 import re
 import logging
 import six
+import itertools
+import random as r
 from glob import glob
 from functools import reduce, partial
-import itertools
+from itertools import accumulate
 
-#import sentencepiece as spm
-#from tqdm import tqdm
+import numpy as np
 
-import random as r
 import propeller
 from propeller.data import Dataset
-
-#import jieba
 from propeller import log
 
 log.setLevel(logging.DEBUG)
-
-if six.PY3:
-    from itertools import accumulate
-else:
-    import operator
-
-    def accumulate(iterable, func=operator.add, initial=None):
-        'Return running totals'
-        # accumulate([1,2,3,4,5]) --> 1 3 6 10 15
-        # accumulate([1,2,3,4,5], initial=100) --> 100 101 103 106 110 115
-        # accumulate([1,2,3,4,5], operator.mul) --> 1 2 6 24 120
-        it = iter(iterable)
-        total = initial
-        if initial is None:
-            try:
-                total = next(it)
-            except StopIteration:
-                return
-        yield total
-        for element in it:
-            total = func(total, element)
-            yield total
-
-
-#debug_dict = {i: j.strip() for i, j in enumerate(open('./data/vocab.txt', encoding='utf8'))}
-#def debugfunc(i):
-#    return debug_dict[i]
-
-#def bucket(dataset, size, cmp_fn):
-#    def gen():
-#        iterator = iter(dataset)
-#        buf = []
-#        while True:
-#            buf.append(next(iterator))
-#            if len(buf) >= size:
-#                buf = sorted(buf, key=cmp_fn)
-#                for x in buf:
-#                    yield x
-#                buf = []
-#    return propeller.data.Dataset.from_generator_func(gen)
 
 
 def truncate_sentence(seq, from_length, to_length):
@@ -141,9 +95,9 @@ def apply_mask(sentence, seg_info, mask_jb_coef, mask_rate, vocab_size, vocab):
     mask[:, 0] = False  # ignore CLS head
 
     rand = np.random.rand(*shape)
-    choose_original = rand < 0.1  # 
-    choose_random_id = (0.1 < rand) & (rand < 0.2)  # 
-    choose_mask_id = 0.2 < rand  # 
+    choose_original = rand < 0.1  #
+    choose_random_id = (0.1 < rand) & (rand < 0.2)  #
+    choose_mask_id = 0.2 < rand  #
     random_id = np.random.randint(1, vocab_size, size=shape)
 
     replace_id = mask_id * choose_mask_id + \

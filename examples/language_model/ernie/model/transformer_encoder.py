@@ -1,4 +1,4 @@
-#   Copyright (c) 2019 PaddlePaddle Authors. All Rights Reserved.
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,16 +13,12 @@
 # limitations under the License.
 """Transformer encoder."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from functools import partial
 
+import numpy as np
 import paddle
 import paddle.fluid as fluid
 import paddle.fluid.layers as layers
-import numpy as np
 
 
 def gelu(x):

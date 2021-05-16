@@ -35,6 +35,7 @@ import paddle
 import paddle.fluid as fluid
 import paddle.distributed.fleet as fleet
 import paddle.fluid.profiler as profiler
+from visualdl import LogWriter
 from paddle.distributed.fleet.meta_optimizers.sharding.utils import add_sync_comm, save_persistables
 
 from pretraining_args import define_args
@@ -43,13 +44,6 @@ from utils.topo import Topology
 from utils.random import get_rng_state_tracker
 from propeller import log
 from model.ernie import ErnieModel, ErnieConfig
-
-try:
-    from tensorboardX import SummaryWriter as LogWriter
-    log.info('using tensorboard')
-except ImportError:
-    from visualdl import LogWriter
-    log.info('tensorboard not found, using visualdl')
 
 paddle.enable_static()
 fleet.init(is_collective=True)
@@ -150,17 +144,6 @@ def create_model(args, phase, micro_bsz, dp_sharding_rank, dp_worldsize, topo):
         data_loader = fluid.io.DataLoader.from_generator(
             feed_list=inputs, capacity=70, iterable=False)
     places = fluid.CUDAPlace(int(os.environ.get('FLAGS_selected_gpus', 0)))
-    """
-    ### for debug data flow
-    for d in data_reader:
-        for dd in d:
-            log.debug(dd.shape)
-            if len(dd.shape) == 3:
-                log.debug(dd.reshape((-1, args.max_seq_len)))
-            else:
-                log.debug(dd.reshape(-1))
-        break
-    """
 
     def data_gen():
         yield from data_reader
