@@ -1,10 +1,10 @@
-# Transformers模型继续预训练
+# Transformers模型预训练数据准备
 
 为了满足各垂类领域（金融、医疗等）继续预训练Tranformers模型，本教程给出如何在垂类领域数据上继续预训练模型（continual pretraining），支持BERT、BERT-WWM、ERNIE等预训练模型在垂类数据上继续预训练。
 
 为了完成继续预训练，需要完成以下几个步骤：
 
-1. 清洗原数据
+1. 数据格式化
 2. Mask Language Model （MLM）数据构建
 3. 开始预训练
 
@@ -19,9 +19,9 @@ pretraining_data_prepare/
 ├── main.py # 程序入口文件
 ├── README.md # 文档说明
 ├── requirements.txt # 第三方依赖
-├── text_formatting # 数据清洗
-│   ├── bookcorpus.py # bookcorpus数据清洗脚本
-│   └── wikicorpus.py # 中英文维基百科数据清洗集哦啊笨
+├── text_formatting # 数据格式化
+│   ├── bookcorpus.py # bookcorpus数据格式化脚本
+│   └── wikicorpus.py # 中英文维基百科数据格式化脚本
 └── text_sharding.py # 数据切片
 ```
 
@@ -41,9 +41,9 @@ tqdm
 
 ## 快速开始
 
-### 清洗原数据
+### 数据格式化
 
-首先，我们需要将原始数据进行清洗，清洗成一行一篇文章的形式，并且文章之间以空行进行分隔。
+首先，我们需要将原始数据进行格式化，整理成一行一篇文章的形式，并且文章之间以空行进行分隔。
 
 如以下示例展示了两篇文章：
 
@@ -55,7 +55,7 @@ tqdm
 测定的，所以单独的离子的标准摩尔熵是以氢离子的标准摩尔熵为0，在无限稀释状态的假想的1 mol kg−1的理想溶液计算的。
 ```
 
-本教程中提供了中英文维基百科数据的清洗方法如**text_formatting/wikicorpus.py**脚本。如需在垂类数据上预训练，则需自定义数据清洗方法。
+本教程中提供了中英文维基百科数据的格式化方法如**text_formatting/wikicorpus.py**脚本。如需在垂类数据上预训练，则需自定义数据格式化方法。
 
 
 ### Mask Language Model （MLM）数据构建
@@ -88,8 +88,8 @@ python main.py --skip_formatting True \
 
 以上参数表示：
 
-* `skip_formatting`：是否跳过数据清洗阶段。若`skip_formatting=True`表示您已完成垂类数据清洗；若`skip_formatting=False`表示按照本教程清洗中英文维基百科数据。
-* `formatted_file`：已完成数据清洗的文件地址。
+* `skip_formatting`：是否跳过数据格式化阶段。若`skip_formatting=True`表示您已完成垂类数据格式化；若`skip_formatting=False`表示按照本教程格式化中英文维基百科数据。
+* `formatted_file`：已完成数据格式化的文件地址。
     **NOTE：** 如果`skip_formatting=False`，则无需指定`formatted_file`。程序将会自动下载维基百科和BookCorpus数据作为预训练数据。
 * `output_dir`：预训练数据构建存放目录。
 * `model_name`：具体预训练模型名称，程序将会按照这种预训练模型完成预训练数据构造。可选'bert-base-uncased', 'bert-base-chinese', 'bert-wwm-chinese','ernie-1.0'。
