@@ -22,7 +22,7 @@ __all__ = ['LinearChainCrf', 'LinearChainCrfLoss', 'ViterbiDecoder']
 
 
 def log_sum_exp(vec, dim=0):
-    # avoid underflow and overflow
+    # Avoid underflow and overflow
     max_num = paddle.max(vec, dim)
     max_exp = max_num.unsqueeze(-1)
     return max_num + paddle.log(paddle.sum(paddle.exp(vec - max_exp), dim))
