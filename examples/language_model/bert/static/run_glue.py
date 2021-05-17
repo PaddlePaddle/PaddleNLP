@@ -177,10 +177,10 @@ def reset_program_state_dict(args, model, state_dict, pretrained_state_dict):
     reset_parameter_names = []
     for n, p in state_dict.items():
         if n in pretrained_state_dict:
-            reset_state_dict[p.name] = pretrained_state_dict[n]
+            reset_state_dict[p.name] = np.array(pretrained_state_dict[n])
             reset_parameter_names.append(n)
         elif p.name in pretrained_state_dict and "bert" in n:
-            reset_state_dict[p.name] = pretrained_state_dict[p.name]
+            reset_state_dict[p.name] = np.array(pretrained_state_dict[p.name])
             reset_parameter_names.append(n)
         else:
             dtype_str = "float32"
@@ -205,7 +205,8 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
-def evaluate(exe, metric, loss, correct, dev_program, data_loader):
+def evaluate(exe, metric, loss, correct, dev_program, data_loader,
+             phase="eval"):
     """
     The evaluate process, calcluate the eval loss and metric. 
     """
@@ -223,8 +224,14 @@ def evaluate(exe, metric, loss, correct, dev_program, data_loader):
         metric_numpy = return_numpys[1] if len(return_numpys[
             1:]) == 1 else return_numpys[1:]
         metric.update(metric_numpy)
-        accuracy = metric.accumulate()
-    print("eval loss: %f, acc: %s" % (return_numpys[0], accuracy))
+    res = metric.accumulate()
+    if isinstance(metric, Mcc):
+        print("%s loss: %f, mcc: %s" % (phase, return_numpys[0], res[0]))
+    elif isinstance(metric, PearsonAndSpearman):
+        print("%s loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s"
+              % (phase, return_numpys[0], res[0], res[1], res[2]))
+    else:
+        print("%s loss: %f, acc: %s, " % (phase, return_numpys[0], res))
 
 
 def convert_example(example,
@@ -412,9 +419,9 @@ def do_train(args):
                 # Validation pass, record the loss and metric
                 if args.task_name == "mnli":
                     evaluate(exe, metric, loss, correct, dev_program,
-                             dev_data_loader_matched)
+                             dev_data_loader_matched, "matched eval")
                     evaluate(exe, metric, loss, correct, dev_program,
-                             dev_data_loader_mismatched)
+                             dev_data_loader_mismatched, "mismatched eval")
                 else:
                     evaluate(exe, metric, loss, correct, dev_program,
                              dev_data_loader)

@@ -512,5 +512,11 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)
-        except AttributeError:
-            return getattr(getattr(self, self.base_model_prefix), name)
+        except AttributeError as e:
+            try:
+                return getattr(getattr(self, self.base_model_prefix), name)
+            except AttributeError:
+                try:
+                    return getattr(self, self.base_model_prefix).config[name]
+                except KeyError:
+                    raise e
