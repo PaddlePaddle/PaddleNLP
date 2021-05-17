@@ -85,7 +85,12 @@ class ErnieCtmPooler(Layer):
 
 
 class ErnieCtmPretrainedModel(PretrainedModel):
-    """An abstract class to handle weights initialzation and a simple interface for loading pretrained models.
+    """
+    An abstract class for pretrained ErnieCtm models. It provides ErnieCtm related `model_config_file`,
+    `resource_files_names`, `pretrained_resource_files_map`, `pretrained_init_configuration` and
+    `base_model_prefix` for downloading and loading pretrained models.
+
+    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
@@ -134,7 +139,7 @@ class ErnieCtmPretrainedModel(PretrainedModel):
     base_model_prefix = "ernie_ctm"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        # Initialize weights
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
@@ -164,8 +169,8 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
 
     Args:
         vocab_size (`int`):
-            Vocabulary size of the XLNet model. Defines the number of different tokens that can
-            be represented by the `inputs_ids` passed when calling XLNetModel.
+            Vocabulary size of the ErnieCtm model. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling ErnieCtmModel.
         embedding_size (`int`, optional):
             Dimensionality of the embedding layer.
             Defaults to ``128``.
