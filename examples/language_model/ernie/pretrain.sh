@@ -1,7 +1,7 @@
 set -x
 
 export PADDLE_WITH_GLOO=0
-export GLOG_v=1
+export GLOG_v=0
 export NCCL_DEBUG=INFO
 export FLAGS_call_stack_level=2
 export FLAGS_allocator_strategy=naive_best_fit
@@ -9,11 +9,11 @@ export FLAGS_allocator_strategy=naive_best_fit
 rm -rf *.prototxt
 rm -rf core.*
 
-task_name='gpt3-230B-32pp4dp2mp'
+task_name='ernie-base-2pp2dp2mp'
 output_dir=output/${task_name}
 rm -rf ${output_dir}
 
-python -m paddle.distributed.fleet.launch \
+PYTHONPATH=../../../ python -m paddle.distributed.fleet.launch \
     --gpus 0,1,2,3,4,5,6,7 \
     --log_dir ${output_dir}/log \
     run_pretraining.py \
