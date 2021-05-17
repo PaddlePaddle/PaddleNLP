@@ -1,7 +1,7 @@
 #include <string>
 #include <vector>
 
-#include "fusion_gpt2_op.h"
+#include "fusion_gpt_op.h"
 #include "pd_traits.h"
 
 
@@ -28,18 +28,18 @@ std::vector<paddle::Tensor> GPT2Forward(
     const paddle::Tensor& decoder_ln_bias,
     const paddle::Tensor& positional_embedding_weight,
     const paddle::Tensor& emb_weight,
-    const int& candidate_num,
-    const float& probability_threshold,
-    const int& max_seq_len,
-    const int& head_num,
+    const int& topk,
+    const float& topp,
+    const int& max_len,
+    const int& n_head,
     const int& size_per_head,
     const int& num_layer,
-    const int& start_id,
-    const int& end_id,
+    const int& bos_id,
+    const int& eos_id,
     const float& temperature,
     const bool& use_fp16 = false) {
   int batch_size = input.shape()[0];
-  std::vector<int64_t> output_dims({max_seq_len, batch_size});
+  std::vector<int64_t> output_dims({max_len, batch_size});
   auto output_ids = paddle::Tensor(input.place(), output_dims);
 
   if (input.place() == paddle::PlaceType::kGPU) {
@@ -66,14 +66,14 @@ std::vector<paddle::Tensor> GPT2Forward(
                            positional_embedding_weight,
                            emb_weight,
                            output_ids,
-                           candidate_num,
-                           probability_threshold,
-                           max_seq_len,
-                           head_num,
+                           topk,
+                           topp,
+                           max_len,
+                           n_head,
                            size_per_head,
                            num_layer,
-                           start_id,
-                           end_id,
+                           bos_id,
+                           eos_id,
                            temperature,
                            use_fp16);
   } else {
@@ -104,18 +104,18 @@ std::vector<std::vector<int64_t>> GPT2InferShape(
     const std::vector<int64_t>& decoder_ln_bias_shape,
     const std::vector<int64_t>& positional_embedding_weight_shape,
     const std::vector<int64_t>& emb_weight_shape,
-    const int& candidate_num,
-    const float& probability_threshold,
-    const int& max_seq_len,
-    const int& head_num,
+    const int& topk,
+    const float& topp,
+    const int& max_len,
+    const int& n_head,
     const int& size_per_head,
     const int& num_layer,
-    const int& start_id,
-    const int& end_id,
+    const int& bos_id,
+    const int& eos_id,
     const float& temperature,
     const bool& use_fp16 = false) {
   int64_t batch_size = input_shape[0];
-  std::vector<int64_t> output_dims({max_seq_len, batch_size});
+  std::vector<int64_t> output_dims({max_len, batch_size});
   return {output_dims};
 }
 
@@ -145,7 +145,7 @@ std::vector<paddle::DataType> GPT2InferDtype(
   return {paddle::DataType::INT32};
 }
 
-PD_BUILD_OP(fusion_gpt2)
+PD_BUILD_OP(fusion_gpt)
     .Inputs({"Input",
              "WordEmbedding",
              paddle::Vec("SelfLayernormWeight"),
@@ -169,14 +169,14 @@ PD_BUILD_OP(fusion_gpt2)
              "PositionEncEmb",
              "EmbWeight"})
     .Outputs({"OutputIds"})
-    .Attrs({"candidate_num: int",
-            "probability_threshold: float",
-            "max_seq_len: int",
-            "head_num: int",
+    .Attrs({"topk: int",
+            "topp: float",
+            "max_len: int",
+            "n_head: int",
             "size_per_head: int",
             "num_layer: int",
-            "start_id: int",
-            "end_id: int",
+            "bos_id: int",
+            "eos_id: int",
             "temperature: float",
             "use_fp16: bool"})
     .SetKernelFn(PD_KERNEL(GPT2Forward))

@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "fastertransformer/cuda/cub/cub.cuh"
-#include "fusion_gpt2_op.h"
+#include "fusion_gpt_op.h"
 #include "pd_traits.h"
 
 
@@ -38,14 +38,14 @@ std::vector<paddle::Tensor> gpt2_kernel(
     const paddle::Tensor& positional_embedding_weight,
     const paddle::Tensor& emb_weight,
     paddle::Tensor& output_ids,
-    const int& candidate_num,
-    const float& probability_threshold,
-    const int& max_seq_len,
-    const int& head_num,
+    const int& topk,
+    const float& topp,
+    const int& max_len,
+    const int& n_head,
     const int& size_per_head,
     const int& num_layer,
-    const int& start_id,
-    const int& end_id,
+    const int& bos_id,
+    const int& eos_id,
     const float& temperature,
     cublasHandle_t cublas_handle_,
     cudaStream_t stream) {
@@ -75,25 +75,24 @@ std::vector<paddle::Tensor> gpt2_kernel(
              input.data<int>(),
              sizeof(int) * batch_size_ * start_len,
              cudaMemcpyDeviceToHost);
-  gpt2_decoding =
-      new DecodingGpt2<DecodingTraits_::OpType>(allocator_,
-                                                batch_size_,
-                                                max_seq_len,
-                                                head_num,
-                                                size_per_head,
-                                                vocab_size,
-                                                num_layer,
-                                                start_id,
-                                                end_id,
-                                                h_input_data,
-                                                start_len,
-                                                candidate_num,
-                                                probability_threshold,
-                                                temperature);
+  gpt2_decoding = new DecodingGpt2<DecodingTraits_::OpType>(allocator_,
+                                                            batch_size_,
+                                                            max_len,
+                                                            n_head,
+                                                            size_per_head,
+                                                            vocab_size,
+                                                            num_layer,
+                                                            bos_id,
+                                                            eos_id,
+                                                            h_input_data,
+                                                            start_len,
+                                                            topk,
+                                                            topp,
+                                                            temperature);
 
   DecoderInitParam<DataType_>* params =
       new DecoderInitParam<DataType_>[num_layer];
-  const int hidden_unit = size_per_head * head_num;
+  const int hidden_unit = size_per_head * n_head;
 
   for (int i = 0; i < num_layer; ++i) {
     params[i].stream = stream;
@@ -180,14 +179,14 @@ std::vector<paddle::Tensor> GPT2CUDAForward(
     const paddle::Tensor& positional_embedding_weight,
     const paddle::Tensor& emb_weight,
     paddle::Tensor& output_ids,
-    const int& candidate_num,
-    const float& probability_threshold,
-    const int& max_seq_len,
-    const int& head_num,
+    const int& topk,
+    const float& topp,
+    const int& max_len,
+    const int& n_head,
     const int& size_per_head,
     const int& num_layer,
-    const int& start_id,
-    const int& end_id,
+    const int& bos_id,
+    const int& eos_id,
     const float& temperature,
     const bool& use_fp16 = false) {
   auto stream = input.stream();
@@ -219,14 +218,14 @@ std::vector<paddle::Tensor> GPT2CUDAForward(
                                                   positional_embedding_weight,
                                                   emb_weight,
                                                   output_ids,
-                                                  candidate_num,
-                                                  probability_threshold,
-                                                  max_seq_len,
-                                                  head_num,
+                                                  topk,
+                                                  topp,
+                                                  max_len,
+                                                  n_head,
                                                   size_per_head,
                                                   num_layer,
-                                                  start_id,
-                                                  end_id,
+                                                  bos_id,
+                                                  eos_id,
                                                   temperature,
                                                   cublas_handle_,
                                                   stream);
@@ -254,14 +253,14 @@ std::vector<paddle::Tensor> GPT2CUDAForward(
                                                   positional_embedding_weight,
                                                   emb_weight,
                                                   output_ids,
-                                                  candidate_num,
-                                                  probability_threshold,
-                                                  max_seq_len,
-                                                  head_num,
+                                                  topk,
+                                                  topp,
+                                                  max_len,
+                                                  n_head,
                                                   size_per_head,
                                                   num_layer,
-                                                  start_id,
-                                                  end_id,
+                                                  bos_id,
+                                                  eos_id,
                                                   temperature,
                                                   cublas_handle_,
                                                   stream);

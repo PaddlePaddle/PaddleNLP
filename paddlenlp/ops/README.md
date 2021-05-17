@@ -60,7 +60,7 @@ cd ../
 注意：
 * `xx` 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
 * 若未指定 `-DPY_CMD` 将会默认使用系统命令 `python` 对应的 Python。
-* 若使用 GPT-2 高性能推理，需要加上 -DWITH_GPT2=ON。
+* 若使用 GPT-2 高性能推理，需要加上 -DWITH_GPT=ON。
 
 
 最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 Faster Transformer decoding 执行的库。
@@ -125,11 +125,11 @@ python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml -
 与 `FasterTransformer` 类似，可以通过一下方式调用 GPT-2 相关优化：
 
 ``` python
-from paddlenlp.ops import FasterGPT2
-from paddlenlp.transformers import GPT2Model, GPT2ForPretraining
+from paddlenlp.ops import FasterGPT
+from paddlenlp.transformers import GPTModel, GPTForPretraining
 
 MODEL_CLASSES = {
-    "gpt2-medium-en": (GPT2ForPretraining, GPT2Tokenizer),
+    "gpt2-medium-en": (GPTForPretraining, GPTTokenizer),
 }
 
 model_class, tokenizer_class = MODEL_CLASSES[args.model_name]
@@ -137,7 +137,7 @@ tokenizer = tokenizer_class.from_pretrained(args.model_name)
 model = model_class.from_pretrained(args.model_name)
 
 # Define model
-gpt2 = FasterGPT2(
+gpt = FasterGPT(
     model=model,
     candidate_num=args.candidate_num,
     probability_threshold=args.probability_threshold,
@@ -151,7 +151,7 @@ gpt2 = FasterGPT2(
 
 目前，GPT-2 的例子仅支持 `batch size` 为 `1` 或是 batch 内输入的序列长度相等的情况。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
 
-更详细的例子可以参考 `./sample/gpt2_sample.py`，我们提供了更详细用例。
+更详细的例子可以参考 `./sample/gpt_sample.py`，我们提供了更详细用例。
 
 #### 执行 GPT-2 decoding on PaddlePaddle
 
@@ -159,7 +159,7 @@ gpt2 = FasterGPT2(
 
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
-python sample/gpt2_sample.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/libdecoding_op.so --batch_size 1 --candidate_num 4 --probability_threshold 0.0 --max_seq_len 12 --start_token <|endoftext|> --end_token <|endoftext|> --temperature 1.0
+python sample/gpt_sample.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/libdecoding_op.so --batch_size 1 --candidate_num 4 --probability_threshold 0.0 --max_seq_len 12 --start_token <|endoftext|> --end_token <|endoftext|> --temperature 1.0
 ```
 
 其中，各个选项的意义如下：

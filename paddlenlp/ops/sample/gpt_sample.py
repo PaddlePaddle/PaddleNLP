@@ -23,15 +23,15 @@ import paddle
 import yaml
 from pprint import pprint
 
-from paddlenlp.ops import FasterGPT2
-from paddlenlp.transformers import GPT2Model, GPT2ForPretraining
-from paddlenlp.transformers import GPT2ChineseTokenizer, GPT2Tokenizer
+from paddlenlp.ops import FasterGPT
+from paddlenlp.transformers import GPTModel, GPTForGreedyGeneration
+from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "gpt2-base-cn": (GPT2ForPretraining, GPT2ChineseTokenizer),
-    "gpt2-medium-en": (GPT2ForPretraining, GPT2Tokenizer),
+    "gpt-cpm-large-cn": (GPTForGreedyGeneration, GPTChineseTokenizer),
+    "gpt2-medium-en": (GPTForGreedyGeneration, GPTTokenizer),
 }
 
 
@@ -41,7 +41,7 @@ def parse_args():
         "--model_name_or_path",
         default="gpt2-medium-en",
         type=str,
-        help="The model name to specify the gpt-2 to use. Can be one of [gpt2-base-cn, gpt2-large-en, gpt2-medium-en, gpt2-small-en]."
+        help="The model name to specify the gpt to use. Can be one of ['gpt2-en', 'gpt2-medium-en', 'gpt-cpm-large-cn']. "
     )
     parser.add_argument(
         "--decoding_lib",
@@ -92,13 +92,15 @@ def do_predict(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_name_or_path]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     logger.info('Loading the model parameters, please wait...')
-    model = model_class.from_pretrained(args.model_name_or_path)
+    model = model_class.from_pretrained(
+        args.model_name_or_path, max_predict_len=args.max_out_len)
+    model.eval()
 
     bos_id = tokenizer.convert_tokens_to_ids(args.start_token)
     eos_id = tokenizer.convert_tokens_to_ids(args.end_token)
 
     # Define model
-    gpt2 = FasterGPT2(
+    gpt = FasterGPT(
         model=model,
         topk=args.topk,
         topp=args.topp,
@@ -110,7 +112,7 @@ def do_predict(args):
         use_fp16_decoding=args.use_fp16_decoding)
 
     # Set evaluate mode
-    gpt2.eval()
+    gpt.eval()
     input_ids = np.array(
         [[bos_id] for i in range(args.batch_size * 1)]).astype("int32").reshape(
             [args.batch_size, 1])
@@ -121,13 +123,13 @@ def do_predict(args):
             # For warmup. 
             if 50 == i:
                 start = time.time()
-            out_seq = gpt2(input_ids)
+            out_seq = gpt(input_ids)
         output_sequence = out_seq.numpy().transpose()
         logger.info("Average test time for decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
     for i in range(args.batch_size):
         print("========== Sample-%d==========" % i)
-        print(tokenizer.decode(output_sequence[i][1:]))
+        print(tokenizer.convert_ids_to_string(output_sequence[i][1:]))
 
 
 if __name__ == "__main__":

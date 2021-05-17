@@ -18,8 +18,8 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddlenlp.transformers import TransformerModel, WordEmbedding, PositionalEmbedding, position_encoding_init, GPT2Model
-from paddlenlp.ops import InferTransformerDecoding, InferGpt2Decoding
+from paddlenlp.transformers import TransformerModel, WordEmbedding, PositionalEmbedding, position_encoding_init, GPTModel
+from paddlenlp.ops import InferTransformerDecoding, InferGptDecoding
 
 
 class FasterTransformer(TransformerModel):
@@ -221,7 +221,7 @@ class FasterTransformer(TransformerModel):
             var.set(model_dict[item], place)
 
 
-class FasterGPT2(nn.Layer):
+class FasterGPT(nn.Layer):
     def __init__(self,
                  model,
                  topk=4,
@@ -232,8 +232,8 @@ class FasterGPT2(nn.Layer):
                  temperature=0,
                  decoding_lib=None,
                  use_fp16_decoding=False):
-        super(FasterGPT2, self).__init__()
-        self.decoding = InferGpt2Decoding(
+        super(FasterGPT, self).__init__()
+        self.decoding = InferGptDecoding(
             model=model,
             topk=topk,
             topp=topp,
