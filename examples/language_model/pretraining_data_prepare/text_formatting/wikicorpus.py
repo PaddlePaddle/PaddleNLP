@@ -62,7 +62,7 @@ class WikicorpusTextFormatter:
             response = requests.get(url=url, stream=True)
             content_size = int(response.headers['Content-Length']) / (1024 *
                                                                       1024)
-            self.downloaded_file = os.path.join(self.save_path, filename)
+            downloaded_file = os.path.join(self.save_path, filename)
             logger.info(
                 f"Downloading: {url}, content size: {content_size:.2f} M and saving file to {downloaded_file}."
             )
