@@ -29,6 +29,7 @@ from paddle.metric import Metric, Accuracy, Precision, Recall
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.data.sampler import SamplerHelper
+from paddlenlp.transformers import AlbertForSequenceClassification, AlbertTokenizer
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
@@ -54,6 +55,7 @@ MODEL_CLASSES = {
     "bert": (BertForSequenceClassification, BertTokenizer),
     "electra": (ElectraForSequenceClassification, ElectraTokenizer),
     "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
+    "albert": (AlbertForSequenceClassification, AlbertTokenizer),
 }
 
 
@@ -307,8 +309,13 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    num_training_steps = args.max_steps if args.max_steps > 0 else (
-        len(train_data_loader) * args.num_train_epochs)
+    if args.max_steps > 0:
+        num_training_steps = args.max_steps
+        num_train_epochs = math.ceil(num_training_steps / len(train_data_loader))
+    else:
+        num_training_steps = len(train_data_loader) * args.num_train_epochs
+        num_train_epochs = args.num_train_epochs
+
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
@@ -336,7 +343,7 @@ def do_train(args):
 
     global_step = 0
     tic_train = time.time()
-    for epoch in range(args.num_train_epochs):
+    for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
 
