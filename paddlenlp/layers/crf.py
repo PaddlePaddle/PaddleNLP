@@ -97,10 +97,7 @@ class LinearChainCrf(nn.Layer):
             F(2) & = log\\sum_{y1}\\sum_{y2} exp(p(y_1) + T([START], y1) + p(y_2) + T(y_1,y_2)) \\\\
             & = log\\sum_{y2} exp(F(1) + p(y_2) + T(y_1,y_2))
 
-        .. math::
-            F(...) = ...
-
-        A recursive formula.
+        Further, We can get F(n) is a recursive formula with F(n-1).
 
         Args:
             inputs (`Tensor`): 

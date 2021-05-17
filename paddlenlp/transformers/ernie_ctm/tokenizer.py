@@ -104,7 +104,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         return len(self.vocab)
 
     def convert_tokens_to_string(self, tokens):
-        """ Converts a sequence of tokens (string) in a single string. """
+        # Converts a sequence of tokens (strings for sub-words) in a single string.
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
 
@@ -138,19 +138,22 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                                 token_ids_0,
                                 token_ids_1=None,
                                 already_has_special_tokens=False):
-        """Retrieve sequence ids from a token list that has no special tokens added. This method is called when
-        adding special tokens using the tokenizer ``prepare_for_model`` method.
+        """
+        Creates a special tokens mask from the input sequences.
+        This method is called when adding special tokens using the tokenizer `encode` method.
 
         Args:
-            token_ids_0 (`List`):
-                List of IDs to which the special tokens will be added.
-            token_ids_1 (`List`, optional):
-                second list of IDs for sequence pairs. Defaults to ``None``.
-            already_has_special_tokens (`bool`, optional):
-                Whether or not the token list is already formatted with special tokens for the model. Defaults to ``False``.
+            token_ids_0 (List[int]):
+                A list of `inputs_ids` for the first sequence.
+            token_ids_1 (List[int], optional):
+                Optional second list of `inputs_ids` for the second sequence.
+                Defaults to `None`.
+            already_has_special_tokens (bool, optional):
+                Whether or not the token list already contains special tokens for the model.
+                Defaults to `False`.
 
         Returns:
-            List: A list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
+            List[int]: A list of integers which is either 0 or 1: 1 for a special token, 0 for a sequence token.
         """
         if already_has_special_tokens:
             if token_ids_1 is not None:
@@ -171,19 +174,36 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                                              token_ids_0,
                                              token_ids_1=None):
         """
-        Create a mask from the two sequences passed to be used in a sequence-pair classification task. A BERT sequence
-        pair mask has the following format:
+        Creates a token_type mask from the input sequences.
+        If `token_ids_1` is not `None`, then a sequence pair
+        token_type mask has the following format:
+
         ::
-            0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
+
+            0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 2
             | first sequence    | second sequence |
-        If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
+
+        Else if `token_ids_1` is `None`, then a single sequence
+        token_type mask has the following format:
+
+        ::
+
+            0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2
+            |            first sequence           |
+
+        - 0 stands for the segment id of **first segment tokens**,
+        - 1 stands for the segment id of **second segment tokens**,
+        - 2 stands for the segment id of **cls_token**.
+
         Args:
-            token_ids_0 (`List`):
-                List of IDs to which the special tokens will be added.
-            token_ids_1 (`List`, optional):
-                second list of IDs for sequence pairs. Defaults to ``None``.
+            token_ids_0 (List[int]):
+                A list of `inputs_ids` for the first sequence.
+            token_ids_1 (List[int], optional):
+                Optional second list of `inputs_ids` for the second sequence.
+                Defaults to `None`.
+
         Returns:
-            `List`: List of `token type IDs  according to the given sequence(s).
+            List[int]: List of token type IDs according to the given sequence(s).
         """
         sep = [self.sep_token_id]
         if token_ids_1 is None:
@@ -192,6 +212,21 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                 ) * [0] + len(token_ids_1 + sep) * [1]
 
     def num_special_tokens_to_add(self, pair=False):
+        """
+        Returns the number of added tokens when encoding a sequence with special tokens.
+
+        Note:
+            This encodes inputs and checks the number of added tokens, and is therefore not efficient.
+            Do not put this inside your training loop.
+
+        Args:
+            pair (bool, optional):
+                Whether the input is a sequence pair or a single sequence.
+                Defaults to `False` and the input is a single sequence.
+
+        Returns:
+            int: Number of tokens added to sequences.
+        """
         if pair is True:
             return self.summary_num + 2
         else:
@@ -199,8 +234,13 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
 
     def tokenize(self, text, **kwargs):
         """
-        Basic Tokenization of a piece of text, to tokenize Chinese Character, we should transform string to token list
-        straightly.
+        Converts a string to a list of tokens.
+        
+        Args:
+            text (str):
+                The text to be tokenized.
+        Returns:
+            List(str): A list of string representing converted tokens.
         """
         orig_tokens = list(text)
         output_tokens = []
