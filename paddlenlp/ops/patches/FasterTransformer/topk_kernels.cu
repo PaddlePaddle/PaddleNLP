@@ -511,6 +511,7 @@ __global__ void sampling(int* topk_tmp_id_buf,
     }
 
     curandState_t local_state;
+    // TODO: fix randomly cannot work in some specific situation.
     curand_init((T)(seed),
                 bid * candidate_num,
                 blockDim.x * candidate_num,
@@ -662,6 +663,7 @@ __global__ void top_p_sampling(T* sorted_log_probs,
                                const int end_id) {
   int tid = threadIdx.x;
   curandState_t local_state;
+  // TODO: fix randomly cannot work in some specific situation.
   curand_init((T)random_num, tid, 0, &local_state);
   T rand_num = (T)curand_uniform(&local_state) * (T)prob_threshold;
   ids[tid] = sorted_id_vals[vocab_size - 1];
@@ -858,6 +860,7 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
     }
 
     curandState_t local_state;
+    // TODO: fix randomly cannot work in some specific situation.
     curand_init((T)(seed), block_id * MAX_K, blockDim.x * MAX_K, &local_state);
     T rand_num = (T)curand_uniform(&local_state) * (T)prob_threshold * sum;
 

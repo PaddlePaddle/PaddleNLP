@@ -52,7 +52,7 @@ def parse_args():
         "--batch_size", default=1, type=int, help="Batch size. ")
     parser.add_argument(
         "--topk",
-        default=1,
+        default=4,
         type=int,
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
@@ -124,14 +124,15 @@ def do_predict(args):
             if 50 == i:
                 start = time.time()
             out_seq = gpt(input_ids)
-        output_sequence = out_seq.numpy().transpose()
         logger.info("Average test time for decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
+        output_sequence = out_seq.numpy().transpose()
     for i in range(args.batch_size):
-        print("========== Sample-%d==========" % i)
+        print("========== Sample-%d ==========" % i)
         print(tokenizer.convert_ids_to_string(output_sequence[i][1:]))
 
 
 if __name__ == "__main__":
     args = parse_args()
+    pprint(args)
     do_predict(args)
