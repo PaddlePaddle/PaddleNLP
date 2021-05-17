@@ -139,14 +139,20 @@ def do_predict(args):
                         f.write(sequence)
         if args.profile:
             if args.decoding_strategy == "beam_search":
-                logger.info("Setting info: batch size: {}, beam size: {}. ".
-                            format(args.infer_batch_size, args.beam_size))
+                logger.info(
+                    "Setting info: batch size: {}, beam size: {}, use fp16: {}. ".
+                    format(args.infer_batch_size, args.beam_size,
+                           args.use_fp16_decoding))
             elif args.decoding_strategy == "topk_sampling":
-                logger.info("Setting info: batch size: {}, topk: {}. ".format(
-                    args.infer_batch_size, args.topk))
+                logger.info(
+                    "Setting info: batch size: {}, topk: {}, use fp16: {}. ".
+                    format(args.infer_batch_size, args.topk,
+                           args.use_fp16_decoding))
             elif args.decoding_strategy == "topp_sampling":
-                logger.info("Setting info: batch size: {}, topp: {}. ".format(
-                    args.infer_batch_size, args.topp))
+                logger.info(
+                    "Setting info: batch size: {}, topp: {}, use fp16: {}. ".
+                    format(args.infer_batch_size, args.topp,
+                           args.use_fp16_decoding))
             paddle.fluid.core._cuda_synchronize(place)
             logger.info("Average time latency is {} ms/batch. ".format((
                 time.time() - start) / len(test_loader) * 1000))
