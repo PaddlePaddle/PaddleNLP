@@ -68,7 +68,7 @@ inputs = tokenizer(text="请输入测试样例", max_seq_len=20)
 
 
 
-从比赛官网下载数据集，解压存放于data/目录下并重命名为train_data.json, dev_data.json, test_data.json.
+从比赛官网[下载数据集](https://aistudio.baidu.com/aistudio/competition/detail/65)，解压存放于data/目录下并重命名为train_data.json, dev_data.json, test_data.json.
 
 我们可以加载自定义数据集。通过继承[`paddle.io.Dataset`](https://www.paddlepaddle.org.cn/documentation/docs/zh/api/paddle/io/Dataset_cn.html#dataset)，自定义实现`__getitem__` 和 `__len__`两个方法。
 
