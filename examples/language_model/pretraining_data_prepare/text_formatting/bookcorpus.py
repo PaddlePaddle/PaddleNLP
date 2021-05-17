@@ -27,13 +27,8 @@ class BookscorpusTextFormatter:
 
     # This puts one book per line
     def merge(self):
-        idx = 0
         with open(self.formatted_file, mode='w', newline='\n') as ofile:
             for data in self.bookcorpus_ds['train']:
                 text = data['text']
                 if text.strip() != "":
                     ofile.write(text.strip() + ' \n')
-                    idx += 1
-
-                if idx >= 20000:
-                    break
