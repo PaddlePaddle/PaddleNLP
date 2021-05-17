@@ -602,7 +602,6 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 inputs = tokenizer("这是个测试样例")
                 inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
                 logits = model(**inputs)
-
         """
         sequence_output, _ = self.ernie(
             input_ids,

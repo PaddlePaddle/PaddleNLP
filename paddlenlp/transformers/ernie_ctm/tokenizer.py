@@ -95,6 +95,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                 "vocabulary from a pretrained model please use "
                 "`tokenizer = ErnieTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(vocab_file))
+        self.do_lower_case = do_lower_case
         self.cls_token_template = cls_token_template
         self.summary_num = summary_num
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
@@ -232,6 +233,24 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         else:
             return self.summary_num + 1
 
+    def _tokenize(self, text, **kwargs):
+        r"""
+        Converts a string to a list of tokens.
+
+        Args:
+            text (str): The text to be tokenized.
+        
+        Returns:
+            List[str]: A list of string representing converted tokens.
+        """
+        orig_tokens = list(text)
+        output_tokens = []
+        for token in orig_tokens:
+            if self.do_lower_case is True:
+                token = token.lower()
+            output_tokens.append(token)
+        return output_tokens
+
     def tokenize(self, text, **kwargs):
         """
         Converts a string to a list of tokens.
@@ -242,10 +261,4 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         Returns:
             List(str): A list of string representing converted tokens.
         """
-        orig_tokens = list(text)
-        output_tokens = []
-        for token in orig_tokens:
-            if self.do_lower_case is True:
-                token = token.lower()
-            output_tokens.append(token)
-        return output_tokens
+        return self._tokenize(text, kwargs)

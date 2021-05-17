@@ -298,7 +298,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
                 Whether the content_output is clone from sequence_output. If set to `True`, the content_output is
                 clone from sequence_output, which may cause the classification task impact on the sequence labeling task.
         Returns:
-            `Tuple`: (``sequence_output``, ``pooled_output``, ``content_output``).
+            A tuple of shape (``sequence_output``, ``pooled_output``, ``content_output``).
             
             With the fields:
             - sequence_output (`Tensor`):
@@ -417,7 +417,7 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
         if tag_labels is not None and cls_label is not None:
             loss_fct = nn.loss.CrossEntropyLoss(ignore_index=self.ignore_index)
             cls_loss = loss_fct(cls_logits, cls_label.reshape([-1]))
-            seq_crf_loss = self.crf_loss(seq_logits, lengths, None, tag_labels)
+            seq_crf_loss = self.crf_loss(seq_logits, lengths, tag_labels)
             total_loss = cls_loss + seq_crf_loss
             return total_loss, seq_logits, cls_logits
         else:
