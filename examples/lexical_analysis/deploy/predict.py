@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 import argparse
 import numpy as np
-import os
 
 import paddle
 import paddlenlp as ppnlp
@@ -47,7 +48,7 @@ def convert_tokens_to_ids(tokens,
                           vocab,
                           oov_replace_token=None,
                           normlize_vocab=None):
-    """convert tokens to token indexs"""
+    """Convert tokens to token indexs"""
     token_ids = []
     oov_replace_token = vocab.get(
         oov_replace_token) if oov_replace_token else None
@@ -60,6 +61,7 @@ def convert_tokens_to_ids(tokens,
 
 
 def convert_example(tokens, max_seq_len, word_vocab, normlize_vocab=None):
+    """Convert tokens of sequences to token ids"""
     tokens = tokens[:max_seq_len]
 
     token_ids = convert_tokens_to_ids(
@@ -72,9 +74,7 @@ def convert_example(tokens, max_seq_len, word_vocab, normlize_vocab=None):
 
 
 def load_vocab(dict_path):
-    """
-    Load vocab from file
-    """
+    """Load vocab from file"""
     vocab = {}
     reverse = None
     with open(dict_path, "r", encoding='utf8') as fin:
@@ -97,7 +97,7 @@ def load_vocab(dict_path):
 
 
 def parse_result(words, preds, lengths, word_vocab, label_vocab):
-    """ parse padding result """
+    """ Parse padding result """
     batch_out = []
     id2word_dict = dict(zip(word_vocab.values(), word_vocab.keys()))
     id2label_dict = dict(zip(label_vocab.values(), label_vocab.keys()))
@@ -167,6 +167,20 @@ class Predictor(object):
                 label_vocab,
                 normlize_vocab,
                 batch_size=1):
+        """
+        Predicts the data labels.
+
+        Args:
+            data (obj:`List(Example)`): The processed data whose each element is a Example (numedtuple) object.
+                A Example object contains `text`(word_ids) and `seq_len`(sequence length).
+            word_vocab(obj:`dict`): The word id (key) to word str (value) map.
+            label_vocab(obj:`dict`): The label id (key) to label str (value) map.
+            normlize_vocab(obj:`dict`): The fullwidth char (key) to halfwidth char (value) map.
+            batch_size(obj:`int`, defaults to 1): The number of batch.
+
+        Returns:
+            results(obj:`dict`): All the predictions labels.
+        """
         examples = []
 
         for text in data:
@@ -226,5 +240,4 @@ if __name__ == "__main__":
         sent_tags = []
         sent, tags = result
         sent_tag = ['(%s, %s)' % (ch, tag) for ch, tag in zip(sent, tags)]
-        print('Result: {}'.format(sent_tag))
-        print()
+        print('Result: {}\n'.format(sent_tag))
