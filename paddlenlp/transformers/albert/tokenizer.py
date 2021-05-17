@@ -116,6 +116,7 @@ class AlbertTokenizer(PretrainedTokenizer):
     def __init__(
         self,
         vocab_file,
+        sentencepiece_model_file,
         do_lower_case=True,
         remove_space=True,
         keep_accents=False,
@@ -132,26 +133,23 @@ class AlbertTokenizer(PretrainedTokenizer):
         self.remove_space = remove_space
         self.keep_accents = keep_accents
         self.vocab_file = vocab_file
+        self.sentencepiece_model_file = sentencepiece_model_file
 
-        if vocab_file.endswith("vocab.txt"):
+        if vocab_file is not None:
             self.tokenizer = AlbertChineseTokenizer(
                 vocab_file,
                 do_lower_case=False,
             )
-        elif vocab_file.endswith("spiece.model"):
+        elif sentencepiece_model_file is not None:
             self.tokenizer = AlbertEnglishTokenizer(
-                vocab_file,
+                sentencepiece_model_file,
                 do_lower_case=True,
             )
         else:
-            raise ValueError('vocab_file has to be either a "vocab.txt" file or a "spiece.model" file')
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        if "chinese" in pretrained_model_name_or_path:
-            return AlbertChineseTokenizer.from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
-        else:
-            return AlbertEnglishTokenizer.from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+            raise ValueError("You should only specify either one(not both) of 'vocal_file'"
+                             "and 'sentencepiece_model_file' to construct an albert tokenizer."
+                             "Specify 'vocal_file' for Chinese tokenizer and "
+                             "'sentencepiece_model_file' for English tokenizer")
 
     @property
     def vocab_size(self):
@@ -283,7 +281,7 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
         self.keep_accents = keep_accents
-        self.vocab_file = sentencepiece_model_file
+        self.sentencepiece_model_file = sentencepiece_model_file
 
         spm = try_import("sentencepiece")
         self.sp_model = spm.SentencePieceProcessor()
@@ -302,7 +300,7 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
         self.__dict__ = d
         spm = try_import("sentencepiece")
         self.sp_model = spm.SentencePieceProcessor()
-        self.sp_model.Load(self.vocab_file)
+        self.sp_model.Load(self.sentencepiece_model_file)
 
     def preprocess_text(self, inputs):
         if self.remove_space:
@@ -433,8 +431,8 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
     def save_resources(self, save_directory):
         for name, file_name in self.resource_files_names.items():
             save_path = os.path.join(save_directory, file_name)
-            if os.path.abspath(self.vocab_file) != os.path.abspath(save_path):
-                copyfile(self.vocab_file, save_path)
+            if os.path.abspath(self.sentencepiece_model_file) != os.path.abspath(save_path):
+                copyfile(self.sentencepiece_model_file, save_path)
 
 
 class AlbertChineseTokenizer(BertTokenizer):
