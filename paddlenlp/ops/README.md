@@ -57,11 +57,15 @@ make -j
 cd ../
 ```
 
-注意：`xx` 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)。若未指定 `-DPY_CMD` 将会默认使用系统命令 `python` 对应的 Python。
+注意：
+* `xx` 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
+* 若未指定 `-DPY_CMD` 将会默认使用系统命令 `python` 对应的 Python。
+* 若使用 GPT-2 高性能推理，需要加上 -DWITH_GPT=ON。
+
 
 最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 Faster Transformer decoding 执行的库。
 
-#### 使用
+### 使用 Transformer decoding 高性能推理
 
 编写 python 脚本的时候，调用 `FasterTransformer` API 并传入 `libdecoding_op.so` 的位置即可实现将 Faster Transformer 用于当前的预测。
 
@@ -93,7 +97,7 @@ transformer = FasterTransformer(
 
 更详细的例子可以参考 `./sample/decoding_sample.py` 以及 `./sample/encoder_decoding_sample.py`，我们提供了更详细用例。
 
-#### 执行 decoding on PaddlePaddle
+#### 执行 Transformer decoding on PaddlePaddle
 
 使用 PaddlePaddle 仅执行 decoding 测试（float32）：
 
@@ -115,6 +119,60 @@ python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml -
 ```
 
 其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。
+
+### 使用 GPT-2 decoding 高性能推理
+
+与 `FasterTransformer` 类似，可以通过一下方式调用 GPT-2 相关优化：
+
+``` python
+from paddlenlp.ops import FasterGPT
+from paddlenlp.transformers import GPTModel, GPTForPretraining
+
+MODEL_CLASSES = {
+    "gpt2-medium-en": (GPTForPretraining, GPTTokenizer),
+}
+
+model_class, tokenizer_class = MODEL_CLASSES[args.model_name]
+tokenizer = tokenizer_class.from_pretrained(args.model_name)
+model = model_class.from_pretrained(args.model_name)
+
+# Define model
+gpt = FasterGPT(
+    model=model,
+    candidate_num=args.candidate_num,
+    probability_threshold=args.probability_threshold,
+    max_seq_len=args.max_seq_len,
+    start_id=start_id,
+    end_id=end_id,
+    temperature=args.temperature,
+    decoding_lib=args.decoding_lib,
+    use_fp16_decoding=args.use_fp16_decoding)
+```
+
+目前，GPT-2 的例子仅支持 `batch size` 为 `1` 或是 batch 内输入的序列长度相等的情况。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
+
+更详细的例子可以参考 `./sample/gpt_sample.py`，我们提供了更详细用例。
+
+#### 执行 GPT-2 decoding on PaddlePaddle
+
+使用 PaddlePaddle 仅执行 decoding 测试（float32）：
+
+``` sh
+export CUDA_VISIBLE_DEVICES=0
+python sample/gpt_sample.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/libdecoding_op.so --batch_size 1 --candidate_num 4 --probability_threshold 0.0 --max_seq_len 12 --start_token <|endoftext|> --end_token <|endoftext|> --temperature 1.0
+```
+
+其中，各个选项的意义如下：
+* `--model_name_or_path`: 预训练模型的名称或是路径。
+* `--decoding_lib`: 指向 `libdecoding_op.so` 的路径。需要包含 `libdecoding_op.so`。
+* `--batch_size`: 一个 batch 内，样本数目的大小。
+* `--candidate_num`: 执行 topk-sampling 的时候的 `k` 的大小，默认是 4。
+* `--probability_threshold`: 执行 topp-sampling 的时候的阈值的大小，默认是 0.0 表示不执行 topp-sampling。
+* `--max_seq_len`: 最长的生成长度。
+* `--start_token`: 字符串，表示任意生成的时候的开始 token。
+* `--end_token`: 字符串，生成的结束 token。
+* `--temperature`: temperature 的设定。
+* `--use_fp16_decoding`: 是否使用 fp16 进行推理。
 
 
 ## C++ 预测库使用自定义 op
