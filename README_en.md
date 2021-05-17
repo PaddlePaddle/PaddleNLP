@@ -81,13 +81,13 @@ For more TokenEmbedding usage, please refer to [Embedding API](./docs/embeddings
 ### Rich Chinese Pre-trained Models
 
 ```python
-from paddlenlp.transformers import ErnieModel, BertModel, RobertaModel, ElectraModel, GPT2ForPretraining
+from paddlenlp.transformers import ErnieModel, BertModel, RobertaModel, ElectraModel, GPTForPretraining
 
 ernie = ErnieModel.from_pretrained('ernie-1.0')
 bert = BertModel.from_pretrained('bert-wwm-chinese')
 roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
 electra = ElectraModel.from_pretrained('chinese-electra-small')
-gpt2 = GPT2ForPretraining.from_pretrained('gpt2-base-cn')
+gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
 For more pretrained model selection, please refer to [Transformer API](./docs/transformers.md)

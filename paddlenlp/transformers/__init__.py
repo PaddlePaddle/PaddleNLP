@@ -20,8 +20,8 @@ from .bert.modeling import *
 from .bert.tokenizer import *
 from .ernie.modeling import *
 from .ernie.tokenizer import *
-from .gpt2.modeling import *
-from .gpt2.tokenizer import *
+from .gpt.modeling import *
+from .gpt.tokenizer import *
 from .roberta.modeling import *
 from .roberta.tokenizer import *
 from .electra.modeling import *
@@ -39,3 +39,5 @@ from .skep.modeling import *
 from .skep.tokenizer import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
+from .xlnet.modeling import *
+from .xlnet.tokenizer import *
