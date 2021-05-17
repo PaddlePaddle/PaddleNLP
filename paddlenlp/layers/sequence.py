@@ -27,7 +27,7 @@ def sequence_mask(seq_ids, valid_lengths):
         mask (`Tensor`): 
             The output sequence mask. Its dtype is ``bool`` and has a shpe of [batch_size, sequence_length].
     """
-    lengths_exp = valid_lengths.unsqueeze(1).expand_as(seq_ids)
+    lengths_exp = valid_lengths.unsqueeze(1)
     mask = seq_ids < lengths_exp
 
     return mask
