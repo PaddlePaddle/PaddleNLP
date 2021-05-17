@@ -19,16 +19,6 @@ from .AdamwOptimizer import AdamwOptimizer
 
 
 def _jit_compile():
-    load(
-        name="custom_jit_ops",
-        sources=[
-            os.path.join(os.path.dirname(__file__), x)
-            for x in [
-                "adamw.cc",
-                "adamw.cu",
-            ]
-        ])
-
     try:
         load(
             name="custom_jit_ops",

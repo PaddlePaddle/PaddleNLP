@@ -35,6 +35,7 @@ import paddle
 import paddle.fluid as fluid
 import paddle.distributed.fleet as fleet
 import paddle.fluid.profiler as profiler
+import paddlenlp
 from visualdl import LogWriter
 from paddle.distributed.fleet.meta_optimizers.sharding.utils import add_sync_comm, save_persistables
 
@@ -78,15 +79,14 @@ def linear_warmup_decay(learning_rate, warmup_steps, num_train_steps):
         return lr
 
 
-def exclude_from_weight_decay(n):
-    name = n.name
+def apply_weight_decay_fun(name):
     if name.find("layer_norm") > -1:
-        return True
+        return False
     bias_suffix = ["_bias", "_b", ".b_0"]
     for suffix in bias_suffix:
         if name.endswith(suffix):
-            return True
-    return False
+            return False
+    return True
 
 
 def create_model(args, phase, micro_bsz, dp_sharding_rank, dp_worldsize, topo):
@@ -322,14 +322,23 @@ def train(args):
                 num_train_steps=args.num_train_steps)
 
             clip_norm_thres = 1.0
-            optimizer = fluid.optimizer.Adam(
-                learning_rate=scheduled_lr,
-                grad_clip=fluid.clip.GradientClipByGlobalNorm(
-                    clip_norm=clip_norm_thres),
-                #multi_precision=True,
-                #weight_decay=args.weight_decay, # merge this pr to use weight_decay: https://github.com/PaddlePaddle/Paddle/pull/29248
-                #exclude_from_weight_decay_fn=exclude_from_weight_decay
-            )
+            if paddlenlp.ops.optimizer._jit_compile():
+                optimizer = paddlenlp.ops.optimizer.AdamwOptimizer(
+                    learning_rate=scheduled_lr,
+                    grad_clip=fluid.clip.GradientClipByGlobalNorm(
+                        clip_norm=clip_norm_thres),
+                    weight_decay=args.weight_decay,
+                    apply_decay_param_fun=apply_weight_decay_fun)
+            else:
+                optimizer = fluid.optimizer.Adam(
+                    learning_rate=scheduled_lr,
+                    grad_clip=fluid.clip.GradientClipByGlobalNorm(
+                        clip_norm=clip_norm_thres),
+                    #multi_precision=True,
+                    #weight_decay=args.weight_decay, # merge this pr to use weight_decay: https://github.com/PaddlePaddle/Paddle/pull/29248
+                    #exclude_from_weight_decay_fn=exclude_from_weight_decay
+                )
+
             optimizer = fleet.distributed_optimizer(optimizer, dist_strategy)
             log.info(f"using dist strategy: {dist_strategy}")
 

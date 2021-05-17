@@ -103,13 +103,13 @@ class AdamwOptimizer(Optimizer):
         assert beta1 is not None
         assert beta2 is not None
         assert epsilon is not None
-        super(AdamOptimizer, self).__init__(
+        super(AdamwOptimizer, self).__init__(
             learning_rate=learning_rate,
             parameter_list=parameter_list,
             regularization=regularization,
             grad_clip=grad_clip,
             name=name)
-        self.type = "custom_adam"
+        self.type = "adamw"
         self._beta1 = beta1
         self._beta2 = beta2
         self._epsilon = epsilon
@@ -195,7 +195,7 @@ class AdamwOptimizer(Optimizer):
             }
 
             framework._dygraph_tracer().trace_op(
-                type="custom_adam", inputs=ins, outputs=outs, attrs=attrs)
+                type="adamw", inputs=ins, outputs=outs, attrs=attrs)
 
             return None
 
