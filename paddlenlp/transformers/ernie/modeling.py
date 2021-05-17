@@ -535,7 +535,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
         dropout (float, optional): 
             The dropout probability for output of ERNIE. 
             If None, use the same value as `hidden_dropout_prob` 
-            of `ErnieModel` instance `Ernie`. Defaults to `None`.
+            of `ErnieModel` instance `ernie`. Defaults to `None`.
     """
 
     def __init__(self, ernie, num_classes=2, dropout=None):
