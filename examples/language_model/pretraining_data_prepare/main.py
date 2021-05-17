@@ -142,7 +142,7 @@ def do_text_sharding(model_name, formatted_files, output_dir, n_train_shards,
         segmenter = ChineseSegmenter()
 
     sharding_output_name_prefix = os.path.join(sharding_path, "sharding")
-    sharding = Sharding([formatted_files], sharding_output_name_prefix,
+    sharding = Sharding(formatted_files, sharding_output_name_prefix,
                         n_train_shards, n_test_shards, fraction_test_set)
     sharding.load_articles()
     logger.info("Splitting the articles into sentences.")
@@ -196,7 +196,7 @@ if __name__ == "__main__":
         logger.info("=" * 50)
         logger.info("Skip text formatting, formatted file: %s" %
                     args.formatted_file)
-        formatted_files = args.formatted_file
+        formatted_files = [args.formatted_file]
 
     sharding_output_name_prefix = do_text_sharding(
         args.model_name, formatted_files, args.output_dir, args.n_train_shards,
