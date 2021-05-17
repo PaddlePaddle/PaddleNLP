@@ -21,13 +21,19 @@ from datasets import load_dataset
 class BookscorpusTextFormatter:
     def __init__(self, save_path):
         self.bookcorpus_ds = load_dataset("bookcorpus")
-        self.books_path = books_path
+        self.save_path = save_path
         self.formatted_file = os.path.join(self.save_path, "book_formatted.txt")
+        self.merge()
 
     # This puts one book per line
     def merge(self):
+        idx = 0
         with open(self.formatted_file, mode='w', newline='\n') as ofile:
             for data in self.bookcorpus_ds['train']:
                 text = data['text']
                 if text.strip() != "":
-                    ofile.write(line.strip() + ' \n')
+                    ofile.write(text.strip() + ' \n')
+                    idx += 1
+
+                if idx >= 20000:
+                    break
