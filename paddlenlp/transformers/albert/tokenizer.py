@@ -51,8 +51,22 @@ class AlbertTokenizer(PretrainedTokenizer):
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xlarge-v2.spiece.model",
             "albert-xxlarge-v2":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-xxlarge-v2.spiece.model",
+            "albert-chinese-tiny": None,
+            "albert-chinese-small": None,
+            "albert-chinese-base": None,
+            "albert-chinese-large": None,
+            "albert-chinese-xlarge": None,
+            "albert-chinese-xxlarge": None,
         },
         "vocab_file": {
+            "albert-base-v1": None,
+            "albert-large-v1": None,
+            "albert-xlarge-v1": None,
+            "albert-xxlarge-v1": None,
+            "albert-base-v2": None,
+            "albert-large-v2": None,
+            "albert-xlarge-v2": None,
+            "albert-xxlarge-v2": None,
             "albert-chinese-tiny":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-tiny.vocab.txt",
             "albert-chinese-small":

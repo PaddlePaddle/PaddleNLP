@@ -20,7 +20,6 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
 
-from paddlenlp.ops import einsum
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -89,7 +88,6 @@ class AlbertEmbeddings(Layer):
             max_position_embeddings,
             type_vocab_size,
             layer_norm_eps,
-            position_embedding_type,
             pad_token_id,
     ):
         super(AlbertEmbeddings, self).__init__()
@@ -103,7 +101,6 @@ class AlbertEmbeddings(Layer):
 
         # Position_ids (1, len position emb) is contiguous in memory and exported when serialized
         self.register_buffer("position_ids", paddle.arange(max_position_embeddings).expand((1, -1)))
-        self.position_embedding_type = position_embedding_type
 
     def forward(
             self,
@@ -132,9 +129,8 @@ class AlbertEmbeddings(Layer):
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
         embeddings = inputs_embeds + token_type_embeddings
 
-        if self.position_embedding_type == "absolute":
-            position_embeddings = self.position_embeddings(position_ids)
-            embeddings += position_embeddings
+        position_embeddings = self.position_embeddings(position_ids)
+        embeddings += position_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -147,9 +143,7 @@ class AlbertAttention(Layer):
             num_attention_heads,
             hidden_dropout_prob,
             attention_probs_dropout_prob,
-            max_position_embeddings,
             layer_norm_eps,
-            position_embedding_type,
     ):
         super(AlbertAttention, self).__init__()
         if hidden_size % num_attention_heads != 0:
@@ -171,11 +165,6 @@ class AlbertAttention(Layer):
         self.output_dropout = nn.Dropout(hidden_dropout_prob)
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-
-        self.position_embedding_type = position_embedding_type if not position_embedding_type else "absolute"
-        if self.position_embedding_type == "relative_key" or self.position_embedding_type == "relative_key_query":
-            self.max_position_embeddings = max_position_embeddings
-            self.distance_embedding = nn.Embedding(2 * max_position_embeddings - 1, self.attention_head_size)
 
     # Copied from transformers.models.bert.modeling_bert.BertSelfAttention.transpose_for_scores
     def transpose_for_scores(self, x):
@@ -204,24 +193,6 @@ class AlbertAttention(Layer):
         if attention_mask is not None:
             # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
             attention_scores = attention_scores + attention_mask
-
-        if self.position_embedding_type == "relative_key" or self.position_embedding_type == "relative_key_query":
-            seq_length = hidden_states.shape[1]
-            position_ids_l = paddle.arange(seq_length, dtype="int64").reshape((-1, 1))
-            position_ids_r = paddle.arange(seq_length, dtype="int64").reshape((1, -1))
-
-            distance = position_ids_l - position_ids_r
-            positional_embedding = self.distance_embedding(distance + self.max_position_embeddings - 1)
-            positional_embedding = paddle.cast(positional_embedding, query_layer.dtype)  # fp16 compatibility
-
-            positional_embedding = paddle.stack([positional_embedding] * query_layer.shape[0], axis=0)
-            if self.position_embedding_type == "relative_key":
-                relative_position_scores = einsum("bhld,blrd->bhlr", query_layer, positional_embedding)
-                attention_scores = attention_scores + relative_position_scores
-            elif self.position_embedding_type == "relative_key_query":
-                relative_position_scores_query = einsum("bhld,blrd->bhlr", query_layer, positional_embedding)
-                relative_position_scores_key = einsum("bhrd,blrd->bhlr", key_layer, positional_embedding)
-                attention_scores = attention_scores + relative_position_scores_query + relative_position_scores_key
 
         # Normalize the attention scores to probabilities.
         attention_probs = F.softmax(attention_scores)
@@ -254,9 +225,7 @@ class AlbertLayer(Layer):
                  hidden_act,
                  hidden_dropout_prob,
                  attention_probs_dropout_prob,
-                 max_position_embeddings,
-                 layer_norm_eps,
-                 position_embedding_type,):
+                 layer_norm_eps,):
         super(AlbertLayer, self).__init__()
         self.seq_len_dim = 1
         self.full_layer_layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
@@ -265,9 +234,7 @@ class AlbertLayer(Layer):
             num_attention_heads,
             hidden_dropout_prob,
             attention_probs_dropout_prob,
-            max_position_embeddings,
             layer_norm_eps,
-            position_embedding_type,
         )
         self.ffn = nn.Linear(hidden_size, intermediate_size)
         self.ffn_output = nn.Linear(intermediate_size, hidden_size)
@@ -306,9 +273,7 @@ class AlbertLayerGroup(Layer):
                  hidden_act,
                  hidden_dropout_prob,
                  attention_probs_dropout_prob,
-                 max_position_embeddings,
                  layer_norm_eps,
-                 position_embedding_type,
     ):
         super(AlbertLayerGroup, self).__init__()
 
@@ -320,9 +285,7 @@ class AlbertLayerGroup(Layer):
                     hidden_act,
                     hidden_dropout_prob,
                     attention_probs_dropout_prob,
-                    max_position_embeddings,
                     layer_norm_eps,
-                    position_embedding_type,
                 ) for _ in range(inner_group_num)
         ])
 
@@ -363,9 +326,7 @@ class AlbertTransformer(Layer):
                  hidden_act,
                  hidden_dropout_prob,
                  attention_probs_dropout_prob,
-                 max_position_embeddings,
                  layer_norm_eps,
-                 position_embedding_type,
     ):
         super(AlbertTransformer, self).__init__()
 
@@ -382,9 +343,7 @@ class AlbertTransformer(Layer):
                 hidden_act,
                 hidden_dropout_prob,
                 attention_probs_dropout_prob,
-                max_position_embeddings,
                 layer_norm_eps,
-                position_embedding_type,
             ) for _ in range(num_hidden_groups)
         ])
 
@@ -807,7 +766,6 @@ class AlbertModel(AlbertPretrainedModel):
                  type_vocab_size=2,
                  initializer_range=0.02,
                  layer_norm_eps=1e-12,
-                 position_embedding_type="absolute",
                  pad_token_id=0,
                  bos_token_id=2,
                  eos_token_id=3,
@@ -822,7 +780,6 @@ class AlbertModel(AlbertPretrainedModel):
             max_position_embeddings,
             type_vocab_size,
             layer_norm_eps,
-            position_embedding_type,
             pad_token_id,)
 
         self.encoder = AlbertTransformer(
@@ -836,9 +793,7 @@ class AlbertModel(AlbertPretrainedModel):
             hidden_act,
             hidden_dropout_prob,
             attention_probs_dropout_prob,
-            max_position_embeddings,
-            layer_norm_eps,
-            position_embedding_type,)
+            layer_norm_eps,)
 
         if add_pooling_layer:
             self.pooler = nn.Linear(hidden_size, hidden_size)

@@ -318,8 +318,7 @@ class PretrainedTokenizer(object):
         init_configuration = {}
         if pretrained_model_name_or_path in pretrained_models:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
-                vocab_files[file_id] = map_list[pretrained_model_name_or_path] \
-                    if pretrained_model_name_or_path in map_list else None
+                vocab_files[file_id] = map_list[pretrained_model_name_or_path]
             init_configuration = copy.deepcopy(
                 cls.pretrained_init_configuration[
                     pretrained_model_name_or_path])
