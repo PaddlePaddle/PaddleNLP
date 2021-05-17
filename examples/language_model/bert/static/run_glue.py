@@ -419,9 +419,9 @@ def do_train(args):
                 # Validation pass, record the loss and metric
                 if args.task_name == "mnli":
                     evaluate(exe, metric, loss, correct, dev_program,
-                             dev_data_loader_matched, "matched")
+                             dev_data_loader_matched, "matched eval")
                     evaluate(exe, metric, loss, correct, dev_program,
-                             dev_data_loader_mismatched, "mismatched")
+                             dev_data_loader_mismatched, "mismatched eval")
                 else:
                     evaluate(exe, metric, loss, correct, dev_program,
                              dev_data_loader)
