@@ -5,6 +5,7 @@ export GLOG_v=0
 export NCCL_DEBUG=INFO
 export FLAGS_call_stack_level=2
 export FLAGS_allocator_strategy=naive_best_fit
+unset CUDA_VISIBLE_DEVICES
 
 rm -rf *.prototxt
 rm -rf core.*
