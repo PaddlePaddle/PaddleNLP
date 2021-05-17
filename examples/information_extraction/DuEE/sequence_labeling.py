@@ -24,11 +24,13 @@ from functools import partial
 
 import numpy as np
 import paddle
+import paddle.nn as nn
 import paddle.nn.functional as F
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import ErnieTokenizer, ErnieForTokenClassification, LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
 from utils import read_by_lines, write_by_lines, load_dict
+from paddlenlp.layers.crf import LinearChainCrf, ViterbiDecoder, LinearChainCrfLoss
 
 warnings.filterwarnings('ignore')
 
@@ -71,14 +73,17 @@ def evaluate(model, criterion, metric, num_label, data_loader):
     metric.reset()
     losses = []
     for input_ids, seg_ids, seq_lens, labels in data_loader:
-        logits = model(input_ids, seg_ids)
-        loss = paddle.mean(criterion(logits.reshape([-1, num_label]), labels.reshape([-1])))
-        losses.append(loss.numpy())
-        preds = paddle.argmax(logits, axis=-1)
+        # logits = model(input_ids, seg_ids)
+        # loss = paddle.mean(criterion(logits.reshape([-1, num_label]), labels.reshape([-1])))
+        # loss = model(input_ids, seg_ids, lengths=seq_lens, labels=labels).mean()
+        # losses.append(loss.numpy())
+        _, preds = model(input_ids, seg_ids, lengths=seq_lens)
+        # preds = paddle.argmax(logits, axis=-1)
         n_infer, n_label, n_correct = metric.compute(None, seq_lens, preds, labels)
         metric.update(n_infer.numpy(), n_label.numpy(), n_correct.numpy())
         precision, recall, f1_score = metric.accumulate()
-    avg_loss = np.mean(losses)
+    # avg_loss = np.mean(losses)
+    avg_loss = None#np.mean(losses)
     model.train()
 
     return precision, recall, f1_score, avg_loss
@@ -104,6 +109,36 @@ def convert_example_to_feature(example, tokenizer, label_vocab=None, max_seq_len
         encoded_label = [label_vocab[x] for x in encoded_label]
         return input_ids, token_type_ids, seq_len, encoded_label
 
+class ErnieCrfForTokenClassification(nn.Layer):
+    def __init__(self, ernie, crf_lr=0.1):
+        super().__init__()
+        self.num_classes = ernie.num_classes
+        self.ernie = ernie  # allow ernie to be config
+        self.crf = LinearChainCrf(
+            self.num_classes, crf_lr=crf_lr, with_start_stop_tag=False)
+        self.crf_loss = LinearChainCrfLoss(self.crf)
+        self.viterbi_decoder = ViterbiDecoder(
+            self.crf.transitions, with_start_stop_tag=False)
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None,
+                lengths=None,
+                labels=None):
+        logits = self.ernie(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids)
+
+        if labels is not None:
+            loss = self.crf_loss(logits, lengths, labels)
+            return loss
+        else:
+            scores, prediction = self.viterbi_decoder(logits, lengths)
+            return scores, prediction
 
 class DuEventExtraction(paddle.io.Dataset):
     """DuEventExtraction"""
@@ -144,7 +179,8 @@ def do_train():
     tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
-    model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+    ernie = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+    model = ErnieCrfForTokenClassification(ernie)
     model = paddle.DataParallel(model)
 
     print("============start train==========")
@@ -201,9 +237,10 @@ def do_train():
     model.train()
     for epoch in range(args.num_epoch):
         for idx, (input_ids, token_type_ids, seq_lens, labels) in enumerate(train_loader):
-            logits = model(input_ids, token_type_ids).reshape(
-                [-1, train_ds.label_num])
-            loss = paddle.mean(criterion(logits, labels.reshape([-1])))
+            # logits = model(input_ids, token_type_ids, lengths=seq_lens, labels=labels).reshape(
+            #     [-1, train_ds.label_num])
+            # loss = paddle.mean(criterion(logits, labels.reshape([-1])))
+            loss = model(input_ids, token_type_ids, lengths=seq_lens, labels=labels).mean()
             loss.backward()
             optimizer.step()
             optimizer.clear_grad()
@@ -235,7 +272,8 @@ def do_predict():
     tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
-    model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+    ernie = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+    model = ErnieCrfForTokenClassification(ernie)
 
     print("============start predict==========")
     if not args.init_ckpt or not os.path.isfile(args.init_ckpt):
@@ -270,9 +308,11 @@ def do_predict():
         input_ids, token_type_ids, seq_lens = batchify_fn(batch)
         input_ids = paddle.to_tensor(input_ids)
         token_type_ids = paddle.to_tensor(token_type_ids)
-        logits = model(input_ids, token_type_ids)
-        probs = F.softmax(logits, axis=-1)
-        probs_ids = paddle.argmax(probs, -1).numpy()
+        # logits = model(input_ids, token_type_ids)
+        # probs = F.softmax(logits, axis=-1)
+        # probs_ids = paddle.argmax(probs, -1).numpy()
+        probs, probs_ids =  model(input_ids, token_type_ids, lengths=seq_lens)
+        probs_ids = probs_ids.numpy()
         probs = probs.numpy()
         for p_list, p_ids, seq_len in zip(probs.tolist(), probs_ids.tolist(), seq_lens.tolist()):
             prob_one = [p_list[index][pid] for index, pid in enumerate(p_ids[1: seq_len - 1])]
