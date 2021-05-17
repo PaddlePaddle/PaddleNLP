@@ -14,8 +14,8 @@
 import os
 from paddle.utils.cpp_extension import load
 
-from .adam import Adam
-from .AdamOptimizer import AdamOptimizer
+from .adamw import AdamW
+from .AdamwOptimizer import AdamwOptimizer
 
 
 def _jit_compile():
@@ -25,21 +25,21 @@ def _jit_compile():
             sources=[
                 os.path.join(os.path.dirname(__file__), x)
                 for x in [
-                    "adam_custom.cc",
-                    "adam_custom.cu",
+                    "adamw.cc",
+                    "adamw.cu",
                 ]
             ])
         return True
     except RuntimeError:
         import sys
         sys.stderr.write(
-            '''Warning with compile custom ops: compile custom adam op failed. \nIf you do not use custom ops, please ignore this warning! \n'''
+            '''Warning with compile custom ops: compile custom adamw op failed. \nIf you do not use custom ops, please ignore this warning! \n'''
         )
         return False
 
 
 __all__ = [
     '_jit_compile',
-    'Adam',
-    'AdamOptimizer',
+    'AdamW',
+    'AdamwOptimizer',
 ]

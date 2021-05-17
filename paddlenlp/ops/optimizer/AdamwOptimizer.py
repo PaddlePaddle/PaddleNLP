@@ -25,25 +25,22 @@ from paddle.fluid.layers import ops
 from paddle.fluid import core
 from paddle.fluid.optimizer import Optimizer
 
-__all__ = ['AdamOptimizer', ]
+__all__ = ['AdamwOptimizer', ]
 
 
-class AdamOptimizer(Optimizer):
+class AdamwOptimizer(Optimizer):
     r"""
-    The Adam optimizer uses an optimization described at the end
-    of section 2 of `Adam paper <https://arxiv.org/abs/1412.6980>`_ ,
-    it can dynamically adjusts the learning rate of each parameter using
-    the 1st moment estimates and the 2nd moment estimates of the gradient.
-
-    The parameter ``param_out`` update rule with gradient ``grad``:
+    The AdamW optimizer is implemented based on the AdamW Optimization
+    in paper `DECOUPLED WEIGHT DECAY REGULARIZATION <https://arxiv.org/pdf/1711.05101.pdf>`_.
+    it can resolves the problem of L2 regularization failure in the Adam optimizer.
     .. math::
         t & = t + 1
         moment\_1\_out & = {\\beta}_1 * moment\_1 + (1 - {\\beta}_1) * grad
-        moment\_2\_out & = {\\beta}_2 * moment\_2 + (1 - {\\beta}_2) * grad * grad
+        moemnt\_2\_out & = {\\beta}_2 * moment\_2 + (1 - {\\beta}_2) * grad * grad
         learning\_rate & = learning\_rate * \\
-                          \\frac{\sqrt{1 - {\\beta}_2^t}}{1 - {\\beta}_1^t}
-        param\_out & = param - learning\_rate * \\frac{moment\_1}{\sqrt{moment\_2} + \epsilon}
-    Related paper: `Adam: A Method for Stochastic Optimization <https://arxiv.org/abs/1412.6980>`_
+            \\frac{\sqrt{1 - {\\beta}_2^t}}{1 - {beta}_1^t}
+        param\_out & = param - learning\_rate * (\\frac{moment\_1}{\sqrt{moment\_2} + \epsilon} + \lambda * param)
+
     Args:
         learning_rate (float|Variable, optional): The learning rate used to update ``Parameter``.
             It can be a float value or a ``Variable`` with a float type. The default value is 0.001.
@@ -106,13 +103,13 @@ class AdamOptimizer(Optimizer):
         assert beta1 is not None
         assert beta2 is not None
         assert epsilon is not None
-        super(AdamOptimizer, self).__init__(
+        super(AdamwOptimizer, self).__init__(
             learning_rate=learning_rate,
             parameter_list=parameter_list,
             regularization=regularization,
             grad_clip=grad_clip,
             name=name)
-        self.type = "custom_adam"
+        self.type = "adamw"
         self._beta1 = beta1
         self._beta2 = beta2
         self._epsilon = epsilon
@@ -198,7 +195,7 @@ class AdamOptimizer(Optimizer):
             }
 
             framework._dygraph_tracer().trace_op(
-                type="custom_adam", inputs=ins, outputs=outs, attrs=attrs)
+                type="adamw", inputs=ins, outputs=outs, attrs=attrs)
 
             return None
 
