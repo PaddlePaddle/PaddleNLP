@@ -109,7 +109,7 @@ std::vector<paddle::DataType> AdamInferDtype(paddle::DataType param_dtype,
 }
 
 
-PD_BUILD_OP(custom_adam)
+PD_BUILD_OP(adamw)
     .Inputs({
         "Param",         // "(Tensor) Input parameter"
         "Grad",          // "(Tensor) Input gradient"
