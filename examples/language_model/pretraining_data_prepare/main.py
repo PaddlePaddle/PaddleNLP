@@ -107,9 +107,8 @@ def do_text_formatting(model_name):
     logger.info("=" * 50)
     logger.info("Start to text formatting.")
     if model_name == "bert-base-uncased":
-        # wiki_formatter = WikicorpusTextFormatter('en', args.output_dir)
-        # formatted_files = [wiki_formatter.formatted_file]
-        formatted_files = []
+        wiki_formatter = WikicorpusTextFormatter('en', args.output_dir)
+        formatted_files = [wiki_formatter.formatted_file]
 
         book_formatter = BookscorpusTextFormatter(args.output_dir)
         formatted_files.append(book_formatter.formatted_file)
