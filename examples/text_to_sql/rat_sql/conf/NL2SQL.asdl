@@ -1,0 +1,119 @@
+-- Assumptions:
+--   1. sql is correct
+--   2. only table name has alias
+--   3. only one intersect/union/except
+
+module NL2SQL
+{
+    -- val: number(float)/string(str)/sql(dict)
+    val = Value(value val_id) | ValSql(sql s) | ColUnit(column col_id)
+
+    -- col_unit: (agg_id, col_id, isDistinct(bool))
+    col_unit = (
+      agg_type agg_id,
+      -- TODO fix
+      column col_id
+    )
+
+    -- val_unit: (unit_op, col_unit1, col_unit2)
+    -- val_unit = (
+    --     unit_type unit_op,
+    --     col_unit col_unit1,
+    --     col_unit col_unit2
+    -- )
+    val_unit = Column(col_unit col_unit1)
+             | Minus(col_unit col_unit1, col_unit col_unit2)
+             | Plus(col_unit col_unit1, col_unit col_unit2)
+             | Times(col_unit col_unit1, col_unit col_unit2)
+             | Divide(col_unit col_unit1, col_unit col_unit2)
+
+    -- condition: [cond_unit1, 'and'/'or', cond_unit2, ...]
+    -- cond_unit: (agg_id, op_id, val_unit, val1, val2)
+    cond = And(cond left, cond right)
+         | Or(cond left, cond right)
+         | NotIn(agg_type agg_id, val_unit val_unit, val val1)
+         | Between(agg_type agg_id, val_unit val_unit, val val1, val val2)
+         | Eq(agg_type agg_id, val_unit val_unit, val val1)
+         | Gt(agg_type agg_id, val_unit val_unit, val val1)
+         | Lt(agg_type agg_id, val_unit val_unit, val val1)
+         | Ge(agg_type agg_id, val_unit val_unit, val val1)
+         | Le(agg_type agg_id, val_unit val_unit, val val1)
+         | Ne(agg_type agg_id, val_unit val_unit, val val1)
+         | In(agg_type agg_id, val_unit val_unit, val val1)
+         | Like(agg_type agg_id, val_unit val_unit, val val1)
+
+    -- sql {
+    --   'select': (isDistinct(bool), [(agg_id, val_unit), (agg_id, val_unit), ...])
+    --   'from': {'table_units': [table_unit1, table_unit2, ...], 'conds': condition}
+    --   'where': condition
+    --   'groupBy': [col_unit1, col_unit2, ...]
+    --   'orderBy': ('asc'/'desc', [val_unit1, val_unit2, ...])
+    --   'having': condition
+    --   'limit': None/limit value
+    --   'intersect': None/sql
+    --   'except': None/sql
+    --   'union': None/sql
+    -- }
+
+    sql = (
+      select select,
+      from from,
+      sql_where sql_where,
+      sql_groupby sql_groupby,
+      sql_orderby sql_orderby,
+      sql_ieu sql_ieu,
+    )
+
+    sql_where = (
+      cond? where,
+    )
+
+    sql_groupby = (
+      col_unit* group_by,
+      cond? having,
+    )
+
+    sql_orderby = (
+      order_by? order_by,
+      value? limit,
+    )
+
+    sql_ieu = (
+      sql? intersect,
+      sql? except,
+      sql? union,
+    )
+
+    --   'select': ([(agg_id, val_unit), (agg_id, val_unit), ...])
+    select = (agg* aggs)
+    agg = (agg_type agg_id, val_unit val_unit)
+
+    --   'from': {'table_units': [table_unit1, table_unit2, ...], 'conds': condition}
+    from = (table_unit* table_units, cond? conds)
+    -- table_unit: (table_type, col_unit/sql)
+    table_unit = TableUnitSql(sql s) | Table(table table_id)
+
+    --   'orderBy': ('asc'/'desc', [val_unit1, val_unit2, ...])
+    order_by = (order order, agg* aggs)
+
+    -- CLAUSE_KEYWORDS = ('select', 'from', 'where', 'group', 'order', 'limit', 'intersect', 'union', 'except')
+    -- JOIN_KEYWORDS = ('join', 'on', 'as')
+
+    -- WHERE_OPS = ('not', 'between', '=', '>', '<', '>=', '<=', '!=', 'in', 'like', 'is', 'exists')
+    -- cond_type = Between | Eq | Gt | Lt | Ge | Le | Ne | In | Like | Is | Exists
+
+    -- UNIT_OPS = ('none', '-', '+', "*", '/')
+    --unit_type = NoneUnitOp | Minus | Plus | Times | Divide
+
+    -- AGG_OPS = ('none', 'avg', 'max', 'min', 'count', 'sum')
+    agg_type = NoneAggOp | Avg | Max | Min | Count | Sum
+
+    -- TABLE_TYPE = {
+    --     'sql': "sql",
+    --     'table_unit': "table_unit",
+    -- }
+    -- COND_OPS = ('and', 'or')
+    -- SQL_OPS = ('intersect', 'union', 'except')
+    -- ORDER_OPS = ('desc', 'asc')
+    order = Asc | Desc
+}

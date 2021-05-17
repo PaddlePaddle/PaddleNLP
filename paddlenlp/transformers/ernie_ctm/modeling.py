@@ -105,12 +105,30 @@ class ErnieCtmPretrainedModel(PretrainedModel):
             "use_content_summary": True,
             "content_summary_index": 1,
         },
+        "wordtag": {
+            "vocab_size": 23000,
+            "embedding_size": 128,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+            "use_content_summary": True,
+            "content_summary_index": 1,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-ctm":
-            "https://paddlenlp.bj.bcebos.com/paddlenlp/models/transformers/ernie-ctm-base.pdparams"
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/ernie_ctm_base.pdparams",
+            "wordtag":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/wordtag.pdparams"
         }
     }
     base_model_prefix = "ernie_ctm"

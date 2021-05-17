@@ -76,7 +76,7 @@ std::vector<paddle::Tensor> DecodingForward(
   } else if (decoding_strategy == "topk_sampling" ||
              decoding_strategy == "topp_sampling") {
     output_dims = {max_len, batch_size};
-    parent_ids_dims = {0};
+    parent_ids_dims = {1};
   } else {
     PD_THROW("Not supported decoding strategy. ");
   }

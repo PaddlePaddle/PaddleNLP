@@ -96,7 +96,9 @@ URLS = {
     "termtree.rawbase":
     "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree.rawbase",
     "termtree_type.csv":
-    "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree_type.csv"
+    "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree_type.csv",
+    "termtree_tags.txt":
+    "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree_tags.txt",
 }
 
 
@@ -104,33 +106,35 @@ class WordtagPredictor(object):
     """Predictor of wordtag model.
     """
 
-    def __init__(self, model_dir, tag_path):
+    def __init__(self, model_name="wordtag", term_linking=True, tag_path=None):
         """Initialize method of the predictor.
 
         Args:
-            model_dir (`str`): 
-                The pre-trained model checkpoint dir.
+            model_name (`str`): 
+                The pre-trained model name.
             tag_path (`str`): 
                 The tag vocab path.
         """
         term_schema_path = self._download_termtree("termtree_type.csv")
         term_data_path = self._download_termtree("termtree.rawbase")
+        if tag_path is None:
+            tag_path = self._download_termtree("termtree_tags.txt")
         self._tags_to_index, self._index_to_tags = self._load_labels(tag_path)
 
         self._model = ErnieCtmWordtagModel.from_pretrained(
-            model_dir,
+            model_name,
             num_cls_label=4,
             num_tag=len(self._tags_to_index),
             ignore_index=self._tags_to_index["O"])
         self._model.eval()
 
-        self._tokenizer = ErnieCtmTokenizer.from_pretrained(model_dir)
+        self._tokenizer = ErnieCtmTokenizer.from_pretrained(model_name)
         self._summary_num = self._model.ernie_ctm.content_summary_index + 1
         if term_schema_path is not None:
             self._term_schema = self._load_schema(term_schema_path)
         if term_data_path is not None:
             self._term_dict = self._load_term_tree_data(term_data_path)
-        if term_data_path is not None and term_schema_path is not None:
+        if term_data_path is not None and term_schema_path is not None and term_linking:
             self._linking = True
         else:
             self._linking = False
