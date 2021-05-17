@@ -205,7 +205,8 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
-def evaluate(exe, metric, loss, correct, dev_program, data_loader):
+def evaluate(exe, metric, loss, correct, dev_program, data_loader,
+             phase="eval"):
     """
     The evaluate process, calcluate the eval loss and metric. 
     """
@@ -223,8 +224,14 @@ def evaluate(exe, metric, loss, correct, dev_program, data_loader):
         metric_numpy = return_numpys[1] if len(return_numpys[
             1:]) == 1 else return_numpys[1:]
         metric.update(metric_numpy)
-        accuracy = metric.accumulate()
-    print("eval loss: %f, acc: %s" % (return_numpys[0], accuracy))
+    res = metric.accumulate()
+    if isinstance(metric, Mcc):
+        print("%s loss: %f, mcc: %s" % (phase, return_numpys[0], res[0]))
+    elif isinstance(metric, PearsonAndSpearman):
+        print("%s loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s"
+              % (phase, return_numpys[0], res[0], res[1], res[2]))
+    else:
+        print("%s loss: %f, acc: %s, " % (phase, return_numpys[0], res))
 
 
 def convert_example(example,
@@ -412,9 +419,9 @@ def do_train(args):
                 # Validation pass, record the loss and metric
                 if args.task_name == "mnli":
                     evaluate(exe, metric, loss, correct, dev_program,
-                             dev_data_loader_matched)
+                             dev_data_loader_matched, "matched")
                     evaluate(exe, metric, loss, correct, dev_program,
-                             dev_data_loader_mismatched)
+                             dev_data_loader_mismatched, "mismatched")
                 else:
                     evaluate(exe, metric, loss, correct, dev_program,
                              dev_data_loader)
