@@ -159,7 +159,7 @@ gpt = FasterGPT(
 
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
-python sample/gpt_sample.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/libdecoding_op.so --batch_size 1 --candidate_num 4 --probability_threshold 0.0 --max_seq_len 12 --start_token <|endoftext|> --end_token <|endoftext|> --temperature 1.0
+python sample/gpt_sample.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/libdecoding_op.so --batch_size 1 --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0
 ```
 
 其中，各个选项的意义如下：
