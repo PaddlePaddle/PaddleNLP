@@ -23,6 +23,7 @@ import paddlenlp as ppnlp
 from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
 
+from model import SimNet
 from utils import convert_example
 
 # yapf: disable
@@ -92,7 +93,7 @@ if __name__ == "__main__":
         "lcqmc", splits=["train", "dev", "test"])
 
     # Constructs the newtork.
-    model = ppnlp.models.SimNet(
+    model = SimNet(
         network=args.network,
         vocab_size=len(vocab),
         num_classes=len(train_ds.label_list))
