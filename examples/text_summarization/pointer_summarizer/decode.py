@@ -90,9 +90,9 @@ class BeamSearch(object):
             write_for_rouge(original_abstract_sents, decoded_words, counter,
                             self._rouge_ref_dir, self._rouge_dec_dir)
             counter += 1
-            if counter % 10 == 0:
-                print('%d example in %d sec' % (counter, time.time() - start))
-                start = time.time()
+            print('global step %d, %.2f step/s' % (counter,
+                                                   1.0 / (time.time() - start)))
+            start = time.time()
             batch = self.batcher.next_batch()
 
         print("Decoder has finished reading dataset for single_pass.")
