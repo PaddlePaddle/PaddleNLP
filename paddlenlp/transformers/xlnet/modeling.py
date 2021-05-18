@@ -835,8 +835,6 @@ class XLNetModel(XLNetPretrainedModel):
             inputs_embeds=None,
             use_mems_train=False,
             use_mems_eval=False,
-            output_attentions=False,
-            output_hidden_states=False,
             return_dict=False, ):
         r"""
         The XLNetModel forward method, overrides the `__call__()` special method.
@@ -917,20 +915,15 @@ class XLNetModel(XLNetPretrainedModel):
             use_mems_eval (bool, optional):
                 Whether or not to use recurrent memory mechanism during evaluation.
                 Defaults to `False` and we don't use recurrent memory mechanism in evaluation mode.
-            output_attentions (bool, optional):
-                Whether or not to return the attentions tensors of all attention layers.
-                Defaults to `False` and do not return the attentions tensors.
-            output_hidden_states (bool, optional):
-                Whether or not to return the hidden states of all layers.
-                Defaults to `False` and do not return the hidden states.
             return_dict (bool, optional):
-                Whether or not to format the output as a dict.
-                If True, the output will be formatted as a dict, else returns a plain tuple.
+                Whether or not to return additional information other than the output tensor.
+                If True, then returns information about `output`, `new_mems`, `hidden_states` and `attentions`
+                which will also be formatted as a dict. Else only returns the output tensor.
                 Defaults to False.
 
         Returns:
-            tuple or dict: A tuple with items: (`output`, `new_mems`, `hidden_states`, `attentions`)
-            or a dict with key-value pairs: {"last_hidden_state": `output`, "mems": `new_mems`,
+            Tensor or dict: Output tensor `output` or a dict with key-value pairs:
+            {"last_hidden_state": `output`, "mems": `new_mems`,
             "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
             With the corresponding fields:
@@ -1127,13 +1120,13 @@ class XLNetModel(XLNetPretrainedModel):
         if mems is None:
             mems = [None] * len(self.layer)
 
-        attentions = [] if output_attentions else None
-        hidden_states = [] if output_hidden_states else None
+        attentions = [] if return_dict else None
+        hidden_states = [] if return_dict else None
         for i, layer_module in enumerate(self.layer):
             if use_mems:
                 # Cache new mems
                 new_mems = new_mems + (self.cache_mem(output_h, mems[i]), )
-            if output_hidden_states:
+            if return_dict:
                 hidden_states.append((output_h, output_g)
                                      if output_g is not None else output_h)
 
@@ -1147,14 +1140,14 @@ class XLNetModel(XLNetPretrainedModel):
                 mems=mems[i],
                 target_mapping=target_mapping,
                 head_mask=head_mask[i],
-                output_attentions=output_attentions, )
+                output_attentions=return_dict, )
             output_h, output_g = outputs[:2]
 
-            if output_attentions:
+            if return_dict:
                 attentions.append(outputs[2])
 
         # Add last hidden state
-        if output_hidden_states:
+        if return_dict:
             hidden_states.append((output_h, output_g)
                                  if output_g is not None else output_h)
 
@@ -1166,7 +1159,7 @@ class XLNetModel(XLNetPretrainedModel):
         if not use_mems:
             new_mems = None
 
-        if output_hidden_states:
+        if return_dict:
             if output_g is not None:
                 hidden_states = tuple(
                     paddle.transpose(
@@ -1176,7 +1169,6 @@ class XLNetModel(XLNetPretrainedModel):
                     paddle.transpose(
                         hs, perm=[1, 0, 2]) for hs in hidden_states)
 
-        if output_attentions:
             if target_mapping is not None:
                 # When target_mapping is provided, there are 2-tuple of attentions
                 attentions = tuple(
@@ -1189,16 +1181,14 @@ class XLNetModel(XLNetPretrainedModel):
                     paddle.transpose(
                         t, perm=[2, 3, 0, 1]) for t in attentions)
 
-        if not return_dict:
-            return tuple(
-                v for v in [output, new_mems, hidden_states, attentions]
-                if v is not None)
-        return {
-            "last_hidden_state": output,
-            "mems": new_mems,
-            "hidden_states": hidden_states,
-            "attentions": attentions,
-        }
+        if return_dict:
+            return {
+                "last_hidden_state": output,
+                "mems": new_mems,
+                "hidden_states": hidden_states,
+                "attentions": attentions,
+            }
+        return output
 
 
 class XLNetClassificationHead(Layer):
@@ -1254,8 +1244,6 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
             inputs_embeds=None,
             use_mems_train=False,
             use_mems_eval=False,
-            output_attentions=False,
-            output_hidden_states=False,
             return_dict=False, ):
         r"""
         The XLNetForSequenceClassification forward method, overrides the `__call__()` special method.
@@ -1283,16 +1271,12 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
                 See :class:`XLNetModel`.
             use_mems_eval (bool, optional):
                 See :class:`XLNetModel`.
-            output_attentions (bool, optional):
-                See :class:`XLNetModel`.
-            output_hidden_states (bool, optional):
-                See :class:`XLNetModel`.
             return_dict (bool, optional):
                 See :class:`XLNetModel`.
 
         Returns:
-            tuple or dict: A tuple with items: (`output`, `new_mems`, `hidden_states`, `attentions`)
-            or a dict with key-value pairs: {"last_hidden_state": `output`, "mems": `new_mems`,
+            Tensor or dict: Output tensor `output` or a dict with key-value pairs:
+            {"last_hidden_state": `output`, "mems": `new_mems`,
             "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
             With the corresponding fields:
@@ -1336,20 +1320,19 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
             inputs_embeds=inputs_embeds,
             use_mems_train=use_mems_train,
             use_mems_eval=use_mems_eval,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
             return_dict=return_dict, )
-        output = transformer_outputs[
-            0] if not return_dict else transformer_outputs["last_hidden_state"]
+        output = transformer_outputs if not return_dict \
+            else transformer_outputs["last_hidden_state"]
         logits = self.classifier(output)
-        if not return_dict:
-            return (logits, ) + transformer_outputs[1:]
-        return {
-            "logits": logits,
-            "mems": transformer_outputs["mems"],
-            "hidden_states": transformer_outputs["hidden_states"],
-            "attentions": transformer_outputs["attentions"],
-        }
+
+        if return_dict:
+            return {
+                "logits": logits,
+                "mems": transformer_outputs["mems"],
+                "hidden_states": transformer_outputs["hidden_states"],
+                "attentions": transformer_outputs["attentions"],
+            }
+        return logits
 
 
 class XLNetForTokenClassification(XLNetPretrainedModel):
@@ -1386,9 +1369,7 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
             inputs_embeds=None,
             use_mems_train=False,
             use_mems_eval=False,
-            output_attentions=False,
-            output_hidden_states=False,
-            return_dict=False, ):
+            return_dict=False,):
         r"""
         The XLNetForTokenClassification forward method, overrides the `__call__()` special method.
 
@@ -1415,16 +1396,12 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
                 See :class:`XLNetModel`.
             use_mems_eval (bool, optional):
                 See :class:`XLNetModel`.
-            output_attentions (bool, optional):
-                See :class:`XLNetModel`.
-            output_hidden_states (bool, optional):
-                See :class:`XLNetModel`.
             return_dict (bool, optional):
                 See :class:`XLNetModel`.
 
         Returns:
-            tuple or dict: A tuple with items: (`output`, `new_mems`, `hidden_states`, `attentions`)
-            or a dict with key-value pairs: {"last_hidden_state": `output`, "mems": `new_mems`,
+            Tensor or dict: Output tensor `output` or a dict with key-value pairs:
+             {"last_hidden_state": `output`, "mems": `new_mems`,
             "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
             With the corresponding fields:
@@ -1467,20 +1444,18 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
             inputs_embeds=inputs_embeds,
             use_mems_train=use_mems_train,
             use_mems_eval=use_mems_eval,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
             return_dict=return_dict, )
-        sequence_output = transformer_outputs[
-            0] if not return_dict else transformer_outputs["last_hidden_state"]
+
+        sequence_output = transformer_outputs if not return_dict \
+            else transformer_outputs["last_hidden_state"]
 
         logits = self.classifier(sequence_output)
 
-        if not return_dict:
-            return (logits, ) + transformer_outputs[1:]
-
-        return {
-            "logits": logits,
-            "mems": transformer_outputs["mems"],
-            "hidden_states": transformer_outputs["hidden_states"],
-            "attentions": transformer_outputs["attentions"],
-        }
+        if return_dict:
+            return {
+                "logits": logits,
+                "mems": transformer_outputs["mems"],
+                "hidden_states": transformer_outputs["hidden_states"],
+                "attentions": transformer_outputs["attentions"],
+            }
+        return logits
