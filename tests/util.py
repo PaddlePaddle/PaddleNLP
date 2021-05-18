@@ -15,6 +15,7 @@ import numpy as np
 import unittest
 import paddle
 import os
+from distutils.util import strtobool
 
 __all__ = ['get_vocab_list', 'stable_softmax', 'cross_entropy']
 
@@ -96,3 +97,30 @@ def create_test_data(file=__file__):
         for vocab in vocab_list:
             f.write("{}\n".format(vocab))
     return test_data_file
+
+
+def get_bool_from_env(key, default_value=False):
+    if key not in os.environ:
+        return default_value
+    value = os.getenv(key)
+    try:
+        value = strtobool(value)
+    except ValueError:
+        raise ValueError(
+            f"If set, {key} must be yes, no, true, false, 0 or 1 (case insensitive)."
+        )
+    return value
+
+
+_run_slow_test = get_bool_from_env("RUN_SLOW_TEST")
+
+
+def slow(test):
+    """
+    Mark a test which spends too much time.
+    Slow tests are skipped by default. Excute the command `export RUN_SLOW_TEST=True` to run them.
+    """
+    if not _run_slow_test:
+        return unittest.skip("test spends too much time")(test)
+    else:
+        return test

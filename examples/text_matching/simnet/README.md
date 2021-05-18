@@ -35,6 +35,7 @@ SimNet框架在百度各产品上广泛应用，主要包括BOW、CNN、RNN、MM
 
 ```text
 simnet/
+├── model.py # 模型组网
 ├── predict.py # 模型预测
 ├── utils.py # 数据处理工具
 ├── train.py # 训练模型主程序入口，包括训练、评估
@@ -46,9 +47,9 @@ simnet/
 #### 使用PaddleNLP内置数据集
 
 ```python
-from paddlenlp.datasets import LCQMC
+from paddlenlp.datasets import load_dataset
 
-train_ds, dev_dataset, test_ds = LCQMC.get_datasets(['train', 'dev', 'test'])
+train_ds, dev_ds, test_ds = load_dataset("lcqmc", splits=["train", "dev", "test"])
 ```
 
 部分样例数据如下：

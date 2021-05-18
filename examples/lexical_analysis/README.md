@@ -84,9 +84,32 @@ python -m paddle.distributed.launch --gpus "0,1"  train.py \
 
 ```bash
 python eval.py --data_dir ./lexical_analysis_dataset_tiny \
-        --init_checkpoint ./save_dir/final \
+        --init_checkpoint ./save_dir/model_100.pdparams \
         --batch_size 32 \
         --device gpu
+```
+
+其中`./save_dir/model_100.pdparams`是训练过程中保存的参数文件，请更换为实际得到的训练保存路径。
+
+### 模型导出
+
+使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见export_model.py。静态图参数保存在`output_path`指定路径中。
+
+运行方式：
+
+```shell
+python export_model.py --data_dir=./lexical_analysis_dataset_tiny --params_path=./save_dir/model_100.pdparams --output_path=./infer_model/static_graph_params
+```
+
+其中`./save_dir/model_100.pdparams`是训练过程中保存的参数文件，请更换为实际得到的训练保存路径。
+
+* `params_path`是指动态图训练保存的参数路径
+* `output_path`是指静态图参数导出路径。
+
+导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式：
+
+```shell
+python deploy/python/predict.py --model_file=infer_model/static_graph_params.pdmodel --params_file=infer_model/static_graph_params.pdiparams
 ```
 
 ### 模型预测
@@ -95,7 +118,7 @@ python eval.py --data_dir ./lexical_analysis_dataset_tiny \
 
 ```bash
 python predict.py --data_dir ./lexical_analysis_dataset_tiny \
-        --init_checkpoint ./save_dir/final \
+        --init_checkpoint ./save_dir/model_100.pdparams \
         --batch_size 32 \
         --device gpu
 ```

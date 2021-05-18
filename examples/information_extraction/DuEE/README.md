@@ -7,10 +7,10 @@
 <img src="pictures/DuEE-Fin/ee.png" width="600" height="200" alt="事件抽取" align=center />
 </div>
 
-该示例展示了如何使用PaddleNLP快速复现[LIC2021事件抽取比赛](http://aistudio-bce.bcc-bdbl.baidu.com/aistudio/competition/detail/141)基线并进阶优化基线。
+该示例展示了如何使用PaddleNLP快速复现[LIC2021事件抽取比赛](http://lic2021.ccf.org.cn/)基线并进阶优化基线。
 
 同时，我们提供了该示例在线运行展示教程：
-[PaddleNLP实战——LIC2021事件抽取任务基线](https://aistudio.baidu.com/aistudio/projectdetail/1605425)
+[PaddleNLP实战——LIC2021事件抽取任务基线](https://aistudio.baidu.com/aistudio/projectdetail/1639964)
 
 ## 目录结构
 
@@ -36,7 +36,7 @@ DuEE/
 ## 篇章级事件抽取基线
 
 篇章级事件抽取数据集（DuEE-Fin）是金融领域篇章级别事件抽取数据集，
-共包含13个已定义好的事件类型约束和1.15万中文篇章（存在部分非目标篇章作为负样例），其中6900训练集，1150验证集和3450测试集，数据集下载[地址]() 。
+共包含13个已定义好的事件类型约束和1.15万中文篇章（存在部分非目标篇章作为负样例），其中6900训练集，1150验证集和3450测试集，数据集下载[地址](https://aistudio.baidu.com/aistudio/competition/detail/65) 。
 在该数据集上基线采用基于[ERNIE](https://github.com/PaddlePaddle/ERNIE)的序列标注（sequence labeling）方案，分为基于序列标注的触发词抽取模型、基于序列标注的论元抽取模型和枚举属性分类模型，属于PipeLine模型；基于序列标注的触发词抽取模型采用BIO方式，识别触发词的位置以及对应的事件类型，基于序列标注的论元抽取模型采用BIO方式识别出事件中的论元以及对应的论元角色；枚举属性分类模型采用ernie进行分类。
 
 ### 评测方法

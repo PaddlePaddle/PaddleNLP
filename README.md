@@ -1,7 +1,7 @@
 简体中文 | [English](./README_en.md)
 
 <p align="center">
-  <img src="./docs/imgs/paddlenlp.png" width="520" height ="100" />
+  <img src="./docs/imgs/paddlenlp.png" width="720" height ="100" />
 </p>
 
 ------------------------------------------------------------------------------------------
@@ -43,6 +43,16 @@ PaddleNLP 2.0拥有**覆盖多场景的模型库**、**简洁易用的全流程A
 pip install --upgrade paddlenlp -i https://pypi.org/simple
 ```
 
+### 源码安装
+
+如果您想体验最新的版本，可以使用以下命令进行源码安装，支持GitHub和Gitee两种方式。
+```
+pip install --upgrade git+https://github.com/PaddlePaddle/PaddleNLP.git
+
+pip install --upgrade git+https://gitee.com/PaddlePaddle/PaddleNLP.git
+```
+
+
 更多关于PaddlePaddle的安装和PaddleNLP安装详细教程请查看[Installation](./docs/get_started/installation.rst)
 
 ## 快速开始
@@ -75,13 +85,13 @@ wordemb.cosine_sim("艺术", "火车")
 ### 一键加载高质量中文预训练模型
 
 ```python
-from paddlenlp.transformers import ErnieModel, BertModel, RobertaModel, ElectraModel, GPT2ForPretraining
+from paddlenlp.transformers import ErnieModel, BertModel, RobertaModel, ElectraModel, GPTForPretraining
 
 ernie = ErnieModel.from_pretrained('ernie-1.0')
 bert = BertModel.from_pretrained('bert-wwm-chinese')
 roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
 electra = ElectraModel.from_pretrained('chinese-electra-small')
-gpt2 = GPT2ForPretraining.from_pretrained('gpt2-base-cn')
+gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
 ### 便捷获取文本特征
