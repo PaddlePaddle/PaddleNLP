@@ -44,7 +44,6 @@ class BeamSearch(object):
     def __init__(self, model_file_path):
         model_name = re.findall(r'train_\d+', model_file_path)[0] + '_' + \
                      re.findall(r'model_\d+_\d+\.\d+', model_file_path)[0]
-        print('o MODEL NAME: ', model_name)
         self._decode_dir = os.path.join(config.log_root,
                                         'decode_%s' % (model_name))
         self._rouge_ref_dir = os.path.join(self._decode_dir, 'rouge_ref')

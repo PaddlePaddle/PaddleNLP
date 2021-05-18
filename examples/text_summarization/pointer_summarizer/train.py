@@ -49,7 +49,8 @@ class Trainer(object):
             'reduce_state': self.model.reduce_state.state_dict(),
             'optimizer': self.optimizer.state_dict()
         }
-        model_save_dir = os.path.join(self.model_dir, 'model_%06d_%.8f' % (iter, running_avg_loss))
+        model_save_dir = os.path.join(self.model_dir, 'model_%06d_%.8f' %
+                                      (iter, running_avg_loss))
         for k in state:
             model_save_path = os.path.join(model_save_dir, '%s.params' % k)
             paddle.save(state[k], model_save_path)
@@ -136,16 +137,19 @@ class Trainer(object):
         while iter < n_iters:
             batch = self.batcher.next_batch()
             loss = self.train_one_batch(batch, iter)
-            running_avg_loss = calc_running_avg_loss(loss, running_avg_loss, iter)
+            running_avg_loss = calc_running_avg_loss(loss, running_avg_loss,
+                                                     iter)
             iter += 1
             print(
                 'global step %d/%d, step loss: %.8f, running avg loss: %.8f, speed: %.2f step/s'
-                % (iter, n_iters, loss, running_avg_loss, 1.0 / (time.time() - start)))
+                % (iter, n_iters, loss, running_avg_loss,
+                   1.0 / (time.time() - start)))
             start = time.time()
-            if iter % 5000 == 0 or iter == 1:
+            if iter % 5000 == 0 or iter == 1000:
                 model_save_dir = self.save_model(running_avg_loss, iter)
-                print('Saved model for iter %d with running avg loss %.8f to directory: %s' %
-                      (iter, running_avg_loss, model_save_dir))
+                print(
+                    'Saved model for iter %d with running avg loss %.8f to directory: %s'
+                    % (iter, running_avg_loss, model_save_dir))
 
 
 if __name__ == '__main__':
