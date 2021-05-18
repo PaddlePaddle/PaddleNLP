@@ -35,7 +35,7 @@ CHUNK_SIZE = 1000  # num examples per chunk, for the chunked data
 
 
 def chunk_file(set_name):
-    in_file = 'finished_files/%s.json' % set_name
+    in_file = finished_files_dir + os.sep + '%s.json' % set_name
     reader = open(in_file, "r")
     chunk = 0
     finished = False
