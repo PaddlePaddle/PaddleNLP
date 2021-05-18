@@ -27,7 +27,7 @@ from paddlenlp.transformers import GPTModel
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 
-MODEL_CLASSES = {"gpt2-medium-en": (GPTForPretraining, GPTTokenizer), }
+MODEL_CLASSES = {"gpt": (GPTForPretraining, GPTTokenizer), }
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -233,7 +233,7 @@ def create_eval_dataset(args):
 
 def do_eval(args):
     paddle.set_device(args.device)
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_name]
+    model_class, tokenizer_class = MODEL_CLASSES["gpt"]
     tokenizer = tokenizer_class.from_pretrained(args.model_name)
 
     if args.init_checkpoint_path is not None:
