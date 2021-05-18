@@ -161,7 +161,15 @@ def do_predict(args):
     with paddle.no_grad():
         for (src_word, ) in test_loader:
             finished_seq = transformer(src_word=src_word)
-            finished_seq = finished_seq.numpy().transpose([0, 2, 1])
+            # TODO(guosheng): FasterTransformer has an output with layout
+            # `[seq_len, batch_size, beam_size]`. While the output layout of
+            # original one is `[batch_size, seq_len, beam_size]`. Maybe we need
+            # unify them later.
+            finished_seq = finished_seq.numpy().transpose(
+                [0, 2, 1]) if isinstance(
+                    transformer.transformer,
+                    InferTransformerModel) else finished_seq.numpy().transpose(
+                        [1, 2, 0])
             for ins in finished_seq:
                 for beam_idx, beam in enumerate(ins):
                     if beam_idx >= args.n_best:
