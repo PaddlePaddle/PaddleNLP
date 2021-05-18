@@ -133,7 +133,7 @@ def gen_pair(dataset, pool_size=100):
     for example in dataset:
         label = example["label"]
 
-        # filter negative example
+        # Filter negative example
         if label == 0:
             continue
 

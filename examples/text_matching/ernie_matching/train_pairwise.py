@@ -29,7 +29,7 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 
 from data import create_dataloader, gen_pair
 from data import convert_pairwise_example as convert_example
-from model import PairWise
+from model import PairwiseMatching
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -149,7 +149,7 @@ def do_train():
         batchify_fn=batchify_fn_eval,
         trans_fn=trans_func_eval)
 
-    model = PairWise(pretrained_model, margin=args.margin)
+    model = PairwiseMatching(pretrained_model, margin=args.margin)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)

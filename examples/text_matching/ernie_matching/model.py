@@ -17,7 +17,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 
-class PonitWise(nn.Layer):
+class PonitwiseMatching(nn.Layer):
     def __init__(self, pretrained_model, dropout=None):
         super().__init__()
         self.ptm = pretrained_model
@@ -42,7 +42,7 @@ class PonitWise(nn.Layer):
         return probs
 
 
-class PairWise(nn.Layer):
+class PairwiseMatching(nn.Layer):
     def __init__(self, pretrained_model, dropout=None, margin=0.1):
         super().__init__()
         self.ptm = pretrained_model
