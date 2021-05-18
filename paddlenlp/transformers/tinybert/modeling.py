@@ -35,6 +35,11 @@ __all__ = [
 
 
 def to_distill(self):
+    """
+    Can be bound to object with transformer layers, and exposes attributes
+    `emb`, `outputs.hidden_states`and `outputs.attentions` of the object for
+    distillation.
+    """
     MultiHeadAttention._forward = attention_forward
     TransformerEncoderLayer._forward = transformer_encoder_layer_forward
     TransformerEncoder._forward = transformer_encoder_forward
@@ -173,10 +178,11 @@ def transformer_encoder_forward(self, src, src_mask=None, cache=None):
 
 class TinyBertPretrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained TinyBERT models. It provides BERT related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    An abstract class for pretrained TinyBERT models. It provides TinyBERT
+    related `model_config_file`, `resource_files_names`,
+    `pretrained_resource_files_map`, `pretrained_init_configuration`,
+    `base_model_prefix` for downloading and loading pretrained models. See
+    `PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"

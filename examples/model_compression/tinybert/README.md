@@ -3,6 +3,7 @@
 ```
 .
 ├── task_distill.py       # 在特定任务上下的蒸馏脚本
+├── data_augmentation.py  # 离线数据增强脚本
 └── README.md             # 文档，本文件
 ```
 ## 简介
@@ -24,9 +25,11 @@ TinyBERT蒸馏流程图
 
 ## 数据、预训练模型介绍及获取
 
-本实验使用GLUE中数据集中的训练集作为训练语料，用数据集中的验证集评估模型的效果。运行本目录下的实验，数据集会被自动下载到`paddlenlp.utils.env.DATA_HOME` 路径下，例如在linux系统下，对于GLUE中的QQP数据集，默认存储路径是`~/.paddlenlp/datasets/Glue/QQP`。
+本实验使用GLUE中数据集中的训练集作为训练语料，用数据集中的验证集评估模型的效果。
 
-对于BERT的fine-tuning任务，本实验中使用了预训练模型`bert-bas-uncased`。同样，这几个模型在训练时会被自动下载到`paddlenlp.utils.env.DATA_HOME`路径下。例如，对于`bert-base-uncased`模型，在linux系统下，会被下载到`~/.paddlenlp/models/bert-base-uncased`下。
+运行本目录下的实验，数据集会被自动下载到`paddlenlp.utils.env.DATA_HOME` 路径下，例如在linux系统下，对于GLUE中的QQP数据集，默认存储路径是`~/.paddlenlp/datasets/Glue/QQP`。
+
+对于BERT的fine-tuning任务，本实验中使用了预训练模型`bert-base-uncased`。同样，这几个模型在训练时会被自动下载到`paddlenlp.utils.env.DATA_HOME`路径下。例如，对于`bert-base-uncased`模型，在linux系统下，会被下载到`~/.paddlenlp/models/bert-base-uncased`下。
 
 ## 蒸馏实验过程
 
@@ -56,26 +59,11 @@ python -u ./run_glue.py \
 训练完成之后，可将训练效果最好的模型保存在本项目下的`pretrained_models/$TASK_NAME/`下。模型目录下有`model_config.json`, `model_state.pdparams`, `tokenizer_config.json`及`vocab.txt`这几个文件。
 
 
-### 数据增强扩充训练集
 
-先下载glove embeddings
 
-```
-wget http://nlp.stanford.edu/data/glove.6B.zip
-```
+### 对TinyBERT在特定任务下蒸馏
 
-然后运行下面的命令对GLUE数据集进行扩展
-```
-export TASK_NAME=SST-2
-export GLOVE_EMB="glove/glove.6B.300d.txt"
-python data_augmentation.py --pretrained_bert_model bert-base-uncased \
-                            --glove_embs $GLOVE_EMB \
-                            --glue_dir /root/.paddlenlp/datasets/Glue/  \
-                            --task_name $TASK_NAME
-
-```
-
-### 训练TinyBERT模型
+先蒸馏中间层：
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -83,15 +71,38 @@ export TASK_NAME=SST-2
 
 python task_distill.py \
     --model_type tinybert \
-    --model_name_or_path tinybert-6l-768d-v2 \
+    --student_model_name_or_path tinybert-6l-768d-v2 \
     --task_name $TASK_NAME \
+    --intermediate_distill \
     --max_seq_length 64 \
     --batch_size 32   \
     --T 1 \
     --teacher_model_type bert \
     --teacher_path ../pretrained_models/SST-2/best_model_610 \
     --learning_rate 5e-5 \
-    --num_train_epochs 10 \
+    --num_train_epochs 20 \
+    --logging_steps 10 \
+    --save_steps 10 \
+    --output_dir ./tmp/$TASK_NAME/ \
+    --device gpu
+
+```
+
+
+然后对预测层进行蒸馏：
+
+```shell
+python task_distill.py \
+    --model_type tinybert \
+    --student_model_name_or_path tmp/TASK_NAME best_inter_model \
+    --task_name $TASK_NAME \
+    --max_seq_length 64 \
+    --batch_size 32   \
+    --T 1 \
+    --teacher_model_type bert \
+    --teacher_path ../pretrained_models/SST-2/best_model_610 \
+    --learning_rate 3e-5 \
+    --num_train_epochs 3 \
     --logging_steps 10 \
     --save_steps 10 \
     --output_dir ./tmp/$TASK_NAME/ \
@@ -111,11 +122,44 @@ python task_distill.py \
 | learning_rate(two stages)        | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 |
 
 
-
-
 ## 蒸馏实验结果
 
-TODO
+本文档的实验基于TinyBERT的6层、hidden_size为768的通用蒸馏得到的模型，用未使用数据增强的原始数据集训练，并基于验证集进行评价。得到以下实验结果：
+
+|                   | SST-2 | QQP(acc/f1) | MRPC(acc/f1) | CoLA  | RTE   | MNLI-m | MNLI-mm | QNLI  |
+| ----------------- | ----- | ----------- | ------------ | ----- | ----- | ------ | ------- | ----- |
+| BERT-base         | 93.00 | 90.58/87.35 | 88.23/91.67  | 59.56 | 73.65 | 84.42  | 84.83   | 91.78 |
+| TinyBERT(6l-768d) | 93.00 | 90.48/87.38 | 87.75/91.20  | 52.37 | 71.48 | 84.40  | 84.33   | 91.20 |
+
+
+
+## 数据增强扩充训练集（推荐）
+
+TinyBERT使用的数据增强需要用到BERT预训练模型和Glove Embeddings做词替换。
+
+即对于样本中的词，有一定的概率会被近义词替换。对于single-piece的词，会利用BERT模型，返回top k个最近似的词，对于非single-piece的词，则使用Glove Embedding，去搜索top k个最近似的词，随机选择一个做替换。
+
+先下载glove embeddings
+
+```
+wget http://nlp.stanford.edu/data/glove.6B.zip
+```
+
+然后运行下面的命令对GLUE数据集进行扩展
+```
+export TASK_NAME=SST-2
+export GLOVE_EMB="glove/glove.6B.300d.txt"
+python data_augmentation.py --pretrained_bert_model bert-base-uncased \
+                            --glove_embs $GLOVE_EMB \
+                            --glue_dir /root/.paddlenlp/datasets/Glue/  \
+                            --task_name $TASK_NAME
+
+```
+
+运行结束后，在glue_dir/$TASK_NAME目录下，会生成`train_aug.tsv`的数据增强后的训练集文件。
+利用`task_distill.py`时，带上--use_aug这个参数，程序会读取`train_aug.tsv`作训练集进行训练。
+
+经过实验，利用数据增强后的数据集，在RTE数据集上，Acc由0.7148提升至0.7184。
 
 ## 参考文献
 

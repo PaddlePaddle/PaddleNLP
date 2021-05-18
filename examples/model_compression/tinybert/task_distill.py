@@ -83,7 +83,7 @@ def parse_args():
         help="Model type selected in the list: " +
         ", ".join(MODEL_CLASSES.keys()), )
     parser.add_argument(
-        "--model_name_or_path",
+        "--student_model_name_or_path",
         default=None,
         type=str,
         required=True,
@@ -146,6 +146,11 @@ def parse_args():
         "--use_aug",
         action="store_true",
         help="Whether to use augmentation data to train.", )
+    parser.add_argument(
+        "--intermediate_distill",
+        action="store_true",
+        help="Whether distilling intermediate layers. If False, it means prediction layer distillation.",
+    )
     parser.add_argument(
         "--weight_decay",
         default=0.0,
@@ -256,10 +261,6 @@ def convert_example(example,
 
 def do_train(args):
     paddle.set_device(args.device)
-
-    aug_data_file = os.path.join(
-        os.path.join('/root/.paddlenlp/datasets/Glue/', args.task_name),
-        "train_aug.tsv"),
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -270,11 +271,14 @@ def do_train(args):
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     if args.use_aug:
+        aug_data_file = os.path.join(
+            os.path.join('/root/.paddlenlp/datasets/Glue/', args.task_name),
+            "train_aug.tsv"),
         train_ds = load_dataset(
             'glue', args.task_name, data_files=aug_data_file)
     else:
         train_ds = load_dataset('glue', args.task_name, splits='train')
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(args.student_model_name_or_path)
 
     trans_func = partial(
         convert_example,
@@ -331,7 +335,7 @@ def do_train(args):
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
     student = model_class.from_pretrained(
-        args.model_name_or_path, num_classes=num_classes)
+        args.student_model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -374,14 +378,35 @@ def do_train(args):
     student = student.to_distill(student)
 
     # Add Linear layer for student's Embedding layer.
-    student.emb_proj = nn.Linear(768, 768)
+    if args.intermediate_distill:
+        student.emb_proj = nn.Linear(768, 768)
 
     global_step = 0
     tic_train = time.time()
     best_res = 0.0
     save_steps = 100
 
-    # 1. Intermediate layer distillation
+    def cal_intermediate_distill_loss(student, teacher):
+        loss_emb = mse_loss_fct(student.emb_proj(student.emb), teacher.emb)
+        loss_hidden, loss_attn = 0, 0
+
+        for i in range(6):
+            student_hidden = student.fit_dense(student.outputs.hidden_states[i])
+            loss_hidden += mse_loss_fct(student_hidden,
+                                        teacher.outputs.hidden_states[2 * i])
+            attn_student = student.outputs.attentions[i]
+            attn_teacher = teacher.outputs.attentions[2 * i + 1]
+            loss_attn_layer = 0.0
+            head_num = attn_student.shape[1]
+            for j in range(head_num):
+                loss_attn_layer += mse_loss_fct(attn_student[:, j, :, :],
+                                                attn_teacher[:, j, :, :])
+            loss_attn += loss_attn_layer / head_num
+        loss = loss_emb + loss_hidden + loss_attn
+        return loss
+
+    distill_part = "intermediate" if args.intermediate_distill else "pred"
+
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
@@ -391,25 +416,13 @@ def do_train(args):
             with paddle.no_grad():
                 teacher_logits = teacher(input_ids, segment_ids)
 
-            loss_emb = mse_loss_fct(student.emb_proj(student.emb), teacher.emb)
-            loss_hidden, loss_attn = 0, 0
+            if args.intermediate_distill:
+                loss = cal_intermediate_distill_loss(student, teacher)
+            else:
+                loss = ce_loss_fct(logits / args.T,
+                                   F.softmax(teacher_logits / args.T))
 
-            for i in range(6):
-                student_hidden = student.fit_dense(
-                    student.outputs.hidden_states[i])
-                loss_hidden += mse_loss_fct(
-                    student_hidden, teacher.outputs.hidden_states[2 * i])
-                attn_student = student.outputs.attentions[i]
-                attn_teacher = teacher.outputs.attentions[2 * i + 1]
-                loss_attn_layer = 0.0
-                head_num = attn_student.shape[1]
-                for j in range(head_num):
-                    loss_attn_layer += mse_loss_fct(attn_student[:, j, :, :],
-                                                    attn_teacher[:, j, :, :])
-                loss_attn += loss_attn_layer / head_num
-            loss = loss_emb + loss_hidden + loss_attn
             loss.backward()
-
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
@@ -432,71 +445,8 @@ def do_train(args):
 
                 if best_res < res and paddle.distributed.get_rank() == 0:
                     output_dir = os.path.join(
-                        args.output_dir, "%s_inter_distill_model_%d.pdparams" %
-                        (args.task_name, global_step))
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    # Need better way to get inner model of DataParallel
-                    model_to_save = student._layers if isinstance(
-                        student, paddle.DataParallel) else student
-                    model_to_save.save_pretrained(output_dir)
-                    tokenizer.save_pretrained(output_dir)
-                    best_res = res
-
-    # 2. Prediction layer distillation
-    # Update lr scheduler and opt
-    args.num_train_epochs = 3
-    args.learning_rate = 3e-5
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         warmup)
-
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        beta1=0.9,
-        beta2=0.999,
-        epsilon=args.adam_epsilon,
-        parameters=student.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
-
-    for epoch in range(args.num_train_epochs):
-        for step, batch in enumerate(train_data_loader):
-            global_step += 1
-            input_ids, segment_ids, labels = batch
-
-            logits = student(input_ids, segment_ids)
-            with paddle.no_grad():
-                teacher_logits = teacher(input_ids, segment_ids)
-
-            loss_pred = ce_loss_fct(logits / args.T,
-                                    F.softmax(teacher_logits / args.T))
-            loss = loss_pred
-            loss.backward()
-
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.clear_grad()
-            if global_step % args.logging_steps == 0:
-                print(
-                    "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
-                    % (global_step, num_training_steps, epoch, step,
-                       paddle.distributed.get_rank(), loss, optimizer.get_lr(),
-                       args.logging_steps / (time.time() - tic_train)))
-                tic_train = time.time()
-            if global_step % args.save_steps == 0 or global_step == num_training_steps:
-                tic_eval = time.time()
-                if args.task_name == "mnli":
-                    res = evaluate(student, metric, dev_data_loader_matched)
-                    evaluate(student, metric, dev_data_loader_mismatched)
-                    print("eval done total : %s s" % (time.time() - tic_eval))
-                else:
-                    res = evaluate(student, metric, dev_data_loader)
-                    print("eval done total : %s s" % (time.time() - tic_eval))
-
-                if best_res < res and paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(args.output_dir,
-                                              "%s_distill_model_%d.pdparams" %
-                                              (args.task_name, global_step))
+                        args.output_dir, "%s_%s_distill_model_%d.pdparams" %
+                        (args.task_name, distill_part, global_step))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     # Need better way to get inner model of DataParallel
