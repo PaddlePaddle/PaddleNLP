@@ -14,11 +14,11 @@
 # limitations under the License.
 """Modeling classes for XLNet model."""
 
-import re
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
+from paddlenlp.ops.einsum import *
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -60,31 +60,6 @@ ACT2FN = {
     "linear": linear_act,
     "swish": swish,
 }
-
-
-def einsum4x4(equation, x, y):
-    """Only works for 4D x 4D."""
-    idx_x, idx_y, idx_z = re.split(",|->", equation)
-    # Compute repeated index
-    repeated_idx = list(set(idx_x + idx_y) - set(idx_z))
-
-    unique_idx_x = list(set(idx_x) - set(idx_y))
-    unique_idx_y = list(set(idx_y) - set(idx_x))
-    common_idx = list(set(idx_x) & set(idx_y) - set(repeated_idx))
-
-    new_idx_x = common_idx + unique_idx_x + repeated_idx
-    new_idx_y = common_idx + unique_idx_y + repeated_idx
-    new_idx_z = common_idx + unique_idx_x + unique_idx_y
-
-    perm_x = [idx_x.index(i) for i in new_idx_x]
-    perm_y = [idx_y.index(i) for i in new_idx_y]
-    perm_z = [new_idx_z.index(i) for i in idx_z]
-
-    x = paddle.transpose(x, perm=perm_x)
-    y = paddle.transpose(y, perm=perm_y)
-    z = paddle.matmul(x=x, y=y, transpose_y=True)
-    z = paddle.transpose(z, perm=perm_z)
-    return z
 
 
 class XLNetRelativeAttention(Layer):
@@ -150,21 +125,20 @@ class XLNetRelativeAttention(Layer):
         # Content based attention score (refer to the Transformer-XL paper)
         # q_head = Exi * Wq; self.r_w_bias = u; k_head_h = Wke * Exj
         # a = Exi * Wq * Wke * Exj; c = u * Wke * Exj; ac = a + c
-        ac = einsum4x4("ibnd,jbnd->bnij", q_head + self.r_w_bias, k_head_h)
+        ac = einsum("ibnd,jbnd->bnij", q_head + self.r_w_bias, k_head_h)
 
         # Position based attention score (refer to the Transformer-XL paper)
         # q_head = Exi * Wq; self.r_r_bias = v; k_head_r = Wkr * Rij
         # b = Exi * Wq * Wkr * Rij; d = v * Wkr * Rij; bd = b + d
-        bd = einsum4x4("ibnd,jbnd->bnij", q_head + self.r_r_bias, k_head_r)
+        bd = einsum("ibnd,jbnd->bnij", q_head + self.r_r_bias, k_head_r)
         bd = self.rel_shift_bnij(bd, klen=ac.shape[3])
 
         # Segment based attention score
         if seg_mat is None:
             ef = 0
         else:
-            seg_embed = paddle.stack([self.seg_embed] * q_head.shape[0], axis=0)
-            ef = einsum4x4('ibnd,isnd->ibns', q_head + self.r_s_bias, seg_embed)
-            ef = einsum4x4('ijbs,ibns->bnij', seg_mat, ef)
+            ef = einsum('ibnd,snd->ibns', q_head + self.r_s_bias, self.seg_embed)
+            ef = einsum('ijbs,ibns->bnij', seg_mat, ef)
 
         # Merge attention scores and perform masking
         attn_score = (ac + bd + ef) * self.scale
@@ -182,7 +156,7 @@ class XLNetRelativeAttention(Layer):
             attn_prob = attn_prob * head_mask.transpose([2, 3, 0, 1])
 
         # Attention output
-        attn_vec = einsum4x4("bnij,jbnd->ibnd", attn_prob, v_head_h)
+        attn_vec = einsum("bnij,jbnd->ibnd", attn_prob, v_head_h)
 
         if output_attentions:
             return attn_vec, attn_prob.transpose([2, 3, 0, 1])
@@ -193,10 +167,8 @@ class XLNetRelativeAttention(Layer):
         # Post-attention projection (back to 'd_model')
         # Compute einsum4x4("ibnd,hnd->ibh", attn_vec, self.o)
         shape = attn_vec.shape
-        attn_vec = attn_vec.reshape([shape[0] * shape[1], -1])
-        attn_out = paddle.matmul(
-            attn_vec, self.o,
-            transpose_y=True).reshape([shape[0], shape[1], -1])
+        attn_vec = attn_vec.reshape([shape[0], shape[1], -1])
+        attn_out = einsum("ibm,hm->ibh", attn_vec, self.o)
 
         attn_out = self.dropout(attn_out)
         if residual:
@@ -281,11 +253,7 @@ class XLNetRelativeAttention(Layer):
             # Core attention ops
             if target_mapping is not None:
                 # Compute q_head_g = einsum4x4("mbnd,mlb->lbnd", q_head_g, target_mapping)
-                q_head_g = q_head_g.transpose([1, 2, 3, 0])
-                target_mapping = target_mapping.transpose([2, 0, 1])
-                q_head_g = paddle.matmul(q_head_g, target_mapping).transpose(
-                    [3, 0, 1, 2])
-
+                q_head_g = einsum("mbnd,mlb->lbnd", q_head_g, target_mapping)
                 attn_vec_g = self.rel_attn_core(
                     q_head_g,
                     k_head_h,
@@ -300,10 +268,8 @@ class XLNetRelativeAttention(Layer):
                     attn_vec_g, attn_prob_g = attn_vec_g
 
                 # Compute attn_vec_g = einsum4x4("lbnd,mlb->mbnd", attn_vec_g, target_mapping)
-                attn_vec_g = attn_vec_g.transpose([1, 2, 3, 0])
-                target_mapping = target_mapping.transpose([2, 1, 0])
-                attn_vec_g = paddle.matmul(
-                    attn_vec_g, target_mapping).transpose([3, 0, 1, 2])
+                attn_vec_g = einsum("lbnd,mlb->mbnd", attn_vec_g, target_mapping)
+
             else:
                 attn_vec_g = self.rel_attn_core(
                     q_head_g,
@@ -810,8 +776,7 @@ class XLNetModel(XLNetPretrainedModel):
     @staticmethod
     def positional_embedding(pos_seq, inv_freq, bsz=None):
         # Compute sinusoid_inp = einsum4x4("i,d->id", pos_seq, inv_freq)
-        sinusoid_inp = paddle.matmul(
-            pos_seq.reshape([-1, 1]), inv_freq.reshape([1, -1]))
+        sinusoid_inp = einsum("i,d->id", pos_seq, inv_freq)
         pos_emb = paddle.concat(
             [paddle.sin(sinusoid_inp), paddle.cos(sinusoid_inp)], axis=-1)
         pos_emb = paddle.unsqueeze(pos_emb, axis=1)
