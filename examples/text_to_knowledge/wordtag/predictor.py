@@ -23,7 +23,7 @@ import paddle.nn as nn
 import pandas as pd
 from paddlenlp.datasets import MapDataset
 from paddlenlp.data import Stack, Pad, Tuple
-from paddle.utils.download import get_path_from_url
+from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
 
@@ -93,8 +93,8 @@ LABEL_TO_SCHEMA = {
 }
 
 URLS = {
-    "termtree.rawbase":
-    "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree.rawbase",
+    "TermTree.V1.0":
+    "https://kg-concept.bj.bcebos.com/TermTree/TermTree.V1.0.tar.gz",
     "termtree_type.csv":
     "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree_type.csv",
     "termtree_tags.txt":
@@ -116,7 +116,7 @@ class WordtagPredictor(object):
                 The tag vocab path.
         """
         term_schema_path = self._download_termtree("termtree_type.csv")
-        term_data_path = self._download_termtree("termtree.rawbase")
+        term_data_path = self._download_termtree("TermTree.V1.0")
         if tag_path is None:
             tag_path = self._download_termtree("termtree_tags.txt")
         self._tags_to_index, self._index_to_tags = self._load_labels(tag_path)
