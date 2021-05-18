@@ -216,7 +216,7 @@ class XLNetRelativeAttention(Layer):
             k_head_r = paddle.matmul(r, self.r)
             k_head_r = paddle.reshape(
                 k_head_r,
-                shape=[cat.shape[0], cat.shape[1], self.n_head, self.d_head])
+                shape=[r.shape[0], r.shape[1], self.n_head, self.d_head])
 
             # H-stream
             # Content-stream query head
@@ -555,7 +555,7 @@ class XLNetPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-large.pdparams",
         }
     }
-    base_model_prefix = "xlnet"
+    base_model_prefix = "transformer"
 
     def init_weights(self):
         # Initialize weights
