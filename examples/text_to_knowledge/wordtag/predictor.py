@@ -409,6 +409,9 @@ class WordtagPredictor(object):
                                 tmp_term_id = can_term_id
                                 if len(target_src) == 1:
                                     matched = True
+                                    if target.startswith(mt):
+                                        target_idx = -1
+                                        term_id = tmp_term_id
                                     if i < target_idx:
                                         target_idx = i
                                         term_id = tmp_term_id
@@ -416,12 +419,18 @@ class WordtagPredictor(object):
                                     if target_src[
                                             1] == "C" and "_cb_" in tmp_term_id:
                                         matched = True
+                                        if target.startswith(mt):
+                                            target_idx = -1
+                                            term_id = tmp_term_id
                                         if i < target_idx:
                                             target_idx = i
                                             term_id = tmp_term_id
                                     if target_src[
                                             1] == "E" and "_eb_" in tmp_term_id:
                                         matched = True
+                                        if target.startswith(mt):
+                                            target_idx = -1
+                                            term_id = tmp_term_id
                                         if i < target_idx:
                                             target_idx = i
                                             term_id = tmp_term_id
