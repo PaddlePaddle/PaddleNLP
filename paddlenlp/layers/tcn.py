@@ -23,7 +23,8 @@ class Chomp1d(nn.Layer):
     Remove the elements on the right.
 
     Args:
-        chomp_size ([int]): The number of elements removed.
+        chomp_size (`int`): 
+            The number of elements removed.
     """
 
     def __init__(self, chomp_size):
@@ -40,13 +41,20 @@ class TemporalBlock(nn.Layer):
     See the Figure 1(b) in https://arxiv.org/pdf/1803.01271.pdf for more details.
 
     Args:
-        n_inputs ([int]): The number of channels in the input tensor.
-        n_outputs ([int]): The number of filters.
-        kernel_size ([int]): The filter size.
-        stride ([int]): The stride size.
-        dilation ([int]): The dilation size.
-        padding ([int]): The size of zeros to be padded.
-        dropout (float, optional): Probability of dropout the units. Defaults to 0.2.
+        n_inputs (`int`): 
+            The number of channels in the input tensor.
+        n_outputs (`int`): 
+            The number of filters.
+        kernel_size (`int`): 
+            The filter size.
+        stride (`int`): 
+            The stride size.
+        dilation (`int`): 
+            The dilation size.
+        padding (`int`): 
+            The size of zeros to be padded.
+        dropout (`float`, optional): 
+            Probability of dropout the units. Defaults to 0.2.
     """
 
     def __init__(self,
@@ -145,9 +153,12 @@ class TCN(nn.Layer):
         Apply temporal convolutional networks to the input tensor.
 
         Args:
-            x ([tensor]): The input tensor with shape `[batch_size, input_channel, sequence_length]`.
+            x (`Tensor`): 
+                The input tensor with a shape  of [batch_size, input_channel, sequence_length].
 
         Returns:
-            [tensor]: The output tensor with shape `[batch_size, num_channels[-1], sequence_length]`.
+            output (`Tensor`): 
+                The output tensor with a shape of [batch_size, num_channels[-1], sequence_length].
         """
-        return self.network(x)
+        output = self.network(x)
+        return output

@@ -1,3 +1,5 @@
+# Batch size during inference. 
+infer_batch_size: 32
 # Hyparams for generation:
 decoding_strategy: "beam_search"
 # The parameters for beam search.
