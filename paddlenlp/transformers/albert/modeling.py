@@ -711,7 +711,7 @@ class AlbertPretrainedModel(PretrainedModel):
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-large.pdparams",
         }
     }
-    base_model_prefix = "albert"
+    base_model_prefix = "transformer"
 
     def init_weights(self):
         # Initialize weights
