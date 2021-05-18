@@ -21,8 +21,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import MultiHeadAttention, TransformerEncoderLayer, TransformerEncoder
 
-from paddlenlp.transformers.bert.modeling import BertPooler, BertEmbeddings
-
+from ..bert.modeling import BertPooler, BertEmbeddings
 from .. import PretrainedModel, register_base_model
 
 __all__ = [

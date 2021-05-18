@@ -59,8 +59,6 @@ python -u ./run_glue.py \
 训练完成之后，可将训练效果最好的模型保存在本项目下的`pretrained_models/$TASK_NAME/`下。模型目录下有`model_config.json`, `model_state.pdparams`, `tokenizer_config.json`及`vocab.txt`这几个文件。
 
 
-
-
 ### 对TinyBERT在特定任务下蒸馏
 
 先蒸馏中间层：
@@ -68,6 +66,7 @@ python -u ./run_glue.py \
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 export TASK_NAME=SST-2
+export TEACHER_DIR=../pretrained_models/SST-2/best_model_610
 
 python task_distill.py \
     --model_type tinybert \
@@ -78,7 +77,7 @@ python task_distill.py \
     --batch_size 32   \
     --T 1 \
     --teacher_model_type bert \
-    --teacher_path ../pretrained_models/SST-2/best_model_610 \
+    --teacher_path $TEACHER_DIR \
     --learning_rate 5e-5 \
     --num_train_epochs 20 \
     --logging_steps 10 \
@@ -92,6 +91,9 @@ python task_distill.py \
 然后对预测层进行蒸馏：
 
 ```shell
+
+export TEACHER_DIR=../pretrained_models/SST-2/best_model_610
+
 python task_distill.py \
     --model_type tinybert \
     --student_model_name_or_path tmp/TASK_NAME best_inter_model \
@@ -100,7 +102,7 @@ python task_distill.py \
     --batch_size 32   \
     --T 1 \
     --teacher_model_type bert \
-    --teacher_path ../pretrained_models/SST-2/best_model_610 \
+    --teacher_path $TEACHER_DIR  \
     --learning_rate 3e-5 \
     --num_train_epochs 3 \
     --logging_steps 10 \
@@ -113,13 +115,14 @@ python task_distill.py \
 
 ### 实验中使用的超参数
 
-|                                  | SST-2     | QQP       | MRPC      | CoLA      | STS-B     | RTE       | MNLI      | QNLI      |
-| -------------------------------- | --------- | --------- | --------- | --------- | --------- | --------- | --------- | --------- |
-| batch_size                       | 32        | 32        | 32        | 32        | 32        | 32        | 32        | 32        |
-| max_seq_length                   | 64        | 128       | 128       | 64        | 128       | 128       | 128       | 128       |
-| max_epochs_of_intermediate_layer | 20        | 10        | 20        | 50        | 20        | 20        | 10        | 10        |
-| max_epochs_of_prediction_layer   | 3         | 3         | 3         | 3         | 3         | 3         | 3         | 3         |
-| learning_rate(two stages)        | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 |
+|                                  | SST-2     | QQP       | MRPC      | CoLA      | RTE       | MNLI      | QNLI      |
+| -------------------------------- | --------- | --------- | --------- | --------- | --------- | --------- | --------- |
+| batch_size                       | 32        | 32        | 32        | 32        | 32        | 32        | 32        |
+| max_seq_length                   | 64        | 128       | 128       | 64        | 128       | 128       | 128       |
+| max_epochs_of_intermediate_layer | 20        | 10        | 20        | 50        | 20        | 10        | 10        |
+| max_epochs_of_prediction_layer   | 3         | 3         | 3         | 3         | 3         | 3         | 3         |
+| learning_rate(two stages)        | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 |
+
 
 
 ## 蒸馏实验结果

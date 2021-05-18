@@ -20,6 +20,7 @@
 |[UnifiedTransformer](https://arxiv.org/abs/2006.16779)| UnifiedTransformerTokenizer| UnifiedTransformerModel<br> UnifiedTransformerLMHeadModel |`unified_transformer-12L-cn`<br> `unified_transformer-12L-cn-luge` |
 |[DistilBERT](https://arxiv.org/abs/1910.01108) |DistilBertTokenizer|DistilBertModel<br>DistilBertForSequenceClassification<br>DistilBertForQuestionAnswering<br>DistilBertForTokenClassification<br>DistilBertForMaskedLM | `distilbert-base-uncased`<br>`distilbert-base-cased` |
 |[TinyBERT](https://arxiv.org/abs/1909.10351) |TinyBertTokenizer | TinyBertModel<br>TinyBertForPretraining<br>TinyBertForSequenceClassification | `tinybert-4l-312d`<br>`tinybert-6l-768d`<br>`tinybert-4l-312d-v2`<br>`tinybert-6l-768d-v2` |
+|[Transformer](https://arxiv.org/abs/1706.03762) |- | TransformerModel | - |
 
 **NOTE**：其中中文的预训练模型有`albert-chinese-tiny, albert-chinese-small, albert-chinese-base, albert-chinese-large, albert-chinese-xlarge, albert-chinese-xxlarge, bert-base-chinese, bert-wwm-chinese, bert-wwm-ext-chinese, ernie-1.0, ernie-tiny, gpt-cpm-large-cn, roberta-wwm-ext, roberta-wwm-ext-large, rbt3, rbtl3, chinese-electra-base, chinese-electra-small, chinese-xlnet-base, chinese-xlnet-mid, chinese-xlnet-large, unified_transformer-12L-cn, unified_transformer-12L-cn-luge`。
 

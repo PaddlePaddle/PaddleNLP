@@ -107,6 +107,12 @@ def parse_args():
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
+        "--glue_dir",
+        default="/root/.paddlenlp/datasets/Glue/",
+        type=str,
+        required=False,
+        help="The Glue directory.", )
+    parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
@@ -272,8 +278,7 @@ def do_train(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     if args.use_aug:
         aug_data_file = os.path.join(
-            os.path.join('/root/.paddlenlp/datasets/Glue/', args.task_name),
-            "train_aug.tsv"),
+            os.path.join(args.glue_dir, args.task_name), "train_aug.tsv"),
         train_ds = load_dataset(
             'glue', args.task_name, data_files=aug_data_file)
     else:
