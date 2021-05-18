@@ -22,6 +22,7 @@ sys.stdout.flush()
 class Trainer(object):
     def __init__(self):
         self.vocab = Vocab(config.vocab_path, config.vocab_size)
+
         self.batcher = Batcher(
             config.train_data_path,
             self.vocab,
@@ -40,9 +41,7 @@ class Trainer(object):
 
     def save_model(self, running_avg_loss, iter):
         state = {
-            'encoder': self.model.encoder.state_dict(),
-            'decoder': self.model.decoder.state_dict(),
-            'reduce_state': self.model.reduce_state.state_dict(),
+            'model': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict()
         }
         for k in state:
@@ -95,7 +94,9 @@ class Trainer(object):
         s_t_1 = self.model.reduce_state(encoder_hidden)
 
         step_losses = []
-        for di in range(min(max_dec_len, config.max_dec_steps)):
+        for di in range(config.max_dec_steps
+                        ):  # similar to RNN(RNNCell) that ignores max_dec_len
+            # for di in range(min(max_dec_len, config.max_dec_steps)):
             y_t_1 = dec_batch[:, di]
 
             final_dist, s_t_1, c_t_1, attn_dist, p_gen, next_coverage = \
@@ -116,6 +117,7 @@ class Trainer(object):
 
             step_mask = dec_padding_mask[:, di]
             step_loss = step_loss * step_mask
+            # print('STEP_LOSS', step_loss)
             step_losses.append(step_loss)
 
         sum_losses = paddle.sum(paddle.stack(step_losses, 1), 1)
@@ -133,22 +135,17 @@ class Trainer(object):
         while iter < n_iters:
             batch = self.batcher.next_batch()
             loss = self.train_one_batch(batch, iter)
-            print('Loss for one batch:  %.8f' % loss, iter)
             running_avg_loss = calc_running_avg_loss(loss, running_avg_loss,
                                                      iter)
-
+            print(
+                'global step %d, step loss: %.8f, running avg loss: %.8f, speed: %.2f step/s'
+                % (iter, loss, running_avg_loss, 1.0 / (time.time() - start)))
             iter += 1
+            start = time.time()
 
-            print_interval = 10
-            if iter % print_interval == 0:
-                print('iter %d, seconds for %d batch: %.2f , loss: %f\t' %
-                      (iter, print_interval, time.time() - start, loss))
-                print('RUNNING AVG LOSS for ITER %d is: %.4f' %
-                      (iter, running_avg_loss))
-                start = time.time()
-            if iter % 5000 == 0 or iter == 1000:
+            if iter % 5000 == 0 or iter in [1000, 1]:
                 self.save_model(running_avg_loss, iter)
-                print('RUNNING AVG LOSS for ITER %d is: %.4f' %
+                print('saving model for iter %d with running avg loss %.4f' %
                       (iter, running_avg_loss))
 
 

@@ -199,8 +199,14 @@ class Decoder(paddle.nn.Layer):
             coverage = coverage_next
 
         y_t_1_embd = self.embedding(y_t_1)
+        # print('c_t_1'.upper(), c_t_1)
+        # print('y_t_1_embd'.upper(), y_t_1_embd)
+        # print('self.x_context.state_dict()'.upper(), self.x_context.state_dict())
         x = self.x_context(paddle.concat((c_t_1, y_t_1_embd), 1))
+        # print('x'.upper(), x)
         lstm_out, s_t = self.lstm(x.unsqueeze(1), s_t_1)
+        # print('lstm_out'.upper(), lstm_out)
+        # print('S_T', s_t)
 
         h_decoder, c_decoder = s_t
         s_t_hat = paddle.concat(
@@ -239,10 +245,11 @@ class Decoder(paddle.nn.Layer):
         else:
             final_dist = vocab_dist
 
+        # print('FINAL DIST', final_dist)
         return final_dist, s_t, c_t, attn_dist, p_gen, coverage
 
 
-class Model(object):
+class Model(paddle.nn.Layer):
     def __init__(self, model_file_path=None, is_eval=False):
         super(Model, self).__init__()
         encoder = Encoder()
@@ -262,10 +269,5 @@ class Model(object):
         self.reduce_state = reduce_state
 
         if model_file_path is not None:
-            self.decoder.set_state_dict(
-                paddle.load(os.path.join(model_file_path, 'decoder.params')))
-            self.encoder.set_state_dict(
-                paddle.load(os.path.join(model_file_path, 'encoder.params')))
-            self.reduce_state.set_state_dict(
-                paddle.load(
-                    os.path.join(model_file_path, 'reduce_state.params')))
+            self.set_state_dict(
+                paddle.load(os.path.join(model_file_path, 'model.params')))
