@@ -58,6 +58,9 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
     paddle.set_device(args.device)
+    rank = paddle.distributed.get_rank()
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.init_parallel_env()
 
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
@@ -76,8 +79,9 @@ if __name__ == "__main__":
 
     model = SemanticIndexBase(
         pretrained_model, output_emb_size=args.output_emb_size)
+    model = paddle.DataParallel(model)
 
-    # load pretrained semantic model
+    # Load pretrained semantic model
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
@@ -99,7 +103,10 @@ if __name__ == "__main__":
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
 
-    final_index = build_index(args, corpus_data_loader, model)
+    # Need better way to get inner model of DataParallel
+    inner_model = model._layers
+
+    final_index = build_index(args, corpus_data_loader, inner_model)
 
     text_list, text2similar_text = gen_text_file(args.similar_text_pair_file)
 
@@ -112,14 +119,14 @@ if __name__ == "__main__":
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
 
-    query_embedding = model.get_semantic_embedding(query_data_loader)
+    query_embedding = inner_model.get_semantic_embedding(query_data_loader)
 
     if not os.path.exists(args.recall_result_dir):
         os.mkdir(args.recall_result_dir)
 
     recall_result_file = os.path.join(args.recall_result_dir,
                                       args.recall_result_file)
-    with open(recall_result_file, 'w') as f:
+    with open(recall_result_file, 'w', encoding='utf-8') as f:
         for batch_index, batch_query_embedding in enumerate(query_embedding):
             recalled_idx, cosine_sims = final_index.knn_query(
                 batch_query_embedding.numpy(), args.recall_num)
