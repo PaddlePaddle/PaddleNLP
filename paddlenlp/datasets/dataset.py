@@ -20,11 +20,12 @@ import warnings
 import sys
 import inspect
 from multiprocess import Pool, RLock
+import time
 
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset
 from paddle.dataset.common import md5file
-from paddle.utils.download import get_path_from_url
+from paddle.utils.download import get_path_from_url, _get_unique_endpoints
 from paddlenlp.utils.env import DATA_HOME
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 import importlib
@@ -502,10 +503,38 @@ class DatasetBuilder:
             ), "`splits` should be a string or list of string or a tuple of string."
             if isinstance(splits, str):
                 filename = self._get_data(splits)
+                from paddle.fluid.dygraph.parallel import ParallelEnv
+                unique_endpoints = _get_unique_endpoints(ParallelEnv()
+                                                         .trainer_endpoints[:])
+                lock_file = os.path.join(DATA_HOME, self.__class__.__name__,
+                                         ".lock_" + splits)
+                if self.name is not None:
+                    lock_file = lock_file + "_" + self.name
+                if not os.path.exists(lock_file) and ParallelEnv(
+                ).current_endpoint in unique_endpoints:
+                    f = open(lock_file, "w")
+                    f.close()
+                else:
+                    while not os.path.exists(lock_file):
+                        time.sleep(1)
                 datasets.append(self.read(filename=filename, split=splits))
             else:
                 for split in splits:
                     filename = self._get_data(split)
+                    from paddle.fluid.dygraph.parallel import ParallelEnv
+                    unique_endpoints = _get_unique_endpoints(ParallelEnv(
+                    ).trainer_endpoints[:])
+                    lock_file = os.path.join(DATA_HOME, self.__class__.__name__,
+                                             ".lock_" + split)
+                    if self.name is not None:
+                        lock_file = lock_file + "_" + self.name
+                    if not os.path.exists(lock_file) and ParallelEnv(
+                    ).current_endpoint in unique_endpoints:
+                        f = open(lock_file, "w")
+                        f.close()
+                    else:
+                        while not os.path.exists(lock_file):
+                            time.sleep(1)
                     datasets.append(self.read(filename=filename, split=split))
 
         return datasets if len(datasets) > 1 else datasets[0]
