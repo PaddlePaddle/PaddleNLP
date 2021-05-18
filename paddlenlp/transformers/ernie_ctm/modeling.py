@@ -85,7 +85,12 @@ class ErnieCtmPooler(Layer):
 
 
 class ErnieCtmPretrainedModel(PretrainedModel):
-    """An abstract class to handle weights initialzation and a simple interface for loading pretrained models.
+    """
+    An abstract class for pretrained ErnieCtm models. It provides ErnieCtm related `model_config_file`,
+    `resource_files_names`, `pretrained_resource_files_map`, `pretrained_init_configuration` and
+    `base_model_prefix` for downloading and loading pretrained models.
+
+    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
@@ -134,7 +139,7 @@ class ErnieCtmPretrainedModel(PretrainedModel):
     base_model_prefix = "ernie_ctm"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        # Initialize weights
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
@@ -152,6 +157,62 @@ class ErnieCtmPretrainedModel(PretrainedModel):
 
 @register_base_model
 class ErnieCtmModel(ErnieCtmPretrainedModel):
+    """
+    The bare ErnieCtm Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Check the superclass documentation for the generic methods and the library implements for all its model.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (`int`):
+            Vocabulary size of the ErnieCtm model. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling ErnieCtmModel.
+        embedding_size (`int`, optional):
+            Dimensionality of the embedding layer.
+            Defaults to ``128``.
+        hidden_size (`int`, optional):
+            Dimensionality of the encoder layers and the pooler layer.
+            Defaults to ``768``.
+        num_hidden_layers (`int`, optional):
+            The number of encoder layers to be stacked.
+            Defaults to ``12``.
+        num_attention_heads (`int`, optional):
+            The number of heads in multi-head attention(MHA).
+            Defaults to ``12``.
+        intermediate_size (`int`, optional):
+            The hidden layer size in the feedforward network(FFN).
+            Defaults to ``3072``.
+        hidden_dropout_prob (`float`, optional):
+            The dropout probability for all fully connected layers in the embeddings and encoder.
+            Defaults to ``0.1``.
+        attention_probs_dropout_prob (`float`, optional):
+            The dropout probability used in MHA to drop some attention target.
+            Defaults to ``0.1``.
+        max_position_embeddings (`int`, optional):
+            The size position embeddings of matrix, which dictates the maximum length
+            for which the model can be run.
+            Defaults to ``512``.
+        type_vocab_size (`int`, optional):
+            The vocabulary size of the `token_type_ids`. 
+            Defaults to ``16``.
+        initializer_range (`float`, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Defaults to ``0.02``.
+        pad_token_id (`int`, optional):
+            The index of padding token for BigBird embedding.
+            Defaults to ``0``.
+        use_content_summary (`bool`, optional):
+            If adding content summary tokens. 
+            Defaults to ``True``.
+        content_summary_index (`int`, optional):
+            The number of the content summary tokens. Only valid when use_content_summary is True.
+            Defaults to ``1``.
+    """
+
     def __init__(self,
                  vocab_size,
                  embedding_size=128,
@@ -214,7 +275,41 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 content_clone=False):
-        """Forward process.
+        r"""
+        The ErnieCtmModel forward method, overrides the __call__() special method.
+        
+        Args:
+            input_ids (`Tensor`):
+                Indices of input sequence tokens in the vocabulary.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            token_type_ids (`Tensor`, optional):
+                Segment token indices to indicate first and second portions of the inputs.
+                Indices can either be 0 or 1:
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to ``None``, which means we don't add segment embeddings.
+            attention_mask_list (`list`, optional):
+                A list which contains some tensors used in multi-head attention
+                to prevents attention to some unwanted positions, usually the
+                paddings or the subsequent positions. The tensors' shape will be
+                broadcasted to `[batch_size, n_head, sequence_length, sequence_length]`
+            content_clone (`bool`, optional):
+                Whether the content_output is clone from sequence_output. If set to `True`, the content_output is
+                clone from sequence_output, which may cause the classification task impact on the sequence labeling task.
+        Returns:
+            A tuple of shape (``sequence_output``, ``pooled_output``, ``content_output``).
+            
+            With the fields:
+            - sequence_output (`Tensor`):
+                Sequence of output at the last layer of the model. Its data type should be float32 and
+                has a shape of [batch_size, sequence_length, hidden_size].
+            - pooled_output (`Tensor`):
+                The output of first token (`[CLS]`) in sequence. Its data type should be float32 and
+                has a shape of [batch_size, hidden_size].
+            - content_output (`Tensor`):
+                The output of content summary token (`[CLS1]` in sequence). Its data type should be float32 and
+                has a shape of [batch_size, hidden_size].
         """
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
@@ -256,7 +351,21 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
 
 
 class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
-    """Wordtag task model.
+    """
+    ErnieCtmWordtag Model with a token classification head on top (a crf layer on top of the hidden-states output) .
+    e.g. for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        ernie_ctm (:clss:`ErnieCtmModel`):
+            An instance of :class:`ErnieCtmModel`.
+        num_tag (`int`):
+            The number of tags.
+        num_cls_label (`int`):
+            The number of sentence classification label.
+        crf_lr (`float`):
+            The learning rate of the crf.
+        ignore_index (`index`):
+            The ignore prediction index when calculating the cross entropy loss.
     """
 
     def __init__(self,
@@ -308,7 +417,7 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
         if tag_labels is not None and cls_label is not None:
             loss_fct = nn.loss.CrossEntropyLoss(ignore_index=self.ignore_index)
             cls_loss = loss_fct(cls_logits, cls_label.reshape([-1]))
-            seq_crf_loss = self.crf_loss(seq_logits, lengths, None, tag_labels)
+            seq_crf_loss = self.crf_loss(seq_logits, lengths, tag_labels)
             total_loss = cls_loss + seq_crf_loss
             return total_loss, seq_logits, cls_logits
         else:
