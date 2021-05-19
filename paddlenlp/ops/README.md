@@ -164,7 +164,7 @@ python sample/gpt_sample.py --model_name_or_path gpt2-medium-en --decoding_lib .
 
 其中，各个选项的意义如下：
 * `--model_name_or_path`: 预训练模型的名称或是路径。
-* `--decoding_lib`: 指向 `libdecoding_op.so` 的路径。需要包含 `libdecoding_op.so`。
+* `--decoding_lib`: 指向 `libdecoding_op.so` 的路径。需要包含 `libdecoding_op.so`。若不存在则将自动进行 jit 编译产出该 lib。
 * `--batch_size`: 一个 batch 内，样本数目的大小。
 * `--candidate_num`: 执行 topk-sampling 的时候的 `k` 的大小，默认是 4。
 * `--probability_threshold`: 执行 topp-sampling 的时候的阈值的大小，默认是 0.0 表示不执行 topp-sampling。
