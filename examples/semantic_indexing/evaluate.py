@@ -52,14 +52,14 @@ def recall(rs, N=10):
 
 if __name__ == "__main__":
     text2similar = {}
-    with open(args.similar_text_pair) as f:
+    with open(args.similar_text_pair, 'r', encoding='utf-8') as f:
         for line in f:
             text, similar_text = line.rstrip().split("\t")
             text2similar[text] = similar_text
 
     rs = []
 
-    with open(args.recall_result_file) as f:
+    with open(args.recall_result_file, 'r', encoding='utf-8') as f:
         relevance_labels = []
         for index, line in enumerate(f):
 
@@ -77,7 +77,6 @@ if __name__ == "__main__":
 
     recall_N = []
     for topN in (10, 50):
-        #logger.info("Recall@{}: {}".format(topN, 100 * recall(rs, N=topN)))
         R = round(100 * recall(rs, N=topN), 3)
         recall_N.append(str(R))
     print("\t".join(recall_N))
