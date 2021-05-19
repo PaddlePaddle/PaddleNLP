@@ -330,6 +330,47 @@ class TransformerGenerator(paddle.nn.Layer):
                 output_time_major=self.output_time_major)
 
     def forward(self, src_word):
+        r"""
+        Performs decoding for transformer model.
+
+        Args:
+            src_word (Tensor):
+                The ids of source sequence words. It is a tensor with shape
+                `[batch_size, source_sequence_length]` and its data type can be
+                int or int64.
+        
+        Returns:
+            Tensor:
+                An int64 tensor shaped indicating the predicted ids. Its shape is
+                `[batch_size, seq_len, beam_size]` or `[seq_len, batch_size, beam_size]`
+                according to `output_time_major`.
+        
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.ops import TransformerGenerator
+
+                transformer = TransformerGenerator(
+                    src_vocab_size=30000,
+                    trg_vocab_size=30000,
+                    max_length=256,
+                    n_layer=6,
+                    n_head=8,
+                    d_model=512,
+                    d_inner_hid=2048,
+                    dropout=0.1,
+                    weight_sharing=True,
+                    bos_id=0,
+                    eos_id=1,
+                    beam_size=4,
+                    max_out_len=256)
+
+                batch_size = 5
+                seq_len = 10
+                transformer(
+                    src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
+        """
         out = self.transformer(src_word)
         # TODO(guosheng): FasterTransformer has an output with layout
         # `[seq_len, batch_size, beam_size]`. While the output layout of
