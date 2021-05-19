@@ -334,10 +334,6 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         sequence_output, pooled_output = self.tinybert(
             input_ids, token_type_ids, attention_mask)
-        tmp = []
-        for sequence_layer in sequence_output:
-            tmp.append(self.fit_dense(sequence_layer))
-        sequence_output = tmp
 
         return sequence_output
 

@@ -19,7 +19,7 @@ TinyBERT蒸馏流程图
 在模型蒸馏中，较大的模型（在本例中是BERT base）通常被称为教师模型，较小的模型（在本例中是层数为6的BERT，下文都称TinyBERT6）通常被称为学生模型。
 知识的蒸馏通常是通过让学生模型学习相关的蒸馏相损失函数实现，在本实验中，蒸馏的学习目标由两个部分组成，分别是中间层的蒸馏损失和预测层的蒸馏损失。其中，中间层的蒸馏包括对Embedding层的蒸馏、对每个Transformer layer输出的蒸馏、以及对每个Transformer中attention矩阵（softmax之前的结果）的蒸馏，三者均采用的是均方误差损失函数。而预测层蒸馏的学习目标则是学生模型输出的logits和教师模型输出的logits的交叉熵损失。
 
-由于教师模型是12层，学生模型的层数少于教师模型的层数，因此需要选择一种layer mapping的方式。参考论文实现，在这里采用了一种固定的映射方式，当学生模型的层数为教师模型的1/2时，学生第i层的attention矩阵，需要学习教师的第2i+1层的attention矩阵，Tnansformer layer输出同理。
+由于教师模型是12层，学生模型的层数少于教师模型的层数，因此需要选择一种layer mapping的方式。参考论文实现，在这里采用了一种固定的映射方式，当学生模型的层数为教师模型的1/2时，学生第i层的attention矩阵，需要学习教师的第2i+1层的attention矩阵，Transformer layer输出同理。
 
 本实验分为两个大的训练过程：先对BERT-base进行微调，得到教师模型，然后进行蒸馏的训练。其中，蒸馏过程也分为两个步骤：先对中间层进行蒸馏多个epochs（论文中是10、20或者30个），再对预测层蒸馏3个epochs。
 
@@ -29,7 +29,7 @@ TinyBERT蒸馏流程图
 
 运行本目录下的实验，数据集会被自动下载到`paddlenlp.utils.env.DATA_HOME` 路径下，例如在linux系统下，对于GLUE中的QQP数据集，默认存储路径是`~/.paddlenlp/datasets/Glue/QQP`。
 
-对于BERT的fine-tuning任务，本实验中使用了预训练模型`bert-base-uncased`。同样，这几个模型在训练时会被自动下载到`paddlenlp.utils.env.DATA_HOME`路径下。例如，对于`bert-base-uncased`模型，在linux系统下，会被下载到`~/.paddlenlp/models/bert-base-uncased`下。
+对于BERT的fine-tuning任务，本实验中使用了预训练模型`bert-base-uncased`。同样，这几个模型在训练时会被自动下载到`paddlenlp.utils.env.MODEL_HOME`路径下。例如，对于`bert-base-uncased`模型，在linux系统下，会被下载到`~/.paddlenlp/models/bert-base-uncased`下。
 
 ## 蒸馏实验过程
 
@@ -87,6 +87,16 @@ python task_distill.py \
 
 ```
 
+其中参数释义如下：
+
+- `model_type` 学生模型类型，默认且目前仅支持tinybert。
+- `student_model_name_or_path` 中间层蒸馏后，学生模型存放的目录
+- `max_seq_length` 表示最大句子长度，超过该长度将被截断。默认：128
+- `T` softmax的温度，用于对softmax做平滑，在训练中起到放大负标签效果的作用。默认：1
+- `teacher_model_type` 教师模型的类型，默认且目前仅支持bert
+- `teacher_path` 教师Fine-tuned模型的目录
+- `output_dir` 学生模型存放的目录
+- `device` 表示运行该程序的设备，默认是gpu
 
 然后对预测层进行蒸馏：
 
@@ -111,6 +121,9 @@ python task_distill.py \
     --device gpu
 
 ```
+其中参数释义如下：
+
+- `student_model_name_or_path` 中间层蒸馏后，学生模型存放的目录
 
 
 ### 实验中使用的超参数
@@ -121,7 +134,7 @@ python task_distill.py \
 | max_seq_length                   | 64        | 128       | 128       | 64        | 128       | 128       | 128       |
 | max_epochs_of_intermediate_layer | 20        | 10        | 20        | 50        | 20        | 10        | 10        |
 | max_epochs_of_prediction_layer   | 3         | 3         | 3         | 3         | 3         | 3         | 3         |
-| learning_rate(two stages)        | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 |
+| learning_rate(inter/pred)       | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 | 5e-5/3e-5 |
 
 
 
