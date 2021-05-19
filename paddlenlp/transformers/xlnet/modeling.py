@@ -224,7 +224,7 @@ class XLNetRelativeAttention(Layer):
             q_head_h = paddle.matmul(h, self.q)  # shape
             q_head_h = paddle.reshape(
                 q_head_h,
-                shape=[cat.shape[0], cat.shape[1], self.n_head, self.d_head])
+                shape=[h.shape[0], h.shape[1], self.n_head, self.d_head])
 
             # Core attention ops
             attn_vec_h = self.rel_attn_core(
@@ -922,8 +922,8 @@ class XLNetModel(XLNetPretrainedModel):
                 Defaults to False.
 
         Returns:
-            Tensor or dict: Output tensor `output` or a dict with key-value pairs:
-            {"last_hidden_state": `output`, "mems": `new_mems`,
+            Tensor or dict: Returns tensor `output` or a dict with key-value pairs:
+            {"last_hidden_state": `output`, "mems": `mems`,
             "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
             With the corresponding fields:
@@ -961,7 +961,7 @@ class XLNetModel(XLNetPretrainedModel):
                 model = XLNetModel.from_pretrained('xlnet-base-cased')
 
                 inputs = tokenizer("Hey, Paddle-paddle is awesome !")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
                 last_hidden_states = outputs[0]
@@ -1275,13 +1275,13 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
                 See :class:`XLNetModel`.
 
         Returns:
-            Tensor or dict: Output tensor `output` or a dict with key-value pairs:
-            {"last_hidden_state": `output`, "mems": `new_mems`,
+            Tensor or dict: Returns tensor `logits` or a dict with key-value pairs:
+            {"logits": `logits`, "mems": `mems`,
             "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
             With the corresponding fields:
 
-            - `output` (Tensor):
+            - `logits` (Tensor):
                 Classification scores before SoftMax (also called logits). It's data type should be `float32`
                 and has a shape of [batch_size, num_classes].
             - `mems` (List[Tensor]):
@@ -1302,7 +1302,7 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
                 model = XLNetForSequenceClassification.from_pretrained('xlnet-base-cased')
 
                 inputs = tokenizer("Hey, Paddle-paddle is awesome !")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
                 logits = outputs[0]
@@ -1400,13 +1400,13 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
                 See :class:`XLNetModel`.
 
         Returns:
-            Tensor or dict: Output tensor `output` or a dict with key-value pairs:
-             {"last_hidden_state": `output`, "mems": `new_mems`,
+            Tensor or dict: Returns tensor `logits` or a dict with key-value pairs:
+             {"logits": `logits`, "mems": `mems`,
             "hidden_states": `hidden_states`, "attentions": `attentions`}.
 
             With the corresponding fields:
 
-            - `output` (Tensor):
+            - `logits` (Tensor):
                 Classification scores before SoftMax (also called logits). It's data type should be `float32`
                 and has a shape of [batch_size, sequence_length, num_classes].
             - `mems` (List[Tensor]):
@@ -1427,7 +1427,7 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
                 model = XLNetForTokenClassification.from_pretrained('xlnet-base-cased')
 
                 inputs = tokenizer("Hey, Paddle-paddle is awesome !")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
                 logits = outputs[0]
