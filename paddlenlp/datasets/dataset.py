@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import atexit
 import collections
 import io
 import math
@@ -503,26 +504,26 @@ class DatasetBuilder:
             ), "`splits` should be a string or list of string or a tuple of string."
             if isinstance(splits, str):
                 splits = [splits]
+            parallel_env = dist.ParallelEnv()
+            unique_endpoints = _get_unique_endpoints(
+                parallel_env.trainer_endpoints[:])
             for split in splits:
-                from paddle.fluid.dygraph.parallel import ParallelEnv
-                unique_endpoints = _get_unique_endpoints(ParallelEnv()
-                                                         .trainer_endpoints[:])
-                lock_file = os.path.join(DATA_HOME, self.__class__.__name__,
-                                         ".lock_" + split)
+                filename = self._get_data(split)
+                lock_file = os.path.join(DATA_HOME, self.__class__.__name__)
                 if self.name is not None:
-                    lock_file = lock_file + "_" + self.name
-                if not os.path.exists(lock_file) and ParallelEnv(
-                ).current_endpoint in unique_endpoints:
+                    lock_file = lock_file + "." + self.name
+                lock_file += "." + split + ".done" + "." + str(os.getppid())
+                # `lock_file` indicates the finished status of`_get_data`.
+                # `_get_data` only works in the `unique_endpoints` specified
+                # proc since `get_path_from_url` only work for it. The other
+                # procs wait `_get_data` to be finished.
+                if parallel_env.current_endpoint in unique_endpoints:
                     f = open(lock_file, "w")
                     f.close()
-                filename = self._get_data(split)
-
-                if ParallelEnv().current_endpoint in unique_endpoints:
-                    os.remove(lock_file)
-
-                while (ParallelEnv().current_endpoint not in unique_endpoints
-                       ) and os.path.exists(lock_file):
-                    time.sleep(1)
+                    atexit.register(lambda: os.remove(lock_file))
+                else:
+                    while not os.path.exists(lock_file):
+                        time.sleep(1)
                 datasets.append(self.read(filename=filename, split=split))
 
         return datasets if len(datasets) > 1 else datasets[0]
