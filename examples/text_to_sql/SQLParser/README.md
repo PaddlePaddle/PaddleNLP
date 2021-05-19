@@ -1,20 +1,26 @@
-# RAT-SQL
+# SQLParser
 
 ## Text2SQL 任务
 
-语义解析是一种交互式分析技术，其将用户输入的自然语言表述转成可操作执行的语义表示形式，如逻辑表达式（如一阶逻辑表示，lambda表示等）、编程语言（如SQL、python等）、数学公式等。
+语义解析是一种交互式分析技术，其将用户输入的自然语言表述转成一种指定的语义表示形式，如图表示（AMR等）、逻辑表达式（一阶逻辑表示，lambda表示等）、编程语言（SQL、python等）、数学公式等。
 
-Text2SQL 是语义解析技术中的一类任务，让机器自动将用户输入的自然语言问题转成可与数据库交互的 SQL 查询语言，实现基于数据库的自动问答能力。
+Text2SQL 是语义解析技术中的一类任务，基于给定的数据库，其将用户输入的自然语言问题转成可与数据库交互的 SQL 查询语句，实现基于数据库的自动问答能力。
+
 
 ## 数据集
 
-数据集是推动自然语言处理技术进步的基石。目前的许多技术研发仅关注模型在单一数据集上的效果，然而自然语言处理技术在大规模产业化的应用中，面临着多领域、多场景等诸多挑战。千言项目针对每个自然语言处理问题，均收集和整理多个开源数据集，进行统一的处理并提供统一的测评方式。
+数据集是推动自然语言处理技术进步的基石。为了处理不同场景、不同领域的应用需求，学术界及工业界陆续开放了一些相关数据集。千言项目为了验证模型的鲁棒性、泛化性等，针对每个自然语言处理问题，均收集和整理多个开源数据集，进行统一的处理并提供统一的测评方式。
 
-作为千言项目的重要任务之一，语义解析方向收集和整理了 NL2SQL、CSpider 和 DuSQL 数据集，详情可参见[千言官网](https://www.luge.ai/)的[语义解析任务](https://aistudio.baidu.com/aistudio/competition/detail/47)页面。
+作为千言项目的重要任务之一，语义解析方向收集和整理了NL2SQL、CSpider和DuSQL数据集，详情可参见千言官网的语义解析任务页面。
+
 
 ## 基线系统
 
-本基线系统基于 PaddlePaddle 2.0 实现了模型的训练和预测，并提供了效果评估和数据处理的工具。本系统同时兼容上述提及的三个数据集，基于 [RAT-SQL](https://github.com/microsoft/rat-sql) 实现，并进行了扩展以提供更优异的表示能力和更完善的SQL解码能力。
+本基线系统基于PaddlePaddle2.0动态图实现了复杂数据集上的SOTA模型RAT-SQL，其核心是基于encoder-decoder框架的序列生成模型。本系统编码端使用了 ERNIE + Relation-aware Transformer对问题和数据库schema 进行编码， 解码端实现了基于语法指导的解码算法，具体算法思想请见[TRANX](https://www.aclweb.org/anthology/D18-2002.pdf)。
+
+同时，为了兼容上述提及的三个数据集，我们基于RAT-SQL模型进行扩展以丰富其问题解决能力，主要包括：1）多语言处理能力；2）value识别能力。
+
+该基线系统除了提供模型的训练、预测外，还提供了评估及数据处理脚本。参赛选手及相关研究者可基于此系统进行更深层的效果优化。
 
 # 环境准备
 代码运行需要 Linux 主机，Python 3.7 和 PaddlePaddle 2.0 以上版本。
@@ -69,7 +75,7 @@ bash data/download_trained_model.sh
 
 # 数据预处理
 
-数据预处理指对原始数据进行转换、信息补充等，以适配模型训练的输入。下面以 DuSQL 数据集为例进行说明。
+对原始数据进行格式转换、依赖信息补充等，以适配模型的输入。下面以DuSQL数据集为例进行说明。
 
 ## 获取 Schema Linking 结果
 将 schema linking 独立出来，以便于针对这一步进行特定优化，可有效提升模型最终的效果。
@@ -113,20 +119,11 @@ bash data/download_trained_model.sh
 
 # 运行模型
 
-## 模型简介
-
-该系统基于 PaddlePaddle 2.0 动态图实现，核心框架为 seq2seq。
-编码端使用 ERNIE + [Relation-aware Transformer](https://arxiv.org/abs/1911.04942)，
-解码端使用 LSTM 建模生成过程，支持基于语法指导的解码算法。模型实现参考了
-[RAT-SQL](https://github.com/microsoft/rat-sql)。
-
 ## 模型配置文件
 
-模型运行必需的配置位于conf下，默认提供的配置包括：text2sql_dusql.jsonnet, text2sql_nl2sql.jsonnet
-和 text2sql_cspider.jsonnet。 分别用于 DuSQL, NL2SQL 和 CSpider 三个数据集的训练、预测等任务。
-下文中如无特殊说明，则上述配置统称为 config.jsonnet。
+模型运行必需的配置位于conf下，默认提供的配置包括：text2sql_dusql.jsonnet, text2sql_nl2sql.jsonnet 和 text2sql_cspider.jsonnet， 分别用于 DuSQL, NL2SQL 和 CSpider 三个数据集的训练、预测等任务。 下文中如无特殊说明，则上述配置统称为 config.jsonnet。
 
-## 运行训练
+## 训练
 
 以训练DuSQL 模型为例
 
@@ -190,8 +187,9 @@ python ./evaluation/text2sql_evaluation.py \
 
 # 基线效果
 
-使用默认的代码和配置进行模型的训练和预测，对开发集效果进行评估。用 Exact Match Score 作为评估指标，
-评价模型生成 SQL 的正确率。效果如下：
+评价指标：Exact Match Accuracy，即预测的SQL query与标准SQL query相等的问题占比，这里“相等”判断时忽略成分的顺序影响，即SELECT A,B和SELECT B,A是相等的。
+评估数据集：各数据集的开发集合。
+评估设置：基线系统默认代码和配置。
 
 | 数据集  | 准确率(%) |
 |-------- | ---    |
