@@ -285,7 +285,8 @@ class TransformerGenerator(paddle.nn.Layer):
                  beam_size=4,
                  max_out_len=256,
                  **kwargs):
-        logger.warning("This is an experimental API and subject to change.")
+        logger.warning(
+            "TransformerGenerator is an experimental API and subject to change.")
         # `kwargs` can include output_time_major, use_fp16_decoding, topk, topp.
         # The later three arguments can only work when using FasterTransformer,
         # and expose topk, topp later.
