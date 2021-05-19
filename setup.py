@@ -37,8 +37,9 @@ def get_package_data_files(package, data, package_dir=None):
         for root, _dirs, files in os.walk(path, followlinks=True):
             root = os.path.relpath(root, package_dir)
             for file in files:
+                file = os.path.join(root, file)
                 if file not in all_files:
-                    all_files.append(os.path.join(root, file))
+                    all_files.append(file)
     return all_files
 
 
