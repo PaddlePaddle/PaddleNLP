@@ -29,7 +29,7 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 
 from data import create_dataloader
 from data import convert_pointwise_example as convert_example
-from model import PonitwiseMatching
+from model import PointwiseMatching
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -131,7 +131,7 @@ def do_train():
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
 
-    model = PonitwiseMatching(pretrained_model)
+    model = PointwiseMatching(pretrained_model)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)

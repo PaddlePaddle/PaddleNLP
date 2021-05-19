@@ -28,7 +28,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 
 from data import create_dataloader, read_text_pair
 from data import convert_pointwise_example as convert_example
-from model import PonitwiseMatching
+from model import PointwiseMatching
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         "ernie-1.0")
 
-    model = PonitwiseMatching(pretrained_model)
+    model = PointwiseMatching(pretrained_model)
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)

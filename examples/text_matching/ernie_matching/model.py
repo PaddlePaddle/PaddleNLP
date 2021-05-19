@@ -17,7 +17,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 
-class PonitwiseMatching(nn.Layer):
+class PointwiseMatching(nn.Layer):
     def __init__(self, pretrained_model, dropout=None):
         super().__init__()
         self.ptm = pretrained_model
