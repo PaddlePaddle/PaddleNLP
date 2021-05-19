@@ -18,8 +18,12 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddlenlp.transformers import TransformerModel, WordEmbedding, PositionalEmbedding, position_encoding_init
+from paddlenlp.transformers import (TransformerModel, WordEmbedding,
+                                    PositionalEmbedding, position_encoding_init,
+                                    InferTransformerModel)
 from paddlenlp.ops import InferTransformerDecoding
+from paddlenlp.ops.ext_utils import load
+from paddlenlp.utils.log import logger
 
 
 class FasterTransformer(TransformerModel):
@@ -133,7 +137,7 @@ class FasterTransformer(TransformerModel):
         model_dict["trg_word_embedding.word_embedding.weight"][
             self.bos_id] = [0] * self.d_model
 
-        # Dealing with weight sharing. 
+        # Dealing with weight sharing.
         if self.weight_sharing:
             model_dict["decoding_linear.weight"] = np.transpose(model_dict[
                 "trg_word_embedding.word_embedding.weight"])
@@ -179,7 +183,7 @@ class FasterTransformer(TransformerModel):
         model_dict["trg_word_embedding.word_embedding.weight"][
             self.bos_id] = [0] * self.d_model
 
-        # Dealing with weight sharing. 
+        # Dealing with weight sharing.
         if self.weight_sharing:
             model_dict["decoding_linear.weight"] = np.transpose(model_dict[
                 "trg_word_embedding.word_embedding.weight"])
@@ -220,3 +224,125 @@ class FasterTransformer(TransformerModel):
             param_name = param.name
             var = paddle.static.global_scope().find_var(param_name).get_tensor()
             var.set(model_dict[item], place)
+
+
+class TransformerGenerator(paddle.nn.Layer):
+    """
+    The Transformer model for auto-regressive generation. It wraps `FasterTransformer`
+    and `InferTransformerModel`, and automatically chioces using `FasterTransformer`
+    (with jit building) or the slower verison `InferTransformerModel`.
+
+    Args:
+        src_vocab_size (int):
+            The size of source vocabulary.
+        trg_vocab_size (int):
+            The size of target vocabulary.
+        max_length (int):
+            The maximum length of input sequences.
+        n_layer (int):
+            The number of sub-layers to be stacked in the encoder and decoder.
+        n_head (int):
+            The number of head used in multi-head attention.
+        d_model (int):
+            The dimension for word embeddings, which is also the last dimension of
+            the input and output of multi-head attention, position-wise feed-forward
+            networks, encoder and decoder.
+        d_inner_hid (int):
+            Size of the hidden layer in position-wise feed-forward networks.
+        dropout (float):
+            Dropout rates. Used for pre-process, activation and inside attention.
+        weight_sharing (bool):
+            Whether to use weight sharing. 
+        bos_id (int, optional):
+            The start token id and also is used as padding id. Defaults to 0.
+        eos_id (int, optional):
+            The end token id. Defaults to 1.
+        beam_size (int, optional):
+            The beam width for beam search. Defaults to 4. 
+        max_out_len (int, optional):
+            The maximum output length. Defaults to 256.
+        kwargs:
+            The key word arguments can be `output_time_major` and `use_fp16_decoding`.
+            `output_time_major(bool, optional)`: Indicate the data layout of predicted
+            Tensor. If `False`, the data layout would be batch major with shape
+            `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
+            be time major with shape `[seq_len, batch_size, beam_size]`. Default
+            to `False`. `use_fp16_decoding(bool, optional)`: Whether to use fp16
+            for decoding.
+    """
+
+    def __init__(self,
+                 src_vocab_size,
+                 trg_vocab_size,
+                 max_length,
+                 n_layer,
+                 n_head,
+                 d_model,
+                 d_inner_hid,
+                 dropout,
+                 weight_sharing,
+                 bos_id=0,
+                 eos_id=1,
+                 beam_size=4,
+                 max_out_len=256,
+                 **kwargs):
+        logger.warning("This is an experimental API and subject to change.")
+        # `kwargs` can include output_time_major, use_fp16_decoding, topk, topp.
+        # The later three arguments can only work when using FasterTransformer,
+        # and expose topk, topp later.
+        super(TransformerGenerator, self).__init__()
+        self.d_model = d_model
+        self.max_length = max_length
+        self.output_time_major = kwargs.pop("output_time_major", True)
+        use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
+        try:
+            load("FasterTransformer", verbose=True)
+            self.transformer = FasterTransformer(
+                src_vocab_size=src_vocab_size,
+                trg_vocab_size=trg_vocab_size,
+                max_length=max_length,
+                n_layer=n_layer,
+                n_head=n_head,
+                d_model=d_model,
+                d_inner_hid=d_inner_hid,
+                dropout=dropout,
+                weight_sharing=weight_sharing,
+                bos_id=bos_id,
+                eos_id=eos_id,
+                beam_size=beam_size,
+                max_out_len=max_out_len,
+                use_fp16_decoding=use_fp16_decoding)
+        except Exception:
+            self.transformer = InferTransformerModel(
+                src_vocab_size=src_vocab_size,
+                trg_vocab_size=trg_vocab_size,
+                max_length=max_length,
+                n_layer=n_layer,
+                n_head=n_head,
+                d_model=d_model,
+                d_inner_hid=d_inner_hid,
+                dropout=dropout,
+                weight_sharing=weight_sharing,
+                bos_id=bos_id,
+                eos_id=eos_id,
+                beam_size=beam_size,
+                max_out_len=max_out_len,
+                output_time_major=self.output_time_major)
+
+    def forward(self, src_word):
+        out = self.transformer(src_word)
+        # TODO(guosheng): FasterTransformer has an output with layout
+        # `[seq_len, batch_size, beam_size]`. While the output layout of
+        # original one is `[batch_size, seq_len, beam_size]`. Maybe we need
+        # unify them later.
+        if not self.output_time_major and isinstance(self.transformer,
+                                                     FasterTransformer):
+            out = paddle.transpose(out, [1, 0, 2])
+        return out
+
+    def load(self, path):
+        if isinstance(self.transformer, FasterTransformer):
+            self.transformer.load(path)
+        else:
+            model_dict = paddle.load(path)
+            self.transformer.load_dict(model_dict)

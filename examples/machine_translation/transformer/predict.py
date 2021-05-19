@@ -7,74 +7,9 @@ from pprint import pprint
 from attrdict import AttrDict
 
 import paddle
+from paddlenlp.ops import TransformerGenerator
 
 import reader
-from paddlenlp.transformers import InferTransformerModel, position_encoding_init
-from paddlenlp.ops import FasterTransformer
-from paddlenlp.ops.ext_utils import load
-
-
-class TransformerInfer(paddle.nn.Layer):
-    def __init__(self,
-                 src_vocab_size,
-                 trg_vocab_size,
-                 max_length,
-                 n_layer,
-                 n_head,
-                 d_model,
-                 d_inner_hid,
-                 dropout,
-                 weight_sharing,
-                 bos_id=0,
-                 eos_id=1,
-                 beam_size=4,
-                 max_out_len=256,
-                 use_fp16_decoding=False):
-        super(TransformerInfer, self).__init__()
-        try:
-            load("FasterTransformer", verbose=True)
-            self.transformer = FasterTransformer(
-                src_vocab_size=src_vocab_size,
-                trg_vocab_size=trg_vocab_size,
-                max_length=max_length,
-                n_layer=n_layer,
-                n_head=n_head,
-                d_model=d_model,
-                d_inner_hid=d_inner_hid,
-                dropout=dropout,
-                weight_sharing=weight_sharing,
-                bos_id=bos_id,
-                eos_id=eos_id,
-                beam_size=beam_size,
-                max_out_len=max_out_len,
-                use_fp16_decoding=use_fp16_decoding)
-        except Exception:
-            self.transformer = InferTransformerModel(
-                src_vocab_size=src_vocab_size,
-                trg_vocab_size=trg_vocab_size,
-                max_length=max_length,
-                n_layer=n_layer,
-                n_head=n_head,
-                d_model=d_model,
-                d_inner_hid=d_inner_hid,
-                dropout=dropout,
-                weight_sharing=weight_sharing,
-                bos_id=bos_id,
-                eos_id=eos_id,
-                beam_size=beam_size,
-                max_out_len=max_out_len)
-        self.d_model = d_model
-        self.max_length = max_length
-
-    def forward(self, src_word):
-        return self.transformer(src_word)
-
-    def load(self, path):
-        if isinstance(self.transformer, FasterTransformer):
-            self.transformer.load(path)
-        else:
-            model_dict = paddle.load(path)
-            self.transformer.load_dict(model_dict)
 
 
 def parse_args():
@@ -121,8 +56,9 @@ def do_predict(args):
     test_loader, to_tokens = reader.create_infer_loader(args)
 
     # Define model
-    # transformer = InferTransformerModel(
-    transformer = TransformerInfer(
+    # `TransformerGenerator` automatically chioces using `FasterTransformer`
+    # (with jit building) or the slower verison `InferTransformerModel`.
+    transformer = TransformerGenerator(
         src_vocab_size=args.src_vocab_size,
         trg_vocab_size=args.trg_vocab_size,
         max_length=args.max_length + 1,
@@ -141,16 +77,6 @@ def do_predict(args):
     assert args.init_from_params, (
         "Please set init_from_params to load the infer model.")
 
-    # model_dict = paddle.load(
-    #     os.path.join(args.init_from_params, "transformer.pdparams"))
-
-    # To avoid a longer length than training, reset the size of position
-    # encoding to max_length
-    # model_dict["encoder.pos_encoder.weight"] = position_encoding_init(
-    #     args.max_length + 1, args.d_model)
-    # model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
-    #     args.max_length + 1, args.d_model)
-    # transformer.load_dict(model_dict)
     transformer.load(
         os.path.join(args.init_from_params, "transformer.pdparams"))
 
@@ -160,16 +86,10 @@ def do_predict(args):
     f = open(args.output_file, "w")
     with paddle.no_grad():
         for (src_word, ) in test_loader:
+            # The shape of finished_seq is `[seq_len, batch_size, beam_size]`
+            # when `output_time_major` argument is `True` for TransformerGenerator.
             finished_seq = transformer(src_word=src_word)
-            # TODO(guosheng): FasterTransformer has an output with layout
-            # `[seq_len, batch_size, beam_size]`. While the output layout of
-            # original one is `[batch_size, seq_len, beam_size]`. Maybe we need
-            # unify them later.
-            finished_seq = finished_seq.numpy().transpose(
-                [0, 2, 1]) if isinstance(
-                    transformer.transformer,
-                    InferTransformerModel) else finished_seq.numpy().transpose(
-                        [1, 2, 0])
+            finished_seq = finished_seq.numpy().transpose([1, 2, 0])
             for ins in finished_seq:
                 for beam_idx, beam in enumerate(ins):
                     if beam_idx >= args.n_best:
