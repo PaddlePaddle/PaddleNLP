@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 import setuptools
 import sys
 import paddlenlp
@@ -18,6 +19,25 @@ long_description = "PaddlePaddle NLP Model Core Library"
 
 with open("requirements.txt") as fin:
     REQUIRED_PACKAGES = fin.read()
+
+
+def get_package_data_files(package, data, package_dir=None):
+    """
+    Helps to list all specified files in package including files in directories
+    since `package_data` ignores directories.
+    """
+    if package_dir is None:
+        package_dir = os.path.join(*package.split('.'))
+    all_files = []
+    for f in data:
+        path = os.path.join(package_dir, f)
+        for root, _dirs, files in os.walk(path, followlinks=True):
+            root = os.path.relpath(root, package_dir)
+            for file in files:
+                if file not in all_files:
+                    all_files.append(os.path.join(root, file))
+    return all_files
+
 
 setuptools.setup(
     name="paddlenlp",
@@ -30,6 +50,12 @@ setuptools.setup(
     url="https://github.com/PaddlePaddle/PaddleNLP",
     packages=setuptools.find_packages(
         where='.', exclude=('./examples')),
+    package_data={
+        'paddlenlp.ops': get_package_data_files('paddlenlp.ops', [
+            'CMakeLists.txt', 'README.md', 'cmake', 'src', 'sample', 'patches',
+            'optimizer'
+        ])
+    },
     setup_requires=['cython', 'numpy'],
     install_requires=REQUIRED_PACKAGES,
     python_requires='>=3.6',

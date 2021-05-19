@@ -99,6 +99,8 @@ python predict.py --config ./configs/transformer.base.yaml
 
  需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
+ 另外 `predict.py` 中使用的 `TransformerGenerator` 接口对于GPU预测将在适配的条件下自动切换到 `FasterTransformer` 预测加速版本（期间会进行jit编译）， `FasterTransformer`的更多内容可以参考 `faster_transformer/README.md`。
+
 #### 导出静态图预测模型与预测引擎预测
 
 Transformer 同时提供了将训练的动态图的 checkpoint 转成静态图模型功能，并提供了对应的使用预测引擎进行预测推理的方法。具体的使用方式如下：

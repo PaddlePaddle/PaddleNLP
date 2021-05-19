@@ -155,7 +155,7 @@ def get_latest_ann_data(ann_data_dir):
 
 def gen_id2corpus(corpus_file):
     id2corpus = {}
-    with open(corpus_file) as f:
+    with open(corpus_file, 'r', encoding='utf-8') as f:
         for idx, line in enumerate(f):
             id2corpus[idx] = line.rstrip()
     return id2corpus
@@ -164,7 +164,7 @@ def gen_id2corpus(corpus_file):
 def gen_text_file(similar_text_pair_file):
     text2similar_text = {}
     texts = []
-    with open(similar_text_pair_file) as f:
+    with open(similar_text_pair_file, 'r', encoding='utf-8') as f:
         for line in f:
             splited_line = line.rstrip().split("\t")
             if len(splited_line) != 2:
