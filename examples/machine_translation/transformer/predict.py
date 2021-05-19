@@ -97,7 +97,6 @@ def do_predict(args):
                     id_list = post_process_seq(beam, args.bos_idx, args.eos_idx)
                     word_list = to_tokens(id_list)
                     sequence = " ".join(word_list) + "\n"
-                    print(sequence)
                     f.write(sequence)
 
 
