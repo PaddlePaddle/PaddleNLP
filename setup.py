@@ -31,6 +31,9 @@ def get_package_data_files(package, data, package_dir=None):
     all_files = []
     for f in data:
         path = os.path.join(package_dir, f)
+        if os.path.isfile(path):
+            all_files.append(f)
+            continue
         for root, _dirs, files in os.walk(path, followlinks=True):
             root = os.path.relpath(root, package_dir)
             for file in files:
