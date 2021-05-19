@@ -91,7 +91,10 @@ class FasterTransformerExtension(CMakeExtension):
         if CUDA_HOME is None:  # GPU only
             # TODO(guosheng): should we touch a dummy file or add a quick exit
             # method to avoid meaningless process in `load`
-            return
+            logger.warning(
+                "FasterTransformer is not available because CUDA can not be found."
+            )
+            raise NotImplementedError
         # TODO(guosheng): Multiple -std seems be passed in FasterTransformer,
         # which is not allowed by NVCC. Fix it later.
         self.cmake_args = [f"-DPY_CMD={sys.executable}"]
@@ -182,6 +185,14 @@ def _write_setup_file(name, file_path, build_dir, **kwargs):
 
 
 def load(name, build_dir=None, force=False, verbose=False, **kwargs):
+    # TODO(guosheng): Need better way to resolve unsupported such as CPU. Currently,
+    # raise NotImplementedError and skip `_jit_compile`. Otherwise, `_jit_compile`
+    # will output the error to stdout (when verbose is True) and raise `RuntimeError`,
+    # which is not friendly for users though no other bad effect.
+    if CUDA_HOME is None:
+        logger.warning("%s is not available because CUDA can not be found." %
+                       name)
+        raise NotImplementedError
     if build_dir is None:
         build_dir = os.path.join(PPNLP_HOME, 'extenstions')
     build_base_dir = os.path.abspath(
