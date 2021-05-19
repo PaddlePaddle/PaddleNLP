@@ -509,6 +509,8 @@ class DatasetBuilder:
                                                          .trainer_endpoints[:])
                 lock_file = os.path.join(DATA_HOME, self.__class__.__name__,
                                          ".lock_" + split)
+                if self.name is not None:
+                    lock_file = lock_file + "_" + self.name
                 if not os.path.exists(lock_file) and ParallelEnv(
                 ).current_endpoint in unique_endpoints:
                     f = open(lock_file, "w")
