@@ -72,6 +72,8 @@ class ErnieTokenizer(PretrainedTokenizer):
         "vocab_file": {
             "ernie-1.0":
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie/vocab.txt",
+            "ernie-tiny":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_tiny/vocab.txt",
             "ernie-2.0-en":
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-2.0-large-en":
@@ -86,6 +88,9 @@ class ErnieTokenizer(PretrainedTokenizer):
     }
     pretrained_init_configuration = {
         "ernie-1.0": {
+            "do_lower_case": True
+        },
+        "ernie-tiny": {
             "do_lower_case": True
         },
         "ernie-2.0-en": {
