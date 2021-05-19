@@ -62,7 +62,3 @@ python decode.py path/to/model/dir/
 python rouge_eval.py path/to/decoded/dir/
 ```
 
-
-
-## Papers using this code:
-1) TBD

@@ -229,13 +229,13 @@ def do_train():
 def do_predict():
     paddle.set_device(args.device)
 
-    no_entity_label = "O"
-    ignore_label = -1
-
     tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
     model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+
+    no_entity_label = "O"
+    ignore_label = len(label_map)
 
     print("============start predict==========")
     if not args.init_ckpt or not os.path.isfile(args.init_ckpt):

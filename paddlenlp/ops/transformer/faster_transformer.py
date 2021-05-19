@@ -20,8 +20,8 @@ import paddle.nn.functional as F
 
 from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     PositionalEmbedding, position_encoding_init,
-                                    InferTransformerModel)
-from paddlenlp.ops import InferTransformerDecoding
+                                    InferTransformerModel, GPTModel)
+from paddlenlp.ops import InferTransformerDecoding, InferGptDecoding
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
 
@@ -84,7 +84,6 @@ class FasterTransformer(TransformerModel):
             word_embedding=self.trg_word_embedding.word_embedding,
             positional_embedding=self.trg_pos_embedding.pos_encoder,
             linear=self.decoding_linear,
-            max_length=max_length,
             n_layer=n_layer,
             n_head=n_head,
             d_model=d_model,
@@ -387,3 +386,30 @@ class TransformerGenerator(paddle.nn.Layer):
         else:
             model_dict = paddle.load(path)
             self.transformer.load_dict(model_dict)
+
+
+class FasterGPT(nn.Layer):
+    def __init__(self,
+                 model,
+                 topk=4,
+                 topp=0.0,
+                 max_out_len=256,
+                 bos_id=50256,
+                 eos_id=50256,
+                 temperature=0,
+                 decoding_lib=None,
+                 use_fp16_decoding=False):
+        super(FasterGPT, self).__init__()
+        self.decoding = InferGptDecoding(
+            model=model,
+            topk=topk,
+            topp=topp,
+            max_out_len=max_out_len,
+            bos_id=bos_id,
+            eos_id=eos_id,
+            temperature=temperature,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=use_fp16_decoding)
+
+    def forward(self, input_ids):
+        return self.decoding(input_ids)

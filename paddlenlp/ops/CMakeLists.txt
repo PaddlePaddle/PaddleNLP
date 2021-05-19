@@ -20,15 +20,27 @@ INCLUDE(ExternalProject)
 
 set(CXX_STD "11" CACHE STRING "C++ standard")
 
-option(ON_INFER        "Compile with inference. "                                  OFF)
-option(WITH_GPU        "Compile with GPU/CPU, default use CPU."                    ON)
-option(USE_TENSORRT    "Compile with TensorRT."                                    OFF)
+option(ON_INFER         "Compile with inference. "                                OFF)
+option(WITH_GPU         "Compile with GPU/CPU, default use CPU."                  ON)
+option(USE_TENSORRT     "Compile with TensorRT."                                  OFF)
+option(WITH_TRANSFORMER "Compile with Transformer"                                ON)
+option(WITH_GPT         "Compile with GPT"                                        OFF)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
 endif()
 
-set(decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu)
+if(WITH_TRANSFORMER)
+  list(APPEND decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu)
+endif()
+
+if(WITH_GPT)
+  list(APPEND decoding_op_files fusion_gpt_op.cc fusion_gpt_op.cu)
+endif()
+
+if(NOT WITH_TRANSFORMER AND NOT WITH_GPT)
+  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON must be set to use FasterTransformer. ")
+endif()
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 
@@ -108,9 +120,12 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/faster
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/CMakeLists.txt cmakelists_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/CMakeLists.txt cmakelists_dst)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/topk_kernels.cu topk_kernels_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cu topk_kernels_dst)
+
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
-set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} && cp ${common_src} ${common_dst} && cp ${cmakelists_src} ${cmakelists_dst} && ${MUTE_COMMAND})
+set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} && cp ${common_src} ${common_dst} && cp ${cmakelists_src} ${cmakelists_dst} && cp ${topk_kernels_src} ${topk_kernels_dst} && ${MUTE_COMMAND})
 
 ######################################################################################
 # A function for automatic detection of GPUs installed  (if autodetection is enabled)
