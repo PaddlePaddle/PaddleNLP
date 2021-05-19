@@ -27,7 +27,7 @@ class CMakeExtension(Extension):
         # A CMakeExtension needs a source_dir instead of a file list.
         Extension.__init__(self, name, sources=[])
         if source_dir is None:
-            self.source_dir = Path(__file__).parent.resolve()
+            self.source_dir = str(Path(__file__).parent.resolve())
         else:
             self.source_dir = os.path.abspath(os.path.expanduser(source_dir))
         self.sources = [
