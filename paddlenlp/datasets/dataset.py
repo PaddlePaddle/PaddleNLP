@@ -504,21 +504,23 @@ class DatasetBuilder:
             if isinstance(splits, str):
                 splits = [splits]
             for split in splits:
-                filename = self._get_data(split)
                 from paddle.fluid.dygraph.parallel import ParallelEnv
                 unique_endpoints = _get_unique_endpoints(ParallelEnv()
                                                          .trainer_endpoints[:])
                 lock_file = os.path.join(DATA_HOME, self.__class__.__name__,
                                          ".lock_" + split)
-                if self.name is not None:
-                    lock_file = lock_file + "_" + self.name
                 if not os.path.exists(lock_file) and ParallelEnv(
                 ).current_endpoint in unique_endpoints:
                     f = open(lock_file, "w")
                     f.close()
-                else:
-                    while not os.path.exists(lock_file):
-                        time.sleep(1)
+                filename = self._get_data(split)
+
+                if ParallelEnv().current_endpoint in unique_endpoints:
+                    os.remove(lock_file)
+
+                while (ParallelEnv().current_endpoint not in unique_endpoints
+                       ) and os.path.exists(lock_file):
+                    time.sleep(1)
                 datasets.append(self.read(filename=filename, split=split))
 
         return datasets if len(datasets) > 1 else datasets[0]
