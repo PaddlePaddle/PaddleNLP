@@ -193,7 +193,7 @@ class RobertaTokenizer(PretrainedTokenizer):
         """
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens. 
         
-        A ERNIE offset_mapping has the following format:
+        A RoBERTa offset_mapping has the following format:
         ::
             - single sequence: ``(0,0) X (0,0)``
             - pair of sequences: `(0,0) A (0,0) B (0,0)``

@@ -86,7 +86,7 @@ def evaluate(model, loss_fct, metric, data_loader):
     global final_res
     for batch in data_loader:
         input_ids, token_type_ids, attention_mask, labels = batch
-        logits = model(input_ids, token_type_ids, attention_mask)[0]
+        logits = model(input_ids, token_type_ids, attention_mask)
         loss = loss_fct(logits, labels)
         losses.append(loss.detach().numpy())
         correct = metric.compute(logits, labels)
@@ -266,7 +266,7 @@ def do_train(args):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
             input_ids, token_type_ids, attention_mask, labels = batch
-            logits = model(input_ids, token_type_ids, attention_mask)[0]
+            logits = model(input_ids, token_type_ids, attention_mask)
             loss = loss_fct(logits, labels)
             loss.backward()
             optimizer.step()
