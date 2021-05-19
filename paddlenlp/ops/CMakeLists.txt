@@ -108,7 +108,9 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/faster
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/CMakeLists.txt cmakelists_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/CMakeLists.txt cmakelists_dst)
 
-set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} | cp ${common_src} ${common_dst} | cp ${cmakelists_src} ${cmakelists_dst})
+# TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
+set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
+set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} && cp ${common_src} ${common_dst} && cp ${cmakelists_src} ${cmakelists_dst} && ${MUTE_COMMAND})
 
 ExternalProject_Add(
   extern_${THIRD_PARTY_NAME}
