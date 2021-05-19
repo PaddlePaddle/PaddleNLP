@@ -233,6 +233,7 @@ class FasterGPT(nn.Layer):
                  decoding_lib=None,
                  use_fp16_decoding=False):
         super(FasterGPT, self).__init__()
+        self.use_fp16_decoding = use_fp16_decoding
         self.decoding = InferGptDecoding(
             model=model,
             topk=topk,
@@ -246,3 +247,18 @@ class FasterGPT(nn.Layer):
 
     def forward(self, input_ids):
         return self.decoding(input_ids)
+
+    def export_params(self, state_to_load, place):
+        for item in state_to_load:
+            param_data = np.array(state_to_load[item])
+            if self.use_fp16_decoding:
+                param_data = np.float16(param_data)
+
+            param = self
+            attr_list = item.split(".")
+            attr_list = ["decoding", "model"] + attr_list
+            for attr in attr_list:
+                param = getattr(param, attr)
+            param_name = param.name
+            var = paddle.static.global_scope().find_var(param_name).get_tensor()
+            var.set(param_data, place)
