@@ -31,11 +31,15 @@ def get_package_data_files(package, data, package_dir=None):
     all_files = []
     for f in data:
         path = os.path.join(package_dir, f)
+        if os.path.isfile(path):
+            all_files.append(f)
+            continue
         for root, _dirs, files in os.walk(path, followlinks=True):
             root = os.path.relpath(root, package_dir)
             for file in files:
+                file = os.path.join(root, file)
                 if file not in all_files:
-                    all_files.append(os.path.join(root, file))
+                    all_files.append(file)
     return all_files
 
 
@@ -49,7 +53,7 @@ setuptools.setup(
     long_description_content_type="text/plain",
     url="https://github.com/PaddlePaddle/PaddleNLP",
     packages=setuptools.find_packages(
-        where='.', exclude=('./examples')),
+        where='.', exclude=('examples*', 'tests*')),
     package_data={
         'paddlenlp.ops': get_package_data_files('paddlenlp.ops', [
             'CMakeLists.txt', 'README.md', 'cmake', 'src', 'sample', 'patches',
