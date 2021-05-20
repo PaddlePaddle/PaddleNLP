@@ -44,7 +44,6 @@ class BeamSearch(object):
     def __init__(self, model_file_path):
         model_name = re.findall(r'train_\d+', model_file_path)[0] + '_' + \
                      re.findall(r'model_\d+_\d+\.\d+', model_file_path)[0]
-        print('o MODEL NAME: ', model_name)
         self._decode_dir = os.path.join(config.log_root,
                                         'decode_%s' % (model_name))
         self._rouge_ref_dir = os.path.join(self._decode_dir, 'rouge_ref')
@@ -90,9 +89,9 @@ class BeamSearch(object):
             write_for_rouge(original_abstract_sents, decoded_words, counter,
                             self._rouge_ref_dir, self._rouge_dec_dir)
             counter += 1
-            if counter % 10 == 0:
-                print('%d example in %d sec' % (counter, time.time() - start))
-                start = time.time()
+            print('global step %d, %.2f step/s' % (counter,
+                                                   1.0 / (time.time() - start)))
+            start = time.time()
             batch = self.batcher.next_batch()
 
         print("Decoder has finished reading dataset for single_pass.")
