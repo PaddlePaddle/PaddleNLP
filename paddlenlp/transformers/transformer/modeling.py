@@ -732,6 +732,11 @@ class InferTransformerModel(TransformerModel):
             The beam width for beam search. Defaults to 4. 
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
+        output_time_major(bool, optional): Indicate the data layout of predicted
+            Tensor. If `False`, the data layout would be batch major with shape
+            `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
+            be time major with shape `[seq_len, batch_size, beam_size]`. Default
+            to `False`.
     """
 
     def __init__(self,
@@ -747,12 +752,14 @@ class InferTransformerModel(TransformerModel):
                  bos_id=0,
                  eos_id=1,
                  beam_size=4,
-                 max_out_len=256):
+                 max_out_len=256,
+                 output_time_major=False):
         args = dict(locals())
         args.pop("self")
         args.pop("__class__", None)
         self.beam_size = args.pop("beam_size")
         self.max_out_len = args.pop("max_out_len")
+        self.output_time_major = args.pop("output_time_major")
         self.dropout = dropout
         super(InferTransformerModel, self).__init__(**args)
 
@@ -775,8 +782,9 @@ class InferTransformerModel(TransformerModel):
         
         Returns:
             Tensor:
-                An int64 tensor shaped `[time_step, batch_size, beam_size]` indicating
-                the predicted ids.
+                An int64 tensor shaped indicating the predicted ids. Its shape is
+                `[batch_size, seq_len, beam_size]` or `[seq_len, batch_size, beam_size]`
+                according to `output_time_major`.
         
         Example:
             .. code-block::
@@ -836,6 +844,7 @@ class InferTransformerModel(TransformerModel):
             memory=enc_output,
             trg_src_attn_bias=trg_src_attn_bias,
             static_cache=static_cache,
-            is_test=True)
+            is_test=True,
+            output_time_major=self.output_time_major)
 
         return rs
