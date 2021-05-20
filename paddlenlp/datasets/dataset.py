@@ -525,6 +525,10 @@ class DatasetBuilder:
                 atexit.register(lambda: remove_if_exit(lock_file))
             for split in splits:
                 filename = self._get_data(split)
+                lock_file = os.path.join(DATA_HOME, self.__class__.__name__)
+                if self.name is not None:
+                    lock_file = lock_file + "." + self.name
+                lock_file += "." + split + ".done" + "." + str(os.getppid())
                 # `lock_file` indicates the finished status of`_get_data`.
                 # `_get_data` only works in the `unique_endpoints` specified
                 # proc since `get_path_from_url` only work for it. The other
