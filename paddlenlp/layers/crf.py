@@ -359,6 +359,7 @@ class ViterbiDecoder(nn.Layer):
         return paddle.slice(
             self._initial_alpha, axes=[0], starts=[0], ends=[batch_size])
 
+    @paddle.no_grad()
     def forward(self, inputs, lengths):
         """
         Decode the highest scoring sequence of tags.
@@ -382,9 +383,9 @@ class ViterbiDecoder(nn.Layer):
         inputs_t = inputs.transpose([1, 0, 2])
         trans_exp = self.transitions.unsqueeze(0)
 
-        all_alpha = []
         historys = []
         left_length = lengths.clone()
+        max_seq_len = left_length.max()
 
         if self.with_start_stop_tag:
             alpha = self._initialize_alpha(batch_size)
@@ -392,10 +393,11 @@ class ViterbiDecoder(nn.Layer):
             alpha = paddle.zeros((batch_size, self.num_tags), dtype='float32')
 
         for i, logit in enumerate(inputs_t):
+            if (i >= max_seq_len).all():
+                break
             # if not with_start_stop_tag, the first label has not antecedent tag.
             if i == 0 and not self.with_start_stop_tag:
                 alpha = logit
-                all_alpha.append(alpha)
                 left_length = left_length - 1
                 continue
             alpha_exp = alpha.unsqueeze(2)
@@ -422,41 +424,28 @@ class ViterbiDecoder(nn.Layer):
                 alpha += mask * self.transitions[self.stop_idx].unsqueeze(0)
 
             left_length = left_length - 1
-            if (left_length <= 0).all():
-                break
 
         # last_ids: batch_size
         scores, last_ids = alpha.max(1), alpha.argmax(1)
         # Trace back the best path
         # historys: seq_len, batch_size, n_labels
         historys = paddle.stack(historys)
-        max_seq_len = paddle.max(lengths)
-        batch_path_shape = paddle.concat(
-            [max_seq_len, batch_size.cast('int64')])
-        batch_path = paddle.zeros(batch_path_shape, dtype='float32')
-        path_idx = max_seq_len - 1
         tag_mask = paddle.cast((left_length >= 0), 'int64')
         last_ids_update = last_ids * tag_mask
-        batch_path = paddle.scatter(
-            batch_path, path_idx,
-            paddle.cast(last_ids_update.unsqueeze(0), 'float32'), False)
 
+        batch_path = [last_ids_update]
         batch_offset = self._get_batch_index(batch_size) * n_label
         historys = paddle.reverse(historys, [0])
         for hist in historys:
             # hist: batch_size, n_labels
             left_length = left_length + 1
-            path_idx = path_idx - 1
             gather_idx = batch_offset + last_ids
             tag_mask = paddle.cast((left_length >= 0), 'int64')
             last_ids_update = paddle.gather(hist.flatten(),
                                             gather_idx) * tag_mask
-            batch_path = paddle.scatter(
-                batch_path, path_idx,
-                paddle.cast(last_ids_update.unsqueeze(0), 'float32'))
+            batch_path.append(last_ids_update)
             last_ids = last_ids_update + last_ids * (1 - tag_mask)
-
-        batch_path = paddle.cast(paddle.transpose(batch_path, [1, 0]), 'int64')
+        batch_path = paddle.reverse(paddle.stack(batch_path, 1), [1])
         return scores, batch_path
 
     def _get_batch_index(self, batch_size):
