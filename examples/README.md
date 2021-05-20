@@ -52,7 +52,7 @@ PaddleNLP 提供了多种成熟的预训练模型技术，适用于自然语言�
 | [ELECTRA](./language_model/electra/)  | [ELECTRA: Pre-training Text Encoders as Discriminators Rather Than Generators](https://arxiv.org/abs/2003.10555) ELECTRA 创新性地引入GAN的思想对BERT预训练过程进行了改进，在和BERT具有相同的模型参数、预训练计算量一样的情况下，ELECTRA GLUE得分明显好。同时相比GPT、ELMo，在GLUE得分略好时，ELECTRA预训练模型只需要很少的参数和计算量。|
 | [RoBERTa](./text_classification/pretrained_models) | [RoBERTa: A Robustly Optimized BERT Pretraining Approach](https://arxiv.org/abs/1907.11692)   |
 | [PLATO-2](./dialogue/plato-2) | 百度自研领先的开放域对话预训练模型 [PLATO-2: Towards Building an Open-Domain Chatbot via Curriculum Learning](https://arxiv.org/abs/2006.16779) |
-| [GPT-2](./language_model/gpt2) | [Language Models are Unsupervised Multitask Learners](https://d4mucfpksywv.cloudfront.net/better-language-models/language-models.pdf)   |
+| [GPT-2](./language_model/gpt) | [Language Models are Unsupervised Multitask Learners](https://d4mucfpksywv.cloudfront.net/better-language-models/language-models.pdf)   |
 
 
 ## NLP核心技术
