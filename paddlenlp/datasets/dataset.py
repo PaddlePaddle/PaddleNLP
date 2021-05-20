@@ -496,6 +496,10 @@ class DatasetBuilder:
                     for split, filename in data_files.items()
                 ]
 
+        def remove_if_exit(filepath):
+            if os.path.exists(filepath):
+                os.remove(filepath)
+
         if splits:
             assert isinstance(splits, str) or (
                 isinstance(splits, list) and isinstance(splits[0], str)
@@ -520,10 +524,13 @@ class DatasetBuilder:
                 if parallel_env.current_endpoint in unique_endpoints:
                     f = open(lock_file, "w")
                     f.close()
-                    atexit.register(lambda: os.remove(lock_file))
                 else:
                     while not os.path.exists(lock_file):
                         time.sleep(1)
+                # Must register to all procs to make the lock file can be removed
+                # when any proc breaks. Otherwise, the single registered proc may
+                # not receive proper singal send by the parent proc to exit.
+                atexit.register(lambda: remove_if_exit(lock_file))
                 datasets.append(self.read(filename=filename, split=split))
 
         return datasets if len(datasets) > 1 else datasets[0]
