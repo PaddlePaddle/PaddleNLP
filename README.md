@@ -20,8 +20,7 @@ PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本�
 ## 特性
 
 - **易用的文本领域API**
--
-  - 深度兼容飞桨2.0[高层API](https://www.paddlepaddle.org.cn/documentation/docs/zh/tutorial/quick_start/high_level_api/high_level_api.html)体系。提供完善的预训练模型基础she内置可复用的文本建模模块([Embedding](./docs/embeddings.md), [CRF](./paddlenlp/layers/crf.py), [Seq2Vec](./paddlenlp/seq2vec/encoder.py), [Transformer](./docs/transformers.md))，可大幅度减少在数据处理、模型组网、训练与评估、推理部署环节的开发量，提升NLP任务迭代与落地的效率。
+  - 提供从数据集、数据预处理、组网、评估、和推理可复用API模块，如[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html), [Embedding API](./docs/embeddings.md), [Transformer API](./docs/transformers.md)等，其中Transformer API集成了50+预训练模型，通过统一API使用体验为开发者提供预训练生态的基础设施，提升NLP任务建模和迭代的效率。
 
 
 - **多场景的应用示例**
@@ -57,7 +56,7 @@ from paddlenlp.datasets import load_dataset
 train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
 ```
 
-可参考[Dataset文档](./docs/datasets.md)查看更多数据集。
+可参考[Dataset文档](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html) 查看更多数据集。
 
 ### 一键加载预训练中文词向量
 
