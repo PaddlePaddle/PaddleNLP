@@ -500,7 +500,10 @@ class DatasetBuilder:
             try:
                 if isinstance(filepath, (list, tuple)):
                     for file in filepath:
-                        os.remove(file)
+                        try:
+                            os.remove(file)
+                        except OSError:
+                            pass
                 else:
                     os.remove(filepath)
             except OSError:
