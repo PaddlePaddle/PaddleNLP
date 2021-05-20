@@ -497,17 +497,17 @@ class DatasetBuilder:
                 ]
 
         def remove_if_exit(filepath):
-            try:
-                if isinstance(filepath, (list, tuple)):
-                    for file in filepath:
-                        try:
-                            os.remove(file)
-                        except OSError:
-                            pass
-                else:
+            if isinstance(filepath, (list, tuple)):
+                for file in filepath:
+                    try:
+                        os.remove(file)
+                    except OSError:
+                        pass
+            else:
+                try:
                     os.remove(filepath)
-            except OSError:
-                pass
+                except OSError:
+                    pass
 
         if splits:
             assert isinstance(splits, str) or (
