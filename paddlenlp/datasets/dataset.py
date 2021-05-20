@@ -513,6 +513,7 @@ class DatasetBuilder:
             parallel_env = dist.ParallelEnv()
             unique_endpoints = _get_unique_endpoints(
                 parallel_env.trainer_endpoints[:])
+            # move register hook to first and register togather
             for split in splits:
                 lock_file = os.path.join(DATA_HOME, self.__class__.__name__)
                 if self.name is not None:
@@ -522,6 +523,7 @@ class DatasetBuilder:
                 # when any proc breaks. Otherwise, the single registered proc may
                 # not receive proper singal send by the parent proc to exit.
                 atexit.register(lambda: remove_if_exit(lock_file))
+            for split in splits:
                 filename = self._get_data(split)
                 # `lock_file` indicates the finished status of`_get_data`.
                 # `_get_data` only works in the `unique_endpoints` specified
