@@ -31,32 +31,34 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
     Construct a ERNIE-CTM tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
+    
     Args:
-        vocab_file (:obj:`str`):
+        vocab_file (`str`):
             File containing the vocabulary.
-        do_lower_case (:obj:`bool`, `optional`, defaults to :obj:`True`):
-            Whether or not to lowercase the input when tokenizing.
-        do_basic_tokenize (:obj:`bool`, `optional`, defaults to :obj:`True`):
-            Whether or not to do basic tokenization before WordPiece.
-        unk_token (:obj:`str`, `optional`, defaults to :obj:`"[UNK]"`):
+        do_lower_case (`bool`, optional):
+            Whether or not to lowercase the input when tokenizing. Defaults to `True`
+        do_basic_tokenize (`bool`, optional):
+            Whether or not to do basic tokenization before WordPiece. Defaults to `True`
+        unk_token (`str`, optional):
             The unknown token. A token that is not in the vocabulary cannot be converted to an ID and is set to be this
-            token instead.
-        sep_token (:obj:`str`, `optional`, defaults to :obj:`"[SEP]"`):
+            token instead. Defaults to `"[UNK]"`
+        sep_token (`str`, optional):
             The separator token, which is used when building a sequence from multiple sequences, e.g. two sequences for
             sequence classification or for a text and a question for question answering. It is also used as the last
-            token of a sequence built with special tokens.
-        pad_token (:obj:`str`, `optional`, defaults to :obj:`"[PAD]"`):
-            The token used for padding, for example when batching sequences of different lengths.
-        cls_token_template (:obj:`str`, `optional` defauts to :obj:`"[CLS{}]"`)
-            The template of summary token for multiple summary placeholders.
-        summary_num (:obj:`int`, `optional`, defaults to 1):
+            token of a sequence built with special tokens. Defaults to `"[SEP]"`
+        pad_token (`str`, optional):
+            The token used for padding, for example when batching sequences of different lengths. Defaults to `"[PAD]"`
+        cls_token_template (`str`, optional)
+            The template of summary token for multiple summary placeholders. Defauts to `"[CLS{}]"`
+        summary_num (`int`, optional):
             Summary placeholder used in ernie-ctm model. For catching a sentence global feature from multiple aware.
-        mask_token (:obj:`str`, `optional`, defaults to :obj:`"[MASK]"`):
+            Defaults to 1
+        mask_token (`str`, optional):
             The token used for masking values. This is the token used when training this model with masked language
-            modeling. This is the token which the model will try to predict.
-        strip_accents: (:obj:`bool`, `optional`):
+            modeling. This is the token which the model will try to predict. Defaults to `"[MASK]"`
+        strip_accents: (`bool`, optional):
             Whether or not to strip all accents. If this option is not specified, then it will be determined by the
-            value for :obj:`lowercase` (as in the original BERT).
+            value for `lowercase` (as in the original BERT).
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
@@ -93,6 +95,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                 "vocabulary from a pretrained model please use "
                 "`tokenizer = ErnieTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(vocab_file))
+        self.do_lower_case = do_lower_case
         self.cls_token_template = cls_token_template
         self.summary_num = summary_num
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
@@ -102,7 +105,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         return len(self.vocab)
 
     def convert_tokens_to_string(self, tokens):
-        """ Converts a sequence of tokens (string) in a single string. """
+        # Converts a sequence of tokens (strings for sub-words) in a single string.
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
 
@@ -113,15 +116,14 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         - single sequence: [CLS0][CLS1]... X [SEP]
         - pair of sequences: [CLS0][CLS1]... X [SEP] X [SEP]
 
-        Arguments:
-            token_ids_0 {typing.List[int]} -- List of IDs to which the special tokens will be added.
-
-        Keyword Arguments:
-            token_ids_1 {typing.Optional[typing.List[int]]} -- Optional second list of IDs for sequence pairs.
-            (default: {None})
+        Args:
+            token_ids_0 (`List`):
+                List of IDs to which the special tokens will be added.
+            token_ids_1 (`List`, optional):
+                second list of IDs for sequence pairs. Defaults to ``None``.
 
         Returns:
-            typing.List[int] -- List of `input IDs <../glossary.html#input-ids>`__ with the appropriate special tokens.
+            List: The input IDs with the appropriate special tokens.
         """
         cls_token_ids = [
             self.convert_tokens_to_ids(self.cls_token_template.format(sid))
@@ -137,20 +139,22 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                                 token_ids_0,
                                 token_ids_1=None,
                                 already_has_special_tokens=False):
-        """Retrieve sequence ids from a token list that has no special tokens added. This method is called when
-        adding special tokens using the tokenizer ``prepare_for_model`` method.
+        """
+        Creates a special tokens mask from the input sequences.
+        This method is called when adding special tokens using the tokenizer `encode` method.
 
-        Arguments:
-            token_ids_0 {typing.List[int]} -- List of IDs.
-
-        Keyword Arguments:
-            token_ids_1 {typing.Optional[typing.List[int]]} --
-                Optional seconde list of IDs for sequence pairs. (default: {None})
-            already_has_special_tokens {bool} --
-                Whether or not the token list is already formatted with special tokens for the model. (default: {False})
+        Args:
+            token_ids_0 (List[int]):
+                A list of `inputs_ids` for the first sequence.
+            token_ids_1 (List[int], optional):
+                Optional second list of `inputs_ids` for the second sequence.
+                Defaults to `None`.
+            already_has_special_tokens (bool, optional):
+                Whether or not the token list already contains special tokens for the model.
+                Defaults to `False`.
 
         Returns:
-            typing.List[int] -- A list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
+            List[int]: A list of integers which is either 0 or 1: 1 for a special token, 0 for a sequence token.
         """
         if already_has_special_tokens:
             if token_ids_1 is not None:
@@ -171,20 +175,36 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                                              token_ids_0,
                                              token_ids_1=None):
         """
-        Create a mask from the two sequences passed to be used in a sequence-pair classification task. A BERT sequence
-        pair mask has the following format:
+        Creates a token_type mask from the input sequences.
+        If `token_ids_1` is not `None`, then a sequence pair
+        token_type mask has the following format:
+
         ::
-            0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
+
+            0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 2
             | first sequence    | second sequence |
-        If :obj:`token_ids_1` is :obj:`None`, this method only returns the first portion of the mask (0s).
+
+        Else if `token_ids_1` is `None`, then a single sequence
+        token_type mask has the following format:
+
+        ::
+
+            0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2
+            |            first sequence           |
+
+        - 0 stands for the segment id of **first segment tokens**,
+        - 1 stands for the segment id of **second segment tokens**,
+        - 2 stands for the segment id of **cls_token**.
+
         Args:
-            token_ids_0 (:obj:`List[int]`):
-                List of IDs.
-            token_ids_1 (:obj:`List[int]`, `optional`):
-                Optional second list of IDs for sequence pairs.
+            token_ids_0 (List[int]):
+                A list of `inputs_ids` for the first sequence.
+            token_ids_1 (List[int], optional):
+                Optional second list of `inputs_ids` for the second sequence.
+                Defaults to `None`.
+
         Returns:
-            :obj:`List[int]`: List of `token type IDs <../glossary.html#token-type-ids>`_ according to the given
-            sequence(s).
+            List[int]: List of token type IDs according to the given sequence(s).
         """
         sep = [self.sep_token_id]
         if token_ids_1 is None:
@@ -193,15 +213,35 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                 ) * [0] + len(token_ids_1 + sep) * [1]
 
     def num_special_tokens_to_add(self, pair=False):
+        """
+        Returns the number of added tokens when encoding a sequence with special tokens.
+
+        Note:
+            This encodes inputs and checks the number of added tokens, and is therefore not efficient.
+            Do not put this inside your training loop.
+
+        Args:
+            pair (bool, optional):
+                Whether the input is a sequence pair or a single sequence.
+                Defaults to `False` and the input is a single sequence.
+
+        Returns:
+            int: Number of tokens added to sequences.
+        """
         if pair is True:
             return self.summary_num + 2
         else:
             return self.summary_num + 1
 
-    def tokenize(self, text, **kwargs):
-        """
-        Basic Tokenization of a piece of text, to tokenize Chinese Character, we should transform string to token list
-        straightly.
+    def _tokenize(self, text, **kwargs):
+        r"""
+        Converts a string to a list of tokens.
+
+        Args:
+            text (str): The text to be tokenized.
+        
+        Returns:
+            List[str]: A list of string representing converted tokens.
         """
         orig_tokens = list(text)
         output_tokens = []
@@ -210,3 +250,15 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                 token = token.lower()
             output_tokens.append(token)
         return output_tokens
+
+    def tokenize(self, text, **kwargs):
+        """
+        Converts a string to a list of tokens.
+        
+        Args:
+            text (str):
+                The text to be tokenized.
+        Returns:
+            List(str): A list of string representing converted tokens.
+        """
+        return self._tokenize(text, kwargs)

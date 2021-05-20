@@ -24,14 +24,59 @@ __all__ = [
 
 
 class BoWEncoder(nn.Layer):
-    """
+    r"""
     A `BoWEncoder` takes as input a sequence of vectors and returns a
     single vector, which simply sums the embeddings of a sequence across the time dimension. 
-    The input to this module is of shape `(batch_size, num_tokens, emb_dim)`, 
+    The input to this encoder is of shape `(batch_size, num_tokens, emb_dim)`, 
     and the output is of shape `(batch_size, emb_dim)`.
 
     Args:
-        emb_dim(int): It is the input dimension to the encoder.
+        emb_dim(int): 
+            The dimension of each vector in the input sequence.
+
+    Example:
+        .. code-block::
+
+            import paddle
+            import paddle.nn as nn
+            import paddlenlp as nlp
+
+            class BoWModel(nn.Layer):
+                def __init__(self,
+                            vocab_size,
+                            num_classes,
+                            emb_dim=128,
+                            padding_idx=0,
+                            hidden_size=128,
+                            fc_hidden_size=96):
+                    super().__init__()
+                    self.embedder = nn.Embedding(
+                        vocab_size, emb_dim, padding_idx=padding_idx)
+                    self.bow_encoder = nlp.seq2vec.BoWEncoder(emb_dim)
+                    self.fc1 = nn.Linear(self.bow_encoder.get_output_dim(), hidden_size)
+                    self.fc2 = nn.Linear(hidden_size, fc_hidden_size)
+                    self.output_layer = nn.Linear(fc_hidden_size, num_classes)
+
+                def forward(self, text):
+                    # Shape: (batch_size, num_tokens, embedding_dim)
+                    embedded_text = self.embedder(text)
+
+                    # Shape: (batch_size, embedding_dim)
+                    summed = self.bow_encoder(embedded_text)
+                    encoded_text = paddle.tanh(summed)
+
+                    # Shape: (batch_size, hidden_size)
+                    fc1_out = paddle.tanh(self.fc1(encoded_text))
+                    # Shape: (batch_size, fc_hidden_size)
+                    fc2_out = paddle.tanh(self.fc2(fc1_out))
+                    # Shape: (batch_size, num_classes)
+                    logits = self.output_layer(fc2_out)
+                    return logits
+
+            model = BoWModel(vocab_size=100, num_classes=2)
+
+            text = paddle.randint(low=1, high=10, shape=[1,10], dtype='int32')
+            logits = model(text)
     """
 
     def __init__(self, emb_dim):
@@ -39,7 +84,7 @@ class BoWEncoder(nn.Layer):
         self._emb_dim = emb_dim
 
     def get_input_dim(self):
-        """
+        r"""
         Returns the dimension of the vector input for each element in the sequence input
         to a `BoWEncoder`. This is not the shape of the input tensor, but the
         last element of that shape.
@@ -47,24 +92,29 @@ class BoWEncoder(nn.Layer):
         return self._emb_dim
 
     def get_output_dim(self):
-        """
+        r"""
         Returns the dimension of the final vector output by this `BoWEncoder`.  This is not
         the shape of the returned tensor, but the last element of that shape.
         """
         return self._emb_dim
 
     def forward(self, inputs, mask=None):
-        """
+        r"""
         It simply sums the embeddings of a sequence across the time dimension.
 
         Args:
-            inputs (paddle.Tensor): Shape as `(batch_size, num_tokens, emb_dim)`
-            mask (obj: `paddle.Tensor`, optional, defaults to `None`): Shape same as `inputs`. Its each elements identify whether is padding token or not. 
+            inputs (Tensor):
+                Shape as `(batch_size, num_tokens, emb_dim)` and dtype as `float32` or `float64`.
+                The sequence length of the input sequence.
+            mask (Tensor, optional): 
+                Shape same as `inputs`. 
+                Its each elements identify whether the corresponding input token is padding or not. 
                 If True, not padding token. If False, padding token.
+                Defaults to `None`.
 
         Returns:
-            summed (paddle.Tensor): Shape of `(batch_size, emb_dim)`. The result vector of BagOfEmbedding.
-
+            Tensor: 
+                Shape as `(batch_size, emb_dim)`, and dtype is same as `inputs`. The result vector of BagOfEmbedding.
         """
         if mask is not None:
             inputs = inputs * mask
@@ -75,10 +125,10 @@ class BoWEncoder(nn.Layer):
 
 
 class CNNEncoder(nn.Layer):
-    """
+    r"""
     A `CNNEncoder` takes as input a sequence of vectors and returns a
     single vector, a combination of multiple convolution layers and max pooling layers.
-    The input to this module is of shape `(batch_size, num_tokens, emb_dim)`, 
+    The input to this encoder is of shape `(batch_size, num_tokens, emb_dim)`, 
     and the output is of shape `(batch_size, ouput_dim)` or `(batch_size, len(ngram_filter_sizes) * num_filter)`.
 
     The CNN has one convolution layer for each ngram filter size. Each convolution operation gives
@@ -91,27 +141,71 @@ class CNNEncoder(nn.Layer):
     (optionally) projected down to a lower dimensional output, specified by `output_dim`.
 
     We then use a fully connected layer to project in back to the desired output_dim.  For more
-    details, refer to "A Sensitivity Analysis of (and Practitioners’ Guide to) Convolutional Neural
-    Networks for Sentence Classification", Zhang and Wallace 2016, particularly Figure 1.
-    ref: https://arxiv.org/abs/1510.03820
+    details, refer to `A Sensitivity Analysis of (and Practitioners’ Guide to) Convolutional Neural
+    Networks for Sentence Classification <https://arxiv.org/abs/1510.03820>`__ , 
+    Zhang and Wallace 2016, particularly Figure 1.
 
     Args:
         emb_dim(int):
-            This is the input dimension to the encoder.
+            The dimension of each vector in the input sequence.
         num_filter(int):
             This is the output dim for each convolutional layer, which is the number of "filters"
             learned by that layer.
-        ngram_filter_sizes(Tuple[int]):
+        ngram_filter_sizes(Tuple[int], optinal):
             This specifies both the number of convolutional layers we will create and their sizes.  The
             default of `(2, 3, 4, 5)` will have four convolutional layers, corresponding to encoding
             ngrams of size 2 to 5 with some number of filters.
-        conv_layer_activation(str):
+        conv_layer_activation(Layer, optional):
             Activation to use after the convolution layers.
-        output_dim(int):
+            Defaults to `paddle.nn.Tanh()`.
+        output_dim(int, optional):
             After doing convolutions and pooling, we'll project the collected features into a vector of
             this size.  If this value is `None`, we will just return the result of the max pooling,
             giving an output of shape `len(ngram_filter_sizes) * num_filter`.
+            Defaults to `None`.
 
+    Example:
+        .. code-block::
+
+            import paddle
+            import paddle.nn as nn
+            import paddlenlp as nlp
+
+            class CNNModel(nn.Layer):
+                def __init__(self,
+                            vocab_size,
+                            num_classes,
+                            emb_dim=128,
+                            padding_idx=0,
+                            num_filter=128,
+                            ngram_filter_sizes=(3, ),
+                            fc_hidden_size=96):
+                    super().__init__()
+                    self.embedder = nn.Embedding(
+                        vocab_size, emb_dim, padding_idx=padding_idx)
+                    self.encoder = nlp.seq2vec.CNNEncoder(
+                        emb_dim=emb_dim,
+                        num_filter=num_filter,
+                        ngram_filter_sizes=ngram_filter_sizes)
+                    self.fc = nn.Linear(self.encoder.get_output_dim(), fc_hidden_size)
+                    self.output_layer = nn.Linear(fc_hidden_size, num_classes)
+
+                def forward(self, text):
+                    # Shape: (batch_size, num_tokens, embedding_dim)
+                    embedded_text = self.embedder(text)
+                    # Shape: (batch_size, len(ngram_filter_sizes)*num_filter)
+                    encoder_out = self.encoder(embedded_text)
+                    encoder_out = paddle.tanh(encoder_out)
+                    # Shape: (batch_size, fc_hidden_size)
+                    fc_out = self.fc(encoder_out)
+                    # Shape: (batch_size, num_classes)
+                    logits = self.output_layer(fc_out)
+                    return logits
+
+            model = CNNModel(vocab_size=100, num_classes=2)
+
+            text = paddle.randint(low=1, high=10, shape=[1,10], dtype='int32')
+            logits = model(text)
     """
 
     def __init__(self,
@@ -145,7 +239,7 @@ class CNNEncoder(nn.Layer):
             self._output_dim = maxpool_output_dim
 
     def get_input_dim(self):
-        """
+        r"""
         Returns the dimension of the vector input for each element in the sequence input
         to a `CNNEncoder`. This is not the shape of the input tensor, but the
         last element of that shape.
@@ -153,26 +247,31 @@ class CNNEncoder(nn.Layer):
         return self._emb_dim
 
     def get_output_dim(self):
-        """
+        r"""
         Returns the dimension of the final vector output by this `CNNEncoder`.  This is not
         the shape of the returned tensor, but the last element of that shape.
         """
         return self._output_dim
 
     def forward(self, inputs, mask=None):
-        """
+        r"""
         The combination of multiple convolution layers and max pooling layers.
 
         Args:
-            inputs (paddle.Tensor): Shape as `(batch_size, num_tokens, emb_dim)`
-            mask (obj: `paddle.Tensor`, optional, defaults to `None`): Shape same as `inputs`. 
-                Its each elements identify whether is padding token or not. 
-                If True, not padding token. If False, padding token.
+            inputs (Tensor): 
+                Shape as `(batch_size, num_tokens, emb_dim)` and dtype as `float32` or `float64`.
+                Tensor containing the features of the input sequence. 
+            mask (Tensor, optional): 
+                Shape shoule be same as `inputs` and dtype as `int32`, `int64`, `float32` or `float64`. 
+                Its each elements identify whether the corresponding input token is padding or not. 
+                If True, not padding token. If False, padding token. 
+                Defaults to `None`
 
         Returns:
-            result (paddle.Tensor): If output_dim is None, the result shape 
-                is of `(batch_size, output_dim)`; if not, the result shape 
-                is of `(batch_size, len(ngram_filter_sizes) * num_filter)`.
+            Tensor: 
+                If output_dim is None, the result shape is of `(batch_size, output_dim)` and 
+                dtype is `float`; 
+                If not, the result shape is of `(batch_size, len(ngram_filter_sizes) * num_filter)`.
 
         """
         if mask is not None:
@@ -198,11 +297,13 @@ class CNNEncoder(nn.Layer):
 
 
 class GRUEncoder(nn.Layer):
-    """
+    r"""
     A GRUEncoder takes as input a sequence of vectors and returns a
-    single vector, which is a combination of multiple GRU layers.
-    The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
-    The output is of shape `(batch_size, hidden_size*2)` if GRU is bidirection;
+    single vector, which is a combination of multiple `paddle.nn.GRU 
+    <https://www.paddlepaddle.org.cn/documentation/docs/en/api
+    /paddle/nn/layer/rnn/GRU_en.html>`__ subclass.
+    The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
+    The output is of shape `(batch_size, hidden_size * 2)` if GRU is bidirection;
     If not, output is of shape `(batch_size, hidden_size)`.
 
     Paddle's GRU have two outputs: the hidden state for every time step at last layer, 
@@ -211,24 +312,87 @@ class GRUEncoder(nn.Layer):
     step at last layer to create a single vector. If not None, we use the hidden state 
     of the last time step at last layer as a single output (shape of `(batch_size, hidden_size)`); 
     And if direction is bidirection, the we concat the hidden state of the last forward 
-    gru and backward gru layer to create a single vector (shape of `(batch_size, hidden_size*2)`).
+    gru and backward gru layer to create a single vector (shape of `(batch_size, hidden_size * 2)`).
 
     Args:
-        input_size (obj:`int`, required): The number of expected features in the input (the last dimension).
-        hidden_size (obj:`int`, required): The number of features in the hidden state.
-        num_layers (obj:`int`, optional, defaults to 1): Number of recurrent layers. 
+        input_size (int): 
+            The number of expected features in the input (the last dimension).
+        hidden_size (int): 
+            The number of features in the hidden state.
+        num_layers (int, optional): 
+            Number of recurrent layers. 
             E.g., setting num_layers=2 would mean stacking two GRUs together to form a stacked GRU, 
             with the second GRU taking in outputs of the first GRU and computing the final results.
-        direction (obj:`str`, optional, defaults to obj:`forward`): The direction of the network. 
-            It can be `forward` and `bidirect` (it means bidirection network).
-            If `biderect`, it is a birectional GRU, and returns the concat output from both directions.
-        dropout (obj:`float`, optional, defaults to 0.0): If non-zero, introduces a Dropout layer 
-            on the outputs of each GRU layer except the last layer, with dropout probability equal to dropout.
-        pooling_type (obj: `str`, optional, defaults to obj:`None`): If `pooling_type` is None, 
-            then the GRUEncoder will return the hidden state of the last time step at last layer as a single vector.
-            If pooling_type is not None, it must be one of `sum`, `max` and `mean`. Then it will be pooled on 
-            the GRU output (the hidden state of every time step at last layer) to create a single vector.
+            Defaults to 1.
+        direction (str, optional): 
+            The direction of the network. It can be "forward" and "bidirect" 
+            (it means bidirection network). If "bidirect", it is a birectional GRU, 
+            and returns the concat output from both directions.
+            Defaults to "forward".
+        dropout (float, optional): 
+            If non-zero, introduces a Dropout layer on the outputs of each GRU layer 
+            except the last layer, with dropout probability equal to dropout.
+            Defaults to 0.0.
+        pooling_type (str, optional): 
+            If `pooling_type` is None, then the GRUEncoder will return the hidden state of
+            the last time step at last layer as a single vector.
+            If pooling_type is not None, it must be one of "sum", "max" and "mean". 
+            Then it will be pooled on the GRU output (the hidden state of every time 
+            step at last layer) to create a single vector.
+            Defaults to `None`
 
+    Example:
+        .. code-block::
+
+            import paddle
+            import paddle.nn as nn
+            import paddlenlp as nlp
+
+            class GRUModel(nn.Layer):
+                def __init__(self,
+                            vocab_size,
+                            num_classes,
+                            emb_dim=128,
+                            padding_idx=0,
+                            gru_hidden_size=198,
+                            direction='forward',
+                            gru_layers=1,
+                            dropout_rate=0.0,
+                            pooling_type=None,
+                            fc_hidden_size=96):
+                    super().__init__()
+                    self.embedder = nn.Embedding(
+                        num_embeddings=vocab_size,
+                        embedding_dim=emb_dim,
+                        padding_idx=padding_idx)
+                    self.gru_encoder = nlp.seq2vec.GRUEncoder(
+                        emb_dim,
+                        gru_hidden_size,
+                        num_layers=gru_layers,
+                        direction=direction,
+                        dropout=dropout_rate,
+                        pooling_type=pooling_type)
+                    self.fc = nn.Linear(self.gru_encoder.get_output_dim(), fc_hidden_size)
+                    self.output_layer = nn.Linear(fc_hidden_size, num_classes)
+
+                def forward(self, text, seq_len):
+                    # Shape: (batch_size, num_tokens, embedding_dim)
+                    embedded_text = self.embedder(text)
+                    # Shape: (batch_size, num_tokens, num_directions*gru_hidden_size)
+                    # num_directions = 2 if direction is 'bidirect'
+                    # if not, num_directions = 1
+                    text_repr = self.gru_encoder(embedded_text, sequence_length=seq_len)
+                    # Shape: (batch_size, fc_hidden_size)
+                    fc_out = paddle.tanh(self.fc(text_repr))
+                    # Shape: (batch_size, num_classes)
+                    logits = self.output_layer(fc_out)
+                    return logits
+
+            model = GRUModel(vocab_size=100, num_classes=2)
+
+            text = paddle.randint(low=1, high=10, shape=[1,10], dtype='int32')
+            seq_len = paddle.to_tensor([10])
+            logits = model(text, seq_len)
     """
 
     def __init__(self,
@@ -253,7 +417,7 @@ class GRUEncoder(nn.Layer):
                                 **kwargs)
 
     def get_input_dim(self):
-        """
+        r"""
         Returns the dimension of the vector input for each element in the sequence input
         to a `GRUEncoder`. This is not the shape of the input tensor, but the
         last element of that shape.
@@ -261,7 +425,7 @@ class GRUEncoder(nn.Layer):
         return self._input_size
 
     def get_output_dim(self):
-        """
+        r"""
         Returns the dimension of the final vector output by this `GRUEncoder`.  This is not
         the shape of the returned tensor, but the last element of that shape.
         """
@@ -271,19 +435,21 @@ class GRUEncoder(nn.Layer):
             return self._hidden_size
 
     def forward(self, inputs, sequence_length):
-        """
-        GRUEncoder takes the a sequence of vectors and and returns a
-        single vector, which is a combination of multiple GRU layers.
-        The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
-        The output is of shape `(batch_size, hidden_size*2)` if GRU is bidirection;
+        r"""
+        GRUEncoder takes the a sequence of vectors and and returns a single vector, 
+        which is a combination of multiple GRU layers. The input to this 
+        encoder is of shape `(batch_size, num_tokens, input_size)`, 
+        The output is of shape `(batch_size, hidden_size * 2)` if GRU is bidirection;
         If not, output is of shape `(batch_size, hidden_size)`.
 
         Args:
-            inputs (paddle.Tensor): Shape as `(batch_size, num_tokens, input_size)`.
-            sequence_length (paddle.Tensor): Shape as `(batch_size)`.
+            inputs (Tensor): Shape as `(batch_size, num_tokens, input_size)`.
+                Tensor containing the features of the input sequence. 
+            sequence_length (Tensor): Shape as `(batch_size)`.
+                The sequence length of the input sequence.
 
         Returns:
-            last_hidden (paddle.Tensor): Shape as `(batch_size, hidden_size)`.
+            Tensor: Shape as `(batch_size, hidden_size)` and dtype is `float`. 
                 The hidden state at the last time step for every layer.
 
         """
@@ -295,7 +461,7 @@ class GRUEncoder(nn.Layer):
             # If gru is not bidirection, then output is the hidden state of the last time step 
             # at last layer. Output is shape of `(batch_size, hidden_size)`.
             # If gru is bidirection, then output is concatenation of the forward and backward hidden state 
-            # of the last time step at last layer. Output is shape of `(batch_size, hidden_size*2)`.
+            # of the last time step at last layer. Output is shape of `(batch_size, hidden_size * 2)`.
             if self._direction != 'bidirect':
                 output = last_hidden[-1, :, :]
             else:
@@ -304,8 +470,8 @@ class GRUEncoder(nn.Layer):
         else:
             # We exploit the `encoded_text` (the hidden state at the every time step for last layer)
             # to create a single vector. We perform pooling on the encoded text.
-            # The output shape is `(batch_size, hidden_size*2)` if use bidirectional GRU, 
-            # otherwise the output shape is `(batch_size, hidden_size*2)`.
+            # The output shape is `(batch_size, hidden_size * 2)` if use bidirectional GRU, 
+            # otherwise the output shape is `(batch_size, hidden_size * 2)`.
             if self._pooling_type == 'sum':
                 output = paddle.sum(encoded_text, axis=1)
             elif self._pooling_type == 'max':
@@ -321,11 +487,13 @@ class GRUEncoder(nn.Layer):
 
 
 class LSTMEncoder(nn.Layer):
-    """
-    A LSTMEncoder takes as input a sequence of vectors and returns a
-    single vector, which is a combination of multiple LSTM layers.
-    The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
-    The output is of shape `(batch_size, hidden_size*2)` if LSTM is bidirection;
+    r"""
+    An LSTMEncoder takes as input a sequence of vectors and returns a
+    single vector, which is a combination of multiple `paddle.nn.LSTM
+    <https://www.paddlepaddle.org.cn/documentation/docs/en/api
+    /paddle/nn/layer/rnn/LSTM_en.html>`__ subclass.
+    The input to this encoder is of shape `(batch_size, num_tokens, input_size)`.
+    The output is of shape `(batch_size, hidden_size * 2)` if LSTM is bidirection;
     If not, output is of shape `(batch_size, hidden_size)`.
 
     Paddle's LSTM have two outputs: the hidden state for every time step at last layer, 
@@ -334,24 +502,86 @@ class LSTMEncoder(nn.Layer):
     step at last layer to create a single vector. If not None, we use the hidden state 
     of the last time step at last layer as a single output (shape of `(batch_size, hidden_size)`); 
     And if direction is bidirection, the we concat the hidden state of the last forward 
-    lstm and backward lstm layer to create a single vector (shape of `(batch_size, hidden_size*2)`).
+    lstm and backward lstm layer to create a single vector (shape of `(batch_size, hidden_size * 2)`).
 
     Args:
-        input_size (int): The number of expected features in the input (the last dimension).
-        hidden_size (int): The number of features in the hidden state.
-        num_layers (int): Number of recurrent layers. 
+        input_size (int): 
+            The number of expected features in the input (the last dimension).
+        hidden_size (int): 
+            The number of features in the hidden state.
+        num_layers (int, optional):
+            Number of recurrent layers. 
             E.g., setting num_layers=2 would mean stacking two LSTMs together to form a stacked LSTM, 
             with the second LSTM taking in outputs of the first LSTM and computing the final results.
-        direction (str): The direction of the network. 
-            It can be `forward` or `bidirect` (it means bidirection network).
-            If `biderect`, it is a birectional LSTM, and returns the concat output from both directions.
-        dropout (float): If non-zero, introduces a Dropout layer 
-            on the outputs of each LSTM layer except the last layer, with dropout probability equal to dropout.
-        pooling_type (str): If `pooling_type` is None, 
-            then the LSTMEncoder will return the hidden state of the last time step at last layer as a single vector.
-            If pooling_type is not None, it must be one of `sum`, `max` and `mean`. Then it will be pooled on 
-            the LSTM output (the hidden state of every time step at last layer) to create a single vector.
+            Defaults to 1.
+        direction (str, optional): 
+            The direction of the network. It can be "forward" or "bidirect" (it means bidirection network).
+            If "bidirect", it is a birectional LSTM, and returns the concat output from both directions.
+            Defaults to "forward".
+        dropout (float, optional): 
+            If non-zero, introduces a Dropout layer on the outputs of each LSTM layer 
+            except the last layer, with dropout probability equal to dropout.
+            Defaults to 0.0 .
+        pooling_type (str, optional):
+            If `pooling_type` is None, then the LSTMEncoder will return 
+            the hidden state of the last time step at last layer as a single vector.
+            If pooling_type is not None, it must be one of "sum", "max" and "mean". 
+            Then it will be pooled on the LSTM output (the hidden state of every 
+            time step at last layer) to create a single vector.
+            Defaults to `None`.
 
+    Example:
+        .. code-block::
+
+            import paddle
+            import paddle.nn as nn
+            import paddlenlp as nlp
+
+            class LSTMModel(nn.Layer):
+                def __init__(self,
+                            vocab_size,
+                            num_classes,
+                            emb_dim=128,
+                            padding_idx=0,
+                            lstm_hidden_size=198,
+                            direction='forward',
+                            lstm_layers=1,
+                            dropout_rate=0.0,
+                            pooling_type=None,
+                            fc_hidden_size=96):
+                    super().__init__()
+                    self.embedder = nn.Embedding(
+                        num_embeddings=vocab_size,
+                        embedding_dim=emb_dim,
+                        padding_idx=padding_idx)
+                    self.lstm_encoder = nlp.seq2vec.LSTMEncoder(
+                        emb_dim,
+                        lstm_hidden_size,
+                        num_layers=lstm_layers,
+                        direction=direction,
+                        dropout=dropout_rate,
+                        pooling_type=pooling_type)
+                    self.fc = nn.Linear(self.lstm_encoder.get_output_dim(), fc_hidden_size)
+                    self.output_layer = nn.Linear(fc_hidden_size, num_classes)
+
+                def forward(self, text, seq_len):
+                    # Shape: (batch_size, num_tokens, embedding_dim)
+                    embedded_text = self.embedder(text)
+                    # Shape: (batch_size, num_tokens, num_directions*lstm_hidden_size)
+                    # num_directions = 2 if direction is 'bidirect'
+                    # if not, num_directions = 1
+                    text_repr = self.lstm_encoder(embedded_text, sequence_length=seq_len)
+                    # Shape: (batch_size, fc_hidden_size)
+                    fc_out = paddle.tanh(self.fc(text_repr))
+                    # Shape: (batch_size, num_classes)
+                    logits = self.output_layer(fc_out)
+                    return logits
+
+            model = LSTMModel(vocab_size=100, num_classes=2)
+
+            text = paddle.randint(low=1, high=10, shape=[1,10], dtype='int32')
+            seq_len = paddle.to_tensor([10])
+            logits = model(text, seq_len)
     """
 
     def __init__(self,
@@ -377,7 +607,7 @@ class LSTMEncoder(nn.Layer):
             **kwargs)
 
     def get_input_dim(self):
-        """
+        r"""
         Returns the dimension of the vector input for each element in the sequence input
         to a `LSTMEncoder`. This is not the shape of the input tensor, but the
         last element of that shape.
@@ -385,7 +615,7 @@ class LSTMEncoder(nn.Layer):
         return self._input_size
 
     def get_output_dim(self):
-        """
+        r"""
         Returns the dimension of the final vector output by this `LSTMEncoder`.  This is not
         the shape of the returned tensor, but the last element of that shape.
         """
@@ -395,19 +625,22 @@ class LSTMEncoder(nn.Layer):
             return self._hidden_size
 
     def forward(self, inputs, sequence_length):
-        """
+        r"""
         LSTMEncoder takes the a sequence of vectors and and returns a
         single vector, which is a combination of multiple LSTM layers.
-        The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
-        The output is of shape `(batch_size, hidden_size*2)` if LSTM is bidirection;
+        The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
+        The output is of shape `(batch_size, hidden_size * 2)` if LSTM is bidirection;
         If not, output is of shape `(batch_size, hidden_size)`.
 
         Args:
-            inputs (paddle.Tensor): Shape as `(batch_size, num_tokens, input_size)`.
-            sequence_length (paddle.Tensor): Shape as `(batch_size)`.
+            inputs (Tensor): Shape as `(batch_size, num_tokens, input_size)`.
+                Tensor containing the features of the input sequence. 
+            sequence_length (Tensor): Shape as `(batch_size)`.
+                The sequence length of the input sequence.
 
         Returns:
-            last_hidden (paddle.Tensor): Shape as `(batch_size, hidden_size)`.
+            Tensor: 
+                Shape as `(batch_size, hidden_size)` and dtype as float.
                 The hidden state at the last time step for every layer.
 
         """
@@ -419,7 +652,7 @@ class LSTMEncoder(nn.Layer):
             # If lstm is not bidirection, then output is the hidden state of the last time step 
             # at last layer. Output is shape of `(batch_size, hidden_size)`.
             # If lstm is bidirection, then output is concatenation of the forward and backward hidden state 
-            # of the last time step at last layer. Output is shape of `(batch_size, hidden_size*2)`.
+            # of the last time step at last layer. Output is shape of `(batch_size, hidden_size * 2)`.
             if self._direction != 'bidirect':
                 output = last_hidden[-1, :, :]
             else:
@@ -428,8 +661,8 @@ class LSTMEncoder(nn.Layer):
         else:
             # We exploit the `encoded_text` (the hidden state at the every time step for last layer)
             # to create a single vector. We perform pooling on the encoded text.
-            # The output shape is `(batch_size, hidden_size*2)` if use bidirectional LSTM, 
-            # otherwise the output shape is `(batch_size, hidden_size*2)`.
+            # The output shape is `(batch_size, hidden_size * 2)` if use bidirectional LSTM, 
+            # otherwise the output shape is `(batch_size, hidden_size * 2)`.
             if self._pooling_type == 'sum':
                 output = paddle.sum(encoded_text, axis=1)
             elif self._pooling_type == 'max':
@@ -445,11 +678,13 @@ class LSTMEncoder(nn.Layer):
 
 
 class RNNEncoder(nn.Layer):
-    """
+    r"""
     A RNNEncoder takes as input a sequence of vectors and returns a
-    single vector, which is a combination of multiple RNN layers.
-    The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
-    The output is of shape `(batch_size, hidden_size*2)` if RNN is bidirection;
+    single vector, which is a combination of multiple `paddle.nn.RNN
+    <https://www.paddlepaddle.org.cn/documentation/docs/en/api
+    /paddle/nn/layer/rnn/RNN_en.html>`__ subclass.
+    The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
+    The output is of shape `(batch_size, hidden_size * 2)` if RNN is bidirection;
     If not, output is of shape `(batch_size, hidden_size)`.
 
     Paddle's RNN have two outputs: the hidden state for every time step at last layer, 
@@ -458,24 +693,86 @@ class RNNEncoder(nn.Layer):
     step at last layer to create a single vector. If not None, we use the hidden state 
     of the last time step at last layer as a single output (shape of `(batch_size, hidden_size)`); 
     And if direction is bidirection, the we concat the hidden state of the last forward 
-    rnn and backward rnn layer to create a single vector (shape of `(batch_size, hidden_size*2)`).
+    rnn and backward rnn layer to create a single vector (shape of `(batch_size, hidden_size * 2)`).
 
     Args:
-        input_size (obj:`int`, required): The number of expected features in the input (the last dimension).
-        hidden_size (obj:`int`, required): The number of features in the hidden state.
-        num_layers (obj:`int`, optional, defaults to 1): Number of recurrent layers. 
+        input_size (int): 
+            The number of expected features in the input (the last dimension).
+        hidden_size (int): 
+            The number of features in the hidden state.
+        num_layers (int, optional): 
+            Number of recurrent layers. 
             E.g., setting num_layers=2 would mean stacking two RNNs together to form a stacked RNN, 
             with the second RNN taking in outputs of the first RNN and computing the final results.
-        direction (obj:`str`, optional, defaults to obj:`forward`): The direction of the network. 
-            It can be "forward" and "bidirect" (it means bidirection network).
-            If `biderect`, it is a birectional RNN, and returns the concat output from both directions.
-        dropout (obj:`float`, optional, defaults to 0.0): If non-zero, introduces a Dropout layer 
-            on the outputs of each RNN layer except the last layer, with dropout probability equal to dropout.
-        pooling_type (obj: `str`, optional, defaults to obj:`None`): If `pooling_type` is None, 
-            then the RNNEncoder will return the hidden state of the last time step at last layer as a single vector.
-            If pooling_type is not None, it must be one of `sum`, `max` and `mean`. Then it will be pooled on 
-            the RNN output (the hidden state of every time step at last layer) to create a single vector.
+            Defaults to 1.
+        direction (str, optional): 
+            The direction of the network. It can be "forward" and "bidirect" 
+            (it means bidirection network). If "biderect", it is a birectional RNN, 
+            and returns the concat output from both directions. Defaults to "forward"
+        dropout (float, optional): 
+            If non-zero, introduces a Dropout layer on the outputs of each RNN layer 
+            except the last layer, with dropout probability equal to dropout.
+            Defaults to 0.0.
+        pooling_type (str, optional):
+            If `pooling_type` is None, then the RNNEncoder will return the hidden state
+            of the last time step at last layer as a single vector.
+            If pooling_type is not None, it must be one of "sum", "max" and "mean". 
+            Then it will be pooled on the RNN output (the hidden state of every time 
+            step at last layer) to create a single vector.
+            Defaults to `None`.
 
+    Example:
+        .. code-block::
+
+            import paddle
+            import paddle.nn as nn
+            import paddlenlp as nlp
+
+            class RNNModel(nn.Layer):
+                def __init__(self,
+                            vocab_size,
+                            num_classes,
+                            emb_dim=128,
+                            padding_idx=0,
+                            rnn_hidden_size=198,
+                            direction='forward',
+                            rnn_layers=1,
+                            dropout_rate=0.0,
+                            pooling_type=None,
+                            fc_hidden_size=96):
+                    super().__init__()
+                    self.embedder = nn.Embedding(
+                        num_embeddings=vocab_size,
+                        embedding_dim=emb_dim,
+                        padding_idx=padding_idx)
+                    self.rnn_encoder = nlp.seq2vec.RNNEncoder(
+                        emb_dim,
+                        rnn_hidden_size,
+                        num_layers=rnn_layers,
+                        direction=direction,
+                        dropout=dropout_rate,
+                        pooling_type=pooling_type)
+                    self.fc = nn.Linear(self.rnn_encoder.get_output_dim(), fc_hidden_size)
+                    self.output_layer = nn.Linear(fc_hidden_size, num_classes)
+
+                def forward(self, text, seq_len):
+                    # Shape: (batch_size, num_tokens, embedding_dim)
+                    embedded_text = self.embedder(text)
+                    # Shape: (batch_size, num_tokens, num_directions*rnn_hidden_size)
+                    # num_directions = 2 if direction is 'bidirect'
+                    # if not, num_directions = 1
+                    text_repr = self.rnn_encoder(embedded_text, sequence_length=seq_len)
+                    # Shape: (batch_size, fc_hidden_size)
+                    fc_out = paddle.tanh(self.fc(text_repr))
+                    # Shape: (batch_size, num_classes)
+                    logits = self.output_layer(fc_out)
+                    return logits
+
+            model = RNNModel(vocab_size=100, num_classes=2)
+
+            text = paddle.randint(low=1, high=10, shape=[1,10], dtype='int32')
+            seq_len = paddle.to_tensor([10])
+            logits = model(text, seq_len)
     """
 
     def __init__(self,
@@ -501,7 +798,7 @@ class RNNEncoder(nn.Layer):
             **kwargs)
 
     def get_input_dim(self):
-        """
+        r"""
         Returns the dimension of the vector input for each element in the sequence input
         to a `RNNEncoder`. This is not the shape of the input tensor, but the
         last element of that shape.
@@ -509,7 +806,7 @@ class RNNEncoder(nn.Layer):
         return self._input_size
 
     def get_output_dim(self):
-        """
+        r"""
         Returns the dimension of the final vector output by this `RNNEncoder`.  This is not
         the shape of the returned tensor, but the last element of that shape.
         """
@@ -519,19 +816,22 @@ class RNNEncoder(nn.Layer):
             return self._hidden_size
 
     def forward(self, inputs, sequence_length):
-        """
+        r"""
         RNNEncoder takes the a sequence of vectors and and returns a
         single vector, which is a combination of multiple RNN layers.
-        The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
-        The output is of shape `(batch_size, hidden_size*2)` if RNN is bidirection;
+        The input to this encoder is of shape `(batch_size, num_tokens, input_size)`.
+        The output is of shape `(batch_size, hidden_size * 2)` if RNN is bidirection;
         If not, output is of shape `(batch_size, hidden_size)`.
 
         Args:
-            inputs (paddle.Tensor): Shape as `(batch_size, num_tokens, input_size)`.
-            sequence_length (paddle.Tensor): Shape as `(batch_size)`.
+            inputs (Tensor): Shape as `(batch_size, num_tokens, input_size)`.
+                Tensor containing the features of the input sequence. 
+            sequence_length (Tensor): Shape as `(batch_size)`.
+                The sequence length of the input sequence.
 
         Returns:
-            last_hidden (paddle.Tensor): Shape as `(batch_size, hidden_size)`.
+            last_hidden (Tensor): 
+                Shape as `(batch_size, hidden_size)` and dtype as `float`.
                 The hidden state at the last time step for every layer.
 
         """
@@ -543,7 +843,7 @@ class RNNEncoder(nn.Layer):
             # If rnn is not bidirection, then output is the hidden state of the last time step 
             # at last layer. Output is shape of `(batch_size, hidden_size)`.
             # If rnn is bidirection, then output is concatenation of the forward and backward hidden state 
-            # of the last time step at last layer. Output is shape of `(batch_size, hidden_size*2)`.
+            # of the last time step at last layer. Output is shape of `(batch_size, hidden_size * 2)`.
             if self._direction != 'bidirect':
                 output = last_hidden[-1, :, :]
             else:
@@ -552,8 +852,8 @@ class RNNEncoder(nn.Layer):
         else:
             # We exploit the `encoded_text` (the hidden state at the every time step for last layer)
             # to create a single vector. We perform pooling on the encoded text.
-            # The output shape is `(batch_size, hidden_size*2)` if use bidirectional RNN, 
-            # otherwise the output shape is `(batch_size, hidden_size*2)`.
+            # The output shape is `(batch_size, hidden_size * 2)` if use bidirectional RNN, 
+            # otherwise the output shape is `(batch_size, hidden_size * 2)`.
             if self._pooling_type == 'sum':
                 output = paddle.sum(encoded_text, axis=1)
             elif self._pooling_type == 'max':
@@ -573,7 +873,7 @@ class Chomp1d(nn.Layer):
     Remove the elements on the right.
 
     Args:
-        chomp_size ([int]): The number of elements removed.
+        chomp_size (int): The number of elements removed.
     """
 
     def __init__(self, chomp_size):
@@ -663,7 +963,7 @@ class TCNEncoder(nn.Layer):
     r"""
     A `TCNEncoder` takes as input a sequence of vectors and returns a
     single vector, which is the last one time step in the feature map. 
-    The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
+    The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
     and the output is of shape `(batch_size, num_channels[-1])` with a receptive 
     filed:
     
@@ -723,7 +1023,7 @@ class TCNEncoder(nn.Layer):
         r"""
         TCNEncoder takes as input a sequence of vectors and returns a
         single vector, which is the last one time step in the feature map. 
-        The input to this module is of shape `(batch_size, num_tokens, input_size)`, 
+        The input to this encoder is of shape `(batch_size, num_tokens, input_size)`, 
         and the output is of shape `(batch_size, num_channels[-1])` with a receptive 
         filed:
     

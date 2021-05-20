@@ -28,11 +28,11 @@
 └── transformer_demo.yaml # 参数配置文件
 ```
 
-上述models下的模型可以在这里[下载](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/simultaneous_translation/stacl/README.md#%E6%A8%A1%E5%9E%8B%E4%B8%8B%E8%BD%BD%E6%9B%B4%E6%96%B0%E4%B8%AD)，下载完后将解压后的`transformer.pdparams`分别放在不同的waitk策略对应的子目录下面。
+上述models目录下的模型可以在这里[下载](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/simultaneous_translation/stacl/README.md#%E6%A8%A1%E5%9E%8B%E4%B8%8B%E8%BD%BD%E6%9B%B4%E6%96%B0%E4%B8%AD)，下载完后将解压后的`transformer.pdparams`分别放在不同的waitk策略对应的子目录下面。
 
 ### 参数说明与配置
 
-可以在`config/transformer_demo.yaml` 文件中设置相应的参数，下面给出主要的参数配置：
+可以在`transformer_demo.yaml` 文件中设置相应的参数，下面给出主要的参数配置：
 
 - `src_bpe_dict`配置源语言（这里是中文）的BPE词表，[中文BPE词表下载](https://paddlenlp.bj.bcebos.com/models/stacl/2M.zh2en.dict4bpe.zh)
 - `src_vocab_fpath`配置源语言（这里是中文）词表，[source vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.20k.zh.vocab)
@@ -40,7 +40,6 @@
 - `device`选择预测用的设备，支持cpu/gpu/xpu，默认为cpu
 
 ### 环境依赖
-
 - attrdict==2.0.1
 - PyYAML==5.4.1
 - subword_nmt==0.3.7
@@ -48,9 +47,22 @@
 
 安装命令：`pip install -r requirements.txt`
 
+注意：本项目依赖于Python内置包`tkinter >= 8.6`
+- 查看`tkinter`的版本：
+    ```python
+    python -c "import tkinter; print(tkinter.TkVersion)"
+- [`tkinter`官方文档](https://tkdocs.com/tutorial/index.html)
+
 ### 使用说明
 
-1. 下载好预训练模型，并放在对应的目录下；
+1. 下载好预训练模型，并放在models目录下对应的子目录里；
 2. 下载好词表（源语言词表，目标语言词表，BPE词表），并在配置文件`transformer_demo.yaml`中修改相应的参数；
 3. 运行`demo.py`；
 4. 出现界面，在Chinese input文本框中输入中文，按【回车键】开始实时翻译，遇到【。！？】结束整句，按【CLEAR】清空所有的输入和输出。
+
+### 常见问题
+**Q:** 出现`_tkinter.TclError: couldn't recognize data in image file`错误  
+**A:** 升级`tkinter`，确保`tkinter >= 8.6`  
+
+**Q:** 出现Chinese input文本框无法输入中文  
+**A:** 升级`tkinter`，确保`tkinter >= 8.6`  

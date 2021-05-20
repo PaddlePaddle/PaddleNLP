@@ -20,15 +20,27 @@ INCLUDE(ExternalProject)
 
 set(CXX_STD "11" CACHE STRING "C++ standard")
 
-option(ON_INFER        "Compile with inference. "                                  OFF)
-option(WITH_GPU        "Compile with GPU/CPU, default use CPU."                    ON)
-option(USE_TENSORRT    "Compile with TensorRT."                                    OFF)
+option(ON_INFER         "Compile with inference. "                                OFF)
+option(WITH_GPU         "Compile with GPU/CPU, default use CPU."                  ON)
+option(USE_TENSORRT     "Compile with TensorRT."                                  OFF)
+option(WITH_TRANSFORMER "Compile with Transformer"                                ON)
+option(WITH_GPT         "Compile with GPT"                                        OFF)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
 endif()
 
-set(decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu)
+if(WITH_TRANSFORMER)
+  list(APPEND decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu)
+endif()
+
+if(WITH_GPT)
+  list(APPEND decoding_op_files fusion_gpt_op.cc fusion_gpt_op.cu)
+endif()
+
+if(NOT WITH_TRANSFORMER AND NOT WITH_GPT)
+  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON must be set to use FasterTransformer. ")
+endif()
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 
@@ -108,7 +120,63 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/faster
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/CMakeLists.txt cmakelists_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/CMakeLists.txt cmakelists_dst)
 
-set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} | cp ${common_src} ${common_dst} | cp ${cmakelists_src} ${cmakelists_dst})
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/topk_kernels.cu topk_kernels_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cu topk_kernels_dst)
+
+# TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
+set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
+set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} && cp ${common_src} ${common_dst} && cp ${cmakelists_src} ${cmakelists_dst} && cp ${topk_kernels_src} ${topk_kernels_dst} && ${MUTE_COMMAND})
+
+######################################################################################
+# A function for automatic detection of GPUs installed  (if autodetection is enabled)
+# Usage:
+#   detect_installed_gpus(out_variable)
+function(detect_installed_gpus out_variable)
+  if(NOT CUDA_gpu_detect_output)
+    set(cufile ${PROJECT_BINARY_DIR}/detect_cuda_archs.cu)
+
+    file(WRITE ${cufile} ""
+      "#include \"stdio.h\"\n"
+      "#include \"cuda.h\"\n"
+      "#include \"cuda_runtime.h\"\n"
+      "int main() {\n"
+      "  int count = 0;\n"
+      "  if (cudaSuccess != cudaGetDeviceCount(&count)) return -1;\n"
+      "  if (count == 0) return -1;\n"
+      "  for (int device = 0; device < count; ++device) {\n"
+      "    cudaDeviceProp prop;\n"
+      "    if (cudaSuccess == cudaGetDeviceProperties(&prop, device))\n"
+      "      printf(\"%d.%d \", prop.major, prop.minor);\n"
+      "  }\n"
+      "  return 0;\n"
+      "}\n")
+
+    execute_process(COMMAND "${CUDA_NVCC_EXECUTABLE}"
+                    "--run" "${cufile}"
+                    WORKING_DIRECTORY "${PROJECT_BINARY_DIR}/CMakeFiles/"
+                    RESULT_VARIABLE nvcc_res OUTPUT_VARIABLE nvcc_out
+                    ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+    if(nvcc_res EQUAL 0)
+      # Only use last item of nvcc_out (the last device's compute capability).
+      string(REGEX REPLACE "\\." "" nvcc_out "${nvcc_out}")
+      string(REGEX MATCHALL "[0-9()]+" nvcc_out "${nvcc_out}")
+      list(GET nvcc_out -1 nvcc_out)
+      set(CUDA_gpu_detect_output ${nvcc_out} CACHE INTERNAL "Returned GPU architetures from detect_installed_gpus tool" FORCE)
+    endif()
+  endif()
+
+  if(NOT CUDA_gpu_detect_output)
+    message(STATUS "Automatic GPU detection failed. Building for all known architectures.")
+    set(${out_variable} ${paddle_known_gpu_archs} PARENT_SCOPE)
+  else()
+    set(${out_variable} ${CUDA_gpu_detect_output} PARENT_SCOPE)
+  endif()
+endfunction()
+
+# TODO(guosheng): Remove it if `GetCUDAComputeCapability` is exposed by paddle.
+# Currently, if `CUDA_gpu_detect_output` is not defined, use the detected arch.
+detect_installed_gpus(SM)
 
 ExternalProject_Add(
   extern_${THIRD_PARTY_NAME}

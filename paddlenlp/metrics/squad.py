@@ -23,34 +23,41 @@ import numpy as np
 def compute_prediction(examples,
                        features,
                        predictions,
-                       version_2_with_negative: bool=False,
-                       n_best_size: int=20,
-                       max_answer_length: int=30,
-                       null_score_diff_threshold: float=0.0):
+                       version_2_with_negative=False,
+                       n_best_size=20,
+                       max_answer_length=30,
+                       null_score_diff_threshold=0.0):
     """
-    Post-processes the predictions of a question-answering model to convert them to answers that are substrings of the
-    original contexts. This is the base postprocessing functions for models that only return start and end logits.
+    Post-processes the predictions of a question-answering model to convert 
+    them to answers that are substrings of the original contexts. This is 
+    the base postprocessing functions for models that only return start and 
+    end logits.
 
     Args:
-        examples: The non-preprocessed dataset (see the main script for more information).
-        features: The processed dataset (see the main script for more information).
-        predictions (:obj:`Tuple[np.ndarray, np.ndarray]`):
-            The predictions of the model: two arrays containing the start logits and the end logits respectively. Its
-            first dimension must match the number of elements of :obj:`features`.
-        version_2_with_negative (:obj:`bool`, `optional`, defaults to :obj:`False`):
-            Whether or not the underlying dataset contains examples with no answers.
-        n_best_size (:obj:`int`, `optional`, defaults to 20):
-            The total number of n-best predictions to generate when looking for an answer.
-        max_answer_length (:obj:`int`, `optional`, defaults to 30):
-            The maximum length of an answer that can be generated. This is needed because the start and end predictions
-            are not conditioned on one another.
-        null_score_diff_threshold (:obj:`float`, `optional`, defaults to 0):
-            The threshold used to select the null answer: if the best answer has a score that is less than the score of
-            the null answer minus this threshold, the null answer is selected for this example (note that the score of
-            the null answer for an example giving several features is the minimum of the scores for the null answer on
-            each feature: all features must be aligned on the fact they `want` to predict a null answer).
-
-            Only useful when :obj:`version_2_with_negative` is :obj:`True`.
+        examples (list): List of raw squad-style data (see `run_squad.py 
+            <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/
+            machine_reading_comprehension/SQuAD/run_squad.py>`__ for more 
+            information).
+        features (list): List of processed squad-style features (see 
+            `run_squad.py <https://github.com/PaddlePaddle/PaddleNLP/blob/
+            develop/examples/machine_reading_comprehension/SQuAD/run_squad.py>`__
+            for more information).
+        predictions (tuple): The predictions of the model. Should be a tuple
+            of two list containing the start logits and the end logits.
+        version_2_with_negative (bool, optional): Whether the dataset contains
+            examples with no answers. Defaults to False.
+        n_best_size (int, optional): The total number of candidate predictions
+            to generate. Defaults to 20.
+        max_answer_length (int, optional): The maximum length of predicted answer.
+            Defaults to 20.
+        null_score_diff_threshold (float, optional): The threshold used to select
+            the null answer. Only useful when `version_2_with_negative` is True.
+            Defaults to 0.0.
+    
+    Returns:
+        A tuple of three dictionaries containing final selected answer, all n_best 
+        answers along with their probability and scores, and the score_diff of each 
+        example.
     """
     assert len(
         predictions
@@ -215,8 +222,7 @@ def make_qid_to_has_ans(examples):
 
 
 def normalize_answer(s):
-    """Lower text and remove punctuation, articles and extra whitespace."""
-
+    #Lower text and remove punctuation, articles and extra whitespace.
     def remove_articles(text):
         regex = re.compile(r'\b(a|an|the)\b', re.UNICODE)
         return re.sub(regex, ' ', text)
@@ -357,6 +363,26 @@ def squad_evaluate(examples,
                    na_probs=None,
                    na_prob_thresh=1.0,
                    is_whitespace_splited=True):
+    '''
+    Computes and prints the f1 score and em score of input prediction.
+
+    Args:
+        examples (list): List of raw squad-style data (see `run_squad.py
+            <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/
+            machine_reading_comprehension/SQuAD/run_squad.py>`__ for more
+            information).
+        preds (dict): Dictionary of final predictions. Usually generated by
+            `compute_prediction`.
+        na_probs (dict, optional): Dictionary of score_diffs of each example.
+            Used to decide if answer exits and compute best score_diff
+            threshold of null. Defaults to None.
+        na_prob_thresh (float, optional): The threshold used to select the
+            null answer. Defaults to 1.0.
+        is_whitespace_splited (bool, optional): Whether the predictions and references
+            can be tokenized by whitespace. Usually set True for English and
+            False for Chinese. Defaults to True.
+    '''
+
     if not na_probs:
         na_probs = {k: 0.0 for k in preds}
 

@@ -192,7 +192,7 @@ def reset_program_state_dict(model, state_dict):
     return new_state_dict
 
 
-def create_strategy():
+def create_strategy(args):
     """
     Create build strategy and exec strategy.
     """
@@ -210,7 +210,7 @@ def dist_optimizer(args, optimizer):
     """
     Create a distributed optimizer based on a normal optimizer
     """
-    build_strategy, exec_strategy = create_strategy()
+    build_strategy, exec_strategy = create_strategy(args)
 
     dist_strategy = fleet.DistributedStrategy()
     dist_strategy.execution_strategy = exec_strategy
@@ -344,8 +344,8 @@ def do_train(args):
     while True:
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if os.path.isfile(os.path.join(args.input_dir, f)) and
-            "training" in f
+            if os.path.isfile(os.path.join(args.input_dir, f)) and "training" in
+            f
         ]
         files.sort()
         num_files = len(files)
