@@ -514,11 +514,15 @@ class DatasetBuilder:
             unique_endpoints = _get_unique_endpoints(
                 parallel_env.trainer_endpoints[:])
             for split in splits:
-                filename = self._get_data(split)
                 lock_file = os.path.join(DATA_HOME, self.__class__.__name__)
                 if self.name is not None:
                     lock_file = lock_file + "." + self.name
                 lock_file += "." + split + ".done" + "." + str(os.getppid())
+                # Must register to all procs to make the lock file can be removed
+                # when any proc breaks. Otherwise, the single registered proc may
+                # not receive proper singal send by the parent proc to exit.
+                atexit.register(lambda: remove_if_exit(lock_file))
+                filename = self._get_data(split)
                 # `lock_file` indicates the finished status of`_get_data`.
                 # `_get_data` only works in the `unique_endpoints` specified
                 # proc since `get_path_from_url` only work for it. The other
@@ -529,10 +533,6 @@ class DatasetBuilder:
                 else:
                     while not os.path.exists(lock_file):
                         time.sleep(1)
-                # Must register to all procs to make the lock file can be removed
-                # when any proc breaks. Otherwise, the single registered proc may
-                # not receive proper singal send by the parent proc to exit.
-                atexit.register(lambda: remove_if_exit(lock_file))
                 datasets.append(self.read(filename=filename, split=split))
 
         return datasets if len(datasets) > 1 else datasets[0]
