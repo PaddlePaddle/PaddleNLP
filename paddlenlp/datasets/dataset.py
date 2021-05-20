@@ -498,7 +498,11 @@ class DatasetBuilder:
 
         def remove_if_exit(filepath):
             try:
-                os.remove(filepath)
+                if isinstance(filepath, (list, tuple)):
+                    for file in filepath:
+                        os.remove(file)
+                else:
+                    os.remove(filepath)
             except OSError:
                 pass
 
@@ -514,15 +518,17 @@ class DatasetBuilder:
             unique_endpoints = _get_unique_endpoints(
                 parallel_env.trainer_endpoints[:])
             # move register hook to first and register togather
+            lock_files = []
             for split in splits:
                 lock_file = os.path.join(DATA_HOME, self.__class__.__name__)
                 if self.name is not None:
                     lock_file = lock_file + "." + self.name
                 lock_file += "." + split + ".done" + "." + str(os.getppid())
-                # Must register to all procs to make the lock file can be removed
-                # when any proc breaks. Otherwise, the single registered proc may
-                # not receive proper singal send by the parent proc to exit.
-                atexit.register(lambda: remove_if_exit(lock_file))
+                lock_files.append(lock_file)
+            # Must register to all procs to make the lock file can be removed
+            # when any proc breaks. Otherwise, the single registered proc may
+            # not receive proper singal send by the parent proc to exit.
+            atexit.register(lambda: remove_if_exit(lock_files))
             for split in splits:
                 filename = self._get_data(split)
                 lock_file = os.path.join(DATA_HOME, self.__class__.__name__)
