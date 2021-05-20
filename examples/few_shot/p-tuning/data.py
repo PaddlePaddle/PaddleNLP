@@ -17,7 +17,6 @@ import json
 import numpy as np
 
 import paddle
-
 from paddlenlp.utils.log import logger
 
 
