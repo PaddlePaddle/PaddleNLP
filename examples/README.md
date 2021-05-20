@@ -58,11 +58,11 @@ PaddleNLP 提供了多种成熟的预训练模型技术，适用于自然语言�
 ## NLP核心技术
 
 ### 文本分类 (Text Classification)
-文本分类任务是NLP中较为常见的任务，在该任务上我们提供了两大类模型，一类是基于RNN类模型的传统轻量级的分类模型，一类是基于预训模型的分类模型，在RNN类模型上我们提供了百度自研的Senta模型，模型结构经典，效果突出；在预训练类模型上，提供了大量的预训练模型，模型参数自动下载，用法简易，极易提升文本分类任务效果。
+文本分类是NLP和核心技术方向之一，在该任务上我们提供了两大类模型，一类是基于RNN类模型的传统轻量级的分类模型，一类是基于预训模型的分类模型。
 
 | 模型  | 简介    |
 | ----- | ------ |
-| [RNN/CNN/GRU/LSTM](./text_classification/rnn) | 面向通用场景的文本分类模型，网络结构接入常见的RNN类模型，例如CNN, LSTM, GRU, RNN。整体模型结构集成在百度的自研的Senta文本情感分类模型上，效果突出，用法简易。|
+| [RNN/CNN/GRU/LSTM](./text_classification/rnn) | 面向通用场景的文本分类模型，网络结构接入常见的RNN类模型，例如CNN, LSTM, GRU, RNN。|
 | [ERNIE/BERT For Sequence Classification](./text_classification/pretrained_models) | 基于预训练模型的文本分类的模型，多达11种的预训练模型可供使用，其中有较多中文预训练模型，预训练模型切换简单，情感分析任务上效果突出。|
 
 ### 文本生成 (Text Generation)
