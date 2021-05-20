@@ -10,14 +10,17 @@ paddlenlp.transformers
 .. toctree::
    :maxdepth: 4
 
+   paddlenlp.transformers.albert
    paddlenlp.transformers.bert
    paddlenlp.transformers.bigbird
+   paddlenlp.transformers.distilbert
    paddlenlp.transformers.electra
    paddlenlp.transformers.ernie
    paddlenlp.transformers.ernie_ctm
    paddlenlp.transformers.ernie_gen
-   paddlenlp.transformers.gpt2
+   paddlenlp.transformers.gpt
    paddlenlp.transformers.roberta
+   paddlenlp.transformers.skep
    paddlenlp.transformers.transformer
    paddlenlp.transformers.unified_transformer
    paddlenlp.transformers.xlnet
