@@ -497,8 +497,10 @@ class DatasetBuilder:
                 ]
 
         def remove_if_exit(filepath):
-            if os.path.exists(filepath):
+            try:
                 os.remove(filepath)
+            except OSError:
+                pass
 
         if splits:
             assert isinstance(splits, str) or (
