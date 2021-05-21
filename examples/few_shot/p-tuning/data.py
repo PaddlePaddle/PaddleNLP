@@ -192,246 +192,155 @@ def convert_chid_example(example,
     return src_ids, token_type_ids, mask_positions, mask_lm_labels, candidate_labels_ids
 
 
-def read_iflytek(data_path, label_normalize_dict=None):
-    """Reads data."""
-    examples = []
-    with open(data_path, encoding='utf-8') as f:
-        print("data_path:{}".format(data_path))
-        for line in f:
-            example = json.loads(line)
-            origin_label = example['label_des']
+def transform_iflytek(example, label_normalize_dict=None):
+    origin_label = example['label_des']
 
-            if origin_label in label_normalize_dict:
-                # 针对部分 Label 进行标准化， eg. 英文 -> 中文
-                normalized_label = label_normalize_dict[origin_label]
-                example['label_des'] = normalized_label
-            else:
-                # filter illegal example
-                continue
+    # Normalize some of the labels, eg. English -> Chinese
+    if origin_label in label_normalize_dict:
+        example['label_des'] = label_normalize_dict[origin_label]
+    else:
+        # Note: Ideal way is drop these examples
+        # which maybe need to change MapDataset
+        # Now hard code may hurt performance of `iflytek` dataset
+        example['label_des'] = "旅游"
 
-            example["sentence1"] = example["sentence"]
-            example["text_label"] = example["label_des"]
-            del example["sentence"]
-            del example["label_des"]
+    example["text_label"] = example["label_des"]
+    example["sentence1"] = example["sentence"]
 
-            examples.append(example)
+    del example["sentence"]
+    del example["label_des"]
 
-    return examples
+    return example
 
 
-def read_tnews(data_path, label_normalize_dict=None):
-    """Reads data."""
-    examples = []
-    with open(data_path, encoding='utf-8') as f:
-        print("data_path:{}".format(data_path))
-        for line in f:
-            example = json.loads(line)
-            origin_label = example['label_desc']
+def transform_tnews(example, label_normalize_dict=None):
+    origin_label = example['label_desc']
+    # Normalize some of the labels, eg. English -> Chinese
+    example['label_desc'] = label_normalize_dict[origin_label]
 
-            if origin_label in label_normalize_dict:
-                # 针对部分 Label 进行标准化， eg. 英文 -> 中文
-                normalized_label = label_normalize_dict[origin_label]
-                example['label_desc'] = normalized_label
-            else:
-                # filter illegal example
-                continue
+    example["sentence1"] = example["sentence"]
+    example["text_label"] = example["label_desc"]
 
-            example["sentence1"] = example["sentence"]
-            example["text_label"] = example["label_desc"]
-            del example["sentence"]
-            del example["label_desc"]
+    del example["sentence"]
+    del example["label_desc"]
 
-            examples.append(example)
-
-    return examples
+    return example
 
 
-def read_eprstmt(data_path, label_normalize_dict=None):
-    """Reads data."""
-    examples = []
-    with open(data_path, encoding='utf-8') as f:
-        print("data_path:{}".format(data_path))
-        for line in f:
-            example = json.loads(line)
-            origin_label = example["label"]
+def transform_eprstmt(example, label_normalize_dict=None):
+    origin_label = example["label"]
+    # Normalize some of the labels, eg. English -> Chinese
+    example['text_label'] = label_normalize_dict[origin_label]
+    example['sentence1'] = example["sentence"]
 
-            if origin_label in label_normalize_dict:
-                # 针对部分 Label 进行标准化， eg. 英文 -> 中文
-                normalized_label = label_normalize_dict[origin_label]
-                example['text_label'] = normalized_label
-            else:
-                # filter illegal example
-                continue
+    del example["sentence"]
+    del example["label"]
 
-            example['sentence1'] = example["sentence"]
-            del example["sentence"]
-            del example["label"]
-
-            examples.append(example)
-
-    return examples
+    return example
 
 
-def read_bustm(data_path, label_normalize_dict=None):
-    """Reads data."""
-    examples = []
-    with open(data_path, encoding='utf-8') as f:
-        print("data_path:{}".format(data_path))
-        for line in f:
-            example = json.loads(line)
-            origin_label = example["label"]
+def transform_bustm(example, label_normalize_dict=None):
+    origin_label = str(example["label"])
+    # Normalize some of the labels, eg. English -> Chinese
+    example['text_label'] = label_normalize_dict[origin_label]
 
-            if origin_label in label_normalize_dict:
-                # 针对部分 Label 进行标准化， eg. 英文 -> 中文
-                normalized_label = label_normalize_dict[origin_label]
-                example['text_label'] = normalized_label
-            else:
-                # filter illegal example
-                continue
+    del example["label"]
 
-            del example["label"]
-            examples.append(example)
-
-    return examples
+    return example
 
 
-def read_ocnli(data_path, label_normalize_dict=None):
-    """Reads data."""
-    examples = []
-    with open(data_path, encoding='utf-8') as f:
-        print("data_path:{}".format(data_path))
-        for line in f:
-            example = json.loads(line)
-            origin_label = example["label"]
+def transform_ocnli(example, label_normalize_dict=None):
 
-            if origin_label in label_normalize_dict:
-                # 针对部分 Label 进行标准化，eg. 英文 -> 中文
-                normalized_label = label_normalize_dict[origin_label]
-                example['text_label'] = normalized_label
-            else:
-                # filter illegal example
-                continue
+    origin_label = example["label"]
+    # Normalize some of the labels, eg. English -> Chinese
+    example['text_label'] = label_normalize_dict[origin_label]
 
-            del example["label"]
-            examples.append(example)
+    del example["label"]
 
-    return examples
+    return example
 
 
-def read_csl(data_path, label_normalize_dict=None):
-    """Reads data."""
-    examples = []
-    with open(data_path, encoding='utf-8') as f:
-        print("data_path:{}".format(data_path))
-        for line in f:
-            example = json.loads(line)
-            origin_label = example["label"]
+def transform_csl(example, label_normalize_dict=None):
+    origin_label = example["label"]
 
-            if origin_label in label_normalize_dict:
-                # 针对部分 Label 进行标准化， eg. 英文 -> 中文
-                normalized_label = label_normalize_dict[origin_label]
-                example['text_label'] = normalized_label
-            else:
-                # filter illegal example
-                continue
+    # Normalize some of the labels, eg. English -> Chinese
+    example['text_label'] = label_normalize_dict[origin_label]
 
-            example["sentence1"] = "本文的关键词是:" + "，".join(example[
-                "keyword"]) + example["abst"]
+    example["sentence1"] = "本文的关键词是:" + "，".join(example["keyword"]) + example[
+        "abst"]
 
-            del example["label"]
-            del example["abst"]
-            del example["keyword"]
-            examples.append(example)
+    del example["label"]
+    del example["abst"]
+    del example["keyword"]
 
-    return examples
+    return example
 
 
-def read_csldcp(data_path, label_normalize_dict=None):
-    """Reads data."""
-    examples = []
-    with open(data_path, encoding='utf-8') as f:
-        print("data_path:{}".format(data_path))
-        for line in f:
-            example = json.loads(line)
-            origin_label = example["label"]
+def transform_csldcp(example, label_normalize_dict=None):
+    origin_label = example["label"]
 
-            if origin_label in label_normalize_dict:
-                # 针对部分 Label 进行标准化， eg. 英文 -> 中文
-                normalized_label = label_normalize_dict[origin_label]
-                example['text_label'] = normalized_label
-            else:
-                # filter illegal example
-                continue
+    # Normalize some of the labels, eg. English -> Chinese
+    normalized_label = label_normalize_dict[origin_label]
+    example['text_label'] = normalized_label
+    example["sentence1"] = example["content"]
 
-            example["sentence1"] = example["content"]
-            del example["label"]
-            del example["content"]
+    del example["label"]
+    del example["content"]
 
-            examples.append(example)
-
-    return examples
+    return example
 
 
-def read_cluewsc(data_path, label_normalize_dict=None):
-    """Reads data."""
-    examples = []
-    with open(data_path, encoding='utf-8') as f:
-        print("data_path:{}".format(data_path))
-        for line in f:
-            example = json.loads(line)
-            origin_label = example["label"]
+def transform_bustm(example, label_normalize_dict=None):
+    origin_label = str(example["label"])
 
-            if origin_label in label_normalize_dict:
-                # 针对部分 Label 进行标准化， eg. 英文 -> 中文
-                normalized_label = label_normalize_dict[origin_label]
-                example['text_label'] = normalized_label
-            else:
-                # filter illegal example
-                continue
+    # Normalize some of the labels, eg. English -> Chinese
+    example['text_label'] = label_normalize_dict[origin_label]
 
-            text = example["text"]
-            span1_text = example["target"]["span1_text"]
-            span2_text = example["target"]["span2_text"]
-            example["sentence1"] = text + span2_text + "指代" + span1_text
+    del example["label"]
 
-            del example["label"]
-            del example["text"]
-            del example["target"]
-
-            examples.append(example)
-
-    return examples
+    return example
 
 
-def read_chid(data_path, label_normalize_dict=None):
-    """Reads data."""
-    examples = []
-    with open(data_path, encoding='utf-8') as f:
-        print("data_path:{}".format(data_path))
-        for line in f:
-            example = json.loads(line)
+def transform_chid(example, label_normalize_dict=None):
 
-            label_index = int(example['answer'])
-            candidates = example["candidates"]
-            example["text_label"] = candidates[label_index]
+    label_index = int(example['answer'])
+    candidates = example["candidates"]
+    example["text_label"] = candidates[label_index]
 
-            # Note: `#idom#` 表示此处是 1 个成语, 必须用生僻字替换, 后续经过 tokenizer 之后才能明确 label 位置
-            example["sentence1"] = example["content"].replace("#idiom#", "淠")
-            del example["content"]
+    # Note: `#idom#` represent a idom which must be replaced with rarely-used Chinese characters
+    # to get the label's position after the text processed by tokenizer
+    example["sentence1"] = example["content"].replace("#idiom#", "淠")
+    del example["content"]
 
-            examples.append(example)
-
-    return examples
+    return example
 
 
-read_fn_dict = {
-    "iflytek": read_iflytek,
-    "tnews": read_tnews,
-    "eprstmt": read_eprstmt,
-    "bustm": read_bustm,
-    "ocnli": read_ocnli,
-    "csl": read_csl,
-    "csldcp": read_csldcp,
-    "cluewsc": read_cluewsc,
-    "chid": read_chid,
+def transform_cluewsc(example, label_normalize_dict=None):
+    origin_label = example["label"]
+
+    # Normalize some of the labels, eg. English -> Chinese
+    example['text_label'] = label_normalize_dict[origin_label]
+
+    text = example["text"]
+    span1_text = example["target"]["span1_text"]
+    span2_text = example["target"]["span2_text"]
+    example["sentence1"] = text + span2_text + "指代" + span1_text
+
+    del example["label"]
+    del example["text"]
+    del example["target"]
+
+    return example
+
+
+transform_fn_dict = {
+    "iflytek": transform_iflytek,
+    "tnews": transform_tnews,
+    "eprstmt": transform_eprstmt,
+    "bustm": transform_bustm,
+    "ocnli": transform_ocnli,
+    "csl": transform_csl,
+    "csldcp": transform_csldcp,
+    "cluewsc": transform_cluewsc,
+    "chid": transform_chid
 }

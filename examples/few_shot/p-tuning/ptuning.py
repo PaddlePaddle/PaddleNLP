@@ -30,7 +30,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 from model import ErnieForPretraining, ErnieMLMCriterion
-from data import read_fn_dict, create_dataloader
+from data import create_dataloader, transform_fn_dict
 from data import convert_example, convert_chid_example
 from evaluate import do_evaluate, do_evaluate_chid
 
@@ -74,14 +74,6 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_set = os.path.join(args.task_data_dir, args.task_name,
-                             "train_" + args.train_set_index + ".json")
-
-    dev_set = os.path.join(args.task_data_dir, args.task_name,
-                           "dev_" + args.train_set_index + ".json")
-    public_test_set = os.path.join(args.task_data_dir, args.task_name,
-                                   "test_public.json")
-
     label_normalize_json = os.path.join("./label_normalized",
                                         args.task_name + ".json")
 
@@ -89,28 +81,25 @@ def do_train():
     with open(label_normalize_json) as f:
         label_norm_dict = json.load(f)
 
-    read_fn = read_fn_dict[args.task_name]
-
     convert_example_fn = convert_example if args.task_name != "chid" else convert_chid_example
     evaluate_fn = do_evaluate if args.task_name != "chid" else do_evaluate_chid
 
-    train_ds = load_dataset(
-        read_fn,
-        data_path=train_set,
-        lazy=False,
-        label_normalize_dict=label_norm_dict)
+    train_ds, dev_ds, public_test_ds = load_dataset(
+        "fewclue",
+        name=args.task_name,
+        splits=("train_0", "dev_0", "test_public"))
 
-    dev_ds = load_dataset(
-        read_fn,
-        data_path=dev_set,
-        lazy=False,
-        label_normalize_dict=label_norm_dict)
+    # Task related transform operations, eg: numbert label -> text_label, english -> chinese
+    transform_fn = partial(
+        transform_fn_dict[args.task_name], label_normalize_dict=label_norm_dict)
 
-    public_test_ds = load_dataset(
-        read_fn,
-        data_path=public_test_set,
-        lazy=False,
-        label_normalize_dict=label_norm_dict)
+    # Some fewshot_learning strategy is defined by transform_fn
+    # Note: Set lazy=True to transform example inplace immediately,
+    # because transform_fn should only be executed only once when 
+    # iterate multi-times for train_ds
+    train_ds = train_ds.map(transform_fn, lazy=False)
+    dev_ds = dev_ds.map(transform_fn, lazy=False)
+    public_test_ds = public_test_ds.map(transform_fn, lazy=False)
 
     model = ErnieForPretraining.from_pretrained('ernie-1.0')
 
