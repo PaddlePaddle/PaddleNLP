@@ -1,4 +1,17 @@
-# -*- coding: utf-8 -*-
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import sys
 import subprocess
@@ -16,9 +29,9 @@ from paddle.utils.cpp_extension.cpp_extension import (
 from paddlenlp.utils.env import PPNLP_HOME
 from paddlenlp.utils.log import logger
 
-if not os.path.exists(CUDA_HOME):
-    # CUDA_HOME is only None when `core.is_compiled_with_cuda()` is True in
-    # find_cuda_home. Clear it for paddle cpu version.
+if CUDA_HOME and not os.path.exists(CUDA_HOME):
+    # CUDA_HOME is only None for Windows CPU version in paddle `find_cuda_home`.
+    # Clear it for other non-CUDA situations.
     CUDA_HOME = None
 
 

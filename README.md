@@ -208,6 +208,13 @@ PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景�
 更多教程参见[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
 
 
+
+## 最近更新（自2.0.0版本）
+
+### paddlenlp文本领域API
+
+- 修复Windows CPU环境下的import问题。
+
 ## 社区贡献与技术交流
 
 ### 特殊兴趣小组
