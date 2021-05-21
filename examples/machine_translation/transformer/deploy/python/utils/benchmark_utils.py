@@ -241,7 +241,7 @@ class PaddleInferBenchmark(object):
             f"{identifier} preprocess_time(ms): {round(self.preprocess_time_s*1000, 1)}, inference_time(ms): {round(self.inference_time_s*1000, 1)}, postprocess_time(ms): {round(self.postprocess_time_s*1000, 1)}"
         )
         if self.inference_time_s_90:
-            self.looger.info(
+            self.logger.info(
                 f"{identifier} 90%_cost: {self.inference_time_s_90}, 99%_cost: {self.inference_time_s_99}, succ_rate: {self.succ_rate}"
             )
         if self.qps:
