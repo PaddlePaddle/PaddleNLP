@@ -15,19 +15,20 @@
 
 ## 简介
 
-PaddleNLP 2.0拥有**覆盖多场景的模型库**、**简洁易用的全流程API**与**动静统一的高性能分布式训练**能力，旨在为飞桨开发者提升文本领域建模效率，并提供基于PaddlePaddle 2.0的NLP领域最佳实践。
+PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本领域API**，**多场景的应用示例**、和**高性能分布式训练**三大特点，旨在提升飞桨开发者文本领域建模效率，并提供基于飞桨框架2.0的NLP领域最佳实践。
 
 ## 特性
 
-- **覆盖多场景的模型库**
-  - PaddleNLP集成了RNN与Transformer等多种主流模型结构，涵盖从[词向量](./examples/word_embedding/)、[词法分析](./examples/lexical_analysis/)、[命名实体识别](./examples/information_extraction/msra_ner/)、[语义表示](./examples/language_model/)等NLP基础技术，到[文本分类](./examples/text_classification/)、[文本匹配](./examples/text_matching/)、[文本生成](./examples/text_generation/)、[文本图学习](./examples/text_graph/erniesage/)、[信息抽取](./examples/information_extraction)等NLP核心技术。同时针对[机器翻译](./examples/machine_translation/)、[通用对话](./examples/dialogue/)、[阅读理解](./examples/machine_reading_comprehension/)等系统应用提供相应核心组件与预训练模型。更多详细介绍请查看[PaddleNLP应用示例](./examples/)。
+- **易用的文本领域API**
+  - 提供从数据集、数据预处理、组网、评估、和推理可复用API模块，如[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html), [Embedding API](./docs/embeddings.md), [Transformer API](./docs/transformers.md)等，其中Transformer API集成了50+预训练模型，通过统一API使用体验为开发者提供预训练生态的基础设施，提升NLP任务建模和迭代的效率。
 
 
-- **简洁易用的全流程API**
-  - 深度兼容飞桨2.0的[高层API](https://www.paddlepaddle.org.cn/documentation/docs/zh/tutorial/quick_start/high_level_api/high_level_api.html)体系，内置可复用的文本建模模块([Embedding](./docs/embeddings.md), [CRF](./paddlenlp/layers/crf.py), [Seq2Vec](./paddlenlp/seq2vec/encoder.py), [Transformer](./docs/transformers.md))，可大幅度减少在数据处理、模型组网、训练与评估、推理部署环节的开发量，提升NLP任务迭代与落地的效率。
+- **多场景的应用示例**
+  - PaddleNLP 2.0提供多粒度多场景的应用示例，全面基于飞桨2.0全新API体系开发，涵盖从[词向量](./examples/word_embedding/)、[词法分析](./examples/lexical_analysis/)、[命名实体识别](./examples/information_extraction/msra_ner/)、[语义表示](./examples/language_model/)、[知识关联](./examples/text_to_knowledge/)等NLP基础技术，到[文本分类](./examples/text_classification/)、[文本匹配](./examples/text_matching/)、[文本生成](./examples/text_generation/)、[文本图学习](./examples/text_graph/erniesage/)、[信息抽取](./examples/information_extraction)等NLP核心技术。同时针对[情感分析](./examples/sentiment_analysis/)、[机器翻译](./examples/machine_translation/)、[通用对话](./examples/dialogue/)、[阅读理解](./examples/machine_reading_comprehension/)等系统应用提供相应核心组件与预训练模型。更多详细介绍请查看[PaddleNLP应用示例](./examples/)。
 
-- **动静统一的高性能分布式训练**
-  - 基于飞桨2.0核心框架『动静统一』的特性与领先的混合精度优化策略，结合Fleet分布式训练API，可充分利用GPU集群资源，高效完成大规模预训练模型的分布式训练。
+
+- **高性能分布式训练**
+  - 基于飞桨核心框架『**动静统一**』的特性与领先的自动混合精度优化策略，通过分布式Fleet API，支持4D混合并行策略充分利用硬件资源高效完成超大规模参数的预训练模型训练。
 
 
 ## 安装
@@ -43,16 +44,6 @@ PaddleNLP 2.0拥有**覆盖多场景的模型库**、**简洁易用的全流程A
 pip install --upgrade paddlenlp -i https://pypi.org/simple
 ```
 
-### 源码安装
-
-如果您想体验最新的版本，可以使用以下命令进行源码安装，支持GitHub和Gitee两种方式。
-```
-pip install --upgrade git+https://github.com/PaddlePaddle/PaddleNLP.git
-
-pip install --upgrade git+https://gitee.com/PaddlePaddle/PaddleNLP.git
-```
-
-
 更多关于PaddlePaddle的安装和PaddleNLP安装详细教程请查看[Installation](./docs/get_started/installation.rst)
 
 ## 快速开始
@@ -65,7 +56,7 @@ from paddlenlp.datasets import load_dataset
 train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
 ```
 
-可参考[Dataset文档](./docs/datasets.md)查看更多数据集。
+可参考[Dataset文档](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html) 查看更多数据集。
 
 ### 一键加载预训练中文词向量
 
@@ -82,7 +73,7 @@ wordemb.cosine_sim("艺术", "火车")
 内置50+中文词向量，更多使用方法请参考[Embedding文档](./examples/word_embedding/README.md)。
 
 
-### 一键加载高质量中文预训练模型
+### 一键加载预训练模型
 
 ```python
 from paddlenlp.transformers import ErnieModel, BertModel, RobertaModel, ElectraModel, GPTForPretraining
@@ -93,6 +84,8 @@ roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
 electra = ElectraModel.from_pretrained('chinese-electra-small')
 gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
+
+请参考[Transformer API文档](./docs/transformers.md)查看目前支持的预训练模型。
 
 ### 便捷获取文本特征
 
@@ -107,29 +100,86 @@ text = tokenizer('自然语言处理')
 pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
 ```
 
-请参考[Transformer API文档](./docs/transformers.md)查看目前支持的预训练模型。
+## 丰富的应用示例
 
-## 模型库及其应用
+PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景示例，帮助开发者按图索骥找到所需，更快上手飞桨2.0框架。
+更多模型应用场景介绍请参考[PaddleNLP Examples](./examples/)。
 
-PaddleNLP模型库整体介绍请参考文档[PaddleNLP Model Zoo](./docs/model_zoo.md)。
-模型应用场景介绍请参考[PaddleNLP Examples](./examples/)。
+### NLP 基础技术
 
-- [词向量](./examples/word_embedding/)
-- [词法分析](./examples/lexical_analysis/)
-- [命名实体识别](./examples/information_extraction/msra_ner/)
-- [语言模型](./examples/language_model/)
+| 任务   | 简介     |
+| -------  | ---- |
+| [词法分析 (Lexical Analysis)](./examples/lexical_analysis/) | 基于BiGRU-CRF模型实现了分词、词性标注和命名实体识的联合训练任务。输入是一个字符串，而输出是句子中的词边界和词性、实体类别。 |
+| [词向量 (Word Embedding)](./exmaples/word_embedding/) | 提供60+预训练词向量，通过`paddlenlp.TokenEmbedding` API实现快速加载，并提供基于VisualDL的降维可视化示例。 |
+| [语言模型 (Language Model)](./examples/language_model/rnnlm)  | 给定一个输入词序列计算其生成概率。 语言模型的评价指标 PPL(困惑度)，用于表示模型生成句子的流利程度。 |
+| [语义解析 (Text-to-SQL)](./examples/text_to_sql) | 语义解析是自然语言处理技术的核心任务之一，Text-to-SQL是语义解析的一个子方向，让机器自动将用户输入的自然语言问题转成数据库可操作的SQL查询语句，实现基于数据库的自动问答能力。|
+
+### NLP 核心技术
+
 - [文本分类](./examples/text_classification/)
 - [文本生成](./examples/text_generation/)
 - [语义匹配](./examples/text_matching/)
-- [文本图学习](./examples/text_graph/erniesage/)
+- [语义索引](./examples/semantic_indexing/)
 - [信息抽取](./examples/information_extraction/)
-- [通用对话](./examples/dialogue/)
-- [机器翻译](./examples/machine_translation/)
-- [阅读理解](./examples/machine_reading_comprehension/)
 
-## 进阶应用
+### NLP 系统应用
 
-- [模型压缩](./examples/model_compression/)
+#### 情感分析 (Sentiment Analysis)
+
+| 模型      | 简介       |
+| -------- | ---------- |
+| [SKEP](./examples/sentiment_analysis/skep/)  | 百度研究团队提出的基于情感知识增强的情感预训练算法，此算法采用无监督方法自动挖掘情感知识，然后利用情感知识构建预训练目标，从而让机器学会理解情感语义。SKEP为各类情感分析任务提供统一且强大的情感语义表示。 |
+
+#### 阅读理解 (Machine Reading Comprehension)
+
+| 任务   | 简介     |
+| -------  | ---- |
+| [SQuAD](./examples/machine_reading_comprehension/SQuAD/) | 提供通过预训练模型在SQuAD 2.0数据集上微调的应用示例。 |
+| [DuReader-yesno](./examples/machine_reading_comprehension/DuReader-yesno/) | 提供通过预训练模型在**千言数据集DuReader-yesno**上微调的应用示例。 |
+| [DuReader-robust](./examples/machine_reading_comprehension/DuReader-robust/) | 提供通过预训练模型在**千言数据集DuReader-robust**上微调的应用示例。 |
+
+#### 机器翻译 (Machine Translation)
+
+| 模型    | 简介     |
+| ------ | ------- |
+| [Seq2Seq-Attn](./machine_translation/seq2seq) | 使用编码器-解码器（Encoder-Decoder）结构, 同时使用了Attention机制来加强Decoder和Encoder之间的信息交互，Seq2Seq 广泛应用于机器翻译，自动对话机器人，文档摘要自动生成，图片描述自动生成等任务中。|
+| [Transformer](./machine_translation/transformer) | 基于PaddlePaddle框架的Transformer结构搭建的机器翻译模型，Transformer 计算并行度高，能解决学习长程依赖问题。并且模型框架集成了训练，验证，预测任务，功能完备，效果突出。|
+
+#### 同声传译（Simultaneous Translation）
+
+| 模型    | 简介     |
+| ------ | ------- |
+| [STACL](./simultaneous_translation/stacl) | [STACL](https://www.aclweb.org/anthology/P19-1289/)是基于Prefix-to-Prefix框架设计的同传翻译模型，具备一定的隐式预测能力；结合Wait-k策略可以在保持较高的翻译质量的同时实现任意字级别的翻译延迟。|
+
+#### 对话系统 (Dialogue System)
+
+| 模型   | 简介      |
+| ----- | ------|
+| [PLATO-2](./dialogue/plato-2) | 百度自研领先的开放域对话预训练模型。[PLATO-2: Towards Building an Open-Domain Chatbot via Curriculum Learning](https://arxiv.org/abs/2006.16779) |
+
+### 拓展应用
+
+#### 文本知识关联 (Text to Knowledge)
+
+[**解语**]((./examples/text_to_knowledge/)是由百度知识图谱部开发的文本知识关联框架，覆盖中文全词类的知识库和知识标注工具能够帮助开发者面对更加多元的应用场景，方便地融合自有知识体系，显著提升中文文本解析和挖掘效果，还可以便捷地利用知识增强机器学习模型效果。
+
+- [TermTree: 中文全词类的知识库](./examples/text_to_knowledge/termtree)
+- [WordTag: 中文词类知识标注工具](./examples/text_to_knowledge/wordtag)
+
+#### 文本图学习 (Text Graph)
+
+| 模型   | 简介     |
+| ------- | ------- |
+| [ERNIESage](./text_graph/erniesage)| 通过Graph(图)来构建自身节点和邻居节点的连接关系，将自身节点和邻居节点的关系构建成一个关联样本输入到ERNIE中，ERNIE作为聚合函数（Aggregators）来表征自身节点和邻居节点的语义关系，最终强化图中节点的语义表示。|
+
+### 进阶应用
+
+### 模型压缩 (Model Compression)
+
+| 模型     | 简介    |
+| -------- | ------- |
+| [Distill-LSTM](./model_compression/distill_lstm/) | 基于[Distilling Task-Specific Knowledge from BERT into Simple Neural Networks](https://arxiv.org/abs/1903.12136)论文策略的实现，将BERT中英文分类的下游模型知识通过蒸馏的方式迁移至LSTM的小模型结构中，取得比LSTM单独训练更好的效果。|
+| [OFA-BERT](./model_compression/ofa/) | 基于PaddleSlim Once-For-ALL(OFA)策略对BERT在GLUE任务的下游模型进行压缩，在精度无损的情况下可减少33%参数量，达到模型小型化的提速的效果。 |
 
 ## API 使用文档
 
