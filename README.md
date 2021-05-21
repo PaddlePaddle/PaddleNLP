@@ -213,7 +213,7 @@ PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景�
 
 ### paddlenlp文本领域API
 
-- 修复Windows CPU环境下的import问题
+- 修复Windows CPU环境下的import问题。
 
 ## 社区贡献与技术交流
 
