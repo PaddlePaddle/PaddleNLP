@@ -346,14 +346,13 @@ class ViterbiDecoder(nn.Layer):
         if self._initial_alpha is None or batch_size > paddle.shape(
                 self._initial_alpha)[0]:
             # Initialized by a small value.
-            alpha_shape = paddle.concat([batch_size, self.num_tags - 1])
             initial_alpha = paddle.full(
-                alpha_shape, dtype='float32', fill_value=-10000.)
+                [batch_size, self.num_tags - 1],
+                dtype='float32',
+                fill_value=-10000.)
             # alpha_start fill_value = 0. > -10000., means the first one step START gets the most score.
-            start_shape = paddle.full((1, ), dtype='int32', fill_value=1)
-            start_shape = paddle.concat([batch_size, start_shape])
             alpha_start = paddle.full(
-                start_shape, dtype='float32', fill_value=0.)
+                [batch_size, 1], dtype='float32', fill_value=0.)
             self._initial_alpha = paddle.concat(
                 [initial_alpha, alpha_start], axis=1)
         return paddle.slice(
@@ -381,26 +380,27 @@ class ViterbiDecoder(nn.Layer):
         n_label = input_shape[2]
 
         inputs_t = inputs.transpose([1, 0, 2])
-        trans_exp = self.transitions.unsqueeze(0)
+        trans_exp = self.transitions.unsqueeze(0).expand(
+            [batch_size, n_label, n_label])
 
         historys = []
         left_length = lengths.clone()
         max_seq_len = left_length.max()
+        # no need to expand the 'mask' in the following iteration 
+        left_length = left_length.unsqueeze(-1).expand([batch_size, n_label])
 
         if self.with_start_stop_tag:
             alpha = self._initialize_alpha(batch_size)
         else:
             alpha = paddle.zeros((batch_size, self.num_tags), dtype='float32')
 
-        for i, logit in enumerate(inputs_t):
-            if (i >= max_seq_len).all():
-                break
+        for i, logit in enumerate(inputs_t[:max_seq_len]):
             # if not with_start_stop_tag, the first label has not antecedent tag.
             if i == 0 and not self.with_start_stop_tag:
                 alpha = logit
                 left_length = left_length - 1
                 continue
-            alpha_exp = alpha.unsqueeze(2)
+            alpha_exp = alpha.unsqueeze(2).expand_as(trans_exp)
             # alpha_trn_sum: batch_size, n_labels, n_labels
             alpha_trn_sum = alpha_exp + trans_exp
 
@@ -415,13 +415,12 @@ class ViterbiDecoder(nn.Layer):
             # Now add the emission scores
             alpha_nxt = alpha_max + logit
 
-            mask = paddle.cast((left_length > 0), dtype='float32').unsqueeze(-1)
+            mask = paddle.cast((left_length > 0), dtype='float32')
             alpha = mask * alpha_nxt + (1 - mask) * alpha
 
             if self.with_start_stop_tag:
-                mask = paddle.cast(
-                    (left_length == 1), dtype='float32').unsqueeze(-1)
-                alpha += mask * self.transitions[self.stop_idx].unsqueeze(0)
+                mask = paddle.cast((left_length == 1), dtype='float32')
+                alpha += mask * trans_exp[:, self.stop_idx]
 
             left_length = left_length - 1
 
@@ -430,6 +429,7 @@ class ViterbiDecoder(nn.Layer):
         # Trace back the best path
         # historys: seq_len, batch_size, n_labels
         historys = paddle.stack(historys)
+        left_length = left_length[:, 0]
         tag_mask = paddle.cast((left_length >= 0), 'int64')
         last_ids_update = last_ids * tag_mask
 
@@ -438,7 +438,7 @@ class ViterbiDecoder(nn.Layer):
         historys = paddle.reverse(historys, [0])
         for hist in historys:
             # hist: batch_size, n_labels
-            left_length = left_length + 1
+            left_length = left_length + ones
             gather_idx = batch_offset + last_ids
             tag_mask = paddle.cast((left_length >= 0), 'int64')
             last_ids_update = paddle.gather(hist.flatten(),
@@ -453,11 +453,3 @@ class ViterbiDecoder(nn.Layer):
                 self._batch_index)[0]:
             self._batch_index = paddle.arange(end=batch_size, dtype="int64")
         return self._batch_index
-
-    def _get_batch_seq_index(self, batch_size, length):
-        if self._batch_seq_index is None or length > paddle.shape(
-                self._batch_seq_index)[1] or batch_size > paddle.shape(
-                    self._batch_seq_index)[0]:
-            self._batch_seq_index = paddle.cumsum(
-                paddle.ones([batch_size, length], "int64"), axis=1) - 1
-        return self._batch_seq_index
