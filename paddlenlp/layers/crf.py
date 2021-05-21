@@ -393,12 +393,14 @@ class ViterbiDecoder(nn.Layer):
             alpha = self._initialize_alpha(batch_size)
         else:
             alpha = paddle.zeros((batch_size, self.num_tags), dtype='float32')
-
+        # avoid call fill_constant in iteration
+        zeros = paddle.zeros([1], dtype='int64')
+        ones = paddle.ones([1], dtype='int64')
         for i, logit in enumerate(inputs_t[:max_seq_len]):
             # if not with_start_stop_tag, the first label has not antecedent tag.
             if i == 0 and not self.with_start_stop_tag:
                 alpha = logit
-                left_length = left_length - 1
+                left_length = left_length - ones
                 continue
             alpha_exp = alpha.unsqueeze(2).expand_as(trans_exp)
             # alpha_trn_sum: batch_size, n_labels, n_labels
@@ -415,14 +417,14 @@ class ViterbiDecoder(nn.Layer):
             # Now add the emission scores
             alpha_nxt = alpha_max + logit
 
-            mask = paddle.cast((left_length > 0), dtype='float32')
-            alpha = mask * alpha_nxt + (1 - mask) * alpha
+            mask = paddle.cast((left_length > zeros), dtype='float32')
+            alpha = mask * alpha_nxt + (ones - mask) * alpha
 
             if self.with_start_stop_tag:
-                mask = paddle.cast((left_length == 1), dtype='float32')
+                mask = paddle.cast((left_length == ones), dtype='float32')
                 alpha += mask * trans_exp[:, self.stop_idx]
 
-            left_length = left_length - 1
+            left_length = left_length - ones
 
         # last_ids: batch_size
         scores, last_ids = alpha.max(1), alpha.argmax(1)
@@ -430,7 +432,7 @@ class ViterbiDecoder(nn.Layer):
         # historys: seq_len, batch_size, n_labels
         historys = paddle.stack(historys)
         left_length = left_length[:, 0]
-        tag_mask = paddle.cast((left_length >= 0), 'int64')
+        tag_mask = paddle.cast((left_length >= zeros), 'int64')
         last_ids_update = last_ids * tag_mask
 
         batch_path = [last_ids_update]
@@ -440,11 +442,11 @@ class ViterbiDecoder(nn.Layer):
             # hist: batch_size, n_labels
             left_length = left_length + ones
             gather_idx = batch_offset + last_ids
-            tag_mask = paddle.cast((left_length >= 0), 'int64')
+            tag_mask = paddle.cast((left_length >= zeros), 'int64')
             last_ids_update = paddle.gather(hist.flatten(),
                                             gather_idx) * tag_mask
             batch_path.append(last_ids_update)
-            last_ids = last_ids_update + last_ids * (1 - tag_mask)
+            last_ids = last_ids_update + last_ids * (ones - tag_mask)
         batch_path = paddle.reverse(paddle.stack(batch_path, 1), [1])
         return scores, batch_path
 
