@@ -14,12 +14,12 @@
 
 <img src="./docs/imgs/news_icon.png" width="50"/> *[2021-05-20] PaddleNLP 2.0正式版已发布！:tada:更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.0.0).*
 
-PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本领域API**，**多场景的应用示例**、和**高性能分布式训练**三大特点，旨在提升飞桨开发者文本领域建模效率，并提供基于飞桨框架2.0的NLP领域最佳实践。
+PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本领域API**，**多场景的应用示例**、和**高性能分布式训练**三大特点，旨在提升飞桨开发者文本领域建模效率，并提供基于飞桨框架2.0的NLP任务最佳实践。
 
 ## 特性
 
 - **易用的文本领域API**
-  - 提供从数据集加载、文本预处理、模型组网、模型评估、和推理的领域API：一键加载丰富中文数据集的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)，可灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)，预置60+预训练词向量的[Embedding API](./docs/embeddings.md); 提供50+预训练模型的生态基础能力的[Transformer API](./docs/transformers.md)等，可大幅提升NLP任务建模和迭代的效率。更多API详细说明请查看[PaddleNLP官方文档](https://paddlenlp.readthedocs.io/)。
+  - 提供从数据集加载、文本预处理、模型组网、模型评估、和推理加速的领域API：一键加载丰富中文数据集的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)，可灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)，预置60+预训练词向量的[Embedding API](./docs/embeddings.md); 提供50+预训练模型的生态基础能力的[Transformer API](./docs/transformers.md)等，可大幅提升NLP任务建模和迭代的效率。更多API详细说明请查看[PaddleNLP官方文档](https://paddlenlp.readthedocs.io/)。
 
 
 - **多场景的应用示例**
@@ -133,7 +133,7 @@ PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景�
 | 模型  | 简介    |
 | :----- | ------ |
 | [RNN/CNN/GRU/LSTM](./examples/text_classification/rnn) | 实现了经典的RNN, CNN, GRU, LSTM等经典文本分类结构。|
-| [BiLSTM-Attention](./examples/text_classification/rnn) | 基于BiLSTM的网络结构通过引入注意力机制用于提升文本分类效果。 |
+| [BiLSTM-Attention](./examples/text_classification/rnn) | 基于BiLSTM的网络结构通过引入注意力机制用于提升文本分类效果。 |
 | [BERT/ERNIE](./examples/text_classification/pretrained_models) | 基于预训练模型的文本分类的模型，结合ChnSentiCorp数据提供了使用不同的预训练模型进行文本分类的Fine-tuning的示例。 |
 
 #### 文本生成 (Text Generation)
