@@ -122,23 +122,23 @@ PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景�
 
 | 任务   | 简介     |
 | -------  | ---- |
-| [词法分析 (Lexical Analysis)](./examples/lexical_analysis/) | 基于BiGRU-CRF模型实现了分词、词性标注和命名实体识的联合训练任务。输入是一个字符串，而输出是句子中的词边界、词性与实体类别。 |
-| [词向量 (Word Embedding)](./exmaples/word_embedding/) | 提供60+预训练词向量，通过`paddlenlp.TokenEmbedding` API实现快速加载，并支持通过VisualDL实现降维可视化。 |
-| [语言模型 (Language Model)](./examples/language_model/rnnlm)  | 给定一个输入词序列计算其生成概率。 语言模型的评价指标 PPL(困惑度)，用于表示模型生成句子的流利程度。 |
-| [语义解析 (Text-to-SQL)](./examples/text_to_sql):new: | 语义解析是自然语言处理技术的核心任务之一，Text-to-SQL是语义解析的一个子方向，让机器自动将用户输入的自然语言问题转成数据库可操作的SQL查询语句，是实现基于数据库自动问答的核心模块。|
+| [词法分析](./examples/lexical_analysis/) | 基于BiGRU-CRF模型实现了分词、词性标注和命名实体识的联合训练任务。输入是中文句子，而输出是句子中的词边界、词性与实体类别。 |
+| [词向量](./exmaples/word_embedding/) | 提供60+预训练词向量，通过`paddlenlp.TokenEmbedding` API实现快速加载，可用于模型热启动或计算词之间的空间距离，支持通过VisualDL实现降维可视化。 |
+| [语言模型](./examples/language_model/)  | 提供了基于RNN和Transformer-XL两种结构的语言模型，支持输入词序列计算其生成概率，并得到Perplexity(困惑度)，用于表示模型生成句子的流利程度。 |
+| [语义解析](./examples/text_to_sql):new: | 语义解析Text-to-SQL是自然语言处理技术的核心任务之一，Text-to-SQL是语义解析的一个子方向，让机器自动将用户输入的自然语言问题转成数据库可操作的SQL查询语句，是实现基于数据库自动问答的核心模块。|
 
 ### NLP 核心技术
 
 #### 文本分类 (Text Classification)
 | 模型  | 简介    |
 | ----- | ------ |
-| [RNN/CNN/GRU/LSTM](./examples/text_classification/rnn) | 基于Paddle 2.0 新API体系，实现了经典的RNN, CNN, GRU, LSTM等经典分类结构。|
-| [BiLSTM with Attention](./examples/text_classification/rnn) | 基于BiLSTM的网络结构上，通过引入Attention机制用于提升文本分类效果。 |
+| [RNN/CNN/GRU/LSTM](./examples/text_classification/rnn) | 实现了经典的RNN, CNN, GRU, LSTM等经典文本分类结构。|
+| [BiLSTM-Attention](./examples/text_classification/rnn) | 基于BiLSTM的网络结构通过引入注意力机制用于提升文本分类效果。 |
 | [BERT/ERNIE](./examples/text_classification/pretrained_models) | 基于预训练模型的文本分类的模型，结合ChnSentiCorp数据提供了使用不同的预训练模型进行文本分类的Fine-tuning的示例。 |
 
 #### 文本生成 (Text Generation)
 | 模型        | 简介      |
-| --------- | ------------------ |
+| --------- | ---------- |
 | [Seq2Seq](./examples/text_generation/couplet) | 实现了经典的Seq2Seq with Attention的网络结构，在中文对联数据集上完成文本生成的示例。 |
 | [VAE-Seq2Seq](./examples/text_generation/vae-seq2seq) | 在传统的Seq2Seq框架基础上，加入VAE结构以实现更加多样化的文本生成。|
 | [ERNIE-GEN](./examples/text_generation/ernie-gen) | ERNIE-GEN(https://arxiv.org/abs/2001.11314)是百度自研的生成式预训练模型，通过Global-Attention的方式解决训练和预测曝光偏差的问题，同时使用Multi-Flow Attention机制来分别进行Global和Context信息的交互，同时通过片段生成的方式来增加语义相关性。|
@@ -167,7 +167,7 @@ PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景�
 
 | 模型      | 简介       |
 | -------- | ---------- |
-| :new:[SKEP](./examples/sentiment_analysis/skep/)  | 百度研究团队提出的基于情感知识增强的情感预训练算法，此算法采用无监督方法自动挖掘情感知识，然后利用情感知识构建预训练目标，从而让机器学会理解情感语义。SKEP为各类情感分析任务提供统一且强大的情感语义表示。 |
+| [SKEP](./examples/sentiment_analysis/skep/):star2: | 百度研究团队提出的基于情感知识增强的情感预训练算法，此算法采用无监督方法自动挖掘情感知识，然后利用情感知识构建预训练目标，从而让机器学会理解情感语义。SKEP为各类情感分析任务提供统一且强大的情感语义表示。 |
 
 #### 阅读理解 (Machine Reading Comprehension)
 
@@ -188,36 +188,36 @@ PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景�
 
 | 模型    | 简介     |
 | ------ | ------- |
-| [STACL](./examples/simultaneous_translation/stacl) :new:| [STACL](https://www.aclweb.org/anthology/P19-1289/)是基于Prefix-to-Prefix框架的同传翻译模型，具备一定的隐式预测能力；结合Wait-k策略在保持较高的翻译质量的同时实现任意字级别的翻译延迟，并提供了可视化的Demo。|
+| [STACL](./examples/simultaneous_translation/stacl) :star:| [STACL](https://www.aclweb.org/anthology/P19-1289/)是基于Prefix-to-Prefix框架的同传翻译模型，具备一定的隐式预测能力；结合Wait-k策略在保持较高的翻译质量的同时实现任意字级别的翻译延迟，并提供了可视化的Demo。|
 
 #### 对话系统 (Dialogue System)
 
 | 模型   | 简介      |
 | ----- | ------|
 | [PLATO-2](./examples/dialogue/plato-2) | 百度自研领先的开放域对话预训练模型。[PLATO-2: Towards Building an Open-Domain Chatbot via Curriculum Learning](https://arxiv.org/abs/2006.16779) |
-| :star:[PLATO-mini](./examples/dialogue/unified_transformer):new: | 基于中文海量数据预训练的轻量级中文闲聊模型。|
+| [PLATO-mini](./examples/dialogue/unified_transformer):star2: | 基于中文海量数据预训练的轻量级中文闲聊模型。|
 
 ### 拓展应用
 
 #### 文本知识关联 (Text to Knowledge)
 
-:star:[**解语**](./examples/text_to_knowledge/)是由百度知识图谱部开发的文本知识关联框架，覆盖中文全词类的知识库和知识标注工具能够帮助开发者面对更加多元的应用场景，方便地融合自有知识体系，显著提升中文文本解析和挖掘效果，还可以便捷地利用知识增强机器学习模型效果。
+:star2:[**解语**](./examples/text_to_knowledge/)是由百度知识图谱部开发的文本知识关联框架，覆盖中文全词类的知识库和知识标注工具能够帮助开发者面对更加多元的应用场景，方便地融合自有知识体系，显著提升中文文本解析和挖掘效果，还可以便捷地利用知识增强机器学习模型效果。
 
-- :new:[TermTree: 中文全词类的知识库](./examples/text_to_knowledge/termtree)
-- :new:[WordTag: 中文词类知识标注工具](./examples/text_to_knowledge/wordtag)
+- [TermTree: 中文全词类的知识库](./examples/text_to_knowledge/termtree):star2:
+- [WordTag: 中文词类知识标注工具](./examples/text_to_knowledge/wordtag):star2:
 
 #### 文本图学习 (Text Graph Learning)
 
 | 模型   | 简介     |
 | ------- | ------- |
-| [ERNIESage](./examples/text_graph/erniesage)| 基于[PGL图学习框架](https://github.com/PaddlePaddle/PGL)结合Transformer API实现的文本图学习模型。|
+| [ERNIESage](./examples/text_graph/erniesage)| 基于[飞桨PGL图学习框架](https://github.com/PaddlePaddle/PGL)结合PaddleNLP Transformer API实现的文本图学习模型。|
 
 #### 模型压缩 (Model Compression)
 
 | 模型     | 简介    |
 | -------- | ------- |
 | [Distill-LSTM](./examples/model_compression/distill_lstm/) | 基于[Distilling Task-Specific Knowledge from BERT into Simple Neural Networks](https://arxiv.org/abs/1903.12136)论文策略的实现，将BERT中英文分类的下游模型知识通过蒸馏的方式迁移至LSTM的小模型结构中，取得比LSTM单独训练更好的效果。|
-| [OFA-BERT](./examples/model_compression/ofa/) :new:| 基于PaddleSlim Once-For-ALL(OFA)策略对BERT在GLUE任务的下游模型进行压缩，在精度无损的情况下可减少33%参数量，达到模型小型化的提速的效果。 |
+| [OFA-BERT](./examples/model_compression/ofa/) :star2:| 基于PaddleSlim Once-For-ALL(OFA)策略对BERT在GLUE任务的下游模型进行压缩，在精度无损的情况下可减少33%参数量，达到模型小型化的提速的效果。 |
 
 
 ## 交互式Notebook教程
