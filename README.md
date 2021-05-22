@@ -17,18 +17,18 @@
 
 PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本领域API**，**多场景的应用示例**、和**高性能分布式训练**三大特点，旨在提升飞桨开发者文本领域建模效率，并提供基于飞桨框架2.0的NLP领域最佳实践。
 
-## 特性
+### 特性
 
 - **易用的文本领域API**
-  - 提供从数据集、数据预处理、组网、评估、和推理可复用API模块，如[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html), [Embedding API](./docs/embeddings.md), [Transformer API](./docs/transformers.md)等，其中Transformer API集成了50+预训练模型，通过统一API使用体验为开发者提供预训练生态的基础设施，提升NLP任务建模和迭代的效率。
+  - 提供从数据集加载、文本预处理、组网建模、评估、到推的领域API：如一键加载丰富中文数据集的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)，可灵活高效的进行数据与处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)，预置60+预训练词向量的[Embedding API](./docs/embeddings.md), 内置50+预训练模型，提供预训练模型生态基础设施的[Transformer API](./docs/transformers.md)等，可大幅提升NLP任务建模和迭代的效率。更多API详细说明请查看[PaddleNLP官方文档](https://paddlenlp.readthedocs.io/)
 
 
 - **多场景的应用示例**
-  - PaddleNLP 2.0提供多粒度多场景的应用示例，全面基于飞桨2.0全新API体系开发，涵盖从[词向量](./examples/word_embedding/)、[词法分析](./examples/lexical_analysis/)、[命名实体识别](./examples/information_extraction/msra_ner/)、[语义表示](./examples/language_model/)、[知识关联](./examples/text_to_knowledge/)等NLP基础技术，到[文本分类](./examples/text_classification/)、[文本匹配](./examples/text_matching/)、[文本生成](./examples/text_generation/)、[文本图学习](./examples/text_graph/erniesage/)、[信息抽取](./examples/information_extraction)等NLP核心技术。同时针对[情感分析](./examples/sentiment_analysis/)、[机器翻译](./examples/machine_translation/)、[通用对话](./examples/dialogue/)、[阅读理解](./examples/machine_reading_comprehension/)等系统应用提供相应核心组件与预训练模型。更多详细介绍请查看[PaddleNLP应用示例](./examples/)。
+  - PaddleNLP 2.0提供多粒度多场景的应用示例，涵盖从NLP基础技术、NLP核心技术、NLP系统应用以及文本相关的拓展应用等。全面基于飞桨2.0全新API体系开发，为开发提供飞桨2.0框架在文本领域的最佳实践。更多详细应用介绍请查看[PaddleNLP应用示例](./examples/)。
 
 
 - **高性能分布式训练**
-  - 基于飞桨核心框架『**动静统一**』的特性与领先的自动混合精度优化策略，通过分布式Fleet API，支持4D混合并行策略充分利用硬件资源高效完成超大规模参数的预训练模型训练。
+  - 基于飞桨核心框架『**动静统一**』的特性与领先的自动混合精度优化策略，通过分布式Fleet API，支持超大规模参数的4D混合并行策略，并且可根据硬件情况灵活可配，高效地完成超大规模参数的模型训练。
 
 
 ## 安装
@@ -36,7 +36,7 @@ PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本�
 ### 环境依赖
 
 - python >= 3.6
-- paddlepaddle >= 2.0.1
+- paddlepaddle >= 2.1.0
 
 ### pip安装
 
@@ -100,6 +100,8 @@ text = tokenizer('自然语言处理')
 pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
 ```
 
+更多的API示例及其使用说明请查阅[PaddleNLP官方文档](https://paddlenlp.readthedocs.io/)
+
 ## 丰富的应用示例
 
 PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景示例，帮助开发者按图索骥找到所需，更快上手飞桨2.0框架。
@@ -161,12 +163,12 @@ PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景�
 
 #### 文本知识关联 (Text to Knowledge)
 
-[**解语**]((./examples/text_to_knowledge/)是由百度知识图谱部开发的文本知识关联框架，覆盖中文全词类的知识库和知识标注工具能够帮助开发者面对更加多元的应用场景，方便地融合自有知识体系，显著提升中文文本解析和挖掘效果，还可以便捷地利用知识增强机器学习模型效果。
+[**解语**](./examples/text_to_knowledge/)是由百度知识图谱部开发的文本知识关联框架，覆盖中文全词类的知识库和知识标注工具能够帮助开发者面对更加多元的应用场景，方便地融合自有知识体系，显著提升中文文本解析和挖掘效果，还可以便捷地利用知识增强机器学习模型效果。
 
 - [TermTree: 中文全词类的知识库](./examples/text_to_knowledge/termtree)
 - [WordTag: 中文词类知识标注工具](./examples/text_to_knowledge/wordtag)
 
-#### 文本图学习 (Text Graph)
+#### 文本图学习 (Text Graph Learning)
 
 | 模型   | 简介     |
 | ------- | ------- |
@@ -208,17 +210,14 @@ PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景�
 更多教程参见[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
 
 
+## 版本更新
 
-## 最近更新（自2.0.0版本）
-
-### paddlenlp文本领域API
-
-- 修复Windows CPU环境下的import问题。
+更多版本更新的详细说明请查看[ChangeLog](./docs/change_log.md)
 
 ## 社区贡献与技术交流
 
 ### 特殊兴趣小组
-- 欢迎您加入PaddleNLP的SIG社区，贡献优秀的模型实现、公开数据集、教程与案例、外围小工具。
+- 欢迎您加入PaddleNLP的SIG社区，贡献优秀的模型实现、公开数据集、教程与案例等。
 
 ### QQ
 - 现在就加入PaddleNLP的QQ技术交流群，一起交流NLP技术吧！⬇️
