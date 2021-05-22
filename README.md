@@ -146,13 +146,13 @@ PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景�
 #### 文本匹配 (Text Maching)
 | 模型    | 简介       |
 | :--------------- | ---------- |
-| [SimNet](./examples/text_matching/simnet/)  | 百度提出的*基于表示(Representation-based)*的双塔语义匹配框架，主要使用BOW、CNN、GRNN等模块作为表示层。 |
+| [SimNet](./examples/text_matching/simnet/)  | 百度提出的的语义匹配框架，主要使用BOW、CNN、GRNN等核心网络作为表示层，适用于信息检索、新闻推荐、智能客服等多种语义匹配应用场景。|
 | [ERNIE](./examples/text_matching/ernie_matching/) | 基于ERNIE使用LCQMC数据完成中文句对匹配任务，提供了Pointwise和Pairwise两种类型学习方式。 |
 | [Sentence-BERT](./examples/text_matching/sentence_transformer/) | 基于Siamese双塔结构的[Sentence-BERT](https://arxiv.org/abs/1908.1008)文本匹配模型，可用于获取基于Transformer预训练模型的句子向量化表示。
 
 #### 语义索引 (Semantic Indexing)
 
-开放了完整的语义索引建设流程，并提供了In-Batch Negative和Hardest Negatives两种策略，开发者可基于该示例实现一个轻量级的语义索引系统，更多信息请查看[语义索引](./examples/semantic_indexing/)。
+开放了完整的语义索引建设流程，并提供了In-Batch Negative和Hardest Negatives两种策略，开发者可基于该示例实现一个轻量级的语义索引系统，更多信息请查看[语义索引应用示例](./examples/semantic_indexing/)。
 
 #### 信息抽取 (Information Extraction)
 | 任务   | 简介     |
@@ -210,7 +210,7 @@ PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景�
 
 | 模型   | 简介     |
 | :------------ | ------- |
-| [ERNIESage](./examples/text_graph/erniesage)| 基于[飞桨PGL图学习框架](https://github.com/PaddlePaddle/PGL)结合PaddleNLP Transformer API实现的文本图学习模型。|
+| [ERNIESage](./examples/text_graph/erniesage)| 基于[飞桨PGL](https://github.com/PaddlePaddle/PGL)图学习框架结合PaddleNLP Transformer API实现的文本图学习模型。|
 
 #### 模型压缩 (Model Compression)
 
