@@ -174,20 +174,6 @@ void SummaryConfig(const paddle_infer::Config& config,
   LOG(INFO) << "----------------------- Data info -----------------------";
   LOG(INFO) << "batch_size: " << batch_size;
   LOG(INFO) << "num_of_samples: " << num_samples;
-  LOG(INFO) << "----------------------- Conf info -----------------------";
-  LOG(INFO) << "runtime_device: " << (config.use_gpu() ? "gpu" : "cpu");
-  LOG(INFO) << "ir_optim: " << (config.ir_optim() ? "true" : "false");
-  LOG(INFO) << "enable_memory_optim: "
-            << (config.enable_memory_optim() ? "true" : "false");
-  if (config.use_gpu()) {
-    LOG(INFO) << "enable_tensorrt: "
-              << (config.tensorrt_engine_enabled() ? "true" : "false");
-  } else {
-    LOG(INFO) << "enable_mkldnn: "
-              << (config.mkldnn_enabled() ? "true" : "false");
-    LOG(INFO) << "cpu_math_library_num_threads: "
-              << config.cpu_math_library_num_threads();
-  }
   LOG(INFO) << "----------------------- Perf info -----------------------";
   LOG(INFO) << "average_latency(ms): " << infer_time / num_samples << ", "
             << "QPS: " << num_samples / (infer_time / 1000.0);
