@@ -88,9 +88,9 @@ def train(args):
     test_ds.map(trans_func)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=0, dtype='int64'),  # word_ids
+        Pad(axis=0, pad_val=word_vocab.get("[PAD]", 0), dtype='int64'),  # word_ids
         Stack(dtype='int64'),  # length
-        Pad(axis=0, pad_val=0, dtype='int64'),  # label_ids
+        Pad(axis=0, pad_val=label_vocab.get("O", 0), dtype='int64'),  # label_ids
     ): fn(samples)
 
     # Create sampler for dataloader

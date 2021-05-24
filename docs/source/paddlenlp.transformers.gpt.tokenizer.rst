@@ -1,7 +1,7 @@
-modeling
+tokenizer
 ===========================================
 
-.. automodule:: paddlenlp.transformers.gpt2.modeling
+.. automodule:: paddlenlp.transformers.gpt.tokenizer
    :members:
    :no-undoc-members:
    :show-inheritance:
