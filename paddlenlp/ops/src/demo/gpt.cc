@@ -57,7 +57,7 @@ struct DataResult {
 bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
                        std::vector<DataResult>& dataresultvec,
                        std::unordered_map<int, std::string>& num2word_dict) {
-  // NOTE: Add SentencePiece to do some proprocess on cpm model.
+  // NOTE: Add SentencePiece to do some postprocess on cpm model.
   // sentencepiece::SentencePieceProcessor processor;
   // max_length * batch_size
   std::vector<int> output_shape = seq_ids->shape();
