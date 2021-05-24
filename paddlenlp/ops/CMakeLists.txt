@@ -112,19 +112,19 @@ include(external/boost)
 set(OPS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/allocator.h allocator_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/fastertransformer/allocator.h allocator_dst)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/allocator.h allocator_dst)
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/common.h common_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/fastertransformer/common.h common_dst)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/common.h common_dst)
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/CMakeLists.txt cmakelists_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/CMakeLists.txt cmakelists_dst)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/CMakeLists.txt cmakelists_dst)
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/topk_kernels.cu topk_kernels_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cu topk_kernels_dst)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cu topk_kernels_dst)
 
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
-set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
+set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
 set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} && cp ${common_src} ${common_dst} && cp ${cmakelists_src} ${cmakelists_dst} && cp ${topk_kernels_src} ${topk_kernels_dst} && ${MUTE_COMMAND})
 
 ######################################################################################
@@ -183,9 +183,9 @@ ExternalProject_Add(
   GIT_REPOSITORY    https://github.com/NVIDIA/FasterTransformer.git
   GIT_TAG           v3.1
   PREFIX            ${THIRD_PATH}
-  SOURCE_DIR        ${THIRD_PATH}/${THIRD_PARTY_NAME}
+  SOURCE_DIR        ${THIRD_PATH}/source/${THIRD_PARTY_NAME}
   PATCH_COMMAND     ${FT_PATCH_COMMAND}
-  BINARY_DIR        ${THIRD_PATH}/build
+  BINARY_DIR        ${THIRD_PATH}/build/${THIRD_PARTY_NAME}
   INSTALL_COMMAND   ""
   CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DPY_CMD=${PY_CMD}
 )
@@ -203,5 +203,24 @@ include_directories(
 link_directories(
   ${FT_LIB_PATH}
 )
+
+if(ON_INFER AND WITH_GPT)
+  ExternalProject_Add(
+    extern_sentencepiece
+    GIT_REPOSITORY    https://github.com/google/sentencepiece.git
+    PREFIX            ${THIRD_PATH}
+    SOURCE_DIR        ${THIRD_PATH}/source/sentencepiece/
+    BINARY_DIR        ${THIRD_PATH}/build/sentencepiece/
+    INSTALL_COMMAND   ""
+  )
+  
+  include_directories(
+    ${THIRD_PATH}/source/sentencepiece/src/
+  )
+
+  link_directories(
+    ${THIRD_PATH}/build/sentencepiece/src/
+  )
+endif()
 
 add_subdirectory(src)

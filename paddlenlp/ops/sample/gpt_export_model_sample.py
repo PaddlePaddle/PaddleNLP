@@ -135,6 +135,8 @@ def do_predict(args):
         executor=exe,
         program=test_program)
 
+    gpt.save_resources(tokenizer, args.inference_model_dir)
+
 
 if __name__ == "__main__":
     args = parse_args()
