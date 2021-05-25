@@ -382,32 +382,26 @@ def do_train(args):
     teacher = teacher.to_distill(teacher)
     student = student.to_distill(student)
 
-    # Add Linear layer for student's Embedding layer.
-    if args.intermediate_distill:
-        student.emb_proj = nn.Linear(768, 768)
-
     global_step = 0
     tic_train = time.time()
     best_res = 0.0
-    save_steps = 100
 
     def cal_intermediate_distill_loss(student, teacher):
-        loss_emb = mse_loss_fct(student.emb_proj(student.emb), teacher.emb)
         loss_hidden, loss_attn = 0, 0
-
-        for i in range(6):
-            student_hidden = student.fit_dense(student.outputs.hidden_states[i])
+        # Calculate emb loss(hidden_states[0]) and hidden states loss.
+        for i in range(len(student.outputs.hidden_states)):
+            # While using tinybert-4l-312d, tinybert-6l-768d, tinybert-4l-312d-zh, tinybert-6l-768d-zh
+            # student_hidden = student.tinybert.fit_dense(student.outputs.hidden_states[i])
+            # While using tinybert-4l-312d-v2, tinybert-6l-768d-v2
+            student_hidden = student.tinybert.fit_denses[i](
+                student.outputs.hidden_states[i])
             loss_hidden += mse_loss_fct(student_hidden,
                                         teacher.outputs.hidden_states[2 * i])
+        for i in range(len(student.outputs.attentions)):
             attn_student = student.outputs.attentions[i]
             attn_teacher = teacher.outputs.attentions[2 * i + 1]
-            loss_attn_layer = 0.0
-            head_num = attn_student.shape[1]
-            for j in range(head_num):
-                loss_attn_layer += mse_loss_fct(attn_student[:, j, :, :],
-                                                attn_teacher[:, j, :, :])
-            loss_attn += loss_attn_layer / head_num
-        loss = loss_emb + loss_hidden + loss_attn
+            loss_attn += mse_loss_fct(attn_student, attn_teacher)
+        loss = loss_hidden + loss_attn
         return loss
 
     distill_part = "intermediate" if args.intermediate_distill else "pred"
@@ -438,7 +432,7 @@ def do_train(args):
                        paddle.distributed.get_rank(), loss, optimizer.get_lr(),
                        args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
-            if global_step % save_steps == 0 or global_step == num_training_steps:
+            if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
                 if args.task_name == "mnli":
                     res = evaluate(student, metric, dev_data_loader_matched)
@@ -447,11 +441,17 @@ def do_train(args):
                 else:
                     res = evaluate(student, metric, dev_data_loader)
                     print("eval done total : %s s" % (time.time() - tic_eval))
-
-                if best_res < res and paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(
-                        args.output_dir, "%s_%s_distill_model_%d.pdparams" %
-                        (args.task_name, distill_part, global_step))
+                if (best_res < res and global_step < num_training_steps or
+                        global_step == num_training_steps
+                    ) and paddle.distributed.get_rank() == 0:
+                    if global_step < num_training_steps:
+                        output_dir = os.path.join(
+                            args.output_dir, "%s_distill_model_%d.pdparams" %
+                            (distill_part, global_step))
+                    else:
+                        output_dir = os.path.join(
+                            args.output_dir,
+                            "%s_distill_model_final.pdparams" % (distill_part))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     # Need better way to get inner model of DataParallel

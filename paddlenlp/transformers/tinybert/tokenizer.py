@@ -28,6 +28,10 @@ class TinyBertTokenizer(BertTokenizer):
             "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-4l-312d-v2-vocab.txt",
             "tinybert-6l-768d-v2":
             "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-6l-768d-v2-vocab.txt",
+            "tinybert-4l-312d-zh":
+            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-4l-312d-zh-vocab.txt",
+            "tinybert-6l-768d-zh":
+            "http://paddlenlp.bj.bcebos.com/models/transformers/tinybert/tinybert-6l-768d-zh-vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -41,6 +45,12 @@ class TinyBertTokenizer(BertTokenizer):
             "do_lower_case": True
         },
         "tinybert-6l-768d-v2": {
+            "do_lower_case": True
+        },
+        "tinybert-4l-312d-zh": {
+            "do_lower_case": True
+        },
+        "tinybert-6l-768d-zh": {
             "do_lower_case": True
         },
     }
