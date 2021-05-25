@@ -174,10 +174,8 @@ void SummaryConfig(const paddle_infer::Config& config,
                    double infer_time,
                    int num_batches,
                    int num_samples) {
-  LOG(INFO) << "----------------------- Data info -----------------------";
-  LOG(INFO) << "batch_size: " << batch_size;
-  LOG(INFO) << "num_of_samples: " << num_samples;
   LOG(INFO) << "----------------------- Perf info -----------------------";
+  LOG(INFO) << "batch_size: " << batch_size;
   LOG(INFO) << "average_latency(ms): " << infer_time / num_samples << ", "
             << "QPS: " << num_samples / (infer_time / 1000.0);
 }
