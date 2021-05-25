@@ -39,6 +39,8 @@ std::vector<paddle::Tensor> GPT2Forward(
     const float& temperature,
     const bool& use_fp16 = false) {
   int batch_size = input.shape()[0];
+  int start_len = input.shape()[1];
+  max_len += start_len;
   std::vector<int64_t> output_dims({max_len, batch_size});
   auto output_ids = paddle::Tensor(input.place(), output_dims);
 
@@ -115,7 +117,8 @@ std::vector<std::vector<int64_t>> GPT2InferShape(
     const float& temperature,
     const bool& use_fp16 = false) {
   int64_t batch_size = input_shape[0];
-  std::vector<int64_t> output_dims({max_len, batch_size});
+  int64_t start_len = input_shape[1];
+  std::vector<int64_t> output_dims({max_len + start_len, batch_size});
   return {output_dims};
 }
 

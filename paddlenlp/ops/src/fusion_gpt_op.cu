@@ -77,7 +77,7 @@ std::vector<paddle::Tensor> gpt2_kernel(
              cudaMemcpyDeviceToHost);
   gpt2_decoding = new DecodingGpt2<DecodingTraits_::OpType>(allocator_,
                                                             batch_size_,
-                                                            max_len + start_len,
+                                                            max_len,
                                                             n_head,
                                                             size_per_head,
                                                             vocab_size,
