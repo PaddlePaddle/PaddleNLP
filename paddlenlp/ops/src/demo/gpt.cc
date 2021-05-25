@@ -2,9 +2,11 @@
 #include <sentencepiece_processor.h>
 #include <algorithm>
 #include <atomic>
+#include <codecvt>
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <locale>
 #include <numeric>
 #include <string>
 #include <thread>
@@ -51,7 +53,7 @@ struct DataInput {
 };
 
 struct DataResult {
-  std::string result_q;
+  std::wstring result_q;
 };
 
 bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
@@ -72,12 +74,13 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
   auto max_output_length = output_shape[0];
 
   for (int bsz = 0; bsz < batch_size; ++bsz) {
-    dataresultvec[bsz].result_q = "";
+    std::string tmp_result_q = "";
     for (int len = 0; len < max_output_length; ++len) {
-      dataresultvec[bsz].result_q =
-          dataresultvec[bsz].result_q +
-          num2word_dict[seq_ids_out[len * batch_size + bsz]];
+      tmp_result_q =
+          tmp_result_q + num2word_dict[seq_ids_out[len * batch_size + bsz]];
     }
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+    dataresultvec[bsz].result_q = converter.from_bytes(tmp_result_q);
   }
   return true;
 }
@@ -197,9 +200,8 @@ void Main(const int& batch_size,
 
   double whole_time = 0;
   Timer timer;
-  int num_batches = 1;
+  int num_batches = 100;
   int warmup = 50;
-  int num_samples = batch_size * num_batches;
   std::vector<std::string> source_query_vec;
 
   while (reader.NextBatch(predictor,
@@ -224,10 +226,17 @@ void Main(const int& batch_size,
                       dataresultvec,
                       reader.num2word_dict);
 
-    std::cout << dataresultvec[0].result_q << std::endl;
+    for (int i = 0; i < batch_size; ++i) {
+      std::cout << std::endl;
+      std::wcout << dataresultvec[i].result_q;
+    }
     source_query_vec.clear();
   }
-  SummaryConfig(config, whole_time, num_batches, num_samples);
+  std::cout << std::endl;
+  SummaryConfig(config,
+                whole_time,
+                num_batches - warmup,
+                (num_batches - warmup) * batch_size);
 }
 }  // namespace inference
 }  // namespace paddle
