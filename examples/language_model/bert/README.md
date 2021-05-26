@@ -203,7 +203,7 @@ python -u ./predict.py \
 
 其中参数释义如下：
 - `model_path` 表示预测模型文件的前缀，和上一步导出预测模型中的`output_path`一致。
-- `device` 表示每个预测批次的样本数目。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 
 样例中的待预测数据返回输出的预测结果如下：
