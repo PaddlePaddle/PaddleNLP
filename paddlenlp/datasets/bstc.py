@@ -64,24 +64,20 @@ class BSTC(DatasetBuilder):
         ''' Check and download Dataset '''
         builder_config = self.BUILDER_CONFIGS[self.name]
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
+        source_file_dir = builder_config['splits'][mode][0]
+        source_full_dir = os.path.join(default_root, source_file_dir)
+        if not os.path.exists(source_full_dir):
+            get_path_from_url(builder_config['url'], default_root,
+                              builder_config['md5'])
         if mode == 'train':
-            source_file_dir = builder_config['splits'][mode][0]
-            source_full_dir = os.path.join(default_root, source_file_dir)
-            if not os.path.exists(source_full_dir):
-                get_path_from_url(builder_config['url'], default_root,
-                                  builder_config['md5'])
             return source_full_dir
         elif mode == 'dev':
-            source_file_dir, target_file_dir = builder_config['splits'][mode]
-            source_full_dir = os.path.join(default_root, source_file_dir)
+            target_file_dir = builder_config['splits'][mode][1]
             target_full_dir = os.path.join(default_root, target_file_dir)
-            if not os.path.exists(source_full_dir) or not os.path.exists(
-                    target_full_dir):
+            if not os.path.exists(target_full_dir):
                 get_path_from_url(builder_config['url'], default_root,
                                   builder_config['md5'])
             return source_full_dir, target_full_dir
-        else:
-            raise ValueError('Argument mode should be one of [train, dev].')
 
     def _read(self, data_dir, split):
         """Reads data."""
@@ -198,6 +194,3 @@ class BSTC(DatasetBuilder):
                             continue
                         tgt_list.append(tgt_line)
                 yield {'src': src_list, 'tgt': tgt_list}
-
-        else:
-            raise ValueError('Argument split should be one of [train, dev].')
