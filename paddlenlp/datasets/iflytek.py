@@ -30,7 +30,7 @@ class IFLYTEK(DatasetBuilder):
 
     More information please refer to `https://github.com/CLUEbenchmark/CLUE`
     '''
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/iflytek.tar.gz"
+    URL = "https://paddlenlp.bj.bcebos.com/datasets/iflytek.zip"
     MD5 = "19e4b19947db126f69aae18db0da2b87"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

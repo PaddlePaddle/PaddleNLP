@@ -32,7 +32,7 @@ class TNEWS(DatasetBuilder):
 
     More information please refer to `https://github.com/CLUEbenchmark/CLUE`
     '''
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/tnews.tar.gz"
+    URL = "https://paddlenlp.bj.bcebos.com/datasets/tnews.zip"
     MD5 = "587171233c8e8db00a3dc9bae5d2b47d"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

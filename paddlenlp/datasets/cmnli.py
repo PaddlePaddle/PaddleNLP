@@ -27,7 +27,7 @@ class CMNLI(DatasetBuilder):
     CMNLI: Long Text classification (Chinese)
     More information please refer to `https://github.com/CLUEbenchmark/CLUE`
     '''
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/cmnli.tar.gz"
+    URL = "https://paddlenlp.bj.bcebos.com/datasets/cmnli.zip"
     MD5 = "e0e8caefd9b3491220c18b466233f2ff"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

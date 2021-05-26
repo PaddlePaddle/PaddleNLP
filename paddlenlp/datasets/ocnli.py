@@ -30,37 +30,81 @@ class OCNLI(DatasetBuilder):
     where the premises are collected from Chinese sources, and universities
     students in language majors are hired to write the hypotheses.
 
+    If 'ori' is chosen, the returned dataset would contain original data, whose
+    labels might be '-' additionally, which means five signers did not reach a
+    consensus. If 'clean' is chosen, examples contain label '-' would be
+    filtered out.
+
     More information please refer to `https://github.com/cluebenchmark/OCNLI`
     '''
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/ocnli.tar.gz"
-    MD5 = "acb426f6f3345076c6ce79239e7bc307"
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
-    SPLITS = {
-        'train': META_INFO(
-            os.path.join('train.50k.json'), 'd38ec492ef086a894211590a18ab7596'),
-        'dev': META_INFO(
-            os.path.join('dev.json'), '3481b456bee57a3c9ded500fcff6834c'),
-        'test': META_INFO(
-            os.path.join('test.json'), '680ff24e6b3419ff8823859bc17936aa')
+    BUILDER_CONFIGS = {
+        'ori': {
+            'url': "https://paddlenlp.bj.bcebos.com/datasets/ocnli.zip",
+            'md5': "acb426f6f3345076c6ce79239e7bc307",
+            'splits': {
+                'train': [
+                    os.path.join('train.50k.json'),
+                    'd38ec492ef086a894211590a18ab7596',
+                ],
+                'dev': [
+                    os.path.join('dev.json'),
+                    '3481b456bee57a3c9ded500fcff6834c',
+                ],
+                'test': [
+                    os.path.join('test.json'),
+                    '680ff24e6b3419ff8823859bc17936aa',
+                ]
+            },
+            'labels': ["entailment", "contradiction", "neutral", "-"]
+        },
+        'clean': {
+            'url': "https://paddlenlp.bj.bcebos.com/datasets/ocnli.zip",
+            'md5': "acb426f6f3345076c6ce79239e7bc307",
+            'splits': {
+                'train': [
+                    os.path.join('train.50k.json'),
+                    'd38ec492ef086a894211590a18ab7596',
+                ],
+                'dev': [
+                    os.path.join('dev.json'),
+                    '3481b456bee57a3c9ded500fcff6834c',
+                ],
+                'test': [
+                    os.path.join('test.json'),
+                    '680ff24e6b3419ff8823859bc17936aa',
+                ]
+            },
+            'labels': ["entailment", "contradiction", "neutral"]
+        }
     }
 
     def _get_data(self, mode, **kwargs):
+        builder_config = self.BUILDER_CONFIGS[self.name]
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
-        filename, data_hash = self.SPLITS[mode]
+        filename, data_hash = builder_config['splits'][mode]
         fullname = os.path.join(default_root, filename)
+
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-            get_path_from_url(self.URL, default_root, self.MD5)
-
+            get_path_from_url(builder_config['url'], default_root,
+                              builder_config['md5'])
         return fullname
 
     def _read(self, filename, split):
-        with open(filename, 'r', encoding='utf-8') as f:
-            for line in f:
-                yield json.loads(line.rstrip())
+        if self.name == 'clean' and split != 'test':
+            with open(filename, 'r', encoding='utf-8') as f:
+                for line in f:
+                    example_dict = json.loads(line.rstrip())
+                    if example_dict['label'] == '-':
+                        continue
+                    yield example_dict
+        else:
+            with open(filename, 'r', encoding='utf-8') as f:
+                for line in f:
+                    yield json.loads(line.rstrip())
 
     def get_labels(self):
         """
         Returns labels of the OCNLI object.
         """
-        return ["entailment", "contradiction", "neutral"]
+        return self.BUILDER_CONFIGS[self.name]['labels']

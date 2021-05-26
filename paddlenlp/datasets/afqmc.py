@@ -31,7 +31,7 @@ class AFQMC(DatasetBuilder):
 
     More information please refer to `https://github.com/CLUEbenchmark/CLUE`
     '''
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/afqmc.tar.gz"
+    URL = "https://paddlenlp.bj.bcebos.com/datasets/afqmc.zip"
     MD5 = "3377b559bb4e61d03a35282550902ca0"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
