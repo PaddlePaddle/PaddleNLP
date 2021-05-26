@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import json
 import os
 
@@ -30,10 +29,10 @@ class OCNLI(DatasetBuilder):
     where the premises are collected from Chinese sources, and universities
     students in language majors are hired to write the hypotheses.
 
-    If 'ori' is chosen, the returned dataset would contain original data, whose
-    labels might be '-' additionally, which means five signers did not reach a
-    consensus. If 'clean' is chosen, examples contain label '-' would be
-    filtered out.
+    If 'ori' is passed to `load_dataset`, the returned dataset contain original
+    data, whose labels might be '-' additionally, which means five signers did
+    not reach a consensus. If 'clean' is chosen, examples contain label '-'
+    would be filtered out. 'clean' is recommended choice for training.
 
     More information please refer to `https://github.com/cluebenchmark/OCNLI`
     '''
