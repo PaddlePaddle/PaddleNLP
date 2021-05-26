@@ -30,7 +30,7 @@ class CSL(DatasetBuilder):
 
     More information please refer to `https://github.com/P01son6415/CSL`
     '''
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/csl.tar.gz"
+    URL = "https://paddlenlp.bj.bcebos.com/datasets/csl.zip"
     MD5 = "394a2ccbf6ddd7e331be4d5d7798f0f6"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {

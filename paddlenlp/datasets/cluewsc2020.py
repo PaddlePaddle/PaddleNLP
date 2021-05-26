@@ -31,7 +31,7 @@ class CLUEWSC2020(DatasetBuilder):
 
     More information please refer to `https://github.com/CLUEbenchmark/CLUE`
     '''
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/cluewsc2020.tar.gz"
+    URL = "https://paddlenlp.bj.bcebos.com/datasets/cluewsc2020.zip"
     MD5 = "17abe1be3f7dd3bad5f114ba4c40ee9b"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
