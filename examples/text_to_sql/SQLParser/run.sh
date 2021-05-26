@@ -31,7 +31,7 @@ export FLAGS_memory_fraction_of_eager_deletion=1
 #export FLAGS_sync_nccl_allreduce=1
 
 #### python ####
-export PYTHONPATH=$WORKROOT:$WORKROOT/third:$WORKROOT/third/ERNIE:$PYTHONPATH
+export PYTHONPATH=$WORKROOT:$PYTHONPATH
 #echo "PYTHONPATH=$PYTHONPATH"
 ## python 3.6/3.7 is recomended
 PYTHON_BIN=`which python3`
