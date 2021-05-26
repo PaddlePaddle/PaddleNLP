@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import json
 import os
 
@@ -24,41 +23,83 @@ from . import DatasetBuilder
 
 class CMNLI(DatasetBuilder):
     '''
-    CMNLI: Long Text classification (Chinese)
+    CMNLI: Chinese Multi-Genre NLI.
+
+    If 'ori' is passed to `load_dataset`, the returned develop dataset contain
+    original data, whose labels might be '-' additionally, which means five
+    signers did not reach a consensus. If 'clean' is chosen, examples contain
+    label '-' would be filtered out. 'clean' is recommended choice for training.
+
     More information please refer to `https://github.com/CLUEbenchmark/CLUE`
     '''
-    URL = "https://paddlenlp.bj.bcebos.com/datasets/cmnli.zip"
-    MD5 = "e0e8caefd9b3491220c18b466233f2ff"
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
-    SPLITS = {
-        'train': META_INFO(
-            os.path.join('cmnli_public', 'train.json'),
-            '7d02308650cd2a0e183bf599ca9bb263'),
-        'dev': META_INFO(
-            os.path.join('cmnli_public', 'dev.json'),
-            '0b16a50a297a9afb1ce5385ee4dd3d9c'),
-        'test': META_INFO(
-            os.path.join('cmnli_public', 'test.json'),
-            '804cb0bb67266983d59d1c855e6b03b0')
+    BUILDER_CONFIGS = {
+        'ori': {
+            'url': "https://paddlenlp.bj.bcebos.com/datasets/cmnli.zip",
+            'md5': "e0e8caefd9b3491220c18b466233f2ff",
+            'splits': {
+                'train': [
+                    os.path.join('cmnli_public', 'train.json'),
+                    '7d02308650cd2a0e183bf599ca9bb263',
+                ],
+                'dev': [
+                    os.path.join('cmnli_public', 'dev.json'),
+                    '0b16a50a297a9afb1ce5385ee4dd3d9c',
+                ],
+                'test': [
+                    os.path.join('cmnli_public', 'test.json'),
+                    '804cb0bb67266983d59d1c855e6b03b0',
+                ]
+            },
+            'labels': ["entailment", "contradiction", "neutral", "-"]
+        },
+        'clean': {
+            'url': "https://paddlenlp.bj.bcebos.com/datasets/cmnli.zip",
+            'md5': "e0e8caefd9b3491220c18b466233f2ff",
+            'splits': {
+                'train': [
+                    os.path.join('cmnli_public', 'train.json'),
+                    '7d02308650cd2a0e183bf599ca9bb263',
+                ],
+                'dev': [
+                    os.path.join('cmnli_public', 'dev.json'),
+                    '0b16a50a297a9afb1ce5385ee4dd3d9c',
+                ],
+                'test': [
+                    os.path.join('cmnli_public', 'test.json'),
+                    '804cb0bb67266983d59d1c855e6b03b0',
+                ]
+            },
+            'labels': ["entailment", "contradiction", "neutral"]
+        },
     }
 
     def _get_data(self, mode, **kwargs):
+        builder_config = self.BUILDER_CONFIGS[self.name]
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
-        filename, data_hash = self.SPLITS[mode]
+        filename, data_hash = builder_config['splits'][mode]
         fullname = os.path.join(default_root, filename)
+
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-            get_path_from_url(self.URL, default_root, self.MD5)
-
+            get_path_from_url(builder_config['url'], default_root,
+                              builder_config['md5'])
         return fullname
 
     def _read(self, filename, split):
-        with open(filename, 'r', encoding='utf-8') as f:
-            for line in f:
-                yield json.loads(line.rstrip())
+        if self.name == 'clean' and split == 'dev':
+            with open(filename, 'r', encoding='utf-8') as f:
+                for line in f:
+                    example_dict = json.loads(line.rstrip())
+                    if example_dict['label'] == '-':
+                        continue
+                    yield example_dict
+        else:
+            with open(filename, 'r', encoding='utf-8') as f:
+                for line in f:
+                    yield json.loads(line.rstrip())
 
     def get_labels(self):
         """
-        Returns labels of the CMNLI object.
+        Returns labels of the OCNLI object.
         """
-        return ["entailment", "contradiction", "neutral"]
+        return self.BUILDER_CONFIGS[self.name]['labels']
