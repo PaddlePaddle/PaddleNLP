@@ -350,7 +350,7 @@ def do_train(args):
                     loss_return, lr_return = ret
                     speed = args.logging_freq / (time.time() - tic_train)
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f steps/s, %.0f token/s, learning rate: %.9f"
+                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f steps/s, ips: %.0f tokens/s, learning rate: %.9f"
                         % (global_step, epoch, step, loss_return[0], speed,
                            speed * args.global_batch_size * args.max_seq_len,
                            lr_return[0]))
