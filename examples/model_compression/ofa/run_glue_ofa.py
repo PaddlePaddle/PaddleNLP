@@ -184,33 +184,61 @@ def evaluate(model, criterion, metric, data_loader, width_mult=1.0):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
-    if isinstance(metric, AccuracyAndF1):
-        print(
-            "width_mult: %s, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
-            % (
-                width_mult,
-                loss.numpy(),
-                res[0],
-                res[1],
-                res[2],
-                res[3],
-                res[4], ),
-            end='')
-    elif isinstance(metric, Mcc):
-        print(
-            "width_mult: %s, eval loss: %f, mcc: %s, " %
-            (str(width_mult), loss.numpy(), res[0]),
-            end='')
-    elif isinstance(metric, PearsonAndSpearman):
-        print(
-            "width_mult: %s, eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
-            % (str(width_mult), loss.numpy(), res[0], res[1], res[2]),
-            end='')
+    # Teacher model's evaluation
+    if width_mult == 100:
+        if isinstance(metric, AccuracyAndF1):
+            print(
+                "teacher model, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
+                % (
+                    loss.numpy(),
+                    res[0],
+                    res[1],
+                    res[2],
+                    res[3],
+                    res[4], ),
+                end='')
+        elif isinstance(metric, Mcc):
+            print(
+                "teacher model, eval loss: %f, mcc: %s, " %
+                (loss.numpy(), res[0]),
+                end='')
+        elif isinstance(metric, PearsonAndSpearman):
+            print(
+                "teacher model, eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
+                % (loss.numpy(), res[0], res[1], res[2]),
+                end='')
+        else:
+            print(
+                "teacher model, eval loss: %f, acc: %s, " % (loss.numpy(), res),
+                end='')
     else:
-        print(
-            "width_mult: %s, eval loss: %f, acc: %s, " %
-            (str(width_mult), loss.numpy(), res),
-            end='')
+        if isinstance(metric, AccuracyAndF1):
+            print(
+                "width_mult: %s, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
+                % (
+                    width_mult,
+                    loss.numpy(),
+                    res[0],
+                    res[1],
+                    res[2],
+                    res[3],
+                    res[4], ),
+                end='')
+        elif isinstance(metric, Mcc):
+            print(
+                "width_mult: %s, eval loss: %f, mcc: %s, " %
+                (str(width_mult), loss.numpy(), res[0]),
+                end='')
+        elif isinstance(metric, PearsonAndSpearman):
+            print(
+                "width_mult: %s, eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
+                % (str(width_mult), loss.numpy(), res[0], res[1], res[2]),
+                end='')
+        else:
+            print(
+                "width_mult: %s, eval loss: %f, acc: %s, " %
+                (str(width_mult), loss.numpy(), res),
+                end='')
     model.train()
 
 

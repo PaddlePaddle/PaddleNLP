@@ -253,7 +253,7 @@ python -u ./run_glue_ofa.py --model_type bert \
 - `n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可；若为0，则使用CPU。
 - `width_mult_list` 表示压缩训练过程中，对每层Transformer Block的宽度选择的范围。
 
-训练时日志中width_mult=100的行表示教师模型的评估结果，压缩训练之后在dev上的结果如压缩结果表格中Result with PaddleSlim那一列所示，延时情况如表1-2所示。
+压缩训练之后在dev上的结果如压缩结果表格中Result with PaddleSlim那一列所示，延时情况如表1-2所示。
 
 
 ### 导出子模型

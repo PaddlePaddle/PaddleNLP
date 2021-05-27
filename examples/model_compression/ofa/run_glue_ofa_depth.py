@@ -197,10 +197,17 @@ def evaluate(model,
             correct = metric.compute(logits, labels)
             metric.update(correct)
         results = metric.accumulate()
-        print(
-            "depth_mult: %f, width_mult: %f, eval loss: %f, %s: %s\n" %
-            (depth_mult, width_mult, loss.numpy(), metric.name(), results),
-            end='')
+        # Teacher model's evaluation
+        if width_mult == 100:
+            print(
+                "teacher_model, eval loss: %f, %s: %s\n" %
+                (loss.numpy(), metric.name(), results),
+                end='')
+        else:
+            print(
+                "depth_mult: %f, width_mult: %f, eval loss: %f, %s: %s\n" %
+                (depth_mult, width_mult, loss.numpy(), metric.name(), results),
+                end='')
         model.train()
 
 
