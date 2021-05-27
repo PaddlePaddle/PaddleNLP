@@ -76,42 +76,44 @@ class Clue(DatasetBuilder):
 
     BUILDER_CONFIGS = {
         'afqmc': {
-            'url': "https://paddlenlp.bj.bcebos.com/datasets/afqmc.zip",
-            'md5': 'fc51f6924870bbc4a68b882d2e4230a9',
+            'url':
+            "https://storage.googleapis.com/cluebenchmark/tasks/afqmc_public.zip",
+            'md5': '3377b559bb4e61d03a35282550902ca0',
             'splits': {
                 'train': [
-                    os.path.join('afqmc', 'train.json'),
+                    os.path.join('afqmc_public', 'train.json'),
                     '319cf775353af9473140abca4052b89a',
                 ],
                 'dev': [
-                    os.path.join('afqmc', 'dev.json'),
+                    os.path.join('afqmc_public', 'dev.json'),
                     '307154b59cb6c3e68a0f39c310bbd364',
                 ],
                 'test': [
-                    os.path.join('afqmc', 'test.json'),
+                    os.path.join('afqmc_public', 'test.json'),
                     '94b925f23a9615dd08199c4013f761f4',
                 ]
             },
             'labels': ["0", "1"]
         },
         'tnews': {
-            'url': "https://paddlenlp.bj.bcebos.com/datasets/tnews.zip",
-            'md5': '600fe9fad0823cc72a7a6ca6fd4c497f',
+            'url':
+            "https://storage.googleapis.com/cluebenchmark/tasks/tnews_public.zip",
+            'md5': '587171233c8e8db00a3dc9bae5d2b47d',
             'splits': {
                 'train': [
-                    os.path.join('tnews', 'train.json'),
+                    os.path.join('tnews_public', 'train.json'),
                     '25c021725309a3330736380a230850fd',
                 ],
                 'dev': [
-                    os.path.join('tnews', 'dev.json'),
+                    os.path.join('tnews_public', 'dev.json'),
                     'f0660a3339a32e764075c801b42ece3c',
                 ],
                 'test': [
-                    os.path.join('tnews', 'test.json'),
+                    os.path.join('tnews_public', 'test.json'),
                     '2d1557c7548c72d5a84c47bbbd3a4e85',
                 ],
                 'labels': [
-                    os.path.join('tnews', 'labels.json'),
+                    os.path.join('tnews_public', 'labels.json'),
                     'a1a7595e596b202556dedd2a20617769',
                 ]
             },
@@ -119,31 +121,33 @@ class Clue(DatasetBuilder):
             [str(i) for i in range(112, 117)]
         },
         'iflytek': {
-            'url': 'https://paddlenlp.bj.bcebos.com/datasets/iflytek.zip',
-            'md5': '0ae75f5779c9bf78e53a2be2653443ec',
+            'url':
+            'https://storage.googleapis.com/cluebenchmark/tasks/iflytek_public.zip',
+            'md5': "19e4b19947db126f69aae18db0da2b87",
             'splits': {
                 'train': [
-                    os.path.join('iflytek', 'train.json'),
+                    os.path.join('iflytek_public', 'train.json'),
                     'fc9a21700c32ee3efee3fc283e9ac560',
                 ],
                 'dev': [
-                    os.path.join('iflytek', 'dev.json'),
+                    os.path.join('iflytek_public', 'dev.json'),
                     '79b7d95bddeb11cd54198fd077992704',
                 ],
                 'test': [
-                    os.path.join('iflytek', 'test.json'),
+                    os.path.join('iflytek_public', 'test.json'),
                     'ea764519ddb4369767d07664afde3325',
                 ],
                 'labels': [
-                    os.path.join('iflytek', 'labels.json'),
+                    os.path.join('iflytek_public', 'labels.json'),
                     '7f9e794688ffb37fbd42b58325579fdf',
                 ]
             },
             'labels': [str(i) for i in range(119)]
         },
         'ocnli': {
-            'url': 'https://paddlenlp.bj.bcebos.com/datasets/ocnli_public.zip',
-            'md5': 'a8d58935a2c1b5f98da117fcbb31eb6a',
+            'url':
+            'https://storage.googleapis.com/cluebenchmark/tasks/ocnli_public.zip',
+            'md5': 'acb426f6f3345076c6ce79239e7bc307',
             'splits': {
                 'train': [
                     os.path.join('ocnli_public', 'train.50k.json'),
@@ -161,57 +165,60 @@ class Clue(DatasetBuilder):
             'labels': ["entailment", "contradiction", "neutral"]
         },
         'cmnli': {
-            'url': 'https://paddlenlp.bj.bcebos.com/datasets/cmnli.zip',
-            'md5': '5337ed1d86cb82eae5d5dc9b6fc6dd43',
+            'url':
+            'https://storage.googleapis.com/cluebenchmark/tasks/cmnli_public.zip',
+            'md5': 'e0e8caefd9b3491220c18b466233f2ff',
             'splits': {
                 'train': [
-                    os.path.join('cmnli', 'train.json'),
+                    os.path.join('cmnli_public', 'train.json'),
                     '7d02308650cd2a0e183bf599ca9bb263',
                 ],
                 'dev': [
-                    os.path.join('cmnli', 'dev.json'),
+                    os.path.join('cmnli_public', 'dev.json'),
                     '0b16a50a297a9afb1ce5385ee4dd3d9c',
                 ],
                 'test': [
-                    os.path.join('cmnli', 'test.json'),
+                    os.path.join('cmnli_public', 'test.json'),
                     '804cb0bb67266983d59d1c855e6b03b0',
                 ]
             },
             'labels': ["contradiction", "entailment", "neutral"]
         },
         'cluewsc2020': {
-            'url': 'https://paddlenlp.bj.bcebos.com/datasets/cluewsc2020.zip',
-            'md5': 'e731a66c916285cd25a32a02ee79cd86',
+            'url':
+            'https://storage.googleapis.com/cluebenchmark/tasks/cluewsc2020_public.zip',
+            'md5': '17abe1be3f7dd3bad5f114ba4c40ee9b',
             'splits': {
                 'train': [
-                    os.path.join('cluewsc2020', 'train.json'),
+                    os.path.join('cluewsc2020_public', 'train.json'),
                     'afd235dcf8cdb89ee1a21d0a4823eecc',
                 ],
                 'dev': [
-                    os.path.join('cluewsc2020', 'dev.json'),
+                    os.path.join('cluewsc2020_public', 'dev.json'),
                     'bad8cd6fa0916fc37ac96b8ce316714a',
                 ],
                 'test': [
-                    os.path.join('cluewsc2020', 'test.json'),
+                    os.path.join('cluewsc2020_public', 'test.json'),
                     '0e9e8ffd8ee90ddf1f58d6dc2e02de7b',
                 ]
             },
             'labels': ["true", "false"]
         },
         'csl': {
-            'url': 'https://paddlenlp.bj.bcebos.com/datasets/csl.zip',
-            'md5': '7e863787463ee142f3fd6b81061caa52',
+            'url':
+            'https://storage.googleapis.com/cluebenchmark/tasks/csl_public.zip',
+            'md5': '394a2ccbf6ddd7e331be4d5d7798f0f6',
             'splits': {
                 'train': [
-                    os.path.join('csl', 'train.json'),
+                    os.path.join('csl_public', 'train.json'),
                     'e927948b4e0eb4992fe9f45a77446bf5',
                 ],
                 'dev': [
-                    os.path.join('csl', 'dev.json'),
+                    os.path.join('csl_public', 'dev.json'),
                     '6c2ab8dd3b4785829ead94b05a1cb957',
                 ],
                 'test': [
-                    os.path.join('csl', 'test.json'),
+                    os.path.join('csl_public', 'test.json'),
                     'ebfb89575355f00dcd9b18f8353547cd',
                 ]
             },
