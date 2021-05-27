@@ -365,6 +365,6 @@ class Glue(DatasetBuilder):
 
     def get_labels(self):
         """
-        Return labels of the Glue task.
+        Returns labels of the Glue task.
         """
         return self.BUILDER_CONFIGS[self.name]['labels']
