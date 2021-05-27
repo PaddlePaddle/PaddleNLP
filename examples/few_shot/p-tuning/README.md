@@ -9,6 +9,7 @@ P-tuning 引入可学习的 prompt embeddings 参数, 让模型自己去学习�
 |—— dataset.py # P-tuning 策略针对 FewCLUE 9 个数据集的任务转换逻辑，以及明文 -> 训练数据的转换
 |—— model.py # P-tuning 的网络结构
 |—— evaluate.py # 针对 FewCLUE 9 个数据集的评估函数
+|—— predict.py # 针对 FewCLUE 9 个数据集进行预测
 ```
 
 ## 基于 FewCLUE 进行 P-tuning 实验
@@ -47,7 +48,17 @@ python -u -m paddle.distributed.launch --gpus "0" \
 模型每训练 1 个 epoch, 会在验证集和测试集上进行评估。
 
 ### 模型预测
-Todo
+通过如下命令，指定 GPU 0 卡，使用 1 个 P-embedding 在 `FewCLUE` 的 `iflytek` 数据集上进行预测
+```
+python -u -m paddle.distributed.launch --gpus "0" predict.py \
+        --task_name "iflytek" \
+        --device gpu \
+        --init_from_ckpt "${model_params_file}" \
+        --p_embedding_num 1 \
+        --output_dir "./output" \
+        --batch_size 32 \
+        --max_seq_length 512
+```
 
 ## 基于自定义数据进行 P-tuning 实验
 
