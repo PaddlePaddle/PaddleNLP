@@ -142,8 +142,6 @@ if __name__ == "__main__":
     label_map = {label: idx for idx, label in enumerate(train_ds.label_list)}
     # `no_entity_label` represents that the token isn't an entity. 
     no_entity_label_idx = label_map.get("O", 2)
-    # `ignore_label` is using to pad input labels.
-    ignore_label = -1
 
     set_seed(args.seed)
     skep = SkepModel.from_pretrained('skep_ernie_1.0_large_ch')
@@ -161,7 +159,7 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input ids
         Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # token type ids
         Stack(dtype='int64'),  # sequence lens
-        Pad(axis=0, pad_val=ignore_label)  # labels
+        Pad(axis=0, pad_val=no_entity_label_idx)  # labels
     ): [data for data in fn(samples)]
 
     train_data_loader = create_dataloader(
