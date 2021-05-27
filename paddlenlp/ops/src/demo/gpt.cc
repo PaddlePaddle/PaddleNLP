@@ -41,6 +41,7 @@ const int BOS_IDX = 50256;
 const int EOS_IDX = 50256;
 const int PAD_IDX = 50256;
 const int MAX_LENGTH = 256;
+std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> convert;
 
 int batch_size = 1;
 int gpu_id = 0;
@@ -58,7 +59,8 @@ struct DataResult {
 
 bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
                        std::vector<DataResult>& dataresultvec,
-                       std::unordered_map<int, std::string>& num2word_dict) {
+                       std::unordered_map<int, std::u32string>& num2word_dict,
+                       std::unordered_map<char32_t, int>& byte_decoder) {
   // NOTE: Add SentencePiece to do some postprocess on cpm model.
   // sentencepiece::SentencePieceProcessor processor;
   // max_length * batch_size
@@ -74,18 +76,64 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
   auto max_output_length = output_shape[0];
 
   for (int bsz = 0; bsz < batch_size; ++bsz) {
-    std::string tmp_result_q = "";
+    std::u32string tmp_result_q = U"";
     for (int len = 1; len < max_output_length; ++len) {
-      if (seq_ids_out[len * batch_size + bsz] == EOS_IDX) {
-        break;
-      }
       tmp_result_q =
           tmp_result_q + num2word_dict[seq_ids_out[len * batch_size + bsz]];
     }
-    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-    dataresultvec[bsz].result_q = converter.from_bytes(tmp_result_q);
+
+    for (int i = 0; i < tmp_result_q.length(); ++i) {
+      char32_t tmp = tmp_result_q[i];
+      // std::cout << tmp << std::endl;
+      if (byte_decoder.find(tmp) != byte_decoder.end()) {
+        dataresultvec[bsz].result_q = dataresultvec[bsz].result_q +
+                                      static_cast<wchar_t>(byte_decoder[tmp]);
+      } else {
+        std::cout << "Should not reach here. " << std::endl;
+        exit(-1);
+      }
+    }
   }
   return true;
+}
+
+std::unordered_map<char32_t, int> convert_unicode() {
+  char32_t c0 = U'!';
+  char32_t c1 = U'~';
+  char32_t c2 = U'¡';
+  char32_t c3 = U'¬';
+  char32_t c4 = U'®';
+  char32_t c5 = U'ÿ';
+
+  int a0 = c0;
+  int a1 = c1;
+  int a2 = c2;
+  int a3 = c3;
+  int a4 = c4;
+  int a5 = c5;
+
+  std::unordered_map<char32_t, int> ret;
+  int n = 0;
+  for (int b = 0; b < 256; ++b) {
+    char32_t key;
+    if (b < a0 || (b > a1 && b < a2) || (b < a3 && b > a4) || b > a5) {
+      key = static_cast<char32_t>(256 + n);
+      ret.insert(std::pair<char32_t, int>(key, b));
+      n++;
+    } else {
+      key = static_cast<char32_t>(b);
+      ret.insert(std::pair<char32_t, int>(key, b));
+    }
+  }
+
+  // std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv32;
+  // for (int i=0; i<256; ++i) {
+  //   std::cout << "=====" << std::endl;
+  //   std::cout << conv32.to_bytes(cs[i]) << std::endl;
+  //   std::cout << bs[i] << std::endl;
+  // }
+
+  return ret;
 }
 
 class DataReader {
@@ -94,10 +142,10 @@ public:
 
   bool NextBatch(std::shared_ptr<paddle_infer::Predictor>& predictor,
                  const int& batch_size,
-                 const std::string& start_token,
-                 const std::string& end_token,
+                 const std::u32string& start_token,
+                 const std::u32string& end_token,
                  const int& num_batches,
-                 std::vector<std::string>& source_query_vec) {
+                 std::vector<std::u32string>& source_query_vec) {
     if (current_batches++ >= num_batches) {
       return false;
     }
@@ -106,8 +154,8 @@ public:
       source_query_vec.push_back(start_token);
     }
 
-    std::string line;
-    std::vector<std::string> word_data;
+    std::u32string line;
+    std::vector<std::u32string> word_data;
     std::vector<DataInput> data_input_vec;
     int max_len = 0;
     for (int i = 0; i < batch_size; i++) {
@@ -129,8 +177,9 @@ public:
     std::string line;
     int k = 0;
     while (std::getline(fin, line)) {
-      word2num_dict[line] = k;
-      num2word_dict[k] = line;
+      std::u32string tmp = convert.from_bytes(line);
+      word2num_dict[tmp] = k;
+      num2word_dict[k] = tmp;
       k += 1;
     }
 
@@ -141,8 +190,8 @@ public:
 
   int GetCurrentBatch() { return current_batches; }
 
-  std::unordered_map<std::string, int> word2num_dict;
-  std::unordered_map<int, std::string> num2word_dict;
+  std::unordered_map<std::u32string, int> word2num_dict;
+  std::unordered_map<int, std::u32string> num2word_dict;
   std::unique_ptr<std::ifstream> file;
 
 private:
@@ -186,8 +235,8 @@ void SummaryConfig(const paddle_infer::Config& config,
 
 void Main(const int& batch_size,
           const int& gpu_id,
-          const std::string& start_token,
-          const std::string& end_token) {
+          const std::u32string& start_token,
+          const std::u32string& end_token) {
   Config config;
   config.SetModel(model_dir + "/gpt.pdmodel", model_dir + "/gpt.pdiparams");
 
@@ -203,7 +252,8 @@ void Main(const int& batch_size,
   Timer timer;
   int num_batches = 100;
   int warmup = 50;
-  std::vector<std::string> source_query_vec;
+  std::vector<std::u32string> source_query_vec;
+  auto byte_decoder = convert_unicode();
 
   while (reader.NextBatch(predictor,
                           batch_size,
@@ -225,11 +275,12 @@ void Main(const int& batch_size,
     auto output_names = predictor->GetOutputNames();
     get_result_tensor(predictor->GetOutputHandle(output_names[0]),
                       dataresultvec,
-                      reader.num2word_dict);
+                      reader.num2word_dict,
+                      byte_decoder);
 
     for (int i = 0; i < batch_size; ++i) {
-      std::cout << std::endl;
       std::wcout << dataresultvec[i].result_q;
+      std::cout << std::endl;
     }
     source_query_vec.clear();
   }
@@ -251,8 +302,10 @@ int main(int argc, char** argv) {
   model_dir = FLAGS_model_dir;
   vocab_dir = FLAGS_vocab_dir;
 
-  paddle::inference::Main(
-      batch_size, gpu_id, FLAGS_start_token, FLAGS_end_token);
+  paddle::inference::Main(batch_size,
+                          gpu_id,
+                          convert.from_bytes(FLAGS_start_token),
+                          convert.from_bytes(FLAGS_end_token));
 
   return 0;
 }
