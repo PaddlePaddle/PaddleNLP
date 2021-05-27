@@ -228,13 +228,9 @@ class Clue(DatasetBuilder):
 
     def _get_data(self, mode, **kwargs):
         builder_config = self.BUILDER_CONFIGS[self.name]
-
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
-
         filename, data_hash = builder_config['splits'][mode]
-
         fullname = os.path.join(default_root, filename)
-
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
             get_path_from_url(builder_config['url'], default_root,
