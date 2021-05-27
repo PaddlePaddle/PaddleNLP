@@ -75,7 +75,10 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
 
   for (int bsz = 0; bsz < batch_size; ++bsz) {
     std::string tmp_result_q = "";
-    for (int len = 0; len < max_output_length; ++len) {
+    for (int len = 1; len < max_output_length; ++len) {
+      if (seq_ids_out[len * batch_size + bsz] == EOS_IDX) {
+        break;
+      }
       tmp_result_q =
           tmp_result_q + num2word_dict[seq_ids_out[len * batch_size + bsz]];
     }

@@ -40,8 +40,8 @@ std::vector<paddle::Tensor> GPT2Forward(
     const bool& use_fp16 = false) {
   int batch_size = input.shape()[0];
   int start_len = input.shape()[1];
-  max_len += start_len;
-  std::vector<int64_t> output_dims({max_len, batch_size});
+  int total_len = max_len + start_len;
+  std::vector<int64_t> output_dims({total_len, batch_size});
   auto output_ids = paddle::Tensor(input.place(), output_dims);
 
   if (input.place() == paddle::PlaceType::kGPU) {
@@ -70,7 +70,7 @@ std::vector<paddle::Tensor> GPT2Forward(
                            output_ids,
                            topk,
                            topp,
-                           max_len,
+                           total_len,
                            n_head,
                            size_per_head,
                            num_layer,
