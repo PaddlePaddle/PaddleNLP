@@ -190,9 +190,9 @@ BERT-base模型是一个迁移能力很强的通用语义表示模型，但是�
 
 ### 环境依赖
 
-模型压缩功能依赖最新版本的PaddleNLP和PaddleSlim.
+模型压缩功能依赖PaddleSlim2.1.0
 ```shell
-pip install paddleslim==2.0.0 -i https://pypi.org/simple
+pip install paddleslim==2.1.0 -i https://pypi.org/simple
 ```
 
 ### Fine-tuing

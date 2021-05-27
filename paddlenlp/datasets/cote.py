@@ -88,7 +88,11 @@ class Cote(DatasetBuilder):
                     labels[start_idx] = "B"
                     for idx in range(start_idx + 1, start_idx + len(entity)):
                         labels[idx] = "I"
-                    yield {"tokens": list(text), "labels": labels}
+                    yield {
+                        "tokens": list(text),
+                        "labels": labels,
+                        "entity": entity
+                    }
 
     def get_labels(self):
         """
