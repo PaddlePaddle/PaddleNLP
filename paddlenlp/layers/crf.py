@@ -358,7 +358,6 @@ class ViterbiDecoder(nn.Layer):
         return paddle.slice(
             self._initial_alpha, axes=[0], starts=[0], ends=[batch_size])
 
-    @paddle.no_grad()
     def forward(self, inputs, lengths):
         """
         Decode the highest scoring sequence of tags.
