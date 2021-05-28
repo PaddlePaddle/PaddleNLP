@@ -192,7 +192,7 @@ python -u ./predict_glue.py \
 - `batch_size` 表示每个预测批次的样本数目。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 
-同时支持使用输入样例数据的方式进行预测任务，这里仅以SST-2数据为例，输出样例数据的预测结果，即正负情感：
+同时支持使用输入样例数据的方式进行预测任务，这里仅以文本情感分类数据[SST-2](https://nlp.stanford.edu/sentiment/index.html)为例，输出样例数据的分类预测结果：
 
 ```shell
 python -u ./predict.py \

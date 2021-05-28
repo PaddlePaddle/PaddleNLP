@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -71,14 +71,14 @@ class Predictor(object):
         config = paddle.inference.Config(args.model_path + ".pdmodel",
                                          args.model_path + ".pdiparams")
         if args.device == "gpu":
-            # set GPU configs accordingly
+            # Set GPU configs accordingly
             config.enable_use_gpu(100, 0)
         elif args.device == "cpu":
-            # set CPU configs accordingly,
+            # Set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             config.disable_gpu()
         elif args.device == "xpu":
-            # set XPU configs accordingly
+            # Set XPU configs accordingly
             config.enable_xpu(100)
         config.switch_use_feed_fetch_ops(False)
         predictor = paddle.inference.create_predictor(config)
