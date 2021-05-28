@@ -267,10 +267,11 @@ def create_pretrained_dataset(
             sample_lens=sample_lens,
             eod_id=eod_id,
             seed=args.seed)
-
         batch_sampler = paddle.io.DistributedBatchSampler(
             dataset,
             batch_size=args.micro_batch_size,
+            num_replicas=topo.data_inner_times,
+            rank=topo.data_info.rank,
             shuffle=False,
             drop_last=True)
 
@@ -298,20 +299,19 @@ def create_pretrained_dataset(
         return data_loader
 
     # Note, data should be broardcast to all devices.
-    # for train, the distinct data num is topo.data_info.size
-    # for valid or test, the distinct data num is 1
+    # for train, valid, test, the distinct data num is topo.data_info.size
     # data_worldsize * data_inner_times -> topo.world.size
-    # 1 * topo.world.size -> topo.world.size
     train_data_loader = build_dataset(0, "train", args.micro_batch_size *
                                       args.max_steps * topo.data_info.size)
     if pipeline_mode:
         valid_data_loader, test_data_loader = None, None
     else:
         valid_data_loader = build_dataset(
-            1, "valid", args.micro_batch_size *
-            (args.max_steps // args.eval_freq + 1) * args.eval_iters)
+            1, "valid",
+            args.micro_batch_size * (args.max_steps // args.eval_freq + 1) *
+            args.eval_iters * topo.data_info.size)
         test_data_loader = build_dataset(2, "test", args.micro_batch_size *
-                                         args.test_iters)
+                                         args.test_iters * topo.data_info.size)
 
     return train_data_loader, valid_data_loader, test_data_loader
 
@@ -351,18 +351,7 @@ class GPTDataset(paddle.io.Dataset):
         # The doc cumsum start pos
         self.start_pos = [0] + np.cumsum(self.sample_lens).tolist()
 
-        if "mode" == "train":
-            # Data broardcast inner data groups.
-            self._length = self.sample_idx.shape[
-                0] * self.topo.data_inner_times - 1
-            # If car=2 bs=4, for dataloader,
-            # The data should be [0,1,2,3] -> card_0 [4,5,6,7] -> card_1
-            self._reindex_func = lambda index: index % self.micro_batch_size + index // (self.micro_batch_size * self.topo.data_inner_times) * self.micro_batch_size
-
-        else:
-            # Data broardcast all devices
-            self._length = self.sample_idx.shape[0] * self.topo.world.size - 1
-            self._reindex_func = lambda index: index % self.micro_batch_size + index // (self.micro_batch_size * self.topo.world.size) * self.micro_batch_size
+        self._length = self.sample_idx.shape[0] - 1
 
     def _construct_sample(self, tokens):
         tokens = np.array(tokens).astype("int64").tolist()
@@ -416,9 +405,7 @@ class GPTDataset(paddle.io.Dataset):
         return tokens
 
     def __getitem__(self, index):
-        # Reindex for card broardcast
-        real_idx = self._reindex_func(index)
-        idx = self.shuffle_idx[real_idx]
+        idx = self.shuffle_idx[index]
         # Start and end documents and offsets.
         doc_index_f = self.sample_idx[idx][0]
         doc_index_l = self.sample_idx[idx + 1][0]
