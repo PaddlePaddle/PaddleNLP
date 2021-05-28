@@ -181,7 +181,7 @@ def do_train(args):
                 if global_step % args.logging_freq == 0:
                     speed = args.logging_freq / (time.time() - tic_train)
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s, %.0f token/s, learning rate: %.9f"
+                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.9f"
                         % (global_step, epoch, step, loss, speed, speed *
                            default_global_tokens_num, optimizer.get_lr()))
                     log_writer.add_scalar("loss", float(loss), global_step)
