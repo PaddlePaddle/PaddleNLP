@@ -56,7 +56,9 @@ class Cote(DatasetBuilder):
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-            get_path_from_url(self.URL, default_root, self.MD5)
+            url = builder_config['url']
+            md5 = builder_config['md5']
+            get_path_from_url(url, DATA_HOME, md5)
 
         return fullname
 
@@ -86,7 +88,11 @@ class Cote(DatasetBuilder):
                     labels[start_idx] = "B"
                     for idx in range(start_idx + 1, start_idx + len(entity)):
                         labels[idx] = "I"
-                    yield {"tokens": list(text), "labels": labels}
+                    yield {
+                        "tokens": list(text),
+                        "labels": labels,
+                        "entity": entity
+                    }
 
     def get_labels(self):
         """

@@ -13,7 +13,6 @@ paddlenlp.metrics
    paddlenlp.metrics.bleu
    paddlenlp.metrics.chunk
    paddlenlp.metrics.distinct
-   paddlenlp.metrics.dureader
    paddlenlp.metrics.glue
    paddlenlp.metrics.perplexity
    paddlenlp.metrics.rouge

@@ -109,6 +109,7 @@ rnn/
 │   └── python
 │       └── predict.py # python预测部署示例
 ├── export_model.py # 动态图参数导出静态图参数脚本
+├── model.py # 模型组网脚本
 ├── predict.py # 模型预测
 ├── utils.py # 数据处理工具
 ├── train.py # 训练模型主程序入口，包括训练、评估
@@ -181,7 +182,7 @@ python train.py --vocab_path='./senta_word_dict.txt' \
 
 * `vocab_path`: 词汇表文件路径。
 * `device`: 选用什么设备进行训练，可选cpu、gpu或者xpu。如使用gpu训练则参数gpus指定GPU卡号。目前xpu只支持模型网络设置为lstm。
-* `network`: 模型网络名称，默认为`bilstm_attn`， 可更换为bilstm, bigru, birnn，bow，lstm，rnn，gru，bilstm_attn，textcnn等。
+* `network`: 模型网络名称，默认为`bilstm`， 可更换为bilstm，bigru，birnn，bow，lstm，rnn，gru，bilstm_attn，cnn等。
 * `lr`: 学习率， 默认为5e-5。
 * `batch_size`: 运行一个batch大小，默认为64。
 * `epochs`: 训练轮次，默认为10。

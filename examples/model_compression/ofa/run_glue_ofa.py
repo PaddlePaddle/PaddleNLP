@@ -23,7 +23,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 from paddle.io import DataLoader
-from paddle.metric import Metric, Accuracy, Precision, Recall
+from paddle.metric import Accuracy, Precision, Recall
 
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
@@ -170,6 +170,7 @@ def set_seed(args):
     # `paddle.seed(args.seed + paddle.distributed.get_rank())`
     paddle.seed(args.seed)
 
+
 @paddle.no_grad()
 def evaluate(model, criterion, metric, data_loader, width_mult=1.0):
     model.eval()
@@ -183,28 +184,63 @@ def evaluate(model, criterion, metric, data_loader, width_mult=1.0):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
-    if isinstance(metric, AccuracyAndF1):
-        print(
-            "width_mult: %s, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
-            % (
-                width_mult,
-                loss.numpy(),
-                res[0],
-                res[1],
-                res[2],
-                res[3],
-                res[4], ),
-            end='')
-    elif isinstance(metric, Mcc):
-        print("width_mult: %s, eval loss: %f, mcc: %s, " % (str(width_mult), loss.numpy(), res[0]), end='')
-    elif isinstance(metric, PearsonAndSpearman):
-        print(
-            "width_mult: %s, eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
-            % (str(width_mult), loss.numpy(), res[0], res[1], res[2]),
-            end='')
+    # Teacher model's evaluation
+    if width_mult == 100:
+        if isinstance(metric, AccuracyAndF1):
+            print(
+                "teacher model, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
+                % (
+                    loss.numpy(),
+                    res[0],
+                    res[1],
+                    res[2],
+                    res[3],
+                    res[4], ),
+                end='')
+        elif isinstance(metric, Mcc):
+            print(
+                "teacher model, eval loss: %f, mcc: %s, " %
+                (loss.numpy(), res[0]),
+                end='')
+        elif isinstance(metric, PearsonAndSpearman):
+            print(
+                "teacher model, eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
+                % (loss.numpy(), res[0], res[1], res[2]),
+                end='')
+        else:
+            print(
+                "teacher model, eval loss: %f, acc: %s, " % (loss.numpy(), res),
+                end='')
     else:
-        print("width_mult: %s, eval loss: %f, acc: %s, " % (str(width_mult), loss.numpy(), res), end='')
+        if isinstance(metric, AccuracyAndF1):
+            print(
+                "width_mult: %s, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
+                % (
+                    width_mult,
+                    loss.numpy(),
+                    res[0],
+                    res[1],
+                    res[2],
+                    res[3],
+                    res[4], ),
+                end='')
+        elif isinstance(metric, Mcc):
+            print(
+                "width_mult: %s, eval loss: %f, mcc: %s, " %
+                (str(width_mult), loss.numpy(), res[0]),
+                end='')
+        elif isinstance(metric, PearsonAndSpearman):
+            print(
+                "width_mult: %s, eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
+                % (str(width_mult), loss.numpy(), res[0], res[1], res[2]),
+                end='')
+        else:
+            print(
+                "width_mult: %s, eval loss: %f, acc: %s, " %
+                (str(width_mult), loss.numpy(), res),
+                end='')
     model.train()
+
 
 ### monkey patch for bert forward to accept [attention_mask, head_mask] as  attention_mask
 def bert_forward(self,
@@ -355,9 +391,7 @@ def do_train(args):
         model = paddle.DataParallel(model)
 
     # Step1: Initialize a dictionary to save the weights from the origin BERT model.
-    origin_weights = {}
-    for name, param in model.named_parameters():
-        origin_weights[name] = param
+    origin_weights = model.state_dict()
 
     # Step2: Convert origin model to supernet.
     sp_config = supernet(expand_ratio=args.width_mult_list)
@@ -485,8 +519,7 @@ def do_train(args):
                         metric,
                         dev_data_loader,
                         width_mult=100)
-                print("eval done total : %s s" %
-                      (time.time() - tic_eval))
+                print("eval done total : %s s" % (time.time() - tic_eval))
                 for idx, width_mult in enumerate(args.width_mult_list):
                     net_config = utils.dynabert_config(ofa_model, width_mult)
                     ofa_model.set_net_config(net_config)

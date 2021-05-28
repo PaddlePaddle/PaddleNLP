@@ -121,7 +121,7 @@ class Predictor(object):
         outputs = []
         samples = 0
         if self.recorder is not None:
-            cpu_mem, gpu_mem = 0, 0
+            cpu_rss_mb, gpu_rss_mb = 0, 0
             gpu_id = 0
             gpu_util = 0
             self.recorder.tic()
@@ -132,8 +132,8 @@ class Predictor(object):
 
             if self.recorder is not None:
                 cm, gm = Recorder.get_current_memory_mb(gpu_id)
-                cpu_mem += cm
-                gpu_mem += gm
+                cpu_rss_mb += cm
+                gpu_rss_mb += gm
                 gpu_util += Recorder.get_current_gputil(gpu_id)
 
             finished_sequence = output[0].transpose([0, 2, 1])
@@ -151,8 +151,8 @@ class Predictor(object):
         if self.recorder is not None:
             self.recorder.toc(samples)
             self.recorder.get_device_info(
-                cpu_mem=cpu_mem / len(test_loader),
-                gpu_mem=gpu_mem / len(test_loader),
+                cpu_rss_mb=cpu_rss_mb / len(test_loader),
+                gpu_rss_mb=gpu_rss_mb / len(test_loader),
                 gpu_util=gpu_util / len(test_loader))
             self.recorder.report()
         return outputs
@@ -160,7 +160,7 @@ class Predictor(object):
 
 def do_inference(args):
     # Define data loader
-    test_loader, to_tokens = reader.create_infer_loader(args, True)
+    test_loader, to_tokens = reader.create_infer_loader(args)
 
     predictor = Predictor.create_predictor(
         args=args, profile=args.profile, model_name=args.model_name)
