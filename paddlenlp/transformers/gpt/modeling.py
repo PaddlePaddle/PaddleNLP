@@ -485,6 +485,20 @@ class GPTPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
         },
+        "gpt-cpm-small-cn-distill": { # 109M
+            "vocab_size": 30000,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 1,  # no use
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
         "gpt3-13B-en": { # 13B
             "vocab_size": 50304,
             "hidden_size": 5120,
@@ -544,6 +558,8 @@ class GPTPretrainedModel(PretrainedModel):
         "model_state": {
             "gpt-cpm-large-cn":
             "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
+            "gpt-cpm-small-cn-distill":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
             "gpt2-medium-en":
             "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-medium-en.pdparams",
         }
