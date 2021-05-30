@@ -224,10 +224,11 @@ cd ../
     └── threadpool/
   └── version.txt
   ```
-* `-DDEMO` 说明预测库使用 demo 的位置。
+* `-DDEMO` 说明预测库使用 demo 的位置。比如指定 -DDEMO=./demo/transformer_e2e.cc 或是 -DDEMO=./demo/gpt.cc。
+* `-DWITH_GPT`，如果是编译 GPT 的预测库可执行文件，需要加上 `-DWITH_GPT=ON`。
 * **当使用预测库的自定义 op 的时候，请务必开启 `-DON_INFER=ON` 选项，否则，不会得到预测库的可执行文件。**
 
-#### 执行 decoding on PaddlePaddle
+#### 执行 Transformer decoding on PaddlePaddle
 
 编译完成后，在 `build/bin/` 路径下将会看到 `transformer_e2e` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
 
@@ -249,3 +250,28 @@ cd bin/
 * `DATA_HOME` 则是 `paddlenlp.utils.env.DATA_HOME` 返回的路径。
 
 预测所需要的模型文件，可以通过 `PaddleNLP/examples/machine_translation/transformer/faster_transformer/README.md` 文档中所记述的方式导出。
+
+#### 执行 GPT decoding on PaddlePaddle
+
+如果需要使用 Paddle Inference 预测库针对 GPT 进行预测，首先，需要导出预测模型，可以通过 `sample/gpt_export_model_sample.py` 脚本获取预测库用模型，执行方式如下所示：
+
+``` sh
+python sample/gpt_export_model_sample.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/libdecoding_op.so --batch_size 1 --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0 --inference_model_dir ./infer_model/
+```
+
+各个选项的意义与上文的 `gpt_sample.py` 的选项相同。额外新增一个 `--inference_model_dir` 选项用于指定保存的模型文件、词表等文件。若是使用的模型是 gpt2-medium-en，保存之后，`./infer_model/` 目录下组织的结构如下：
+
+``` text
+.
+├── gpt.pdiparams   # 保存的参数文件
+├── gpt.pdmodel     # 保存的模型文件
+├── merges.txt      # bpe
+└── vocab.txt       # 词表
+```
+
+同理，完成编译后，可以在 `build/bin/` 路径下将会看到 `gpt` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
+
+``` sh
+cd bin/
+./gpt -batch_size 1 -gpu_id 0 -model_dir path/to/model -vocab_dir path/to/vocab -start_token "<|endoftext|>" -end_token "<|endoftext|>"
+```
