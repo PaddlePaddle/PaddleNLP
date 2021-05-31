@@ -87,7 +87,7 @@ if __name__ == '__main__':
     test_ds.map(trans_func)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=word_vocab.get('OOV', 0), dtype='int64'),  # token_ids
+        Pad(axis=0, pad_val=word_vocab.get('OOV', 0), dtype='int32'),  # token_ids
         Stack(dtype='int64'),  # seq_len
         Pad(axis=0, pad_val=label_vocab.get('O', 0), dtype='int64')  # label_ids
     ): fn(samples)

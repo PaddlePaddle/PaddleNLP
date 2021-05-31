@@ -395,8 +395,7 @@ class ViterbiDecoder(nn.Layer):
         # avoid call fill_constant in iteration
         zeros = paddle.zeros([1], dtype='int64')
         ones = paddle.ones([1], dtype='int64')
-        emission = paddle.slice(inputs_t, [0], [0], [max_seq_len])
-        for i, logit in enumerate(emission):
+        for i, logit in enumerate(inputs_t[:max_seq_len]):
             # if not with_start_stop_tag, the first label has not antecedent tag.
             if i == 0 and not self.with_start_stop_tag:
                 alpha = logit
