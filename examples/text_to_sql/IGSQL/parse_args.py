@@ -1,3 +1,17 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import sys
 args = sys.argv
 
@@ -174,12 +188,5 @@ def interpret_args():
         raise ValueError('You need to be training or evaluating')
     if args.enable_testing and not args.evaluate:
         raise ValueError('You should evaluate the model if enabling testing')
-
-    # if args.train:
-    #     args_file = args.logdir + '/args.log'
-    #     if os.path.exists(args_file):
-    #         raise ValueError('Warning: arguments already exist in ' + str(args_file))
-    #     with open(args_file, 'w') as infile:
-    #         infile.write(str(args))
 
     return args

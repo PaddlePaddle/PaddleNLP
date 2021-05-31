@@ -1,14 +1,23 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Contains classes for computing and keeping track of attention distributions.
 """
 from collections import namedtuple
 
-# import torch
-# import torch.nn.functional as F
-
 import paddle
 import paddle.nn.functional as F
 import math
-# from . import torch_utils
 import numpy as np
 np.random.seed(0)
 
@@ -23,18 +32,18 @@ class Attention(paddle.nn.Layer):
     """Attention mechanism class. Stores parameters for and computes attention.
 
     Attributes:
-       transform_query (bool): Whether or not to transform the query being
+       transform_query (`bool`): Whether or not to transform the query being
            passed in with a weight transformation before computing attentino.
-       transform_key (bool): Whether or not to transform the key being
+       transform_key (`bool`): Whether or not to transform the key being
            passed in with a weight transformation before computing attentino.
-       transform_value (bool): Whether or not to transform the value being
+       transform_value (`bool`): Whether or not to transform the value being
            passed in with a weight transformation before computing attentino.
-       key_size (int): The size of the key vectors.
-       value_size (int): The size of the value vectors.
+       key_size (`int`): The size of the key vectors.
+       value_size (`int`): The size of the value vectors.
            the query or key.
-       query_weights (dy.Parameters): Weights for transforming the query.
-       key_weights (dy.Parameters): Weights for transforming the key.
-       value_weights (dy.Parameters): Weights for transforming the value.
+       query_weights (`Parameter`): Weights for transforming the query.
+       key_weights (`Parameter`): Weights for transforming the key.
+       value_weights (`Parameter`): Weights for transforming the value.
     """
 
     def __init__(self, query_size, key_size, value_size):
@@ -52,20 +61,17 @@ class Attention(paddle.nn.Layer):
             weight_attr=query_weights,
             bias_attr=False)
 
-        # 测试decoder
-        # self.query_linear.weight.set_value(paddle.to_tensor(np.random.random([self.query_linear.weight.shape[0],self.query_linear.weight.shape[1]]),dtype='float32'))
-
     def transform_arguments(self, query, keys, values):
         """ Transforms the query/key/value inputs before attention calculations.
 
         Arguments:
-            query (dy.Expression): Vector representing the query (e.g., hidden state.)
-            keys (list of dy.Expression): List of vectors representing the key
+            query (`Tensor`): Vector representing the query (e.g., hidden state.)
+            keys (`list`): List of vectors representing the key
                 values.
-            values (list of dy.Expression): List of vectors representing the values.
+            values (`list`): List of vectors representing the values.
 
         Returns:
-            triple of dy.Expression, where the first represents the (transformed)
+            `triple`: The first represents the (transformed)
                 query, the second represents the (transformed and concatenated)
                 keys, and the third represents the (transformed and concatenated)
                 values.
@@ -80,7 +86,7 @@ class Attention(paddle.nn.Layer):
                 self.key_size) + " but got " + str(all_keys.shape[0])
         assert all_values.shape[0] == self.value_size
 
-        # query = torch_utils.linear_layer(query, self.query_weights)
+        # query = model_utils.linear_layer(query, self.query_weights)
         if query.dim() == 1:
             query = query.unsqueeze(0)
         query = self.query_linear(query)

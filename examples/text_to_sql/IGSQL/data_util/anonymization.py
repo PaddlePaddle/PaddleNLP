@@ -15,6 +15,7 @@
 
 import copy
 import json
+
 from . import util
 
 ENTITY_NAME = "ENTITY"
@@ -26,11 +27,11 @@ SEPARATOR = "#"
 def timeval(string):
     """Returns the numeric version of a time.
 
-    Inputs:
-        string (str): String representing a time.
+    Args:
+        string (`str`): String representing a time.
 
     Returns:
-        String representing the absolute time.
+        `str`: String representing the absolute time.
     """
     if string.endswith("am") or string.endswith("pm") and string[:-2].isdigit():
         numval = int(string[:-2])
@@ -45,11 +46,11 @@ def timeval(string):
 def is_time(string):
     """Returns whether a string represents a time.
 
-    Inputs:
+    Args:
         string (str): String to check.
 
     Returns:
-        Whether the string represents a time.
+        `bool`: Whether the string represents a time.
     """
     if string.endswith("am") or string.endswith("pm"):
         if string[:-2].isdigit():
@@ -61,13 +62,13 @@ def is_time(string):
 def deanonymize(sequence, ent_dict, key):
     """Deanonymizes a sequence.
 
-    Inputs:
-        sequence (list of str): List of tokens to deanonymize.
-        ent_dict (dict str->(dict str->str)): Maps from tokens to the entity dictionary.
-        key (str): The key to use, in this case either natural language or SQL.
+    Args:
+        sequence (`list`): List of tokens to deanonymize.
+        ent_dict (`dict`): Maps from tokens to the entity dictionary.
+        key (`str`): The key to use, in this case either natural language or SQL.
 
     Returns:
-        Deanonymized sequence of tokens.
+        `list`: Deanonymized sequence of tokens.
     """
     new_sequence = []
     for token in sequence:
@@ -83,13 +84,13 @@ class Anonymizer:
     """Anonymization class for keeping track of entities in this domain and
        scripts for anonymizing/deanonymizing.
 
-    Members:
-        anonymization_map (list of dict (str->str)): Containing entities from
+    Attributes:
+        anonymization_map (`list`): Containing entities from
             the anonymization file.
-        entity_types (list of str): All entities in the anonymization file.
-        keys (set of str): Possible keys (types of text handled); in this case it should be
+        entity_types (`list`): All entities in the anonymization file.
+        keys (`set`): Possible keys (types of text handled); in this case it should be
             one for natural language and another for SQL.
-        entity_set (set of str): entity_types as a set.
+        entity_set (`set`): entity_types as a set.
     """
 
     def __init__(self, filename):
@@ -115,11 +116,11 @@ class Anonymizer:
     def get_entity_type_from_token(self, token):
         """Gets the type of an entity given an anonymized token.
 
-        Inputs:
-            token (str): The entity token.
+        Args:
+            token (`str`): The entity token.
 
         Returns:
-            str, representing the type of the entity.
+            `str`: representing the type of the entity.
         """
         # these are in the pattern NAME:#, so just strip the thing after the
         # colon
@@ -132,22 +133,22 @@ class Anonymizer:
     def is_anon_tok(self, token):
         """Returns whether a token is an anonymized token or not.
 
-        Input:
-            token (str): The token to check.
+        Args:
+            token (`str`): The token to check.
 
         Returns:
-            bool, whether the token is an anonymized token.
+            `bool`: whether the token is an anonymized token.
         """
         return token.split(SEPARATOR)[0] in self.entity_set
 
     def get_anon_id(self, token):
         """Gets the entity index (unique ID) for a token.
 
-        Input:
-            token (str): The token to get the index from.
+        Args:
+            token (`str`): The token to get the index from.
 
         Returns:
-            int, the token ID if it is an anonymized token; otherwise -1.
+            `int`: the token ID if it is an anonymized token; otherwise -1.
         """
         if self.is_anon_tok(token):
             return self.entity_types.index(token.split(SEPARATOR)[0])
@@ -161,15 +162,15 @@ class Anonymizer:
                   add_new_anon_toks=False):
         """Anonymizes a sequence.
 
-        Inputs:
-            sequence (list of str): Sequence to anonymize.
-            tok_to_entity_dict (dict): Existing dictionary mapping from anonymized
+        Args:
+            sequence (`list`): Sequence to anonymize.
+            tok_to_entity_dict (`dict`): Existing dictionary mapping from anonymized
                 tokens to entities.
-            key (str): Which kind of text this is (natural language or SQL)
-            add_new_anon_toks (bool): Whether to add new entities to tok_to_entity_dict.
+            key (`str`): Which kind of text this is (natural language or SQL)
+            add_new_anon_toks (`bool`): Whether to add new entities to tok_to_entity_dict.
 
         Returns:
-            list of str, the anonymized sequence.
+            `list`: The anonymized sequence.
         """
         # Sort the token-tok-entity dict by the length of the modality.
         sorted_dict = sorted(

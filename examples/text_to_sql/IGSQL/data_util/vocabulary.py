@@ -1,4 +1,18 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Contains class and methods for storing and computing a vocabulary from text."""
+
 import operator
 import os
 import pickle
@@ -12,24 +26,24 @@ DEL_TOK = ";"
 class Vocabulary:
     """Vocabulary class: stores information about words in a corpus.
 
-    Members:
-        functional_types (list of str): Functional vocabulary words, such as EOS.
-        max_size (int): The maximum size of vocabulary to keep.
-        min_occur (int): The minimum number of times a word should occur to keep it.
-        id_to_token (list of str): Ordered list of word types.
-        token_to_id (dict str->int): Maps from each unique word type to its index.
+    Attributes:
+        functional_types (`list`): Functional vocabulary words, such as EOS.
+        max_size (`int`): The maximum size of vocabulary to keep.
+        min_occur (`int`): The minimum number of times a word should occur to keep it.
+        id_to_token (`list`): Ordered list of word types.
+        token_to_id (`dict`): Maps from each unique word type to its index.
     """
 
     def get_vocab(self, sequences, ignore_fn):
         """Gets vocabulary from a list of sequences.
 
-        Inputs:
-            sequences (list of list of str): Sequences from which to compute the vocabulary.
-            ignore_fn (lambda str: bool): Function used to tell whether to ignore a
+        Args:
+            sequences (`list`): Sequences from which to compute the vocabulary.
+            ignore_fn (`function`): Function used to tell whether to ignore a
                 token during computation of the vocabulary.
 
         Returns:
-            list of str, representing the unique word types in the vocabulary.
+            `list`: List of the unique word types in the vocabulary.
         """
         type_counts = {}
 

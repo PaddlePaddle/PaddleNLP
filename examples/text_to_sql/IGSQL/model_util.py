@@ -1,3 +1,16 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Basic model training and evaluation functions."""
 
 from enum import Enum
@@ -6,9 +19,8 @@ import random
 import sys
 import json
 import progressbar
-import model.torch_utils
+import model.model_utils
 import data_util.sql_util
-# import torch
 import paddle
 
 
@@ -126,9 +138,9 @@ class Metrics(Enum):
 def get_progressbar(name, size):
     """Gets a progress bar object given a name and the total size.
 
-    Inputs:
-        name (str): The name to display on the side.
-        size (int): The maximum size of the progress bar.
+    Args:
+        name (`str`): The name to display on the side.
+        size (`int`): The maximum size of the progress bar.
 
     """
     return progressbar.ProgressBar(
@@ -142,15 +154,15 @@ def get_progressbar(name, size):
 def train_epoch_with_utterances(batches, model, randomize=True):
     """Trains model for a single epoch given batches of utterance data.
 
-    Inputs:
-        batches (UtteranceBatch): The batches to give to training.
-        model (ATISModel): The model obect.
-        learning_rate (float): The learning rate to use during training.
-        dropout_amount (float): Amount of dropout to set in the model.
-        randomize (bool): Whether or not to randomize the order that the batches are seen.
+    Args:
+        batches (`UtteranceBatch`): The batches to give to training.
+        model (`ATISModel`): The model obect.
+        learning_rate (`float`): The learning rate to use during training.
+        dropout_amount (`float`): Amount of dropout to set in the model.
+        randomize (`bool`): Whether or not to randomize the order that the batches are seen.
     """
-    # if randomize:
-    #     random.shuffle(batches)
+    if randomize:
+        random.shuffle(batches)
     progbar = get_progressbar("train     ", len(batches))
     progbar.start()
     loss_sum = 0.
@@ -177,11 +189,11 @@ def train_epoch_with_interactions(interaction_batches,
                                   step=None):
     """Trains model for single epoch given batches of interactions.
 
-    Inputs:
-        interaction_batches (list of InteractionBatch): The batches to train on.
-        params (namespace): Parameters to run with.
-        model (ATISModel): Model to train.
-        randomize (bool): Whether or not to randomize the order that batches are seen.
+    Args:
+        interaction_batches (`list`): The batches to train on.
+        params (`namespace`): Parameters to run with.
+        model (`ATISModel`): Model to train.
+        randomize (`bool`): Whether or not to randomize the order that batches are seen.
     """
     if randomize:
         random.shuffle(interaction_batches)
@@ -195,22 +207,10 @@ def train_epoch_with_interactions(interaction_batches,
     ]
     skip_num = 0
 
-    # error_utterance=interaction_batches[3010:3013]
-
-    # for utter in error_utterance:
-    #     for utter1 in utter.items:
-    #         for utter2 in utter1.interaction.utterances:
-    #             print(f"input_seq:{utter2.input_seq_to_use}")
-    #             print(f"gold_query:{utter2.gold_query_to_use}")
-    #             print("*"*100)
     for i, interaction_batch in enumerate(interaction_batches):
         assert len(interaction_batch) == 1
 
         interaction = interaction_batch.items[0]
-
-        # interaction = interaction_batches[1413].items[0]
-
-        # print(f"step {step} batch {i}:")
 
         if interaction.identifier == "raw/atis2/12-1.1/ATIS2/TEXT/TEST/NOV92/770/5":
             continue
@@ -239,7 +239,6 @@ def train_epoch_with_interactions(interaction_batches,
             step=step)
 
         loss_sum += batch_loss
-        #torch.cuda.empty_cache()
 
         progbar.update(i)
 
@@ -284,15 +283,6 @@ def update_sums(metrics,
                 len(gold_query)
 
     if Metrics.STRING_ACCURACY in metrics:
-        # if isinstance(flat_sequence[-1],int):
-        #     if Metrics.FIRST_ACC in metrics and flat_sequence[-1]==0:
-        #         flat_sequence.pop()
-        #         metrics_sums[Metrics.FIRST_ACC] += int(
-        #     flat_sequence == original_gold_query)
-        #     elif Metrics.AFTER_FIRST_ACC in metrics and flat_sequence[-1]!=0:
-        #         flat_sequence.pop()
-        #         metrics_sums[Metrics.AFTER_FIRST_ACC] += int(
-        #     flat_sequence == original_gold_query)
 
         metrics_sums[Metrics.STRING_ACCURACY] += int(
             flat_sequence == original_gold_query)
@@ -325,9 +315,9 @@ def update_sums(metrics,
 def construct_averages(metrics_sums, total_num):
     """ Computes the averages for metrics.
 
-    Inputs:
-        metrics_sums (dict Metric -> float): Sums for a metric.
-        total_num (int): Number to divide by (average).
+    Args:
+        metrics_sums (`dict`): Sums for a metric.
+        total_num (`int`): Number to divide by (average).
     """
     metrics_averages = {}
     if isinstance(total_num, int):
@@ -357,18 +347,18 @@ def evaluate_utterance_sample(sample,
                               write_results=False):
     """Evaluates a sample of utterance examples.
 
-    Inputs:
-        sample (list of Utterance): Examples to evaluate.
-        model (ATISModel): Model to predict with.
-        max_generation_length (int): Maximum length to generate.
-        name (str): Name to log with.
-        gold_forcing (bool): Whether to force the gold tokens during decoding.
-        metrics (list of Metric): Metrics to evaluate with.
-        total_num (int): Number to divide by when reporting results.
-        database_username (str): Username to use for executing queries.
-        database_password (str): Password to use when executing queries.
-        database_timeout (float): Timeout on queries when executing.
-        write_results (bool): Whether to write the results to a file.
+    Args:
+        sample (`list`): Examples to evaluate.
+        model (`ATISModel`): Model to predict with.
+        max_generation_length (`int`): Maximum length to generate.
+        name (`str`): Name to log with.
+        gold_forcing (`bool`): Whether to force the gold tokens during decoding.
+        metrics (`list`): Metrics to evaluate with.
+        total_num (`int`): Number to divide by when reporting results.
+        database_username (`str`): Username to use for executing queries.
+        database_password (`str`): Password to use when executing queries.
+        database_timeout (`float`): Timeout on queries when executing.
+        write_results (`bool`): Whether to write the results to a file.
     """
     assert metrics
 
@@ -392,7 +382,7 @@ def evaluate_utterance_sample(sample,
         predictions.append(predicted_seq)
 
         flat_sequence = item.flatten_sequence(predicted_seq)
-        token_accuracy = torch_utils.per_token_accuracy(item.gold_query(),
+        token_accuracy = model_utils.per_token_accuracy(item.gold_query(),
                                                         predicted_seq)
 
         if write_results:
@@ -469,10 +459,6 @@ def evaluate_interaction_sample(sample,
     model.eval()
 
     for i, interaction in enumerate(sample):
-        # if use_gpu and interaction.identifier in ignore_with_gpu:
-        #     continue
-        # elif not use_gpu and interaction.identifier not in ignore_with_gpu:
-        #     continue
         try:
             with paddle.no_grad():
                 if use_predicted_queries:
@@ -483,7 +469,6 @@ def evaluate_interaction_sample(sample,
                         interaction,
                         max_generation_length,
                         feed_gold_query=gold_forcing)
-                #torch.cuda.empty_cache()
         except RuntimeError as exception:
             print("Failed on interaction: " + str(interaction.identifier))
             print(exception)
@@ -569,8 +554,6 @@ def evaluate_interaction_sample(sample,
 
     if total_num < 0:
         total_num = num_utterances
-        # if num_after_first_utterances!=0 or num_first_utterances!=0:
-        #     total_num=[num_utterances, num_first_utterances, num_after_first_utterances]
 
     predictions_file.close()
     return construct_averages(metrics_sums, total_num), predictions

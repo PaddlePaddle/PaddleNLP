@@ -27,9 +27,9 @@ class ATISVocabulary():
     """ Stores the vocabulary for the ATIS data.
 
     Attributes:
-        raw_vocab (Vocabulary): Vocabulary object.
-        tokens (set of str): Set of all of the strings in the vocabulary.
-        inorder_tokens (list of str): List of all tokens, with a strict and
+        raw_vocab (`Vocabulary`): Vocabulary object.
+        tokens (`set`): Set of all of the strings in the vocabulary.
+        inorder_tokens (`list`): List of all tokens, with a strict and
             unchanging order.
     """
 
@@ -69,21 +69,21 @@ class ATISVocabulary():
     def token_to_id(self, token):
         """ Maps from a token to a unique ID.
 
-        Inputs:
-            token (str): The token to look up.
+        Args:
+            token (`str`): The token to look up.
 
         Returns:
-            int, uniquely identifying the token.
+            `int`: Uniquely identifying the token.
         """
         return self.raw_vocab.token_to_id[token]
 
     def id_to_token(self, identifier):
         """ Maps from a unique integer to an identifier.
 
-        Inputs:
-            identifier (int): The unique ID.
+        Args:
+            identifier (`int`): The unique ID.
 
         Returns:
-            string, representing the token.
+            `str`: Representing the token.
         """
         return self.raw_vocab.id_to_token[identifier]

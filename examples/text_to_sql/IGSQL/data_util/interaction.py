@@ -1,12 +1,24 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """ Contains the class for an interaction in ATIS. """
+
+import paddle
 
 from . import anonymization as anon
 from . import sql_util
 from .snippets import expand_snippets
 from .utterance import Utterance, OUTPUT_KEY, ANON_INPUT_KEY
-
-# import torch
-import paddle
 
 
 class Schema:
@@ -190,15 +202,6 @@ class Schema:
 
 
 class Interaction:
-    """ ATIS interaction class.
-
-    Attributes:
-        utterances (list of Utterance): The utterances in the interaction.
-        snippets (list of Snippet): The snippets that appear through the interaction.
-        anon_tok_to_ent:
-        identifier (str): Unique identifier for the interaction in the dataset.
-    """
-
     def __init__(self, utterances, schema, snippets, anon_tok_to_ent,
                  identifier, params):
         self.utterances = utterances
@@ -240,17 +243,17 @@ class Interaction:
     def deanonymize(self, sequence, key):
         """ Deanonymizes a predicted query or an input utterance.
 
-        Inputs:
-            sequence (list of str): The sequence to deanonymize.
-            key (str): The key in the anonymization table, e.g. NL or SQL.
+        Args:
+            sequence (`list`): The sequence to deanonymize.
+            key (`str`): The key in the anonymization table, e.g. NL or SQL.
         """
         return anon.deanonymize(sequence, self.anon_tok_to_ent, key)
 
     def expand_snippets(self, sequence):
         """ Expands snippets for a sequence.
 
-        Inputs:
-            sequence (list of str): A SQL query.
+        Args:
+            sequence (`list`): A SQL query.
 
         """
         return expand_snippets(sequence, self.snippets)

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import copy
+
 from . import snippets as snip
 from . import sql_util
 from . import vocabulary as vocab
@@ -180,10 +181,6 @@ class PredUtteranceItem():
 
     def set_predicted_query(self, query):
         self.anonymized_pred_query = query
-
-
-# Mocks an Interaction item, but allows for the parameters to be updated during
-# the process
 
 
 class InteractionItem():

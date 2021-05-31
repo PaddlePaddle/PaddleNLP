@@ -1,15 +1,25 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """ Decoder for the SQL generation problem."""
 
 from collections import namedtuple
 import numpy as np
 
-# import torch
-# import torch.nn.functional as F
-
 import paddle
 import paddle.nn.functional as F
 
-from . import torch_utils
+from . import model_utils
 
 from .token_predictor import PredictionInput, PredictionInputWithSchema
 import data_util.snippets as snippet_handler
@@ -25,12 +35,12 @@ def flatten_distribution(distribution_map, probabilities):
         of the probabilities.
 
         Arguments:
-            distribution_map (list of str): List of values to get the probability for.
-            probabilities (np.ndarray): Probabilities corresponding to the values in
+            distribution_map (`list`): List of values to get the probability for.
+            probabilities (`np.ndarray`): Probabilities corresponding to the values in
                 distribution_map.
 
         Returns:
-            list, np.ndarray of the same size where probabilities for duplicates
+            `list`: `np.ndarray` of the same size where probabilities for duplicates
                 in distribution_map are given the sum of the probabilities in probabilities.
     """
     assert len(distribution_map) == len(probabilities)
@@ -89,15 +99,8 @@ class SequencePredictorWithSchema(paddle.nn.Layer):
                  column_name_token_embedder, token_predictor):
         super().__init__()
 
-        # self.lstms = torch_utils.create_multilayer_lstm_params(params.decoder_num_layers, input_size, params.decoder_state_size, "LSTM-d")
         self.lstmCell = paddle.nn.LSTMCell(input_size,
                                            params.decoder_state_size)
-
-        # 测试decoder
-        # self.lstmCell.weight_hh.set_value(paddle.to_tensor(np.random.random([self.lstmCell.weight_hh.shape[0],self.lstmCell.weight_hh.shape[1]]),dtype='float32'))
-        # self.lstmCell.weight_ih.set_value(paddle.to_tensor(np.random.random([self.lstmCell.weight_ih.shape[0],self.lstmCell.weight_ih.shape[1]]),dtype='float32'))
-        # self.lstmCell.bias_hh.set_value(paddle.to_tensor(np.random.random([self.lstmCell.bias_hh.shape[0]]),dtype='float32'))
-        # self.lstmCell.bias_ih.set_value(paddle.to_tensor(np.random.random([self.lstmCell.bias_ih.shape[0]]),dtype='float32'))
 
         self.token_predictor = token_predictor
         self.output_embedder = output_embedder
@@ -110,18 +113,11 @@ class SequencePredictorWithSchema(paddle.nn.Layer):
                 low=-0.1, high=0.1))
         self.add_parameter("start_token_embedding", start_token_embedding)
 
-        # self.start_token_embedding = torch_utils.add_params((params.output_embedding_size,))
-        # 测试decoder
-        # self.start_token_embedding = paddle.to_tensor(np.random.random([self.start_token_embedding.shape[0]]),dtype='float32')
         self.input_size = input_size
         self.params = params
 
     def _initialize_decoder_lstm(self, encoder_state):
         decoder_lstm_states = []
-        # for i, lstm in enumerate(self.lstms):
-        #     encoder_layer_num = 0
-        #     if len(encoder_state[0]) > 1:
-        #         encoder_layer_num = i
 
         # check which one is h_0, which is c_0
         c_0 = encoder_state[1].reshape([1, -1])
@@ -203,30 +199,16 @@ class SequencePredictorWithSchema(paddle.nn.Layer):
 
         decoder_states = self._initialize_decoder_lstm(final_encoder_state)[0]
 
-        # temp=decoder_states
-
-        # if self.start_token_embedding.is_cuda:
-        #     decoder_input = paddle.concat([self.start_token_embedding, paddle.zeros(context_vector_size).cuda()], axis=0)
-        # else:
         decoder_input = paddle.concat(
             [self.start_token_embedding, paddle.zeros([context_vector_size])],
             axis=0)
-        # num=0
         continue_generating = True
         while continue_generating:
             if len(sequence) == 0 or sequence[-1] != EOS_TOK:
-                # print(f"continue_generating {num}")
-                # num+=1
-
-                # _, decoder_state, decoder_states = torch_utils.forward_one_multilayer(self.lstms, decoder_input, decoder_states, dropout_amount)
 
                 decoder_state, decoder_states = self.lstmCell(
                     decoder_input.unsqueeze(0), decoder_states)
                 decoder_state = decoder_state.squeeze()
-                # is_nan=[paddle.cast(paddle.isnan(decoder_states[i][j]),'float32') for i in range(len(decoder_states)) for j in range(len(decoder_states[i]))]
-                # if sum([paddle.sum(i).numpy() for i in is_nan])!=0:
-                #     print(f"decoder_states:{temp}")
-                #     print(f"final_encoder_state:{final_encoder_state}")
 
                 prediction_input = PredictionInputWithSchema(
                     decoder_state=decoder_state,

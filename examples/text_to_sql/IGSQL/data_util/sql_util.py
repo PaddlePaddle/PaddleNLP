@@ -1,28 +1,42 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import copy
-import pymysql
 import random
+
+import pymysql
 import signal
 import sqlparse
-from . import util
-
-from .snippets import Snippet
 from sqlparse import tokens as token_types
 from sqlparse import sql as sql_types
+
+from . import util
+from .snippets import Snippet
 
 interesting_selects = ["DISTINCT", "MAX", "MIN", "count"]
 ignored_subtrees = [["1", "=", "1"]]
 
-# strip_whitespace_front
-# Strips whitespace and punctuation from the front of a SQL token list.
-#
-# Inputs:
-#    token_list: the token list.
-#
-# Outputs:
-#    new token list.
-
 
 def strip_whitespace_front(token_list):
+    """Strips whitespace and punctuation from the front of a SQL token list.
+
+    Args:
+        token_list(`list`): the token list.
+
+    Outputs:
+        `list`: New token list.
+    """
     new_token_list = []
     found_valid = False
 
@@ -35,34 +49,30 @@ def strip_whitespace_front(token_list):
     return new_token_list
 
 
-# strip_whitespace
-# Strips whitespace from a token list.
-#
-# Inputs:
-#    token_list: the token list.
-#
-# Outputs:
-#    new token list with no whitespace/punctuation surrounding.
-
-
 def strip_whitespace(token_list):
+    """ Strips whitespace from a token list.
+    
+    Args:
+        token_list(`list`): the token list.
+
+    Returns:
+        `list`: New token list with no whitespace/punctuation surrounding.
+    """
     subtokens = strip_whitespace_front(token_list)
     subtokens = strip_whitespace_front(subtokens[::-1])[::-1]
     return subtokens
 
 
-# token_list_to_seq
-# Converts a Token list to a sequence of strings, stripping out surrounding
-# punctuation and all whitespace.
-#
-# Inputs:
-#    token_list: the list of tokens.
-#
-# Outputs:
-#    list of strings
-
-
 def token_list_to_seq(token_list):
+    """Converts a Token list to a sequence of strings, stripping out surrounding
+    punctuation and all whitespace.
+
+    Args:
+        token_list(`list`): the list of tokens.
+
+    Outputs:
+        `list`: sequence of strings
+    """
     subtokens = strip_whitespace(token_list)
 
     seq = []
@@ -78,24 +88,20 @@ def token_list_to_seq(token_list):
     return seq
 
 
-# TODO: clean this up
-# find_subtrees
-# Finds subtrees for a subsequence of SQL.
-#
-# Inputs:
-#   sequence: sequence of SQL tokens.
-#   current_subtrees: current list of subtrees.
-#
-# Optional inputs:
-#   where_parent: whether the parent of the current sequence was a where clause
-#   keep_conj_subtrees: whether to look for a conjunction in this sequence and
-#                       keep its arguments
-
-
 def find_subtrees(sequence,
                   current_subtrees,
                   where_parent=False,
                   keep_conj_subtrees=False):
+    """Finds subtrees for a subsequence of SQL.
+    
+    Args:
+      sequence(`list`): Sequence of SQL tokens.
+      current_subtrees(`list`): Current list of subtrees.
+      where_parent(`bool`, optional): Whether the parent of the current sequence was a where clause
+      keep_conj_subtrees('bool', optional): Whether to look for a conjunction in this sequence and
+                          keep its arguments
+    """
+
     # If the parent of the subsequence was a WHERE clause, keep everything in the
     # sequence except for the beginning WHERE and any surrounding parentheses.
     if where_parent:
@@ -172,9 +178,6 @@ def find_subtrees(sequence,
             # Recursively find subtrees in the children of the node.
             find_subtrees(token, current_subtrees, is_where, where_parent or
                           keep_conj_subtrees)
-
-
-# get_subtrees
 
 
 def get_subtrees(sql, oldsnippets=[]):
@@ -342,9 +345,6 @@ def get_sql_snippets(sequence):
     exit()
 
 
-# add_snippets_to_query
-
-
 def add_snippets_to_query(snippets, ignored_entities, query, prob_align=1.):
     query_copy = copy.copy(query)
 
@@ -355,7 +355,6 @@ def add_snippets_to_query(snippets, ignored_entities, query, prob_align=1.):
         ignore = False
         snippet_seq = snippet.sequence
 
-        # TODO: continue here
         # If it contains an ignored entity, then don't use it.
         for entity in ignored_entities:
             ignore = ignore or util.subsequence(entity, snippet_seq)

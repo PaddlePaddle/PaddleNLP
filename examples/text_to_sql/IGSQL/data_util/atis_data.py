@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """ Utility functions for loading and processing ATIS data."""
+
 import os
 import random
 import json
@@ -19,7 +20,6 @@ import json
 from . import anonymization as anon
 from . import atis_batch
 from . import dataset_split as ds
-
 from .interaction import load_function
 from .entities import NLtoSQLDict
 from .atis_vocab import ATISVocabulary
@@ -300,12 +300,15 @@ class ATISDataset():
                              sorted_by_length=False):
         """Gets all interactions in a dataset that fit the criteria.
 
-        Inputs:
-            dataset (ATISDatasetSplit): The dataset to use.
-            max_interaction_length (int): Maximum interaction length to keep.
-            max_input_length (int): Maximum input sequence length to keep.
-            max_output_length (int): Maximum output sequence length to keep.
-            sorted_by_length (bool): Whether to sort the examples by interaction length.
+        Args:
+            dataset (`ATISDatasetSplit`): The dataset to use.
+            max_interaction_length (`int`): Maximum interaction length to keep.
+            max_input_length (`int`): Maximum input sequence length to keep.
+            max_output_length (`int`): Maximum output sequence length to keep.
+            sorted_by_length (`bool`): Whether to sort the examples by interaction length.
+
+        Returns:
+            `list`: All interactions.
         """
         ints = [
             atis_batch.InteractionItem(
@@ -318,8 +321,6 @@ class ATISDataset():
         else:
             return ints
 
-    # This defines a standard way of training: each example is an utterance, and
-    # the batch can contain unrelated utterances.
     def get_utterance_batches(self,
                               batch_size,
                               max_input_length=float('inf'),
@@ -327,11 +328,14 @@ class ATISDataset():
                               randomize=False):
         """Gets batches of utterances in the data.
 
-        Inputs:
-            batch_size (int): Batch size to use.
-            max_input_length (int): Maximum length of input to keep.
-            max_output_length (int): Maximum length of output to use.
-            randomize (bool): Whether to randomize the ordering.
+        Args:
+            batch_size (`int`): Batch size to use.
+            max_input_length (`int`): Maximum length of input to keep.
+            max_output_length (`int`): Maximum length of output to use.
+            randomize (`bool`): Whether to randomize the ordering.
+        
+        Returns:
+            `list`: Batches of utterances.
         """
         # First, get all interactions and the positions of the utterances that are
         # possible in them.
@@ -362,12 +366,16 @@ class ATISDataset():
                                 randomize=False):
         """Gets batches of interactions in the data.
 
-        Inputs:
-            batch_size (int): Batch size to use.
-            max_interaction_length (int): Maximum length of interaction to keep
-            max_input_length (int): Maximum length of input to keep.
-            max_output_length (int): Maximum length of output to keep.
-            randomize (bool): Whether to randomize the ordering.
+        Args:
+            batch_size (`int`): Batch size to use.
+            max_interaction_length (`int`): Maximum length of interaction to keep
+            max_input_length (`int`): Maximum length of input to keep.
+            max_output_length (`int`): Maximum length of output to keep.
+            randomize (`bool`): Whether to randomize the ordering.
+        
+        Returns:
+            `list`: Batches of interactions.
+
         """
         items = self.get_all_interactions(
             self.train_data,
@@ -375,8 +383,8 @@ class ATISDataset():
             max_input_length,
             max_output_length,
             sorted_by_length=not randomize)
-        # if randomize:
-        #     random.shuffle(items)
+        if randomize:
+            random.shuffle(items)
 
         batches = []
         current_batch_items = []
@@ -397,14 +405,17 @@ class ATISDataset():
                               max_output_length=float('inf')):
         """Gets a random selection of utterances in the data.
 
-        Inputs:
-            num_samples (bool): Number of random utterances to get.
-            max_input_length (int): Limit of input length.
-            max_output_length (int): Limit on output length.
+        Args:
+            num_samples (`bool`): Number of random utterances to get.
+            max_input_length (`int`): Limit of input length.
+            max_output_length (`int`): Limit on output length.
+        
+        Returns:
+            `list`: A random selection of utterances.
         """
         items = self.get_all_utterances(self.train_data, max_input_length,
                                         max_output_length)
-        # random.shuffle(items)
+        random.shuffle(items)
         return items[:num_samples]
 
     def get_random_interactions(self,
@@ -414,10 +425,13 @@ class ATISDataset():
                                 max_output_length=float('inf')):
         """Gets a random selection of interactions in the data.
 
-        Inputs:
-            num_samples (bool): Number of random interactions to get.
-            max_input_length (int): Limit of input length.
-            max_output_length (int): Limit on output length.
+        Args:
+            num_samples (`bool`): Number of random interactions to get.
+            max_input_length (`int`): Limit of input length.
+            max_output_length (`int`): Limit on output length.
+
+        Returns:
+            A random selection of interactions.
         """
         items = self.get_all_interactions(self.train_data,
                                           max_interaction_length,

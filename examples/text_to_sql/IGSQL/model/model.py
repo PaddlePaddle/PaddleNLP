@@ -1,18 +1,27 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """ Class for the Sequence to sequence model for ATIS."""
 
 import os
 
-# import torch
-# import torch.nn.functional as F
-
 import paddle
 
-from . import torch_utils
+from . import model_utils
 from . import utils_ernie
 
 from data_util.vocabulary import DEL_TOK, UNK_TOK
 
-# from .encoder import Encoder
 from .embedder import Embedder
 from .token_predictor import construct_token_predictor
 
@@ -26,12 +35,12 @@ import pickle
 def get_token_indices(token, index_to_token):
     """ Maps from a gold token (string) to a list of indices.
 
-    Inputs:
-        token (string): String to look up.
-        index_to_token (list of tokens): Ordered list of tokens.
+    Args:
+        token (`string`): String to look up.
+        index_to_token (`list`): Ordered list of tokens.
 
     Returns:
-        list of int, representing the indices of the token in the probability
+        `list`: Representing the indices of the token in the probability
             distribution.
     """
     if token in index_to_token:
@@ -39,10 +48,7 @@ def get_token_indices(token, index_to_token):
             return [index_to_token.index(token)]
         else:
             indices = []
-            # print(f"token:{token}")
-            # print(f"index_to_token:{index_to_token}")
             for index, other_token in enumerate(index_to_token):
-                # print(f"token:{token}==other_token:{other_token}")
                 if token == other_token:
                     indices.append(index)
             assert len(indices) == len(set(indices))
@@ -54,11 +60,11 @@ def get_token_indices(token, index_to_token):
 def flatten_utterances(utterances):
     """ Gets a flat sequence from a sequence of utterances.
 
-    Inputs:
-        utterances (list of list of str): Utterances to concatenate.
+    Args:
+        utterances (`list`): Utterances to concatenate.
 
     Returns:
-        list of str, representing the flattened sequence with separating
+        `list`: Representing the flattened sequence with separating
             delimiter tokens.
     """
     sequence = []
@@ -73,10 +79,9 @@ def flatten_utterances(utterances):
 def encode_snippets_with_states(snippets, states):
     """ Encodes snippets by using previous query states instead.
 
-    Inputs:
-        snippets (list of Snippet): Input snippets.
-        states (list of dy.Expression): Previous hidden states to use.
-        TODO: should this by dy.Expression or vector values?
+    Args:
+        snippets (`list`): Input snippets.
+        states (`list`): Previous hidden states to use.
     """
     for snippet in snippets:
         snippet.set_embedding(
@@ -199,50 +204,6 @@ class ATISModel(paddle.nn.Layer):
                     anonymizer=anonymizer,
                     freeze=False)
                 self.column_name_token_embedder = None
-        #     else:
-        #         input_vocabulary_embeddings, output_vocabulary_embeddings, output_vocabulary_schema_embeddings, input_embedding_size = load_word_embeddings(input_vocabulary, output_vocabulary, output_vocabulary_schema, params)
-
-        #         params.input_embedding_size = input_embedding_size
-        #         self.params.input_embedding_size = input_embedding_size
-
-        #         # Create the input embeddings
-        #         self.input_embedder = Embedder(params.input_embedding_size,
-        #                                        name="input-embedding",
-        #                                        initializer=input_vocabulary_embeddings,
-        #                                        vocabulary=input_vocabulary,
-        #                                        anonymizer=anonymizer,
-        #                                        freeze=params.freeze)
-
-        #         # Create the output embeddings
-        #         self.output_embedder = Embedder(params.output_embedding_size,
-        #                                         name="output-embedding",
-        #                                         initializer=output_vocabulary_embeddings,
-        #                                         vocabulary=output_vocabulary,
-        #                                         anonymizer=anonymizer,
-        #                                         freeze=False)
-
-        #         self.column_name_token_embedder = Embedder(params.input_embedding_size,
-        #                                         name="schema-embedding",
-        #                                         initializer=output_vocabulary_schema_embeddings,
-        #                                         vocabulary=output_vocabulary_schema,
-        #                                         anonymizer=anonymizer,
-        #                                         freeze=params.freeze)
-        # else:
-        #     # Create the input embeddings
-        #     self.input_embedder = Embedder(params.input_embedding_size,
-        #                                    name="input-embedding",
-        #                                    vocabulary=input_vocabulary,
-        #                                    anonymizer=anonymizer,
-        #                                    freeze=False)
-
-        #     # Create the output embeddings
-        #     self.output_embedder = Embedder(params.output_embedding_size,
-        #                                     name="output-embedding",
-        #                                     vocabulary=output_vocabulary,
-        #                                     anonymizer=anonymizer,
-        #                                     freeze=False)
-
-        #     self.column_name_token_embedder = None
 
         # Create the encoder
         encoder_input_size = params.input_embedding_size
@@ -253,7 +214,6 @@ class ATISModel(paddle.nn.Layer):
         if params.discourse_level_lstm:
             encoder_input_size += params.encoder_state_size // 2
 
-        # self.utterance_encoder = Encoder(params.encoder_num_layers, encoder_input_size, encoder_output_size)
         self.utterance_encoder = paddle.nn.LSTM(
             encoder_input_size,
             encoder_output_size // 2,
@@ -274,7 +234,6 @@ class ATISModel(paddle.nn.Layer):
 
         # Create the discourse-level LSTM parameters
         if params.discourse_level_lstm:
-            # self.discourse_lstms = torch_utils.create_multilayer_lstm_params(1, params.encoder_state_size, params.encoder_state_size / 2, "LSTM-t")
             self.discourse_lstms = paddle.nn.LSTMCell(
                 params.encoder_state_size, params.encoder_state_size // 2)
 
@@ -286,25 +245,8 @@ class ATISModel(paddle.nn.Layer):
             self.add_parameter("initial_discourse_state",
                                initial_discourse_state)
 
-            # self.initial_discourse_state = torch_utils.add_params(tuple([params.encoder_state_size // 2]))
-
         # Snippet encoder
         final_snippet_size = 0
-        # if params.use_snippets and not params.previous_decoder_snippet_encoding:
-        #     snippet_encoding_size = int(params.encoder_state_size / 2)
-        #     final_snippet_size = params.encoder_state_size
-        #     if params.snippet_age_embedding:
-        #         snippet_encoding_size -= int(
-        #             params.snippet_age_embedding_size / 4)
-        #         self.snippet_age_embedder = Embedder(
-        #             params.snippet_age_embedding_size,
-        #             name="snippet-age-embedding",
-        #             num_tokens=params.max_snippet_age_embedding)
-        #         final_snippet_size = params.encoder_state_size + params.snippet_age_embedding_size / 2
-
-        #     self.snippet_encoder = Encoder(params.snippet_num_layers,
-        #                                    params.output_embedding_size,
-        #                                    snippet_encoding_size)
 
         # Previous query Encoder
         if params.use_previous_query:
@@ -313,63 +255,16 @@ class ATISModel(paddle.nn.Layer):
                 params.encoder_state_size // 2,
                 num_layers=params.encoder_num_layers,
                 direction='bidirect')
-            # Encoder(params.encoder_num_layers, params.output_embedding_size, params.encoder_state_size)
 
         self.final_snippet_size = final_snippet_size
-
-# def _encode_snippets(self, previous_query, snippets, input_schema):
-#     """ Computes a single vector representation for each snippet.
-
-#     Inputs:
-#         previous_query (list of str): Previous query in the interaction.
-#         snippets (list of Snippet): Snippets extracted from the previous
-
-#     Returns:
-#         list of Snippets, where the embedding is set to a vector.
-#     """
-#     startpoints = [snippet.startpos for snippet in snippets]
-#     endpoints = [snippet.endpos for snippet in snippets]
-#     assert len(startpoints) == 0 or min(startpoints) >= 0
-#     if input_schema:
-#         assert len(endpoints) == 0 or max(endpoints) <= len(previous_query)
-#     else:
-#         assert len(endpoints) == 0 or max(endpoints) < len(previous_query)
-
-#     snippet_embedder = lambda query_token: self.get_query_token_embedding(query_token, input_schema)
-#     if previous_query and snippets:
-#         _, previous_outputs = self.snippet_encoder(
-#             previous_query, snippet_embedder, dropout_amount=self.dropout)
-#         assert len(previous_outputs) == len(previous_query)
-
-#         for snippet in snippets:
-#             if input_schema:
-#                 embedding = paddle.concat([previous_outputs[snippet.startpos],previous_outputs[snippet.endpos-1]], axis=0)
-#             else:
-#                 embedding = paddle.concat([previous_outputs[snippet.startpos],previous_outputs[snippet.endpos]], axis=0)
-#             if self.params.snippet_age_embedding:
-#                 embedding = paddle.concat([embedding, self.snippet_age_embedder(min(snippet.age, self.params.max_snippet_age_embedding - 1))], axis=0)
-#             snippet.set_embedding(embedding)
-
-#     return snippets
 
     def _initialize_discourse_states(self):
         discourse_state = self.initial_discourse_state
 
-        # discourse_lstm_states = []
-        # for lstm in self.discourse_lstms:
         hidden_size = self.discourse_lstms.weight_hh.shape[1]
-        # if paddle.get_device()=='cpu':
-        # h_0 = torch.cuda.FloatTensor(1,hidden_size).fill_(0)
-        # c_0 = torch.cuda.FloatTensor(1,hidden_size).fill_(0)
 
         h_0 = paddle.zeros([1, hidden_size])
         c_0 = paddle.zeros([1, hidden_size])
-
-        # else:
-        #     # h_0 = torch.zeros(1,hidden_size)
-        #     # c_0 = torch.zeros(1,hidden_size)
-
-        # discourse_lstm_states.append((h_0, c_0))
 
         return discourse_state, (h_0, c_0)
 
@@ -439,11 +334,8 @@ class ATISModel(paddle.nn.Layer):
                 learning_rate=self.scheduler,
                 grad_clip=clip)
         else:
-            #print('decoder warmup scheduler')
-            sss = 1.0  #paddle.optimizer.lr.LinearWarmup(self.params.initial_learning_rate, 100, 0, self.params.initial_learning_rate)
             self.trainer = paddle.optimizer.Adam(
-                parameters=params_trainer, learning_rate=sss
-            )  #self.params.initial_learning_rate,grad_clip=clip)
+                parameters=params_trainer, learning_rate=1.0, grad_clip=clip)
         if self.params.fine_tune_bert:
             if self.params.scheduler:
                 self.scheduler = paddle.optimizer.lr.ReduceOnPlateau(
@@ -454,25 +346,25 @@ class ATISModel(paddle.nn.Layer):
                     learning_rate=self.scheduler,
                     grad_clip=clip)
             else:
-                # print("bert warmup scheduler")
-                yyy = 1.0  #paddle.optimizer.lr.LinearWarmup(self.params.initial_learning_rate*0.01, 100, 0, self.params.initial_learning_rate*0.01)
+                yyy = 1.0
                 self.bert_trainer = paddle.optimizer.Adam(
                     parameters=params_bert_trainer,
-                    learning_rate=yyy)  #)self.params.lr_bert,grad_clip=clip)
+                    learning_rate=1.0,
+                    grad_clip=clip)
 
     def set_dropout(self, value):
         """ Sets the dropout to a specified value.
 
-        Inputs:
-            value (float): Value to set dropout to.
+        Args:
+            value (`float`): Value to set dropout to.
         """
         self.dropout = value
 
     def set_learning_rate(self, value):
         """ Sets the learning rate for the trainer.
 
-        Inputs:
-            value (float): The new learning rate.
+        Args:
+            value (`float`): The new learning rate.
         """
         #return
         for param_group in self.trainer._parameter_list:
@@ -492,16 +384,16 @@ class ATISModel(paddle.nn.Layer):
     def save(self, filename):
         """ Saves the model to the specified filename.
 
-        Inputs:
-            filename (str): The filename to save to.
+        Args:
+            filename (`str`): The filename to save to.
         """
         paddle.save(self.state_dict(), filename)
 
     def load(self, filename):
         """ Loads saved parameters into the parameter collection.
 
-        Inputs:
-            filename (str): Name of file containing parameters.
+        Args:
+            filename (`str`): Name of file containing parameters.
         """
         self.load_dict(paddle.load(filename))
         print("Loaded model from file " + filename)

@@ -1,32 +1,31 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 # modified from https://github.com/naver/sqlova
 
 import os, json
 import random as rd
 from copy import deepcopy
 
-# import torch
-# import torch.nn as nn
-# import torch.nn.functional as F
-
 import paddle
 import paddle.nn as nn
 
-# from .bert import tokenization as tokenization
-# from .bert.modeling import BertConfig, BertModel
-
-from .bert.modeling import BertModel
 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
-
-# from .ernie import ErnieModel,ErnieTokenizer
-
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def get_ernie(params):
     with open("model/ernie/ernie-2.0-en/ernie_config.json") as ifs:
         ernie_config = json.load(ifs)
-    # model_ernie = ErnieModel.from_pretrained('ernie-2.0-en')
-    # tokenizer = ErnieTokenizer.from_pretrained('ernie-2.0-en')
 
     model_ernie = BertModel.from_pretrained("bert-base-uncased")
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
@@ -102,22 +101,6 @@ def gen_l_hpu(i_hds):
 def get_ernie_output(model_ernie, tokenizer, nlu_t, hds, max_seq_length):
     """
     Here, input is toknized further by WordPiece (WP) tokenizer and fed into BERT.
-
-    INPUT
-    :param model_bert:
-    :param tokenizer: WordPiece toknizer
-    :param nlu: Question
-    :param nlu_t: CoreNLP tokenized nlu.
-    :param hds: Headers
-    :param hs_t: None or 1st-level tokenized headers
-    :param max_seq_length: max input token length
-
-    OUTPUT
-    tokens: BERT input tokens
-    nlu_tt: WP-tokenized input natural language questions
-    orig_to_tok_index: map the index of 1st-level-token to the index of 2nd-level-token
-    tok_to_orig_index: inverse map.
-
     """
 
     l_n = []
@@ -215,8 +198,6 @@ def get_ernie_output(model_ernie, tokenizer, nlu_t, hds, max_seq_length):
 
     # 4. Generate BERT output.
     # pooled_output, all_encoder_layer = model_ernie(src_ids=all_input_ids,sent_ids=all_sent_ids)
-    if len(all_input_ids) > 1:
-        print("大于2")
     all_encoder_layer, pooled_output = model_ernie(
         all_input_ids, token_type_ids=all_segment_ids)
 

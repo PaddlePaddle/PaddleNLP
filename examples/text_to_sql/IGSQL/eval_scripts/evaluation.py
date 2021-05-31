@@ -1,3 +1,31 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import os
+import sys
+import json
+import traceback
+import argparse
+
+import sqlite3
+from process_sql import tokenize, get_schema, get_tables_with_alias, Schema, get_sql
+
+# Flag to disable value evaluation
+DISABLE_VALUE = True
+# Flag to disable distinct in select evaluation
+DISABLE_DISTINCT = True
+
 ################################
 # val: number(float)/string(str)/sql(dict)
 # col_unit: (agg_id, col_id, isDistinct(bool))
@@ -18,19 +46,6 @@
 #   'union': None/sql
 # }
 ################################
-
-import os, sys
-import json
-import sqlite3
-import traceback
-import argparse
-
-from process_sql import tokenize, get_schema, get_tables_with_alias, Schema, get_sql
-
-# Flag to disable value evaluation
-DISABLE_VALUE = True
-# Flag to disable distinct in select evaluation
-DISABLE_DISTINCT = True
 
 CLAUSE_KEYWORDS = ('select', 'from', 'where', 'group', 'order', 'limit',
                    'intersect', 'union', 'except')
@@ -586,8 +601,6 @@ def evaluate(gold, predict, db_dir, etype, kmaps):
         plist = [
             l.strip().split('\t') for l in f.readlines() if len(l.strip()) > 0
         ]
-    # plist = [("select max(Share),min(Share) from performance where Type != 'terminal'", "orchestra")]
-    # glist = [("SELECT max(SHARE) ,  min(SHARE) FROM performance WHERE TYPE != 'Live final'", "orchestra")]
     evaluator = Evaluator()
 
     levels = ['easy', 'medium', 'hard', 'extra', 'all']

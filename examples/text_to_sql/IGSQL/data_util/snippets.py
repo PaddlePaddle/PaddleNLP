@@ -1,8 +1,17 @@
-""" Contains the Snippet class and methods for handling snippets.
-
-Attributes:
-    SNIPPET_PREFIX: string prefix for snippets.
-"""
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+""" Contains the Snippet class and methods for handling snippets."""
 
 SNIPPET_PREFIX = "SNIPPET_"
 
@@ -10,11 +19,11 @@ SNIPPET_PREFIX = "SNIPPET_"
 def is_snippet(token):
     """ Determines whether a token is a snippet or not.
 
-    Inputs:
-        token (str): The token to check.
+    Args:
+        token (`str`): The token to check.
 
     Returns:
-        bool, indicating whether it's a snippet.
+        `bool`: Indicating whether it's a snippet.
     """
     return token.startswith(SNIPPET_PREFIX)
 
@@ -22,11 +31,12 @@ def is_snippet(token):
 def expand_snippets(sequence, snippets):
     """ Given a sequence and a list of snippets, expand the snippets in the sequence.
 
-    Inputs:
-        sequence (list of str): Query containing snippet references.
-        snippets (list of Snippet): List of available snippets.
+    Args:
+        sequence (`list`): Query containing snippet references.
+        snippets (`list`): List of available snippets.
 
-    return list of str representing the expanded sequence
+    Returns:
+        `list`: The expanded sequence list.
     """
     snippet_id_to_snippet = {}
     for snippet in snippets:
@@ -46,11 +56,11 @@ def expand_snippets(sequence, snippets):
 def snippet_index(token):
     """ Returns the index of a snippet.
 
-    Inputs:
-        token (str): The snippet to check.
+    Args:
+        token (`str`): The snippet to check.
 
     Returns:
-        integer, the index of the snippet.
+        `int`: The index of the snippet.
     """
     assert is_snippet(token)
     return int(token.split("_")[-1])
@@ -96,10 +106,5 @@ class Snippet():
         self.name = SNIPPET_PREFIX + str(number)
 
     def set_embedding(self, embedding):
-        """ Sets the embedding of the snippet.
-
-        Inputs:
-            embedding (dy.Expression)
-
-        """
+        """ Sets the embedding of the snippet. """
         self.embedding = embedding

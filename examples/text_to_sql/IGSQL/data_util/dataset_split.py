@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Utility functions for loading and processing ATIS data.
-"""
+"""Utility functions for loading and processing ATIS data."""
+
 import os
 import pickle
 
@@ -21,7 +21,7 @@ class DatasetSplit:
     """Stores a split of the ATIS dataset.
 
     Attributes:
-        examples (list of Interaction): Stores the examples in the split.
+        examples (`list`): Stores the examples in the split.
     """
 
     def __init__(self, processed_filename, raw_filename, load_function):
@@ -54,12 +54,11 @@ class DatasetSplit:
     def get_ex_properties(self, function):
         """ Applies some function to the examples in the dataset.
 
-        Inputs:
-            function: (lambda Interaction -> T): Function to apply to all
-                examples.
+        Args:
+            function (`function`): Function to apply to all examples.
 
         Returns
-            list of the return value of the function
+            `list`: The return value of the function
         """
         elems = []
         for example in self.examples:

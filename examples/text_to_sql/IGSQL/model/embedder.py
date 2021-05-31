@@ -1,7 +1,17 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """ Embedder for tokens. """
-
-# import torch
-# import torch.nn.functional as F
 
 import paddle
 
@@ -55,28 +65,15 @@ class Embedder(paddle.nn.Layer):
             self.vocabulary_size) + " x " + str(embedding_size))
 
         if initializer is not None:
-            # word_embeddings_tensor = paddle.to_tensor(initializer, 'float32')
-            # self.token_embedding_matrix = torch.nn.Embedding.from_pretrained(word_embeddings_tensor, freeze=freeze)
             self.token_embedding_matrix = paddle.nn.Embedding(
                 initializer.shape[0], initializer.shape[1])
             self.token_embedding_matrix.weight.set_value(initializer)
         else:
-            # init_tensor = torch.empty(self.vocabulary_size, embedding_size).uniform_(-0.1, 0.1)
-            # self.token_embedding_matrix = torch.nn.Embedding.from_pretrained(init_tensor, freeze=False)
             initializer = paddle.nn.initializer.Uniform(low=-0.1, high=0.1)
             init_tensor = paddle.ParamAttr(
                 initializer=initializer, trainable=True)
             self.token_embedding_matrix = paddle.nn.Embedding(
                 self.vocabulary_size, embedding_size, weight_attr=initializer)
-
-        # if self.anonymizer:
-        #     emb_name = name + "-entities"
-        #     entity_size = len(self.anonymizer.entity_types)
-        #     print("Creating entity embedder called " + emb_name + " of size " + str(entity_size) + " x " + str(embedding_size))
-        #     # self.entity_embedding_matrix = torch.nn.Embedding.from_pretrained(init_tensor, freeze=False)
-        #     initializer=paddle.nn.initializer.Uniform(low=- 0.1, high=0.1)
-        #     initializer=paddle.ParamAttr(initializer=initializer,trainable=True)
-        #     self.token_embedding_matrix = paddle.nn.Embedding(init_tensor.shape[0],init_tensor.shape[1],weight_attr=initializer)
 
     def forward(self, token):
         assert isinstance(token, int) or not snippet_handler.is_snippet(
@@ -84,21 +81,11 @@ class Embedder(paddle.nn.Layer):
         ), "embedder should only be called on flat tokens; use snippet_bow if you are trying to encode snippets"
 
         if self.in_vocabulary(token):
-            # index_list = torch.LongTensor([self.vocab_token_lookup(token)])
             index_list = paddle.to_tensor(
                 self.vocab_token_lookup(token), 'int64')
-            # if self.token_embedding_matrix.weight.is_cuda:
-            # index_list = index_list
             return self.token_embedding_matrix(index_list).squeeze()
-        # elif self.anonymizer and self.anonymizer.is_anon_tok(token):
-        #     index_list = paddle.to_tensor(self.anonymizer.get_anon_id(token),'int64')
-        #     # if self.token_embedding_matrix.weight.is_cuda:
-        #         # index_list = index_list
-        #     return self.entity_embedding_matrix(index_list).squeeze()
         else:
             index_list = paddle.to_tensor(self.unknown_token_id, 'int64')
-            # if self.token_embedding_matrix.weight.is_cuda:
-            #     index_list = index_list
             return self.token_embedding_matrix(index_list).squeeze()
 
 

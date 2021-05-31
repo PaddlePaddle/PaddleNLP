@@ -1,18 +1,26 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Predicts a token."""
 
 from collections import namedtuple
 
-# import torch
-# import torch.nn.functional as F
-
 import paddle
 import paddle.nn.functional as F
 
-from . import torch_utils
+from . import model_utils
 
 from .attention import Attention, AttentionResult
-
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class PredictionInput(
@@ -63,12 +71,12 @@ class TokenPredictor(paddle.nn.Layer):
     """ Predicts a token given a (decoder) state.
 
     Attributes:
-        vocabulary (Vocabulary): A vocabulary object for the output.
-        attention_module (Attention): An attention module.
-        state_transformation_weights (dy.Parameters): Transforms the input state
+        vocabulary (`Vocabulary`): A vocabulary object for the output.
+        attention_module (`Attention`): An attention module.
+        state_transformation_weights (`Parameter`): Transforms the input state
             before predicting a token.
-        vocabulary_weights (dy.Parameters): Final layer weights.
-        vocabulary_biases (dy.Parameters): Final layer biases.
+        vocabulary_weights (`Parameter`): Final layer weights.
+        vocabulary_biases (`Parameter`): Final layer biases.
     """
 
     def __init__(self, params, vocabulary, attention_key_size):
@@ -137,7 +145,7 @@ class SchemaTokenPredictor(TokenPredictor):
     """ Token predictor that also predicts snippets.
 
     Attributes:
-        snippet_weights (dy.Parameter): Weights for scoring snippets against some
+        snippet_weights (`Parameter`): Weights for scoring snippets against some
             state.
     """
 
@@ -145,10 +153,6 @@ class SchemaTokenPredictor(TokenPredictor):
                  schema_attention_key_size, snippet_size):
         TokenPredictor.__init__(self, params, vocabulary,
                                 utterance_attention_key_size)
-        # if params.use_snippets:
-        #     if snippet_size <= 0:
-        #         raise ValueError("Snippet size must be greater than zero; was " + str(snippet_size))
-        #     self.snippet_weights = torch_utils.add_params((params.decoder_state_size, snippet_size), "weights-snippet")
 
         _initializer = paddle.nn.initializer.XavierUniform()
 
@@ -163,13 +167,12 @@ class SchemaTokenPredictor(TokenPredictor):
                                                     params.encoder_state_size,
                                                     params.encoder_state_size)
             if not self.params.fix_use_previous_query:
-                #import pdb; pdb.set_trace()
+
                 self.start_query_attention_vector = self.create_parameter(
                     [params.encoder_state_size],
                     dtype='float32',
                     default_initializer=paddle.nn.initializer.Uniform(
                         low=-0.1, high=0.1))
-                #self.start_query_attention_vector = torch_utils.add_params((params.encoder_state_size,), "start_query_attention_vector")
 
         state_transform_weights = paddle.ParamAttr(initializer=_initializer)
         if params.use_schema_attention and self.params.use_query_attention:
@@ -188,9 +191,6 @@ class SchemaTokenPredictor(TokenPredictor):
                 weight_attr=state_transform_weights,
                 bias_attr=False)
 
-        # Use lstm schema encoder
-        # self.schema_token_weights = torch_utils.add_params((params.decoder_state_size, schema_attention_key_size), "weights-schema-token")
-
         schema_token_weights = paddle.ParamAttr(initializer=_initializer)
         self.schema_token_Linear = paddle.nn.Linear(
             in_features=params.decoder_state_size,
@@ -199,7 +199,7 @@ class SchemaTokenPredictor(TokenPredictor):
             bias_attr=False)
 
         if self.params.use_previous_query:
-            # self.query_token_weights = torch_utils.add_params((params.decoder_state_size, self.params.encoder_state_size), "weights-query-token")
+
             query_token_weights = paddle.ParamAttr(initializer=_initializer)
             self.query_token_Linear = paddle.nn.Linear(
                 in_features=params.decoder_state_size,
@@ -225,7 +225,6 @@ class SchemaTokenPredictor(TokenPredictor):
                     out_features=1,
                     weight_attr=state2copyswitch_transform_weights,
                     bias_attr=False)
-        # self.state2copy_transform_weights = torch_utils.add_params((params.decoder_state_size , 3), "my_copy_weights")
 
         state2copy_transform_weights = paddle.ParamAttr(
             initializer=_initializer)
@@ -234,10 +233,6 @@ class SchemaTokenPredictor(TokenPredictor):
             out_features=3,
             weight_attr=state2copy_transform_weights,
             bias_attr=False)
-
-    # def _get_snippet_scorer(self, state):
-    #     scorer = paddle.t(torch_utils.linear_layer(state, self.snippet_weights))
-    #     return scorer
 
     def _get_schema_token_scorer(self, state):
         scorer = paddle.t(self.schema_token_Linear(state))
@@ -304,7 +299,7 @@ class SchemaTokenPredictor(TokenPredictor):
             state_and_attn, dropout_amount=dropout_amount)
         copy_score = F.sigmoid(
             self.state2copy_transform_Linear(intermediate_state).squeeze(0))
-        # print(f"copy_score:{copy_score}")
+
         vocab_scores, vocab_tokens = self._score_vocabulary_tokens(
             intermediate_state)
 
@@ -312,19 +307,10 @@ class SchemaTokenPredictor(TokenPredictor):
         aligned_tokens = []
         aligned_tokens.extend(vocab_tokens)
 
-        # if self.params.use_snippets and snippets:
-        #     snippet_scores, snippet_tokens = score_snippets(snippets, self._get_snippet_scorer(intermediate_state))
-        #     final_scores =  paddle.concat([final_scores, snippet_scores], axis=0)
-        #     aligned_tokens.extend(snippet_tokens)
-
         schema_states = paddle.stack(schema_states, axis=1)
         schema_scores, schema_tokens = score_schema_tokens(
             input_schema, schema_states,
             self._get_schema_token_scorer(intermediate_state))
-        '''
-        schema_tokens = input_schema.column_names_surface_form
-        schema_scores = schema_attention_results.distribution
-        '''
 
         final_scores = paddle.concat(
             [copy_score[0] * final_scores, copy_score[1] * schema_scores],
@@ -352,15 +338,11 @@ class SchemaTokenPredictor(TokenPredictor):
                     previous_query, previous_query_state,
                     self._get_query_token_scorer(intermediate_state))
                 query_scores = query_scores.squeeze()
-                # print(f"query_scores:{query_scores}")
-                # print(f"query_tokens:{query_tokens}")
 
         if query_scores is not None:
             final_scores = paddle.concat(
                 [final_scores, copy_score[2] * query_scores], axis=0)
             aligned_tokens += query_tokens
-
-        # final_scores = final_scores.squeeze()
 
         return TokenPrediction(
             final_scores, aligned_tokens, utterance_attention_results,
@@ -372,7 +354,7 @@ class AnonymizationTokenPredictor(TokenPredictor):
     """ Token predictor that also predicts anonymization tokens.
 
     Attributes:
-        anonymizer (Anonymizer): The anonymization object.
+        anonymizer (`Anonymizer`): The anonymization object.
 
     """
 
@@ -445,12 +427,11 @@ def construct_token_predictor(params,
                               anonymizer=None):
     """ Constructs a token predictor given the parameters.
 
-    Inputs:
-        parameter_collection (dy.ParameterCollection): Contains the parameters.
-        params (dictionary): Contains the command line parameters/hyperparameters.
-        vocabulary (Vocabulary): Vocabulary object for output generation.
-        attention_key_size (int): The size of the attention keys.
-        anonymizer (Anonymizer): An anonymization object.
+    Args:
+        params (`dict`): Contains the command line parameters/hyperparameters.
+        vocabulary (`Vocabulary`): Vocabulary object for output generation.
+        attention_key_size (`int`): The size of the attention keys.
+        anonymizer (`Anonymizer`): An anonymization object.
     """
 
     if not anonymizer and not params.previous_decoder_snippet_encoding:

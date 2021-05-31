@@ -1,3 +1,22 @@
+#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import json
+
+import sqlite3
+from nltk import word_tokenize
+
 ################################
 # Assumptions:
 #   1. sql is correct
@@ -23,11 +42,6 @@
 #   'union': None/sql
 # }
 ################################
-
-import json
-import sqlite3
-from nltk import word_tokenize
-
 CLAUSE_KEYWORDS = ('select', 'from', 'where', 'group', 'order', 'limit',
                    'intersect', 'union', 'except')
 JOIN_KEYWORDS = ('join', 'on', 'as')
@@ -83,8 +97,10 @@ def get_schema(db):
     """
     Get database's schema, which is a dict with table name as key
     and list of column names as value
-    :param db: database path
-    :return: schema dict
+    Args:
+        db(`str`): Database path.
+    Returns: 
+        `dict`: Schema dict.
     """
 
     schema = {}
@@ -170,9 +186,6 @@ def get_tables_with_alias(schema, toks):
 
 
 def parse_col(toks, start_idx, tables_with_alias, schema, default_tables=None):
-    """
-        :returns next idx, column id
-    """
     tok = toks[start_idx]
     if tok == "*":
         return start_idx + 1, schema.idMap[tok]
@@ -199,9 +212,6 @@ def parse_col_unit(toks,
                    tables_with_alias,
                    schema,
                    default_tables=None):
-    """
-        :returns next idx, (agg_op id, col_id)
-    """
     idx = start_idx
     len_ = len(toks)
     isBlock = False
@@ -270,9 +280,6 @@ def parse_val_unit(toks,
 
 
 def parse_table_unit(toks, start_idx, tables_with_alias, schema):
-    """
-        :returns next idx, table id, table name
-    """
     idx = start_idx
     len_ = len(toks)
     key = tables_with_alias[toks[idx]]
