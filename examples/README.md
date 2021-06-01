@@ -52,17 +52,17 @@ PaddleNLP 提供了多种成熟的预训练模型技术，适用于自然语言�
 | [ELECTRA](./language_model/electra/)  | [ELECTRA: Pre-training Text Encoders as Discriminators Rather Than Generators](https://arxiv.org/abs/2003.10555) ELECTRA 创新性地引入GAN的思想对BERT预训练过程进行了改进，在和BERT具有相同的模型参数、预训练计算量一样的情况下，ELECTRA GLUE得分明显好。同时相比GPT、ELMo，在GLUE得分略好时，ELECTRA预训练模型只需要很少的参数和计算量。|
 | [RoBERTa](./text_classification/pretrained_models) | [RoBERTa: A Robustly Optimized BERT Pretraining Approach](https://arxiv.org/abs/1907.11692)   |
 | [PLATO-2](./dialogue/plato-2) | 百度自研领先的开放域对话预训练模型 [PLATO-2: Towards Building an Open-Domain Chatbot via Curriculum Learning](https://arxiv.org/abs/2006.16779) |
-| [GPT-2](./language_model/gpt2) | [Language Models are Unsupervised Multitask Learners](https://d4mucfpksywv.cloudfront.net/better-language-models/language-models.pdf)   |
+| [GPT-2](./language_model/gpt) | [Language Models are Unsupervised Multitask Learners](https://d4mucfpksywv.cloudfront.net/better-language-models/language-models.pdf)   |
 
 
 ## NLP核心技术
 
 ### 文本分类 (Text Classification)
-文本分类任务是NLP中较为常见的任务，在该任务上我们提供了两大类模型，一类是基于RNN类模型的传统轻量级的分类模型，一类是基于预训模型的分类模型，在RNN类模型上我们提供了百度自研的Senta模型，模型结构经典，效果突出；在预训练类模型上，提供了大量的预训练模型，模型参数自动下载，用法简易，极易提升文本分类任务效果。
+文本分类是NLP和核心技术方向之一，在该任务上我们提供了两大类模型，一类是基于RNN类模型的传统轻量级的分类模型，一类是基于预训模型的分类模型。
 
 | 模型  | 简介    |
 | ----- | ------ |
-| [RNN/CNN/GRU/LSTM](./text_classification/rnn) | 面向通用场景的文本分类模型，网络结构接入常见的RNN类模型，例如CNN, LSTM, GRU, RNN。整体模型结构集成在百度的自研的Senta文本情感分类模型上，效果突出，用法简易。|
+| [RNN/CNN/GRU/LSTM](./text_classification/rnn) | 面向通用场景的文本分类模型，网络结构接入常见的RNN类模型，例如CNN, LSTM, GRU, RNN。|
 | [ERNIE/BERT For Sequence Classification](./text_classification/pretrained_models) | 基于预训练模型的文本分类的模型，多达11种的预训练模型可供使用，其中有较多中文预训练模型，预训练模型切换简单，情感分析任务上效果突出。|
 
 ### 文本生成 (Text Generation)
@@ -99,19 +99,24 @@ PaddleNLP 提供了多种成熟的预训练模型技术，适用于自然语言�
 | ------- | ------- |
 | [事件抽取](./information_extraction/DuEE)| 基于百度开放的大规模中文事件抽取数据集[DuEE](https://link.springer.com/chapter/10.1007/978-3-030-60457-8_44)，结合ERNIE预训练模型与序列标注模型完成高质量的事件抽取。|
 | [关系抽取](./information_extraction/DuIE)| 基于百度开放的业界规模最大的Schema的中文关系抽取数据集[DuIE](http://tcci.ccf.org.cn/conference/2019/papers/EV10.pdf)，结合ERNIE预训练模型与序列标注模型完成文本关系抽取。|
-| [知识抽取](./information_extraction/wordtag)| 基于百度大规模知识图谱数据集样例，结合ErnieCtm预训练模型完成百度百科知识抽取。|
+
+### 文本知识挖掘 (Text to Knoledge)
 
 
 ## NLP系统应用
 
 ### 机器翻译 (Machine Translation)
 机器翻译是计算语言学的一个分支，是人工智能的终极目标之一，具有重要的科学研究价值。在机器翻译的任务上，提供了两大类模型，一类是传统的 Sequence to Sequence任务，简称Seq2Seq，通过RNN类模型进行编码，解码；另外一类是Transformer类模型，通过Self-Attention机制来提升Encoder和Decoder的效果，Transformer模型的具体信息可以参考论文, [Attention Is All You Need](https://arxiv.org/abs/1706.03762)。下面是具体的模型信息。
-
 | 模型    | 简介     |
 | ------ | ------- |
 | [Seq2Seq](./machine_translation/seq2seq) | 使用编码器-解码器（Encoder-Decoder）结构, 同时使用了Attention机制来加强Decoder和Encoder之间的信息交互，Seq2Seq 广泛应用于机器翻译，自动对话机器人，文档摘要自动生成，图片描述自动生成等任务中。|
 | [Transformer](./machine_translation/transformer) |基于PaddlePaddle框架的Transformer结构搭建的机器翻译模型，Transformer 计算并行度高，能解决学习长程依赖问题。并且模型框架集成了训练，验证，预测任务，功能完备，效果突出。|
 
+### 同声传译（Simultaneous Translation）
+同声传译（Simultaneous Translation）也隶属于机器翻译，它要求在句子完成之前进行翻译，同传模型STACL是针对同传场景提出的模型，它的Prefix-to-Prefix架构拥有预测能力，即在未看到源词的情况下仍然可以翻译出对应的目标词，克服了SOV（主宾谓）→SVO（主谓宾）等词序差异，同时Wait-k策略可以不需要全句的源句，直接预测目标句，可以实现任意的字级延迟，并保持较高的翻译质量。下面是具体的模型信息。
+| 模型    | 简介     |
+| ------ | ------- |
+| [STACL](./simultaneous_translation/stacl) | 基于Transformer网络结构的同传模型STACL的PaddlePaddle 实现，STACL是针对同传提出的适用于所有同传场景的翻译模型，既能在未看到源词的情况下仍然翻译出对应的目标词，同时又能保持较高的翻译质量。|
 
 ### 阅读理解 (Machine Reading Comprehension)
 机器阅读理解是近期自然语言处理领域的研究热点之一，也是人工智能在处理和理解人类语言进程中的一个长期目标。得益于深度学习技术和大规模标注数据集的发展，用端到端的神经网络来解决阅读理解任务取得了长足的进步。下面是具体的模型信息。

@@ -1,7 +1,7 @@
 import os
 import time
+
 import yaml
-import logging
 import argparse
 import numpy as np
 from pprint import pprint
@@ -14,6 +14,8 @@ import reader
 from paddlenlp.transformers import TransformerModel, CrossEntropyCriterion
 from paddlenlp.utils.log import logger
 
+from util.record import AverageStatistical
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -22,12 +24,22 @@ def parse_args():
         default="./configs/transformer.big.yaml",
         type=str,
         help="Path of the config file. ")
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+    )
+    parser.add_argument(
+        "--max_iter",
+        default=None,
+        type=int,
+        help="The maximum iteration for training. ")
     args = parser.parse_args()
     return args
 
 
 def do_train(args):
-    if args.use_gpu:
+    if args.device == "gpu":
         rank = dist.get_rank()
         trainer_count = dist.get_world_size()
     else:
@@ -99,9 +111,12 @@ def do_train(args):
             (1. - args.label_smooth_eps)) + args.label_smooth_eps *
         np.log(args.label_smooth_eps / (args.trg_vocab_size - 1) + 1e-20))
 
-    ce_time = []
-    ce_ppl = []
     step_idx = 0
+
+    # For benchmark
+    reader_cost_avg = AverageStatistical()
+    batch_cost_avg = AverageStatistical()
+    batch_ips_avg = AverageStatistical()
 
     # Train loop
     for pass_id in range(args.epoch):
@@ -110,18 +125,43 @@ def do_train(args):
         batch_id = 0
         batch_start = time.time()
         for input_data in train_loader:
+            #NOTE: Used for benchmark and use None as default. 
+            if args.max_iter and step_idx == args.max_iter:
+                return
+            train_reader_cost = time.time() - batch_start
             (src_word, trg_word, lbl_word) = input_data
 
-            logits = transformer(src_word=src_word, trg_word=trg_word)
+            if args.use_amp:
+                scaler = paddle.amp.GradScaler(
+                    init_loss_scaling=args.scale_loss)
+                with paddle.amp.auto_cast():
+                    logits = transformer(src_word=src_word, trg_word=trg_word)
+                    sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
 
-            sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
+                scaled = scaler.scale(avg_cost)  # scale the loss
+                scaled.backward()  # do backward
 
-            avg_cost.backward()
+                scaler.minimize(optimizer, scaled)  # update parameters
+                optimizer.clear_grad()
+            else:
+                logits = transformer(src_word=src_word, trg_word=trg_word)
+                sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
 
-            optimizer.step()
-            optimizer.clear_grad()
+                avg_cost.backward()
 
-            if step_idx % args.print_step == 0 and rank == 0:
+                optimizer.step()
+                optimizer.clear_grad()
+
+            tokens_per_cards = token_num.numpy()
+
+            train_batch_cost = time.time() - batch_start
+            reader_cost_avg.record(train_reader_cost)
+            batch_cost_avg.record(train_batch_cost)
+            batch_ips_avg.record(train_batch_cost, tokens_per_cards)
+
+            # NOTE: For benchmark, loss infomation on all cards will be printed.
+            if step_idx % args.print_step == 0 and (args.benchmark or
+                                                    rank == 0):
                 total_avg_cost = avg_cost.numpy()
 
                 if step_idx == 0:
@@ -132,20 +172,23 @@ def do_train(args):
                          total_avg_cost - loss_normalizer,
                          np.exp([min(total_avg_cost, 100)])))
                 else:
-                    train_avg_batch_cost = args.print_step / (
-                        time.time() - batch_start)
+                    train_avg_batch_cost = args.print_step / batch_cost_avg.get_total_time(
+                    )
                     logger.info(
                         "step_idx: %d, epoch: %d, batch: %d, avg loss: %f, "
-                        "normalized loss: %f, ppl: %f, avg_speed: %.2f step/sec"
-                        % (
-                            step_idx,
-                            pass_id,
-                            batch_id,
-                            total_avg_cost,
-                            total_avg_cost - loss_normalizer,
-                            np.exp([min(total_avg_cost, 100)]),
-                            train_avg_batch_cost, ))
-                batch_start = time.time()
+                        "normalized loss: %f, ppl: %f, avg_speed: %.2f step/sec, "
+                        "batch_cost: %.5f sec, reader_cost: %.5f sec, tokens: %d, "
+                        "ips: %.5f words/sec" %
+                        (step_idx, pass_id, batch_id, total_avg_cost,
+                         total_avg_cost - loss_normalizer,
+                         np.exp([min(total_avg_cost, 100)]),
+                         train_avg_batch_cost, batch_cost_avg.get_average(),
+                         reader_cost_avg.get_average(),
+                         batch_ips_avg.get_total_cnt(),
+                         batch_ips_avg.get_average_per_sec()))
+                reader_cost_avg.reset()
+                batch_cost_avg.reset()
+                batch_ips_avg.reset()
 
             if step_idx % args.save_step == 0 and step_idx != 0:
                 # Validation
@@ -178,13 +221,13 @@ def do_train(args):
                                 os.path.join(model_dir, "transformer.pdparams"))
                     paddle.save(optimizer.state_dict(),
                                 os.path.join(model_dir, "transformer.pdopt"))
-                batch_start = time.time()
+
             batch_id += 1
             step_idx += 1
             scheduler.step()
+            batch_start = time.time()
 
         train_epoch_cost = time.time() - epoch_start
-        ce_time.append(train_epoch_cost)
         logger.info("train epoch: %d, epoch_cost: %.5f s" %
                     (pass_id, train_epoch_cost))
 
@@ -204,5 +247,8 @@ if __name__ == "__main__":
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
+    args.benchmark = ARGS.benchmark
+    if ARGS.max_iter:
+        args.max_iter = ARGS.max_iter
 
     do_train(args)

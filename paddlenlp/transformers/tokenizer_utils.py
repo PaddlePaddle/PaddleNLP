@@ -37,7 +37,7 @@ def convert_to_unicode(text):
     Converts `text` to Unicode (if it's not already), assuming utf-8 input.
     Args:
         text (str|bytes): Text to be converted to unicode.
-    Returns: 
+    Returns:
         str: converted text.
     """
     if isinstance(text, str):
@@ -370,7 +370,7 @@ class PretrainedTokenizer(object):
         return self.vocab.to_indices(tokens)
 
     def convert_tokens_to_string(self, tokens):
-        """ 
+        """
         Converts a sequence of tokens (list of string) to a single string by
         using `' '.join(tokens)` .
 
@@ -686,8 +686,8 @@ class PretrainedTokenizer(object):
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
-        adding special tokens. 
-        
+        adding special tokens.
+
         Should be overridden in a subclass if the model has a special way of building those.
 
         Args:
@@ -708,8 +708,8 @@ class PretrainedTokenizer(object):
                                                  offset_mapping_0,
                                                  offset_mapping_1=None):
         """
-        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens. 
-        
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
         Should be overridden in a subclass if the model has a special way of building those.
 
         Args:
@@ -737,7 +737,7 @@ class PretrainedTokenizer(object):
         Args:
             token_ids_0 (List[int]): List of ids of the first sequence.
             token_ids_1 (List[int], optinal): List of ids of the second sequence.
-            already_has_special_tokens (bool, optional): Whether or not the token list is already 
+            already_has_special_tokens (bool, optional): Whether or not the token list is already
                 formatted with special tokens for the model. Defaults to None.
 
         Returns:
@@ -750,10 +750,10 @@ class PretrainedTokenizer(object):
                                              token_ids_0,
                                              token_ids_1=None):
         """
-        Create a mask from the two sequences passed to be used in a sequence-pair classification task. 
+        Create a mask from the two sequences passed to be used in a sequence-pair classification task.
 
         Should be overridden in a subclass if the model has a special way of building those.
-        
+
 
         If :obj:`token_ids_1` is :obj:`None`, this method only returns the first portion of the mask (0s).
 
@@ -769,6 +769,23 @@ class PretrainedTokenizer(object):
         if token_ids_1 is None:
             return len(token_ids_0) * [0]
         return [0] * len(token_ids_0) + [1] * len(token_ids_1)
+
+    def num_special_tokens_to_add(self, pair):
+        """
+        Returns the number of added tokens when encoding a sequence with special tokens.
+
+        Args:
+            pair (:obj:`bool`, `optional`, defaults to :obj:`False`):
+                Whether the number of added tokens should be computed in the case of a sequence pair or a single
+                sequence.
+        Returns:
+            :obj:`int`: Number of special tokens added to sequences.
+        """
+        token_ids_0 = []
+        token_ids_1 = []
+        return len(
+            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
+                                                  if pair else None))
 
     def encode(self,
                text,

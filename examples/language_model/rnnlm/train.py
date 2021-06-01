@@ -106,12 +106,13 @@ def train(args):
         model.load(args.init_from_ckpt)
         print("Loaded checkpoint from %s" % args.init_from_ckpt)
 
+    benchmark_logger = paddle.callbacks.ProgBarLogger(
+        log_freq=(len(train_loader) // 10), verbose=3)
     model.fit(train_data=train_loader,
               eval_data=valid_loader,
               epochs=args.max_epoch,
               shuffle=False,
-              callbacks=[callback, scheduler],
-              log_freq=max(1, len(train_loader) // 10))
+              callbacks=[callback, scheduler, benchmark_logger])
 
     model.save(path='checkpoint/test')  # save for training
 

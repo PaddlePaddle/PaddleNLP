@@ -1,4 +1,5 @@
 add_definitions(-DNDEBUG)
+add_definitions(-DPADDLE_CUDA)
 
 if(ON_INFER)
   add_definitions(-DPADDLE_ON_INFERENCE)
@@ -154,6 +155,10 @@ if(ON_INFER)
   list(GET DEMO_NAME 0 DEMO_NAME)
   add_executable(${DEMO_NAME} ${DEMO})
   set(DEPS pd_infer_custom_op ${ft_lib_link} boost ${DEPS} cublas cudart)
+
+  if(WITH_GPT)
+    set(DEPS ${DEPS} sentencepiece)
+  endif()
 
   if(WIN32)
     if(USE_TENSORRT)
