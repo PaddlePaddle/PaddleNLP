@@ -130,14 +130,23 @@ cp -rf ../../../../paddlenlp/ops/build/third-party/build/bin/decoding_gemm ./
 python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --decoding_strategy beam_search --beam_size 5
 ```
 
-其中，`--config` 选项用于指明配置文件的位置，而 `--decoding_lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。
+其中:
+* `--config`: 选项用于指明配置文件的位置
+* `--decoding_lib`: 选项用于指明编译好的 Faster Transformer decoding lib 的位置
+* `--decoding_strategy`: 选项用于指定解码使用的策略，可以选择是 `beam_search`，`topk_sampling`，`topp_sampling`。
+  * 当使用 `beam_search` 的时候，需要指定 `--beam_size` 的值
+  * 当使用 `topk_sampling` 的时候，需要指定 `--topk` 的值
+  * 当使用 `topp_sampling` 的时候，需要指定 `topp` 的值，并且需要保证 `--topk` 的值为 0
+* `--beam_size`: 解码策略是 `beam_search` 的时候，beam size 的大小，数据类型是 `int`
+* `--topk`: 解码策略是 `topk_sampling` 的时候，topk 计算的 k 值的大小，数据类型是 `int`
+* `--topp`: 解码策略是 `topp_sampling` 的时候，p 的大小，数据类型是 `float`
 
 翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `./sample/config/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 base model 的配置。
 
 
 #### 使用动态图预测(使用 float16 decoding 预测)
 
-float16 与 float32 预测的基本流程相同，不过在使用 float16 的 decoding 进行预测的时候，需要再加上 `--use_fp16_decoding` 选项。后按照与之前相同的方式执行即可。具体执行方式如下：
+float16 与 float32 预测的基本流程相同，不过在使用 float16 的 decoding 进行预测的时候，需要再加上 `--use_fp16_decoding` 选项，表示使用 fp16 进行预测。后按照与之前相同的方式执行即可。具体执行方式如下：
 
 ``` sh
 # setting visible devices for prediction
