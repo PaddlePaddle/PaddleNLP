@@ -194,7 +194,7 @@ class FewCLUE(DatasetBuilder):
         'iflytek': {
             'url':
             "https://paddlenlp.bj.bcebos.com/datasets/FewCLUE/fewclue_iflytek.tar.gz",
-            'md5': '3f7ba09b470b578641efce92faeee6ad',
+            'md5': '6f60fd6e0ab35c934732e41b7b7489b7',
             'splits': {
                 'train_0': [
                     os.path.join('fewclue_iflytek', 'train_0.json'),
@@ -250,7 +250,7 @@ class FewCLUE(DatasetBuilder):
                 ],
                 'test': [
                     os.path.join('fewclue_iflytek', 'test.json'),
-                    'db7b2714f08f58cf1376f2ef1439971c'
+                    'ea764519ddb4369767d07664afde3325'
                 ],
                 'test_public': [
                     os.path.join('fewclue_iflytek', 'test_public.json'),

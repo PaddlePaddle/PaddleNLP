@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import shutil
 import numpy as np
 
 import paddle
@@ -24,6 +25,7 @@ from paddlenlp.transformers import (TransformerModel, WordEmbedding,
 from paddlenlp.ops import InferTransformerDecoding, InferGptDecoding
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
+from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 
 
 class FasterTransformer(TransformerModel):
@@ -401,6 +403,7 @@ class FasterGPT(nn.Layer):
                  decoding_lib=None,
                  use_fp16_decoding=False):
         super(FasterGPT, self).__init__()
+        self.use_fp16_decoding = use_fp16_decoding
         self.decoding = InferGptDecoding(
             model=model,
             topk=topk,
@@ -414,3 +417,29 @@ class FasterGPT(nn.Layer):
 
     def forward(self, input_ids):
         return self.decoding(input_ids)
+
+    def export_params(self, state_to_load, place):
+        for item in state_to_load:
+            param_data = np.array(state_to_load[item])
+            if self.use_fp16_decoding:
+                param_data = np.float16(param_data)
+
+            param = self
+            attr_list = item.split(".")
+            attr_list = ["decoding", "model"] + attr_list
+            for attr in attr_list:
+                param = getattr(param, attr)
+            param_name = param.name
+            var = paddle.static.global_scope().find_var(param_name).get_tensor()
+            var.set(param_data, place)
+
+    def save_resources(self, tokenizer, path):
+        vocab_file = os.path.join(path, "vocab.txt")
+        if isinstance(tokenizer, GPTTokenizer):
+            with open(vocab_file, 'w', encoding='utf-8') as f:
+                for token in tokenizer.encoder:
+                    f.write(token + '\n')
+            merges_file = os.path.join(path, "merges.txt")
+            shutil.copyfile(tokenizer._merges_file, merges_file)
+        elif isinstance(tokenizer, GPTChineseTokenizer):
+            tokenizer.save_resources(path)
