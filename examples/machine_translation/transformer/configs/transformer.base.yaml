@@ -105,8 +105,5 @@ use_amp: False
 use_pure_fp16: False
 scale_loss: 128.0
 
-# Whether to use multi-card/multi-node distributed training.
-# Only works for static graph for now.
-is_distributed: False
 # Maximum iteration for training. 
 max_iter: None
