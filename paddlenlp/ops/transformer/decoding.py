@@ -474,13 +474,7 @@ class InferGptDecoding(nn.Layer):
             self.model.gpt.decoder.norm.bias = transfer_param(
                 self.model.gpt.decoder.norm.bias, restore_data=True)
 
-        emb_data = self.model.gpt.embeddings.word_embeddings.weight.numpy()
-        self.linear_weight = [
-            paddle.create_parameter(
-                shape=emb_data.shape,
-                dtype=data_type,
-                default_initializer=paddle.nn.initializer.Assign(emb_data))
-        ]
+        self.linear_weight = [self.model.gpt.embeddings.word_embeddings.weight]
 
         self.slf_ln_weight = []
         self.slf_ln_bias = []
