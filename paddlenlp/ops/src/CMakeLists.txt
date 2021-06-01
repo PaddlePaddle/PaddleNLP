@@ -156,6 +156,10 @@ if(ON_INFER)
   add_executable(${DEMO_NAME} ${DEMO})
   set(DEPS pd_infer_custom_op ${ft_lib_link} boost ${DEPS} cublas cudart)
 
+  if(WITH_GPT)
+    set(DEPS ${DEPS} sentencepiece)
+  endif()
+
   if(WIN32)
     if(USE_TENSORRT)
       add_custom_command(TARGET ${DEMO_NAME} POST_BUILD

@@ -32,7 +32,7 @@ def guard(device):
             def __init__(self, *args, **kw):
                 with paddle.static.device_guard(device):
                     print("Init {} on {}".format(Layer.__name__, device))
-                    return super().__init__(*args, **kw)
+                    super().__init__(*args, **kw)
 
             def forward(self, *args, **kw):
                 with paddle.static.device_guard(device):
@@ -185,12 +185,19 @@ class ParallelLinear(nn.Layer):
 
         weight = self.linear.weight
         weight.is_distributed = True
+        # alias for weight tensor
         self.weight = self.linear.weight
 
         startup_block = paddle.static.default_startup_program().global_block()
         main_block = paddle.static.default_main_program().global_block()
         startup_block.vars[weight.name].is_distributed = True
         main_block.vars[weight.name].is_distributed = True
+        # set is_distributed for splited bias
+        # if a linear layer is splited by row, each rank would hold a complete bias
+        # if a linear layer is splited by col, the bias would also be split into each rank as its weight
+        if axis == 1 and self.linear._bias_attr != False:
+            startup_block.vars[self.linear.bias.name].is_distributed = True
+            main_block.vars[self.linear.bias.name].is_distributed = True
 
     def forward(self, x):
         if self.axis == 0:
