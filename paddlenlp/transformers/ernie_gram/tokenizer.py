@@ -72,18 +72,9 @@ class ErnieGramTokenizer(ErnieTokenizer):
         "vocab_file": {
             "ernie-gram-zh":
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_gram_zh/vocab.txt",
-            "ernie-gram-en":
-            "/ssd1/zhangxuefei/program-paddle/PaddleNLP/paddlenlp/transformers/ernie_gram/ernie-gram-en/vocab.txt",
         }
     }
-    pretrained_init_configuration = {
-        "ernie-gram-zh": {
-            "do_lower_case": True
-        },
-        "ernie-gram-en": {
-            "do_lower_case": True
-        },
-    }
+    pretrained_init_configuration = {"ernie-gram-zh": {"do_lower_case": True}, }
 
     def __init__(self,
                  vocab_file,
