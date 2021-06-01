@@ -81,10 +81,10 @@ if __name__ == '__main__':
     test_ds.map(trans_func)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-        Stack(),  # seq_len
-        Pad(axis=0, pad_val=label_vocab.get("O", 0))  # labels
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),  # token_type_ids
+        Stack(dtype='int64'),  # seq_len
+        Pad(axis=0, pad_val=label_vocab.get("O", 0), dtype='int64')  # labels
     ): fn(samples)
 
     train_loader = paddle.io.DataLoader(
