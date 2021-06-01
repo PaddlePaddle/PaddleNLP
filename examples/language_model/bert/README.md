@@ -192,6 +192,49 @@ python -u ./predict_glue.py \
 - `batch_size` 表示每个预测批次的样本数目。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 
+同时支持使用输入样例数据的方式进行预测任务，这里仅以文本情感分类数据[SST-2](https://nlp.stanford.edu/sentiment/index.html)为例，输出样例数据的分类预测结果：
+
+```shell
+python -u ./predict.py \
+    --model_path ./infer_model/model \
+    --device gpu \
+    --max_seq_length 128
+```
+
+其中参数释义如下：
+- `model_path` 表示预测模型文件的前缀，和上一步导出预测模型中的`output_path`一致。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `max_seq_length` 表示最大句子长度，超过该长度将被截断。
+
+样例中的待预测数据返回输出的预测结果如下：
+
+```text
+Data: against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting
+ Label: positive
+ Negative prob: 0.0004963805549778044
+ Positive prob: 0.9995037317276001
+
+Data: the situation in a well-balanced fashion
+ Label: positive
+ Negative prob: 0.000471479695988819
+ Positive prob: 0.9995285272598267
+
+Data: at achieving the modest , crowd-pleasing goals it sets for itself
+ Label: positive
+ Negative prob: 0.0019163173856213689
+ Positive prob: 0.998083770275116
+
+Data: so pat it makes your teeth hurt
+ Label: negative
+ Negative prob: 0.9988648295402527
+ Positive prob: 0.0011351780267432332
+
+Data: this new jangle of noise , mayhem and stupidity must be a serious contender for the title .
+ Label: negative
+ Negative prob: 0.9884825348854065
+ Positive prob: 0.011517543345689774
+```
+
 ## 扩展
 
 上述的介绍是基于动态图的BERT的预训练任务和微调任务以及预测任务的实践过程，同时在我们也提供了基于PaddlePaddle Fleet API的静态图的BERT相关实践，在组网代码层面保持动静统一，在计算速度以及多机联合训练方面有着更优的性能，具体的细节可以参考 [BERT静态图](./static)  。

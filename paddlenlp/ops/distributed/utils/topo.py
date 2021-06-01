@@ -66,9 +66,9 @@ class Topology:
         data_arr = np.expand_dims(data_arr, axis=3).repeat(mp_degree, axis=3)
 
         self.data_info = GroupInfo(
-            size=self.dp_info.size * self.sharding_info.size,
-            rank=self.dp_info.rank * self.sharding_info.size +
-            self.sharding_info.rank,
+            size=int(self.dp_info.size * self.sharding_info.size),
+            rank=int(self.dp_info.rank * self.sharding_info.size +
+                     self.sharding_info.rank),
             world=data_arr.reshape(-1).tolist())
 
         assert self.data_info.world[

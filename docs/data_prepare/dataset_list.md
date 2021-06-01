@@ -27,6 +27,25 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 |  [WNLI](https://cs.nyu.edu/faculty/davise/papers/WinogradSchemas/WS.html) | 判断句子对是否相关，相关或不相关，二分类任务| `paddlenlp.datasets.load_dataset('glue','wnli')`|
 |  [LCQMC](http://icrc.hitsz.edu.cn/Article/show/171.html) | A Large-scale Chinese Question Matching Corpus 语义匹配数据集| `paddlenlp.datasets.load_dataset('lcqmc')`|
 |  [ChnSentiCorp](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/ChnSentiCorp_htl_all/intro.ipynb) | 中文评论情感分析语料| `paddlenlp.datasets.load_dataset('chnsenticorp')`|
+|  [COTE-DP](https://aistudio.baidu.com/aistudio/competition/detail/50/?isFromLuge=1) | 中文观点抽取语料  | `paddlenlp.datasets.load_dataset('cote', 'dp')`|
+|  [SE-ABSA16_PHNS](https://aistudio.baidu.com/aistudio/competition/detail/50/?isFromLuge=1) | 中文评价对象级情感分析语料| `paddlenlp.datasets.load_dataset('seabsa16', 'phns')`|
+|  [AFQMC](https://github.com/CLUEbenchmark/CLUE) | 蚂蚁金融语义相似度数据集，1表示句子1和句子2的含义类似，0表示含义不同| `paddlenlp.datasets.load_dataset('clue', 'afqmc')`|
+|  [TNEWS](https://github.com/CLUEbenchmark/CLUE) | 今日头条中文新闻（短文本）分类，共15类| `paddlenlp.datasets.load_dataset('clue', 'tnews')`|
+|  [IFLYTEK](https://github.com/CLUEbenchmark/CLUE) | 长文本分类，共119个类别| `paddlenlp.datasets.load_dataset('clue', 'iflytek')`|
+|  [OCNLI](https://github.com/cluebenchmark/OCNLI) | 原生中文自然语言推理数据集，句子对三分类问题| `paddlenlp.datasets.load_dataset('clue', 'ocnli')`|
+|  [CMNLI ](https://github.com/CLUEbenchmark/CLUE) | 中文语言推理任务，判断sentence1和sentence2的关系：蕴含（entailment），矛盾（contradiction），中立（neutral）。句子对三分类问题 | `paddlenlp.datasets.load_dataset('clue', 'cmnli')`|
+|  [CLUEWSC2020](https://github.com/CLUEbenchmark/CLUE) | WSC Winograd模式挑战中文版，代词消歧任务，二分类任务| `paddlenlp.datasets.load_dataset('clue', 'cluewsc2020')`|
+|  [CSL](https://github.com/P01son6415/CSL) | 论文关键词识别，判断关键词是否全部为真实关键词，二分类任务 | `paddlenlp.datasets.load_dataset('clue', 'csl')`|
+|  [EPRSTMT](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中的电商产品评论情感分析数据集，Positive、Negative 情感 2 分类任务| `paddlenlp.datasets.load_dataset('fewclue', 'eprstmt')`|
+|  [CSLDCP](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中的中文科学文献学科分类数据集，根据文献的中文摘要判断文献类别，共 67 类别。| `paddlenlp.datasets.load_dataset('fewclue', 'csldcp')`|
+|  [TNEWSF](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中的今日头条中文新闻（短文本）分类，共15类 | `paddlenlp.datasets.load_dataset('fewclue', 'tnews')`|
+|  [IFLYTEK](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中的长文本分类任务，共 119 个类别 | `paddlenlp.datasets.load_dataset('fewclue', 'iflytek')`|
+|  [OCNLIF](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中的中文自然语言推理数据集，句子对三分类问题 | `paddlenlp.datasets.load_dataset('fewclue', 'ocnli')`|
+|  [BUSTM](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中对话短文本语义匹配数据集, 2 分类任务 | `paddlenlp.datasets.load_dataset('fewclue', ‘bustm')`|
+|  [CHIDF](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中的成语阅读理解填空, 根据文本内容从候选 7 个成语中预测正确的成语 | `paddlenlp.datasets.load_dataset('fewclue', 'chid')`|
+|  [CSLF](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中的论文关键词识别，判断关键词是否全部为真实关键词，二分类任务 | `paddlenlp.datasets.load_dataset('fewclue', 'csl')`|
+|  [CLUEWSCF](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中的 WSC Winograd 模式挑战中文版，代词消歧任务，二分类任务 | `paddlenlp.datasets.load_dataset('fewclue', 'cluewsc')`|
+
 
 
 ## 序列标注
@@ -43,7 +62,6 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 | ----  | --------- | ------ |
 |  [IWSLT15](https://workshop2015.iwslt.org/) | IWSLT'15 English-Vietnamese data 英语-越南语翻译数据集| `paddlenlp.datasets.load_dataset('iwslt15')`|
 |  [WMT14ENDE](http://www.statmt.org/wmt14/translation-task.html) | WMT14 EN-DE 经过BPE分词的英语-德语翻译数据集| `paddlenlp.datasets.load_dataset('wmt14ende')`|
-
 
 ## 机器同传
 
