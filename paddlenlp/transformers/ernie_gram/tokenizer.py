@@ -56,8 +56,8 @@ class ErnieGramTokenizer(ErnieTokenizer):
     
     Examples:
         .. code-block:: python
-            from paddlenlp.transformers import ErnieTokenizer
-            tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+            from paddlenlp.transformers import ErnieGramTokenizer
+            tokenizer = ErnieGramTokenizer.from_pretrained('ernie-gram-zh')
             encoded_inputs = tokenizer('这是一个测试样例')
             # encoded_inputs: 
             # { 

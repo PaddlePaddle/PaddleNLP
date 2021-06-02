@@ -85,41 +85,6 @@ def match_mlm_parameter(convert_parameter_name_dict):
     return convert_parameter_name_dict
 
 
-def convert_static_to_dygraph_params(dygraph_params_save_path,
-                                     static_params_dir,
-                                     static_to_dygraph_param_name,
-                                     model_name='static'):
-    files = os.listdir(static_params_dir)
-
-    state_dict = {}
-    model_name = model_name
-    for name in files:
-        path = os.path.join(static_params_dir, name)
-        # static_para_name = name.replace('@HUB_chinese-roberta-wwm-ext-large@',
-        #                                 '')  # for hub module params
-        static_para_name = name.replace('.npy', '')
-        if static_para_name not in static_to_dygraph_param_name:
-            print(static_para_name, "not in static_to_dygraph_param_name")
-            continue
-        dygraph_para_name = static_to_dygraph_param_name[static_para_name]
-        value = np.load(path)
-        if "cls" in dygraph_para_name:
-            # Note: cls.predictions parameters do not need add `model_name.` prefix
-            state_dict[dygraph_para_name] = value
-        else:
-            state_dict[model_name + '.' + dygraph_para_name] = value
-
-    with open(dygraph_params_save_path, 'wb') as f:
-        pickle.dump(state_dict, f)
-    params = paddle.load(dygraph_params_save_path)
-
-    for name in state_dict.keys():
-        if name in params:
-            assert ((state_dict[name] == params[name]).all() == True)
-        else:
-            print(name, 'not in params')
-
-
 def write_vocab(vocab_file):
     with open(
             vocab_file, 'r', encoding='utf8') as f, open(
@@ -138,9 +103,7 @@ if __name__ == "__main__":
         convert_parameter_name_dict, layer_num=12)
     convert_parameter_name_dict = match_pooler_parameter(
         convert_parameter_name_dict)
-    ernie_state_dict = paddle.load(
-        '/ssd1/zhangxuefei/program-paddle/PaddleNLP/paddlenlp/transformers/ernie_gram/ernie-gram-zh/saved_weights.pdparams'
-    )
+    ernie_state_dict = paddle.load('./ernie-gram-zh/saved_weights.pdparams')
     nlp_state_dict = {}
     for name, value in ernie_state_dict.items():
         nlp_name = convert_parameter_name_dict[name]
@@ -150,5 +113,3 @@ if __name__ == "__main__":
 
     for ernie_name, nlp_name in convert_parameter_name_dict.items():
         print(ernie_name, "          ", nlp_name)
-
-    # write_vocab("ernie-gram-zh/vocab.txt")
