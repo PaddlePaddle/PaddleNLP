@@ -84,7 +84,7 @@ electra = ElectraModel.from_pretrained('chinese-electra-small')
 gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
-请参考[Transformer API文档](./docs/transformers.md)查看目前支持的预训练模型。
+请参考[Transformer API文档](./docs/model_zoo/transformers.md)查看目前支持的预训练模型。
 
 ### 便捷获取文本特征
 
@@ -100,7 +100,7 @@ pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_i
 ```
 ### 更多API使用文档
 
-- [Transformer API](./docs/transformers.md)
+- [Transformer API](./docs/model_zoo/transformers.md)
   * 基于Transformer结构相关的预训练模型API，包含50+预训练模型，涵盖主流BERT/ERNIE/ALBERT/RoBERTa/Electra等经典结构和下游任务。
 - [Data API](./docs/data.md)
   * 文本数据处理Pipeline的相关API说明。
