@@ -45,3 +45,5 @@ from .albert.modeling import *
 from .albert.tokenizer import *
 from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
+from .nezha.modeling import *
+from .nezha.tokenizer import *
