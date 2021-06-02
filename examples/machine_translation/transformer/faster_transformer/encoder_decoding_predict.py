@@ -87,6 +87,10 @@ def do_predict(args):
     place = paddle.set_device(place)
 
     # Define data loader
+    # NOTE: Data yielded by DataLoader may be on CUDAPinnedPlace,
+    # but custom op doesn't support CUDAPinnedPlace. Hence,
+    # disable using CUDAPinnedPlace in DataLoader.
+    paddle.fluid.reader.use_pinned_memory(False)
     test_loader, to_tokens = reader.create_infer_loader(args)
 
     # Define model
