@@ -29,7 +29,7 @@ from args import parse_args
 import paddlenlp as ppnlp
 
 from paddlenlp.data import Pad, Stack, Tuple, Dict
-from paddlenlp.transformers import BertForQuestionAnswering, BertTokenizer, ErnieForQuestionAnswering, ErnieTokenizer, RobertaForQuestionAnswering, RobertaTokenizer
+from paddlenlp.transformers import BertForQuestionAnswering, BertTokenizer, ErnieForQuestionAnswering, ErnieTokenizer, ErnieGramForQuestionAnswering, ErnieGramTokenizer, RobertaForQuestionAnswering, RobertaTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 from paddlenlp.datasets import load_dataset
@@ -37,6 +37,7 @@ from paddlenlp.datasets import load_dataset
 MODEL_CLASSES = {
     "bert": (BertForQuestionAnswering, BertTokenizer),
     "ernie": (ErnieForQuestionAnswering, ErnieTokenizer),
+    "ernie_gram": (ErnieGramForQuestionAnswering, ErnieGramTokenizer),
     "roberta": (RobertaForQuestionAnswering, RobertaTokenizer)
 }
 
