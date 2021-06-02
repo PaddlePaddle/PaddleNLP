@@ -18,7 +18,7 @@ import os
 import paddle
 
 from . import model_utils
-from . import utils_bert
+from . import bert_utils
 
 from data_util.vocabulary import DEL_TOK, UNK_TOK
 
@@ -186,7 +186,7 @@ class ATISModel(paddle.nn.Layer):
         self.dropout = 0.
 
         if params.use_bert:
-            self.model_bert, self.tokenizer, self.bert_config = utils_bert.get_bert(
+            self.model_bert, self.tokenizer, self.bert_config = bert_utils.get_bert(
                 params)
 
         if 'atis' not in params.data_directory:

@@ -196,17 +196,12 @@ def train(model, data, params):
                 patience = patience * params.patience_ratio
                 countdown = int(patience)
                 last_save_file = os.path.join(params.logdir, "best_model")
-                #   "save_" + str(epochs))
                 model.save(last_save_file)
 
                 log.put("maximum string accuracy:\t" + str(
                     maximum_string_accuracy))
                 log.put("patience:\t" + str(patience))
                 log.put("save file:\t" + str(last_save_file))
-            # else:
-            #     log.put("still saved")
-            #     last_save_file = os.path.join(params.logdir, "save_" + str(epochs))
-            #     model.save(last_save_file)
 
             if countdown <= 0:
                 keep_training = False

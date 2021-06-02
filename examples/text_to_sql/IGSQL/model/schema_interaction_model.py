@@ -35,7 +35,7 @@ from data_util.utterance import ANON_INPUT_KEY
 
 from .decoder import SequencePredictorWithSchema
 
-from . import utils_bert
+from . import bert_utils
 
 import data_util.atis_batch
 
@@ -400,7 +400,7 @@ class SchemaInteractionATISModel(ATISModel):
 
     def get_bert_encoding(self, input_sequence, input_schema, discourse_state,
                           dropout):
-        utterance_states, schema_token_states = utils_bert.get_bert_encoding(
+        utterance_states, schema_token_states = bert_utils.get_bert_encoding(
             self.bert_config,
             self.model_bert,
             self.tokenizer,

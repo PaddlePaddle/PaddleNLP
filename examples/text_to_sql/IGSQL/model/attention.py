@@ -86,7 +86,6 @@ class Attention(paddle.nn.Layer):
                 self.key_size) + " but got " + str(all_keys.shape[0])
         assert all_values.shape[0] == self.value_size
 
-        # query = model_utils.linear_layer(query, self.query_weights)
         if query.dim() == 1:
             query = query.unsqueeze(0)
         query = self.query_linear(query)
