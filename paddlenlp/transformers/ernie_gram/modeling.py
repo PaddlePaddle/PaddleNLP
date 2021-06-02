@@ -392,7 +392,7 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
 
 class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
     """
-    Model for Question and Answering task with ErnieGram.
+    Model for Question and Answering task with ERNIE-Gram.
 
 
     Args:
