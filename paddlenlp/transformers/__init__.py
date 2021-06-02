@@ -37,6 +37,7 @@ from .ernie_ctm.modeling import *
 from .ernie_ctm.tokenizer import *
 from .tinybert.modeling import *
 from .tinybert.tokenizer import *
+from .distiller import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
 from .skep.modeling import *
@@ -45,4 +46,7 @@ from .xlnet.modeling import *
 from .xlnet.tokenizer import *
 from .albert.modeling import *
 from .albert.tokenizer import *
-from .distiller import *
+from .ernie_gram.modeling import *
+from .ernie_gram.tokenizer import *
+from .nezha.modeling import *
+from .nezha.tokenizer import *
