@@ -117,8 +117,10 @@ class Clue(DatasetBuilder):
                     'a1a7595e596b202556dedd2a20617769',
                 ]
             },
-            'labels': [str(i) for i in range(100, 111)] +
-            [str(i) for i in range(112, 117)]
+            'labels': [
+                "100", "101", "102", "103", "104", "106", "107", "108", "109",
+                "110", "112", "113", "114", "115", "116"
+            ]
         },
         'iflytek': {
             'url':

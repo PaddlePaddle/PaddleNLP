@@ -45,3 +45,4 @@ from .xlnet.modeling import *
 from .xlnet.tokenizer import *
 from .albert.modeling import *
 from .albert.tokenizer import *
+from .distiller import *

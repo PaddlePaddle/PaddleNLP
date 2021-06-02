@@ -34,7 +34,8 @@ from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import TinyBertForSequenceClassification, TinyBertTokenizer, to_distill
+from paddlenlp.transformers import TinyBertForSequenceClassification, TinyBertTokenizer
+from paddlenlp.transformers import to_distill
 
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -344,9 +345,14 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    args.learning_rate = 5e-5
-    num_training_steps = args.max_steps if args.max_steps > 0 else (
-        len(train_data_loader) * args.num_train_epochs)
+    if args.max_steps > 0:
+        num_training_steps = args.max_steps
+        num_train_epochs = math.ceil(num_training_steps /
+                                     len(train_data_loader))
+    else:
+        num_training_steps = len(train_data_loader) * args.num_train_epochs
+        num_train_epochs = args.num_train_epochs
+
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
@@ -406,7 +412,7 @@ def do_train(args):
 
     distill_part = "intermediate" if args.intermediate_distill else "pred"
 
-    for epoch in range(args.num_train_epochs):
+    for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
             input_ids, segment_ids, labels = batch
@@ -460,6 +466,9 @@ def do_train(args):
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
                     best_res = res
+
+            if global_step >= num_training_steps:
+                return
 
 
 def print_arguments(args):
