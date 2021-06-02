@@ -20,17 +20,16 @@ from copy import deepcopy
 import paddle
 import paddle.nn as nn
 
-from paddlenlp.transformers.bert.tokenizer import BertTokenizer
+from paddlenlp.transformers import BertModel, BertPretrainedModel, BertTokenizer
 
 
-def get_ernie(params):
-    with open("model/ernie/ernie-2.0-en/ernie_config.json") as ifs:
-        ernie_config = json.load(ifs)
-
-    model_ernie = BertModel.from_pretrained("bert-base-uncased")
+def get_bert(params):
+    model_bert = BertModel.from_pretrained("bert-base-uncased")
+    bert_config = BertPretrainedModel.pretrained_init_configuration[
+        "bert-base-uncased"]
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
-    return model_ernie, tokenizer, ernie_config
+    return model_bert, tokenizer, bert_config
 
 
 def generate_inputs(tokenizer, nlu1_tok, hds1):
@@ -98,7 +97,7 @@ def gen_l_hpu(i_hds):
     return l_hpu
 
 
-def get_ernie_output(model_ernie, tokenizer, nlu_t, hds, max_seq_length):
+def get_bert_output(model_bert, tokenizer, nlu_t, hds, max_seq_length):
     """
     Here, input is toknized further by WordPiece (WP) tokenizer and fed into BERT.
     """
@@ -197,9 +196,8 @@ def get_ernie_output(model_ernie, tokenizer, nlu_t, hds, max_seq_length):
     all_sent_ids = paddle.to_tensor(sent_ids, dtype="int64")
 
     # 4. Generate BERT output.
-    # pooled_output, all_encoder_layer = model_ernie(src_ids=all_input_ids,sent_ids=all_sent_ids)
-    all_encoder_layer, pooled_output = model_ernie(
-        all_input_ids, token_type_ids=all_segment_ids)
+    all_encoder_layer, pooled_output = model_bert(
+        all_input_ids, token_type_ids=all_segment_ids, return_all_layers=True)
 
     # 5. generate l_hpu from i_hds
     l_hpu = gen_l_hpu(i_hds)
@@ -272,19 +270,19 @@ def get_wemb_h(i_hds, l_hpu, l_hs, hS, num_hidden_layers, all_encoder_layer,
     return wemb_h
 
 
-def get_wemb_ernie(ernie_config,
-                   model_ernie,
-                   tokenizer,
-                   nlu_t,
-                   hds,
-                   max_seq_length,
-                   num_out_layers_n=1,
-                   num_out_layers_h=1):
+def get_wemb_bert(bert_config,
+                  model_bert,
+                  tokenizer,
+                  nlu_t,
+                  hds,
+                  max_seq_length,
+                  num_out_layers_n=1,
+                  num_out_layers_h=1):
 
     # get contextual output of all tokens from bert
     all_encoder_layer, pooled_output, tokens, i_nlu, i_hds,\
     l_n, l_hpu, l_hs, \
-    nlu_tt, t_to_tt_idx, tt_to_t_idx, t_to_tt_idx_hds = get_ernie_output(model_ernie, tokenizer, nlu_t, hds, max_seq_length)
+    nlu_tt, t_to_tt_idx, tt_to_t_idx, t_to_tt_idx_hds = get_bert_output(model_bert, tokenizer, nlu_t, hds, max_seq_length)
     # all_encoder_layer: BERT outputs from all layers.
     # pooled_output: output of [CLS] vec.
     # tokens: BERT intput tokens
@@ -292,12 +290,12 @@ def get_wemb_ernie(ernie_config,
     # i_hds: start and end indices of headers
 
     # get the wemb
-    wemb_n = get_wemb_n(i_nlu, l_n, ernie_config['hidden_size'],
-                        ernie_config['num_hidden_layers'], all_encoder_layer,
+    wemb_n = get_wemb_n(i_nlu, l_n, bert_config['hidden_size'],
+                        bert_config['num_hidden_layers'], all_encoder_layer,
                         num_out_layers_n)
 
-    wemb_h = get_wemb_h(i_hds, l_hpu, l_hs, ernie_config['hidden_size'],
-                        ernie_config['num_hidden_layers'], all_encoder_layer,
+    wemb_h = get_wemb_h(i_hds, l_hpu, l_hs, bert_config['hidden_size'],
+                        bert_config['num_hidden_layers'], all_encoder_layer,
                         num_out_layers_h)
 
     return wemb_n, wemb_h, l_n, l_hpu, l_hs, \
@@ -372,24 +370,24 @@ def prepare_input_v2(tokenizer, input_sequence, input_schema):
     return nlu_t, hds, max_seq_length
 
 
-def get_ernie_encoding(ernie_config,
-                       model_ernie,
-                       tokenizer,
-                       input_sequence,
-                       input_schema,
-                       ernie_input_version='v1',
-                       max_seq_length=512,
-                       num_out_layers_n=1,
-                       num_out_layers_h=1):
-    if ernie_input_version == 'v1':
+def get_bert_encoding(bert_config,
+                      model_bert,
+                      tokenizer,
+                      input_sequence,
+                      input_schema,
+                      bert_input_version='v1',
+                      max_seq_length=512,
+                      num_out_layers_n=1,
+                      num_out_layers_h=1):
+    if bert_input_version == 'v1':
         nlu_t, hds = prepare_input(tokenizer, input_sequence, input_schema,
                                    max_seq_length)
-    elif ernie_input_version == 'v2':
+    elif bert_input_version == 'v2':
         nlu_t, hds, max_seq_length = prepare_input_v2(tokenizer, input_sequence,
                                                       input_schema)
 
-    wemb_n, wemb_h, l_n, l_hpu, l_hs, nlu_tt, t_to_tt_idx, tt_to_t_idx, t_to_tt_idx_hds = get_wemb_ernie(
-        ernie_config, model_ernie, tokenizer, nlu_t, hds, max_seq_length,
+    wemb_n, wemb_h, l_n, l_hpu, l_hs, nlu_tt, t_to_tt_idx, tt_to_t_idx, t_to_tt_idx_hds = get_wemb_bert(
+        bert_config, model_bert, tokenizer, nlu_t, hds, max_seq_length,
         num_out_layers_n, num_out_layers_h)
 
     t_to_tt_idx = t_to_tt_idx[0]

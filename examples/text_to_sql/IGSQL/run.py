@@ -76,10 +76,6 @@ def train(model, data, params):
         max_output_length=maximum_output_length,
         randomize=not params.deterministic)
 
-    # train_batches = trainbatch_fn(batch_size,
-    #                               max_output_length=maximum_output_length,
-    #                               randomize=False)
-
     if params.num_train >= 0:
         train_batches = train_batches[:params.num_train]
 
@@ -115,8 +111,6 @@ def train(model, data, params):
 
     keep_training = True
     step = 0
-    # if os.path.exists('/home/work/yujieyi/IGSQL_paddle/logs_sparc_editsql/last_model')
-    #     model.load('/home/work/yujieyi/IGSQL_paddle/logs_sparc_editsql/last_model')
 
     save_num = 0
 
@@ -131,8 +125,6 @@ def train(model, data, params):
         if not params.scheduler:
             model.set_learning_rate(learning_rate_coefficient *
                                     params.initial_learning_rate)
-
-        # params.count_utter=0
 
         # Run a training step.
         if params.interaction_level:
@@ -149,8 +141,6 @@ def train(model, data, params):
                 train_batches, model, randomize=not params.deterministic)
 
         log.put("train epoch loss:\t" + str(epoch_loss))
-
-        # print(f"count_utter:{params.count_utter}")
 
         model.set_dropout(0.)
 
@@ -248,9 +238,6 @@ def evaluate(model, data, params, last_save_file, split):
         if not params.save_file:
             raise ValueError(
                 "Must provide a save file name if not training first.")
-        print('0------0')
-        print(params.save_file)
-        print('0------0')
         model.load(params.save_file)
 
     filename = split
@@ -338,26 +325,7 @@ def main():
                        if params.anonymize and params.anonymization_scoring else
                        None)
 
-    # model = model.cuda()
-    print('=====================Model Parameters=====================')
-    for name, param in model.named_parameters():
-        print(name, param.trainable, param.place, param.size)
-        assert param.place
-
     model.build_optim()
-
-    # print('=====================Parameters in Optimizer==============')
-    # for param_group in model.trainer.param_groups:
-    #     print(param_group.keys())
-    #     for param in param_group['params']:
-    #         print(param.size())
-
-    # if params.fine_tune_bert:
-    #     print('=====================Parameters in BERT Optimizer==============')
-    #     for param_group in model.bert_trainer.param_groups:
-    #         print(param_group.keys())
-    #         for param in param_group['params']:
-    #             print(param.size())
 
     sys.stdout.flush()
 

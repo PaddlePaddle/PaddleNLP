@@ -35,7 +35,7 @@ from data_util.utterance import ANON_INPUT_KEY
 
 from .decoder import SequencePredictorWithSchema
 
-from . import utils_ernie
+from . import utils_bert
 
 import data_util.atis_batch
 
@@ -137,7 +137,7 @@ class SchemaInteractionATISModel(ATISModel):
             schema_encoder_input_size = params.input_embedding_size
             schema_encoder_state_size = params.encoder_state_size
             if params.use_bert:
-                schema_encoder_input_size = self.ernie_config["hidden_size"]
+                schema_encoder_input_size = self.bert_config["hidden_size"]
 
             self.schema_encoder = paddle.nn.LSTM(
                 schema_encoder_input_size,
@@ -194,13 +194,6 @@ class SchemaInteractionATISModel(ATISModel):
                 [GraphNN(params) for _ in range(2 * params.gnn_layer_number)])
             self.gnn = paddle.nn.LayerList(
                 [GraphNN(params) for _ in range(params.gnn_layer_number)])
-
-        self.fix_utter_h_temp = model_utils.add_params(([300]))
-        self.fix_utter_c_temp = model_utils.add_params(([300]))
-        if self.params.fix_use_previous_query:
-            if self.params.use_previous_query:
-                self.start_query_attention_vector = model_utils.add_params(
-                    (3, params.encoder_state_size))
 
     def predict_turn(self,
                      utterance_final_state,
@@ -405,15 +398,15 @@ class SchemaInteractionATISModel(ATISModel):
 
         return schema_states
 
-    def get_ernie_encoding(self, input_sequence, input_schema, discourse_state,
-                           dropout):
-        utterance_states, schema_token_states = utils_ernie.get_ernie_encoding(
-            self.ernie_config,
-            self.model_ernie,
+    def get_bert_encoding(self, input_sequence, input_schema, discourse_state,
+                          dropout):
+        utterance_states, schema_token_states = utils_bert.get_bert_encoding(
+            self.bert_config,
+            self.model_bert,
             self.tokenizer,
             input_sequence,
             input_schema,
-            ernie_input_version=self.params.bert_input_version,
+            bert_input_version=self.params.bert_input_version,
             num_out_layers_n=1,
             num_out_layers_h=1)
 
@@ -465,27 +458,13 @@ class SchemaInteractionATISModel(ATISModel):
     def get_utterance_attention(self, final_utterance_states_c,
                                 final_utterance_states_h, final_utterance_state,
                                 num_utterances_to_keep):
-        if self.params.fix_use_utterance_attention:
-            if len(final_utterance_states_c) == 0:
-                final_utterance_states_c.append(self.fix_utter_c_temp)
-            if len(final_utterance_states_h) == 0:
-                final_utterance_states_h.append(self.fix_utter_h_temp)
-
         # self-attention between utterance_states            
         final_utterance_states_h.append(final_utterance_state[0])
         final_utterance_states_c.append(final_utterance_state[1])
-        if self.params.fix_use_utterance_attention:
-            final_utterance_states_c = [
-                final_utterance_states_c[0]
-            ] + final_utterance_states_c[-num_utterances_to_keep:]
-            final_utterance_states_h = [
-                final_utterance_states_h[0]
-            ] + final_utterance_states_h[-num_utterances_to_keep:]
-        else:
-            final_utterance_states_c = final_utterance_states_c[
-                -num_utterances_to_keep:]
-            final_utterance_states_h = final_utterance_states_h[
-                -num_utterances_to_keep:]
+        final_utterance_states_c = final_utterance_states_c[
+            -num_utterances_to_keep:]
+        final_utterance_states_h = final_utterance_states_h[
+            -num_utterances_to_keep:]
 
         attention_result = self.utterance_attention_module(
             final_utterance_states_c[-1], final_utterance_states_c)
@@ -508,21 +487,10 @@ class SchemaInteractionATISModel(ATISModel):
         query_token_embedder = lambda query_token: self.get_query_token_embedding(query_token, input_schema)
 
         previous_query_embedding = []
-        if self.params.fix_use_previous_query:
-            if len(previous_query) > 0:
-                for output_token in previous_query:
-                    previous_query_embedding.append(
-                        query_token_embedder(output_token))
-                previous_query_embedding = paddle.stack(
-                    previous_query_embedding)
-            else:
-                previous_query = ['_UNK', '_UNK', '_UNK']
-                previous_query_embedding = self.start_query_attention_vector
-        else:
-            for output_token in previous_query:
-                previous_query_embedding.append(
-                    query_token_embedder(output_token))
-            previous_query_embedding = paddle.stack(previous_query_embedding)
+
+        for output_token in previous_query:
+            previous_query_embedding.append(query_token_embedder(output_token))
+        previous_query_embedding = paddle.stack(previous_query_embedding)
 
         previous_queries.append(previous_query)
         num_queries_to_keep = min(self.params.maximum_queries,
@@ -662,7 +630,7 @@ class SchemaInteractionATISModel(ATISModel):
             else:
                 gold_query = utterance.gold_query()
 
-            final_utterance_state, utterance_states, schema_states = self.get_ernie_encoding(
+            final_utterance_state, utterance_states, schema_states = self.get_bert_encoding(
                 input_sequence, input_schema, discourse_state, dropout=True)
 
             # temp1=final_utterance_state
@@ -706,15 +674,10 @@ class SchemaInteractionATISModel(ATISModel):
             snippets = None
 
             if self.params.use_previous_query:
-                if self.params.fix_use_previous_query:
+                if len(previous_query) > 0:
                     previous_queries, previous_query_states = self.get_previous_queries(
                         previous_queries, previous_query_states, previous_query,
                         input_schema)
-                else:
-                    if len(previous_query) > 0:
-                        previous_queries, previous_query_states = self.get_previous_queries(
-                            previous_queries, previous_query_states,
-                            previous_query, input_schema)
 
             if len(gold_query) <= max_generation_length and len(
                     previous_query) <= max_generation_length:
@@ -1028,7 +991,7 @@ class SchemaInteractionATISModel(ATISModel):
             available_snippets = utterance.snippets()
             previous_query = utterance.previous_query()
 
-            final_utterance_state, utterance_states, schema_states = self.get_ernie_encoding(
+            final_utterance_state, utterance_states, schema_states = self.get_bert_encoding(
                 input_sequence, input_schema, discourse_state, dropout=True)
 
             schema_states = paddle.stack(schema_states, axis=0)

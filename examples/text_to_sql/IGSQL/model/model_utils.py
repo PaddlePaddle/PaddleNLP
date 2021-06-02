@@ -177,7 +177,6 @@ def encode_sequence(sequence, rnns, embedder, dropout_amount=0.):
     outputs = []
     for token in sequence:
         rnn_input = embedder(token)
-        #问题
         (cell_states,
          hidden_states), output, layer_states = forward_one_multilayer(
              rnns, rnn_input, layer_states, dropout_amount)

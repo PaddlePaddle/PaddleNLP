@@ -166,13 +166,12 @@ class SchemaTokenPredictor(TokenPredictor):
             self.query_attention_module = Attention(params.decoder_state_size,
                                                     params.encoder_state_size,
                                                     params.encoder_state_size)
-            if not self.params.fix_use_previous_query:
 
-                self.start_query_attention_vector = self.create_parameter(
-                    [params.encoder_state_size],
-                    dtype='float32',
-                    default_initializer=paddle.nn.initializer.Uniform(
-                        low=-0.1, high=0.1))
+            self.start_query_attention_vector = self.create_parameter(
+                [params.encoder_state_size],
+                dtype='float32',
+                default_initializer=paddle.nn.initializer.Uniform(
+                    low=-0.1, high=0.1))
 
         state_transform_weights = paddle.ParamAttr(initializer=_initializer)
         if params.use_schema_attention and self.params.use_query_attention:
@@ -271,10 +270,9 @@ class SchemaTokenPredictor(TokenPredictor):
                 query_attention_results = self.query_attention_module(
                     decoder_state, previous_query_states[-1])
             else:
-                if not self.params.fix_use_previous_query:
-                    query_attention_results = self.start_query_attention_vector
-                    query_attention_results = AttentionResult(
-                        None, None, query_attention_results)
+                query_attention_results = self.start_query_attention_vector
+                query_attention_results = AttentionResult(
+                    None, None, query_attention_results)
 
         if self.params.use_schema_attention and self.params.use_query_attention:
             state_and_attn = paddle.concat(

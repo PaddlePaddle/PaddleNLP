@@ -63,34 +63,29 @@ def interpret_args():
         type=str,
         default='output_vocabulary.pkl')
 
-    parser.add_argument('--input_key', type=str, default='nl_with_dates')
+    parser.add_argument('--input_key', type=str, default='utterance')
 
     parser.add_argument('--anonymize', type=bool, default=False)
     parser.add_argument('--anonymization_scoring', type=bool, default=False)
     parser.add_argument('--use_snippets', type=bool, default=False)
 
-    parser.add_argument('--use_previous_query', type=int, default=0)
+    parser.add_argument('--use_previous_query', type=bool, default=True)
     parser.add_argument('--maximum_queries', type=int, default=1)
     parser.add_argument('--use_copy_switch', type=bool, default=False)
-    parser.add_argument('--use_query_attention', type=int, default=0)
+    parser.add_argument('--use_query_attention', type=bool, default=True)
 
-    parser.add_argument('--use_utterance_attention', type=int, default=0)
+    parser.add_argument('--use_utterance_attention', type=bool, default=True)
 
-    parser.add_argument('--freeze', type=bool, default=False)
-    parser.add_argument('--scheduler', type=int, default=0)
+    parser.add_argument('--scheduler', type=bool, default=False)
 
-    parser.add_argument('--use_bert', type=int, default=0)
-    parser.add_argument(
-        "--bert_type_abb",
-        type=str,
-        help="Type of BERT model to load. e.g.) uS, uL, cS, cL, and mcS")
+    parser.add_argument('--use_bert', type=bool, default=True)
     parser.add_argument("--bert_input_version", type=str, default='v1')
-    parser.add_argument('--fine_tune_bert', type=int, default=0)
+    parser.add_argument('--fine_tune_bert', type=bool, default=True)
     parser.add_argument(
         '--lr_bert', default=1e-5, type=float, help='BERT model learning rate.')
 
     ### Debugging/logging parameters
-    parser.add_argument('--reload_embedding', type=int, default=0)
+    parser.add_argument('--reload_embedding', type=bool, default=True)
     parser.add_argument('--logdir', type=str, default='logs')
     parser.add_argument('--deterministic', type=bool, default=False)
     parser.add_argument('--num_train', type=int, default=-1)
@@ -110,7 +105,8 @@ def interpret_args():
     parser.add_argument('--snippet_num_layers', type=int, default=1)
 
     parser.add_argument('--maximum_utterances', type=int, default=5)
-    parser.add_argument('--state_positional_embeddings', type=int, default=0)
+    parser.add_argument(
+        '--state_positional_embeddings', type=bool, default=True)
     parser.add_argument('--positional_embedding_size', type=int, default=50)
 
     parser.add_argument('--snippet_age_embedding', type=bool, default=False)
@@ -119,14 +115,14 @@ def interpret_args():
     parser.add_argument(
         '--previous_decoder_snippet_encoding', type=bool, default=False)
 
-    parser.add_argument('--discourse_level_lstm', type=int, default=0)
+    parser.add_argument('--discourse_level_lstm', type=bool, default=True)
 
-    parser.add_argument('--use_schema_attention', type=int, default=0)
-    parser.add_argument('--use_encoder_attention', type=int, default=0)
+    parser.add_argument('--use_schema_attention', type=bool, default=True)
+    parser.add_argument('--use_encoder_attention', type=bool, default=True)
 
-    parser.add_argument('--use_schema_encoder', type=int, default=0)
+    parser.add_argument('--use_schema_encoder', type=bool, default=True)
     parser.add_argument('--use_schema_self_attention', type=bool, default=False)
-    parser.add_argument('--use_schema_encoder_2', type=int, default=0)
+    parser.add_argument('--use_schema_encoder_2', type=bool, default=False)
 
     ### Training parameters
     parser.add_argument('--batch_size', type=int, default=16)
@@ -142,22 +138,22 @@ def interpret_args():
     parser.add_argument('--initial_learning_rate', type=float, default=1e-3)
     parser.add_argument('--learning_rate_ratio', type=float, default=0.9)
 
-    parser.add_argument('--interaction_level', type=int, default=0)
-    parser.add_argument('--reweight_batch', type=int, default=0)
+    parser.add_argument('--interaction_level', type=bool, default=True)
+    parser.add_argument('--reweight_batch', type=bool, default=True)
     parser.add_argument('--gnn_layer_number', type=int, default=1)
     parser.add_argument('--clip', type=float, default=5.0)
     parser.add_argument('--warmup_step', type=int, default=1000)
 
     ### Setting
-    parser.add_argument('--train', type=int, default=0)
-    parser.add_argument('--debug', type=int, default=0)
+    parser.add_argument('--train', type=bool, default=False)
+    parser.add_argument('--debug', type=bool, default=False)
 
     parser.add_argument('--evaluate', type=bool, default=False)
     parser.add_argument('--attention', type=bool, default=False)
     parser.add_argument('--save_file', type=str, default="")
     parser.add_argument('--enable_testing', type=bool, default=False)
-    parser.add_argument('--use_predicted_queries', type=int, default=0)
-    parser.add_argument('--evaluate_split', type=str, default='dev')
+    parser.add_argument('--use_predicted_queries', type=bool, default=False)
+    parser.add_argument('--evaluate_split', type=str, default='valid')
     parser.add_argument(
         '--evaluate_with_gold_forcing', type=bool, default=False)
     parser.add_argument('--eval_maximum_sql_length', type=int, default=400)
@@ -172,12 +168,7 @@ def interpret_args():
     parser.add_argument('--database_password', type=str, default="aviarmy")
     parser.add_argument('--database_timeout', type=int, default=2)
 
-    parser.add_argument('--count_utter', type=int, default=0)
-    parser.add_argument('--all_in_one_trainer', type=int, default=0)
-    parser.add_argument('--test_decoder', type=int, default=0)
-
-    parser.add_argument('--fix_use_previous_query', type=int, default=0)
-    parser.add_argument('--fix_use_utterance_attention', type=int, default=0)
+    parser.add_argument('--all_in_one_trainer', type=bool, default=False)
 
     args = parser.parse_args()
 

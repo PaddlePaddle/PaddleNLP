@@ -18,7 +18,7 @@ import os
 import paddle
 
 from . import model_utils
-from . import utils_ernie
+from . import utils_bert
 
 from data_util.vocabulary import DEL_TOK, UNK_TOK
 
@@ -186,7 +186,7 @@ class ATISModel(paddle.nn.Layer):
         self.dropout = 0.
 
         if params.use_bert:
-            self.model_ernie, self.tokenizer, self.ernie_config = utils_ernie.get_ernie(
+            self.model_bert, self.tokenizer, self.bert_config = utils_bert.get_bert(
                 params)
 
         if 'atis' not in params.data_directory:
@@ -209,7 +209,7 @@ class ATISModel(paddle.nn.Layer):
         encoder_input_size = params.input_embedding_size
         encoder_output_size = params.encoder_state_size
         if params.use_bert:
-            encoder_input_size = self.ernie_config["hidden_size"]
+            encoder_input_size = self.bert_config["hidden_size"]
 
         if params.discourse_level_lstm:
             encoder_input_size += params.encoder_state_size // 2
@@ -319,7 +319,7 @@ class ATISModel(paddle.nn.Layer):
                     param.name = name
                     params_trainer.append(param)
                 else:
-                    if 'model_ernie' in name:
+                    if 'model_bert' in name:
                         params_bert_trainer.append(param)
                     else:
                         params_trainer.append(param)
@@ -369,7 +369,7 @@ class ATISModel(paddle.nn.Layer):
         #return
         for param_group in self.trainer._parameter_list:
             if self.params.all_in_one_trainer:
-                if 'model_ernie' in param_group.name:
+                if 'model_bert' in param_group.name:
                     param_group.optimize_attr['learning_rate'] = value * 0.01
                 else:
                     param_group.optimize_attr['learning_rate'] = value
