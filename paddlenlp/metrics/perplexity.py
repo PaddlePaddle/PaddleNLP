@@ -48,7 +48,7 @@ class Perplexity(paddle.metric.Metric):
     def compute(self, pred, label, seq_mask=None):
         label = paddle.unsqueeze(label, axis=2)
         ce = F.cross_entropy(
-            logits=pred, label=label, reduction='none', soft_label=False)
+            input=pred, label=label, reduction='none', soft_label=False)
         ce = paddle.squeeze(ce, axis=[2])
         if seq_mask is not None:
             ce = ce * seq_mask

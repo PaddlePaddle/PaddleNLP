@@ -252,7 +252,7 @@ class CrossEntropyCriterion(nn.Layer):
                 label = paddle.randint(
                     low=3,
                     high=vocab_size,
-                    shape=[batch_size, seq_len, vocab_size])
+                    shape=[batch_size, seq_len, 1])
 
                 criterion(predict, label)
         """
@@ -266,7 +266,7 @@ class CrossEntropyCriterion(nn.Layer):
                 epsilon=self.label_smooth_eps)
 
         cost = F.cross_entropy(
-            logits=predict,
+            input=predict,
             label=label,
             reduction='none',
             soft_label=True if self.label_smooth_eps else False)
