@@ -172,13 +172,12 @@ if __name__ == "__main__":
     set_seed(args.seed)
     if args.model_name == "skep_ernie_1.0_large_ch":
         dataset_name = "chnsenticorp"
-        train_ds, dev_ds, test_ds = load_dataset(
-            dataset_name, splits=["train", "dev", "test"])
+        train_ds, dev_ds = load_dataset(dataset_name, splits=["train", "dev"])
 
     else:
         dataset_name = "sst-2"
-        train_ds, dev_ds, test_ds = load_dataset(
-            "glue", dataset_name, splits=["train", "dev", "test"])
+        train_ds, dev_ds = load_dataset(
+            "glue", dataset_name, splits=["train", "dev"])
     label_map = {0: 'negative', 1: 'positive'}
 
     model = SkepForSequenceClassification.from_pretrained(
