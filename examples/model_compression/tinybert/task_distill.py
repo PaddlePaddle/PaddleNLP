@@ -35,7 +35,7 @@ from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import TinyBertForSequenceClassification, TinyBertTokenizer
-from paddlenlp.transformers import to_distill
+from paddlenlp.transformers.distiller import to_distill
 
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)

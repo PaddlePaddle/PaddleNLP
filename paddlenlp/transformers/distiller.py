@@ -19,6 +19,7 @@ from paddle import tensor
 import paddle.nn.functional as F
 from paddle.nn import MultiHeadAttention, TransformerEncoderLayer, TransformerEncoder
 from paddle.fluid.data_feeder import convert_dtype
+from paddlenlp.utils.log import logger
 
 __all__ = ['to_distill']
 
@@ -29,6 +30,7 @@ def to_distill(self):
     `outputs.hidden_states`and `outputs.attentions` of the object for
     distillation.
     """
+    logger.warning("to_distill is an experimental API and subject to change.")
     MultiHeadAttention._forward = attention_forward
     TransformerEncoderLayer._forward = transformer_encoder_layer_forward
     TransformerEncoder._forward = transformer_encoder_forward
