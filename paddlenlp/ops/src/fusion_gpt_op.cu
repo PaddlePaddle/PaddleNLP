@@ -61,7 +61,7 @@ std::vector<paddle::Tensor> gpt2_kernel(
   DecodingInitParam<DataType_> decoding_params;
   decoding_params.cublas_handle = cublas_handle_;
 
-  decoding_params.output_ids = output_ids.mutable_data<int>(input.place());
+  decoding_params.output_ids = output_ids.mutable_data<int>(word_emb.place());
 
   typedef DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
   decoding_params.stream = stream;
@@ -69,12 +69,8 @@ std::vector<paddle::Tensor> gpt2_kernel(
 
   DecodingGpt2<DecodingTraits_::OpType>* gpt2_decoding;
 
-  // input data is on gpu.
-  int* h_input_data = new int[batch_size_ * start_len];
-  cudaMemcpy(h_input_data,
-             input.data<int>(),
-             sizeof(int) * batch_size_ * start_len,
-             cudaMemcpyDeviceToHost);
+  // input data should be on CPU.
+  int* h_input_data = input.data<int>();
   gpt2_decoding = new DecodingGpt2<DecodingTraits_::OpType>(allocator_,
                                                             batch_size_,
                                                             max_len,
@@ -189,7 +185,7 @@ std::vector<paddle::Tensor> GPT2CUDAForward(
     const int& eos_id,
     const float& temperature,
     const bool& use_fp16 = false) {
-  auto stream = input.stream();
+  auto stream = word_embedding.stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
   cublasSetStream(cublas_handle_, stream);
