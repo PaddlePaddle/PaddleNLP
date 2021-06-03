@@ -33,8 +33,8 @@ DuReader-robust数据集是单篇章、抽取式阅读理解数据集，具体�
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run_du.py \
     --task_name dureader_robust \
-    --model_type bert \
-    --model_name_or_path bert-base-chinese \
+    --model_type ernie_gram \
+    --model_name_or_path ernie-gram-zh \
     --max_seq_length 384 \
     --batch_size 12 \
     --learning_rate 3e-5 \
@@ -60,11 +60,11 @@ python -m paddle.distributed.launch --gpus "0" run_du.py \
 
 ```text
 {
-  "exact": 68.59562455892731,
-  "f1": 84.23267270105613,
+  "exact": 72.90049400141143,
+  "f1": 86.95957173352133,
   "total": 1417,
-  "HasAns_exact": 68.59562455892731,
-  "HasAns_f1": 84.23267270105613,
+  "HasAns_exact": 72.90049400141143,
+  "HasAns_f1": 86.95957173352133,
   "HasAns_total": 1417
 }
 ```

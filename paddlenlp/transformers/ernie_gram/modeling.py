@@ -19,8 +19,10 @@ from ..ernie.modeling import ErniePooler
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'ErnieGramModel', 'ErnieGramForSequenceClassification',
-    'ErnieGramForTokenClassification'
+    'ErnieGramModel',
+    'ErnieGramForSequenceClassification',
+    'ErnieGramForTokenClassification',
+    'ErnieGramForQuestionAnswering',
 ]
 
 
@@ -386,6 +388,93 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
         return logits
+
+
+class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
+    """
+    Model for Question and Answering task with ERNIE-Gram.
+
+
+    Args:
+        ernie_gram (`ErnieGramModel`): 
+            An instance of `ErnieGramModel`.
+    """
+
+    def __init__(self, ernie_gram):
+        super(ErnieGramForQuestionAnswering, self).__init__()
+        self.ernie_gram = ernie_gram  # allow ernie_gram to be config
+        self.classifier = nn.Linear(self.ernie_gram.config["hidden_size"], 2)
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate first and second portions of the inputs.
+                Indices can be either 0 or 1:
+
+                - 0 corresponds to a **sentence A** token,
+                - 1 corresponds to a **sentence B** token.
+
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                Defaults to None, which means no segment embeddings is added to token embeddings.
+            position_ids (Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                config.max_position_embeddings - 1]``.
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attention_mask (Tensor, optional):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set
+                to **-infinity** for any positions in the mask that are **0**, and will be
+                **unchanged** for positions that are **1**.
+
+                - **1** for tokens that are **not masked**,
+                - **0** for tokens that are **masked**.
+
+                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+                Defaults to `None`.
+
+
+        Returns:
+            A tuple of shape (``start_logits``, ``end_logits``).
+
+            With the fields:
+            - start_logits(Tensor): The logits of start position of prediction answer.
+            - end_logits(Tensor): The logits of end position of prediction answer.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ErnieGramForQuestionAnswering, ErnieGramTokenizer
+
+                tokenizer = ErnieGramTokenizer.from_pretrained('ernie-gram-zh')
+                model = ErnieGramForQuestionAnswering.from_pretrained('ernie-gram-zh')
+
+                inputs = tokenizer("这是个测试样例")
+                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+        """
+
+        sequence_output, _ = self.ernie_gram(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+
+        logits = self.classifier(sequence_output)
+        logits = paddle.transpose(logits, perm=[2, 0, 1])
+        start_logits, end_logits = paddle.unstack(x=logits, axis=0)
+
+        return start_logits, end_logits
 
 
 class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
