@@ -1,4 +1,4 @@
-# EnRATSQL: Enhanced Relation-Aware Schema Encoding and Linking for Text-to-SQL
+# Enhanced RAT-SQL
 
 ## Text2SQL 任务
 
