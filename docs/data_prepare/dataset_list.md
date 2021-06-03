@@ -69,6 +69,11 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 | ----  | --------- | ------ |
 |  [BSTC](https://aistudio.baidu.com/aistudio/competition/detail/44/) | 千言数据集：机器同传，包括transcription_translation和asr | `paddlenlp.datasets.load_dataset('bstc', 'asr')`|
 
+## 对话系统
+
+| 数据集名称  | 简介 | 调用方法 |
+| ----  | --------- | ------ |
+|  [DuConv](https://aistudio.baidu.com/aistudio/competition/detail/48/) | 千言数据集：开放域对话，中文知识型对话数据集 | `paddlenlp.datasets.load_dataset('duconv')`|
 
 ## 文本生成
 
