@@ -31,19 +31,19 @@ class ChnSentiCorp(DatasetBuilder):
 
     """
 
-    URL = "https://bj.bcebos.com/paddlehub-dataset/chnsenticorp.tar.gz"
-    MD5 = "fbb3217aeac76a2840d2d5cd19688b07"
+    URL = "https://dataset-bj.cdn.bcebos.com/qianyan/ChnSentiCorp.zip"
+    MD5 = "7ef61b08ad10fbddf2ba97613f071561"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
         'train': META_INFO(
-            os.path.join('chnsenticorp', 'train.tsv'),
+            os.path.join('ChnSentiCorp', 'ChnSentiCorp', 'train.tsv'),
             '689360c4a4a9ce8d8719ed500ae80907'),
         'dev': META_INFO(
-            os.path.join('chnsenticorp', 'dev.tsv'),
-            '05e4b02561c2a327833e05bbe8156cec'),
+            os.path.join('ChnSentiCorp', 'ChnSentiCorp', 'dev.tsv'),
+            '20c77cc2371634731a367996b097ec0a'),
         'test': META_INFO(
-            os.path.join('chnsenticorp', 'test.tsv'),
-            '917dfc6fbce596bb01a91abaa6c86f9e'),
+            os.path.join('ChnSentiCorp', 'ChnSentiCorp', 'test.tsv'),
+            '9b4dc7d1e4ada48c645b7e938592f49c'),
     }
 
     def _get_data(self, mode, **kwargs):
@@ -57,7 +57,7 @@ class ChnSentiCorp(DatasetBuilder):
 
         return fullname
 
-    def _read(self, filename):
+    def _read(self, filename, split):
         """Reads data."""
         with open(filename, 'r', encoding='utf-8') as f:
             head = None
@@ -66,8 +66,15 @@ class ChnSentiCorp(DatasetBuilder):
                 if not head:
                     head = data
                 else:
-                    label, text = data
-                    yield {"text": text, "label": label}
+                    if split == 'train':
+                        label, text = data
+                        yield {"text": text, "label": label, "qid": ''}
+                    elif split == 'dev':
+                        qid, label, text = data
+                        yield {"text": text, "label": label, "qid": qid}
+                    elif split == 'test':
+                        qid, text = data
+                        yield {"text": text, "label": '', "qid": qid}
 
     def get_labels(self):
         """
