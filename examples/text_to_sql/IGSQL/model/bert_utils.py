@@ -197,7 +197,9 @@ def get_bert_output(model_bert, tokenizer, nlu_t, hds, max_seq_length):
 
     # 4. Generate BERT output.
     all_encoder_layer, pooled_output = model_bert(
-        all_input_ids, token_type_ids=all_segment_ids, return_all_layers=True)
+        all_input_ids,
+        token_type_ids=all_segment_ids,
+        output_hidden_states=True)
 
     # 5. generate l_hpu from i_hds
     l_hpu = gen_l_hpu(i_hds)

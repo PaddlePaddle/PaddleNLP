@@ -1,4 +1,4 @@
-# IGSQL
+# IGSQL: Database Schema Interaction Graph Based Neural Model for Context-Dependent Text-to-SQL Generation
 
 ## 上下文相关的 Text2SQL 任务
 

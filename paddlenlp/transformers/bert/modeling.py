@@ -309,7 +309,7 @@ class BertModel(BertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                return_all_layers=False):
+                output_hidden_states=False):
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
@@ -319,7 +319,7 @@ class BertModel(BertPretrainedModel):
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
-        if return_all_layers:
+        if output_hidden_states:
             output = embedding_output
             encoder_outputs = []
             for mod in self.encoder.layers:
@@ -331,7 +331,7 @@ class BertModel(BertPretrainedModel):
         else:
             sequence_output = self.encoder(embedding_output, attention_mask)
             pooled_output = self.pooler(sequence_output)
-        if return_all_layers:
+        if output_hidden_states:
             return encoder_outputs, pooled_output
         else:
             return sequence_output, pooled_output
