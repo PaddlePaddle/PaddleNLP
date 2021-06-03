@@ -607,7 +607,7 @@ class ErnieForGeneration(ErnieModel):
             if len(tgt_labels.shape) == 1:
                 tgt_labels = paddle.reshape(tgt_labels, [-1, 1])
 
-            loss = paddle.nn.functional.cross_entropy(
+            loss = F.cross_entropy(
                 logits_2d, tgt_labels, soft_label=(tgt_labels.shape[-1] != 1))
 
             return loss, logits_2d, info
