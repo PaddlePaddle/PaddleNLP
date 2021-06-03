@@ -37,13 +37,13 @@ class LCQMC(DatasetBuilder):
     SPLITS = {
         'train': META_INFO(
             os.path.join('lcqmc', 'lcqmc', 'train.tsv'),
-            '2193c022439b038ac12c0ae918b211a1'),
+            '479d94fe575981f236319f2a5b8b3c03'),
         'dev': META_INFO(
             os.path.join('lcqmc', 'lcqmc', 'dev.tsv'),
-            'c5dcba253cb4105d914964fd8b3c0e94'),
+            '089329fb44ef26155baef9c9c8c823ba'),
         'test': META_INFO(
             os.path.join('lcqmc', 'lcqmc', 'test.tsv'),
-            '8f4b71e15e67696cc9e112a459ec42bd'),
+            'a4a483f2f871d57e0f3894fca0d0f8f0'),
     }
 
     def _get_data(self, mode, **kwargs):
