@@ -21,6 +21,9 @@ import paddle.nn.functional as F
 from paddle.fluid.layer_helper import LayerHelper
 import paddle
 
+from paddlenlp.ops.ext_utils import load
+from paddlenlp.utils.log import logger
+
 
 def infer_transformer_decoding(
         enc_output, memory_seq_lens, word_emb, slf_ln_weight, slf_ln_bias,
@@ -206,15 +209,17 @@ class InferTransformerDecoding(nn.Layer):
                  beam_search_diversity_rate=0.0,
                  decoding_lib=None,
                  use_fp16_decoding=False):
-        if decoding_lib is None:
-            raise ValueError(
-                "The args decoding_lib must be set to use Faster Transformer. ")
-        elif not os.path.exists(decoding_lib):
-            raise ValueError("The path to decoding lib is not exist.")
+        # if decoding_lib is None:
+        #     raise ValueError(
+        #         "The args decoding_lib must be set to use Faster Transformer. ")
+        # elif not os.path.exists(decoding_lib):
+        #     raise ValueError("The path to decoding lib is not exist.")
+        if decoding_lib is not None and os.path.isfile(decoding_lib):
+            # Maybe it has been loadad by `ext_utils.load`
+            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                decoding_lib)
 
         super(InferTransformerDecoding, self).__init__()
-        paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-            decoding_lib)
         for arg, value in locals().items():
             if arg not in [
                     "self", "decoder", "word_embedding", "positional_embedding",
@@ -395,14 +400,15 @@ class InferGptDecoding(nn.Layer):
                  temperature=1,
                  decoding_lib=None,
                  use_fp16_decoding=False):
-        if decoding_lib is None:
-            raise ValueError(
-                "The args decoding_lib must be set to use Faster Transformer. ")
-        elif not os.path.exists(decoding_lib):
-            raise ValueError("The path to decoding lib is not exist.")
+        if os.path.exists(decoding_lib):
+            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                decoding_lib)
+        else:
+            logger.warning(
+                "The specified decoding_lib does not exist, and it will be built automatically."
+            )
+            load("FasterTransformer", verbose=True)
 
-        paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-            decoding_lib)
         super(InferGptDecoding, self).__init__()
         self.topk = topk
         self.topp = topp
@@ -468,13 +474,7 @@ class InferGptDecoding(nn.Layer):
             self.model.gpt.decoder.norm.bias = transfer_param(
                 self.model.gpt.decoder.norm.bias, restore_data=True)
 
-        emb_data = self.model.gpt.embeddings.word_embeddings.weight.numpy()
-        self.linear_weight = [
-            paddle.create_parameter(
-                shape=emb_data.shape,
-                dtype=data_type,
-                default_initializer=paddle.nn.initializer.Assign(emb_data))
-        ]
+        self.linear_weight = [self.model.gpt.embeddings.word_embeddings.weight]
 
         self.slf_ln_weight = []
         self.slf_ln_bias = []

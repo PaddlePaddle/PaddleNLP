@@ -30,12 +30,14 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Pad, Stack, Dict
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.transformers import ErnieGramForSequenceClassification, ErnieGramTokenizer
 from paddlenlp.transformers import RobertaForSequenceClassification, RobertaTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 MODEL_CLASSES = {
     "bert": (BertForSequenceClassification, BertTokenizer),
     "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
+    "ernie_gram": (ErnieGramForSequenceClassification, ErnieGramTokenizer),
     "roberta": (RobertaForSequenceClassification, RobertaTokenizer),
 }
 

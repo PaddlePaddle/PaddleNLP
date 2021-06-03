@@ -4,35 +4,9 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddlenlp.ops import einsum
 
 global_dtype = paddle.get_default_dtype()
-
-
-def einsum4x4(equation, x, y):
-    """
-    Only works for 4D x 4D. 
-    """
-    idx_x, idx_y, idx_z = re.split(",|->", equation)
-    # Compute repeated index
-    repeated_idx = list(set(idx_x + idx_y) - set(idx_z))
-
-    unique_idx_x = list(set(idx_x) - set(idx_y))
-    unique_idx_y = list(set(idx_y) - set(idx_x))
-    common_idx = list(set(idx_x) & set(idx_y) - set(repeated_idx))
-
-    new_idx_x = common_idx + unique_idx_x + repeated_idx
-    new_idx_y = common_idx + unique_idx_y + repeated_idx
-    new_idx_z = common_idx + unique_idx_x + unique_idx_y
-
-    perm_x = [idx_x.index(i) for i in new_idx_x]
-    perm_y = [idx_y.index(i) for i in new_idx_y]
-    perm_z = [new_idx_z.index(i) for i in idx_z]
-
-    x = paddle.transpose(x, perm=perm_x)
-    y = paddle.transpose(y, perm=perm_y)
-    z = paddle.matmul(x=x, y=y, transpose_y=True)
-    z = paddle.transpose(z, perm=perm_z)
-    return z
 
 
 def sample_logits(embedding, bias, labels, inputs, sampler):
@@ -422,7 +396,7 @@ class MultiHeadAttn(nn.Layer):
         head_v = paddle.reshape(
             head_v, shape=[c.shape[0], c.shape[1], self.n_head, self.d_head])
 
-        attn_score = einsum4x4('bind,bjnd->bnij', head_q, head_k)
+        attn_score = einsum('bind,bjnd->bnij', head_q, head_k)
         attn_score = attn_score * self.scale
         if attn_mask is not None:
             attn_score = attn_score - float('inf') * attn_mask
@@ -430,7 +404,7 @@ class MultiHeadAttn(nn.Layer):
         attn_prob = F.softmax(attn_score, dim=-1)
         attn_prob = self.attn_drop(attn_prob)
 
-        attn_vec = einsum4x4('bnij,bjnd->bind', attn_prob, head_v)
+        attn_vec = einsum('bnij,bjnd->bind', attn_prob, head_v)
         attn_vec = paddle.reshape(
             attn_vec,
             shape=[
@@ -564,11 +538,10 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
 
         rw_head_q = w_head_q + r_w_bias
 
-        AC = einsum4x4('bind,bjnd->bnij', rw_head_q, w_head_k)
+        AC = einsum('bind,bjnd->bnij', rw_head_q, w_head_k)
         rr_head_q = w_head_q + r_r_bias
 
-        # TODO: use einsum. einsum4x4 only works for 4D tensor.
-        BD = einsum4x4('bind,bjnd->bnij', rr_head_q, r_head_k)
+        BD = einsum('bind,bjnd->bnij', rr_head_q, r_head_k)
         BD = self._rel_shift(BD)
 
         attn_score = AC + BD
@@ -580,7 +553,7 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
         attn_prob = F.softmax(attn_score, axis=-1)
         attn_prob = self.attn_drop(attn_prob)
 
-        attn_vec = einsum4x4('bnij,bjnd->bind', attn_prob, w_head_v)
+        attn_vec = einsum('bnij,bjnd->bind', attn_prob, w_head_v)
 
         attn_vec = paddle.reshape(
             attn_vec,
@@ -653,9 +626,9 @@ class RelLearnableMultiHeadAttn(RelMultiHeadAttn):
 
         rw_head_q = w_head_q + r_w_bias.unsqueeze([0])
 
-        AC = einsum4x4('bind,bjnd->bnij', rw_head_q, w_head_k)
+        AC = einsum('bind,bjnd->bnij', rw_head_q, w_head_k)
         r_emb = r_emb.unsqueeze([0]).expand([bsz, -1, -1, -1])
-        B_ = einsum4x4('bind,bjnd->bnij', w_head_q, r_emb)
+        B_ = einsum('bind,bjnd->bnij', w_head_q, r_emb)
         D_ = r_bias.unsqueeze([0, 2])
         BD = self._rel_shift(B_ + D_)
 
@@ -668,7 +641,7 @@ class RelLearnableMultiHeadAttn(RelMultiHeadAttn):
         attn_prob = F.softmax(attn_score, dim=-1)
         attn_prob = self.attn_drop(attn_prob)
 
-        attn_vec = einsum4x4('bnij,bjnd->bind', attn_prob, w_head_v)
+        attn_vec = einsum('bnij,bjnd->bind', attn_prob, w_head_v)
 
         attn_vec = paddle.reshape(
             attn_vec,

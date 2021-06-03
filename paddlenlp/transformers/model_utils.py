@@ -38,10 +38,24 @@ __all__ = [
 
 def register_base_model(cls):
     """
-    Add a `base_model_class` attribute for the base class of decorated class,
-    representing the base model class in derived classes of the same architecture.
+    A decorator for `PretrainedModel` class. It adds a `base_model_class` attribute
+    for the parent class of decorated class, and the attribute value is the decorated
+    class. It indicates the base model class in derived classes of the same architecture.
+
     Args:
-        cls (class): the name of the model
+        cls (`type`): The `PretrainedModel` class to be decorated.
+    
+    Returns:
+        `type`: The decorated `PretrainedModel` class. It's same as the input
+            argument `cls`.
+    
+    Example:
+        .. code-block::
+
+            from paddlenlp.transformers import BertModel, register_base_model
+
+            BertModel = register_base_model(BertModel)
+            assert BertModel.base_model_class == BertModel
     """
     base_cls = cls.__bases__[0]
     assert issubclass(
@@ -54,24 +68,40 @@ def register_base_model(cls):
 @six.add_metaclass(InitTrackerMeta)
 class PretrainedModel(Layer, GenerationMixin):
     """
-    The base class for all pretrained models. It provides some attributes and
-    common methods for all pretrained models, including attributes `init_config`,
-    `config` for initialized arguments and methods for saving, loading.
-    It also includes some class attributes (should be set by derived classes):
-    - `model_config_file` (str): represents the file name for saving and loading
-      model configuration, it's value is `model_config.json`.
-    - `resource_files_names` (dict): use this to map resources to specific file
-      names for saving and loading.
-    - `pretrained_resource_files_map` (dict): The dict has the same keys as
-      `resource_files_names`, the values are also dict mapping specific pretrained
-      model name to URL linking to pretrained model.
-    - `pretrained_init_configuration` (dict): The dict has pretrained model names
-      as keys, and the values are also dict preserving corresponding configuration
-      for model initialization.
-    
-    - `base_model_prefix` (str): represents the the attribute associated to the
+    The base class for all pretrained models. It mainly provides common methods
+    for pretrained models loading (construction and loading) and saving. Loading
+    and saving also rely on the following class attributes which should be overridden
+    by derived classes accordingly:
+
+    - `model_config_file` (`str`): Represents the file name of model configuration
+      for configuration saving and loading in local file system. The value is
+      `model_config.json`.
+    - `resource_files_names` (`dict`): Represents resources to specific file
+      names mapping for resource saving and loading in local file system. Currently,
+      resources only include the model state, thus the dict only includes
+      `'model_state'` as key with corresponding value `'model_state.pdparams'`
+      for model weights saving and loading.
+    - `pretrained_init_configuration` (`dict`): Provides the model configurations
+      of built-in pretrained models (constract to models in local file system).
+      It has pretrained model names as keys (such as `bert-base-uncased`), and
+      the values are dict preserving corresponding configuration for model initialization.
+    - `pretrained_resource_files_map` (`dict`): Provides resource URLs of built-in
+      pretrained models (constract to models in local file system). It has the
+      same keys as `resource_files_names` (that is `'model_state'`), and the
+      values are also `dict` mapping specific pretrained model name (such as
+      `bert-base-uncased`) to URL of pretrained model weights.
+    - `base_model_prefix` (`str`): Represents the attribute associated to the
       base model in derived classes of the same architecture adding layers on
-      top of the base model.
+      top of the base model. Note: A base model class is pretrained model class
+      decorated by `register_base_model`, such as `BertModel`; A derived model
+      class is a pretrained model class adding layers on top of the base model,
+      and it has a base model as attribute, such as `BertForSequenceClassification`.
+
+    Methods common to models for text generation are defined in `GenerationMixin`
+    and also inherited here.
+
+    Besides, metaclass `InitTrackerMeta` is used to create `PretrainedModel`,
+    by which subclasses can track arguments for initialization automatically.
     """
     model_config_file = "model_config.json"
     pretrained_init_configuration = {}
@@ -92,10 +122,19 @@ class PretrainedModel(Layer, GenerationMixin):
 
     @property
     def base_model(self):
+        """
+        PretrainedModel: The body of the same model architecture. It is the base
+            model itself for base model or the base model attribute for derived
+            model.
+        """
         return getattr(self, self.base_model_prefix, self)
 
     @property
     def model_name_list(self):
+        """
+        list: Contains all supported built-in pretrained model names of the
+            current PretrainedModel class.
+        """
         return list(self.pretrained_init_configuration.keys())
 
     def get_input_embeddings(self):
@@ -111,20 +150,31 @@ class PretrainedModel(Layer, GenerationMixin):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         """
-        Instantiate an instance of `PretrainedModel` from a predefined
-        model specified by name or path.
+        Create an instance of `PretrainedModel` and load pretrained model weights
+        for it according to a specific model name (such as `bert-base-uncased`)
+        or a local file directory path.
+
         Args:
-            pretrained_model_name_or_path (str): A name of or a file path to a
-                pretrained model.
-            *args (tuple): position arguments for `__init__`. If provide, use
-                this as position argument values for model initialization.
-            **kwargs (dict): keyword arguments for `__init__`. If provide, use
-                this to update pre-defined keyword argument values for model
-                initialization. If the key is in base model `__init__`, update
-                keyword argument of base model; else update keyword argument of
-                derived model.
+            pretrained_model_name_or_path (`str`): A name of pretrained model
+                for built-in pretrained models loading, such as `bert-base-uncased`.
+                Or a local file directory path for local trained models loading.
+            *args (tuple): position arguments for model `__init__`. If provided,
+                use these as position argument values for model initialization.
+            **kwargs (dict): keyword arguments for model `__init__`. If provided,
+                use these to update pre-defined keyword argument values for model
+                initialization. If the keyword is in `__init__` argument names of
+                base model, update argument values of the base model; else update
+                argument values of derived model.
+
         Returns:
-            PretrainedModel: An instance of PretrainedModel.
+            `PretrainedModel`: An instance of `PretrainedModel`.
+        
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import BertForSequenceClassification
+
+                model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
         """
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}
@@ -284,10 +334,27 @@ class PretrainedModel(Layer, GenerationMixin):
 
     def save_model_config(self, save_dir):
         """
-        Save model configuration to files
-        under `save_dir`.
+        Save model configuration and related resources (model state) to files
+        under `save_directory`. The model configuration would be saved into
+        `model_config_file` indicating file (thus `model_config.json`), and model
+        state would be saved into `resource_files_names` indicating file (thus
+        `model_state.pdparams`).
+        
+        The `save_directory` can be used in `from_pretrained` as argument value
+        of `pretrained_model_name_or_path` to re-load the trained model.
+
         Args:
-            save_dir (str): Directory to save files into.
+            save_directory (str): Directory to save files into.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import BertForSequenceClassification
+
+                model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
+                model.save_pretrained('trained_model')
+                # reload from save_directory
+                model = BertForSequenceClassification.from_pretrained('trained_model')
         """
         # Save model config
         model_config_file = os.path.join(save_dir, self.model_config_file)

@@ -45,6 +45,13 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 |  [WMT14ENDE](http://www.statmt.org/wmt14/translation-task.html) | WMT14 EN-DE 经过BPE分词的英语-德语翻译数据集| `paddlenlp.datasets.load_dataset('wmt14ende')`|
 
 
+## 机器同传
+
+| 数据集名称  | 简介 | 调用方法 |
+| ----  | --------- | ------ |
+|  [BSTC](https://aistudio.baidu.com/aistudio/competition/detail/44/) | 千言数据集：机器同传，包括transcription_translation和asr | `paddlenlp.datasets.load_dataset('bstc', 'asr')`|
+
+
 ## 文本生成
 
 | 数据集名称  | 简介 | 调用方法 |
