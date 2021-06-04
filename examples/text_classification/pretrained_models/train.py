@@ -152,8 +152,7 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds, dev_ds, test_ds = load_dataset(
-        "chnsenticorp", splits=["train", "dev", "test"])
+    train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
     # If you wanna use bert/roberta/electra pretrained model,
     # model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_class=2)
@@ -188,12 +187,6 @@ def do_train():
     dev_data_loader = create_dataloader(
         dev_ds,
         mode='dev',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
-    test_data_loader = create_dataloader(
-        test_ds,
-        mode='test',
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
@@ -253,10 +246,6 @@ def do_train():
                 evaluate(model, criterion, metric, dev_data_loader)
                 model._layers.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
-
-    if rank == 0:
-        print('Evaluating on test data.')
-        evaluate(model, criterion, metric, test_data_loader)
 
 
 if __name__ == "__main__":

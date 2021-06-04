@@ -14,7 +14,7 @@
 import numpy as np
 import unittest
 import paddle
-import paddlenlp.utils.ops as ops
+import paddlenlp.ops as ops
 from common_test import CommonTest
 
 EINSUM_TEST_SAMPLE = {
@@ -29,6 +29,8 @@ EINSUM_TEST_SAMPLE = {
     "G": np.random.rand(4, 2, 5),
     "H": np.random.rand(3, 2, 4),
     "I": np.random.rand(2, 2),
+    "J": np.random.rand(1, 3, 5),
+    "K": np.random.rand(1, 2, 3, 4),
 }
 
 
@@ -169,6 +171,11 @@ class TestEinsumTestEinsumOthers(TestEinsum):
 class TestEinsumTestEinsumOthers(TestEinsum):
     def setUp(self):
         self.sample = {"paradigm": "ijkl, lmn->ijn", "data": ["F", "H"]}
+
+
+class TestEinsumBatch1(TestEinsum):
+    def setUp(self):
+        self.sample = {"paradigm": "blq,bhlk->bhlqk", "data": ["J", "K"]}
 
 
 if __name__ == "__main__":
