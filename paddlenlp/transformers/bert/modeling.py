@@ -535,9 +535,12 @@ class BertPretrainingCriterion(paddle.nn.Layer):
     def forward(self, prediction_scores, seq_relationship_score,
                 masked_lm_labels, next_sentence_labels, masked_lm_scale):
         with paddle.static.amp.fp16_guard():
-            masked_lm_loss = paddle.nn.functional.softmax_with_cross_entropy(
-                prediction_scores, masked_lm_labels, ignore_index=-1)
+            masked_lm_loss = F.cross_entropy(
+                prediction_scores,
+                masked_lm_labels,
+                reduction='none',
+                ignore_index=-1)
             masked_lm_loss = masked_lm_loss / masked_lm_scale
-            next_sentence_loss = paddle.nn.functional.softmax_with_cross_entropy(
-                seq_relationship_score, next_sentence_labels)
+            next_sentence_loss = F.cross_entropy(
+                seq_relationship_score, next_sentence_labels, reduction='none')
         return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)

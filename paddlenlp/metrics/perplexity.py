@@ -46,9 +46,10 @@ class Perplexity(paddle.metric.Metric):
         self.total_word_num = 0
 
     def compute(self, pred, label, seq_mask=None):
-        label = paddle.unsqueeze(label, axis=2)
-        ce = F.softmax_with_cross_entropy(
-            logits=pred, label=label, soft_label=False)
+        if label.dim() == 2:
+            label = paddle.unsqueeze(label, axis=2)
+        ce = F.cross_entropy(
+            input=pred, label=label, reduction='none', soft_label=False)
         ce = paddle.squeeze(ce, axis=[2])
         if seq_mask is not None:
             ce = ce * seq_mask
