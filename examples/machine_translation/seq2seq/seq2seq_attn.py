@@ -25,8 +25,8 @@ class CrossEntropyCriterion(nn.Layer):
         super(CrossEntropyCriterion, self).__init__()
 
     def forward(self, predict, label, trg_mask):
-        cost = F.softmax_with_cross_entropy(
-            logits=predict, label=label, soft_label=False)
+        cost = F.cross_entropy(
+            input=predict, label=label, soft_label=False, reduction='none')
         cost = paddle.squeeze(cost, axis=[2])
         masked_cost = cost * trg_mask
         batch_mean_cost = paddle.mean(masked_cost, axis=[0])

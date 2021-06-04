@@ -200,8 +200,8 @@ def do_train():
         convert_example, tokenizer=tokenizer, label_map=label_map, max_seq_len=args.max_seq_len)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'),
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'),
         Stack(dtype="int64")  # label
     ): fn(list(map(trans_func, samples)))
 

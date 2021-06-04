@@ -80,13 +80,23 @@ std::vector<paddle::Tensor> DecodingForward(
   } else {
     PD_THROW("Not supported decoding strategy. ");
   }
-  auto output_ids = paddle::Tensor(input.place(), output_dims);
-  auto parent_ids = paddle::Tensor(input.place(), parent_ids_dims);
-  auto sequence_length = paddle::Tensor(input.place(), sequence_length_dims);
 
   if (input.place() == paddle::PlaceType::kGPU) {
+    auto output_ids = paddle::Tensor(paddle::PlaceType::kGPU, output_dims);
+    auto parent_ids = paddle::Tensor(paddle::PlaceType::kGPU, parent_ids_dims);
+    auto sequence_length =
+        paddle::Tensor(paddle::PlaceType::kGPU, sequence_length_dims);
+
+    paddle::Tensor seq_len = paddle::Tensor(paddle::PlaceType::kGPU);
+
+    if (mem_seq_len.place() != paddle::PlaceType::kGPU) {
+      seq_len = mem_seq_len.copy_to<int>(paddle::PlaceType::kGPU);
+    } else {
+      seq_len = mem_seq_len;
+    }
+
     return DecodingCUDAForward(input,
-                               mem_seq_len,
+                               seq_len,
                                word_embedding,
                                self_ln_weight,
                                self_ln_bias,

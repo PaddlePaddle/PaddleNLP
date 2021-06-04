@@ -44,8 +44,16 @@ std::vector<paddle::Tensor> GPT2Forward(
   std::vector<int64_t> output_dims({total_len, batch_size});
   auto output_ids = paddle::Tensor(input.place(), output_dims);
 
-  if (input.place() == paddle::PlaceType::kGPU) {
-    return GPT2CUDAForward(input,
+  if (word_embedding.place() == paddle::PlaceType::kGPU) {
+    paddle::Tensor input_ids = paddle::Tensor(paddle::PlaceType::kCPU);
+
+    if (input.place() != paddle::PlaceType::kCPU) {
+      input_ids = input.copy_to<int>(paddle::PlaceType::kCPU);
+    } else {
+      input_ids = input;
+    }
+
+    return GPT2CUDAForward(input_ids,
                            word_embedding,
                            self_ln_weight,
                            self_ln_bias,

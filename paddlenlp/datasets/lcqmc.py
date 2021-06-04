@@ -31,19 +31,19 @@ class LCQMC(DatasetBuilder):
 
     """
 
-    URL = "https://bj.bcebos.com/paddlehub-dataset/lcqmc.tar.gz"
-    MD5 = "62a7ba36f786a82ae59bbde0b0a9af0c"
+    URL = "https://dataset-bj.cdn.bcebos.com/qianyan/lcqmc.zip"
+    MD5 = "7069fa0cffbd2110845869c61f83814a"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
         'train': META_INFO(
-            os.path.join('lcqmc', 'train.tsv'),
-            '2193c022439b038ac12c0ae918b211a1'),
+            os.path.join('lcqmc', 'lcqmc', 'train.tsv'),
+            '479d94fe575981f236319f2a5b8b3c03'),
         'dev': META_INFO(
-            os.path.join('lcqmc', 'dev.tsv'),
-            'c5dcba253cb4105d914964fd8b3c0e94'),
+            os.path.join('lcqmc', 'lcqmc', 'dev.tsv'),
+            '089329fb44ef26155baef9c9c8c823ba'),
         'test': META_INFO(
-            os.path.join('lcqmc', 'test.tsv'),
-            '8f4b71e15e67696cc9e112a459ec42bd'),
+            os.path.join('lcqmc', 'lcqmc', 'test.tsv'),
+            'a4a483f2f871d57e0f3894fca0d0f8f0'),
     }
 
     def _get_data(self, mode, **kwargs):
@@ -59,14 +59,14 @@ class LCQMC(DatasetBuilder):
     def _read(self, filename):
         """Reads data."""
         with open(filename, 'r', encoding='utf-8') as f:
-            head = None
             for line in f:
                 data = line.strip().split("\t")
-                if not head:
-                    head = data
-                else:
+                if len(data) == 3:
                     query, title, label = data
                     yield {"query": query, "title": title, "label": label}
+                else:
+                    query, title = data
+                    yield {"query": query, "title": title, "label": ''}
 
     def get_labels(self):
         """
