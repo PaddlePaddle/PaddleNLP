@@ -95,7 +95,6 @@ def do_train(agrs):
 
     ce_loss = nn.CrossEntropyLoss()
     mse_loss = nn.MSELoss()
-    klloss = nn.KLDivLoss()
 
     metric_class = METRIC_CLASSES[args.task_name]
     metric = metric_class()
