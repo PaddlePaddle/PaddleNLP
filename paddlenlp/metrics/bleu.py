@@ -98,6 +98,7 @@ class BLEU(paddle.metric.Metric):
 
     Examples:
         1. Using as a general evaluation object.
+
         .. code-block:: python
 
             from paddlenlp.metrics import BLEU
