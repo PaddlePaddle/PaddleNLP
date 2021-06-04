@@ -12,11 +12,14 @@
 ![support os](https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg)
 ![GitHub](https://img.shields.io/github/license/paddlepaddle/paddlenlp)
 
-<img src="./docs/imgs/news_icon.png" width="50"/> *[2021-05-20] PaddleNLP 2.0正式版已发布！:tada:更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.0.0).*
+## News  <img src="./docs/imgs/news_icon.png" width="50"/>
+
+* [2021-05-20] PaddleNLP 2.0正式版已发布！:tada:更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.0.0).
+* [2021-06-04] 新增效果领先的[ERNIE-Gram](https://arxiv.org/abs/2010.12148)中文预训练模型，获取2.0.2版本快速体验吧！
+
+## 简介
 
 PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本领域API**，**多场景的应用示例**、和**高性能分布式训练**三大特点，旨在提升飞桨开发者文本领域建模效率，并提供基于飞桨框架2.0的NLP任务最佳实践。
-
-## 特性
 
 - **易用的文本领域API**
   - 提供从数据集加载、文本预处理、模型组网、模型评估、和推理加速的领域API：一键加载丰富中文数据集的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)，可灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)，预置60+预训练词向量的[Embedding API](./docs/embeddings.md); 提供50+预训练模型的生态基础能力的[Transformer API](./docs/model_zoo/transformers.rst)等，可大幅提升NLP任务建模和迭代的效率。更多API详细说明请查看[PaddleNLP官方文档](https://paddlenlp.readthedocs.io/)。
