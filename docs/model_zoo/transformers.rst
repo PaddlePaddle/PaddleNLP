@@ -202,7 +202,6 @@ Transformer预训练模型适用任务汇总
 .. _RoBERTa: https://arxiv.org/abs/1907.11692
 .. _SKEP: https://arxiv.org/abs/2005.05635
 .. _TinyBert: https://arxiv.org/abs/1909.10351
-.. _Transformer: https://arxiv.org/abs/1706.03762
 .. _UnifiedTransformer: https://arxiv.org/abs/2006.16779
 .. _XLNet: https://arxiv.org/abs/1906.08237
 
