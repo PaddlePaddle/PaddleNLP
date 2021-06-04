@@ -19,7 +19,7 @@ PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本�
 ## 特性
 
 - **易用的文本领域API**
-  - 提供从数据集加载、文本预处理、模型组网、模型评估、和推理加速的领域API：一键加载丰富中文数据集的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)，可灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)，预置60+预训练词向量的[Embedding API](./docs/embeddings.md); 提供50+预训练模型的生态基础能力的[Transformer API](./docs/transformers.md)等，可大幅提升NLP任务建模和迭代的效率。更多API详细说明请查看[PaddleNLP官方文档](https://paddlenlp.readthedocs.io/)。
+  - 提供从数据集加载、文本预处理、模型组网、模型评估、和推理加速的领域API：一键加载丰富中文数据集的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)，可灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)，预置60+预训练词向量的[Embedding API](./docs/embeddings.md); 提供50+预训练模型的生态基础能力的[Transformer API](./docs/model_zoo/transformers.rst)等，可大幅提升NLP任务建模和迭代的效率。更多API详细说明请查看[PaddleNLP官方文档](https://paddlenlp.readthedocs.io/)。
 
 
 - **多场景的应用示例**
@@ -84,7 +84,7 @@ electra = ElectraModel.from_pretrained('chinese-electra-small')
 gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
-请参考[Transformer API文档](./docs/transformers.md)查看目前支持的预训练模型。
+请参考[Transformer API文档](./docs/model_zoo/transformers.rst)查看目前支持的预训练模型。
 
 ### 便捷获取文本特征
 
@@ -100,7 +100,7 @@ pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_i
 ```
 ### 更多API使用文档
 
-- [Transformer API](./docs/transformers.md)
+- [Transformer API](./docs/model_zoo/transformers.rst)
   * 基于Transformer结构相关的预训练模型API，包含50+预训练模型，涵盖主流BERT/ERNIE/ALBERT/RoBERTa/Electra等经典结构和下游任务。
 - [Data API](./docs/data.md)
   * 文本数据处理Pipeline的相关API说明。
