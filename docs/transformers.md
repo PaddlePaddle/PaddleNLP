@@ -5,7 +5,7 @@
 
 ## Transformer预训练模型汇总
 
-下表汇总了目前PaddleNLP支持的各类预训练模型。用户可以使用PaddleNLP提供的模型，完成问答、文本分类、序列标注、文本生成等任务。同时我们提供了48种预训练的参数权重供用户使用，其中包含了23种中文语言模型的预训练权重。
+下表汇总了目前PaddleNLP支持的各类预训练模型。用户可以使用PaddleNLP提供的模型，完成问答、文本分类、序列标注、文本生成等任务。同时我们提供了48种预训练的参数权重供用户使用，其中包含了24种中文语言模型的预训练权重。
 
 | Model | Tokenizer | Supported Task | Pretrained Weight|
 |---|---|---|---|
@@ -13,7 +13,7 @@
 |[BERT](https://arxiv.org/abs/1810.04805) | BertTokenizer|BertModel<br> BertForQuestionAnswering<br> BertForSequenceClassification<br>BertForTokenClassification| `bert-base-uncased`<br> `bert-large-uncased` <br>`bert-base-multilingual-uncased` <br>`bert-base-cased`<br> `bert-base-chinese`<br> `bert-base-multilingual-cased`<br> `bert-large-cased`<br> `bert-wwm-chinese`<br> `bert-wwm-ext-chinese` |
 |[ERNIE](https://arxiv.org/abs/1904.09223)|ErnieTokenizer<br>ErnieTinyTokenizer|ErnieModel<br> ErnieForQuestionAnswering<br> ErnieForSequenceClassification<br> ErnieForTokenClassification | `ernie-1.0`<br> `ernie-tiny`<br> `ernie-2.0-en`<br> `ernie-2.0-large-en`|
 |[ERNIE-GEN](https://arxiv.org/abs/2001.11314)|ErnieTokenizer| ErnieForGeneration|`ernie-gen-base-en`<br>`ernie-gen-large-en`<br>`ernie-gen-large-en-430g`|
-|[GPT](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)| GPTTokenizer<br> GPTChineseTokenizer| GPTForGreedyGeneration| `gpt-cpm-large-cn` <br> `gpt2-medium-en`|
+|[GPT](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)| GPTTokenizer<br> GPTChineseTokenizer| GPTForGreedyGeneration| `gpt-cpm-large-cn` <br> `gpt-cpm-small-cn-distill` <br> `gpt2-medium-en`|
 |[RoBERTa](https://arxiv.org/abs/1907.11692)|RobertaTokenizer| RobertaModel<br>RobertaForQuestionAnswering<br>RobertaForSequenceClassification<br>RobertaForTokenClassification| `roberta-wwm-ext`<br> `roberta-wwm-ext-large`<br> `rbt3`<br> `rbtl3`|
 |[ELECTRA](https://arxiv.org/abs/2003.10555) | ElectraTokenizer| ElectraModel<br>ElectraForSequenceClassification<br>ElectraForTokenClassification<br>|`electra-small`<br> `electra-base`<br> `electra-large`<br> `chinese-electra-small`<br> `chinese-electra-base`<br>|
 |[XLNet](https://arxiv.org/abs/1906.08237)| XLNetTokenizer| XLNetModel<br> XLNetForSequenceClassification<br> XLNetForTokenClassification |`xlnet-base-cased`<br> `xlnet-large-cased`<br> `chinese-xlnet-base`<br> `chinese-xlnet-mid`<br> `chinese-xlnet-large`|
@@ -22,7 +22,7 @@
 |[TinyBERT](https://arxiv.org/abs/1909.10351) |TinyBertTokenizer | TinyBertModel<br>TinyBertForPretraining<br>TinyBertForSequenceClassification | `tinybert-4l-312d`<br>`tinybert-6l-768d`<br>`tinybert-4l-312d-v2`<br>`tinybert-6l-768d-v2` |
 |[Transformer](https://arxiv.org/abs/1706.03762) |- | TransformerModel | - |
 
-**NOTE**：其中中文的预训练模型有`albert-chinese-tiny, albert-chinese-small, albert-chinese-base, albert-chinese-large, albert-chinese-xlarge, albert-chinese-xxlarge, bert-base-chinese, bert-wwm-chinese, bert-wwm-ext-chinese, ernie-1.0, ernie-tiny, gpt-cpm-large-cn, roberta-wwm-ext, roberta-wwm-ext-large, rbt3, rbtl3, chinese-electra-base, chinese-electra-small, chinese-xlnet-base, chinese-xlnet-mid, chinese-xlnet-large, unified_transformer-12L-cn, unified_transformer-12L-cn-luge`。
+**NOTE**：其中中文的预训练模型有`albert-chinese-tiny, albert-chinese-small, albert-chinese-base, albert-chinese-large, albert-chinese-xlarge, albert-chinese-xxlarge, bert-base-chinese, bert-wwm-chinese, bert-wwm-ext-chinese, ernie-1.0, ernie-tiny, gpt-cpm-large-cn, gpt-cpm-small-cn-distill, roberta-wwm-ext, roberta-wwm-ext-large, rbt3, rbtl3, chinese-electra-base, chinese-electra-small, chinese-xlnet-base, chinese-xlnet-mid, chinese-xlnet-large, unified_transformer-12L-cn, unified_transformer-12L-cn-luge`。
 
 ## 预训练模型使用方法
 
