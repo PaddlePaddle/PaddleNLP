@@ -81,14 +81,17 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         "model_file": "sentencepiece.model"
     }  # for save_pretrained
 
-    cpm_modle_link = "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-cn-sentencepiece.model"
+    cpm_model_link = "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-cn-sentencepiece.model"
     pretrained_resource_files_map = {
         "model_file": {
-            "gpt-cpm-large-cn": cpm_modle_link,
-            "gpt-cpm-small-cn-distill": cpm_modle_link,
+            "gpt-cpm-large-cn": cpm_model_link,
+            "gpt-cpm-small-cn-distill": cpm_model_link,
         }
     }
-    pretrained_init_configuration = {"gpt-cpm-large-cn": {}, "gpt-cpm-small-cn-distill": {}, }
+    pretrained_init_configuration = {
+        "gpt-cpm-large-cn": {},
+        "gpt-cpm-small-cn-distill": {},
+    }
 
     def __init__(
             self,
