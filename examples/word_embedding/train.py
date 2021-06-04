@@ -151,8 +151,7 @@ if __name__ == '__main__':
     if '[PAD]' not in vocab:
         vocab['[PAD]'] = len(vocab)
     # Loads dataset.
-    train_ds, dev_ds, test_ds = load_dataset(
-        "chnsenticorp", splits=["train", "dev", "test"])
+    train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
     # Constructs the newtork.
     model = BoWModel(
@@ -187,12 +186,6 @@ if __name__ == '__main__':
         batch_size=args.batch_size,
         mode='validation',
         pad_token_id=vocab['[PAD]'])
-    test_loader = create_dataloader(
-        test_ds,
-        trans_fn=trans_fn,
-        batch_size=args.batch_size,
-        mode='test',
-        pad_token_id=vocab['[PAD]'])
 
     optimizer = paddle.optimizer.Adam(
         parameters=model.parameters(), learning_rate=args.lr)
@@ -219,7 +212,3 @@ if __name__ == '__main__':
               epochs=args.epochs,
               save_dir=args.save_dir,
               callbacks=callback)
-
-    # Finally tests model.
-    results = model.evaluate(test_loader, callbacks=callback)
-    print("Finally test acc: %.5f" % results['acc'])
