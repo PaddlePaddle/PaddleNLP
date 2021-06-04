@@ -33,7 +33,7 @@
 
 本实验使用GLUE中的SST-2、QQP以及中文情感分类数据集ChnSentiCorp中的训练集作为训练语料，用数据集中的验证集评估模型的效果。运行本目录下的实验，数据集会被自动下载到`paddlenlp.utils.env.DATA_HOME` 路径下，例如在linux系统下，例如对于GLUE中的QQP数据集，默认存储路径是`~/.paddlenlp/datasets/glue/QQP`，对于ChnSentiCorp数据集，则会下载到 `~/.paddlenlp/datasets/chnsenticorp`。
 
-对于BERT的fine-tuning任务，本实验中使用了预训练模型`bert-bas-uncased`、`bert-wwm-ext-chinese`、`bert-base-chinese`。同样，这几个模型在训练时会被自动下载到`paddlenlp.utils.env.DATA_HOME`路径下。例如，对于`bert-base-uncased`模型，在linux系统下，会被下载到`~/.paddlenlp/models/bert-base-uncased`下。
+对于BERT的fine-tuning任务，本实验中使用了预训练模型`bert-bas-uncased`、`bert-wwm-ext-chinese`、`bert-base-chinese`。同样，这几个模型在训练时会被自动下载到`paddlenlp.utils.env.MODEL_HOME`路径下。例如，对于`bert-base-uncased`模型，在linux系统下，会被下载到`~/.paddlenlp/models/bert-base-uncased`下。
 
 在中文数据集上的小模型训练的输入利用jieba分词，其中词表同本repo下[文本分类项目](../../text_classification/rnn)的词表，可通过运行以下命令进行下载：
 

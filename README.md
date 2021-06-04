@@ -123,7 +123,7 @@ PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景�
 | 任务   | 简介     |
 | :------------  | ---- |
 | [词法分析](./examples/lexical_analysis/) | 基于BiGRU-CRF模型实现了分词、词性标注和命名实体识的联合训练任务。输入是中文句子，而输出是句子中的词边界、词性与实体类别。 |
-| [词向量](./exmaples/word_embedding/) | 提供60+预训练词向量，通过`paddlenlp.TokenEmbedding` API实现快速加载，可用于模型热启动或计算词之间的空间距离，支持通过VisualDL实现降维可视化。 |
+| [词向量](./examples/word_embedding/) | 提供60+预训练词向量，通过`paddlenlp.TokenEmbedding` API实现快速加载，可用于模型热启动或计算词之间的空间距离，支持通过VisualDL实现降维可视化。 |
 | [语言模型](./examples/language_model/)  | 提供了基于RNN和Transformer-XL两种结构的语言模型，支持输入词序列计算其生成概率，并得到Perplexity(困惑度)，用于表示模型生成句子的流利程度。 |
 | [语义解析](./examples/text_to_sql):star: | 语义解析Text-to-SQL是自然语言处理技术的核心任务之一，Text-to-SQL是语义解析的一个子方向，让机器自动将用户输入的自然语言问题转成数据库可操作的SQL查询语句，是实现基于数据库自动问答的核心模块。|
 
