@@ -348,5 +348,6 @@ def einsum(equation, *operands):
     squeeze_dims = [
         i for i in range(len(result.shape) - 1, num_output_dims - 1, -1)
     ]
-    result = paddle.squeeze(result, squeeze_dims)
+    if len(squeeze_dims) != 0:
+        result = paddle.squeeze(result, squeeze_dims)
     return result
