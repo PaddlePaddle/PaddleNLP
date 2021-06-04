@@ -90,7 +90,7 @@ electra = ElectraModel.from_pretrained('chinese-electra-small')
 gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
-For more pretrained model selection, please refer to [Transformer API](./docs/transformers.md)
+For more pretrained model selection, please refer to [Transformer API](./docs/model_zoo/transformers.rst)
 
 ### Extract Feature Through Pre-trained Model
 
@@ -128,7 +128,7 @@ For model zoo introduction please refer to[PaddleNLP Model Zoo](./docs/model_zoo
 
 ## API Usage
 
-- [Transformer API](./docs/transformers.md)
+- [Transformer API](./docs/model_zoo/transformers.rst)
 - [Data API](./docs/data.md)
 - [Dataset API](./docs/datasets.md)
 - [Embedding API](./docs/embeddings.md)

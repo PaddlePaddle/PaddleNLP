@@ -25,7 +25,6 @@ PaddleNLP提供了丰富的模型结构，包含经典的RNN类模型结构，�
 | ------ | ------ |
 | [Transformer](../examples/machine_translation/transformer/) | [Attention Is All You Need](https://arxiv.org/abs/1706.03762)     |
 | [Transformer-XL](../examples/language_model/transformer-xl/) | [Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context](https://arxiv.org/abs/1901.02860)     |
-| [ALBERT](../examples/language_model/albert/) | [ALBERT: A Lite BERT for Self-supervised Learning of Language Representations](https://arxiv.org/abs/1909.11942)      |
 | [BERT](../examples/language_model/bert/) | [BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding](https://arxiv.org/abs/1810.04805)      |
 | [ERNIE](../examples/text_classification/pretrained_models) | [ERNIE: Enhanced Representation through Knowledge Integration](https://arxiv.org/abs/1904.09223)   |
 | [ERNIE-Tiny](../examples/text_classification/pretrained_models) | 百度自研的小型化ERNIE网络结构，采用浅层Transformer，加宽隐层参数，中文subword粒度词表结合蒸馏的方法使模型相比SOTA Before BERT 提升8.35%， 速度提升4.3倍。 |

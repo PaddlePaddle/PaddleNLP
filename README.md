@@ -151,7 +151,7 @@ PaddleNLP基于PaddlePaddle 2.0全新API体系，提供了丰富的应用场景�
 | :--------------- | ---------- |
 | [SimNet](./examples/text_matching/simnet/)  | 百度提出的的语义匹配框架，主要使用BOW、CNN、GRNN等核心网络作为表示层，适用于信息检索、新闻推荐、智能客服等多种语义匹配应用场景。|
 | [ERNIE](./examples/text_matching/ernie_matching/) | 基于ERNIE使用LCQMC数据完成中文句对匹配任务，提供了Pointwise和Pairwise两种类型学习方式。 |
-| [Sentence-BERT](./examples/text_matching/sentence_transformer/) | 基于Siamese双塔结构的[Sentence-BERT](https://arxiv.org/abs/1908.1008)文本匹配模型，可用于获取基于Transformer预训练模型的句子向量化表示。
+| [Sentence-BERT](./examples/text_matching/sentence_transformers/) | 基于Siamese双塔结构的[Sentence-BERT](https://arxiv.org/abs/1908.1008)文本匹配模型，可用于获取基于Transformer预训练模型的句子向量化表示。
 
 #### 语义索引 (Semantic Indexing)
 
