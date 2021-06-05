@@ -151,7 +151,7 @@ Transformer预训练模型汇总
 |                    |                                     |              | Trained on Chinese text.                |
 +--------------------+-------------------------------------+--------------+-----------------------------------------+
 |ERNIE_              |``ernie-1.0``                        | Chinese      | 12-layer, 768-hidden,                   |
-|                    |                                     |              | 12-heads, _M parameters.                |
+|                    |                                     |              | 12-heads, 103M parameters.              |
 |                    |                                     |              | Trained on Chinese text.                |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``ernie-tiny``                       | Chinese      | 3-layer, 1024-hidden,                   |
@@ -190,7 +190,7 @@ Transformer预训练模型汇总
 |                    |``gpt-cpm-small-cn-distill``         | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                     |              | 12-heads, 109M parameters.              |
 |                    |                                     |              | The model distilled from                |
-|                    |                                     |              | the GPT model ``gpt-cpm-small-cn``      |
+|                    |                                     |              | the GPT model ``gpt-cpm-large-cn``      |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``gpt2-medium-en``                   | English      | 24-layer, 1024-hidden,                  |
 |                    |                                     |              | 16-heads, 345M parameters.              |
