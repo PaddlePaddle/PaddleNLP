@@ -57,7 +57,7 @@ pretrained_models/
 │       └── predict.py # python预测部署示例
 │   └── serving
 │       ├── client.py # 客户端预测脚本
-│       └── covert_inference_model_to_serving.py # Inference模型导出Serving模型及其配置
+│       └── convert_inference_model_to_serving.py # Inference模型导出Serving模型及其配置
 ├── export_model.py # 动态图参数导出静态图参数脚本
 ├── predict.py # 预测脚本
 ├── README.md # 使用说明
@@ -221,7 +221,7 @@ pip install paddle-serving-app paddle-serving-client
 使用Serving进行预测部署时，需要将静态图inference model导出为Serving可读入的模型参数和配置。运行方式如下：
 
 ```shell
-python -u deploy/serving/covert_inference_model_to_serving.py \
+python -u deploy/serving/convert_inference_model_to_serving.py \
     --inference_model_dir ./ \
     --model_file static_graph_params.pdmodel \
     --params_file static_graph_params.pdiparams

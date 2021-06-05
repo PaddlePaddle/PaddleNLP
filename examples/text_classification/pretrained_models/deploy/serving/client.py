@@ -32,14 +32,19 @@ parser.add_argument(
 parser.add_argument(
     "--server_ip_port",
     type=str,
-    default="10.9.189.6:8095",
+    default="127.0.0.1:8090",
     help="server_ip:port")
-parser.add_argument("--batch_size", type=int, default=1, help="batch size")
+parser.add_argument(
+    "--batch_size",
+    type=int,
+    default=1,
+    help="Batch size per GPU/CPU for training.")
 parser.add_argument(
     "--max_seq_length",
     type=int,
     default=128,
-    help="max length of each sequence")
+    help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
+)
 args = parser.parse_args()
 
 
