@@ -192,7 +192,7 @@ PaddleNLP的所有模型均采用PaddlePaddle 2.0全新API体系实现，通过�
 
 | 模型    | 简介     |
 | :---------- | ------- |
-| [STACL](./examples/simultaneous_translation/stacl) :star:| [STACL](https://www.aclweb.org/anthology/P19-1289/)是基于Prefix-to-Prefix框架的同传翻译模型，具备一定的隐式预测能力；结合Wait-k策略在保持较高的翻译质量的同时实现任意字级别的翻译延迟，并提供了可视化的Demo。|
+| [STACL](./examples/simultaneous_translation/stacl) :star:| [STACL](https://www.aclweb.org/anthology/P19-1289/)是基于Prefix-to-Prefix框架的同传翻译模型，结合Wait-k策略在保持较高的翻译质量的同时实现任意字级别的翻译延迟，并提供了轻量级同声传译系统搭建说明。|
 
 #### 对话系统 (Dialogue System)
 
@@ -241,9 +241,7 @@ PaddleNLP的所有模型均采用PaddlePaddle 2.0全新API体系实现，通过�
 更多教程参见[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
 
 
-## 版本更新
 
-更多版本更新说明请查看[ChangeLog](./docs/change_log.md)
 
 ## 社区贡献与技术交流
 
@@ -258,6 +256,10 @@ PaddleNLP的所有模型均采用PaddlePaddle 2.0全新API体系实现，通过�
 <div align="center">
   <img src="./docs/imgs/qq.png" width="200" height="200" />
 </div>  
+
+## 版本更新
+
+更多版本更新说明请查看[ChangeLog](./docs/changelog.md)
 
 ## License
 
