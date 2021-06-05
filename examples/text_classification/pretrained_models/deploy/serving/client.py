@@ -19,7 +19,7 @@ import os
 
 import paddle
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import ElectraTokenizer, ErnieTokenizer
+from paddlenlp.transformers import ErnieTinyTokenizer
 from paddle_serving_client import Client
 from scipy.special import softmax
 
@@ -27,12 +27,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "--client_config_file",
     type=str,
-    required=True,
+    default="./serving_client/serving_client_conf.prototxt",
     help="client prototxt config file")
 parser.add_argument(
     "--server_ip_port",
     type=str,
-    default="10.12.121.132:8383",
+    default="10.9.189.6:8095",
     help="server_ip:port")
 parser.add_argument("--batch_size", type=int, default=1, help="batch size")
 parser.add_argument(
@@ -112,7 +112,7 @@ def predict(data, label_map, batch_size):
     client.load_client_config(args.client_config_file)
     client.connect([args.server_ip_port])
 
-    tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
+    tokenizer = ErnieTinyTokenizer.from_pretrained("ernie-tiny")
     examples = []
     for text in data:
         input_ids, token_type_ids = convert_example(
