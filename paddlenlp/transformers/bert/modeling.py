@@ -344,7 +344,8 @@ class BertModel(BertPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False):
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
@@ -354,10 +355,22 @@ class BertModel(BertPretrainedModel):
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
-        encoder_outputs = self.encoder(embedding_output, attention_mask)
-        sequence_output = encoder_outputs
-        pooled_output = self.pooler(sequence_output)
-        return sequence_output, pooled_output
+        if output_hidden_states:
+            output = embedding_output
+            encoder_outputs = []
+            for mod in self.encoder.layers:
+                output = mod(output, src_mask=attention_mask)
+                encoder_outputs.append(output)
+            if self.encoder.norm is not None:
+                encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
+            pooled_output = self.pooler(encoder_outputs[-1])
+        else:
+            sequence_output = self.encoder(embedding_output, attention_mask)
+            pooled_output = self.pooler(sequence_output)
+        if output_hidden_states:
+            return encoder_outputs, pooled_output
+        else:
+            return sequence_output, pooled_output
 
 
 class BertForQuestionAnswering(BertPretrainedModel):
@@ -535,9 +548,12 @@ class BertPretrainingCriterion(paddle.nn.Layer):
     def forward(self, prediction_scores, seq_relationship_score,
                 masked_lm_labels, next_sentence_labels, masked_lm_scale):
         with paddle.static.amp.fp16_guard():
-            masked_lm_loss = paddle.nn.functional.softmax_with_cross_entropy(
-                prediction_scores, masked_lm_labels, ignore_index=-1)
+            masked_lm_loss = F.cross_entropy(
+                prediction_scores,
+                masked_lm_labels,
+                reduction='none',
+                ignore_index=-1)
             masked_lm_loss = masked_lm_loss / masked_lm_scale
-            next_sentence_loss = paddle.nn.functional.softmax_with_cross_entropy(
-                seq_relationship_score, next_sentence_labels)
+            next_sentence_loss = F.cross_entropy(
+                seq_relationship_score, next_sentence_labels, reduction='none')
         return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)

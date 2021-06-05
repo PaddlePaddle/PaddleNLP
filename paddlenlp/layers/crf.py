@@ -401,7 +401,7 @@ class ViterbiDecoder(nn.Layer):
                 alpha = logit
                 left_length = left_length - ones
                 continue
-            alpha_exp = alpha.unsqueeze(2).expand_as(trans_exp)
+            alpha_exp = alpha.unsqueeze(2)
             # alpha_trn_sum: batch_size, n_labels, n_labels
             alpha_trn_sum = alpha_exp + trans_exp
 

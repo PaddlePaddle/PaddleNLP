@@ -862,14 +862,17 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
                                 masked_lm_scale, masked_lm_weights)
                 print(loss)
         """
-        masked_lm_loss = paddle.nn.functional.softmax_with_cross_entropy(
-            prediction_scores, masked_lm_labels, ignore_index=self.ignore_index)
+        masked_lm_loss = F.cross_entropy(
+            prediction_scores,
+            masked_lm_labels,
+            ignore_index=self.ignore_index,
+            reduction='none')
         masked_lm_loss = paddle.transpose(masked_lm_loss, [1, 0])
         masked_lm_loss = paddle.sum(masked_lm_loss * masked_lm_weights) / (
             paddle.sum(masked_lm_weights) + 1e-5)
         scale = 1.0
         if not self.use_nsp:
             scale = 0.0
-        next_sentence_loss = paddle.nn.functional.softmax_with_cross_entropy(
-            seq_relationship_score, next_sentence_labels)
+        next_sentence_loss = F.cross_entropy(
+            seq_relationship_score, next_sentence_labels, reduction='none')
         return masked_lm_loss + paddle.mean(next_sentence_loss) * scale
