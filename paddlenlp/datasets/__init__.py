@@ -34,3 +34,4 @@ from .imdb import *
 from .seabsa16 import *
 from .cote import *
 from .clue import *
+from .nlpcc14_sc import *
