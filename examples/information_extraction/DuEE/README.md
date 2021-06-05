@@ -213,7 +213,7 @@ f1_score = (2 * P * R) / (P + R)，其中
 ## 进阶优化基线效果
 
 基线采用的预训练模型为ERNIE，PaddleNLP提供了丰富的预训练模型，如BERT，RoBERTa，Electra，XLNet等
-参考[PaddleNLP预训练模型介绍](../../../docs/transformers.md)
+参考[PaddleNLP预训练模型介绍](../../../docs/model_zoo/transformers.rst)
 
 如可以选择RoBERTa large中文模型优化模型效果，只需更换模型和tokenizer即可无缝衔接。
 
