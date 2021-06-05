@@ -56,19 +56,19 @@ Transformer预训练模型汇总
 |                    |                                     |              | ALBERT small model (Chinese)            |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-chinese-base``              | Chinese      | 12 repeating layers, 128 embedding,     |
-|                    |                                     |              | 768-hidden, 12-heads, 12M parameters     |
+|                    |                                     |              | 768-hidden, 12-heads, 12M parameters    |
 |                    |                                     |              | ALBERT base model (Chinese)             |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-chinese-large``             | Chinese      | 24 repeating layers, 128 embedding,     |
-|                    |                                     |              | 1024-hidden, 16-heads, 18M parameters    |
+|                    |                                     |              | 1024-hidden, 16-heads, 18M parameters   |
 |                    |                                     |              | ALBERT large model (Chinese)            |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-chinese-xlarge``            | Chinese      | 24 repeating layers, 128 embedding,     |
-|                    |                                     |              | 2048-hidden, 16-heads, 60M parameters    |
+|                    |                                     |              | 2048-hidden, 16-heads, 60M parameters   |
 |                    |                                     |              | ALBERT xlarge model (Chinese)           |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-chinese-xxlarge``           | Chinese      | 12 repeating layers, 128 embedding,     |
-|                    |                                     |              | 4096-hidden, 16-heads, 235M parameters    |
+|                    |                                     |              | 4096-hidden, 16-heads, 235M parameters  |
 |                    |                                     |              | ALBERT xxlarge model (Chinese)          |
 +--------------------+-------------------------------------+--------------+-----------------------------------------+
 |BERT_               |``bert-base-uncased``                | English      | 12-layer, 768-hidden,                   |
@@ -175,7 +175,7 @@ Transformer预训练模型汇总
 |                    |                                     |              | Trained on lower-cased English text.    |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``ernie-gen-large-en-430g``          | English      | 24-layer, 1024-hidden,                  |
-|                    |                                     |              | 16-heads, 336M parameters.                |
+|                    |                                     |              | 16-heads, 336M parameters.              |
 |                    |                                     |              | Trained on lower-cased English text.    |
 |                    |                                     |              | with extended data (430 GB).            |
 +--------------------+-------------------------------------+--------------+-----------------------------------------+
