@@ -20,7 +20,7 @@
 
 ## 简介
 
-PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本领域API**，**多场景的应用示例**、和**高性能分布式训练**三大特点，旨在提升飞桨开发者文本领域建模效率，并提供基于飞桨框架2.0的NLP任务最佳实践。
+PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本领域API**，**多场景的应用示例**、和**高性能分布式训练**三大特点，旨在提升开发者文本领域的开发效率并提供基于飞桨2.0核心框架下的NLP任务最佳实践。
 
 - **易用的文本领域API**
   - 提供从数据加载、文本预处理、模型组网评估、到推理加速的领域API：一键加载丰富中文数据集的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)，可灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)，预置60+预训练词向量的[Embedding API](./docs/embeddings.md); 提供60+预训练模型的[Transformer API](./docs/model_zoo/transformers.rst)等，可大幅提升NLP任务建模和迭代的效率。更多API详细说明请查看[PaddleNLP官方文档](https://paddlenlp.readthedocs.io/)。
@@ -32,7 +32,6 @@ PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本�
 
 - **高性能分布式训练**
   - 基于飞桨核心框架领先的自动混合精度优化策略，结合分布式Fleet API，支持4D混合并行策略，可高效地完成超大规模参数的模型训练。
-
 
 ## 安装
 
@@ -49,19 +48,61 @@ pip install --upgrade paddlenlp -i https://pypi.org/simple
 
 更多关于PaddlePaddle和PaddleNLP安装的详细教程请查看[Installation](./docs/get_started/installation.rst)。
 
-## 文本领域API
+## 易用的文本领域API
 
-### 数据集快速加载
+### Transformer API: 强大的预训练模型生态底座
+
+覆盖**15+**网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。
+
+```python
+from paddlenlp.transformers import *
+
+ernie = ErnieModel.from_pretrained('ernie-1.0')
+ernie_gram = ErnieGramModel.from_pretrained('ernie-gram')
+bert = BertModel.from_pretrained('bert-wwm-chinese')
+albert = AlbertModel.from_pretrained('albert-chinese-tiny')
+roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
+electra = ElectraModel.from_pretrained('chinese-electra-small')
+gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
+```
+
+对预训练模型应用范式如语义表示、文本分类、句对匹配、序列标注、问答等，提供统一的API体验。
+
+```python
+import paddle
+from paddlenlp.transformers import ErnieTokenizer, ErnieModel
+
+tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+text = tokenizer('自然语言处理')
+
+# 获取语义表示
+model = ErnieModel.from_pretrained('ernie-1.0')
+pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
+# 文本分类/句对匹配
+model = ErnieForSequenceClassifiation.from_pretrained('ernie-1.0')
+# 序列标注
+model = ErnieForTokenClassifiation.from_pretrained('ernie-1.0')
+# 问答
+model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
+```
+
+请参考[Transformer API文档](./docs/model_zoo/transformers.rst)查看目前支持的预训练模型结构、参数和详细用法。
+
+### Dataset API: 丰富的中文数据集
+
+Dataset API提供便捷、高效的数据集加载功能；内置[千言数据集](https://www.luge.ai/)，提供丰富的面向自然语言理解与生成场景的中文数据集，为NLP研究人员提供一站式的科研体验。
 
 ```python
 from paddlenlp.datasets import load_dataset
 
 train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
+
+train_ds, dev_ds = load_dataset("lcqmc", splits=["train", "dev"])
 ```
 
 可参考[Dataset文档](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html) 查看更多数据集。
 
-### 一键加载预训练中文词向量
+### Embedding API: 一键加载预训练词向量
 
 ```python
 from paddlenlp.embeddings import TokenEmbedding
@@ -73,54 +114,19 @@ wordemb.cosine_sim("艺术", "火车")
 >>> 0.14792643
 ```
 
-内置50+中文词向量，更多使用方法请参考[Embedding文档](./examples/word_embedding/README.md)。
-
-### 一键加载预训练模型
-
-```python
-from paddlenlp.transformers import *
-
-ernie = ErnieModel.from_pretrained('ernie-1.0')
-bert = BertModel.from_pretrained('bert-wwm-chinese')
-albert = AlbertModel.from_pretrained('albert-chinese-tiny')
-roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
-electra = ElectraModel.from_pretrained('chinese-electra-small')
-gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
-```
-
-请参考[Transformer API文档](./docs/model_zoo/transformers.rst)查看目前支持的预训练模型结构与参数。
-
-### 便捷获取文本特征
-
-```python
-import paddle
-from paddlenlp.transformers import ErnieTokenizer, ErnieModel
-
-tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
-model = ErnieModel.from_pretrained('ernie-1.0')
-
-text = tokenizer('自然语言处理')
-pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
-```
+内置50+中文词向量，覆盖多种领域语料、如百科、新闻、微博等。更多使用方法请参考[Embedding文档](./examples/word_embedding/README.md)。
 
 ### 更多API使用文档
 
-- [Transformer API](./docs/model_zoo/transformers.rst)
-  * 基于Transformer结构相关的预训练模型API，包含60+预训练模型，涵盖主流BERT/ERNIE/ALBERT/RoBERTa/Electra等10+经典结构。
-- [Data API](./docs/data.md)
-  * 文本数据处理Pipeline的相关API说明。
-- [Dataset API](./docs/datasets.md)
-  * 数据集相关API，包含自定义数据集，数据集贡献与数据集快速加载等功能说明。
-- [Embedding API](./docs/embeddings.md)
-  * 词向量相关API，支持一键快速加载包预训练的中文词向量，VisulDL高维可视化等功能说明。
-- [Metrics API](./docs/metrics.md)
-  * 针对NLP场景的评估指标说明，与飞桨2.0框架高层API兼容。
+- [Data API](./docs/data.md): 提供便捷高效的文本数据处理功能
+- [Metrics API](./docs/metrics.md): 提供NLP任务的评估指标，与飞桨高层API兼容。
 
-更多的API示例及其使用说明请查阅[PaddleNLP官方文档](https://paddlenlp.readthedocs.io/)
+更多的API示例与使用说明请查阅[PaddleNLP官方文档](https://paddlenlp.readthedocs.io/)
 
-## 丰富的应用示例
+## 多场景的应用示例
 
-PaddleNLP的所有模型均采用PaddlePaddle 2.0全新API体系实现，通过丰富的NLP应用示例，让开发者可以更快使用飞桨2.0核心框架解决NLP问题。
+PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模式和全新的API体系开发，更加简单易懂。
+涵盖了[NLP基础技术](#nlp-基础技术)、[NLP核心技术](#nlp-核心技术)、[NLP系统应用](#nlp-系统应用)以及文本相关的拓展应用如[模型压缩](./examples/model_compression/)、与知识库结合的[文本知识关联](./examples/text_to_knowledge)、与图结合的[文本图学习](./examples/text_graph/)等。
 
 ### NLP 基础技术
 
@@ -181,7 +187,7 @@ PaddleNLP的所有模型均采用PaddlePaddle 2.0全新API体系实现，通过�
 | [DuReader-yesno](./examples/machine_reading_comprehension/DuReader-yesno/) | 提供通过预训练模型在**千言数据集DuReader-yesno**上微调的应用示例。 |
 | [DuReader-robust](./examples/machine_reading_comprehension/DuReader-robust/) | 提供通过预训练模型在**千言数据集DuReader-robust**上微调的应用示例。 |
 
-#### 机器翻译 (Machine Translation)
+#### 文本翻译 (Text Translation)
 
 | 模型    | 简介     |
 | :--------------- | ------- |
@@ -223,11 +229,6 @@ PaddleNLP的所有模型均采用PaddlePaddle 2.0全新API体系实现，通过�
 | [Distill-LSTM](./examples/model_compression/distill_lstm/) | 基于[Distilling Task-Specific Knowledge from BERT into Simple Neural Networks](https://arxiv.org/abs/1903.12136)论文策略的实现，将BERT中英文分类的下游模型知识通过蒸馏的方式迁移至LSTM的小模型结构中，取得比LSTM单独训练更好的效果。|
 | [OFA-BERT](./examples/model_compression/ofa/) :star2:| 基于PaddleSlim Once-For-ALL(OFA)策略对BERT在GLUE任务的下游模型进行压缩，在精度无损的情况下可减少33%参数量，达到模型小型化的提速的效果。 |
 
-#### 时间序列预测 (Time Series Prediction)
-| 模型     | 简介    |
-| -------- | ------- |
-| [TCN(Temporal Convolutional Network)](./time_series/tcn)|TCN模型基于卷积的时间序列模型，通过因果卷积(Causal Convolution)和空洞卷积(Dilated Convolution) 特定的组合方式解决卷积不适合时间序列任务的问题，TCN具备并行度高，内存低等诸多优点，在某些时间序列任务上效果已经超过传统的RNN模型。|
-
 ## 交互式Notebook教程
 
 - [使用Seq2Vec模块进行句子情感分类](https://aistudio.baidu.com/aistudio/projectdetail/1283423)
@@ -239,8 +240,6 @@ PaddleNLP的所有模型均采用PaddlePaddle 2.0全新API体系实现，通过�
 - [使用TCN网络完成新冠疫情病例数预测](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
 
 更多教程参见[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
-
-
 
 
 ## 社区贡献与技术交流
