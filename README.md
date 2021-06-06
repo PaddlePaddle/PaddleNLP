@@ -132,10 +132,10 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 
 | 任务   | 简介     |
 | :------------  | ---- |
-| [词向量](./examples/word_embedding/) | 提供60+预训练词向量，通过`paddlenlp.TokenEmbedding` API实现快速加载，可用于模型热启动或计算词之间的语义距离，支持通过VisualDL实现降维可视化。 |
-| [词法分析](./examples/lexical_analysis/) | 基于BiGRU-CRF模型实现了分词、词性标注和命名实体识的联合训练任务。输入是中文句子，而输出是句子中的词边界、词性与实体类别。 |
-| [语言模型](./examples/language_model/)  | 提供了基于[RNNLM](./exampels/language_model/rnnlm)和[Transformer-XL]((./exampels/language_model/transformer-xl))两种结构的语言模型，支持输入词序列计算其生成概率，并得到Perplexity(困惑度)，用于表示模型生成句子的流利程度。 |
-| [语义解析](./examples/text_to_sql):star: | 语义解析Text-to-SQL是自然语言处理技术的核心任务之一，Text-to-SQL是语义解析的一个子方向，让机器自动将用户输入的自然语言问题转成数据库可操作的SQL查询语句，是实现基于数据库自动问答的核心模块。|
+| [词向量](./examples/word_embedding/) | 利用`TokenEmbedding API`展示如何快速计算词之间语义距离和词的特征提取。 |
+| [词法分析](./examples/lexical_analysis/) | 基于BiGRU-CRF模型实现了分词、词性标注和命名实体识的联合训练任务。 |
+| [语言模型](./examples/language_model/)  | 提供了基于[RNNLM](./exampels/language_model/rnnlm)和[Transformer-XL]((./exampels/language_model/transformer-xl))两种结构的语言模型，支持输入词序列计算其生成概率，可用于表示模型生成句子的流利程度。 |
+| [语义解析](./examples/text_to_sql):star: | 语义解析Text-to-SQL任务是让机器自动让自然语言问题转换数据库可操作的SQL查询语句，是实现基于数据库自动问答的核心模块。|
 
 ### NLP 核心技术
 
@@ -144,20 +144,20 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 | :----- | ------ |
 | [RNN/CNN/GRU/LSTM](./examples/text_classification/rnn) | 实现了经典的RNN, CNN, GRU, LSTM等经典文本分类结构。|
 | [BiLSTM-Attention](./examples/text_classification/rnn) | 基于BiLSTM网络结构引入注意力机制提升文本分类效果。 |
-| [BERT/ERNIE](./examples/text_classification/pretrained_models) | 基于预训练模型的文本分类的模型，结合ChnSentiCorp数据提供了使用不同的预训练模型进行文本分类的Fine-tuning的示例。 |
+| [BERT/ERNIE](./examples/text_classification/pretrained_models) | 提供基于预训练模型的文本分类任务实现，包含训练、预测和推理部署的全流程应用。 |
 
 #### 文本匹配 (Text Matching)
 | 模型    | 简介       |
 | :--------------- | ---------- |
-| [SimNet](./examples/text_matching/simnet/)  | 百度提出的语义匹配框架，主要使用BOW、CNN、GRNN等核心网络作为表示层，适用于信息检索、新闻推荐、智能客服等多种语义匹配应用场景。|
+| [SimNet](./examples/text_matching/simnet/)  | 百度自研的语义匹配框架，使用BOW、CNN、GRNN等核心网络作为表示层，在百度内搜索、推荐等多个应用场景得到广泛易用。|
 | [ERNIE](./examples/text_matching/ernie_matching/) | 基于ERNIE使用LCQMC数据完成中文句对匹配任务，提供了Pointwise和Pairwise两种类型学习方式。 |
 | [Sentence-BERT](./examples/text_matching/sentence_transformers/) | 提供基于Siamese双塔结构的文本匹配模型[Sentence-BERT](https://arxiv.org/abs/1908.1008)实现，可用于获取文本的向量化表示。
 
 #### 文本生成 (Text Generation)
 | 模型        | 简介      |
 | :------------ | ---------- |
-| [Seq2Seq](./examples/text_generation/couplet) |实现了经典的Seq2Seq with Attention的网络结构，并提供在自动对联的文本生成应用示例。 |
-| [VAE-Seq2Seq](./examples/text_generation/vae-seq2seq) | 在传统的Seq2Seq框架基础上，加入VAE结构以实现更加多样化的文本生成。|
+| [Seq2Seq](./examples/text_generation/couplet) | 实现了经典的Seq2Seq with Attention的网络结构，并提供在自动对联的文本生成应用示例。 |
+| [VAE-Seq2Seq](./examples/text_generation/vae-seq2seq) | 在Seq2Seq框架基础上，加入VAE结构以实现更加多样化的文本生成。|
 | [ERNIE-GEN](./examples/text_generation/ernie-gen) | [ERNIE-GEN](https://arxiv.org/abs/2001.11314)是百度NLP提出的基于多流(multi-flow)机制生成完整语义片段的预训练模型，基于该模型实现了提供了智能写诗的应用示例。|
 
 #### 语义索引 (Semantic Indexing)
@@ -177,28 +177,28 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 
 | 模型      | 简介       |
 | :--------- | ---------- |
-| [SKEP](./examples/sentiment_analysis/skep/):star2: | 百度研究团队提出的基于情感知识增强的情感预训练算法，此算法采用无监督方法自动挖掘情感知识，然后利用情感知识构建预训练目标，从而让机器学会理解情感语义。SKEP为各类情感分析任务提供统一且强大的情感语义表示。 |
+| [SKEP](./examples/sentiment_analysis/skep/):star2: | [SKEP](https://arxiv.org/abs/2005.05635)是百度提出的基于情感知识增强的预训练算法，利用无监督挖掘的海量情感知识构建预训练目标，让模型更好理解情感语义，可为各类情感分析任务提供统一且强大的情感语义表示。 |
 
 #### 阅读理解 (Machine Reading Comprehension)
 
 | 任务   | 简介     |
 | :-------------------  | ---- |
-| [SQuAD](./examples/machine_reading_comprehension/SQuAD/) | 提供通过预训练模型在SQuAD 2.0数据集上微调的应用示例。 |
-| [DuReader-yesno](./examples/machine_reading_comprehension/DuReader-yesno/) | 提供通过预训练模型在**千言数据集DuReader-yesno**上微调的应用示例。 |
-| [DuReader-robust](./examples/machine_reading_comprehension/DuReader-robust/) | 提供通过预训练模型在**千言数据集DuReader-robust**上微调的应用示例。 |
+| [SQuAD](./examples/machine_reading_comprehension/SQuAD/) | 提供预训练模型在SQuAD 2.0数据集上微调的应用示例。 |
+| [DuReader-yesno](./examples/machine_reading_comprehension/DuReader-yesno/) | 提供预训练模型在**千言数据集DuReader-yesno**上微调的应用示例。 |
+| [DuReader-robust](./examples/machine_reading_comprehension/DuReader-robust/) | 提供预训练模型在**千言数据集DuReader-robust**上微调的应用示例。 |
 
 #### 文本翻译 (Text Translation)
 
 | 模型    | 简介     |
 | :--------------- | ------- |
-| [Seq2Seq-Attn](./examples/machine_translation/seq2seq) | 使用编码器-解码器（Encoder-Decoder）结构, 同时使用了Attention机制来加强Decoder和Encoder之间的信息交互，Seq2Seq 广泛应用于机器翻译，自动对话机器人，文档摘要自动生成，图片描述自动生成等任务中。|
-| [Transformer](./examples/machine_translation/transformer) | 基于PaddlePaddle框架的Transformer结构搭建的机器翻译模型，Transformer 计算并行度高，能解决学习长程依赖问题。并且模型框架集成了训练，验证，预测任务，功能完备，效果突出。|
+| [Seq2Seq-Attn](./examples/machine_translation/seq2seq) | 提供了[Effective Approaches to Attention-based Neural Machine Translation](https://arxiv.org/abs/1508.04025v5)基于注意力机制改进的Seq2Seq经典神经网络机器翻译模型实现。|
+| [Transformer](./examples/machine_translation/transformer) | 提供了基于[Attention Is All You Need](https://arxiv.org/abs/1706.03762)论文的Transformer机器翻译实现，包含了完整的训练到推理部署的全流程实现。|
 
 #### 同传翻译 (Simultaneous Translation)
 
 | 模型    | 简介     |
 | :---------- | ------- |
-| [STACL](./examples/simultaneous_translation/stacl) :star:| [STACL](https://www.aclweb.org/anthology/P19-1289/)是基于Prefix-to-Prefix框架的同传翻译模型，结合Wait-k策略在保持较高的翻译质量的同时实现任意字级别的翻译延迟，并提供了轻量级同声传译系统搭建说明。|
+| [STACL](./examples/simultaneous_translation/stacl) :star:| [STACL](https://www.aclweb.org/anthology/P19-1289/)是百度自研的基于Prefix-to-Prefix框架的同传翻译模型，结合Wait-k策略可以在保持较高的翻译质量的同时实现任意字级别的翻译延迟，并提供了轻量级同声传译系统搭建教程。|
 
 #### 对话系统 (Dialogue System)
 
