@@ -1,7 +1,7 @@
 简体中文 | [English](./README_en.md)
 
 <p align="center">
-  <img src="./docs/imgs/paddlenlp.png" width="720" height ="100" />
+  <img src="./docs/imgs/paddlenlp.png" width="718" height ="100" />
 </p>
 
 ------------------------------------------------------------------------------------------
@@ -20,14 +20,14 @@
 
 ## 简介
 
-PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本领域API**，**多场景的应用示例**、和**高性能分布式训练**三大特点，旨在提升开发者文本领域的开发效率并提供基于飞桨2.0核心框架下的NLP任务最佳实践。
+PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本领域API**，**多场景的应用示例**、和**高性能分布式训练**三大特点，旨在提升开发者文本领域的开发效率，并提供基于飞桨2.0核心框架的NLP任务最佳实践。
 
 - **易用的文本领域API**
-  - 提供从数据加载、文本预处理、模型组网评估、到推理加速的领域API：一键加载丰富中文数据集的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)，可灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)，预置60+预训练词向量的[Embedding API](./docs/embeddings.md); 提供60+预训练模型的[Transformer API](./docs/model_zoo/transformers.rst)等，可大幅提升NLP任务建模和迭代的效率。更多API详细说明请查看[PaddleNLP官方文档](https://paddlenlp.readthedocs.io/)。
+  - 提供从数据加载、文本预处理、模型组网评估、到推理加速的领域API：支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)；灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)；提供60+预训练模型的[Transformer API](./docs/model_zoo/transformers.rst)等，可大幅提升NLP任务建模与迭代的效率。
 
 
 - **多场景的应用示例**
-  - 提供多粒度多场景的应用示例，涵盖从NLP基础技术、NLP核心技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发提供飞桨2.0框架在文本领域的最佳实践。更多详细应用介绍请查看[PaddleNLP应用示例](./examples/)。
+  - 提供多粒度多场景的[应用示例](#多场景的应用示例)，涵盖从NLP基础技术、NLP核心技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发提供飞桨2.0框架在文本领域的最佳实践。
 
 
 - **高性能分布式训练**
@@ -52,7 +52,7 @@ pip install --upgrade paddlenlp -i https://pypi.org/simple
 
 ### Transformer API: 强大的预训练模型生态底座
 
-覆盖**15+**网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。
+覆盖**15**个网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。
 
 ```python
 from paddlenlp.transformers import *
