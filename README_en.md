@@ -1,9 +1,8 @@
 English | [简体中文](./README.md)
 
 <p align="center">
-  <img src="./docs/imgs/paddlenlp.png" width="720" height ="100" />
+  <img src="./docs/imgs/paddlenlp.png" width="718" height ="100" />
 </p>
-
 
 ------------------------------------------------------------------------------------------
 [![PyPI - PaddleNLP Version](https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white)](https://pypi.org/project/paddlenlp/)
