@@ -24,13 +24,7 @@ def do_evaluate(model, tokenizer, data_loader, task_label_description):
     total_num = 0
     correct_num = 0
 
-    labels = [
-        int(label)
-        for label, label_description in task_label_description.items()
-    ]
-
-    class_num = len(labels)
-    #print("class_num:{}".format(class_num))
+    class_num = len(task_label_description)
 
     # [total_num * class_num, 2]
     all_prediction_probs = []
@@ -39,38 +33,30 @@ def do_evaluate(model, tokenizer, data_loader, task_label_description):
 
     for batch in data_loader:
         src_ids, token_type_ids, true_labels = batch
-        #print("true_labels:{}".format(true_labels))
-
         # Prediction_probs:[bs * class_num, 2]
         prediction_probs = model(
             input_ids=src_ids, token_type_ids=token_type_ids).numpy()
-        #print("prediciton_probs shape:{}".format(prediction_probs.shape))
+
         all_prediction_probs.append(prediction_probs)
         all_labels.append(true_labels.numpy())
 
     all_labels = np.concatenate(all_labels, axis=0)
-    #print("all labels shape:{}".format(all_labels.shape))
 
     all_prediction_probs = np.concatenate(all_prediction_probs, axis=0)
-    #print("all_prediciton_probs shape:{}".format(all_prediction_probs.shape))
 
     all_prediction_probs = np.reshape(all_prediction_probs, (-1, class_num, 2))
-    #print("prediciton_probs reshape:{}".format(all_prediction_probs.shape))
 
     prediction_pos_probs = all_prediction_probs[:, :, 1]
     prediction_pos_probs = np.reshape(prediction_pos_probs, (-1, class_num))
     y_pred_index = np.argmax(prediction_pos_probs, axis=-1)
-    y_preds = np.array([labels[idx] for idx in y_pred_index])
 
-    #print("y_preds:{}".format(y_preds))
-
-    y_true = np.array([
-        label for idx, label in enumerate(all_labels) if idx % class_num == 0
+    y_true_index = np.array([
+        true_label_index for idx, true_label_index in enumerate(all_labels)
+        if idx % class_num == 0
     ])
-    #print("y_true:{}".format(y_true))
 
-    total_num = len(y_true)
-    correct_num = (y_preds == y_true).sum()
+    total_num = len(y_true_index)
+    correct_num = (y_pred_index == y_true_index).sum()
 
     model.train()
     return 100 * correct_num / total_num, total_num

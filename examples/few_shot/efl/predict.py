@@ -25,13 +25,11 @@ import paddle
 import paddle.nn.functional as F
 
 import paddlenlp as ppnlp
-from model import Classifier
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 
-from data import create_dataloader
-from data import convert_example, convert_chid_example
-from evaluate import do_evaluate, do_evaluate_chid
+from data import create_dataloader, convert_example, Processor_dict
+from task_label_description import TASK_LABELS_DESC
 
 
 # yapf: disable
@@ -63,13 +61,12 @@ def set_seed(seed):
 def do_predict(model, tokenizer, data_loader, task_label_description):
     model.eval()
 
-    labels = [
-        int(label)
-        for label, label_description in task_label_description.items()
-    ]
+    index2label = {
+        idx: label
+        for idx, label in enumerate(task_label_description.keys())
+    }
 
-    class_num = len(labels)
-    #print("class_num:{}".format(class_num))
+    class_num = len(task_label_description)
 
     all_prediction_probs = []
 
@@ -80,104 +77,29 @@ def do_predict(model, tokenizer, data_loader, task_label_description):
         prediction_probs = model(
             input_ids=src_ids, token_type_ids=token_type_ids).numpy()
 
-        #print("prediciton_probs shape:{}".format(prediction_probs.shape))
         all_prediction_probs.append(prediction_probs)
 
     all_prediction_probs = np.concatenate(all_prediction_probs, axis=0)
-    #print("all_prediciton_probs shape:{}".format(all_prediction_probs.shape))
 
     all_prediction_probs = np.reshape(all_prediction_probs, (-1, class_num, 2))
-    #print("prediciton_probs reshape:{}".format(all_prediction_probs.shape))
 
     prediction_pos_probs = all_prediction_probs[:, :, 1]
     prediction_pos_probs = np.reshape(prediction_pos_probs, (-1, class_num))
     y_pred_index = np.argmax(prediction_pos_probs, axis=-1)
 
-    y_preds = [labels[idx] for idx in y_pred_index]
-    #print("y_preds:{}".format(y_preds))
+    y_preds = [index2label[idx] for idx in y_pred_index]
 
     model.train()
     return y_preds
 
 
-@paddle.no_grad()
-def do_predict_chid(model, tokenizer, data_loader, label_normalize_dict):
-    """
-        FewCLUE `chid` dataset is specical when evaluate: input slots have 
-        additional `candidate_label_ids`, so need to customize the
-        evaluate function.
-    """
-
-    model.eval()
-
-    normed_labels = [
-        normalized_lable
-        for origin_lable, normalized_lable in label_normalize_dict.items()
-    ]
-
-    label_length = len(normed_labels[0])
-
-    y_pred_all = []
-    for batch in data_loader:
-        src_ids, token_type_ids, masked_positions, candidate_label_ids = batch
-
-        # [bs * label_length, vocab_size]
-        prediction_probs = model.predict(
-            input_ids=src_ids,
-            token_type_ids=token_type_ids,
-            masked_positions=masked_positions)
-
-        batch_size = len(src_ids)
-        vocab_size = prediction_probs.shape[1]
-
-        # prediction_probs: [batch_size, label_lenght, vocab_size]
-        prediction_probs = paddle.reshape(
-            prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
-
-        candidate_num = candidate_label_ids.shape[1]
-
-        # [batch_size, candidate_num(7)]
-        y_pred = np.ones(shape=[batch_size, candidate_num])
-
-        for label_idx in range(candidate_num):
-            # [bathc_size, label_length(4)] 
-            single_candidate_label_ids = candidate_label_ids[:, label_idx, :]
-            # Calculate joint distribution of candidate labels
-            for index in range(label_length):
-                # [batch_size,]
-                slice_word_ids = single_candidate_label_ids[:, index].numpy()
-
-                batch_single_token_prob = []
-                for bs_index in range(batch_size):
-                    # [1, 1]
-                    single_token_prob = prediction_probs[
-                        bs_index, index, slice_word_ids[bs_index]]
-                    batch_single_token_prob.append(single_token_prob)
-
-                y_pred[:, label_idx] *= np.array(batch_single_token_prob)
-
-        # Get max probs label's index
-        y_pred_index = np.argmax(y_pred, axis=-1)
-        y_pred_all.extend(y_pred_index)
-    return y_pred_all
-
-
-predict_file = {
-    "bustm": "bustm_predict.json",
-    "chid": "chidf_predict.json",
-    "cluewsc": "cluewscf_predict.json",
-    "csldcp": "csldcp_predict.json",
-    "csl": "cslf_predict.json",
-    "eprstmt": "eprstmt_predict.json",
-    "iflytek": "iflytekf_predict.json",
-    "ocnli": "ocnlif_predict.json",
-    "tnews": "tnewsf_predict.json"
-}
-
-
 def write_iflytek(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
-    #test_ds = load_dataset("fewclue", name=task_name, data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_iflytek/test_demo.json")
+    test_ds = load_dataset(
+        "fewclue",
+        name=task_name,
+        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_iflytek/test_demo.json"
+    )
 
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
@@ -191,6 +113,12 @@ def write_iflytek(task_name, output_file, pred_labels):
 
 def write_bustm(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
+    test_ds = load_dataset(
+        "fewclue",
+        name=task_name,
+        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_bustm/test_demo.json"
+    )
+
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
@@ -202,6 +130,12 @@ def write_bustm(task_name, output_file, pred_labels):
 
 def write_csldcp(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
+    test_ds = load_dataset(
+        "fewclue",
+        name=task_name,
+        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_csldcp/test_demo.json"
+    )
+
     test_example = {}
 
     with open(output_file, 'w', encoding='utf-8') as f:
@@ -215,25 +149,17 @@ def write_csldcp(task_name, output_file, pred_labels):
 
 
 def write_tnews(task_name, output_file, pred_labels):
-    test_ds, train_few_all = load_dataset(
-        "fewclue", name=task_name, splits=("test", "train_few_all"))
-
-    def label2id(train_few_all):
-        label2id = {}
-        for example in train_few_all:
-            label = example["label_desc"]
-            label_id = example["label"]
-            if label not in label2id:
-                label2id[label] = str(label_id)
-        return label2id
-
-    label2id_dict = label2id(train_few_all)
-
+    test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
+    test_ds = load_dataset(
+        "fewclue",
+        name=task_name,
+        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_tnews/test_demo.json"
+    )
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
-            test_example["label"] = label2id_dict[pred_labels[idx]]
+            test_example["label"] = pred_labels[idx]
 
             str_test_example = json.dumps(test_example) + "\n"
             f.write(str_test_example)
@@ -241,6 +167,12 @@ def write_tnews(task_name, output_file, pred_labels):
 
 def write_cluewsc(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
+    test_ds = load_dataset(
+        "fewclue",
+        name=task_name,
+        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_cluewsc/test_demo.json"
+    )
+
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
@@ -254,6 +186,12 @@ def write_cluewsc(task_name, output_file, pred_labels):
 
 def write_eprstmt(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
+    test_ds = load_dataset(
+        "fewclue",
+        name=task_name,
+        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_eprstmt/test_demo.json"
+    )
+
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
@@ -266,6 +204,12 @@ def write_eprstmt(task_name, output_file, pred_labels):
 
 def write_ocnli(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
+    test_ds = load_dataset(
+        "fewclue",
+        name=task_name,
+        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_ocnli/test_demo.json"
+    )
+
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
@@ -277,6 +221,12 @@ def write_ocnli(task_name, output_file, pred_labels):
 
 def write_csl(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
+    test_ds = load_dataset(
+        "fewclue",
+        name=task_name,
+        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_csl/test_demo.json"
+    )
+
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
@@ -288,6 +238,12 @@ def write_csl(task_name, output_file, pred_labels):
 
 def write_chid(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
+    test_ds = load_dataset(
+        "fewclue",
+        name=task_name,
+        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_chid/test_demo.json"
+    )
+
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
@@ -297,6 +253,18 @@ def write_chid(task_name, output_file, pred_labels):
                 "id", test_example['id'], "answer", test_example["answer"])
             f.write("{" + str_test_example + "}\n")
 
+
+predict_file = {
+    "bustm": "bustm_predict.json",
+    "chid": "chidf_predict.json",
+    "cluewsc": "cluewscf_predict.json",
+    "csldcp": "csldcp_predict.json",
+    "csl": "cslf_predict.json",
+    "eprstmt": "eprstmt_predict.json",
+    "iflytek": "iflytekf_predict.json",
+    "ocnli": "ocnlif_predict.json",
+    "tnews": "tnewsf_predict.json"
+}
 
 write_fn = {
     "bustm": write_bustm,
@@ -315,35 +283,34 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
     set_seed(args.seed)
 
-    label_normalize_json = os.path.join("./label_normalized",
-                                        args.task_name + ".json")
-
-    label_norm_dict = None
-    with open(label_normalize_json) as f:
-        label_norm_dict = json.load(f)
-
-    convert_example_fn = convert_example if args.task_name != "chid" else convert_chid_example
-    predict_fn = do_predict if args.task_name != "chid" else do_predict_chid
-
+    processor = Processor_dict[args.task_name]()
     # Load test_ds for FewCLUE leaderboard
     test_ds = load_dataset("fewclue", name=args.task_name, splits=("test"))
+    test_ds = processor.get_test_datasets(test_ds,
+                                          TASK_LABELS_DESC[args.task_name])
 
-    # Task related transform operations, eg: numbert label -> text_label, english -> chinese
-    transform_fn = partial(
-        transform_fn_dict[args.task_name],
-        label_normalize_dict=label_norm_dict,
+    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
+        'ernie-1.0', num_classes=2)
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+
+    # [src_ids, token_type_ids]
+    predict_batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
+    ): [data for data in fn(samples)]
+
+    predict_trans_func = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        max_seq_length=args.max_seq_length,
         is_test=True)
 
-    # Some fewshot_learning strategy is defined by transform_fn
-    # Note: Set lazy=False to transform example inplace immediately,
-    # because transform_fn should only be executed only once when 
-    # iterate multi-times for train_ds
-    test_ds = test_ds.map(transform_fn, lazy=False)
-
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        'ernie-1.0')
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    model = Classifier(pretrained_model)
+    test_data_loader = create_dataloader(
+        test_ds,
+        mode='eval',
+        batch_size=args.batch_size,
+        batchify_fn=predict_batchify_fn,
+        trans_fn=predict_trans_func)
 
     # Load parameters of best model on test_public.json of current task
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
@@ -354,38 +321,10 @@ if __name__ == "__main__":
         raise ValueError(
             "Please set --params_path with correct pretrained model file")
 
-    if args.task_name != "chid":
-        # [src_ids, token_type_ids, masked_positions, masked_lm_labels]
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-            Stack(dtype="int64"),  # masked_positions
-        ): [data for data in fn(samples)]
-    else:
-        # [src_ids, token_type_ids, masked_positions, masked_lm_labels, candidate_labels_ids]
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-            Stack(dtype="int64"),  # masked_positions
-            Stack(dtype="int64"),  # candidate_labels_ids [candidate_num, label_length]
-        ): [data for data in fn(samples)]
-
-    trans_func = partial(
-        convert_example_fn,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        p_embedding_num=args.p_embedding_num,
-        is_test=True)
-
-    test_data_loader = create_dataloader(
-        test_ds,
-        mode='eval',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
-
-    y_pred_labels = predict_fn(model, tokenizer, test_data_loader,
-                               label_norm_dict)
+    y_pred_labels = do_predict(
+        model,
+        tokenizer,
+        test_data_loader,
+        task_label_description=TASK_LABELS_DESC[args.task_name])
     output_file = os.path.join(args.output_dir, predict_file[args.task_name])
-
     write_fn[args.task_name](args.task_name, output_file, y_pred_labels)

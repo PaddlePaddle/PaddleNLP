@@ -1,4 +1,16 @@
-#-*- coding:utf-8 -*-
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 tnews_labels = {
     '109': '科技',
@@ -17,17 +29,15 @@ tnews_labels = {
     '115': '农业',
     '114': '股票'
 }
-# tnews_label_descriptions= {key:"这是一条"+value+"新闻" for key,value in tnews_labels.items()}
+
 tnews_label_descriptions = {
     key: "下面报道一条" + value + "新闻"
     for key, value in tnews_labels.items()
 }
 
-# eprstmt_labels ={'Negative':'负面','Positive':'正面'}
 eprstmt_labels = {'Negative': '不满意', 'Positive': '满意'}
-# eprstmt_label_descriptions= {key:"这表达了"+value+"的情感" for key,value in eprstmt_labels.items()}
 eprstmt_label_descriptions = {
-    key: value
+    key: "这表达了" + value + "的情感"
     for key, value in eprstmt_labels.items()
 }
 
@@ -101,7 +111,6 @@ csldcp_labels = {
     "植物保护": "植物",
 }
 
-# csldcp_label_description={key:"这段文本的文献学科分类是"+key for key,value in csldcp_labels.items()}
 csldcp_label_description = {
     key: "这篇论文阐述了" + key
     for key, value in csldcp_labels.items()
@@ -233,7 +242,6 @@ iflytek_label_description = {
     key: "这段文本的应用描述主题是" + value
     for key, value in iflytek_labels.items()
 }
-# iflytek_label_description={key:"这是一款"+key+"应用" for key,value in iflytek_labels.items()}
 
 bustm_label_description = {"1": "entail", "0": "not_entail"}
 
@@ -243,7 +251,17 @@ ocnli_label_description = {
     "neutral": "无"
 }
 
-chid_label_description = {}
+# Note: chid_label_description has no effect for model performance
+# just for get candidate number from chid_label_description
+chid_label_description = {
+    "0": 0,
+    "1": 1,
+    "2": 2,
+    "3": 3,
+    "4": 4,
+    "5": 5,
+    "6": 6,
+}
 
 csl_label_description = {"1": "entail", "0": "not_entail"}
 

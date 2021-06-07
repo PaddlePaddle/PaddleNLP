@@ -62,7 +62,6 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
         mask_positions(obj: `list[int]`): The list of mask_positions.
         mask_lm_labels(obj: `list[int]`): The list of mask_lm_labels.
     """
-    #logger.debug("example:{}".format(example))
     sentence1 = example["sentence1"]
     sentence2 = example["sentence2"]
     encoded_inputs = tokenizer(
@@ -77,106 +76,16 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     if not is_test:
         label = example["label"]
 
-    #logger.debug("example:{}".format(example))
-    #logger.debug("src_ids:{}".format(src_ids))
-    #logger.debug("token_type_ids:{}".format(token_type_ids))
-
     if is_test:
         return src_ids, token_type_ids
     else:
-        #logger.debug("label:{}".format(label))
         return src_ids, token_type_ids, label
-
-
-def convert_chid_example(example,
-                         tokenizer,
-                         max_seq_length=512,
-                         p_embedding_num=5,
-                         is_test=False):
-    """
-    Args:
-        example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
-            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
-            Sequences longer than this will be truncated, sequences shorter will be padded.
-        p_embedding_num(obj:`int`) The number of p-embedding.
-
-    Returns:
-        input_ids(obj:`list[int]`): The list of query token ids.
-        token_type_ids(obj: `list[int]`): List of query sequence pair mask.
-        mask_positions(obj: `list[int]`): The list of mask_positions.
-        mask_lm_labels(obj: `list[int]`): The list of mask_lm_labels.
-        mask_lm_labels(obj: `list[int]`): The list of mask_lm_labels.
-    """
-    # FewClue Task `Chid`' label's position must be calculated by special token: "淠"
-    seg_tokens = tokenizer.tokenize(example["sentence1"])
-
-    # find insert position of `[MASK]`
-    start_mask_position = seg_tokens.index("淠") + 1
-    seg_tokens.remove("淠")
-    sentence1 = "".join(seg_tokens)
-    candidates = example["candidates"]
-    candidate_labels_ids = [
-        tokenizer(text=idom)["input_ids"][1:-1] for idom in candidates
-    ]
-
-    sentence1 = example["sentence1"]
-
-    encoded_inputs = tokenizer(text=sentence1, max_seq_len=max_seq_length)
-    src_ids = encoded_inputs["input_ids"]
-    token_type_ids = encoded_inputs["token_type_ids"]
-
-    # Step1: gen mask ids
-    if is_test:
-        label_length = example["label_length"]
-    else:
-        text_label = example["text_label"]
-        label_length = len(text_label)
-
-    mask_tokens = ["[MASK]"] * label_length
-    mask_ids = tokenizer.convert_tokens_to_ids(mask_tokens)
-
-    # Step2: gen p_token_ids
-    p_tokens = ["[unused{}]".format(i) for i in range(p_embedding_num)]
-    p_token_ids = tokenizer.convert_tokens_to_ids(p_tokens)
-
-    # Step3: Insert "[MASK]" to src_ids based on start_mask_position
-    src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
-        start_mask_position:]
-
-    # Stpe4: Insert P-tokens at begin of sentence
-    src_ids = p_token_ids + src_ids
-
-    # calculate mask_positions
-    mask_positions = [
-        index + start_mask_position + len(p_token_ids)
-        for index in range(label_length)
-    ]
-
-    token_type_ids = [0] * len(src_ids)
-
-    assert len(src_ids) == len(
-        token_type_ids), "length src_ids, token_type_ids must be equal"
-
-    if is_test:
-        return src_ids, token_type_ids, mask_positions, candidate_labels_ids
-    else:
-        mask_lm_labels = tokenizer(
-            text=text_label, max_seq_len=max_seq_length)["input_ids"][1:-1]
-
-        assert len(mask_lm_labels) == len(
-            mask_positions
-        ) == label_length, "length of mask_lm_labels:{} mask_positions:{} label_length:{} not equal".format(
-            mask_lm_labels, mask_positions, text_label)
-
-        return src_ids, token_type_ids, mask_positions, mask_lm_labels, candidate_labels_ids
 
 
 class DataProcessor(object):
     """Base class for data converters for sequence classification data sets."""
 
-    def __init__(self, negative_num):
+    def __init__(self, negative_num=1):
         # Random negative sample number for efl strategy
         self.neg_num = negative_num
 
@@ -204,7 +113,6 @@ class IflytekProcessor(DataProcessor):
         if phase == "train":
             for example in datasets:
                 true_label = str(example["label"])
-                #print("origin_example:{}".format(example))
                 neg_examples = []
                 for label, label_description in task_label_description.items():
                     new_example = dict()
@@ -212,7 +120,6 @@ class IflytekProcessor(DataProcessor):
                     new_example["sentence2"] = label_description
 
                     # Todo: handle imbanlanced example, maybe hurt model performance 
-                    #print("true_label:{}\tlabel:{}".format(true_label, label))
                     if true_label == label:
                         new_example["label"] = 1
                         examples.append(new_example)
@@ -220,29 +127,27 @@ class IflytekProcessor(DataProcessor):
                         new_example["label"] = 0
                         neg_examples.append(new_example)
                 neg_examples = random.sample(neg_examples, self.neg_num)
-                #print("neg_exmaples:{}".format(neg_examples))                    
                 examples.extend(neg_examples)
 
         elif phase == "dev":
             for example in datasets:
-                #print("origin_example:{}".format(example))
-                true_label = example["label"]
+                true_label = str(example["label"])
                 for label, label_description in task_label_description.items():
                     new_example = dict()
                     new_example["sentence1"] = example['sentence']
                     new_example["sentence2"] = label_description
-                    new_example["label"] = true_label
+                    # Get true_label's index at task_label_description for evaluate
+                    true_label_index = list(task_label_description.keys(
+                    )).index(true_label)
+                    new_example["label"] = true_label_index
                     examples.append(new_example)
-                    #print("phase_dev new_example:{}".format(new_example))
 
         elif phase == "test":
             for example in datasets:
-                #print("origin_example:{}".format(example))
                 for label, label_description in task_label_description.items():
                     new_example = dict()
                     new_example["sentence1"] = example['sentence']
                     new_example["sentence2"] = label_description
-                    #print("phase_test new_example:{}".format(new_example))
                     examples.append(new_example)
 
         return MapDataset(examples)
@@ -251,8 +156,7 @@ class IflytekProcessor(DataProcessor):
 class OcnliProcessor(DataProcessor):
     """Processor for the IFLYTEK data set (CLUE version)."""
 
-    @classmethod
-    def _create_examples(cls, datasets, phase, task_label_description):
+    def _create_examples(self, datasets, phase, task_label_description):
         """Creates examples for the training and dev sets."""
 
         examples = []
@@ -260,15 +164,14 @@ class OcnliProcessor(DataProcessor):
         if phase == "train":
             for example in datasets:
                 true_label = str(example["label"])
-                #print("origin_example:{}".format(example))
                 neg_examples = []
                 for label, label_description in task_label_description.items():
                     new_example = dict()
                     new_example["sentence1"] = example['sentence1']
                     new_example["sentence2"] = label_description + example[
                         'sentence2']
+
                     # Todo: handle imbanlanced example, maybe hurt model performance 
-                    #print("true_label:{}\tlabel:{}".format(true_label, label))
                     if true_label == label:
                         new_example["label"] = 1
                         examples.append(new_example)
@@ -280,231 +183,413 @@ class OcnliProcessor(DataProcessor):
 
         elif phase == "dev":
             for example in datasets:
-                #print("origin_example:{}".format(example))
                 true_label = example["label"]
                 for label, label_description in task_label_description.items():
                     new_example = dict()
                     new_example["sentence1"] = example['sentence1']
                     new_example["sentence2"] = label_description + example[
                         'sentence2']
-                    new_example["label"] = true_label
+                    # Get true_label's index at task_label_description for evaluate
+                    true_label_index = list(task_label_description.keys(
+                    )).index(true_label)
+                    new_example["label"] = true_label_index
                     examples.append(new_example)
-                    #print("phase_dev new_example:{}".format(new_example))
 
         elif phase == "test":
             for example in datasets:
-                #print("origin_example:{}".format(example))
                 for label, label_description in task_label_description.items():
                     new_example = dict()
                     new_example["sentence1"] = example['sentence1']
                     new_example["sentence2"] = label_description + example[
                         'sentence2']
-                    #print("phase_test new_example:{}".format(new_example))
                     examples.append(new_example)
 
         return MapDataset(examples)
 
 
-def transform_iflytek(example, label_normalize_dict=None, phase="train"):
+class TnewsProcessor(DataProcessor):
+    """Processor for the Tnews data set (CLUE version)."""
 
-    if is_test:
-        # When do_test, set label_length field to point
-        # where to insert [MASK] id
-        example["label_length"] = 2
-        example["sentence1"] = example["sentence"]
-        del example["sentence"]
-        return example
-    else:
-        print(example)
-        origin_label = example['label_des']
+    def _create_examples(self, datasets, phase, task_label_description):
+        """Creates examples for the training and dev sets."""
 
-        # Normalize some of the labels, eg. English -> Chinese
-        if origin_label in label_normalize_dict:
-            example['label_des'] = label_normalize_dict[origin_label]
-        else:
-            # Note: Ideal way is drop these examples
-            # which maybe need to change MapDataset
-            # Now hard code may hurt performance of `iflytek` dataset
-            example['label_des'] = "旅游"
+        examples = []
 
-        example["text_label"] = example["label_des"]
-        example["sentence1"] = example["sentence"]
+        if phase == "train":
+            for example in datasets:
+                true_label = example["label"]
+                neg_examples = []
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['sentence']
+                    new_example["sentence2"] = label_description
 
-        del example["sentence"]
-        del example["label_des"]
+                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    if true_label == label:
+                        new_example["label"] = 1
+                        examples.append(new_example)
+                    else:
+                        new_example["label"] = 0
+                        neg_examples.append(new_example)
+                neg_examples = random.sample(neg_examples, self.neg_num)
+                examples.extend(neg_examples)
 
-        return example
+        elif phase == "dev":
+            for example in datasets:
+                true_label = str(example["label"])
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['sentence']
+                    new_example["sentence2"] = label_description
 
+                    # Get true_label's index at task_label_description for evaluate
+                    true_label_index = list(task_label_description.keys(
+                    )).index(true_label)
+                    new_example["label"] = true_label_index
+                    examples.append(new_example)
 
-def transform_tnews(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        example["label_length"] = 2
-        example["sentence1"] = example["sentence"]
-        del example["sentence"]
-        return example
-    else:
-        origin_label = example['label_desc']
-        # Normalize some of the labels, eg. English -> Chinese
-        example['label_desc'] = label_normalize_dict[origin_label]
+        elif phase == "test":
+            for example in datasets:
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['sentence']
+                    new_example["sentence2"] = label_description
+                    examples.append(new_example)
 
-        example["sentence1"] = example["sentence"]
-        example["text_label"] = example["label_desc"]
-
-        del example["sentence"]
-        del example["label_desc"]
-
-        return example
-
-
-def transform_eprstmt(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        example["label_length"] = 1
-        example['sentence1'] = example["sentence"]
-        return example
-    else:
-        origin_label = example["label"]
-        # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
-        example['sentence1'] = example["sentence"]
-
-        del example["sentence"]
-        del example["label"]
-
-        return example
+        return MapDataset(examples)
 
 
-def transform_ocnli(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        example["label_length"] = 1
-        return example
-    else:
-        origin_label = example["label"]
-        # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
+class BustmProcessor(DataProcessor):
+    """Processor for the Bustum data set (CLUE version)."""
 
-        del example["label"]
+    def _create_examples(self, datasets, phase, task_label_description):
+        """Creates examples for the training and dev sets."""
 
-        return example
+        examples = []
 
+        if phase == "train":
+            for example in datasets:
+                true_label = example["label"]
+                neg_examples = []
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['sentence1']
+                    new_example["sentence2"] = label_description + example[
+                        'sentence2']
 
-def transform_csl(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        example["label_length"] = 1
-        example["sentence1"] = "本文的关键词是:" + "，".join(example[
-            "keyword"]) + example["abst"]
+                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    if true_label == label:
+                        new_example["label"] = 1
+                        examples.append(new_example)
+                    else:
+                        new_example["label"] = 0
+                        neg_examples.append(new_example)
+                neg_examples = random.sample(neg_examples, self.neg_num)
+                examples.extend(neg_examples)
 
-        del example["abst"]
-        del example["keyword"]
+        elif phase == "dev":
+            for example in datasets:
+                true_label = example["label"]
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['sentence1']
+                    new_example["sentence2"] = label_description + example[
+                        'sentence2']
+                    # Get true_label's index at task_label_description for evaluate
+                    true_label_index = list(task_label_description.keys(
+                    )).index(true_label)
+                    new_example["label"] = true_label_index
+                    examples.append(new_example)
 
-        return example
-    else:
-        origin_label = example["label"]
-        # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
+        elif phase == "test":
+            for example in datasets:
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['sentence1']
+                    new_example["sentence2"] = label_description + example[
+                        'sentence2']
+                    examples.append(new_example)
 
-        example["sentence1"] = "本文的关键词是:" + "，".join(example[
-            "keyword"]) + example["abst"]
-
-        del example["label"]
-        del example["abst"]
-        del example["keyword"]
-
-        return example
-
-
-def transform_csldcp(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        example["label_length"] = 2
-        example["sentence1"] = example["content"]
-        del example["content"]
-        return example
-    else:
-        origin_label = example["label"]
-        # Normalize some of the labels, eg. English -> Chinese
-        normalized_label = label_normalize_dict[origin_label]
-        example['text_label'] = normalized_label
-        example["sentence1"] = example["content"]
-
-        del example["label"]
-        del example["content"]
-
-        return example
+        return MapDataset(examples)
 
 
-def transform_bustm(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        # Label: ["很"， "不"]
-        example["label_length"] = 1
-        return example
-    else:
-        origin_label = str(example["label"])
+class EprstmtProcessor(DataProcessor):
+    """Processor for the Eprstmt data set (CLUE version)."""
 
-        # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
+    def _create_examples(self, datasets, phase, task_label_description):
+        """Creates examples for the training and dev sets."""
 
-        del example["label"]
+        examples = []
 
-        return example
+        if phase == "train":
+            for example in datasets:
+                true_label = example["label"]
+                neg_examples = []
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['sentence']
+                    new_example["sentence2"] = label_description
+
+                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    if true_label == label:
+                        new_example["label"] = 1
+                        examples.append(new_example)
+                    else:
+                        new_example["label"] = 0
+                        neg_examples.append(new_example)
+                neg_examples = random.sample(neg_examples, self.neg_num)
+                examples.extend(neg_examples)
+
+        elif phase == "dev":
+            for example in datasets:
+                true_label = str(example["label"])
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['sentence']
+                    new_example["sentence2"] = label_description
+
+                    # Get true_label's index at task_label_description for evaluate
+                    true_label_index = list(task_label_description.keys(
+                    )).index(true_label)
+                    new_example["label"] = true_label_index
+                    examples.append(new_example)
+
+        elif phase == "test":
+            for example in datasets:
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['sentence']
+                    new_example["sentence2"] = label_description
+                    examples.append(new_example)
+
+        return MapDataset(examples)
 
 
-def transform_chid(example, label_normalize_dict=None, is_test=False):
+class CsldcpProcessor(DataProcessor):
+    """Processor for the Csldcp data set (CLUE version)."""
 
-    if is_test:
-        example["label_length"] = 4
-        example["sentence1"] = example["content"].replace("#idiom#", "淠")
-        del example["content"]
+    def _create_examples(self, datasets, phase, task_label_description):
+        """Creates examples for the training and dev sets."""
 
-        return example
-    else:
-        label_index = int(example['answer'])
-        candidates = example["candidates"]
-        example["text_label"] = candidates[label_index]
+        examples = []
 
-        # Note: `#idom#` represent a idom which must be replaced with rarely-used Chinese characters
-        # to get the label's position after the text processed by tokenizer
-        example["sentence1"] = example["content"].replace("#idiom#", "淠")
-        del example["content"]
+        if phase == "train":
+            for example in datasets:
+                true_label = example["label"]
+                neg_examples = []
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['content']
+                    new_example["sentence2"] = label_description
 
-        return example
+                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    if true_label == label:
+                        new_example["label"] = 1
+                        examples.append(new_example)
+                    else:
+                        new_example["label"] = 0
+                        neg_examples.append(new_example)
+                neg_examples = random.sample(neg_examples, self.neg_num)
+                examples.extend(neg_examples)
+
+        elif phase == "dev":
+            for example in datasets:
+                true_label = str(example["label"])
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['content']
+                    new_example["sentence2"] = label_description
+
+                    # Get true_label's index at task_label_description for evaluate
+                    true_label_index = list(task_label_description.keys(
+                    )).index(true_label)
+                    new_example["label"] = true_label_index
+                    examples.append(new_example)
+
+        elif phase == "test":
+            for example in datasets:
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['content']
+                    new_example["sentence2"] = label_description
+                    examples.append(new_example)
+
+        return MapDataset(examples)
 
 
-def transform_cluewsc(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        example["label_length"] = 2
-        text = example["text"]
-        span1_text = example["target"]["span1_text"]
-        span2_text = example["target"]["span2_text"]
-        example["sentence1"] = text + span2_text + "指代" + span1_text
+class CslProcessor(DataProcessor):
+    """Processor for the Csl data set (CLUE version)."""
 
-        del example["text"]
-        del example["target"]
+    def _create_examples(self, datasets, phase, task_label_description):
+        """Creates examples for the training and dev sets."""
 
-        return example
-    else:
-        origin_label = example["label"]
-        # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
+        examples = []
 
-        text = example["text"]
-        span1_text = example["target"]["span1_text"]
-        span2_text = example["target"]["span2_text"]
-        example["sentence1"] = text + span2_text + "指代" + span1_text
+        if phase == "train":
+            for example in datasets:
+                true_label = example["label"]
+                neg_examples = []
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['abst']
+                    new_example["sentence2"] = label_description + " ".join(
+                        example['keyword'])
 
-        del example["label"]
-        del example["text"]
-        del example["target"]
+                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    if true_label == label:
+                        new_example["label"] = 1
+                        examples.append(new_example)
+                    else:
+                        new_example["label"] = 0
+                        neg_examples.append(new_example)
+                neg_examples = random.sample(neg_examples, self.neg_num)
+                examples.extend(neg_examples)
 
-        return example
+        elif phase == "dev":
+            for example in datasets:
+                true_label = str(example["label"])
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['abst']
+                    new_example["sentence2"] = label_description + " ".join(
+                        example['keyword'])
+
+                    # Get true_label's index at task_label_description for evaluate
+                    true_label_index = list(task_label_description.keys(
+                    )).index(true_label)
+                    new_example["label"] = true_label_index
+                    examples.append(new_example)
+
+        elif phase == "test":
+            for example in datasets:
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example['abst']
+                    new_example["sentence2"] = label_description + " ".join(
+                        example['keyword'])
+                    examples.append(new_example)
+
+        return MapDataset(examples)
+
+
+class CluewscProcessor(DataProcessor):
+    """Processor for the ClueWSC data set (CLUE version)."""
+
+    def _create_examples(self, datasets, phase, task_label_description):
+        """Creates examples for the training and dev sets."""
+
+        examples = []
+
+        if phase == "train":
+            for example in datasets:
+                true_label = example["label"]
+                neg_examples = []
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example["text"]
+                    new_example["sentence2"] = example["target"][
+                        "span1_text"] + label_description + example["target"][
+                            "span2_text"]
+
+                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    if true_label == label:
+                        new_example["label"] = 1
+                        examples.append(new_example)
+                    else:
+                        new_example["label"] = 0
+                        neg_examples.append(new_example)
+                neg_examples = random.sample(neg_examples, self.neg_num)
+                examples.extend(neg_examples)
+
+        elif phase == "dev":
+            for example in datasets:
+                true_label = str(example["label"])
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example["text"]
+                    new_example["sentence2"] = example["target"][
+                        "span1_text"] + label_description + example["target"][
+                            "span2_text"]
+
+                    # Get true_label's index at task_label_description for evaluate
+                    true_label_index = list(task_label_description.keys(
+                    )).index(true_label)
+                    new_example["label"] = true_label_index
+                    examples.append(new_example)
+
+        elif phase == "test":
+            for example in datasets:
+                for label, label_description in task_label_description.items():
+                    new_example = dict()
+                    new_example["sentence1"] = example["text"]
+                    new_example["sentence2"] = example["target"][
+                        "span1_text"] + label_description + example["target"][
+                            "span2_text"]
+                    examples.append(new_example)
+
+        return MapDataset(examples)
+
+
+class ChidProcessor(DataProcessor):
+    """Processor for the CHID data set (CLUE version)."""
+
+    def _create_examples(self, datasets, phase, task_label_description):
+        """Creates examples for the training and dev sets."""
+
+        examples = []
+
+        if phase == "train":
+            for example in datasets:
+                neg_examples = []
+                true_label_index = int(example["answer"])
+                candidates = example["candidates"]
+                for idx, cantidate in enumerate(candidates):
+                    new_example = dict()
+                    new_example["sentence1"] = example["content"]
+                    new_example["sentence2"] = "位置#idiom#处的成语应该填写" + cantidate
+
+                    if idx == true_label_index:
+                        new_example["label"] = 1
+                        examples.append(new_example)
+                    else:
+                        new_example["label"] = 0
+                        neg_examples.append(new_example)
+                examples.extend(neg_examples)
+
+        elif phase == "dev":
+            for example in datasets:
+                true_label = str(example["answer"])
+                candidates = example["candidates"]
+                for idx, cantidate in enumerate(candidates):
+                    new_example = dict()
+                    new_example["sentence1"] = example["content"]
+                    new_example["sentence2"] = "位置#idiom#处的成语应该填写" + cantidate
+
+                    # Get true_label's index at task_label_description for evaluate
+                    true_label_index = int(true_label)
+                    new_example["label"] = true_label_index
+                    examples.append(new_example)
+
+        elif phase == "test":
+            for example in datasets:
+                candidates = example["candidates"]
+                for idx, cantidate in enumerate(candidates):
+                    new_example = dict()
+                    new_example["sentence1"] = example["content"]
+                    new_example["sentence2"] = "位置#idiom#处的成语应该填写" + cantidate
+                    examples.append(new_example)
+
+        return MapDataset(examples)
 
 
 Processor_dict = {
     "iflytek": IflytekProcessor,
-    "tnews": transform_tnews,
-    "eprstmt": transform_eprstmt,
-    "bustm": transform_bustm,
+    "tnews": TnewsProcessor,
+    "eprstmt": EprstmtProcessor,
+    "bustm": BustmProcessor,
     "ocnli": OcnliProcessor,
-    "csl": transform_csl,
-    "csldcp": transform_csldcp,
-    "cluewsc": transform_cluewsc,
-    "chid": transform_chid
+    "csl": CslProcessor,
+    "csldcp": CsldcpProcessor,
+    "cluewsc": CluewscProcessor,
+    "chid": ChidProcessor
 }

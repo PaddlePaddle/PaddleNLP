@@ -29,12 +29,10 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
-from data import create_dataloader
-from data import convert_example, convert_chid_example
-from evaluate import do_evaluate, do_evaluate_chid
-from predict import do_predict, do_predict_chid, write_fn, predict_file
+from data import create_dataloader, convert_example, Processor_dict
+from evaluate import do_evaluate
+from predict import do_predict, write_fn, predict_file
 from task_label_description import TASK_LABELS_DESC
-from data import Processor_dict
 
 
 def parse_args():
@@ -126,20 +124,22 @@ def do_train():
 
     set_seed(args.seed)
 
-    convert_example_fn = convert_example if args.task_name != "chid" else convert_chid_example
-    evaluate_fn = do_evaluate if args.task_name != "chid" else do_evaluate_chid
-    predict_fn = do_predict if args.task_name != "chid" else do_predict_chid
-
     train_ds, public_test_ds, test_ds = load_dataset(
         "fewclue",
         name=args.task_name,
         splits=("train_0", "test_public", "test"))
 
-    #public_test_ds = load_dataset("fewclue", name=args.task_name, data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_iflytek/dev_0_demo.json")
-    #test_ds = load_dataset("fewclue", name=args.task_name, data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_iflytek/test_demo.json")
+    public_test_file = os.path.join(
+        "/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_" + args.task_name,
+        "dev_0_demo.json")
+    test_file = os.path.join(
+        "/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_" + args.task_name,
+        "test_demo.json")
 
-    #pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-    #    'ernie-1.0')
+    public_test_ds = load_dataset(
+        "fewclue", name=args.task_name, data_files=public_test_file)
+    test_ds = load_dataset("fewclue", name=args.task_name, data_files=test_file)
+
     model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
         'ernie-1.0', num_classes=2)
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
@@ -148,45 +148,31 @@ def do_train():
     train_ds = processor.get_train_datasets(train_ds,
                                             TASK_LABELS_DESC[args.task_name])
 
-    # print("*******************************************")
-    # for example in train_ds:
-    #     print(example)
-
     public_test_ds = processor.get_dev_datasets(
         public_test_ds, TASK_LABELS_DESC[args.task_name])
     test_ds = processor.get_test_datasets(test_ds,
                                           TASK_LABELS_DESC[args.task_name])
 
-    if args.task_name != "chid":
-        # [src_ids, token_type_ids, labels]
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-            Stack(dtype="int64"),  # labels
-        ): [data for data in fn(samples)]
+    # [src_ids, token_type_ids, labels]
+    batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
+        Stack(dtype="int64"),  # labels
+    ): [data for data in fn(samples)]
 
-        # [src_ids, token_type_ids]
-        predict_batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-        ): [data for data in fn(samples)]
-    else:
-        # [src_ids, token_type_ids, masked_positions, masked_lm_labels, candidate_labels_ids]
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-            Stack(dtype="int64"),  # masked_positions
-            Stack(dtype="int64"),  # masked_lm_labels
-            Stack(dtype="int64"),  # candidate_labels_ids [candidate_num, label_length]
-        ): [data for data in fn(samples)]
+    # [src_ids, token_type_ids]
+    predict_batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
+    ): [data for data in fn(samples)]
 
     trans_func = partial(
-        convert_example_fn,
+        convert_example,
         tokenizer=tokenizer,
         max_seq_length=args.max_seq_length)
 
     predict_trans_func = partial(
-        convert_example_fn,
+        convert_example,
         tokenizer=tokenizer,
         max_seq_length=args.max_seq_length,
         is_test=True)
@@ -246,7 +232,6 @@ def do_train():
 
             prediction_scores = model(
                 input_ids=src_ids, token_type_ids=token_type_ids)
-            #print("prediction_scores:{}".format(prediction_scores))
 
             loss = criterion(prediction_scores, labels)
 
@@ -263,30 +248,33 @@ def do_train():
             lr_scheduler.step()
             optimizer.clear_grad()
 
-        test_public_accuracy, total_num = evaluate_fn(
+        test_public_accuracy, total_num = do_evaluate(
             model,
             tokenizer,
             public_test_data_loader,
             task_label_description=TASK_LABELS_DESC[args.task_name])
+
         print("epoch:{}, dev_accuracy:{:.3f}, total_num:{}".format(
             epoch, test_public_accuracy, total_num))
 
-        y_pred_labels = predict_fn(
+        y_pred_labels = do_predict(
             model,
             tokenizer,
             test_data_loader,
             task_label_description=TASK_LABELS_DESC[args.task_name])
+
         output_file = os.path.join(args.output_dir,
                                    str(epoch) + predict_file[args.task_name])
+
         write_fn[args.task_name](args.task_name, output_file, y_pred_labels)
 
-        # if rank == 0:
-        #     save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
-        #     if not os.path.exists(save_dir):
-        #         os.makedirs(save_dir)
-        #     save_param_path = os.path.join(save_dir, 'model_state.pdparams')
-        #     paddle.save(model.state_dict(), save_param_path)
-        #     tokenizer.save_pretrained(save_dir)
+        if rank == 0:
+            save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            save_param_path = os.path.join(save_dir, 'model_state.pdparams')
+            paddle.save(model.state_dict(), save_param_path)
+            tokenizer.save_pretrained(save_dir)
 
 
 if __name__ == "__main__":
