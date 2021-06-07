@@ -44,8 +44,8 @@
    :maxdepth: 2
    :caption: 模型库
 
-   预训练模型 <model_zoo/transformers>
-   基本组网单元 <model_zoo/others>
+   Transformer预训练模型 <model_zoo/transformers>
+   预训练词向量 <model_zoo/embeddings>
 
 .. toctree::
    :maxdepth: 2

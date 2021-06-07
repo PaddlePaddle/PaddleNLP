@@ -73,7 +73,7 @@ wordemb.cosine_sim("apple", "rail")
 >>> 0.29207364
 ```
 
-For more `TokenEmbedding` usage, please refer to [Embedding API](./docs/embeddings.md)
+For more `TokenEmbedding` usage, please refer to [Embedding API](./docs/model_zoo/embeddings.md)
 
 ### Rich Chinese Pre-trained Models
 
@@ -108,7 +108,7 @@ pooled_output, sequence_output = model.forward(input_ids=paddle.to_tensor([text[
 - [Transformer API](./docs/model_zoo/transformers.rst)
 - [Data API](./docs/data.md)
 - [Dataset API](./docs/datasets.md)
-- [Embedding API](./docs/embeddings.md)
+- [Embedding API](./docs/model_zoo/embeddings.md)
 - [Metrics API](./docs/metrics.md)
 
 Please find more API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
