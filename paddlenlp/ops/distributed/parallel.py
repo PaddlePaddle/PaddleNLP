@@ -52,74 +52,58 @@ class ParallelEmbedding(nn.Layer):
     def __init__(self,
                  num_embeddings,
                  embedding_dim,
-                 num_partitions,
-                 padding_idx=None,
+                 topo,
                  weight_attr=None,
                  name=None):
-        super().__init__()
-        size = (num_embeddings, embedding_dim)
-        if in_dygraph_mode():
-            rank = paddle.distributed.get_rank()
-            nranks = paddle.distributed.get_world_size()
-        else:
-            assert fleet._role_maker, ("To use paddle.distributed.split, "
-                                       "you must call fleet.init() firstly.")
-            rank = fleet.worker_index()
-            nranks = fleet.worker_num()
+        super(ParallelEmbedding, self).__init__()
+        self.rank = topo.mp_info.rank
+        self.world_size = topo.mp_info.nranks
+        self.num_embeddings = num_embeddings
+        self.is_mp = (self.nranks > 1)
 
-        # rank within a model parallel group
-        inner_rank = rank % num_partitions
-        self.inner_rank = inner_rank
-        self.num_partitions = num_partitions
+        assert num_embeddings % self.world_size == 0, \
+            "The length of the vocabulary must be divisible by the parallelism degree of MP"
 
-        per_part_size = (size[0] + num_partitions - 1) // num_partitions
-        last_part_size = size[0] - per_part_size * (num_partitions - 1)
-        if inner_rank == num_partitions - 1: per_part_size = last_part_size
-        per_part_size += 1  # make the last row as the padding index
+        per_part_size = num_embeddings // self.world_size
 
-        self.origin_size = size
-        if not name:
-            self.name = "emb_rank_%d" % inner_rank
-        else:
-            self.name = name + "_rank_%d" % inner_rank
-        self.per_part_embeddings = per_part_size
-        self.origin_num_embeddings = self.origin_size[0]
-        self.weight_attr = weight_attr
+        self.vocab_start_index = self.rank * per_part_size
+        self._dtype = self._helper.get_default_dtype()
+        self._size = [per_part_size, embedding_dim]
+        self._weight_attr = weight_attr
+        self._name = name
 
-        self.embedding = paddle.nn.Embedding(
-            self.per_part_embeddings,
-            self.origin_size[1],
-            padding_idx=self.per_part_embeddings - 1,
-            sparse=False,
-            weight_attr=self.weight_attr,
-            name=self.name)
+        self.weight = self.create_parameter(
+            attr=self._weight_attr,
+            shape=self._size,
+            dtype=self._dtype,
+            is_bias=False)
+        self.weight.is_distributed = True
 
-        self.embedding.weight.is_distributed = True
-        # Alias for nn.Embedding
-        self.weight = self.embedding.weight
         startup_block = paddle.static.default_startup_program().global_block()
         main_block = paddle.static.default_main_program().global_block()
-        startup_block.vars[self.embedding.weight.name].is_distributed = True
-        main_block.vars[self.embedding.weight.name].is_distributed = True
+        startup_block.vars[self.weight.name].is_distributed = True
+        main_block.vars[self.weight.name].is_distributed = True
 
     def forward(self, x):
-        origin_input_shape = x.shape
-        if len(origin_input_shape) == 2:
-            x = paddle.unsqueeze(x, axis=-1)
+        if self.is_mp:
+            output_parallel = paddle.distributed.collective._c_lookup_table(
+                self.weight,
+                x,
+                start_index=self.vocab_start_index,
+                name=self._name)
+            output = paddle.distributed.collective._mp_allreduce(
+                output_parallel,
+                group=None,
+                use_calc_stream=True,
+                use_model_parallel=True)
         else:
-            assert origin_input_shape[-1] == 1, (
-                "The last dimension size of x must be 1.")
-
-        x_shard = paddle.shard_index(x, self.origin_num_embeddings,
-                                     self.num_partitions, self.inner_rank,
-                                     self.per_part_embeddings - 1)
-        if len(origin_input_shape) == 2:
-            x_shard = paddle.squeeze(x_shard, axis=-1)
-
-        emb_out = self.embedding(x_shard)
-
-        paddle.distributed.all_reduce(emb_out, group=None)
-        return emb_out
+            output = paddle.nn.functional.embedding(
+                x,
+                weight=self.weight,
+                padding_idx=None,
+                sparse=False,
+                name=self._name)
+        return output
 
 
 class ParallelLinear(nn.Layer):

@@ -422,22 +422,21 @@ class GPTEmbeddings(nn.Layer):
                  initializer_range=0.02,
                  topo=None):
         super(GPTEmbeddings, self).__init__()
-        # TODO @ZHUI Use ParallelEmbedding
-        #if topo is None or topo.mp_info.size == 1:
-        self.word_embeddings = nn.Embedding(
-            vocab_size,
-            hidden_size,
-            weight_attr=paddle.ParamAttr(
-                name="word_embeddings",
-                initializer=nn.initializer.Normal(
+        if topo is None or topo.mp_info.size == 1:
+            self.word_embeddings = nn.Embedding(
+                vocab_size,
+                hidden_size,
+                weight_attr=paddle.ParamAttr(
+                    name="word_embeddings",
+                    initializer=nn.initializer.Normal(
+                        mean=0.0, std=initializer_range)))
+        else:
+            self.word_embeddings = paddlenlp.ops.ParallelEmbedding(
+                vocab_size,
+                hidden_size,
+                topo,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
                     mean=0.0, std=initializer_range)))
-        #else:
-        #    self.word_embeddings = paddlenlp.ops.ParallelEmbedding(
-        #        vocab_size,
-        #        hidden_size,
-        #        topo.mp_info.size,
-        #        weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
-        #            mean=0.0, std=initializer_range)))
         self.position_embeddings = nn.Embedding(
             max_position_embeddings,
             hidden_size,
