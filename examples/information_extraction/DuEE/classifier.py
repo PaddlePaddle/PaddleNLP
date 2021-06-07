@@ -37,7 +37,7 @@ from utils import read_by_lines, write_by_lines, load_dict
 # warnings.filterwarnings('ignore')
 """
 For All pre-trained model（English and Chinese),
-Please refer to https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/transformers.md.
+Please refer to https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/transformers.rst.
 """
 
 # yapf: disable
