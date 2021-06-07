@@ -46,8 +46,8 @@ class Converter(object):
     def __init__(self, model_name, append_eod):
         self.append_eod = append_eod
         self.tokenizer = GPTTokenizer.from_pretrained(model_name)
-        self.eod_id = tokenizer.eod_token_id
-        self.vocab_size = len(tokenizer)
+        self.eod_id = self.tokenizer.eod_token_id
+        self.vocab_size = len(self.tokenizer)
 
     def encode(self, text):
         tokens = self.tokenizer(text)["input_ids"]
