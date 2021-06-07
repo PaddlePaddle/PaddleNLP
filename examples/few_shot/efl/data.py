@@ -47,21 +47,6 @@ def create_dataloader(dataset,
 
 
 def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
-    """
-    Args:
-        example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
-            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
-            Sequences longer than this will be truncated, sequences shorter will be padded.
-        p_embedding_num(obj:`int`) The number of p-embedding.
-
-    Returns:
-        input_ids(obj:`list[int]`): The list of query token ids.
-        token_type_ids(obj: `list[int]`): List of query sequence pair mask.
-        mask_positions(obj: `list[int]`): The list of mask_positions.
-        mask_lm_labels(obj: `list[int]`): The list of mask_lm_labels.
-    """
     sentence1 = example["sentence1"]
     sentence2 = example["sentence2"]
     encoded_inputs = tokenizer(
@@ -83,7 +68,7 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
 
 
 class DataProcessor(object):
-    """Base class for data converters for sequence classification data sets."""
+    """Base class for data converters for sequence classification datasets."""
 
     def __init__(self, negative_num=1):
         # Random negative sample number for efl strategy
@@ -103,7 +88,7 @@ class DataProcessor(object):
 
 
 class IflytekProcessor(DataProcessor):
-    """Processor for the IFLYTEK data set (CLUE version)."""
+    """Processor for the IFLYTEK dataset (CLUE version)."""
 
     def _create_examples(self, datasets, phase, task_label_description):
         """Creates examples for the training and dev sets."""
@@ -154,7 +139,7 @@ class IflytekProcessor(DataProcessor):
 
 
 class OcnliProcessor(DataProcessor):
-    """Processor for the IFLYTEK data set (CLUE version)."""
+    """Processor for the IFLYTEK dataset (CLUE version)."""
 
     def _create_examples(self, datasets, phase, task_label_description):
         """Creates examples for the training and dev sets."""
@@ -208,7 +193,7 @@ class OcnliProcessor(DataProcessor):
 
 
 class TnewsProcessor(DataProcessor):
-    """Processor for the Tnews data set (CLUE version)."""
+    """Processor for the Tnews dataset (CLUE version)."""
 
     def _create_examples(self, datasets, phase, task_label_description):
         """Creates examples for the training and dev sets."""
@@ -260,7 +245,7 @@ class TnewsProcessor(DataProcessor):
 
 
 class BustmProcessor(DataProcessor):
-    """Processor for the Bustum data set (CLUE version)."""
+    """Processor for the Bustum dataset (CLUE version)."""
 
     def _create_examples(self, datasets, phase, task_label_description):
         """Creates examples for the training and dev sets."""
@@ -314,7 +299,7 @@ class BustmProcessor(DataProcessor):
 
 
 class EprstmtProcessor(DataProcessor):
-    """Processor for the Eprstmt data set (CLUE version)."""
+    """Processor for the Eprstmt dataset (CLUE version)."""
 
     def _create_examples(self, datasets, phase, task_label_description):
         """Creates examples for the training and dev sets."""
@@ -366,7 +351,7 @@ class EprstmtProcessor(DataProcessor):
 
 
 class CsldcpProcessor(DataProcessor):
-    """Processor for the Csldcp data set (CLUE version)."""
+    """Processor for the Csldcp dataset (CLUE version)."""
 
     def _create_examples(self, datasets, phase, task_label_description):
         """Creates examples for the training and dev sets."""
@@ -418,7 +403,7 @@ class CsldcpProcessor(DataProcessor):
 
 
 class CslProcessor(DataProcessor):
-    """Processor for the Csl data set (CLUE version)."""
+    """Processor for the Csl dataset (CLUE version)."""
 
     def _create_examples(self, datasets, phase, task_label_description):
         """Creates examples for the training and dev sets."""
@@ -473,7 +458,7 @@ class CslProcessor(DataProcessor):
 
 
 class CluewscProcessor(DataProcessor):
-    """Processor for the ClueWSC data set (CLUE version)."""
+    """Processor for the ClueWSC dataset (CLUE version)."""
 
     def _create_examples(self, datasets, phase, task_label_description):
         """Creates examples for the training and dev sets."""
@@ -531,7 +516,7 @@ class CluewscProcessor(DataProcessor):
 
 
 class ChidProcessor(DataProcessor):
-    """Processor for the CHID data set (CLUE version)."""
+    """Processor for the CHID dataset (CLUE version)."""
 
     def _create_examples(self, datasets, phase, task_label_description):
         """Creates examples for the training and dev sets."""
@@ -582,7 +567,7 @@ class ChidProcessor(DataProcessor):
         return MapDataset(examples)
 
 
-Processor_dict = {
+processor_dict = {
     "iflytek": IflytekProcessor,
     "tnews": TnewsProcessor,
     "eprstmt": EprstmtProcessor,

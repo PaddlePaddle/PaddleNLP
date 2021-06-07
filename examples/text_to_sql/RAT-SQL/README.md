@@ -1,4 +1,4 @@
-# SQLParser
+# Enhanced RAT-SQL
 
 ## Text2SQL 任务
 
@@ -16,7 +16,7 @@ Text2SQL 是语义解析技术中的一类任务，基于给定的数据库，�
 
 ## 基线系统
 
-本基线系统基于PaddlePaddle2.0动态图实现了复杂数据集上的SOTA模型RAT-SQL，其核心是基于encoder-decoder框架的序列生成模型。本系统编码端使用了 ERNIE + Relation-aware Transformer对问题和数据库schema 进行编码， 解码端实现了基于语法指导的解码算法，具体算法思想请见[TRANX](https://www.aclweb.org/anthology/D18-2002.pdf)。
+本基线系统基于PaddlePaddle2.0动态图实现了复杂数据集上的SOTA模型[RAT-SQL](https://arxiv.org/abs/1911.04942)，其核心是基于encoder-decoder框架的序列生成模型。本系统编码端使用了 ERNIE + Relation-aware Transformer对问题和数据库schema 进行编码， 解码端实现了基于语法指导的解码算法，具体算法思想请见[TRANX](https://www.aclweb.org/anthology/D18-2002.pdf)。
 
 同时，为了兼容上述提及的三个数据集，我们基于RAT-SQL模型进行扩展以丰富其问题解决能力，主要包括：1）多语言处理能力；2）value识别能力。
 

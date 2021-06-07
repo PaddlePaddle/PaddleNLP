@@ -1,25 +1,20 @@
 欢迎使用PaddleNLP
 ==================
 
-`PaddleNLP 2.0 <https://github.com/PaddlePaddle/PaddleNLP>`_ 拥有覆盖多场景的模型库、简洁易用的全流程API与动静统一的高性能分布式训练能力，旨在为飞桨开发者提升文本领域建模效率，并提供基于PaddlePaddle 2.0的NLP领域最佳实践。具备如下特性：
+`PaddleNLP 2.0 <https://github.com/PaddlePaddle/PaddleNLP>`_ 是基于飞桨的文本领域核心库，具备 **易用的文本领域API**，**多场景的应用示例**、和 **高性能分布式训练** 三大特点，旨在提升飞桨开发者文本领域建模效率，并提供基于飞桨核心框架2.0的NLP任务最佳实践。
 
 
-- **覆盖多场景的模型库**
+- **易用的文本领域API**
 
-  - PaddleNLP集成了RNN与Transformer等多种主流模型结构，涵盖从词向量、词法分析、命名实体识别、语义表示等NLP基础技术，到文本分类、文本匹配、文本生成、文本图学习、信息抽取等NLP核心技术。同时针对机器翻译、通用对话、阅读理解等系统应用提供相应核心组件与预训练模型。
+  - 提供从数据集加载、文本预处理、模型组网、模型评估、到推理加速的领域API：如一键加载中文数据集的 **Dataset API**，可灵活高效地完成数据预处理的Data API，预置60+预训练词向量的 **Embedding API**; 提供50+预训练模型的生态基础能力的 **Transformer API**，可大幅提升NLP任务建模和迭代的效率。
 
+- **多场景的应用示例**
 
+  - PaddleNLP 2.0提供多粒度多场景的应用示例，涵盖从NLP基础技术、NLP核心技术、NLP系统应用以及文本相关的拓展应用等。全面基于飞桨2.0全新API体系开发，为开发提供飞桨2.0框架在文本领域的最佳实践。
 
-- **简洁易用的全流程API**
+- **高性能分布式训练**
 
-  - 深度兼容飞桨2.0的高层API体系，内置可复用的文本建模模块(Embedding、CRF、 Seq2Vec、Transformer)，可大幅度减少在数据处理、模型组网、训练与评估、推理部署环节的开发量，提升NLP任务迭代与落地的效率。
-
-
-
-- **动静统一的高性能分布式训练**
-
-  - 基于飞桨2.0核心框架『动静统一』的特性与领先的混合精度优化策略，结合Fleet分布式训练API，可充分利用GPU集群资源，高效完成大规模预训练模型的分布式训练。
-
+  - 基于飞桨核心框架『**动静统一**』的特性与领先的自动混合精度优化策略，通过分布式Fleet API可支持超大规模参数的4D混合并行策略，并且可根据硬件情况灵活可配，高效地完成超大规模参数的模型训练。
 
 
 * 项目GitHub: https://github.com/PaddlePaddle/PaddleNLP
@@ -49,8 +44,8 @@
    :maxdepth: 2
    :caption: 模型库
 
-   预训练模型 <model_zoo/transformers.md>
-   基本组网单元 <model_zoo/others>
+   Transformer预训练模型 <model_zoo/transformers>
+   预训练词向量 <model_zoo/embeddings>
 
 .. toctree::
    :maxdepth: 2

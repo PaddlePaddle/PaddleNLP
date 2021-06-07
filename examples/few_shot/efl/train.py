@@ -29,7 +29,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
-from data import create_dataloader, convert_example, Processor_dict
+from data import create_dataloader, convert_example, processor_dict
 from evaluate import do_evaluate
 from predict import do_predict, write_fn, predict_file
 from task_label_description import TASK_LABELS_DESC
@@ -129,22 +129,11 @@ def do_train():
         name=args.task_name,
         splits=("train_0", "test_public", "test"))
 
-    public_test_file = os.path.join(
-        "/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_" + args.task_name,
-        "dev_0_demo.json")
-    test_file = os.path.join(
-        "/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_" + args.task_name,
-        "test_demo.json")
-
-    public_test_ds = load_dataset(
-        "fewclue", name=args.task_name, data_files=public_test_file)
-    test_ds = load_dataset("fewclue", name=args.task_name, data_files=test_file)
-
     model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
         'ernie-1.0', num_classes=2)
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
-    processor = Processor_dict[args.task_name](args.negative_num)
+    processor = processor_dict[args.task_name](args.negative_num)
     train_ds = processor.get_train_datasets(train_ds,
                                             TASK_LABELS_DESC[args.task_name])
 
@@ -279,6 +268,4 @@ def do_train():
 
 if __name__ == "__main__":
     args = parse_args()
-    print("args:{}".format(args))
-
     do_train()

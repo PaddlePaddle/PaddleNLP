@@ -28,7 +28,7 @@ import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 
-from data import create_dataloader, convert_example, Processor_dict
+from data import create_dataloader, convert_example, processor_dict
 from task_label_description import TASK_LABELS_DESC
 
 
@@ -95,12 +95,6 @@ def do_predict(model, tokenizer, data_loader, task_label_description):
 
 def write_iflytek(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
-    test_ds = load_dataset(
-        "fewclue",
-        name=task_name,
-        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_iflytek/test_demo.json"
-    )
-
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
@@ -113,12 +107,6 @@ def write_iflytek(task_name, output_file, pred_labels):
 
 def write_bustm(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
-    test_ds = load_dataset(
-        "fewclue",
-        name=task_name,
-        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_bustm/test_demo.json"
-    )
-
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
@@ -130,19 +118,12 @@ def write_bustm(task_name, output_file, pred_labels):
 
 def write_csldcp(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
-    test_ds = load_dataset(
-        "fewclue",
-        name=task_name,
-        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_csldcp/test_demo.json"
-    )
-
     test_example = {}
 
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
             test_example["label"] = pred_labels[idx]
-            # {"id": 0, "label": "力学"}
             str_test_example = "\"{}\": {}, \"{}\": \"{}\"".format(
                 "id", test_example['id'], "label", test_example["label"])
             f.write("{" + str_test_example + "}\n")
@@ -150,11 +131,6 @@ def write_csldcp(task_name, output_file, pred_labels):
 
 def write_tnews(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
-    test_ds = load_dataset(
-        "fewclue",
-        name=task_name,
-        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_tnews/test_demo.json"
-    )
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
@@ -167,18 +143,11 @@ def write_tnews(task_name, output_file, pred_labels):
 
 def write_cluewsc(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
-    test_ds = load_dataset(
-        "fewclue",
-        name=task_name,
-        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_cluewsc/test_demo.json"
-    )
-
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
             test_example["label"] = pred_labels[idx]
-            # {"id": 0, "label": "力学"}
             str_test_example = "\"{}\": {}, \"{}\": \"{}\"".format(
                 "id", test_example['id'], "label", test_example["label"])
             f.write("{" + str_test_example + "}\n")
@@ -186,12 +155,6 @@ def write_cluewsc(task_name, output_file, pred_labels):
 
 def write_eprstmt(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
-    test_ds = load_dataset(
-        "fewclue",
-        name=task_name,
-        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_eprstmt/test_demo.json"
-    )
-
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
@@ -204,12 +167,6 @@ def write_eprstmt(task_name, output_file, pred_labels):
 
 def write_ocnli(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
-    test_ds = load_dataset(
-        "fewclue",
-        name=task_name,
-        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_ocnli/test_demo.json"
-    )
-
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
@@ -221,12 +178,6 @@ def write_ocnli(task_name, output_file, pred_labels):
 
 def write_csl(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
-    test_ds = load_dataset(
-        "fewclue",
-        name=task_name,
-        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_csl/test_demo.json"
-    )
-
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
@@ -238,12 +189,6 @@ def write_csl(task_name, output_file, pred_labels):
 
 def write_chid(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=task_name, splits=("test"))
-    test_ds = load_dataset(
-        "fewclue",
-        name=task_name,
-        data_files="/home/tianxin04/.paddlenlp/datasets/FewCLUE/fewclue_chid/test_demo.json"
-    )
-
     test_example = {}
     with open(output_file, 'w', encoding='utf-8') as f:
         for idx, example in enumerate(test_ds):
@@ -283,7 +228,7 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
     set_seed(args.seed)
 
-    processor = Processor_dict[args.task_name]()
+    processor = processor_dict[args.task_name]()
     # Load test_ds for FewCLUE leaderboard
     test_ds = load_dataset("fewclue", name=args.task_name, splits=("test"))
     test_ds = processor.get_test_datasets(test_ds,

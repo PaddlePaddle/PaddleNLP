@@ -236,7 +236,7 @@ def run(args):
 
     if args.do_train:
         if args.train_file:
-            train_ds = load_dataset('sqaud', data_files=args.train_file)
+            train_ds = load_dataset('squad', data_files=args.train_file)
         elif args.version_2_with_negative:
             train_ds = load_dataset('squad', splits='train_v2')
         else:
@@ -320,7 +320,7 @@ def run(args):
 
     if args.do_predict and rank == 0:
         if args.predict_file:
-            dev_ds = load_dataset('sqaud', data_files=args.predict_file)
+            dev_ds = load_dataset('squad', data_files=args.predict_file)
         elif args.version_2_with_negative:
             dev_ds = load_dataset('squad', splits='dev_v2')
         else:
