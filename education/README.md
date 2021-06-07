@@ -9,7 +9,7 @@
 直播日期：6月7日～6月24日直播授课，6月25日结营直播。
 
 <p align="center">
-  <img src="./img/course.png" width="800" height ="410" />
+  <img src="https://paddlenlp.bj.bcebos.com/images/edu/course.png" width="800" height ="410" />
 </p>			
 
 
@@ -17,7 +17,7 @@
 致敬开源、鼓励分享：开课期间发布原创优秀技术经验贴、有价值的开源项目、视频等，即可获得额外加分，加分直接体现在总成绩上。希望你收获更强的自己，如有问题，欢迎加入课程qq群（618354318）交流讨论。
 
 <p align="center">
-  <img src="./img/qq.jpeg" width="170" height ="230" />
+  <img src="https://paddlenlp.bj.bcebos.com/images/edu/qq.jpeg" width="170" height ="230" />
 </p>
 
 ## 萌新学习经验 ：不求全部吸收，但求各有收货
@@ -29,7 +29,7 @@
 第二步：结合自身知识水平，有选择得学习，在拉伸区努力！
 
 <p align="center">
-  <img src="./img/learn_curve.png" width="400" height ="210" />
+  <img src="https://paddlenlp.bj.bcebos.com/images/edu/learn_curve.png" width="400" height ="210" />
 </p>
 
 | **精心设置学习梯度**  | **低、中（必修）**                                           | 中、高                                                       |
@@ -95,7 +95,7 @@
 对于还未有自己的repo的同学（fork他人项目不算噢）可以点进自己的主页，点击【New】创建一个新的repo，并予以命名。
 
 <p align="center">
-  <img src="./img/github1.png" width="800" height ="310" />
+  <img src="https://paddlenlp.bj.bcebos.com/images/edu/github1.png" width="800" height ="310" />
 </p>
 
 ### Step 2：新增requirements.txt文件
@@ -105,7 +105,7 @@ Requirements.txt文件中包含了你创建的repo中所使用其他开发者的
 点击Step 1	中新创建的repo，选择【Add file】中的【Create new file】，将其命名为【requirements.txt】。
 
 <p align="center">
-  <img src="./img/github2.png" width="800" height ="280" />
+  <img src="https://paddlenlp.bj.bcebos.com/images/edu/github2.png" width="800" height ="280" />
 </p>
 
 这样，文件列表中即新增【requirements.txt】~
@@ -115,7 +115,7 @@ Requirements.txt文件中包含了你创建的repo中所使用其他开发者的
 点击step 3中创建的【requirements.txt】，在其中增加”paddlenlp“即可。
 
 <p align="center">
-  <img src="./img/github3.png" width="800" height ="210" />
+  <img src="https://paddlenlp.bj.bcebos.com/images/edu/github3.png" width="800" height ="210" />
 </p>
 
 ### Step 4：提交作业
@@ -123,7 +123,7 @@ Requirements.txt文件中包含了你创建的repo中所使用其他开发者的
 从AI Studio中将作业导出为ipynb格式：
 
 <p align="center">
-  <img src="./img/notebook1.png" width="800" height ="270" />
+  <img src="https://paddlenlp.bj.bcebos.com/images/edu/notebook1.png" width="800" height ="270" />
 </p>
 
 回到Step 1中创建的repo的主页，同创建【requirements.txt】步骤一样，选择【Add file】中的【Upload files】上传自己作业即可。
@@ -154,13 +154,13 @@ Requirements.txt文件中包含了你创建的repo中所使用其他开发者的
 - 你想要什么周边，撩班班吧😍😍
 
 <p align="center">
-  <img src="./img/award1.png" width="800" height ="410" />
+  <img src="https://paddlenlp.bj.bcebos.com/images/edu/award1.png" width="800" height ="410" />
 </p>
 
 
 
 <p align="center">
-  <img src="./img/award2.png" width="800" height ="510" />
+  <img src="https://paddlenlp.bj.bcebos.com/images/edu/award2.png" width="800" height ="510" />
 </p>
 
 
