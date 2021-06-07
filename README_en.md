@@ -14,6 +14,7 @@ English | [简体中文](./README.md)
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
+* [2021-06-07] **NLP Live Class** from Baidu has started!🔥🔥🔥 Click [HERE](https://aistudio.baidu.com/aistudio/course/introduce/24177) to join us!
 * [2021-06-04] [ERNIE-Gram](https://arxiv.org/abs/2010.12148) pretrained model has been released! Install v2.0.2 to try it.
 * [2021-05-20] PaddleNLP 2.0 has been officially relealsed! :tada: For more information please refer to [Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.0.0).
 
@@ -52,7 +53,7 @@ pip install --upgrade paddlenlp -i https://pypi.org/simple
 
 ### Transformer API: Powerful Pre-trained Model Ecosystem
 
-We provide 15+ network architecture and 67 pretrained model parameters, not only including all the SOTA pretrained model like ERNIE, PLATO and SKEP released by Baidu, but also most of useful Chinese pretrained model developed by other organizations.
+We provide **15** network architecture and **67** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of high quality Chinese pretrained model developed by other organizations.
 
 ```python
 from paddlenlp.transformers import *
@@ -86,9 +87,7 @@ model = ErnieForTokenClassifiation.from_pretrained('ernie-1.0')
 model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
 ```
 
-
 For more pretrained model usage, please refer to [Transformer API](./docs/model_zoo/transformers.rst)
-
 
 
 ### Dataset API: Rich Dataset Integration and Quick Loading
