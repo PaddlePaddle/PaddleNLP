@@ -1,4 +1,4 @@
-# Day02 词向量作业辅导
+# Day01 词向量作业辅导
 
 本教程旨在辅导同学如何完成 AI Studio课程——[『NLP打卡营』实践课1：词向量应用展示
 ](https://aistudio.baidu.com/aistudio/projectdetail/1535355)课后作业。
