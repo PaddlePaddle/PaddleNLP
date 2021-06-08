@@ -1,16 +1,44 @@
+
+
 # NLP 12日直播打卡营
 
 欢迎加入《基于深度学习的自然语言处理打》直播打卡课程，百度自然语言处理部 & PaddlePaddle研发团队直播授课，6月7日起，每天1.5小时，共1+12次直播课程（第一节为导论课程），深入剖析NLP前沿技术和实践应用，提供基于最新飞桨框架和飞桨PaddleNLP文本领域开发库的代码实践。
 
-直播链接：http://live.bilibili.com/21689802 
+直播链接：http://live.bilibili.com/21689802
 
 直播日期：6月7日～6月24日直播授课，6月25日结营直播。
 
-![image-20210602171357613](/Users/chenshuo07/Library/Application Support/typora-user-images/image-20210602171357613.png)
+<p align="center">
+  <img src="images/course.png" width="800" height ="410" />
+</p>
+
+
 
 致敬开源、鼓励分享：开课期间发布原创优秀技术经验贴、有价值的开源项目、视频等，即可获得额外加分，加分直接体现在总成绩上。希望你收获更强的自己，如有问题，欢迎加入课程qq群（618354318）交流讨论。
 
-<img src="/Users/chenshuo07/Library/Caches/BaiduMacHi/Share/images/26011e8a783bab6cc6785a9d345a8c7e.jpeg" alt="26011e8a783bab6cc6785a9d345a8c7e" style="zoom: 25%;" />
+<p align="center">
+  <img src="https://paddlenlp.bj.bcebos.com/images/edu/qq.jpeg" width="170" height ="230" />
+</p>
+
+## 萌新学习经验 ：不求全部吸收，但求各有收货
+
+这套课程内容，乍看是不是，有点头大？萌新产品小妹建议你：
+
+第一步：了解课程整体内容、难度梯度
+
+第二步：结合自身知识水平，有选择得学习，在拉伸区努力！
+
+<p align="center">
+  <img src="images/learn_curve.png" width="400" height ="210" />
+</p>
+
+| **精心设置学习梯度**  | **低、中（必修）**                                           | 中、高                                                       |
+| --------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| 课程上半场 - 理论课   | 课程上半场 - 理论课                                          | Paper解读、模型理论推导、技术难点拆解                        |
+| 课程下半场 - 代码实践 | 1. 学习使用AI Studio、安装飞桨框架和PaddleNLP<br />2. 学习深度学习NLP任务通用流程<br />3. 使用飞桨PaddleNLP跑通完整案例 | 1. 深入学习PaddleNLP重点API；<br />2. 学习模型调优策略、模型复现、模型创新；<br />3.  学以致用：更换数据集解决自己实际业务问题 |
+| 作业1 - 选择题        | 巩固课上重要知识点                                           | 无                                                           |
+| 作业2 - 代码实践题    | 1. 跑通baseline参加千言竞赛<br />2. 简单实践，如将BOW网络换RNN<br />3. 模型压缩和部署 | 1. 通过模型调优等方式提高千言竞赛成绩<br />2. 模型复现、模型创新<br />3. 花样部署 |
+| 代码3 - 开放题        | 无                                                           | 闲聊；机器同传                                               |
 
 ## 课程安排
 
@@ -66,7 +94,9 @@
 
 对于还未有自己的repo的同学（fork他人项目不算噢）可以点进自己的主页，点击【New】创建一个新的repo，并予以命名。
 
-![image-20210602172805171](/Users/chenshuo07/Library/Application Support/typora-user-images/image-20210602172805171.png)
+<p align="center">
+  <img src="images/github1.png" width="800" height ="310" />
+</p>
 
 ### Step 2：新增requirements.txt文件
 
@@ -74,7 +104,9 @@ Requirements.txt文件中包含了你创建的repo中所使用其他开发者的
 
 点击Step 1	中新创建的repo，选择【Add file】中的【Create new file】，将其命名为【requirements.txt】。
 
-![image-20210602173455816](/Users/chenshuo07/Library/Application Support/typora-user-images/image-20210602173455816.png)
+<p align="center">
+  <img src="images/github2.png" width="800" height ="280" />
+</p>
 
 这样，文件列表中即新增【requirements.txt】~
 
@@ -82,15 +114,17 @@ Requirements.txt文件中包含了你创建的repo中所使用其他开发者的
 
 点击step 3中创建的【requirements.txt】，在其中增加”paddlenlp“即可。
 
-![image-20210602173710063](/Users/chenshuo07/Library/Application Support/typora-user-images/image-20210602173710063.png)
+<p align="center">
+  <img src="images/github3.png" width="800" height ="210" />
+</p>
 
 ### Step 4：提交作业
 
 从AI Studio中将作业导出为ipynb格式：
 
-![image-20210602174010656](/Users/chenshuo07/Library/Application Support/typora-user-images/image-20210602174010656.png)
-
-
+<p align="center">
+  <img src="images/notebook1.png" width="800" height ="270" />
+</p>
 
 回到Step 1中创建的repo的主页，同创建【requirements.txt】步骤一样，选择【Add file】中的【Upload files】上传自己作业即可。
 
@@ -119,11 +153,15 @@ Requirements.txt文件中包含了你创建的repo中所使用其他开发者的
 - 机械键盘、小度等可爱奖品
 - 你想要什么周边，撩班班吧😍😍
 
-[![04a0a06a4b03b679100c02a4463ccf47](https://user-images.githubusercontent.com/48054808/113859231-40736800-97d7-11eb-90e9-f4d371a8067c.png)](https://user-images.githubusercontent.com/48054808/113859231-40736800-97d7-11eb-90e9-f4d371a8067c.png)
+<p align="center">
+  <img src="images/award1.png" width="800" height ="410" />
+</p>
 
 
 
-![9e31104e40d1b74ad99d5983d77f4b86](https://user-images.githubusercontent.com/48054808/113859359-64cf4480-97d7-11eb-8881-83d493c970a4.png)
+<p align="center">
+  <img src="images/award2.png" width="800" height ="510" />
+</p>
 
 
 

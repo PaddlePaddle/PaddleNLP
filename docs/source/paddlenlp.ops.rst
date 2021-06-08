@@ -19,3 +19,4 @@ paddlenlp.ops
    :maxdepth: 4
 
    paddlenlp.ops.einsum
+   paddlenlp.ops.ext_utils
