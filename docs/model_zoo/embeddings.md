@@ -10,7 +10,7 @@ PaddleNLP提供多个开源的预训练词向量模型，用户仅需在使用`p
 
 |  参数 | 类型  | 属性  |
 | ------------ | ------------ | ------------ |
-| embedding_name | **string**  | 预训练embedding名称，可通过paddlenlp.embeddings.list_embedding_name()或[Embedding 模型汇总](####中文词向量)查询。 |
+| embedding_name | **string**  | 预训练embedding名称，可通过paddlenlp.embeddings.list_embedding_name()或[Embedding 模型汇总](#中文词向量)查询。 |
 | unknown_token | **string**  | unknown token。 |
 | unknown_token_vector | **list** 或者 **np.array** | 用来初始化unknown token对应的vector。默认为None（以正态分布方式初始化vector）|
 | extended_vocab_path | **string**  | 扩展词表的文件名路径。词表格式为一行一个词。 |
