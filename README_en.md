@@ -39,12 +39,12 @@ English | [简体中文](./README.md)
 * python >= 3.6
 * paddlepaddle >= 2.1
 
-More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)
+More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html).
 
 ### PIP Installation
 
 ```
-pip install --upgrade paddlenlp -i https://pypi.org/simple
+pip install --upgrade paddlenlp
 ```
 
 ## Easy-to-use API
@@ -127,7 +127,7 @@ Please find more API Reference from our [readthedocs](https://paddlenlp.readthed
 
 PaddleNLP provide rich application examples covers mainstream NLP task to help developer accelerate problem solving.
 
-### NLP Basic Technique
+### NLP Basic Task
 
 - [Word Embedding](./examples/word_embedding/)
 - [Lexical Analysis](./examples/lexical_analysis/)
@@ -143,7 +143,7 @@ PaddleNLP provide rich application examples covers mainstream NLP task to help d
 - [Semantic Indexing](./examples/semantic_indexing/)
 - [Information Extraction](./examples/information_extraction/)
 
-### NLP Application in Real System
+### NLP Industrial Applications
 
 - [Sentiment Analysis](./examples/sentiment_analysis/skep/):star2:
 - [General Dialogue System](./examples/dialogue/)
@@ -151,7 +151,7 @@ PaddleNLP provide rich application examples covers mainstream NLP task to help d
 - [Simultaneous Translation](././examples/simultaneous_translation/)
 - [Machine Reading Comprehension](./examples/machine_reading_comprehension/)
 
-### Extention Application
+### Extented Application
 
 - [Text Knowledge Linking](./examples/text_to_knowledge/):star2:
 - [Machine Reading Comprehension](./examples/machine_reading_comprehension)
