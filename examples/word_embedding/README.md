@@ -44,7 +44,7 @@ python train.py --device='gpu' \
 
 * `save_dir`: 模型保存目录。默认值为"./checkpoints/"。
 * `init_from_ckpt`: 恢复模型训练的断点路径。默认值为None，表示不恢复训练。
-* `embedding_name`: 预训练Embedding名称，默认为`w2v.baidu_encyclopedia.target.word-word.dim300`. 支持的预训练Embedding可参考[Embedding 模型汇总](../../docs/embeddings.md)。
+* `embedding_name`: 预训练Embedding名称，默认为`w2v.baidu_encyclopedia.target.word-word.dim300`. 支持的预训练Embedding可参考[Embedding 模型汇总](../../docs/model_zoo/embeddings.md)。
 
 **注意：**
 
