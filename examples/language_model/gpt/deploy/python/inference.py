@@ -67,7 +67,7 @@ class Predictor(object):
             for name in predictor.get_input_names()
         ]
         output_handles = [
-            predictor.get_input_handle(name)
+            predictor.get_output_handle(name)
             for name in predictor.get_output_names()
         ]
         return cls(predictor, input_handles, output_handles)
