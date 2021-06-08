@@ -499,6 +499,9 @@ class GPTPretrainedModel(PretrainedModel):
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "eos_token_id": 7,
+            "bos_token_id": 0,
+            "eol_token_id": 3,
         },
         "gpt-cpm-small-cn-distill": { # 109M
             "vocab_size": 30000,
@@ -513,6 +516,9 @@ class GPTPretrainedModel(PretrainedModel):
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "eos_token_id": 7,
+            "bos_token_id": 0,
+            "eol_token_id": 3,
         },
         "gpt3-13B-en": { # 13B
             "vocab_size": 50304,
@@ -526,6 +532,8 @@ class GPTPretrainedModel(PretrainedModel):
             "max_position_embeddings": 1024,
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
         },
         "gpt3-1.3B-en": { # 1.3B
             "vocab_size": 50304,
@@ -539,6 +547,8 @@ class GPTPretrainedModel(PretrainedModel):
             "max_position_embeddings": 1024,
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
         },
         "gpt2-medium-en": { #345M
             "vocab_size": 50304,
@@ -552,6 +562,8 @@ class GPTPretrainedModel(PretrainedModel):
             "max_position_embeddings": 1024,
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
         },
         "gpt2-en": { #117M
             "vocab_size": 50304,
@@ -565,6 +577,8 @@ class GPTPretrainedModel(PretrainedModel):
             "max_position_embeddings": 1024,
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
         },
 
     }
@@ -617,6 +631,9 @@ class GPTModel(GPTPretrainedModel):
                  type_vocab_size=16,
                  initializer_range=0.02,
                  pad_token_id=0,
+                 eos_token_id=7,
+                 bos_token_id=0,
+                 eol_token_id=3,
                  topo=None):
         super(GPTModel, self).__init__()
         self.pad_token_id = pad_token_id

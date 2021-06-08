@@ -148,8 +148,7 @@ def main(args, input_text):
         num_beams=args.num_beams,
         length_penalty=args.length_penalty,
         early_stopping=args.early_stopping,
-        eos_token_id=tokenizer.stop_token_id,
-        num_return_sequences=args.num_return_sequences, )
+        num_return_sequences=args.num_return_sequences)
 
     generated_sequences = []
     for i, generated_ids in enumerate(ids):
