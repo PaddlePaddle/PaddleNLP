@@ -76,7 +76,14 @@ def predict(model, data_loader):
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    # If you want to use ernie1.0 model, plesace uncomment the following code
+    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
+
+    pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
+        'ernie-gram-zh')
+    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
+        'ernie-gram-zh')
 
     trans_func = partial(
         convert_example,
@@ -99,9 +106,6 @@ if __name__ == "__main__":
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        "ernie-1.0")
-
     model = PairwiseMatching(pretrained_model)
 
     if args.params_path and os.path.isfile(args.params_path):
@@ -116,6 +120,7 @@ if __name__ == "__main__":
 
     valid_ds = load_dataset(
         read_text_pair, data_path=args.input_file, lazy=False)
+
     for idx, prob in enumerate(y_probs):
         text_pair = valid_ds[idx]
         text_pair["pred_prob"] = prob[0]

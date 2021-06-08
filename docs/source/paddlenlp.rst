@@ -15,7 +15,6 @@ paddlenlp
    paddlenlp.embeddings
    paddlenlp.layers
    paddlenlp.metrics
-   paddlenlp.models
    paddlenlp.ops
    paddlenlp.seq2vec
    paddlenlp.transformers
