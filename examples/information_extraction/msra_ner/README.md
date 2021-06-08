@@ -33,7 +33,7 @@ python -u ./train.py \
 ```
 
 其中参数释义如下：
-- `model_name_or_path`: 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer API](../../../docs/transformers.md)中除ernie-gen以外的所有模型。若使用非BERT系列模型，需修改脚本导入相应的Task和Tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `model_name_or_path`: 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer API](../../../docs/model_zoo/transformers.rst)中除ernie-gen以外的所有模型。若使用非BERT系列模型，需修改脚本导入相应的Task和Tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
 - `max_seq_length`: 表示最大句子长度，超过该长度将被截断。
 - `batch_size`: 表示每次迭代**每张卡**上的样本数目。
 - `learning_rate`: 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
@@ -111,7 +111,7 @@ python -u ./predict.py \
 
 ### 使用其它预训练模型
 
-请参考[Transformer API文档](../../../docs/transformers.md)了解更多PaddleNLP支持的预训练模型信息，并更换`--model_name_or_path`参数即可对比其他预训练模型的效果。
+请参考[Transformer API文档](../../../docs/model_zoo/transformers.rst)了解更多PaddleNLP支持的预训练模型信息，并更换`--model_name_or_path`参数即可对比其他预训练模型的效果。
 
 ## Reference
 
