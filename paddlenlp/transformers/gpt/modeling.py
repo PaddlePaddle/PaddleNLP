@@ -70,7 +70,7 @@ class MultiHeadAttention(nn.Layer):
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
-        if topo is None or toppo.mp.size == 1:
+        if topo is None or topo.mp_info.size == 1:
             self.q_proj = nn.Linear(
                 embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
             self.k_proj = nn.Linear(
