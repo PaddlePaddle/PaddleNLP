@@ -20,11 +20,21 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['NLPCC14_SC']
+__all__ = ['NLPCC14SC']
 
 
-class NLPCC14_SC(DatasetBuilder):
+class NLPCC14SC(DatasetBuilder):
     """
+    NLPCC14-SC is the datasets for sentiment classification. There are 2 classes
+    in the datasets: Negative (0) and Positive (1). The following is a part of
+    the train data:
+      '''
+      label	                  text_a
+      1	                      超级值得看的一个电影
+      0	                      我感觉卓越的东西现在好垃圾，还贵，关键贵。
+      '''
+    Please note that the test data contains no the corresponding labels. 
+
     NLPCC14-SC datasets only contains train and test data, so we remove the dev
     data in META_INFO. By Fiyen at Beijing Jiaotong University.
     """
