@@ -333,7 +333,7 @@ def do_train(args):
 
         for step, batch in enumerate(train_data_loader()):
             global_step += 1
-            ret = exe.run(main_program, feed=batch, fetch_list=fetchs)
+            ret = exe.run(main_program, feed=batch, fetch_list=fetchs, use_program_cache=True)
             # In the new 2.0 api, must call this function to change the learning_rate
             lr_scheduler.step()
 

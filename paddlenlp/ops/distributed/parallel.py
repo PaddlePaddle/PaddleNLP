@@ -57,9 +57,9 @@ class ParallelEmbedding(nn.Layer):
                  name=None):
         super(ParallelEmbedding, self).__init__()
         self.rank = topo.mp_info.rank
-        self.world_size = topo.mp_info.nranks
+        self.world_size = topo.mp_info.size
         self.num_embeddings = num_embeddings
-        self.is_mp = (self.nranks > 1)
+        self.is_mp = (self.world_size > 1)
 
         assert num_embeddings % self.world_size == 0, \
             "The length of the vocabulary must be divisible by the parallelism degree of MP"
