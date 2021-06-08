@@ -100,7 +100,7 @@ logs_sparc/valid-eval[==================================]100% Time: 0:04:53
 以预测sparc数据集为例:
 
 ```bash
-python3 run.py --raw_train_filename="data/sparc_data_removefrom/train.pkl" \
+python run.py --raw_train_filename="data/sparc_data_removefrom/train.pkl" \
           --raw_validation_filename="data/sparc_data_removefrom/dev.pkl" \
           --database_schema_filename="data/sparc_data_removefrom/tables.json" \
           --embedding_filename="glove.840B.300d.txt" \
