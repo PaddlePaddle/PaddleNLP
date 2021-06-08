@@ -49,10 +49,9 @@ pip install --upgrade paddlenlp
 
 ## Easy-to-use API
 
-
 ### Transformer API: Awesome Pre-trained Model Ecosystem
 
-We provide **15** network architecture and **67** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of high quality Chinese pretrained model developed by other organizations. We also welcome developer to contribute your transformer model! 🤗 
+We provide **15** network architectures and **67** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. We also welcome developer to contribute your Transformer models! 🤗
 
 ```python
 from paddlenlp.transformers import *
@@ -123,7 +122,7 @@ For more `TokenEmbedding` usage, please refer to [Embedding API](./docs/embeddin
 
 Please find more API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
 
-## Rich Application Examples
+##  Wide-range NLP Task Support
 
 PaddleNLP provide rich application examples covers mainstream NLP task to help developer accelerate problem solving.
 
@@ -191,7 +190,7 @@ Join our QQ Technical Group for technical exchange right now! ⬇️
 
 ## ChangeLog
 
-For more information about our release, please refer to [ChangeLog](./docs/changelog.md)
+For more details about our release, please refer to [ChangeLog](./docs/changelog.md)
 
 ## License
 
