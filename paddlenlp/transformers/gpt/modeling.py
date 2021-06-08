@@ -62,7 +62,6 @@ class MultiHeadAttention(nn.Layer):
                  topo=None):
         super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim
-        self.bias = paddle.tensor.tril(paddle.ones((embed_dim, embed_dim)))
         self.kdim = kdim if kdim is not None else embed_dim
         self.vdim = vdim if vdim is not None else embed_dim
         self.num_heads = num_heads
@@ -179,6 +178,7 @@ class MultiHeadAttention(nn.Layer):
                 query,
                 key,
                 value,
+                causal_mask=None,
                 attn_mask=None,
                 use_cache=False,
                 cache=None):
@@ -197,11 +197,10 @@ class MultiHeadAttention(nn.Layer):
         # scale dot product attention
         product = layers.matmul(
             x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
-        key_length = product.shape[-2]
-        causal_mask = self.bias[:key_length, :key_length]
-        product = product * causal_mask
-        mask_score = (causal_mask - 1.0) * 10000.0
-        product = product + mask_score
+        if causal_mask is not None:
+            product = product * causal_mask
+            mask_score = (causal_mask - 1.0) * 10000.0
+            product = product + mask_score
         if attn_mask is not None:
             product = product + attn_mask
 
@@ -255,6 +254,7 @@ class TransformerDecoder(nn.Layer):
 
     def forward(self,
                 tgt,
+                causal_mask,
                 memory,
                 tgt_mask=None,
                 memory_mask=None,
@@ -273,6 +273,7 @@ class TransformerDecoder(nn.Layer):
             if cache is None:
                 if use_cache:
                     output, new_cache = mod(output,
+                                            causal_mask,
                                             memory,
                                             tgt_mask=tgt_mask,
                                             use_cache=use_cache,
@@ -280,6 +281,7 @@ class TransformerDecoder(nn.Layer):
                     new_caches.append(new_cache)
                 else:
                     output = mod(output,
+                                 causal_mask,
                                  memory,
                                  tgt_mask=tgt_mask,
                                  use_cache=use_cache,
@@ -287,6 +289,7 @@ class TransformerDecoder(nn.Layer):
 
             else:
                 output, new_cache = mod(output,
+                                        causal_mask,
                                         memory,
                                         tgt_mask=tgt_mask,
                                         use_cache=use_cache,
@@ -379,17 +382,24 @@ class TransformerDecoderLayer(nn.Layer):
         self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
         self.activation = getattr(F, activation)
 
-    def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None):
+    def forward(self,
+                tgt,
+                causal_mask,
+                memory,
+                tgt_mask=None,
+                use_cache=False,
+                cache=None):
         residual = tgt
 
         if self.normalize_before:
             tgt = self.norm1(tgt)
 
         if use_cache is False:
-            tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
+            tgt = self.self_attn(tgt, tgt, tgt, causal_mask, tgt_mask,
+                                 use_cache, cache)
         else:
-            tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask,
-                                                    use_cache, cache)
+            tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, causal_mask,
+                                                    tgt_mask, use_cache, cache)
         tgt = residual + self.dropout1(tgt)
         if not self.normalize_before:
             tgt = self.norm1(tgt)
@@ -611,6 +621,10 @@ class GPTModel(GPTPretrainedModel):
         super(GPTModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
+        self.register_buffer("bias",
+                             paddle.tensor.tril(
+                                 paddle.ones((max_position_embeddings,
+                                              max_position_embeddings))))
         self.topo = topo
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
@@ -682,9 +696,11 @@ class GPTModel(GPTPretrainedModel):
                                                          input_ids)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
-
+        causal_mask = self.bias[:paddle.shape(input_ids)[-1], :paddle.shape(
+            input_ids)[-1]]
         encoder_outputs = self.decoder(
             embedding_output,
+            causal_mask,
             memory=None,
             tgt_mask=attention_mask,
             use_cache=use_cache,
