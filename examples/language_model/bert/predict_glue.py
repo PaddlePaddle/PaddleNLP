@@ -147,8 +147,8 @@ def main():
         is_test=True)
     test_ds = test_ds.map(trans_func)
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
     ): fn(samples)
     predictor.predict(
         test_ds, batch_size=args.batch_size, collate_fn=batchify_fn)
