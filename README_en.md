@@ -20,18 +20,17 @@ English | [简体中文](./README.md)
 
 ## Introduction
 
-PaddleNLP is a powerful text domain library, which aims to accelerate NLP applications through easy-to-use API, rich application examples, and high performance distributed training. We also provide the NLP best practice based on PaddlePaddle 2.0 API system.
+**PaddleNLP** is a powerful NLP library with **Awesome** pre-trained Transformer models and easy-to-use interface, supporting wide-range of NLP tasks from research to industrial applications. 
 
 
-* **Easy-to-Use and End-to-End API**
-  - The API is fully integrated with PaddlePaddle 2.0 high-level API system. It minimizes the number of user actions required for common use cases like data loading, text pre-processing, transformer model loading, training and deployment, which enables you to deal with text problems more productively.
+* **Easy-to-Use API**
+  - The API is fully integrated with PaddlePaddle 2.0 high-level API system. It minimizes the number of user actions required for common use cases like data loading, text pre-processing, awesome transfomer models, and fast inference, which enables developer to deal with text problems more productively.
 
-* **Rich Application Examples**
-  - Our model zoo covers mainstream NLP applications, including Lexical Analysis, Text Classification, Text Generation, Text Matching, Text Graph, Information Extraction, Machine Translation, General Dialogue and Question Answering etc.
+* **Wide-range NLP Task Support**
+  - PaddleNLP support NLP task from research to industrial applications, including Lexical Analysis, Text Classification, Text Matching, Text Generation, Information Extraction, Machine Translation, General Dialogue and Question Answering etc.
 
 * **High Performance Distributed Training**
-  -  We provide a highly optimized ditributed training implementation for BERT with Fleet API, and mixed precision training strategy based on PaddlePaddle 2.0, it can fully utilize GPU clusters for large-scale model pre-training.
-
+  -  We provide an industrial level training pipeline for super large-scale Transformer model based on **Auto Mixed Precision** and Fleet distributed training API by PaddlePaddle, which can support customized model pre-training efficiently.
 
 ## Installation
 
@@ -40,7 +39,7 @@ PaddleNLP is a powerful text domain library, which aims to accelerate NLP applic
 * python >= 3.6
 * paddlepaddle >= 2.1
 
-More information about PaddlePaddle installation please refer to [PaddlePaddle Installation](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)
+More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)
 
 ### PIP Installation
 
@@ -51,9 +50,9 @@ pip install --upgrade paddlenlp -i https://pypi.org/simple
 ## Easy-to-use API
 
 
-### Transformer API: Powerful Pre-trained Model Ecosystem
+### Transformer API: Awesome Pre-trained Model Ecosystem
 
-We provide **15** network architecture and **67** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of high quality Chinese pretrained model developed by other organizations.
+We provide **15** network architecture and **67** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of high quality Chinese pretrained model developed by other organizations. We also welcome developer to contribute your transformer model! 🤗 
 
 ```python
 from paddlenlp.transformers import *
