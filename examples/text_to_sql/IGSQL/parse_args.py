@@ -85,7 +85,7 @@ def interpret_args():
         '--lr_bert', default=1e-5, type=float, help='BERT model learning rate.')
 
     ### Debugging/logging parameters
-    parser.add_argument('--reload_embedding', type=bool, default=True)
+    parser.add_argument('--reload_embedding', type=bool, default=False)
     parser.add_argument('--logdir', type=str, default='logs')
     parser.add_argument('--deterministic', type=bool, default=False)
     parser.add_argument('--num_train', type=int, default=-1)
