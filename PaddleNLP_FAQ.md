@@ -38,7 +38,7 @@ Paddle Inference预测示例：[https://github.com/PaddlePaddle/PaddleNLP/pull/2
 
 #### 6、如何复现相同结果
 
-确保训练模式下排除一些随机性参数条件，例如dropout的mask位置
+确保训练模式下排除一些随机性参数条件，例如dropout的mask位置。
 
 #### 7、在conda11安装和使用PaddlNLP
 
