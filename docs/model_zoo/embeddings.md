@@ -1,5 +1,26 @@
 # PaddleNLP Embedding API
 
+- [介绍](#介绍)
+- [用法](#用法)
+  * [TokenEmbedding参数](#TokenEmbedding参数)
+  * [初始化](#初始化)
+  * [查询embedding结果](#查询embedding结果)
+  * [可视化embedding结果](#可视化embedding结果)
+  * [计算词向量cosine相似度](#计算词向量cosine相似度)
+  * [计算词向量内积](#计算词向量内积)
+  * [训练](#训练)
+  * [切词](#切词)
+- [预训练模型](#预训练模型)
+  * [中文词向量](#中文词向量)
+  * [英文词向量](#英文词向量)
+  * [Word2Vec](#word2vec)
+  * [GloVe](#glove)
+  * [FastText](#fasttext)
+  * [使用方式](#使用方式)
+  * [模型信息](#模型信息)
+- [致谢](#致谢)
+- [参考论文](#参考论文)
+
 ## 介绍
 
 PaddleNLP提供多个开源的预训练词向量模型，用户仅需在使用`paddlenlp.embeddings.TokenEmbedding`时，指定预训练模型的名称，即可加载相对应的预训练模型。以下将介绍`TokenEmbeddign`详细用法，并列出PaddleNLP所支持的预训练Embedding模型。
