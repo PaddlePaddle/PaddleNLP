@@ -147,10 +147,10 @@ def parse_args():
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
-        "--n_gpu",
-        type=int,
-        default=1,
-        help="number of gpus to use, 0 for cpu.")
+        "--device",
+        default="gpu",
+        type=str,
+        help="The device to select to train the model, is must be cpu/gpu/xpu.")
     parser.add_argument(
         '--width_mult_list',
         nargs='+',
@@ -316,7 +316,7 @@ def convert_example(example,
 
 
 def do_train(args):
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -406,7 +406,9 @@ def do_train(args):
 
     # Step4: Config about distillation.
     mapping_layers = ['bert.embeddings']
-    for idx in range(model.bert.config['num_hidden_layers']):
+    for idx in range(model._layers.bert.config['num_hidden_layers']
+                     if isinstance(model, paddle.DataParallel) else
+                     model.bert.config['num_hidden_layers']):
         mapping_layers.append('bert.encoder.layers.{}'.format(idx))
 
     default_distill_config = {
@@ -561,7 +563,4 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_gpu)
-    else:
-        do_train(args)
+    do_train(args)
