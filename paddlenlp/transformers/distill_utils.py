@@ -77,6 +77,8 @@ def attention_forward(self,
     # scale dot product attention
     product = tensor.matmul(x=q, y=k, transpose_y=True)
     product /= math.sqrt(self.head_dim)
+    self.scaled_qk = product
+    self.v = v
 
     if attn_mask is not None:
         # Support bool or int mask
@@ -135,6 +137,8 @@ def transformer_encoder_layer_forward(self, src, src_mask=None, cache=None):
     src = residual + self.dropout2(src)
     if not self.normalize_before:
         src = self.norm2(src)
+    self.scaled_qk = self.self_attn.scaled_qk
+    self.v = self.self_attn.v
     return src if cache is None else (src, incremental_cache)
 
 
@@ -148,7 +152,8 @@ def transformer_encoder_forward(self, src, src_mask=None, cache=None):
     new_caches = []
     self.attentions = []
     self.hidden_states = []
-    self.v = None
+    self.scaled_qks = []
+    self.vs = []
     for i, mod in enumerate(self.layers):
         self.hidden_states.append(output)
         if cache is None:
@@ -157,6 +162,8 @@ def transformer_encoder_forward(self, src, src_mask=None, cache=None):
             output, new_cache = mod(output, src_mask=src_mask, cache=cache[i])
             new_caches.append(new_cache)
         self.attentions.append(mod.attention_matrix)
+        self.scaled_qks.append(mod.scaled_qk)
+        self.vs.append(mod.v)
 
     if self.norm is not None:
         output = self.norm(output)
