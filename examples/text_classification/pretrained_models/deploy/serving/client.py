@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,12 +28,12 @@ parser.add_argument(
     "--client_config_file",
     type=str,
     default="./serving_client/serving_client_conf.prototxt",
-    help="client prototxt config file")
+    help="Client prototxt config file.")
 parser.add_argument(
     "--server_ip_port",
     type=str,
     default="127.0.0.1:8090",
-    help="server_ip:port")
+    help="The ip address and port of the server.")
 parser.add_argument(
     "--batch_size",
     type=int,
@@ -117,6 +117,7 @@ def predict(data, label_map, batch_size):
     client.load_client_config(args.client_config_file)
     client.connect([args.server_ip_port])
 
+    # TODO: Text tokenization which is done in the serving end not the client end may be better.
     tokenizer = ErnieTinyTokenizer.from_pretrained("ernie-tiny")
     examples = []
     for text in data:

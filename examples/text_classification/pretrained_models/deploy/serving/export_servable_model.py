@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,17 +23,17 @@ def parse_args():
         "--inference_model_dir",
         type=str,
         default="./",
-        help="input inference model dir")
+        help="The directory of the inference model.")
     parser.add_argument(
         "--model_file",
         type=str,
         default='./static_graph_params.pdmodel',
-        help="input inference model file name")
+        help="The inference model file name.")
     parser.add_argument(
         "--params_file",
         type=str,
         default='./static_graph_params.pdiparams',
-        help="input inference parameters file name")
+        help="The input inference parameters file name.")
     return parser.parse_args()
 
 
