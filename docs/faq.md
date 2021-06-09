@@ -8,14 +8,14 @@
 
 #### 2、如何加载训练好的模型
 
-在训练中通过以下方式保存下来的模型
+保存模型
 
 ```
 model.save_pretrained('./checkpoint')
 tokenizer.save_pretrained('./checkpoint')
 ```
 
-通过下面代码来加载已保存的模型
+加载模型
 
 ```
 model.from_pretrained('./checkpoint')
