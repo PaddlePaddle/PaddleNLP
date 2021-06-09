@@ -267,29 +267,25 @@ class TransformerDecoder(nn.Layer):
         for i, mod in enumerate(self.layers):
             if cache is None:
                 if use_cache:
-                    output, new_cache = mod(
-                        output,
-                        memory,
-                        tgt_mask=tgt_mask,
-                        use_cache=use_cache,
-                        cache=cache)
+                    output, new_cache = mod(output,
+                                            memory,
+                                            tgt_mask=tgt_mask,
+                                            use_cache=use_cache,
+                                            cache=cache)
                     new_caches.append(new_cache)
                 else:
-                    output = mod(
-                        output,
-                        causal_mask,
-                        memory,
-                        tgt_mask=tgt_mask,
-                        use_cache=use_cache,
-                        cache=cache)
+                    output = mod(output,
+                                 memory,
+                                 tgt_mask=tgt_mask,
+                                 use_cache=use_cache,
+                                 cache=cache)
 
             else:
-                output, new_cache = mod(
-                    output,
-                    memory,
-                    tgt_mask=tgt_mask,
-                    use_cache=use_cache,
-                    cache=cache[i])
+                output, new_cache = mod(output,
+                                        memory,
+                                        tgt_mask=tgt_mask,
+                                        use_cache=use_cache,
+                                        cache=cache[i])
                 new_caches.append(new_cache)
             self.checkpoints.append(output.name)
 
@@ -397,7 +393,8 @@ class TransformerDecoderLayer(nn.Layer):
         if self.normalize_before:
             tgt = self.norm2(tgt)
         tgt = self.dropout2(
-            self.linear2(F.gelu(self.linear1(tgt), approximate=True)))
+            self.linear2(F.gelu(
+                self.linear1(tgt), approximate=True)))
         tgt = residual + tgt
 
         if not self.normalize_before:
@@ -594,9 +591,9 @@ class GPTPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range if hasattr(
-                            self, "initializer_range") else self.gpt.config[
-                                "initializer_range"],
+                        std=self.initializer_range
+                        if hasattr(self, "initializer_range") else
+                        self.gpt.config["initializer_range"],
                         shape=layer.weight.shape))
 
 
@@ -626,11 +623,12 @@ class GPTModel(GPTPretrainedModel):
         super(GPTModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        self.register_buffer("bias",
-                             paddle.tensor.triu(
-                                 paddle.ones((max_position_embeddings,
-                                              max_position_embeddings)) * -1e9,
-                                 diagonal=1))
+        self.register_buffer(
+            "bias",
+            paddle.tensor.triu(
+                paddle.ones((max_position_embeddings,
+                             max_position_embeddings)) * -1e9,
+                diagonal=1))
         self.topo = topo
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
@@ -666,8 +664,8 @@ class GPTModel(GPTPretrainedModel):
                     topo=topo))
 
         if self.pipline_mode:
-            Decoder = paddlenlp.ops.guard(
-                'gpu:{}'.format(self.topo.pp_info.size - 1))(TransformerDecoder)
+            Decoder = paddlenlp.ops.guard('gpu:{}'.format(
+                self.topo.pp_info.size - 1))(TransformerDecoder)
         else:
             Decoder = TransformerDecoder
 
@@ -698,8 +696,8 @@ class GPTModel(GPTPretrainedModel):
                 dtype='int64')
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
-            position_ids = paddle.fluid.layers.expand_as(
-                position_ids, input_ids)
+            position_ids = paddle.fluid.layers.expand_as(position_ids,
+                                                         input_ids)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
         causal_mask = self.bias[:paddle.shape(input_ids)[-1], :paddle.shape(
@@ -737,12 +735,11 @@ class GPTForPretraining(GPTPretrainedModel):
                 masked_positions=None,
                 use_cache=False,
                 cache=None):
-        outputs = self.gpt(
-            input_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            use_cache=use_cache,
-            cache=cache)
+        outputs = self.gpt(input_ids,
+                           position_ids=position_ids,
+                           attention_mask=attention_mask,
+                           use_cache=use_cache,
+                           cache=cache)
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
         else:
@@ -798,12 +795,11 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
               masked_positions=None,
               use_cache=False,
               cache=None):
-        outputs = self.gpt(
-            input_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            use_cache=use_cache,
-            cache=cache)
+        outputs = self.gpt(input_ids,
+                           position_ids=position_ids,
+                           attention_mask=attention_mask,
+                           use_cache=use_cache,
+                           cache=cache)
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
         else:
@@ -865,12 +861,11 @@ class GPTLMHeadModel(GPTPretrainedModel):
                 attention_mask=None,
                 use_cache=False,
                 cache=None):
-        outputs = self.gpt(
-            input_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            use_cache=use_cache,
-            cache=cache)
+        outputs = self.gpt(input_ids,
+                           position_ids=position_ids,
+                           attention_mask=attention_mask,
+                           use_cache=use_cache,
+                           cache=cache)
 
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
