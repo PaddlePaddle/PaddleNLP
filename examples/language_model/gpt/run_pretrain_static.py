@@ -221,8 +221,8 @@ def do_train(args):
                 model_config = model_class.pretrained_init_configuration[
                     args.model_name_or_path]
                 if model_config["vocab_size"] % 8 != 0:
-                    model_config[
-                        "vocab_size"] += 8 - (model_config["vocab_size"] % 8)
+                    model_config["vocab_size"] += 8 - (
+                        model_config["vocab_size"] % 8)
                 model_config["topo"] = topo
 
                 train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
@@ -244,7 +244,7 @@ def do_train(args):
                     GPTPretrainingCriterion)()
                 loss = criterion(preds, labels, loss_mask)
 
-            # Create the learning_rate sheduler and optimizergit
+            # Create the learning_rate sheduler and optimizer
             if args.decay_steps is None:
                 args.decay_steps = args.max_steps
             warmup_step = args.warmup_rate * args.decay_steps
