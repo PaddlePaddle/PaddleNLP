@@ -4,10 +4,11 @@
 
 ```text
 .
-└── faster_transformer/       # 基于自定义 op Faster Transformer 子路径
+├── faster_transformer/       # 基于自定义 op Faster Transformer 子路径
   ├── sample/                 # 基于 Faster Transformer 使用样例
   ├── src/                    # 自定义 OP C++ CUDA 代码
   └── transformer/            # Python API 封装脚本
+└── patches                   # 自定义 op 第三方库自定义补丁代码
 ```
 
 ## 使用环境说明
