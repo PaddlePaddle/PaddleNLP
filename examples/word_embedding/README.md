@@ -2,7 +2,7 @@
 
 ## 简介
 
-PaddleNLP已预置多个公开的预训练Embedding，用户可以通过使用`paddlenlp.embeddings.TokenEmbedding`接口加载预训练Embedding，从而提升训练效果。以下通过基于开源情感倾向分类数据集ChnSentiCorp的文本分类训练例子展示`paddlenlp.embeddings.TokenEmbedding`对训练提升的效果。更多的`paddlenlp.embeddings.TokenEmbedding`用法，请参考[TokenEmbedding 接口使用指南](../../paddlenlp/embeddings/README.md) 。
+PaddleNLP已预置多个公开的预训练Embedding，用户可以通过使用`paddlenlp.embeddings.TokenEmbedding`接口加载预训练Embedding，从而提升训练效果。以下通过基于开源情感倾向分类数据集ChnSentiCorp的文本分类训练例子展示`paddlenlp.embeddings.TokenEmbedding`对训练提升的效果。更多的`paddlenlp.embeddings.TokenEmbedding`用法，请参考[TokenEmbedding 接口使用指南](../../docs/model_zoo/embeddings.md) 。
 
 
 ## 快速开始

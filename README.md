@@ -28,7 +28,7 @@ PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本�
 
 
 - **多场景的应用示例**
-  - 提供多粒度多场景的[应用示例](#多场景的应用示例)，涵盖从NLP基础技术、NLP核心技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发提供飞桨2.0框架在文本领域的最佳实践。
+  - 覆盖从学术到工业级的NLP[应用示例](#多场景的应用示例)，涵盖从NLP基础技术、NLP核心技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发提供飞桨2.0框架在文本领域的最佳实践。
 
 
 - **高性能分布式训练**
@@ -44,7 +44,7 @@ PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本�
 ### pip安装
 
 ```
-pip install --upgrade paddlenlp -i https://pypi.org/simple
+pip install --upgrade paddlenlp
 ```
 
 更多关于PaddlePaddle和PaddleNLP安装的详细教程请查看[Installation](./docs/get_started/installation.rst)。
@@ -53,7 +53,7 @@ pip install --upgrade paddlenlp -i https://pypi.org/simple
 
 ### Transformer API: 强大的预训练模型生态底座
 
-覆盖**15**个网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。
+覆盖**15**个网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。也欢迎开发者进预训练模贡献！🤗 
 
 ```python
 from paddlenlp.transformers import *
@@ -76,10 +76,10 @@ from paddlenlp.transformers import ErnieTokenizer, ErnieModel
 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 text = tokenizer('自然语言处理')
 
-# 获取语义表示
+# 语义表示
 model = ErnieModel.from_pretrained('ernie-1.0')
 pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
-# 文本分类/句对匹配
+# 文本分类 & 句对匹配
 model = ErnieForSequenceClassifiation.from_pretrained('ernie-1.0')
 # 序列标注
 model = ErnieForTokenClassifiation.from_pretrained('ernie-1.0')
@@ -115,7 +115,7 @@ wordemb.cosine_sim("艺术", "火车")
 >>> 0.14792643
 ```
 
-内置50+中文词向量，覆盖多种领域语料、如百科、新闻、微博等。更多使用方法请参考[Embedding文档](./examples/word_embedding/README.md)。
+内置50+中文词向量，覆盖多种领域语料、如百科、新闻、微博等。更多使用方法请参考[Embedding文档](./docs/model_zoo/embeddings.md)。
 
 ### 更多API使用文档
 
