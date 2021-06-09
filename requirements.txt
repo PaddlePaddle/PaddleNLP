@@ -5,3 +5,4 @@ colorlog
 colorama
 seqeval
 multiprocess
+pre-commit
