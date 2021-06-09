@@ -81,7 +81,7 @@ def evaluate(model, metric, data_loader, phase="dev"):
         preds = np.concatenate((neg_probs, pos_probs), axis=1)
         metric.update(preds=preds, labels=labels)
 
-    print("eval_{}\tauc:{:.2}".format(phase, metric.accumulate()))
+    print("eval_{} auc:{:.2}".format(phase, metric.accumulate()))
     metric.reset()
     model.train()
 
