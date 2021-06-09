@@ -4,9 +4,10 @@
 
 ```text
 .
-├── sample/                 # 基于 Transformer 机器翻译使用样例（beam search）
-├── src/                    # 自定义 OP C++ CUDA 代码
-└── transformer/            # Python API 封装脚本
+└── faster_transformer/       # 基于自定义 op Faster Transformer 子路径
+  ├── sample/                 # 基于 Faster Transformer 使用样例
+  ├── src/                    # 自定义 OP C++ CUDA 代码
+  └── transformer/            # Python API 封装脚本
 ```
 
 ## 使用环境说明
@@ -95,7 +96,7 @@ transformer = FasterTransformer(
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 
-更详细的例子可以参考 `./sample/decoding_sample.py` 以及 `./sample/encoder_decoding_sample.py`，我们提供了更详细用例。
+更详细的例子可以参考 `./faster_transformer/sample/decoding_sample.py` 以及 `./sample/encoder_decoding_sample.py`，我们提供了更详细用例。
 
 #### 执行 Transformer decoding on PaddlePaddle
 
@@ -105,7 +106,7 @@ transformer = FasterTransformer(
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
 ./build/third-party/build/bin/decoding_gemm 32 4 8 64 30000 32 512 0
-python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so
+python ./faster_transformer/sample/decoding_sample.py --config ./faster_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so
 ```
 
 使用 PaddlePaddle 仅执行 decoding 测试（float16）：
@@ -115,7 +116,7 @@ python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml -
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
 ./build/third-party/build/bin/decoding_gemm 32 4 8 64 30000 32 512 1
-python sample/decoding_sample.py --config ./sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so --use_fp16_decoding
+python ./faster_transformer/sample/decoding_sample.py --config ./faster_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so --use_fp16_decoding
 ```
 
 其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。
@@ -151,7 +152,7 @@ gpt = FasterGPT(
 
 目前，GPT-2 的例子仅支持 `batch size` 为 `1` 或是 batch 内输入的序列长度相等的情况。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
 
-更详细的例子可以参考 `./sample/gpt_sample.py`，我们提供了更详细用例。
+更详细的例子可以参考 `./faster_transformer/sample/gpt_sample.py`，我们提供了更详细用例。
 
 #### 执行 GPT-2 decoding on PaddlePaddle
 
@@ -159,7 +160,7 @@ gpt = FasterGPT(
 
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
-python sample/gpt_sample.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/libdecoding_op.so --batch_size 1 --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0
+python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/libdecoding_op.so --batch_size 1 --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0
 ```
 
 其中，各个选项的意义如下：
@@ -253,10 +254,10 @@ cd bin/
 
 #### 执行 GPT decoding on PaddlePaddle
 
-如果需要使用 Paddle Inference 预测库针对 GPT 进行预测，首先，需要导出预测模型，可以通过 `sample/gpt_export_model_sample.py` 脚本获取预测库用模型，执行方式如下所示：
+如果需要使用 Paddle Inference 预测库针对 GPT 进行预测，首先，需要导出预测模型，可以通过 `./faster_transformer/sample/gpt_export_model_sample.py` 脚本获取预测库用模型，执行方式如下所示：
 
 ``` sh
-python sample/gpt_export_model_sample.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/libdecoding_op.so --batch_size 1 --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0 --inference_model_dir ./infer_model/
+python ./faster_transformer/sample/gpt_export_model_sample.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/libdecoding_op.so --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0 --inference_model_dir ./infer_model/
 ```
 
 各个选项的意义与上文的 `gpt_sample.py` 的选项相同。额外新增一个 `--inference_model_dir` 选项用于指定保存的模型文件、词表等文件。若是使用的模型是 gpt2-medium-en，保存之后，`./infer_model/` 目录下组织的结构如下：
