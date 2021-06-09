@@ -36,7 +36,8 @@ def parse_args():
         '--top_k',
         type=int,
         default=5,
-        help='The number of highest probability vocabulary tokens to keep for top-k sampling.'
+        help=
+        'The number of highest probability vocabulary tokens to keep for top-k sampling.'
     )
     parser.add_argument(
         '--temperature',
@@ -62,7 +63,8 @@ def parse_args():
         '--early_stopping',
         type=eval,
         default=False,
-        help='Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.'
+        help=
+        'Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.'
     )
     parser.add_argument(
         '--min_dec_len',
@@ -166,5 +168,5 @@ def main(args, input_text):
 
 if __name__ == "__main__":
     args = parse_args()
-    input_text = '默写古诗: 大漠孤烟直，长河落日圆。\n举杯邀明月，'
+    input_text = '花间一壶酒，独酌无相亲。举杯邀明月，'
     main(args, input_text)
