@@ -75,7 +75,7 @@ def do_train():
                                         args.task_name + ".json")
 
     label_norm_dict = None
-    with open(label_normalize_json) as f:
+    with open(label_normalize_json, 'r', encoding="utf-8") as f:
         label_norm_dict = json.load(f)
 
     convert_example_fn = convert_example if args.task_name != "chid" else convert_chid_example
@@ -203,11 +203,11 @@ def do_train():
 
         dev_accuracy, total_num = evaluate_fn(model, tokenizer, dev_data_loader,
                                               label_norm_dict)
-        print("epoch:{}\tdev_accuracy:{:.3f}\ttotal_num:{}".format(
+        print("epoch:{}, dev_accuracy:{:.3f}, total_num:{}".format(
             epoch, dev_accuracy, total_num))
         test_accuracy, total_num = evaluate_fn(
             model, tokenizer, public_test_data_loader, label_norm_dict)
-        print("epoch:{}\ttest_accuracy:{:.3f}\ttotal_num:{}".format(
+        print("epoch:{}, test_accuracy:{:.3f}, total_num:{}".format(
             epoch, test_accuracy, total_num))
 
         if rank == 0:

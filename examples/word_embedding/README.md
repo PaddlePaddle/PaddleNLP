@@ -2,7 +2,7 @@
 
 ## 简介
 
-PaddleNLP已预置多个公开的预训练Embedding，用户可以通过使用`paddlenlp.embeddings.TokenEmbedding`接口加载预训练Embedding，从而提升训练效果。以下通过基于开源情感倾向分类数据集ChnSentiCorp的文本分类训练例子展示`paddlenlp.embeddings.TokenEmbedding`对训练提升的效果。更多的`paddlenlp.embeddings.TokenEmbedding`用法，请参考[TokenEmbedding 接口使用指南](../../paddlenlp/embeddings/README.md) 。
+PaddleNLP已预置多个公开的预训练Embedding，用户可以通过使用`paddlenlp.embeddings.TokenEmbedding`接口加载预训练Embedding，从而提升训练效果。以下通过基于开源情感倾向分类数据集ChnSentiCorp的文本分类训练例子展示`paddlenlp.embeddings.TokenEmbedding`对训练提升的效果。更多的`paddlenlp.embeddings.TokenEmbedding`用法，请参考[TokenEmbedding 接口使用指南](../../docs/model_zoo/embeddings.md) 。
 
 
 ## 快速开始
@@ -44,7 +44,7 @@ python train.py --device='gpu' \
 
 * `save_dir`: 模型保存目录。默认值为"./checkpoints/"。
 * `init_from_ckpt`: 恢复模型训练的断点路径。默认值为None，表示不恢复训练。
-* `embedding_name`: 预训练Embedding名称，默认为`w2v.baidu_encyclopedia.target.word-word.dim300`. 支持的预训练Embedding可参考[Embedding 模型汇总](../../docs/embeddings.md)。
+* `embedding_name`: 预训练Embedding名称，默认为`w2v.baidu_encyclopedia.target.word-word.dim300`. 支持的预训练Embedding可参考[Embedding 模型汇总](../../docs/model_zoo/embeddings.md)。
 
 **注意：**
 

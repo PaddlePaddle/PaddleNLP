@@ -94,15 +94,18 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds, dev_ds, test_ds = load_dataset(
-        "lcqmc", splits=["train", "dev", "test"])
+    train_ds, dev_ds = load_dataset("lcqmc", splits=["train", "dev"])
 
     train_ds = gen_pair(train_ds)
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        'ernie-1.0')
+    # If you want to use ernie1.0 model, plesace uncomment the following code
+    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained('ernie-1.0')
+    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
+        'ernie-gram-zh')
+    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
+        'ernie-gram-zh')
 
     trans_func_train = partial(
         convert_example,
@@ -138,13 +141,6 @@ def do_train():
     dev_data_loader = create_dataloader(
         dev_ds,
         mode='dev',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn_eval,
-        trans_fn=trans_func_eval)
-
-    test_data_loader = create_dataloader(
-        test_ds,
-        mode='test',
         batch_size=args.batch_size,
         batchify_fn=batchify_fn_eval,
         trans_fn=trans_func_eval)
@@ -205,15 +201,10 @@ def do_train():
                     os.makedirs(save_dir)
 
                 evaluate(model, metric, dev_data_loader, "dev")
-                evaluate(model, metric, test_data_loader, "test")
 
                 save_param_path = os.path.join(save_dir, 'model_state.pdparams')
                 paddle.save(model.state_dict(), save_param_path)
                 tokenizer.save_pretrained(save_dir)
-
-    if rank == 0:
-        print('Evaluating on test data.')
-        evaluate(model, metric, test_data_loader)
 
 
 if __name__ == "__main__":

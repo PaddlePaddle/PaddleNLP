@@ -18,9 +18,12 @@ paddlenlp.transformers
    paddlenlp.transformers.ernie
    paddlenlp.transformers.ernie_ctm
    paddlenlp.transformers.ernie_gen
+   paddlenlp.transformers.ernie_gram
    paddlenlp.transformers.gpt
+   paddlenlp.transformers.nezha
    paddlenlp.transformers.roberta
    paddlenlp.transformers.skep
+   paddlenlp.transformers.tinybert
    paddlenlp.transformers.transformer
    paddlenlp.transformers.unified_transformer
    paddlenlp.transformers.xlnet
@@ -30,6 +33,7 @@ paddlenlp.transformers
    :maxdepth: 4
 
    paddlenlp.transformers.attention_utils
+   paddlenlp.transformers.distill_utils
    paddlenlp.transformers.generation_utils
    paddlenlp.transformers.model_utils
    paddlenlp.transformers.optimization
