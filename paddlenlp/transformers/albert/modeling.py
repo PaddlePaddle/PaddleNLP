@@ -706,9 +706,9 @@ class AlbertPretrainedModel(PretrainedModel):
             "albert-chinese-large":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-large.pdparams",
             "albert-chinese-xlarge":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-large.pdparams",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xlarge.pdparams",
             "albert-chinese-xxlarge":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-large.pdparams",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/albert/albert-chinese-xxlarge.pdparams",
         }
     }
     base_model_prefix = "transformer"
