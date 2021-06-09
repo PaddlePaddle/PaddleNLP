@@ -14,23 +14,23 @@ English | [简体中文](./README.md)
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
+* [2021-06-07] **NLP Live Class** from Baidu has started!🔥🔥🔥 Click [HERE](https://aistudio.baidu.com/aistudio/course/introduce/24177) to join us!
 * [2021-06-04] [ERNIE-Gram](https://arxiv.org/abs/2010.12148) pretrained model has been released! Install v2.0.2 to try it.
 * [2021-05-20] PaddleNLP 2.0 has been officially relealsed! :tada: For more information please refer to [Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.0.0).
 
 ## Introduction
 
-PaddleNLP is a powerful text domain library, which aims to accelerate NLP applications through easy-to-use API, rich application examples, and high performance distributed training. We also provide the NLP best practice based on PaddlePaddle 2.0 API system.
+**PaddleNLP** is a powerful NLP library with **Awesome** pre-trained Transformer models and easy-to-use interface, supporting wide-range of NLP tasks from research to industrial applications. 
 
 
-* **Easy-to-Use and End-to-End API**
-  - The API is fully integrated with PaddlePaddle 2.0 high-level API system. It minimizes the number of user actions required for common use cases like data loading, text pre-processing, transformer model loading, training and deployment, which enables you to deal with text problems more productively.
+* **Easy-to-Use API**
+  - The API is fully integrated with PaddlePaddle 2.0 high-level API system. It minimizes the number of user actions required for common use cases like data loading, text pre-processing, awesome transfomer models, and fast inference, which enables developer to deal with text problems more productively.
 
-* **Rich Application Examples**
-  - Our model zoo covers mainstream NLP applications, including Lexical Analysis, Text Classification, Text Generation, Text Matching, Text Graph, Information Extraction, Machine Translation, General Dialogue and Question Answering etc.
+* **Wide-range NLP Task Support**
+  - PaddleNLP support NLP task from research to industrial applications, including Lexical Analysis, Text Classification, Text Matching, Text Generation, Information Extraction, Machine Translation, General Dialogue and Question Answering etc.
 
 * **High Performance Distributed Training**
-  -  We provide a highly optimized ditributed training implementation for BERT with Fleet API, and mixed precision training strategy based on PaddlePaddle 2.0, it can fully utilize GPU clusters for large-scale model pre-training.
-
+  -  We provide an industrial level training pipeline for super large-scale Transformer model based on **Auto Mixed Precision** and Fleet distributed training API by PaddlePaddle, which can support customized model pre-training efficiently.
 
 ## Installation
 
@@ -39,20 +39,19 @@ PaddleNLP is a powerful text domain library, which aims to accelerate NLP applic
 * python >= 3.6
 * paddlepaddle >= 2.1
 
-More information about PaddlePaddle installation please refer to [PaddlePaddle Installation](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)
+More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html).
 
 ### PIP Installation
 
 ```
-pip install --upgrade paddlenlp -i https://pypi.org/simple
+pip install --upgrade paddlenlp
 ```
 
 ## Easy-to-use API
 
+### Transformer API: Awesome Pre-trained Model Ecosystem
 
-### Transformer API: Powerful Pre-trained Model Ecosystem
-
-We provide 15+ network architecture and 67 pretrained model parameters, not only including all the SOTA pretrained model like ERNIE, PLATO and SKEP released by Baidu, but also most of useful Chinese pretrained model developed by other organizations.
+We provide **15** network architectures and **67** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. We also welcome developer to contribute your Transformer models! 🤗
 
 ```python
 from paddlenlp.transformers import *
@@ -86,9 +85,7 @@ model = ErnieForTokenClassifiation.from_pretrained('ernie-1.0')
 model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
 ```
 
-
 For more pretrained model usage, please refer to [Transformer API](./docs/model_zoo/transformers.rst)
-
 
 
 ### Dataset API: Rich Dataset Integration and Quick Loading
@@ -125,11 +122,11 @@ For more `TokenEmbedding` usage, please refer to [Embedding API](./docs/embeddin
 
 Please find more API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
 
-## Rich Application Examples
+##  Wide-range NLP Task Support
 
 PaddleNLP provide rich application examples covers mainstream NLP task to help developer accelerate problem solving.
 
-### NLP Basic Technique
+### NLP Basic Task
 
 - [Word Embedding](./examples/word_embedding/)
 - [Lexical Analysis](./examples/lexical_analysis/)
@@ -145,7 +142,7 @@ PaddleNLP provide rich application examples covers mainstream NLP task to help d
 - [Semantic Indexing](./examples/semantic_indexing/)
 - [Information Extraction](./examples/information_extraction/)
 
-### NLP Application in Real System
+### NLP Industrial Applications
 
 - [Sentiment Analysis](./examples/sentiment_analysis/skep/):star2:
 - [General Dialogue System](./examples/dialogue/)
@@ -153,7 +150,7 @@ PaddleNLP provide rich application examples covers mainstream NLP task to help d
 - [Simultaneous Translation](././examples/simultaneous_translation/)
 - [Machine Reading Comprehension](./examples/machine_reading_comprehension/)
 
-### Extention Application
+### Extented Application
 
 - [Text Knowledge Linking](./examples/text_to_knowledge/):star2:
 - [Machine Reading Comprehension](./examples/machine_reading_comprehension)
@@ -193,7 +190,7 @@ Join our QQ Technical Group for technical exchange right now! ⬇️
 
 ## ChangeLog
 
-For more information about our release, please refer to [ChangeLog](./docs/changelog.md)
+For more details about our release, please refer to [ChangeLog](./docs/changelog.md)
 
 ## License
 
