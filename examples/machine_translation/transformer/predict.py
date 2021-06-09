@@ -83,7 +83,7 @@ def do_predict(args):
     # Set evaluate mode
     transformer.eval()
 
-    f = open(args.output_file, "w")
+    f = open(args.output_file, "w", encoding="utf-8")
     with paddle.no_grad():
         for (src_word, ) in test_loader:
             # The shape of finished_seq is `[seq_len, batch_size, beam_size]`

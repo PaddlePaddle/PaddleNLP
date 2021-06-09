@@ -54,4 +54,5 @@ class StackModel(nn.Layer):
             past_cache=(past_cache_k, past_cache_v),
             tgt_labels=tgt_labels,
             tgt_pos=tgt_pos)
+        loss = loss.mean()
         return loss
