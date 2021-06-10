@@ -14,24 +14,23 @@ English | [简体中文](./README.md)
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
+* [2021-06-07] **NLP Live Class** from Baidu has started!🔥🔥🔥 Click [HERE](https://aistudio.baidu.com/aistudio/course/introduce/24177) to join us!
 * [2021-06-04] [ERNIE-Gram](https://arxiv.org/abs/2010.12148) pretrained model has been released! Install v2.0.2 to try it.
 * [2021-05-20] PaddleNLP 2.0 has been officially relealsed! :tada: For more information please refer to [Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.0.0).
 
 ## Introduction
 
-PaddleNLP 2.0 aims to accelerate NLP applications through powerful model zoo, easy-to-use API and high performance distributed training. We also provide NLP best practice based on PaddlePaddle 2.0 API system.
+**PaddleNLP** is a powerful NLP library with **Awesome** pre-trained Transformer models and easy-to-use interface, supporting wide-range of NLP tasks from research to industrial applications. 
 
-### Feature
 
-* **Easy-to-Use and End-to-End API**
-  - The API is fully integrated with PaddlePaddle 2.0 high-level API system. It minimizes the number of user actions required for common use cases like data loading, text pre-processing, transformer model loading, training and deployment, which enables you to deal with text problems more productively.
+* **Easy-to-Use API**
+  - The API is fully integrated with PaddlePaddle 2.0 high-level API system. It minimizes the number of user actions required for common use cases like data loading, text pre-processing, awesome transfomer models, and fast inference, which enables developer to deal with text problems more productively.
 
-* **Rich Application Examples**
-  - Our Model Zoo covers mainstream NLP applications, including Lexical Analysis, Text Classification, Text Generation, Text Matching, Text Graph, Information Extraction, Machine Translation, General Dialogue and Question Answering etc.
+* **Wide-range NLP Task Support**
+  - PaddleNLP support NLP task from research to industrial applications, including Lexical Analysis, Text Classification, Text Matching, Text Generation, Information Extraction, Machine Translation, General Dialogue and Question Answering etc.
 
 * **High Performance Distributed Training**
-  -  We provide a highly optimized ditributed training implementation for BERT with Fleet API, and mixed precision training strategy based on PaddlePaddle 2.0, it can fully utilize GPU clusters for large-scale model pre-training.
-
+  -  We provide an industrial level training pipeline for super large-scale Transformer model based on **Auto Mixed Precision** and Fleet distributed training API by PaddlePaddle, which can support customized model pre-training efficiently.
 
 ## Installation
 
@@ -40,17 +39,56 @@ PaddleNLP 2.0 aims to accelerate NLP applications through powerful model zoo, ea
 * python >= 3.6
 * paddlepaddle >= 2.1
 
-More information about PaddlePaddle installation please refer to [PaddlePaddle Install](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)
+More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html).
 
 ### PIP Installation
 
 ```
-pip install --upgrade paddlenlp -i https://pypi.org/simple
+pip install --upgrade paddlenlp
 ```
 
-## Quick Start
+## Easy-to-use API
 
-### Quick Dataset Loading
+### Transformer API: Awesome Pre-trained Model Ecosystem
+
+We provide **15** network architectures and **67** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. We also welcome developer to contribute your Transformer models! 🤗
+
+```python
+from paddlenlp.transformers import *
+
+ernie = ErnieModel.from_pretrained('ernie-1.0')
+ernie_gram = ErnieGramModel.from_pretrained('ernie-gram')
+bert = BertModel.from_pretrained('bert-wwm-chinese')
+albert = AlbertModel.from_pretrained('albert-chinese-tiny')
+roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
+electra = ElectraModel.from_pretrained('chinese-electra-small')
+gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
+```
+
+PaddleNLP also provides unified API experience for NLP task like semantic representation, text classification, sentence matching, sequence labeling, question answering, etc.
+
+```python
+import paddle
+from paddlenlp.transformers import ErnieTokenizer, ErnieModel
+
+tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+text = tokenizer('natural language understanding')
+
+# Semantic Representation
+model = ErnieModel.from_pretrained('ernie-1.0')
+pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
+# Text Classificaiton and Matching
+model = ErnieForSequenceClassifiation.from_pretrained('ernie-1.0')
+# Sequence Labeling
+model = ErnieForTokenClassifiation.from_pretrained('ernie-1.0')
+# Question Answering
+model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
+```
+
+For more pretrained model usage, please refer to [Transformer API](./docs/model_zoo/transformers.rst)
+
+
+### Dataset API: Rich Dataset Integration and Quick Loading
 
 ```python
 from paddlenlp.datasets import load_dataset
@@ -60,10 +98,9 @@ train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev",
 
 For more dataset API usage please refer to [Dataset API](./docs/datasets.md).
 
-### Pre-trained Text Embedding Loading
+### Embedding API: Quick Loading for Word Embedding
 
 ```python
-
 from paddlenlp.embeddings import TokenEmbedding
 
 wordemb = TokenEmbedding("fasttext.wiki-news.target.word-word.dim300.en")
@@ -73,51 +110,23 @@ wordemb.cosine_sim("apple", "rail")
 >>> 0.29207364
 ```
 
-For more `TokenEmbedding` usage, please refer to [Embedding API](./docs/embeddings.md)
-
-### Rich Chinese Pre-trained Models
-
-```python
-from paddlenlp.transformers import *
-
-ernie = ErnieModel.from_pretrained('ernie-1.0')
-bert = BertModel.from_pretrained('bert-wwm-chinese')
-albert = AlbertModel.from_pretrained('albert-chinese-tiny')
-roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
-electra = ElectraModel.from_pretrained('chinese-electra-small')
-gpt = GPTForPretraining.from_pretrained('gpt-cpm-large-cn')
-```
-
-For more pretrained model selection, please refer to [Transformer API](./docs/model_zoo/transformers.rst)
-
-### Extract Feature Through Pre-trained Model
-
-```python
-import paddle
-from paddlenlp.transformers import ErnieTokenizer, ErnieModel
-
-tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
-model = ErnieModel.from_pretrained('ernie-1.0')
-
-text = tokenizer('自然语言处理')
-pooled_output, sequence_output = model.forward(input_ids=paddle.to_tensor([text['input_ids']]))
-```
+For more `TokenEmbedding` usage, please refer to [Embedding API](./docs/model_zoo/embeddings.md)
 
 ### More API Usage
 
 - [Transformer API](./docs/model_zoo/transformers.rst)
 - [Data API](./docs/data.md)
 - [Dataset API](./docs/datasets.md)
-- [Embedding API](./docs/embeddings.md)
+- [Embedding API](./docs/model_zoo/embeddings.md)
 - [Metrics API](./docs/metrics.md)
 
 Please find more API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
 
-## Rich Text Application Examples
+##  Wide-range NLP Task Support
 
 PaddleNLP provide rich application examples covers mainstream NLP task to help developer accelerate problem solving.
 
-### NLP Basic Technique
+### NLP Basic Task
 
 - [Word Embedding](./examples/word_embedding/)
 - [Lexical Analysis](./examples/lexical_analysis/)
@@ -132,9 +141,8 @@ PaddleNLP provide rich application examples covers mainstream NLP task to help d
 - [Text Generation](./examples/text_generation/)
 - [Semantic Indexing](./examples/semantic_indexing/)
 - [Information Extraction](./examples/information_extraction/)
--
 
-### NLP Application in Real System
+### NLP Industrial Applications
 
 - [Sentiment Analysis](./examples/sentiment_analysis/skep/):star2:
 - [General Dialogue System](./examples/dialogue/)
@@ -142,7 +150,7 @@ PaddleNLP provide rich application examples covers mainstream NLP task to help d
 - [Simultaneous Translation](././examples/simultaneous_translation/)
 - [Machine Reading Comprehension](./examples/machine_reading_comprehension/)
 
-### Extention Application
+### Extented Application
 
 - [Text Knowledge Linking](./examples/text_to_knowledge/):star2:
 - [Machine Reading Comprehension](./examples/machine_reading_comprehension)
@@ -182,7 +190,7 @@ Join our QQ Technical Group for technical exchange right now! ⬇️
 
 ## ChangeLog
 
-For more information about our release, please refer to [ChangeLog](./docs/changelog.md)
+For more details about our release, please refer to [ChangeLog](./docs/changelog.md)
 
 ## License
 

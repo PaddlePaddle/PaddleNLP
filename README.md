@@ -14,6 +14,7 @@
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
+* [2021-06-07]《基于深度学习的自然语言处理》直播打卡课正在进行中🔥🔥🔥，快来打卡吧：[https://aistudio.baidu.com/aistudio/course/introduce/24177](https://aistudio.baidu.com/aistudio/course/introduce/24177)
 * [2021-06-04] 新增多粒度语言知识预训练模型[ERNIE-Gram](https://arxiv.org/abs/2010.12148)，多项中文NLP任务取得SOTA成绩，获取2.0.2版本快速体验吧！
 * [2021-05-20] PaddleNLP 2.0正式版已发布！:tada:更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.0.0).
 
@@ -27,7 +28,7 @@ PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本�
 
 
 - **多场景的应用示例**
-  - 提供多粒度多场景的[应用示例](#多场景的应用示例)，涵盖从NLP基础技术、NLP核心技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发提供飞桨2.0框架在文本领域的最佳实践。
+  - 覆盖从学术到工业级的NLP[应用示例](#多场景的应用示例)，涵盖从NLP基础技术、NLP核心技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发提供飞桨2.0框架在文本领域的最佳实践。
 
 
 - **高性能分布式训练**
@@ -43,7 +44,7 @@ PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本�
 ### pip安装
 
 ```
-pip install --upgrade paddlenlp -i https://pypi.org/simple
+pip install --upgrade paddlenlp
 ```
 
 更多关于PaddlePaddle和PaddleNLP安装的详细教程请查看[Installation](./docs/get_started/installation.rst)。
@@ -52,7 +53,7 @@ pip install --upgrade paddlenlp -i https://pypi.org/simple
 
 ### Transformer API: 强大的预训练模型生态底座
 
-覆盖**15**个网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。
+覆盖**15**个网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。也欢迎开发者进预训练模贡献！🤗 
 
 ```python
 from paddlenlp.transformers import *
@@ -75,10 +76,10 @@ from paddlenlp.transformers import ErnieTokenizer, ErnieModel
 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 text = tokenizer('自然语言处理')
 
-# 获取语义表示
+# 语义表示
 model = ErnieModel.from_pretrained('ernie-1.0')
 pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
-# 文本分类/句对匹配
+# 文本分类 & 句对匹配
 model = ErnieForSequenceClassifiation.from_pretrained('ernie-1.0')
 # 序列标注
 model = ErnieForTokenClassifiation.from_pretrained('ernie-1.0')
@@ -114,7 +115,7 @@ wordemb.cosine_sim("艺术", "火车")
 >>> 0.14792643
 ```
 
-内置50+中文词向量，覆盖多种领域语料、如百科、新闻、微博等。更多使用方法请参考[Embedding文档](./examples/word_embedding/README.md)。
+内置50+中文词向量，覆盖多种领域语料、如百科、新闻、微博等。更多使用方法请参考[Embedding文档](./docs/model_zoo/embeddings.md)。
 
 ### 更多API使用文档
 
@@ -134,7 +135,7 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 | :------------  | ---- |
 | [词向量](./examples/word_embedding/) | 利用`TokenEmbedding API`展示如何快速计算词之间语义距离和词的特征提取。 |
 | [词法分析](./examples/lexical_analysis/) | 基于BiGRU-CRF模型实现了分词、词性标注和命名实体识的联合训练任务。 |
-| [语言模型](./examples/language_model/)  | 提供了基于[RNNLM](./exampels/language_model/rnnlm)和[Transformer-XL]((./exampels/language_model/transformer-xl))两种结构的语言模型，支持输入词序列计算其生成概率，可用于表示模型生成句子的流利程度。 |
+| [语言模型](./examples/language_model/)  | 提供了基于[RNNLM](./examples/language_model/rnnlm)和[Transformer-XL](./examples/language_model/transformer-xl)两种结构的语言模型，支持输入词序列计算其生成概率，可用于表示模型生成句子的流利程度。 |
 | [语义解析](./examples/text_to_sql):star: | 语义解析Text-to-SQL任务是让机器自动让自然语言问题转换数据库可操作的SQL查询语句，是实现基于数据库自动问答的核心模块。|
 
 ### NLP 核心技术
