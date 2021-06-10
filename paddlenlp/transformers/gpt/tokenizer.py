@@ -98,9 +98,9 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             model_file,
             max_len=512,
             unk_token='<unk>',
-            bod_token='<bod>',
-            eod_token='<eod>',
-            stop_token='\u2583',  # The token of newline.
+            bos_token='<bod>',
+            eos_token='<eod>',
+            eol_token='\u2583',  # The token of newline.
     ):
         self._model_file = model_file
         if not os.path.isfile(model_file):
@@ -235,8 +235,8 @@ class GPTTokenizer(PretrainedTokenizer):
             max_len=None,
             special_tokens=None,
             pad_token='<|endoftext|>',
-            eod_token='<|endoftext|>',
-            stop_token='\u010a',  # The token of newline.
+            eos_token='<|endoftext|>',
+            eol_token='\u010a',  # The token of newline.
     ):
         self._vocab_file = vocab_file
         self._merges_file = merges_file
