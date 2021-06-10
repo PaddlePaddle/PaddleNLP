@@ -9,7 +9,7 @@
 
 从本地文件创建数据集时，我们 **推荐** 根据本地数据集的格式给出读取function并传入 :func:`load_dataset` 中创建数据集。
 
-以 :obj:`waybill_ie` 快递单信息抽取任务中的数据为例：
+以 `waybill_ie <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/waybill_ie>`__ 快递单信息抽取任务中的数据为例：
 
 .. code-block::
 
@@ -71,8 +71,8 @@
         def __len__(self):
             return len(self.data)
     
-    ds = MyDataset(data_path)      # paddle.io.Dataset
-    new_ds = MapDataset(MyDataset) # paddlenlp.datasets.MapDataset
+    ds = MyDataset(data_path)  # paddle.io.Dataset
+    new_ds = MapDataset(ds)    # paddlenlp.datasets.MapDataset
 
 从其他python对象创建数据集
 -------------------

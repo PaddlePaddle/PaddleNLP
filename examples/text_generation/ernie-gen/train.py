@@ -44,7 +44,6 @@ parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initi
 parser.add_argument("--weight_decay", default=0.1, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
 parser.add_argument("--num_epochs", default=3, type=int, help="Total number of training epochs to perform.", )
-parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_epochs.",)
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion.")
 parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
 parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")

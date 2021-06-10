@@ -95,7 +95,7 @@ tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained('ernie-gram-zh
 # tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext-large')
 
 ```
-更多预训练模型，参考[transformers](../../../docs/model_zoo/transformers.md)
+更多预训练模型，参考[transformers](../../../docs/model_zoo/transformers.rst)
 
 程序运行时将会自动进行训练，评估。同时训练过程中会自动保存模型在指定的`save_dir`中。
 如：

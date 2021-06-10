@@ -44,7 +44,7 @@ def do_eval(args):
     total_pred = 0.0
     seg_acc = 0.0
     tag_acc = 0.0
-    for line in open("./data/eval.txt"):
+    for line in open("./data/eval.txt", encoding='utf8'):
         line = line.strip()
         wl = line.split("\t")
         text = wl[0]
