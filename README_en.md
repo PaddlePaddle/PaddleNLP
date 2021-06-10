@@ -110,7 +110,7 @@ wordemb.cosine_sim("apple", "rail")
 >>> 0.29207364
 ```
 
-For more `TokenEmbedding` usage, please refer to [Embedding API](./docs/embeddings.md)
+For more `TokenEmbedding` usage, please refer to [Embedding API](./docs/model_zoo/embeddings.md)
 
 ### More API Usage
 
