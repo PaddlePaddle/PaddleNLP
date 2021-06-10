@@ -66,9 +66,10 @@ def run_evaluate(data_loader,
             break
 
     average_loss = sum(all_loss) / len(all_loss)
-    logger.info("%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                % (task_name, global_step, epoch, eval_step, average_loss,
-                   iter_steps / (time.time() - local_time)))
+    logger.info(
+        "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s" %
+        (task_name, global_step, epoch, eval_step, average_loss,
+         iter_steps / (time.time() - local_time)))
     log_writer.add_scalar(task_name + "_loss", average_loss, global_step)
 
 
@@ -94,8 +95,9 @@ def do_train(args):
     log_writer_path = os.path.join(
         args.output_dir, "train_log",
         "{}_globalbsz_{}_amp_{}_recompute_{}_card_{}".format(
-            args.model_name_or_path, args.micro_batch_size *
-            topo.data_info.size, False, False, worker_index).lower())
+            args.model_name_or_path,
+            args.micro_batch_size * topo.data_info.size, False, False,
+            worker_index).lower())
     if os.path.exists(log_writer_path):
         import shutil
         shutil.rmtree(log_writer_path)
@@ -155,15 +157,15 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_"
-                not in str(f))
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and
+                "npz_" not in str(f))
         ]
         files.sort()
         num_files = len(files)
         for f_id in range(num_files):
             data_file = files[f_id]
             train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                args, data_file, topo=topo, eod_id=tokenizer.eod_token_id)
+                args, data_file, topo=topo, eos_id=tokenizer.eos_token_id)
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.
             valid_data_loader = valid_data_loader()
@@ -182,8 +184,9 @@ def do_train(args):
                     speed = args.logging_freq / (time.time() - tic_train)
                     logger.info(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.9f"
-                        % (global_step, epoch, step, loss, speed, speed *
-                           default_global_tokens_num, optimizer.get_lr()))
+                        % (global_step, epoch, step, loss, speed,
+                           speed * default_global_tokens_num,
+                           optimizer.get_lr()))
                     log_writer.add_scalar("loss", float(loss), global_step)
                     log_writer.add_scalar("learning_rate",
                                           optimizer.get_lr(), global_step)
@@ -212,9 +215,9 @@ def do_train(args):
                         logger.info("Save model to %s" % output_dir)
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
-                        paddle.save(
-                            optimizer.state_dict(),
-                            os.path.join(output_dir, "model_state.pdopt"))
+                        paddle.save(optimizer.state_dict(),
+                                    os.path.join(output_dir,
+                                                 "model_state.pdopt"))
 
                 if global_step >= args.max_steps:
                     run_evaluate(test_data_loader, model, criterion,

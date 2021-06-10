@@ -49,7 +49,7 @@ class Demo:
         ids = self.tokenizer(text)["input_ids"]
         input_ids = paddle.to_tensor(
             np.array(ids).reshape(1, -1).astype('int64'))
-        out = self.model(input_ids, self.tokenizer.stop_token_id)
+        out = self.model(input_ids, self.tokenizer.eol_token_id)
         out = [int(x) for x in out.numpy().reshape([-1])]
         logger.info(self.tokenizer.convert_ids_to_string(out))
 
