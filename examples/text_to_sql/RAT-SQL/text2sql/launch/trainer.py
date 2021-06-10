@@ -47,15 +47,9 @@ def epoch_train(config, model, optimizer, epoch, train_data, is_debug=False):
     for batch_id, (inputs, labels) in enumerate(train_data(), start=1):
         loss = model(inputs, labels)
 
-        #if trainer_num > 1:
-        #    loss = model.scale_loss(loss)
-        #    loss.backward()
-        #    model.apply_collective_grads()
-        #else:
         loss.backward()
         optimizer.step()
         optimizer.clear_grad()
-        ## trick，这里的 _learning_rate 实际是 scheduler
         if type(optimizer._learning_rate) is not float:
             optimizer._learning_rate.step()
 
