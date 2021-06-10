@@ -167,7 +167,7 @@ def do_train(args):
                 data_file,
                 data_world_size=topo.data_info.size,
                 data_world_rank=topo.data_info.rank,
-                eod_id=tokenizer.eod_token_id)
+                eos_id=tokenizer.eos_token_id)
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.
             valid_data_loader = valid_data_loader()
@@ -216,9 +216,9 @@ def do_train(args):
                         logger.info("Save model to %s" % output_dir)
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
-                        paddle.save(
-                            optimizer.state_dict(),
-                            os.path.join(output_dir, "model_state.pdopt"))
+                        paddle.save(optimizer.state_dict(),
+                                    os.path.join(output_dir,
+                                                 "model_state.pdopt"))
 
                 if global_step >= args.max_steps:
                     run_evaluate(test_data_loader, model, criterion,
