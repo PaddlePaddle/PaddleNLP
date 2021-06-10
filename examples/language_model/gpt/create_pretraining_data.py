@@ -30,7 +30,7 @@ def get_args():
     parser.add_argument(
         '--model_name', type=str, required=True, help='What model to use.')
     parser.add_argument(
-        '--append_eod',
+        '--append_eos',
         action='store_true',
         help='Append an <eod> token to the end of a document.')
     parser.add_argument(
@@ -43,16 +43,16 @@ def get_args():
 
 
 class Converter(object):
-    def __init__(self, model_name, append_eod):
-        self.append_eod = append_eod
+    def __init__(self, model_name, append_eos):
+        self.append_eos = append_eos
         self.tokenizer = GPTTokenizer.from_pretrained(model_name)
-        self.eod_id = self.tokenizer.eod_token_id
+        self.eos_id = self.tokenizer.eos_token_id
         self.vocab_size = len(self.tokenizer)
 
     def encode(self, text):
         tokens = self.tokenizer(text)["input_ids"]
-        if self.append_eod:
-            tokens.append(self.eod_id)
+        if self.append_eos:
+            tokens.append(self.eos_id)
         return tokens, len(tokens)
 
 
@@ -67,7 +67,7 @@ def main():
                 file_paths.append(os.path.join(root, f))
     all_doc_ids = []
     lens = []
-    convert = Converter(args.model_name, args.append_eod)
+    convert = Converter(args.model_name, args.append_eos)
     pool = multiprocessing.Pool(args.workers)
     if convert.vocab_size < 65500:
         save_dtype = np.uint16

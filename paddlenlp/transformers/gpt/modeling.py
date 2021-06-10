@@ -35,6 +35,7 @@ __all__ = [
     'GPTForPretraining',
     'GPTPretrainingCriterion',
     'GPTForGreedyGeneration',
+    'GPTLMHeadModel',
 ]
 
 
@@ -195,11 +196,10 @@ class MultiHeadAttention(nn.Layer):
         # scale dot product attention
         product = layers.matmul(
             x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
+
         if attn_mask is not None:
-            # product = product + attn_mask
-            product = product * attn_mask
-            mask_score = (attn_mask - 1.0) * 10000.0
-            product = product + mask_score
+            product = product + attn_mask
+
         weights = F.softmax(product)
         if self.dropout:
             weights = F.dropout(
@@ -484,6 +484,9 @@ class GPTPretrainedModel(PretrainedModel):
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "eos_token_id": 7,
+            "bos_token_id": 0,
+            "eol_token_id": 3,
         },
         "gpt-cpm-small-cn-distill": { # 109M
             "vocab_size": 30000,
@@ -498,6 +501,9 @@ class GPTPretrainedModel(PretrainedModel):
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "eos_token_id": 7,
+            "bos_token_id": 0,
+            "eol_token_id": 3,
         },
         "gpt3-13B-en": { # 13B
             "vocab_size": 50304,
@@ -511,6 +517,8 @@ class GPTPretrainedModel(PretrainedModel):
             "max_position_embeddings": 1024,
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
         },
         "gpt3-1.3B-en": { # 1.3B
             "vocab_size": 50304,
@@ -524,6 +532,8 @@ class GPTPretrainedModel(PretrainedModel):
             "max_position_embeddings": 1024,
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
         },
         "gpt2-medium-en": { #345M
             "vocab_size": 50304,
@@ -537,6 +547,8 @@ class GPTPretrainedModel(PretrainedModel):
             "max_position_embeddings": 1024,
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
         },
         "gpt2-en": { #117M
             "vocab_size": 50304,
@@ -550,6 +562,8 @@ class GPTPretrainedModel(PretrainedModel):
             "max_position_embeddings": 1024,
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
         },
 
     }
@@ -602,10 +616,19 @@ class GPTModel(GPTPretrainedModel):
                  type_vocab_size=16,
                  initializer_range=0.02,
                  pad_token_id=0,
+                 eos_token_id=7,
+                 bos_token_id=0,
+                 eol_token_id=3,
                  topo=None):
         super(GPTModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
+        self.register_buffer(
+            "bias",
+            paddle.tensor.triu(
+                paddle.ones((max_position_embeddings,
+                             max_position_embeddings)) * -1e9,
+                diagonal=1))
         self.topo = topo
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
@@ -623,8 +646,8 @@ class GPTModel(GPTPretrainedModel):
         for i in range(num_hidden_layers):
             DecoderLayer = TransformerDecoderLayer
             if self.pipline_mode:
-                DecoderLayer = paddlenlp.ops.guard(
-                    f'gpu:{i//self.layer_per_stage}')(TransformerDecoderLayer)
+                DecoderLayer = paddlenlp.ops.guard('gpu:{}'.format(
+                    i // self.layer_per_stage))(TransformerDecoderLayer)
             decoder_layers.append(
                 DecoderLayer(
                     d_model=hidden_size,
@@ -641,8 +664,8 @@ class GPTModel(GPTPretrainedModel):
                     topo=topo))
 
         if self.pipline_mode:
-            Decoder = paddlenlp.ops.guard(f'gpu:{self.topo.pp_info.size-1}')(
-                TransformerDecoder)
+            Decoder = paddlenlp.ops.guard('gpu:{}'.format(
+                self.topo.pp_info.size - 1))(TransformerDecoder)
         else:
             Decoder = TransformerDecoder
 
@@ -663,14 +686,6 @@ class GPTModel(GPTPretrainedModel):
                 use_cache=False,
                 cache=None):
         self.checkpoints = []
-        if attention_mask is None:
-            length = paddle.shape(input_ids)[1]
-            # Use bool mask
-            attention_mask = paddle.tensor.tril(
-                paddle.ones(
-                    (length, length),
-                    dtype=self.embeddings.word_embeddings.weight.dtype))
-
         if position_ids is None:
             past_length = 0
             if cache is not None:
@@ -685,7 +700,12 @@ class GPTModel(GPTPretrainedModel):
                                                          input_ids)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
-
+        causal_mask = self.bias[:paddle.shape(input_ids)[-1], :paddle.shape(
+            input_ids)[-1]]
+        if attention_mask is not None:
+            attention_mask = attention_mask + causal_mask
+        else:
+            attention_mask = causal_mask
         encoder_outputs = self.decoder(
             embedding_output,
             memory=None,
@@ -809,5 +829,87 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
             cur_len += 1
             if paddle.max(nid) == end_id:
                 break
-
         return src_ids
+
+
+class GPTLMHead(nn.Layer):
+    def __init__(self, hidden_size, vocab_size, embedding_weights=None):
+        super(GPTLMHead, self).__init__()
+        self.decoder_weight = self.create_parameter(
+            shape=[hidden_size, vocab_size],
+            dtype=paddle.get_default_dtype(),
+            is_bias=True) if embedding_weights is None else embedding_weights
+
+    def forward(self, hidden_states):
+        logits = paddle.tensor.matmul(
+            hidden_states, self.decoder_weight, transpose_y=True)
+        return logits
+
+
+class GPTLMHeadModel(GPTPretrainedModel):
+    def __init__(self, gpt):
+        super(GPTLMHeadModel, self).__init__()
+        self.gpt = gpt
+        self.lm_head = GPTLMHead(self.gpt.config["hidden_size"],
+                                 self.gpt.config["vocab_size"],
+                                 self.gpt.embeddings.word_embeddings.weight)
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                position_ids=None,
+                attention_mask=None,
+                use_cache=False,
+                cache=None):
+        outputs = self.gpt(input_ids,
+                           position_ids=position_ids,
+                           attention_mask=attention_mask,
+                           use_cache=use_cache,
+                           cache=cache)
+
+        if use_cache:
+            encoder_outputs, cached_kvs = outputs[:2]
+        else:
+            encoder_outputs = outputs
+
+        logits = self.lm_head(encoder_outputs)
+
+        if use_cache:
+            return logits, cached_kvs
+        else:
+            return logits
+
+    def prepare_inputs_for_generation(self,
+                                      input_ids,
+                                      use_cache=False,
+                                      cache=None,
+                                      **kwargs):
+        # only last token for inputs_ids if cache is defined in kwargs
+        position_ids = kwargs.get("position_ids", None)
+        attention_mask = kwargs.get("attention_mask", None)
+        if cache is not None:
+            input_ids = input_ids[:, -1].unsqueeze(-1)
+            if position_ids is not None:
+                position_ids = position_ids[:, -1].unsqueeze(-1)
+            if attention_mask is not None:
+                attention_mask = attention_mask[:, :, -1, :].unsqueeze(2)
+
+        return {
+            "input_ids": input_ids,
+            "position_ids": position_ids,
+            "attention_mask": attention_mask,
+            "use_cache": use_cache,
+            "cache": cache
+        }
+
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError as e:
+            try:
+                return getattr(getattr(self, self.base_model_prefix), name)
+            except AttributeError:
+                try:
+                    return getattr(self, self.base_model_prefix).config[name]
+                except KeyError:
+                    raise e
