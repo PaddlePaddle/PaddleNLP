@@ -1,7 +1,7 @@
 set -x
 export CUDA_VISIBLE_DEVICES=0
 
-python -u run_pretrain.py \
+PYTHONPATH=../../../ python -u run_pretrain.py \
     --model_type "gpt"\
     --model_name_or_path "gpt2-en"\
     --input_dir "./data"\

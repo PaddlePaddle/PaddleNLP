@@ -25,7 +25,7 @@ from paddlenlp.utils.log import logger
 
 def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
                                        num_samples, seq_length, seed,
-                                       worker_index):
+                                       build_data_file):
     """
     documents: document index from 0 to len(docs)
     sizes: the length list of all docs.
@@ -55,8 +55,7 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
     shuffle_idx_filename = _filename + '_shuffle_idx.npy'
 
     # Build the indexed mapping if not exist.
-    # TODO @ZHUI support multi-mechine, worker_index % len(cudas()) == 0
-    if worker_index == 0:
+    if build_data_file:
         if (not os.path.isfile(doc_idx_filename)) or \
            (not os.path.isfile(sample_idx_filename)) or \
            (not os.path.isfile(shuffle_idx_filename)):
@@ -228,19 +227,25 @@ def get_train_valid_test_split_(splits_string, size):
 def create_pretrained_dataset(
         args,
         input_path,
-        topo,
-        eod_id,
+        data_world_rank,
+        data_world_size,
+        eos_id,
         worker_init=None,
         max_seq_len=1024,
         places=None,
         data_holders=None,
         pipeline_mode=False, ):
+    device_world_size = paddle.distributed.get_world_size()
+    device_world_rank = paddle.distributed.get_rank()
+    data_replicas_num = device_world_size // data_world_size
+    assert data_replicas_num * data_world_size == device_world_size, "The device_world_size should be divisible by data_world_size"
+
     logger.info("The distributed run, total device num:{}".format(
-        topo.world.size))
+        device_world_size))
     logger.info("The distributed run, distinct dataflow num:{}".format(
-        topo.data_info.size))
+        data_world_size))
     logger.info("The distributed run, repeat dataflow times:{}".format(
-        topo.data_inner_times))
+        data_replicas_num))
 
     process_datas = np.load(input_path, mmap_mode="r+", allow_pickle=True)
     # All documment ids, extend as 1-D array.
@@ -257,21 +262,21 @@ def create_pretrained_dataset(
     def build_dataset(index, name, num_samples):
         dataset = GPTDataset(
             file_path=input_path,
-            topo=topo,
+            build_data_file=device_world_rank == 0,
             micro_batch_size=args.micro_batch_size,
-            name="gpt" + name,
+            name="gpt_" + name,
             max_seq_len=max_seq_len,
             num_samples=num_samples,
             documents=np.arange(splits[index], splits[index + 1]),
             sample_ids=sample_ids,
             sample_lens=sample_lens,
-            eod_id=eod_id,
+            eos_id=eos_id,
             seed=args.seed)
         batch_sampler = paddle.io.DistributedBatchSampler(
             dataset,
             batch_size=args.micro_batch_size,
-            num_replicas=topo.data_inner_times,
-            rank=topo.data_info.rank,
+            num_replicas=data_replicas_num,
+            rank=data_world_rank,
             shuffle=False,
             drop_last=True)
 
@@ -299,19 +304,18 @@ def create_pretrained_dataset(
         return data_loader
 
     # Note, data should be broardcast to all devices.
-    # for train, valid, test, the distinct data num is topo.data_info.size
-    # data_worldsize * data_inner_times -> topo.world.size
+    # for train, valid, test, the distinct data num is data_world_size
+    # data_world_size * data_replicas_num -> device_world_size
     train_data_loader = build_dataset(0, "train", args.micro_batch_size *
-                                      args.max_steps * topo.data_info.size)
+                                      args.max_steps * data_world_size)
     if pipeline_mode:
         valid_data_loader, test_data_loader = None, None
     else:
-        valid_data_loader = build_dataset(
-            1, "valid",
-            args.micro_batch_size * (args.max_steps // args.eval_freq + 1) *
-            args.eval_iters * topo.data_info.size)
+        valid_data_loader = build_dataset(1, "valid", args.micro_batch_size *
+                                          (args.max_steps // args.eval_freq + 1)
+                                          * args.eval_iters * data_world_size)
         test_data_loader = build_dataset(2, "test", args.micro_batch_size *
-                                         args.test_iters * topo.data_info.size)
+                                         args.test_iters * data_world_size)
 
     return train_data_loader, valid_data_loader, test_data_loader
 
@@ -319,24 +323,22 @@ def create_pretrained_dataset(
 class GPTDataset(paddle.io.Dataset):
     def __init__(self,
                  file_path,
-                 topo,
                  micro_batch_size,
                  num_samples,
-                 eod_id,
+                 eos_id,
                  sample_ids,
                  sample_lens,
                  documents=None,
+                 build_data_file=False,
                  name="gpt",
                  max_seq_len=1024,
-                 mode="train",
                  seed=1234):
         self.file_path = file_path
         self.max_seq_len = max_seq_len
         self.name = name
-        self.eod_id = eod_id
+        self.eos_id = eos_id
         self.sample_ids = sample_ids
         self.sample_lens = sample_lens
-        self.topo = topo
         self.micro_batch_size = micro_batch_size
 
         if documents is None:
@@ -346,7 +348,7 @@ class GPTDataset(paddle.io.Dataset):
 
         self.doc_idx, self.sample_idx, self.shuffle_idx = \
             construct_samples_and_shuffle_data(self.name, self.file_path, document_ids,\
-                self.sample_lens, num_samples, max_seq_len, seed, topo.world.rank)
+                self.sample_lens, num_samples, max_seq_len, seed, build_data_file)
 
         # The doc cumsum start pos
         self.start_pos = [0] + np.cumsum(self.sample_lens).tolist()
@@ -362,9 +364,9 @@ class GPTDataset(paddle.io.Dataset):
         attention_mask = np.tri(seq_length, seq_length).reshape(
             (1, seq_length, seq_length))
 
-        # The pad and eod tokens do not contribute the loss
+        # The pad and eos tokens do not contribute the loss
         loss_mask = np.ones(seq_length, dtype="float32")
-        loss_mask[np.where(np.array(tokens) == self.eod_id)] = 0.0
+        loss_mask[np.where(np.array(tokens) == self.eos_id)] = 0.0
         position_ids = np.arange(0, seq_length, dtype="int64")
 
         # Optional mask method: -INF mask value attention_mask = (attention_mask - 1.0) * 1e9

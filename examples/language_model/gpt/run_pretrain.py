@@ -163,7 +163,11 @@ def do_train(args):
         for f_id in range(num_files):
             data_file = files[f_id]
             train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                args, data_file, topo=topo, eod_id=tokenizer.eod_token_id)
+                args,
+                data_file,
+                data_world_size=topo.data_info.size,
+                data_world_rank=topo.data_info.rank,
+                eod_id=tokenizer.eod_token_id)
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.
             valid_data_loader = valid_data_loader()
