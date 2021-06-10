@@ -472,6 +472,7 @@ class DatasetBuilder:
     def read_datasets(self, splits=None, data_files=None):
         datasets = []
         assert splits or data_files, "`data_files` and `splits` can not both be None."
+        assert splits is None or data_files is None , "Only one of `data_files` and `splits` can be set."
 
         if data_files:
             assert isinstance(data_files, str) or isinstance(
