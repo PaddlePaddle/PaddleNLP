@@ -27,8 +27,11 @@ from .poetry import *
 from .cmrc2018 import *
 from .drcd import *
 from .dureader_robust import *
-from .glue import *
 from .wmt14ende import *
 from .couplet import *
 from .yahoo_answer_100k import *
 from .imdb import *
+from .seabsa16 import *
+from .cote import *
+from .clue import *
+from .nlpcc14_sc import *

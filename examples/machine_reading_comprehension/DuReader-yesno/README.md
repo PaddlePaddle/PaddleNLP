@@ -42,8 +42,8 @@
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run_du.py \
-    --model_type bert \
-    --model_name_or_path bert-base-chinese \
+    --model_type ernie_gram \
+    --model_name_or_path ernie-gram-zh \
     --max_seq_length 384 \
     --batch_size 12 \
     --learning_rate 3e-5 \
@@ -63,7 +63,7 @@ python -m paddle.distributed.launch --gpus "0" run_du.py \
 训练结束后模型会自动对结果进行评估，得到类似如下的输出：
 
 ```text
-accu: 0.861040
+accu: 0.874954
 ```
 评估结束后模型会自动对测试集进行预测，并将可提交的结果生成在`prediction.json`中。
 

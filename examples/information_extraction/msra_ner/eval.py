@@ -79,10 +79,10 @@ def do_eval(args):
         max_seq_len=args.max_seq_length)
     ignore_label = -100
     batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        'seq_len': Stack(),
-        'labels': Pad(axis=0, pad_val=ignore_label)  # label
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),  # segment
+        'seq_len': Stack(dtype='int64'),
+        'labels': Pad(axis=0, pad_val=ignore_label, dtype='int64')  # label
     }): fn(samples)
     eval_ds = eval_ds.map(trans_func)
     eval_data_loader = DataLoader(
@@ -111,7 +111,7 @@ def do_eval(args):
         avg_loss = paddle.mean(loss)
         preds = logits.argmax(axis=2)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            None, length, preds, labels)
+            length, preds, labels)
         metric.update(num_infer_chunks.numpy(),
                       num_label_chunks.numpy(), num_correct_chunks.numpy())
         precision, recall, f1_score = metric.accumulate()

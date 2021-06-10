@@ -62,7 +62,7 @@ def evaluate(model, loss_fct, metric, data_loader, label_num):
         avg_loss = paddle.mean(loss)
         preds = logits.argmax(axis=2)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            None, length, preds, labels)
+            length, preds, labels)
         metric.update(num_infer_chunks.numpy(),
                       num_label_chunks.numpy(), num_correct_chunks.numpy())
         precision, recall, f1_score = metric.accumulate()
@@ -116,10 +116,10 @@ def do_train(args):
     ignore_label = -100
 
     batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        'seq_len': Stack(),  # seq_len
-        'labels': Pad(axis=0, pad_val=ignore_label)  # label
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),  # segment
+        'seq_len': Stack(dtype='int64'),  # seq_len
+        'labels': Pad(axis=0, pad_val=ignore_label, dtype='int64')  # label
     }): fn(samples)
 
     train_batch_sampler = paddle.io.DistributedBatchSampler(

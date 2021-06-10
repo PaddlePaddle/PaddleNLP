@@ -12,7 +12,7 @@
 
 .. code-block::
 
-    >>> pip install --upgrade paddlenlp>=2.0.0rc -i https://pypi.org/simple
+    >>> pip install --upgrade paddlenlp -i https://pypi.org/simple
 
 2. 一键加载预训练模型
 ========

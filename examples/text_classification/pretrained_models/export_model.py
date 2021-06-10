@@ -30,7 +30,6 @@ args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-
     # The number of labels should be in accordance with the training dataset.
     label_map = {0: 'negative', 1: 'positive'}
     model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(

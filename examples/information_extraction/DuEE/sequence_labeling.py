@@ -161,10 +161,10 @@ def do_train():
         ignore_label=ignore_label,
         is_test=False)
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]), # input ids
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]), # token type ids
-        Stack(), # sequence lens
-        Pad(axis=0, pad_val=ignore_label) # labels
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'), # input ids
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'), # token type ids
+        Stack(dtype='int64'), # sequence lens
+        Pad(axis=0, pad_val=ignore_label, dtype='int64') # labels
     ): fn(list(map(trans_func, samples)))
 
     batch_sampler = paddle.io.DistributedBatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
@@ -229,13 +229,13 @@ def do_train():
 def do_predict():
     paddle.set_device(args.device)
 
-    no_entity_label = "O"
-    ignore_label = -1
-
     tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
     model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+
+    no_entity_label = "O"
+    ignore_label = len(label_map)
 
     print("============start predict==========")
     if not args.init_ckpt or not os.path.isfile(args.init_ckpt):
@@ -257,9 +257,9 @@ def do_predict():
         encoded_inputs_list.append((input_ids, token_type_ids, seq_len))
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]), # input_ids
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]), # token_type_ids
-        Stack() # sequence lens
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'), # input_ids
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'), # token_type_ids
+        Stack(dtype='int64') # sequence lens
     ): fn(samples)
     # Seperates data into some batches.
     batch_encoded_inputs = [encoded_inputs_list[i: i + args.batch_size]

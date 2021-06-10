@@ -7,9 +7,9 @@ from pprint import pprint
 from attrdict import AttrDict
 
 import paddle
+from paddlenlp.ops import TransformerGenerator
 
 import reader
-from paddlenlp.transformers import InferTransformerModel, position_encoding_init
 
 
 def parse_args():
@@ -19,6 +19,11 @@ def parse_args():
         default="./configs/transformer.big.yaml",
         type=str,
         help="Path of the config file. ")
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+    )
     args = parser.parse_args()
     return args
 
@@ -40,8 +45,8 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 
 
 def do_predict(args):
-    if args.use_gpu:
-        place = "gpu:0"
+    if args.device == "gpu":
+        place = "gpu"
     else:
         place = "cpu"
 
@@ -51,7 +56,9 @@ def do_predict(args):
     test_loader, to_tokens = reader.create_infer_loader(args)
 
     # Define model
-    transformer = InferTransformerModel(
+    # `TransformerGenerator` automatically chioces using `FasterTransformer`
+    # (with jit building) or the slower verison `InferTransformerModel`.
+    transformer = TransformerGenerator(
         src_vocab_size=args.src_vocab_size,
         trg_vocab_size=args.trg_vocab_size,
         max_length=args.max_length + 1,
@@ -70,25 +77,19 @@ def do_predict(args):
     assert args.init_from_params, (
         "Please set init_from_params to load the infer model.")
 
-    model_dict = paddle.load(
+    transformer.load(
         os.path.join(args.init_from_params, "transformer.pdparams"))
-
-    # To avoid a longer length than training, reset the size of position
-    # encoding to max_length
-    model_dict["encoder.pos_encoder.weight"] = position_encoding_init(
-        args.max_length + 1, args.d_model)
-    model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
-        args.max_length + 1, args.d_model)
-    transformer.load_dict(model_dict)
 
     # Set evaluate mode
     transformer.eval()
 
-    f = open(args.output_file, "w")
+    f = open(args.output_file, "w", encoding="utf-8")
     with paddle.no_grad():
         for (src_word, ) in test_loader:
+            # The shape of finished_seq is `[seq_len, batch_size, beam_size]`
+            # when `output_time_major` argument is `True` for TransformerGenerator.
             finished_seq = transformer(src_word=src_word)
-            finished_seq = finished_seq.numpy().transpose([0, 2, 1])
+            finished_seq = finished_seq.numpy().transpose([1, 2, 0])
             for ins in finished_seq:
                 for beam_idx, beam in enumerate(ins):
                     if beam_idx >= args.n_best:
@@ -105,5 +106,6 @@ if __name__ == "__main__":
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
+    args.benchmark = ARGS.benchmark
 
     do_predict(args)

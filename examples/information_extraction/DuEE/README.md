@@ -36,7 +36,7 @@ DuEE/
 ## 篇章级事件抽取基线
 
 篇章级事件抽取数据集（DuEE-Fin）是金融领域篇章级别事件抽取数据集，
-共包含13个已定义好的事件类型约束和1.15万中文篇章（存在部分非目标篇章作为负样例），其中6900训练集，1150验证集和3450测试集，数据集下载[地址]() 。
+共包含13个已定义好的事件类型约束和1.15万中文篇章（存在部分非目标篇章作为负样例），其中6900训练集，1150验证集和3450测试集，数据集下载[地址](https://aistudio.baidu.com/aistudio/competition/detail/65) 。
 在该数据集上基线采用基于[ERNIE](https://github.com/PaddlePaddle/ERNIE)的序列标注（sequence labeling）方案，分为基于序列标注的触发词抽取模型、基于序列标注的论元抽取模型和枚举属性分类模型，属于PipeLine模型；基于序列标注的触发词抽取模型采用BIO方式，识别触发词的位置以及对应的事件类型，基于序列标注的论元抽取模型采用BIO方式识别出事件中的论元以及对应的论元角色；枚举属性分类模型采用ernie进行分类。
 
 ### 评测方法
@@ -213,7 +213,7 @@ f1_score = (2 * P * R) / (P + R)，其中
 ## 进阶优化基线效果
 
 基线采用的预训练模型为ERNIE，PaddleNLP提供了丰富的预训练模型，如BERT，RoBERTa，Electra，XLNet等
-参考[PaddleNLP预训练模型介绍](../../../docs/transformers.md)
+参考[PaddleNLP预训练模型介绍](../../../docs/model_zoo/transformers.rst)
 
 如可以选择RoBERTa large中文模型优化模型效果，只需更换模型和tokenizer即可无缝衔接。
 
