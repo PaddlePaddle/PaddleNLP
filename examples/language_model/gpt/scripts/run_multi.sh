@@ -4,7 +4,7 @@ task_name="gpt-dygraph"
 rm -rf output/$task_name/log
 
 unset CUDA_VISIBLE_DEVICES
-PYTHONPATH=../../../ python -m paddle.distributed.launch \
+python -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
     --log_dir "output/$task_name/log"  run_pretrain.py \
     --model_type "gpt" \

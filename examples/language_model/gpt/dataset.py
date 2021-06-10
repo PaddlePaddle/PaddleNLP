@@ -237,15 +237,11 @@ def create_pretrained_dataset(
         pipeline_mode=False, ):
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
-    data_replicas_num = device_world_size // data_world_size
-    assert data_replicas_num * data_world_size == device_world_size, "The device_world_size should be divisible by data_world_size"
 
     logger.info("The distributed run, total device num:{}".format(
         device_world_size))
     logger.info("The distributed run, distinct dataflow num:{}".format(
         data_world_size))
-    logger.info("The distributed run, repeat dataflow times:{}".format(
-        data_replicas_num))
 
     process_datas = np.load(input_path, mmap_mode="r+", allow_pickle=True)
     # All documment ids, extend as 1-D array.
@@ -275,7 +271,7 @@ def create_pretrained_dataset(
         batch_sampler = paddle.io.DistributedBatchSampler(
             dataset,
             batch_size=args.micro_batch_size,
-            num_replicas=data_replicas_num,
+            num_replicas=data_world_size,
             rank=data_world_rank,
             shuffle=False,
             drop_last=True)
@@ -305,7 +301,6 @@ def create_pretrained_dataset(
 
     # Note, data should be broardcast to all devices.
     # for train, valid, test, the distinct data num is data_world_size
-    # data_world_size * data_replicas_num -> device_world_size
     train_data_loader = build_dataset(0, "train", args.micro_batch_size *
                                       args.max_steps * data_world_size)
     if pipeline_mode:
@@ -353,7 +348,7 @@ class GPTDataset(paddle.io.Dataset):
         # The doc cumsum start pos
         self.start_pos = [0] + np.cumsum(self.sample_lens).tolist()
 
-        self._length = self.sample_idx.shape[0] - 1
+        self._length = self.sample_idx.shape[0]
 
     def _construct_sample(self, tokens):
         tokens = np.array(tokens).astype("int64").tolist()
