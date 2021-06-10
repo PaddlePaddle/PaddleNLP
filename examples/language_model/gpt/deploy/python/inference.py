@@ -121,7 +121,9 @@ def main():
     ] for text in ds]
     outs = predictor.predict(dataset)
     for res in outs:
-        print(tokenizer.convert_ids_to_string(list(res[0].reshape([-1]))))
+        res_ids = list(res[0].reshape([-1]))
+        res_ids = [int(x) for x in res_ids]
+        print(tokenizer.convert_ids_to_string(res_ids))
 
 
 if __name__ == "__main__":
