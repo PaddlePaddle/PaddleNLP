@@ -30,7 +30,7 @@ STACL 主要具有以下优势：
 Wait-k策略首先等待源句单词，然后与源句的其余部分同时翻译，即输出总是隐藏在输入后面。这是受到同声传译人员的启发，同声传译人员通常会在几秒钟内开始翻译演讲者的演讲，在演讲者结束几秒钟后完成。例如，如果k=2，第一个目标词使用前2个源词预测，第二个目标词使用前3个源词预测，以此类推。下图3中，(a)simultaneous: our wait-2 等到"布什"和"总统"输入后就开始解码预测"pres."，而(b) non-simultaneous baseline 为传统的翻译模型，需要等到整句"布什 总统 在 莫斯科 与 普京 会晤"才开始解码预测。
 <p align="center">
 <img src="images/example.png" height=100 hspace='10'/> <br />
-图 3. Wait-k 例子
+图 2. Wait-k 例子
 </p>
 
 ## 环境依赖
@@ -143,7 +143,15 @@ perl mosesdecoder/scripts/generic/multi-bleu.perl newstest2017.tok.en < predict.
 词表下载：[source vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.20k.zh.vocab) ，[target vocab](https://paddlenlp.bj.bcebos.com/models/stacl/nist.10k.en.vocab)
 
 ## Demo展示
-通过GUI界面的Demo来模拟STACL实时翻译的效果，可查看[demo](./demo)
+通过GUI界面的Demo来模拟STACL实时翻译的效果，下图为Demo示例，实现细节可查看[demo](./demo)
+<p align="center">
+<img src="demo/images/text_demo_show.gif" height=350 hspace='10'/> <br />
+图 3. 文本同传
+</p>
+<p align="center">
+<img src="demo/images/speech_demo_show.gif" height=350 hspace='10'/> <br />
+图 4. 语音同传
+</p>
 
 ## 参考文献
 1. Vaswani A, Shazeer N, Parmar N, et al. [Attention is all you need](http://papers.nips.cc/paper/7181-attention-is-all-you-need.pdf)[C]//Advances in Neural Information Processing Systems. 2017: 6000-6010.
