@@ -15,6 +15,7 @@
 import collections
 import io
 import json
+import numpy as np
 import os
 import warnings
 
@@ -171,7 +172,8 @@ class Vocab(object):
         Maps the input indices to token list.
 
         Args:
-            indices (int|list[int]|tuple[int]): The input indice(s) for mapping.
+            indices (int|list[int]|tuple[int]|numpy.ndarray): The input indice(s) for mapping.
+            Must be an `int` or 1D `list[int]`|`tuple[int]`|`numpy.ndarray`.
 
         Returns:
             str|list[str]: Obtained token(s). If `indices` is an integer, it 
@@ -195,9 +197,16 @@ class Vocab(object):
                 # ['[PAD]', '[UNK]', '一斤三', '意面屋']
         """
         to_reduce = False
-        if not isinstance(indices, (list, tuple)):
+        if not isinstance(indices, (list, tuple, np.ndarray)):
             indices = [indices]
             to_reduce = True
+        elif isinstance(indices, (list, tuple)):
+            indices = np.asarray(indices)
+
+        if len(indices.shape) > 1:
+            raise ValueError(
+                'Token indices is invalid. Expected 1D array, but received {}D array. '.
+                format(len(indices.shape)))
 
         max_idx = len(self._idx_to_token) - 1
 

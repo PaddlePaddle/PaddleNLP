@@ -116,8 +116,8 @@ def dist_optimizer(args, topo):
 def get_train_data_file(args):
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and
-            "npz_" not in str(f))
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_" not in
+            str(f))
     ]
 
     data_file = files[0]
@@ -228,7 +228,8 @@ def do_train(args):
                 train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
                     args,
                     data_file,
-                    topo,
+                    data_world_size=topo.data_info.size,
+                    data_world_rank=topo.data_info.rank,
                     eos_id=eos_id,
                     max_seq_len=args.max_seq_len,
                     places=paddle.static.cuda_places(),
