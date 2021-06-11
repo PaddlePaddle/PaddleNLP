@@ -70,7 +70,7 @@ class MultiHeadAttention(nn.Layer):
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
-        if topo is None or toppo.mp.size == 1:
+        if topo is None or topo.mp_info.size == 1:
             self.q_proj = nn.Linear(
                 embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
             self.k_proj = nn.Linear(
@@ -80,25 +80,31 @@ class MultiHeadAttention(nn.Layer):
             self.out_proj = nn.Linear(
                 embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
         else:
+            assert self.head_dim % topo.mp_info.size == 0
+            self.head_dim = self.head_dim // topo.mp_info.size
             self.q_proj = paddlenlp.ops.ColumnParallelLiner(
                 (embed_dim, embed_dim),
                 topo.mp_info.size,
-                weight_attr,
+                gather_out=False,
+                param_attr=weight_attr,
                 bias_attr=bias_attr)
             self.k_proj = paddlenlp.ops.ColumnParallelLiner(
                 (self.kdim, embed_dim),
                 topo.mp_info.size,
-                weight_attr,
+                gather_out=False,
+                param_attr=weight_attr,
                 bias_attr=bias_attr)
             self.v_proj = paddlenlp.ops.ColumnParallelLiner(
                 (self.vdim, embed_dim),
                 topo.mp_info.size,
-                weight_attr,
+                gather_out=False,
+                param_attr=weight_attr,
                 bias_attr=bias_attr)
             self.out_proj = paddlenlp.ops.RowParallelLiner(
                 (embed_dim, embed_dim),
                 topo.mp_info.size,
-                weight_attr,
+                input_is_parallel=True,
+                param_attr=weight_attr,
                 bias_attr=bias_attr)
 
     def _prepare_qkv(self, query, key, value, use_cache=False, cache=None):
@@ -196,10 +202,10 @@ class MultiHeadAttention(nn.Layer):
         product = layers.matmul(
             x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
         if attn_mask is not None:
-            # product = product + attn_mask
-            product = product * attn_mask
-            mask_score = (attn_mask - 1.0) * 10000.0
-            product = product + mask_score
+            product = product + attn_mask
+            #product = product * attn_mask
+            #mask_score = (attn_mask - 1.0) * 10000.0
+            #product = product + mask_score
         weights = F.softmax(product)
         if self.dropout:
             weights = F.dropout(
@@ -343,7 +349,8 @@ class TransformerDecoderLayer(nn.Layer):
             nhead,
             dropout=attn_dropout,
             weight_attr=weight_attrs[0],
-            bias_attr=bias_attrs[0])
+            bias_attr=bias_attrs[0],
+            topo=topo)
 
         if topo is None or topo.mp_info.size == 1:
             self.linear1 = nn.Linear(
@@ -360,12 +367,14 @@ class TransformerDecoderLayer(nn.Layer):
             self.linear1 = paddlenlp.ops.ColumnParallelLiner(
                 (d_model, dim_feedforward),
                 topo.mp_info.size,
-                weight_attrs[2],
+                gather_out=False,
+                param_attr=weight_attrs[2],
                 bias_attr=bias_attrs[2])
             self.linear2 = paddlenlp.ops.RowParallelLiner(
                 (dim_feedforward, d_model),
                 topo.mp_info.size,
-                weight_attrs[2],
+                input_is_parallel=True,
+                param_attr=weight_attrs[2],
                 bias_attr=bias_attrs[2])
 
         self.norm1 = nn.LayerNorm(d_model, epsilon=1e-5)
@@ -422,6 +431,7 @@ class GPTEmbeddings(nn.Layer):
                  initializer_range=0.02,
                  topo=None):
         super(GPTEmbeddings, self).__init__()
+        #if True:
         if topo is None or topo.mp_info.size == 1:
             self.word_embeddings = nn.Embedding(
                 vocab_size,

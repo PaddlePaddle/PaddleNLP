@@ -82,6 +82,8 @@ def dist_optimizer(args, topo):
     dist_strategy.recompute = args.use_recompute
     dist_strategy.pipeline = args.pp_degree > 1
 
+    #dist_strategy.without_graph_optimization = True
+
     if args.use_amp:
         dist_strategy.amp = True
         dist_strategy.amp_configs = {
@@ -265,7 +267,8 @@ def do_train(args):
                 if not any(nd in n for nd in ["bias", "norm"])
             ]
             # TODO @ZHUI Use paddle.optimizer.AdamW
-            if ops.optimizer._jit_compile():
+            #if ops.optimizer._jit_compile():
+            if False:
                 optimizer = ops.optimizer.AdamwOptimizer(
                     learning_rate=lr_scheduler,
                     beta1=args.adam_beta1,

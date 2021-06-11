@@ -115,6 +115,7 @@ class ParallelLinear(nn.Layer):
                  size,
                  axis,
                  num_partitions=1,
+                 input_is_parallel=False,
                  gather_out=True,
                  param_attr=None,
                  bias_attr=None,
@@ -132,6 +133,8 @@ class ParallelLinear(nn.Layer):
 
         # rank within a model parallel group
         inner_rank = rank % num_partitions
+        self.gather_out = gather_out
+        self.input_is_parallel = input_is_parallel
         self.axis = axis
         if axis == 0:
             assert size[0] % num_partitions == 0, (
@@ -154,8 +157,6 @@ class ParallelLinear(nn.Layer):
 
         num_rows, num_cols = linear_size
 
-        self.gather_out = gather_out
-        self.axis = axis
         if not name:
             name = "fc_by_row_rank_%d" % inner_rank if axis == 0 else "fc_by_col_rank_%d" % inner_rank
         else:
@@ -164,7 +165,8 @@ class ParallelLinear(nn.Layer):
             num_rows,
             num_cols,
             weight_attr=param_attr,
-            bias_attr=bias_attr,
+            # NOTE(wangxi): row split, bias need add after allreduce
+            bias_attr=bias_attr if axis == 1 else False,
             name=name)
 
         weight = self.linear.weight
@@ -183,30 +185,56 @@ class ParallelLinear(nn.Layer):
             startup_block.vars[self.linear.bias.name].is_distributed = True
             main_block.vars[self.linear.bias.name].is_distributed = True
 
-    def forward(self, x):
-        if self.axis == 0:
-            assert x.shape[-1] == self.per_part_size, (
-                "The width ({}) of the input "
-                "x must be equal to the height ({}) of the weight. Maybe you "
-                "should split the input x using paddle.split.".format(
-                    x.shape[-1], self.per_part_size))
+        if axis == 0 and bias_attr is not False:
+            self.bias = self.create_parameter(
+                shape=[num_cols],
+                attr=bias_attr,
+                dtype=self._dtype,
+                is_bias=True
+            )
+        else:
+            self.bias = None
 
-        linear_out = self.linear(x)
-        if self.gather_out:
-            if self.axis == 0:
-                paddle.distributed.all_reduce(linear_out)
+    def forward(self, x):
+        # TODO(wangxi): dynamic group
+        group = None
+        if self.axis == 0:
+            if self.input_is_parallel:
+                assert x.shape[-1] == self.per_part_size, (
+                    "The width ({}) of the input "
+                    "x must be equal to the height ({}) of the weight. Maybe you "
+                    "should split the input x using paddle.split.".format(
+                        x.shape[-1], self.per_part_size))
             else:
-                output = []
-                paddle.distributed.all_gather(output, linear_out)
-                linear_out = paddle.concat(
-                    output, axis=len(linear_out.shape) - 1)
-        return linear_out
+                # split last dim
+                # TODO(wangxi): dynamic group
+                x = paddle.distributed.collective._c_split(x, group=group)
+            output_parallel = self.linear(x)
+            output = paddle.distributed.collective._mp_allreduce(
+                output_parallel,
+                group=group,
+                use_calc_stream=True,
+                use_model_parallel=True)
+            output = output + self.bias if self.bias is not None else output
+            return output
+        else:
+            # TODO(wangxi): dynamic group
+            x = paddle.distributed.collective._c_identity(
+                x, group=group)
+            output_parallel = self.linear(x)
+            if self.gather_out is False:
+                return output_parallel
+
+            # TODO(wangxi): dynamic group
+            return paddle.distributed.collective._concat(
+                output_parallel, group=group)
 
 
 class ColumnParallelLiner(ParallelLinear):
     def __init__(self,
                  size,
                  num_partitions,
+                 gather_out=False,
                  param_attr=None,
                  bias_attr=None,
                  name=None):
@@ -214,7 +242,7 @@ class ColumnParallelLiner(ParallelLinear):
             size,
             axis=1,
             num_partitions=num_partitions,
-            gather_out=False,
+            gather_out=gather_out,
             param_attr=param_attr,
             bias_attr=bias_attr)
 
@@ -223,6 +251,7 @@ class RowParallelLiner(ParallelLinear):
     def __init__(self,
                  size,
                  num_partitions,
+                 input_is_parallel=False,
                  param_attr=None,
                  bias_attr=None,
                  name=None):
@@ -231,5 +260,6 @@ class RowParallelLiner(ParallelLinear):
             axis=0,
             num_partitions=num_partitions,
             gather_out=True,
+            input_is_parallel=input_is_parallel,
             param_attr=param_attr,
             bias_attr=bias_attr)
