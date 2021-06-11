@@ -68,7 +68,8 @@ def dist_optimizer(args, topo):
 
     bsz_per_dp = args.global_batch_size // topo.data_info.size
     micro_batch_size = args.micro_batch_size
-    assert args.global_batch_size % micro_batch_size == 0, f"cannot do gradient accumulate, global_batch_size: {args.global_batch_size} micro_batch_size: {micro_batch_size}"
+    assert args.global_batch_size % micro_batch_size == 0, "cannot do gradient accumulate, global_batch_size: {} micro_batch_size: {}".format(
+        args.global_batch_size, micro_batch_size)
     acc_steps = bsz_per_dp // micro_batch_size
 
     exec_strategy = paddle.fluid.ExecutionStrategy()
@@ -106,7 +107,8 @@ def dist_optimizer(args, topo):
             "accumulate_steps": acc_steps,
         }
     else:
-        assert acc_steps == 1, f"Only support accumulate steps in piplinemode. Please set you global_batch_size={default_global_batch_size}"
+        assert acc_steps == 1, "Only support accumulate steps in piplinemode. Please set you global_batch_size={}".format(
+            default_global_batch_size)
 
     return dist_strategy
 
@@ -184,7 +186,7 @@ def do_train(args):
         sharding_degree=args.sharding_degree,
         mp_degree=args.mp_degree)
 
-    logger.info(f"The topo of hybrid parallelism:\n{topo}")
+    logger.info("The topo of hybrid parallelism:\n{}".format(topo))
 
     dist_strategy = dist_optimizer(args, topo)
 
@@ -215,7 +217,7 @@ def do_train(args):
                 model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
                 tokenizer = tokenizer_class.from_pretrained(
                     args.model_name_or_path)
-                eod_id = tokenizer.eod_token_id
+                eos_id = tokenizer.eos_token_id
                 model_config = model_class.pretrained_init_configuration[
                     args.model_name_or_path]
                 if model_config["vocab_size"] % 8 != 0:
@@ -226,8 +228,9 @@ def do_train(args):
                 train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
                     args,
                     data_file,
-                    topo,
-                    eod_id=eod_id,
+                    data_world_size=topo.data_info.size,
+                    data_world_rank=topo.data_info.rank,
+                    eos_id=eos_id,
                     max_seq_len=args.max_seq_len,
                     places=paddle.static.cuda_places(),
                     data_holders=data_holders,
