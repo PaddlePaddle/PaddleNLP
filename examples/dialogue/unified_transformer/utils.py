@@ -192,7 +192,7 @@ def select_response(ids,
                     max_dec_len=None,
                     num_return_sequences=1,
                     keep_space=True):
-    ids = ids.numpy().tolist()
+    ids = ids.numpy()
     scores = scores.numpy()
 
     if len(ids) != len(scores) or (len(ids) % num_return_sequences) != 0:
