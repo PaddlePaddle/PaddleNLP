@@ -28,7 +28,7 @@
     >>> print(type(train_ds))
     <class 'paddlenlp.datasets.dataset.IterDataset'>
 
-关于 :class:`MapDataset` 和 :class:`IterDataset` 功能和异同可以参考***。
+关于 :class:`MapDataset` 和 :class:`IterDataset` 功能和异同可以参考API文档 :doc:`datasets <../source/paddlenlp.datasets.dataset>`。
 
 选择子数据集
 ^^^^^^^^^^^^^^^^^^^^^^^
