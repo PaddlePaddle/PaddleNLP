@@ -238,10 +238,9 @@ def create_pretrained_dataset(
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
 
-    logger.info("The distributed run, total device num:{}".format(
-        device_world_size))
-    logger.info("The distributed run, distinct dataflow num:{}".format(
-        data_world_size))
+    logger.info(
+        "The distributed run, total device num:{}, distinct dataflow num:{}.".
+        format(device_world_size, data_world_size))
 
     process_datas = np.load(input_path, mmap_mode="r+", allow_pickle=True)
     # All documment ids, extend as 1-D array.
@@ -348,8 +347,6 @@ class GPTDataset(paddle.io.Dataset):
         # The doc cumsum start pos
         self.start_pos = [0] + np.cumsum(self.sample_lens).tolist()
 
-        self._length = self.sample_idx.shape[0]
-
     def _construct_sample(self, tokens):
         tokens = np.array(tokens).astype("int64").tolist()
         labels = tokens[1:]
@@ -412,4 +409,4 @@ class GPTDataset(paddle.io.Dataset):
         return self._construct_sample(tokens)
 
     def __len__(self):
-        return self._length
+        return self.sample_idx.shape[0] - 1
