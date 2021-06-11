@@ -113,7 +113,7 @@ def main():
             "问题：中国的首都是哪里？答案：",
             "问题：世界上最高的山峰是? 答案：",
         ]
-    end_id = tokenizer.stop_token_id
+    end_id = tokenizer.eol_token_id
 
     dataset = [[
         np.array(tokenizer(text)["input_ids"]).astype("int64").reshape([1, -1]),
@@ -121,7 +121,9 @@ def main():
     ] for text in ds]
     outs = predictor.predict(dataset)
     for res in outs:
-        print(tokenizer.convert_ids_to_string(list(res[0].reshape([-1]))))
+        res_ids = list(res[0].reshape([-1]))
+        res_ids = [int(x) for x in res_ids]
+        print(tokenizer.convert_ids_to_string(res_ids))
 
 
 if __name__ == "__main__":

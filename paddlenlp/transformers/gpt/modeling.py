@@ -623,12 +623,6 @@ class GPTModel(GPTPretrainedModel):
         super(GPTModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        self.register_buffer(
-            "bias",
-            paddle.tensor.triu(
-                paddle.ones((max_position_embeddings,
-                             max_position_embeddings)) * -1e9,
-                diagonal=1))
         self.topo = topo
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
@@ -700,8 +694,13 @@ class GPTModel(GPTPretrainedModel):
                                                          input_ids)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
-        causal_mask = self.bias[:paddle.shape(input_ids)[-1], :paddle.shape(
-            input_ids)[-1]]
+
+        # TODO, use registered buffer
+        causal_mask = paddle.tensor.triu(
+            paddle.ones((paddle.shape(input_ids)[-1],
+                         paddle.shape(input_ids)[-1])) * -1e9,
+            diagonal=1)
+
         if attention_mask is not None:
             attention_mask = attention_mask + causal_mask
         else:
