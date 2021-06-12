@@ -25,9 +25,9 @@ __all__ = ['PAWS']
 
 class PAWS(DatasetBuilder):
     """
-    PAWS-X: Paraphrase Adversaries from Word Scrambling
+    PAWS-X: A Cross-lingual Adversarial Dataset for Paraphrase Identification
     More information please refer to `https://arxiv.org/abs/1908.11828`
-
+    Here we only store simplified Chinese(zh) version.
     """
     URL = "https://dataset-bj.cdn.bcebos.com/qianyan/paws-x-zh.zip"
     MD5 = "f1c6f2ab8afb1f29fe04a0c929e3ab1c"
@@ -60,11 +60,11 @@ class PAWS(DatasetBuilder):
             for line in f:
                 data = line.strip().split("\t")
                 if len(data) == 3:
-                    query, title, label = data
-                    yield {"query": query, "title": title, "label": label}
+                    sentence1, sentence2, label = data                    
+                    yield {"sentence1": sentence1, "sentence2": sentence2, "label": label}
                 elif len(data) == 2:
-                    query, title = data
-                    yield {"query": query, "title": title, "label": ''}
+                    sentence1, sentence2 = data                    
+                    yield {"sentence1": sentence1, "sentence2": sentence2, "label":''}
                 else:
                     continue
 
