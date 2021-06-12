@@ -25,7 +25,7 @@ __all__ = ['PAWS']
 
 class PAWS(DatasetBuilder):
     """
-    PAWS-X:Paraphrase Adversaries from Word Scrambling
+    PAWS-X: Paraphrase Adversaries from Word Scrambling
     More information please refer to `https://arxiv.org/abs/1908.11828`
 
     """
