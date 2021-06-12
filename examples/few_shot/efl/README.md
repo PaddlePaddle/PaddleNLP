@@ -27,7 +27,7 @@ train_ds, dev_ds, public_test_ds = load_dataset("fewclue", name="tnews", splits=
 通过如下命令，指定 GPU 0 卡,  在 FewCLUE 的 `tnews` 数据集上进行训练&评估
 ```
 python -u -m paddle.distributed.launch --gpus "0" \
-    ptuning.py \
+    train.py \
     --task_name "tnews" \
     --device gpu \
     --negative_num 1 \

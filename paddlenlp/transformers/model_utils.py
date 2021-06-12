@@ -334,26 +334,10 @@ class PretrainedModel(Layer, GenerationMixin):
 
     def save_model_config(self, save_dir):
         """
-        Saves model configuration and related resources (model state) as files
-        under `save_directory`. The model configuration would be saved into a file named
-        "model_config.json", and model state would be saved into a file
-        named "model_state.pdparams".
-        
-        The `save_directory` can be used in `from_pretrained` as argument value
-        of `pretrained_model_name_or_path` to re-load the trained model.
+        Saves model configuration to a file named "model_config.json" under `save_dir`.
 
         Args:
-            save_directory (str): Directory to save files into.
-
-        Example:
-            .. code-block::
-
-                from paddlenlp.transformers import BertForSequenceClassification
-
-                model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
-                model.save_pretrained('trained_model')
-                # reload from save_directory
-                model = BertForSequenceClassification.from_pretrained('trained_model')
+            save_dir (str): Directory to save model_config file into.
         """
         # Save model config
         model_config_file = os.path.join(save_dir, self.model_config_file)
@@ -374,11 +358,26 @@ class PretrainedModel(Layer, GenerationMixin):
 
     def save_pretrained(self, save_dir):
         """
-        Saves model configuration and related resources (model state) to files
-        under `save_dir`.
+        Saves model configuration and related resources (model state) as files
+        under `save_dir`. The model configuration would be saved into a file named
+        "model_config.json", and model state would be saved into a file
+        named "model_state.pdparams".
+
+        The `save_dir` can be used in `from_pretrained` as argument value
+        of `pretrained_model_name_or_path` to re-load the trained model.
 
         Args:
             save_dir (str): Directory to save files into.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import BertForSequenceClassification
+
+                model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
+                model.save_pretrained('./trained_model/')
+                # reload from save_directory
+                model = BertForSequenceClassification.from_pretrained('./trained_model/')
         """
         assert os.path.isdir(
             save_dir), "save_dir ({}) is not available.".format(save_dir)
