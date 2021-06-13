@@ -173,7 +173,7 @@ class Vocab(object):
 
         Args:
             indices (int|list[int]|tuple[int]|numpy.ndarray): The input indice(s) for mapping.
-            Must be an `int` or 1D `list[int]`|`tuple[int]`|`numpy.ndarray`.
+                Must be an `int` or 1D `list[int]`|`tuple[int]`|`numpy.ndarray`.
 
         Returns:
             str|list[str]: Obtained token(s). If `indices` is an integer, it 
