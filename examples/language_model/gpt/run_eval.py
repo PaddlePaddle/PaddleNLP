@@ -27,7 +27,9 @@ from paddlenlp.transformers import GPTModel
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 
-MODEL_CLASSES = {"gpt": (GPTForPretraining, GPTTokenizer), }
+MODEL_CLASSES = {
+    "gpt": (GPTForPretraining, GPTTokenizer),
+}
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -69,10 +71,10 @@ class LM_Eval_Dataset(paddle.io.Dataset):
         tokens = tokens[:-1]
         seq_length = len(tokens)
         # attention mask for the attention calulate
-        attention_mask = np.tri(seq_length, seq_length).reshape(
-            (1, seq_length, seq_length))
+        attention_mask = np.tri(seq_length, seq_length).reshape((1, seq_length,
+                                                                 seq_length))
 
-        # the pad and eod tokens do not contribute the loss
+        # the pad and eos tokens do not contribute the loss
         loss_mask = np.ones(seq_length, dtype="float32")
         loss_mask[np.where(np.array(tokens) == self.pad_idx)] = 0.0
         position_ids = np.arange(0, seq_length, dtype="int64")
@@ -116,10 +118,10 @@ class Lambada_Eval_Dataset(paddle.io.Dataset):
 
         seq_length = len(tokens)
         # attention mask for the attention calulate
-        attention_mask = np.tri(seq_length, seq_length).reshape(
-            (1, seq_length, seq_length))
+        attention_mask = np.tri(seq_length, seq_length).reshape((1, seq_length,
+                                                                 seq_length))
 
-        # the pad and eod tokens do not contribute the loss
+        # the pad and eos tokens do not contribute the loss
         position_ids = np.arange(0, seq_length, dtype="int64")
 
         # -INF mask value as default
@@ -138,8 +140,8 @@ class Lambada_Eval_Dataset(paddle.io.Dataset):
             tokens += [self.pad_idx] * num_pad
         loss_mask = np.zeros(self.seq_len, dtype="float32")
         loss_mask[num_tokens - len(labels) - 1:num_tokens - 1] = 1.
-        [tokens, attention_mask, position_ids, labels] = self._construct_sample(
-            tokens)
+        [tokens, attention_mask, position_ids,
+         labels] = self._construct_sample(tokens)
         return [tokens, loss_mask, attention_mask, position_ids, labels]
 
 

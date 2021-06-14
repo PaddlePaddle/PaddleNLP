@@ -76,4 +76,4 @@ class Topology:
         self.data_inner_times = self.world.size // self.data_info.size
 
     def __repr__(self):
-        return f'dp_info:\n\t {self.dp_info}, \npp_info:\n\t {self.pp_info}, \nsharding_info:\n\t {self.sharding_info}, \nmp_info:\n\t {self.mp_info}'
+        return f'dp_info:\n\t {self.dp_info}, \npp_info:\n\t {self.pp_info}, \nsharding_info:\n\t {self.sharding_info}, \nmp_info:\n\t {self.mp_info}\ndata_info:\n\t {self.data_info}'
