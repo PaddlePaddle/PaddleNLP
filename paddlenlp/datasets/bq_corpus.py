@@ -7,12 +7,14 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['bq_corpus']
+__all__ = ['BQCorpus']
 
 
-class bq_corpus(DatasetBuilder):
+class BQCorpus(DatasetBuilder):
     """
-    bq_corpus
+    BQCorpus: the largest dataset available for for the banking and finance sector
+
+    by frozenfish123@Wuhan University
 
     """
     lazy = False
@@ -21,13 +23,13 @@ class bq_corpus(DatasetBuilder):
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
         'train': META_INFO(
-            os.path.join('bq_corpus', 'train.tsv'),
+            os.path.join('BQCorpus', 'train.tsv'),
             'd37683e9ee778ee2f4326033b654adb9'),
         'dev': META_INFO(
-            os.path.join('bq_corpus', 'dev.tsv'),
+            os.path.join('BQCorpus', 'dev.tsv'),
             '8a71f2a69453646921e9ee1aa457d1e4'),
         'test': META_INFO(
-            os.path.join('bq_corpus', 'test.tsv'),
+            os.path.join('BQCorpus', 'test.tsv'),
             'c797995baa248b144ceaa4018b191e52'),
     }
 
@@ -51,11 +53,15 @@ class bq_corpus(DatasetBuilder):
                 if not head:
                     head = data
                 else:
-                    texta, textb, label = data
-                    yield {"texta": texta, "textb": textb, "label": label}
+                    sentence1, sentence2, label = data
+                    yield {
+                        "sentence1": sentence1,
+                        "sentence2": sentence2,
+                        "label": label
+                    }
 
     def get_labels(self):
         """
-        Return labels of the bq_corpus object.
+        Return labels of the BQCorpus object.
         """
         return ["0", "1"]
