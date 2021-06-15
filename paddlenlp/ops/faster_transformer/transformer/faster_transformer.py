@@ -22,10 +22,12 @@ import paddle.nn.functional as F
 from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     PositionalEmbedding, position_encoding_init,
                                     InferTransformerModel, GPTModel)
-from paddlenlp.ops import InferTransformerDecoding, InferGptDecoding
+from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
+                           InferUnifiedDecoding)
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
+from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
+                                    UnifiedTransformerPretrainedModel)
 
 
 class FasterTransformer(TransformerModel):
@@ -443,3 +445,88 @@ class FasterGPT(nn.Layer):
             shutil.copyfile(tokenizer._merges_file, merges_file)
         elif isinstance(tokenizer, GPTChineseTokenizer):
             tokenizer.save_resources(path)
+
+
+class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+        super(FasterUnifiedTransformer, self).__init__()
+        self._model = model
+        self.bos_token_id = model.bos_token_id
+        self.pad_token_id = model.pad_token_id
+        self.eos_token_id = model.eos_token_id
+
+        self.decoding = InferUnifiedDecoding(
+            model=self._model,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=False)
+
+    def prepare_inputs_for_generation(self,
+                                      input_ids,
+                                      token_type_ids,
+                                      position_ids,
+                                      attention_mask,
+                                      use_cache=False,
+                                      cache=None,
+                                      **kwargs):
+        input_ids = input_ids[:, :-1]
+        token_type_ids = token_type_ids[:, :-1]
+        position_ids = position_ids[:, :-1]
+        attention_mask = attention_mask[:, :, :-1, :-1]
+        seq_len = kwargs.get("seq_len", None) - 1
+
+        return {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "position_ids": position_ids,
+            "attention_mask": attention_mask,
+            "use_cache": use_cache,
+            "cache": cache,
+            "seq_len": seq_len
+        }
+
+    def sample(self,
+               input_ids,
+               logits_processors,
+               max_length,
+               pad_token_id,
+               eos_token_id,
+               top_k=4,
+               top_p=0.0,
+               temperature=1.0,
+               min_tokens_to_keep=1,
+               **model_kwargs):
+        max_length -= input_ids.shape[-1]
+        model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                          **model_kwargs)
+        seq_len = model_inputs.pop('seq_len', None)
+        outputs = self._model(**model_inputs)
+        if isinstance(outputs, tuple):
+            caches = outputs[1]
+        else:
+            raise RuntimeError('Not support.')
+        cache_k = [c.k for c in caches]
+        cache_v = [c.v for c in caches]
+
+        return self.decoding(
+            cache_k=cache_k,
+            cache_v=cache_v,
+            memory_seq_lens=seq_len,
+            topk=top_k,
+            topp=top_p,
+            max_out_len=max_length,
+            bos_id=self.bos_token_id,
+            eos_id=self.eos_token_id,
+            temperature=temperature)
+
+    def forward(self,
+                input_ids,
+                logits_processors,
+                max_length,
+                pad_token_id,
+                eos_token_id,
+                top_k=4,
+                top_p=0.0,
+                temperature=1.0,
+                min_tokens_to_keep=1,
+                **model_kwargs):
+        raise RuntimeError('Not implement. Please use generate API. ')
