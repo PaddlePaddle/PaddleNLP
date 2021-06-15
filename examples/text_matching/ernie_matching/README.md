@@ -57,21 +57,21 @@ python -u -m paddle.distributed.launch --gpus "0" train_pointwise.py \
 
 ```python
 
-# 使用 ernie-gram 预训练模型
+# 使用 ERNIE-Gram 预训练模型
 model = ppnlp.transformers.ErnieGramModel.from_pretrained('ernie-gram-zh')
 tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained('ernie-gram-zh')
 
-# 使用ernie预训练模型
-# ernie
-#model = ppnlp.transformers.ErnieModel.from_pretrained('ernie'))
-#tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie')
+# 使用 ERNIE 预训练模型
+# ernie-1.0
+#model = ppnlp.transformers.ErnieModel.from_pretrained('ernie-1.0'))
+#tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
 # ernie-tiny
 # model = ppnlp.transformers.ErnieModel.from_pretrained('ernie-tiny'))
 # tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained('ernie-tiny')
 
 
-# 使用bert预训练模型
+# 使用 BERT 预训练模型
 # bert-base-chinese
 # model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese')
 # tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-chinese')
@@ -85,7 +85,7 @@ tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained('ernie-gram-zh
 # tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-wwm-ext-chinese')
 
 
-# 使用roberta预训练模型
+# 使用 RoBERTa 预训练模型
 # roberta-wwm-ext
 # model = ppnlp.transformers.RobertaModel.from_pretrained('roberta-wwm-ext')
 # tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext')
@@ -95,7 +95,7 @@ tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained('ernie-gram-zh
 # tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext-large')
 
 ```
-更多预训练模型，参考[transformers](../../../docs/model_zoo/transformers.md)
+更多预训练模型，参考[transformers](../../../docs/model_zoo/transformers.rst)
 
 程序运行时将会自动进行训练，评估。同时训练过程中会自动保存模型在指定的`save_dir`中。
 如：

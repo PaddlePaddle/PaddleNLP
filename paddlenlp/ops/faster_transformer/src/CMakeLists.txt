@@ -72,7 +72,7 @@ if(ON_INFER)
     if(WITH_MKL)
       set(FLAG_OPENMP "-fopenmp")
     endif()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 ${FLAG_OPENMP}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 ${FLAG_OPENMP}")
   endif()
 
   if (USE_TENSORRT AND WITH_GPU)
