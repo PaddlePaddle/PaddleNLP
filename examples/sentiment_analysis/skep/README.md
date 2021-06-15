@@ -10,7 +10,7 @@
 <img src="https://paddlenlp.bj.bcebos.com/models/transformers/skep/skep.png" width="80%" height="60%"> <br />
 </p>
 
-百度研究团队在三个典型情感分析任务，句子级情感分类（Sentence-level Sentiment Classification），评价对象级情感分类（Aspect-level Sentiment Classification）、观点抽取（Opinion Role Labeling），共计14个中英文数据上进一步验证了情感预训练模型SKEP的效果。实验表明，以通用预训练模型ERNIE（内部版本）作为初始化，SKEP相比ERNIE平均提升约1.2%，并且较原SOTA平均提升约2%，具体效果如下表：
+百度研究团队在三个典型情感分析任务，句子级情感分类（Sentence-level Sentiment Classification），评价对象级情感分类（Aspect-level Sentiment Classification）、观点抽取（Opinion Role Labeling），共计14个中英文数据上进一步验证了情感预训练模型SKEP的效果。实验表明，以通用预训练模型ERNIE作为初始化，具体效果如下表：
 
 
 
@@ -20,7 +20,6 @@
         <td><strong><center>数据集合</strong></td>
         <td><strong><center>语言</strong></td>
         <td><strong><center>指标</strong></td>
-        <td><strong><center>原SOTA</strong></td>
         <td><strong><center>SKEP</strong></td>
         <td><strong><center>数据集地址</strong></td>
     </tr>
@@ -29,7 +28,6 @@
         <td><center>SST-2</td>
         <td><center>英文</td>
         <td><center>ACC</td>
-        <td><center>97.50</td>
         <td><center>97.60</td>
         <td><center><a href="https://gluebenchmark.com/tasks" >下载地址</a></td>
     </tr>
@@ -37,8 +35,7 @@
         <td><center>ChnSentiCorp</td>
         <td><center>中文</td>
         <td><center>ACC</td>
-        <td><center>95.80</td>
-        <td><center>96.50</td>
+        <td><center>96.08</td>
         <td><center><a href="https://ernie.bj.bcebos.com/task_data_zh.tgz" >下载地址</a></td>
     </tr>
     <tr>
@@ -46,8 +43,7 @@
         <td><center>SE-ABSA16_PHNS</td>
         <td><center>中文</td>
         <td><center>ACC</td>
-        <td><center>79.58</td>
-        <td><center>82.91</td>
+        <td><center>65.22</td>
         <td><center><a href="http://alt.qcri.org/semeval2016/task5/" >下载地址</a></td>
     </tr>
     <tr>
@@ -55,7 +51,6 @@
         <td><center>COTE_DP</td>
         <td><center>中文</td>
         <td><center>F1</td>
-        <td><center>84.33</td>
         <td><center>86.30</td>
         <td><center><a href="https://github.com/lsvih/chinese-customer-review" >下载地址</a></td>
     </tr>
