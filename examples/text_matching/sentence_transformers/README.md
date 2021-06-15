@@ -91,17 +91,17 @@ $ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_di
 代码示例中使用的预训练模型是ERNIE，如果想要使用其他预训练模型如BERT，RoBERTa，Electra等，只需更换`model` 和 `tokenizer`即可。
 
 ```python
-# 使用ernie预训练模型
-# ernie
-model = ppnlp.transformers.ErnieModel.from_pretrained('ernie'))
-tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie')
+# 使用 ERNIE 预训练模型
+# ernie-1.0
+model = ppnlp.transformers.ErnieModel.from_pretrained('ernie-1.0'))
+tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
 # ernie-tiny
 # model = ppnlp.transformers.ErnieModel.from_pretrained('ernie-tiny'))
 # tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained('ernie-tiny')
 
 
-# 使用bert预训练模型
+# 使用 BERT 预训练模型
 # bert-base-chinese
 # model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese')
 # tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-chinese')
@@ -115,7 +115,7 @@ tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie')
 # tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-wwm-ext-chinese')
 
 
-# 使用roberta预训练模型
+# 使用 RoBERTa 预训练模型
 # roberta-wwm-ext
 # model = ppnlp.transformers.RobertaModel.from_pretrained('roberta-wwm-ext')
 # tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext')
