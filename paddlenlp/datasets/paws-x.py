@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import collections
 import json
 import os
@@ -20,39 +21,30 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['NLPCC14SC']
+__all__ = ['PAWS']
 
-
-class NLPCC14SC(DatasetBuilder):
+class PAWS(DatasetBuilder):
     """
-    NLPCC14-SC is the dataset for sentiment classification. There are 2 classes
-    in the datasets: Negative (0) and Positive (1). The following is a part of
-    the train data:
-      '''
-      label	                  text_a
-      1	                      超级值得看的一个电影
-      0	                      我感觉卓越的东西现在好垃圾，还贵，关键贵。
-      '''
-    Please note that the test data contains no corresponding labels. 
-
-    NLPCC14-SC datasets only contain train and test data, so we remove the dev
-    data in META_INFO. By Fiyen at Beijing Jiaotong University.
+    PAWS-X: A Cross-lingual Adversarial Dataset for Paraphrase Identification
+    More information please refer to `https://arxiv.org/abs/1908.11828`
+    Here we only store simplified Chinese(zh) version.
     """
-
-    URL = "https://dataset-bj.cdn.bcebos.com/qianyan/NLPCC14-SC.zip"
-    MD5 = "4792a0982bc64b83d9a76dcce8bc00ad"
+    URL = "https://dataset-bj.cdn.bcebos.com/qianyan/paws-x-zh.zip"
+    MD5 = "f1c6f2ab8afb1f29fe04a0c929e3ab1c"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
         'train': META_INFO(
-            os.path.join('NLPCC14-SC', 'NLPCC14-SC', 'train.tsv'),
-            'b0c6f74bb8d41020067c8f103c6e08c0'),
+            os.path.join('paws-x-zh', 'paws-x-zh', 'train.tsv'),
+            '3422ba98e5151c91bbb0a785c4873a4c'),
+        'dev': META_INFO(
+            os.path.join('paws-x-zh', 'paws-x-zh', 'dev.tsv'),
+            'dc163453e728cf118e17b4065d6602c8'),
         'test': META_INFO(
-            os.path.join('NLPCC14-SC', 'NLPCC14-SC', 'test.tsv'),
-            '57526ba07510fdc901777e7602a26774'),
+            os.path.join('paws-x-zh', 'paws-x-zh', 'test.tsv'),
+            '5b7320760e70559591092cb01b6f5955'),
     }
 
     def _get_data(self, mode, **kwargs):
-        """Downloads dataset."""
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
         filename, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
@@ -62,24 +54,22 @@ class NLPCC14SC(DatasetBuilder):
 
         return fullname
 
-    def _read(self, filename, split):
+    def _read(self, filename):
         """Reads data."""
         with open(filename, 'r', encoding='utf-8') as f:
-            head = None
             for line in f:
                 data = line.strip().split("\t")
-                if not head:
-                    head = data
+                if len(data) == 3:
+                    sentence1, sentence2, label = data                    
+                    yield {"sentence1": sentence1, "sentence2": sentence2, "label": label}
+                elif len(data) == 2:
+                    sentence1, sentence2 = data                    
+                    yield {"sentence1": sentence1, "sentence2": sentence2, "label":''}
                 else:
-                    if split == 'train':
-                        label, text = data
-                        yield {"text": text, "label": label, "qid": ''}
-                    elif split == 'test':
-                        qid, text = data
-                        yield {"text": text, "label": '', "qid": qid}
+                    continue
 
     def get_labels(self):
         """
-        Return labels of the NLPCC14-SC object.
+        Return labels of the PAWS-X object.
         """
         return ["0", "1"]

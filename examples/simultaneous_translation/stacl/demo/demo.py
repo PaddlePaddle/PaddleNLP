@@ -13,18 +13,32 @@
 # limitations under the License.
 import os
 import argparse
-from tkinter import Label, Tk, PhotoImage, Entry, LEFT, W, END, Button, N, E
+import tkinter
+from tkinter import Label, Tk, PhotoImage, Entry, LEFT, W, END, Button, E
+import time
+import threading
+import json
+import uuid
 import yaml
 from attrdict import AttrDict
-
 import _locale
 import jieba
 import paddle
 from paddlenlp.data import Vocab
 from paddlenlp.transformers import position_encoding_init
+from paddlenlp.utils.log import logger
 from subword_nmt import subword_nmt
+import websocket
 
-from model_for_demo import SimultaneousTransformerDemo
+open_speech = True
+try:
+    from pyaudio import PyAudio, paInt16
+except ImportError as e:
+    open_speech = False
+    logger.warning("No module named 'pyaudio', so no audio demo.")
+
+import const
+from model_demo import SimultaneousTransformerDemo
 
 # By default, the Windows system opens the file with GBK code,
 # and the subword_nmt package does not support setting open encoding,
@@ -64,7 +78,7 @@ class STACLTokenizer:
     def tokenize(self, raw_string):
         raw_string = raw_string.strip('\n')
         if not raw_string:
-            return raw_string
+            return raw_string, raw_string
         if self.is_chinese:
             raw_string = ' '.join(jieba.cut(raw_string))
         bpe_str = self.bpe.process_line(raw_string)
@@ -122,7 +136,6 @@ def translate(args, tokenizer, tokenized_src, transformers, waitks,
 
     for idx, (waitk, transformer) in enumerate(zip(waitks, transformers)):
         if len(tokenized_src) < waitk or (waitk == -1 and not is_last):
-            print()
             continue
         with paddle.no_grad():
             input_src = tokenized_src
@@ -138,7 +151,6 @@ def translate(args, tokenizer, tokenized_src, transformers, waitks,
                 bos_id=bos_id[idx])
             caches[idx] = cache
             finished_seq = finished_seq.numpy()
-            finished_scores = finished_scores.numpy()
             for beam_idx, beam in enumerate(finished_seq[0]):
                 if beam_idx >= args.n_best:
                     break
@@ -150,8 +162,7 @@ def translate(args, tokenizer, tokenized_src, transformers, waitks,
                 for word in word_list:
                     all_result[idx].append(word)
                 res = ' '.join(word_list).replace('@@ ', '')
-                print(res)
-                print()
+                logger.debug('[waitk={}] {}'.format(waitk, res))
 
 
 def cut_line(str, line_len):
@@ -184,12 +195,12 @@ def process(args, tokenizer, transformers, waitks):
 
     window = Tk()
 
-    window.title("Welcome to Simultaneous Translation(text)")
-    window.geometry('1500x600')
+    window.title("Welcome to Simultaneous Translation")
+    window.geometry('1200x600')
 
     logo = PhotoImage(file='images/paddlenlp.png')
     button = Label(window, image=logo, compound='center')
-    button.grid(column=0, row=0)
+    button.place(x=0, y=0)
 
     # for chinese input
     lbl1 = Label(
@@ -198,23 +209,25 @@ def process(args, tokenizer, transformers, waitks):
         fg="green",
         font=font_label,
         anchor=E,
-        width=28,
-        justify=LEFT)
-    lbl1.grid(column=0, row=1)
-    txt = Entry(window, width=130, font=('Courier', 24))
-    txt.grid(column=1, row=1)
-    txt.focus()
+        width=28)
+    lbl1.place(x=0, y=60)
+    txt = Entry(window, font=('Courier', 24))
+    txt.place(x=250, y=50, width=800, height=50)
+
+    button_on = Button(
+        window,
+        text='REC',
+        width=2,
+        height=2,
+        relief=tkinter.RAISED,
+        cursor="hand2")
+    if open_speech:
+        button_on.place(x=1090, y=52)
+
+    s_x, s_y = 0, 130
+    x, y = 250, 120
 
     # for jieba+BPE
-    lbl2 = Label(
-        window,
-        text="",
-        width=150,
-        font=font_align,
-        background="pale green",
-        anchor=E,
-        justify=LEFT)
-    lbl2.grid(column=1, row=2)
     lbl2_s = Label(
         window,
         text="Jieba+BPE:",
@@ -222,12 +235,12 @@ def process(args, tokenizer, transformers, waitks):
         font=font_label,
         anchor=E,
         width=28)
-    lbl2_s.grid(column=0, row=2)
+    lbl2_s.place(x=s_x, y=s_y)
+    lbl2 = Label(
+        window, text="", font=font_align, background="pale green", anchor=E)
+    lbl2.place(x=x, y=y, width=800, height=50)
 
     # for wait-1
-    lbl3 = Label(
-        window, text="", width=150, font=font_align, background="linen")
-    lbl3.grid(column=1, row=3)
     waitnum = '1'
     lbl3_s = Label(
         window,
@@ -236,12 +249,12 @@ def process(args, tokenizer, transformers, waitks):
         font=font_label,
         anchor=E,
         width=28)
-    lbl3_s.grid(column=0, row=3)
+    lbl3_s.place(x=s_x, y=s_y + 70)
+
+    lbl3 = Label(window, text="", font=font_align, background="linen")
+    lbl3.place(x=x, y=y + 75, width=800, height=50)
 
     # for wait-3
-    lbl4 = Label(
-        window, text="", width=150, font=font_align, background="linen")
-    lbl4.grid(column=1, row=4)
     waitnum = '3'
     lbl4_s = Label(
         window,
@@ -250,12 +263,11 @@ def process(args, tokenizer, transformers, waitks):
         font=font_label,
         anchor=E,
         width=28)
-    lbl4_s.grid(column=0, row=4)
+    lbl4_s.place(x=s_x, y=s_y + 140)
+    lbl4 = Label(window, text="", font=font_align, background="linen")
+    lbl4.place(x=x, y=y + 145, width=800, height=50)
 
     # for wait-5
-    lbl5 = Label(
-        window, text="", width=150, font=font_align, background="linen")
-    lbl5.grid(column=1, row=5)
     waitnum = '5'
     lbl5_s = Label(
         window,
@@ -264,12 +276,11 @@ def process(args, tokenizer, transformers, waitks):
         font=font_label,
         anchor=E,
         width=28)
-    lbl5_s.grid(column=0, row=5)
+    lbl5_s.place(x=s_x, y=s_y + 210)
+    lbl5 = Label(window, text="", font=font_align, background="linen")
+    lbl5.place(x=x, y=y + 215, width=800, height=50)
 
     # for  wait--1
-    lbl6 = Label(
-        window, text="", width=150, font=font_align, background="sky blue")
-    lbl6.grid(column=1, row=6)
     lbl6_s = Label(
         window,
         text="Full Sentence\nTranslation (wait -1):",
@@ -277,7 +288,10 @@ def process(args, tokenizer, transformers, waitks):
         font=font_label,
         anchor=E,
         width=28)
-    lbl6_s.grid(column=0, row=6)
+    lbl6_s.place(x=s_x, y=s_y + 280)
+
+    lbl6 = Label(window, text="", font=font_align, background="sky blue")
+    lbl6.place(x=x, y=y + 285, width=800, height=50)
 
     def set_val(event=None):
         """
@@ -308,22 +322,22 @@ def process(args, tokenizer, transformers, waitks):
                       waitks, decoder_max_length, is_last, caches, bos_id,
                       all_result)
             lbl3.configure(
-                text=cut_line(' '.join(all_result[0]).replace('@@ ', ''), 14),
+                text=cut_line(' '.join(all_result[0]).replace('@@ ', ''), 11),
                 fg="red",
                 anchor=W,
                 justify=LEFT)
             lbl4.configure(
-                text=cut_line(' '.join(all_result[1]).replace('@@ ', ''), 14),
+                text=cut_line(' '.join(all_result[1]).replace('@@ ', ''), 11),
                 fg="red",
                 anchor=W,
                 justify=LEFT)
             lbl5.configure(
-                text=cut_line(' '.join(all_result[2]).replace('@@ ', ''), 14),
+                text=cut_line(' '.join(all_result[2]).replace('@@ ', ''), 11),
                 fg="red",
                 anchor=W,
                 justify=LEFT)
             lbl6.configure(
-                text=cut_line(' '.join(all_result[3]).replace('@@ ', ''), 14),
+                text=cut_line(' '.join(all_result[3]).replace('@@ ', ''), 11),
                 fg="blue",
                 anchor=W,
                 justify=LEFT)
@@ -337,12 +351,225 @@ def process(args, tokenizer, transformers, waitks):
                 user_input_tokenized = []
             i += 1
 
+    def set_val_voice(event=None):
+        """
+        Start translating
+        """
+
+        def send_start_params(ws):
+            """
+            Send start frame
+            :param websocket.WebSocket ws:
+            :return:
+            """
+            req = {
+                "type": "START",
+                "data": {
+                    "appid": const.APPID,
+                    "appkey": const.APPKEY,
+                    "dev_pid": const.DEV_PID,
+                    "cuid": "yourself_defined_user_id",
+                    "sample": 16000,
+                    "format": "pcm"
+                }
+            }
+            body = json.dumps(req)
+            ws.send(body, websocket.ABNF.OPCODE_TEXT)
+            logger.info("send START frame with params:" + body)
+
+        def send_audio(ws):
+            """
+             Send audio
+            :param  websocket.WebSocket ws:
+            :return:
+            """
+            # 160ms record
+            chunk_ms = 160
+
+            # 160ms *  16000  * 2bytes / 1000ms = 5120bytes
+            chunk_len = int(16000 * 2 / 1000 * chunk_ms)
+
+            pa = PyAudio()
+            stream = pa.open(
+                format=paInt16,
+                channels=1,
+                rate=16000,
+                input=True,
+                frames_per_buffer=chunk_len // 2)
+
+            while True:
+                frames = []
+                frame = stream.read(chunk_len // 2, exception_on_overflow=False)
+                frames.append(frame)
+                body = b''.join(frames)
+                if len(body) == 0:
+                    logger.info("empty body")
+                    continue
+                logger.debug("try to send audio length {}".format(len(body)))
+                ws.send(body, websocket.ABNF.OPCODE_BINARY)
+
+        def send_finish(ws):
+            """
+            Send finished frame
+            :param websocket.WebSocket ws:
+            :return:
+            """
+            req = {"type": "FINISH"}
+            body = json.dumps(req)
+            ws.send(body, websocket.ABNF.OPCODE_TEXT)
+            logger.info("send FINISH frame")
+
+        def close_websocket(ws_app):
+            if ws_app:
+                logger.info('close ws_app.')
+                send_finish(ws_app)
+                ws_app.close()
+            logger.info('ws_app closed.')
+
+        def on_open(ws):
+            """
+            Send data frame after connected
+            :param  websocket.WebSocket ws:
+            :return:
+            """
+
+            def run(*args):
+                """
+                Send data frame
+                :param args:
+                :return:
+                """
+                send_start_params(ws)
+                send_audio(ws)
+                send_finish(ws)
+                logger.debug("thread terminating")
+
+            threading.Thread(target=run).start()
+
+        def on_error(ws, error):
+            """
+            For error
+            :param ws:
+            :param error: json
+            :return:
+                """
+            logger.error("error: " + str(error))
+
+        def on_close(ws):
+            """
+            Close websocket
+            :param websocket.WebSocket ws:
+            :return:
+            """
+            logger.info("ws close ...")
+            # ws.close()
+
+        def on_message(ws, message):
+            """
+            Response from server
+            :param ws:
+            :param message: json
+            :return:
+            """
+            global i
+            global text
+            global caches
+            global bos_id
+            global decoder_max_length
+            global all_result
+            global is_last
+            global user_input_bpe
+            global user_input_tokenized
+            global ws_app
+            global start_time
+
+            logger.info("Response: " + message)
+            message = json.loads(message)
+            if is_last and ws_app:
+                close_websocket(ws_app)
+            end_time = time.time()
+            if end_time - start_time > 10 and ws_app:
+                close_websocket(ws_app)
+                logger.info('ws_app started at: {} closed at: {}, cost {}s.'.
+                            format(start_time, end_time, end_time - start_time))
+            if 'result' in message:
+                start_time = time.time()
+                text = message['result']
+                txt.delete(0, END)
+                txt.insert(0, text)
+                bpe_str, tokenized_src = tokenizer.tokenize(txt.get())
+                while i < len(tokenized_src):
+                    user_input_bpe.append(bpe_str[i])
+                    user_input_tokenized.append(tokenized_src[i])
+                    lbl2.configure(
+                        text=cut_line(
+                            (lbl2.cget("text") + ' ' + bpe_str[i]).strip(), 20),
+                        fg="black",
+                        anchor=W,
+                        justify=LEFT)
+                    window.update()
+                    if bpe_str[i] in ['。', '？', '！']:
+                        is_last = True
+                    translate(args, tokenizer, user_input_tokenized,
+                              transformers, waitks, decoder_max_length, is_last,
+                              caches, bos_id, all_result)
+                    lbl3.configure(
+                        text=cut_line(' '.join(all_result[0]).replace('@@ ',
+                                                                      ''), 11),
+                        fg="red",
+                        anchor=W,
+                        justify=LEFT)
+                    lbl4.configure(
+                        text=cut_line(' '.join(all_result[1]).replace('@@ ',
+                                                                      ''), 11),
+                        fg="red",
+                        anchor=W,
+                        justify=LEFT)
+                    lbl5.configure(
+                        text=cut_line(' '.join(all_result[2]).replace('@@ ',
+                                                                      ''), 11),
+                        fg="red",
+                        anchor=W,
+                        justify=LEFT)
+                    lbl6.configure(
+                        text=cut_line(' '.join(all_result[3]).replace('@@ ',
+                                                                      ''), 11),
+                        fg="blue",
+                        anchor=W,
+                        justify=LEFT)
+                    window.update()
+                    if is_last:
+                        caches = [None] * len(waitks)
+                        bos_id = [None] * len(waitks)
+                        decoder_max_length = [1] * len(waitks)
+                        is_last = False
+                        user_input_bpe = []
+                        user_input_tokenized = []
+                        if ws_app:
+                            close_websocket(ws_app)
+                    i += 1
+
+        logger.info("begin")
+        uri = const.URI + "?sn=" + str(uuid.uuid1())
+        logger.info("uri is " + uri)
+        global start_time
+        start_time = time.time()
+        global ws_app
+        ws_app = websocket.WebSocketApp(
+            uri,
+            on_open=on_open,
+            on_message=on_message,
+            on_error=on_error,
+            on_close=on_close)
+        ws_app.run_forever()
+
     def clear():
         """
         Clear input and output
         """
         txt.delete(0, END)
         global i
+        global text
         global caches
         global bos_id
         global decoder_max_length
@@ -350,6 +577,10 @@ def process(args, tokenizer, transformers, waitks):
         global is_last
         global user_input_bpe
         global user_input_tokenized
+        global ws_app
+        global start_time
+        if ws_app:
+            ws_app.close()
         decoder_max_length = [1] * len(waitks)
         caches = [None] * len(waitks)
         bos_id = [None] * len(waitks)
@@ -358,13 +589,14 @@ def process(args, tokenizer, transformers, waitks):
         is_last = False
         user_input_bpe = []
         user_input_tokenized = []
-        print('CLEAR')
-        print(f'i: {i}')
-        print(f'caches: {caches}')
-        print(f'bos_id: {bos_id}')
-        print(f'decoder_max_length: {decoder_max_length}')
-        print(f'all_result: {all_result}')
-        print(f'is_last: {is_last}')
+        start_time = 0
+        logger.info('CLEAR')
+        logger.info(f'i: {i}')
+        logger.info(f'caches: {caches}')
+        logger.info(f'bos_id: {bos_id}')
+        logger.info(f'decoder_max_length: {decoder_max_length}')
+        logger.info(f'all_result: {all_result}')
+        logger.info(f'is_last: {is_last}')
         lbl2.configure(text="", fg="black", anchor=W, justify=LEFT)
         lbl3.configure(text="", fg="red", anchor=W, justify=LEFT)
         lbl4.configure(text="", fg="red", anchor=W, justify=LEFT)
@@ -373,29 +605,33 @@ def process(args, tokenizer, transformers, waitks):
         window.update()
 
     txt.bind('<Return>', set_val)
+    button_on.bind('<Button-1>', set_val_voice)
 
-    button = Label(window, height=2)
-    button.grid(column=1, row=7)
-
-    image = PhotoImage(file='images/clear.png')
-    button1 = Button(
+    desc1 = Label(
         window,
-        image=image,
-        width=60,
-        height=15,
+        text='使用说明：1. 在Chinese input输入中文，按【回车键】开始实时翻译，'
+        '遇到【。！？】结束整句，按【CLEAR】清空所有的输入和输出；',
+        anchor=E)
+    desc1.place(x=s_x + 100, y=s_y + 380)
+
+    desc2 = Label(
+        window,
+        text=' ' * 19 + '2. 按【REC】开始录音并开始实时翻译，遇到【。！？】结束整句，'
+        '按【CLEAR】清空所有的输入和输出。',
+        anchor=E)
+    if open_speech:
+        desc2.place(x=s_x + 100, y=s_y + 410)
+
+    button_clear = Button(
+        window,
+        text='CLEAR',
+        width=3,
+        height=3,
         relief="ridge",
         cursor="hand2",
         command=clear)
-    button1.grid(column=1, row=8, sticky=N)
 
-    button = Label(
-        window,
-        text='使用说明：在Chinese input输入中文，按【回车键】开始实时翻译，'
-        '遇到【。！？】结束整句，按【CLEAR】清空所有的输入和输出。' + ' ' * 300,
-        anchor=E,
-        justify=LEFT)
-    button.grid(
-        column=0, row=9, rowspan=2, columnspan=2, padx=10, ipadx=10, pady=10)
+    button_clear.place(x=x + 840, y=y + 380)
 
     window.mainloop()
 
@@ -431,7 +667,7 @@ if __name__ == "__main__":
     transformers = []
     for waitk in waitks:
         transformers.append(init_model(args, f'models/nist_wait_{waitk}'))
-        print(f'Loaded wait_{waitk} model.')
+        logger.info(f'Loaded wait_{waitk} model.')
 
     # for decoding max length
     decoder_max_length = [1] * len(waitks)
@@ -443,11 +679,17 @@ if __name__ == "__main__":
     all_result = [[], [], [], []]
     # current source word index
     i = 0
-    # for decoding: is_last=True,max_len=256 
+    # for decoding: is_last=True, max_len=256
     is_last = False
     # subword after bpe
     user_input_bpe = []
     # tokenized id
     user_input_tokenized = []
+    # for stream input
+    text = ''
+    # websocket app
+    ws_app = None
+    # start time
+    start_time = 0
 
     process(args, tokenizer, transformers, waitks)

@@ -44,7 +44,7 @@ PaddleNLP 2.0是飞桨生态的文本领域核心库，具备**易用的文本�
 ### pip安装
 
 ```
-pip install --upgrade paddlenlp -i https://pypi.org/simple
+pip install --upgrade paddlenlp
 ```
 
 更多关于PaddlePaddle和PaddleNLP安装的详细教程请查看[Installation](./docs/get_started/installation.rst)。
@@ -53,7 +53,7 @@ pip install --upgrade paddlenlp -i https://pypi.org/simple
 
 ### Transformer API: 强大的预训练模型生态底座
 
-覆盖**15**个网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。
+覆盖**15**个网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。也欢迎开发者进预训练模贡献！🤗 
 
 ```python
 from paddlenlp.transformers import *
@@ -76,10 +76,10 @@ from paddlenlp.transformers import ErnieTokenizer, ErnieModel
 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 text = tokenizer('自然语言处理')
 
-# 获取语义表示
+# 语义表示
 model = ErnieModel.from_pretrained('ernie-1.0')
 pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
-# 文本分类/句对匹配
+# 文本分类 & 句对匹配
 model = ErnieForSequenceClassifiation.from_pretrained('ernie-1.0')
 # 序列标注
 model = ErnieForTokenClassifiation.from_pretrained('ernie-1.0')
@@ -115,7 +115,7 @@ wordemb.cosine_sim("艺术", "火车")
 >>> 0.14792643
 ```
 
-内置50+中文词向量，覆盖多种领域语料、如百科、新闻、微博等。更多使用方法请参考[Embedding文档](./examples/word_embedding/README.md)。
+内置50+中文词向量，覆盖多种领域语料、如百科、新闻、微博等。更多使用方法请参考[Embedding文档](./docs/model_zoo/embeddings.md)。
 
 ### 更多API使用文档
 
@@ -135,7 +135,7 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 | :------------  | ---- |
 | [词向量](./examples/word_embedding/) | 利用`TokenEmbedding API`展示如何快速计算词之间语义距离和词的特征提取。 |
 | [词法分析](./examples/lexical_analysis/) | 基于BiGRU-CRF模型实现了分词、词性标注和命名实体识的联合训练任务。 |
-| [语言模型](./examples/language_model/)  | 提供了基于[RNNLM](./exampels/language_model/rnnlm)和[Transformer-XL]((./exampels/language_model/transformer-xl))两种结构的语言模型，支持输入词序列计算其生成概率，可用于表示模型生成句子的流利程度。 |
+| [语言模型](./examples/language_model/)  | 提供了基于[RNNLM](./examples/language_model/rnnlm)和[Transformer-XL](./examples/language_model/transformer-xl)两种结构的语言模型，支持输入词序列计算其生成概率，可用于表示模型生成句子的流利程度。 |
 | [语义解析](./examples/text_to_sql):star: | 语义解析Text-to-SQL任务是让机器自动让自然语言问题转换数据库可操作的SQL查询语句，是实现基于数据库自动问答的核心模块。|
 
 ### NLP 核心技术
