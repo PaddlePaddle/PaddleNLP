@@ -153,19 +153,6 @@ Requirements.txt文件中包含了你创建的repo中所使用其他开发者的
 - 机械键盘、小度等可爱奖品
 - 你想要什么周边，撩班班吧😍😍
 
-<p align="center">
-  <img src="images/award1.png" width="800" height ="410" />
-</p>
-
-
-
-<p align="center">
-  <img src="images/award2.png" width="800" height ="510" />
-</p>
-
-
-
-
 
 ## 优秀作业公示
 
