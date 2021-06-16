@@ -429,7 +429,7 @@ def do_train(args):
         dev_data_loader = (dev_data_loader_matched, dev_data_loader_mismatched)
 
     if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
+        ofa_model.model = paddle.DataParallel(ofa_model.model)
 
     if args.max_steps > 0:
         num_training_steps = args.max_steps
@@ -488,7 +488,7 @@ def do_train(args):
             ofa_model.model.clear_gradients()
 
             if global_step % args.logging_steps == 0:
-                if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+                if paddle.distributed.get_rank() == 0:
                     logger.info(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
                         % (global_step, epoch, step, loss,
@@ -538,8 +538,7 @@ def do_train(args):
                             print("eval done total : %s s" %
                                   (time.time() - tic_eval))
 
-                        if (not args.n_gpu > 1
-                            ) or paddle.distributed.get_rank() == 0:
+                        if paddle.distributed.get_rank() == 0:
                             output_dir = os.path.join(args.output_dir,
                                                       "model_%d" % global_step)
                             if not os.path.exists(output_dir):
