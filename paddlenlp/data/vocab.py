@@ -200,7 +200,7 @@ class Vocab(object):
         if not isinstance(indices, (list, tuple, np.ndarray)):
             indices = [indices]
             to_reduce = True
-        elif isinstance(indices, (list, tuple)):
+        if isinstance(indices, (list, tuple)):
             indices = np.asarray(indices)
 
         if len(indices.shape) > 1:
