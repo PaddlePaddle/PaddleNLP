@@ -429,7 +429,8 @@ def do_train(args):
         dev_data_loader = (dev_data_loader_matched, dev_data_loader_mismatched)
 
     if paddle.distributed.get_world_size() > 1:
-        ofa_model.model = paddle.DataParallel(ofa_model.model)
+        ofa_model.model = paddle.DataParallel(
+            ofa_model.model, find_unused_parameters=True)
 
     if args.max_steps > 0:
         num_training_steps = args.max_steps
