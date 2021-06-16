@@ -268,21 +268,6 @@ public:
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
 #endif
-
-      // {
-      //   int dim = m * n;
-      //   float* data = new float[m * n];
-      //   cudaMemcpy(data, masked_output_buf_, sizeof(float) * dim,
-      //   cudaMemcpyDeviceToHost);
-      //   float sum = 0.0;
-      //   for (int i=0; i<dim; ++i) {
-      //     sum += data[i];
-      //     std::cout << i << ": " << data[i] << std::endl;
-      //   }
-      //   std::cout << "AVG is: " << sum << std::endl;
-      // }
-      // exit(0);
-
       decoder_norm2(from_tensor,
                     param_.ffn_layernorm.gamma,
                     param_.ffn_layernorm.beta,
@@ -296,24 +281,9 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
 
-      // {
-      //   int dim = m * n;
-      //   float* data = new float[m * n];
-      //   cudaMemcpy(data, norm_masked_output_buf_, sizeof(float) * dim,
-      //   cudaMemcpyDeviceToHost);
-      //   float sum = 0.0;
-      //   for (int i=0; i<dim; ++i) {
-      //     sum += data[i];
-      //     std::cout << i << ": " << data[i] << std::endl;
-      //   }
-      //   std::cout << "AVG is: " << sum << std::endl;
-      // }
-      // exit(0);
-
       if (!normalization_before_) {
         masked_output_buf_ = norm_masked_output_buf_;
       }
-
       // For GPT-2 decoder
       ffn(norm_masked_output_buf_,
           ffn_inner_buf_,
@@ -327,20 +297,6 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
       add_bias_input(decoder_output, masked_output_buf_, m, n);
-
-      // {
-      //   int dim = m * n;
-      //   float* data = new float[m * n];
-      //   cudaMemcpy(data, decoder_output, sizeof(float) * dim,
-      //   cudaMemcpyDeviceToHost);
-      //   float sum = 0.0;
-      //   for (int i=0; i<dim; ++i) {
-      //     sum += data[i];
-      //     std::cout << i << ": " << data[i] << std::endl;
-      //   }
-      //   std::cout << "AVG is: " << sum << std::endl;
-      // }
-      // exit(0);
 
       if (!normalization_before_) {
         masked_output_buf_ = masked_output_tmp_buf_;
@@ -362,14 +318,6 @@ public:
                                  DataType_ *decoder_output,
                                  const int step,
                                  const int start_len);
-
-  // void cross_multi_head_attention(const DataType_ *from_tensor, const
-  // DataType_ *memory_tensor,
-  //                                 DataType_ *key_mem_cache_, DataType_
-  //                                 *value_mem_cache_,
-  //                                 DataType_ *decoder_output, const int
-  //                                 *memory_sequence_length,
-  //                                 const int max_seq_len, const int step);
 
   void ffn(const DataType_ *input,
            DataType_ *ffn_inner,

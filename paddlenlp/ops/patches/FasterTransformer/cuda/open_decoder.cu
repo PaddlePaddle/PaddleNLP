@@ -2079,7 +2079,12 @@ __global__ void self_attention_kernel(const int* memory_sequence_length,
       key_cache[ite * offset + qkv_id] = key;
     }
 
-    T val = (tid < size_per_head) ? key * sq[tid] * (T)(scalar) : (T)(0.0f);
+    // T val = (tid < size_per_head) ? key * sq[tid] * (T)(scalar) : (T)(0.0f);
+    T val = (T)(0.0f);
+    if (tid < size_per_head &&
+        ite >= (start_len - memory_sequence_length[bid])) {
+      val = key * sq[tid] * (T)(scalar);
+    }
     T qk = blockReduceSum(val);
     if (threadIdx.x == 0) {
       logits[ite] = qk;
@@ -2124,7 +2129,9 @@ __global__ void self_attention_kernel(const int* memory_sequence_length,
         value = value_buf[qkv_id] + self_V_bias[qkv_bias_id];
         value_cache[ite * offset + qkv_id] = value;
       }
-      sum += value * logits[ite];
+      if (ite >= (start_len - memory_sequence_length[bid])) {
+        sum += value * logits[ite];
+      }
     }
     context_buf[qkv_id] = sum;
   }
@@ -2349,20 +2356,7 @@ void OpenTransformerDecoder<OpType_>::self_multi_head_attention(
                      computeType_,
                      static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
   }
-  // {
-  //   std::cout << "=====" << std::endl;
-  //   int dims = m * k;
-  //   float* data = new float[dims];
-  //   cudaMemcpy(data, query_buf_, sizeof(float) * dims,
-  //   cudaMemcpyDeviceToHost);
-  //   float sum = 0.0f;
-  //   for (int i=0; i<dims; ++i) {
-  //     sum += data[i];
-  //     std::cout << data[i] << std::endl;
-  //   }
-  //   std::cout << sum / (dims) << std::endl;
-  // }
-  // exit(0);
+
   self_attention_dispatch<DataType_>(memory_sequence_length,
                                      key_buf_,
                                      value_buf_,
@@ -2379,22 +2373,6 @@ void OpenTransformerDecoder<OpType_>::self_multi_head_attention(
                                      step,
                                      start_len,
                                      param_.stream);
-
-  cudaDeviceSynchronize();
-  check_cuda_error(cudaGetLastError());
-
-  // {
-  //   int dims = m * 12 * 267;
-  //   float* data = new float[dims];
-  //   cudaMemcpy(data, context_buf_, sizeof(float) * dims,
-  //   cudaMemcpyDeviceToHost);
-  //   float sum = 0.0f;
-  //   for (int i=0; i<dims; ++i) {
-  //     sum += data[i];
-  //   }
-  //   std::cout << sum / (dims) << std::endl;
-  // }
-  // exit(0);
 
   check_cuda_error(
       cublasGemmEx(param_.cublas_handle,
@@ -2416,18 +2394,6 @@ void OpenTransformerDecoder<OpType_>::self_multi_head_attention(
                    n,
                    computeType_,
                    static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
-  // {
-  //   int dims = m * k;
-  //   float* data = new float[dims];
-  //   cudaMemcpy(data, decoder_output, sizeof(float) * dims,
-  //   cudaMemcpyDeviceToHost);
-  //   float sum = 0.0f;
-  //   for (int i=0; i<dims; ++i) {
-  //     sum += data[i];
-  //   }
-  //   std::cout << sum / (dims) << std::endl;
-  // }
-  // exit(0);
 }
 
 
