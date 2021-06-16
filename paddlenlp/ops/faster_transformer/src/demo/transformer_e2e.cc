@@ -33,19 +33,31 @@ limitations under the License. */
 
 using namespace paddle_infer;
 
+DEFINE_int32(batch_size, 1, "Batch size to do inference. ");
+DEFINE_int32(beam_size, 5, "Beam size to do inference. ");
+DEFINE_int32(gpu_id, 0, "The gpu id to do inference. ");
+DEFINE_string(model_dir,
+              "./infer_model/",
+              "The directory to the inference model. ");
+DEFINE_string(vocab_dir,
+              "./vocab_all.bpe.33708",
+              "The directory to the vocabulary file. ");
+DEFINE_string(data_dir,
+              "./newstest2014.tok.bpe.33708.en",
+              "The directory to the input data. ");
 
 std::string model_dir = "";
-std::string dict_dir = "";
-std::string datapath = "";
+std::string vocab_dir = "";
+std::string data_dir = "";
 
-const int eos_idx = 1;
-const int pad_idx = 0;
-const int beam_size = 5;
-const int max_length = 256;
-const int n_best = 1;
+const int EOS_IDX = 1;
+const int PAD_IDX = 0;
+const int MAX_LENGTH = 256;
+const int N_BEST = 1;
 
 int batch_size = 1;
 int gpu_id = 0;
+int beam_size = 5;
 
 namespace paddle {
 namespace inference {
@@ -69,18 +81,18 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
   seq_ids_out.resize(out_num);
   seq_ids->CopyToCpu(seq_ids_out.data());
 
-  dataresultvec.resize(batch_size * n_best);
+  dataresultvec.resize(batch_size * N_BEST);
   auto max_output_length = output_shape[0];
 
   for (int bsz = 0; bsz < output_shape[1]; ++bsz) {
-    for (int k = 0; k < n_best; ++k) {
-      dataresultvec[bsz * n_best + k].result_q = "";
+    for (int k = 0; k < N_BEST; ++k) {
+      dataresultvec[bsz * N_BEST + k].result_q = "";
       for (int len = 0; len < max_output_length; ++len) {
         if (seq_ids_out[len * batch_size * beam_size + bsz * beam_size + k] ==
-            eos_idx)
+            EOS_IDX)
           break;
-        dataresultvec[bsz * n_best + k].result_q =
-            dataresultvec[bsz * n_best + k].result_q +
+        dataresultvec[bsz * N_BEST + k].result_q =
+            dataresultvec[bsz * N_BEST + k].result_q +
             num2word_dict[seq_ids_out[len * batch_size * beam_size +
                                       bsz * beam_size + k]] +
             " ";
@@ -110,7 +122,7 @@ public:
       split(line, ' ', &word_data);
       std::string query_str = "";
       for (int j = 0; j < word_data.size(); ++j) {
-        if (j >= max_length) {
+        if (j >= MAX_LENGTH) {
           break;
         }
         query_str += word_data[j];
@@ -121,9 +133,9 @@ public:
         }
       }
       source_query_vec.push_back(query_str);
-      data_input.src_data.push_back(eos_idx);
+      data_input.src_data.push_back(EOS_IDX);
       max_len = std::max(max_len, static_cast<int>(data_input.src_data.size()));
-      max_len = std::min(max_len, max_length);
+      max_len = std::min(max_len, MAX_LENGTH);
       data_input_vec.push_back(data_input);
     }
     if (data_input_vec.empty()) {
@@ -134,7 +146,7 @@ public:
   }
 
   bool GetWordDict() {
-    std::ifstream fin(dict_dir);
+    std::ifstream fin(vocab_dir);
     std::string line;
     int k = 0;
     while (std::getline(fin, line)) {
@@ -165,7 +177,7 @@ private:
         if (k < data_input_vec[i].src_data.size()) {
           src_word_vec[i * max_len + k] = data_input_vec[i].src_data[k];
         } else {
-          src_word_vec[i * max_len + k] = pad_idx;
+          src_word_vec[i * max_len + k] = PAD_IDX;
         }
       }
     }
@@ -204,7 +216,7 @@ void Main(int batch_size, int gpu_id) {
   config.SwitchUseFeedFetchOps(false);
   config.SwitchSpecifyInputNames(true);
   auto predictor = CreatePredictor(config);
-  DataReader reader(datapath);
+  DataReader reader(data_dir);
   reader.GetWordDict();
 
   double whole_time = 0;
@@ -242,12 +254,15 @@ void Main(int batch_size, int gpu_id) {
 }  // namespace paddle
 
 int main(int argc, char** argv) {
-  batch_size = std::stoi(std::string(argv[1]));
-  gpu_id = std::stoi(std::string(argv[2]));
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  model_dir = std::string(argv[3]);
-  dict_dir = std::string(argv[4]);
-  datapath = std::string(argv[5]);
+  batch_size = FLAGS_batch_size;
+  gpu_id = FLAGS_gpu_id;
+  beam_size = FLAGS_beam_size;
+
+  model_dir = FLAGS_model_dir;
+  vocab_dir = FLAGS_vocab_dir;
+  data_dir = FLAGS_data_dir;
 
   paddle::inference::Main(batch_size, gpu_id);
 

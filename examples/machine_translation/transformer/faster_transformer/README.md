@@ -249,7 +249,7 @@ cd bin/
 使用 C++ 预测库，首先，我们需要做的是将动态图的 checkpoint 导出成预测库能使用的模型文件和参数文件。可以执行 `export_model.py` 实现这个过程。
 
 ``` sh
-python export_model.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/src/build/lib/libdecoding_op.so  --decoding_strategy beam_search --beam_size 5
+python export_model.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so  --decoding_strategy beam_search --beam_size 5
 ```
 
 注意：这里的 `libdecoding_op.so` 的动态库是参照前文 **`Python 动态图使用自定义 op`** 编译出来的 lib，当前 **`C++ 预测库使用自定义 op`** 不包含编译的动态库。因此，如果在使用预测库前，还需要额外导出模型，需要编译两次：
