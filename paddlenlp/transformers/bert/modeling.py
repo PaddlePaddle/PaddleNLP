@@ -321,7 +321,8 @@ class BertModel(BertPretrainedModel):
                  max_position_embeddings=512,
                  type_vocab_size=16,
                  initializer_range=0.02,
-                 pad_token_id=0):
+                 pad_token_id=0,
+                 normalize_before=False):
         super(BertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -336,7 +337,10 @@ class BertModel(BertPretrainedModel):
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0)
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
+        if normalize_before:
+            self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers, norm=LayerNorm(hidden_size))
+        else:
+            self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
         self.pooler = BertPooler(hidden_size)
         self.apply(self.init_weights)
 
