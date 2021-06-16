@@ -1,0 +1,4 @@
+sqlparse
+pymysql
+progressbar
+nltk

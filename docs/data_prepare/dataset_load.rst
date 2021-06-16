@@ -12,7 +12,7 @@
 .. code-block::
 
     >>> from paddlenlp.datasets import load_dataset
-    >>> train_ds,dev_ds = load_dataset("msra_ner", splits=("train", "dev"))
+    >>> train_ds, test_ds = load_dataset("msra_ner", splits=("train", "test"))
 
 :func:`load_dataset` 方法会从 :obj:`paddlenlp.datasets` 下找到msra_ner数据集对应的数据读取脚本（默认路径：paddlenlp/datasets/msra_ner.py），并调用脚本中 :class:`DatasetBuilder` 类的相关方法生成数据集。
 
@@ -28,7 +28,7 @@
     >>> print(type(train_ds))
     <class 'paddlenlp.datasets.dataset.IterDataset'>
 
-关于 :class:`MapDataset` 和 :class:`IterDataset` 功能和异同可以参考***。
+关于 :class:`MapDataset` 和 :class:`IterDataset` 功能和异同可以参考API文档 :doc:`datasets <../source/paddlenlp.datasets.dataset>`。
 
 选择子数据集
 ^^^^^^^^^^^^^^^^^^^^^^^

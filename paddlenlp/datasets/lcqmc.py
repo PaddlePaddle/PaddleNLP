@@ -64,9 +64,11 @@ class LCQMC(DatasetBuilder):
                 if len(data) == 3:
                     query, title, label = data
                     yield {"query": query, "title": title, "label": label}
-                else:
+                elif len(data) == 2:
                     query, title = data
                     yield {"query": query, "title": title, "label": ''}
+                else:
+                    continue
 
     def get_labels(self):
         """

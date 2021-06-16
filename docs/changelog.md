@@ -1,6 +1,18 @@
+### v2.0.2 (2021.06.07)
+
+- 丰富预训练模型
+  * 新增多粒度语言知识预训练模型[ERNIE-Gram](https://arxiv.org/abs/2010.12148)，该模型在多项中文NLP任务取得SOTA成绩。
+  * 新增NeZha中文预训练模型，感谢 @jm12138 的高质量贡献！ 🎉 🎉 🎉 
+  * 新增GPT CPM-Distill中文小型化模型，感谢 @jm12138 的高质量贡献！🎉 🎉 🎉 
+
+- Bug Fix
+  * 修复了`softmax_with_crossentropy` API导致的deprecated warning
+  * 更正了`ChnSentiCorp`, `LCQMC`等数据集的官方下载链接。
+
 ### v2.0.1 (2021.05.21)
 
-- 修复Windows CPU环境下的import产生的CUDA_HOME检测问题。
+- Bug Fix
+  - 修复Windows CPU环境下的import产生的CUDA_HOME检测问题。
 
 ### v2.0.0 (2021.05.20)
 

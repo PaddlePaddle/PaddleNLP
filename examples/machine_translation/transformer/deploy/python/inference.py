@@ -102,7 +102,7 @@ class Predictor(object):
             for name in predictor.get_input_names()
         ]
         output_handles = [
-            predictor.get_input_handle(name)
+            predictor.get_output_handle(name)
             for name in predictor.get_output_names()
         ]
         return cls(predictor, input_handles, output_handles, recorder)
@@ -167,7 +167,7 @@ def do_inference(args):
     sequence_outputs = predictor.predict(test_loader, to_tokens, args.n_best,
                                          args.bos_idx, args.eos_idx)
 
-    f = open(args.output_file, "w")
+    f = open(args.output_file, "w", encoding="utf-8")
     for target in sequence_outputs:
         for sequence in target:
             f.write(sequence + "\n")
