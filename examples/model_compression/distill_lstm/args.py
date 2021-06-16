@@ -103,7 +103,7 @@ def parse_args():
     parser.add_argument(
         "--vocab_path",
         type=str,
-        default='/root/.paddlenlp/models/bert-base-uncased/bert-base-uncased-vocab.txt',
+        default='~/.paddlenlp/models/bert-base-uncased/bert-base-uncased-vocab.txt',
         help="Student model's vocab path.")
 
     parser.add_argument(

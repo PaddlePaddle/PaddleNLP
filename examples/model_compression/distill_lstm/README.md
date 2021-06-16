@@ -134,7 +134,7 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --lr 1.0 \
     --dropout_prob 0.1 \
     --batch_size 64 \
-    --model_name ernie-gram-zh \
+    --model_name bert-wwm-ext-chinese \
     --teacher_dir pretrained_models/chnsenticorp/best_bert_wwm_ext_model_880 \
     --vocab_path senta_word_dict.txt \
     --output_dir distilled_models/chnsenticorp \
