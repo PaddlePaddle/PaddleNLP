@@ -40,8 +40,8 @@ class CrossEntropyWithKL(nn.Layer):
         self.update_kl_weight()
         self.kl_loss = kl_loss
 
-        rec_loss = F.softmax_with_cross_entropy(
-            logits=dec_output, label=label, soft_label=False)
+        rec_loss = F.cross_entropy(
+            input=dec_output, label=label, reduction='none', soft_label=False)
 
         rec_loss = paddle.squeeze(rec_loss, axis=[2])
         rec_loss = rec_loss * trg_mask
@@ -117,7 +117,9 @@ class TrainCallback(paddle.callbacks.ProgBarLogger):
 
     def on_train_begin(self, logs=None):
         super(TrainCallback, self).on_train_begin(logs)
-        self.train_metrics = ["loss", "ppl", "nll", "kl weight", "kl loss", "rec loss"]
+        self.train_metrics = [
+            "loss", "ppl", "nll", "kl weight", "kl loss", "rec loss"
+        ]
 
     def on_epoch_begin(self, epoch=None, logs=None):
         super(TrainCallback, self).on_epoch_begin(epoch, logs)
