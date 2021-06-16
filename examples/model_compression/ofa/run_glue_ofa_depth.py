@@ -384,8 +384,6 @@ def do_train(args):
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
     origin_weights = model.state_dict()
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
 
     # Step2: Convert origin model to supernet.
     sp_config = supernet(expand_ratio=args.width_mult_list)
@@ -430,8 +428,16 @@ def do_train(args):
     if args.task_name == "mnli":
         dev_data_loader = (dev_data_loader_matched, dev_data_loader_mismatched)
 
-    num_training_steps = args.max_steps if args.max_steps > 0 else len(
-        train_data_loader) * args.num_train_epochs
+    if paddle.distributed.get_world_size() > 1:
+        model = paddle.DataParallel(model)
+
+    if args.max_steps > 0:
+        num_training_steps = args.max_steps
+        num_train_epochs = math.ceil(num_training_steps /
+                                     len(train_data_loader))
+    else:
+        num_training_steps = len(train_data_loader) * args.num_train_epochs
+        num_train_epochs = args.num_train_epochs
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_steps)
@@ -451,7 +457,7 @@ def do_train(args):
 
     global_step = 0
     tic_train = time.time()
-    for epoch in range(args.num_train_epochs):
+    for epoch in range(num_train_epochs):
         # Step6: Set current epoch and task.
         ofa_model.set_epoch(epoch)
         ofa_model.set_task('depth')
@@ -543,6 +549,8 @@ def do_train(args):
                                 model, paddle.DataParallel) else model
                             model_to_save.save_pretrained(output_dir)
                             tokenizer.save_pretrained(output_dir)
+            if global_step >= num_training_steps:
+                return
 
 
 def print_arguments(args):

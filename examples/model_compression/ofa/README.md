@@ -238,7 +238,7 @@ python -u ./run_glue_ofa.py --model_type bert \
           --save_steps 100     \
           --output_dir ./tmp/$TASK_NAME \
           --device gpu  \
-          --width_mult_list 1.0 0.8333333333333334 0.6666666666666666 0.5
+          --width_mult_list 1.0 5/6 2/3 1/2
 ```
 
 多卡训练
@@ -256,7 +256,7 @@ python -m paddle.distributed.launch --gpus "0,1" run_glue_ofa.py  \
           --save_steps 100     \
           --output_dir ./tmp/$TASK_NAME \
           --device gpu  \
-          --width_mult_list 1.0 0.8333333333333334 0.6666666666666666 0.5
+          --width_mult_list 1.0 5/6 2/3 1/2
 ```
 
 
@@ -289,7 +289,7 @@ python -u ./export_model.py --model_type bert \
                  --sub_model_output_dir ./tmp/$TASK_NAME/dynamic_model \
                              --static_sub_model ./tmp/$TASK_NAME/static_model \
                  --device gpu \
-                 --width_mult  0.6666666666666666
+                 --width_mult  2/3
 ```
 
 其中参数释义如下：
