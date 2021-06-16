@@ -14,10 +14,7 @@
 
 from args import parse_args
 
-import numpy as np
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
 from paddlenlp.metrics import Perplexity
 
 from data import create_train_loader
