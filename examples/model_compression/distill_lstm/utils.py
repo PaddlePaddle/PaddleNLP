@@ -29,11 +29,8 @@ def convert_small_example(example,
             example['text'] = example['text'][:max_seq_length]
             input_ids = [vocab[token] for token in example['text']]
         else:
-            for i, token in enumerate(jieba.cut(example['text'])):
-                if i == max_seq_length:
-                    break
-                token_id = vocab[token]
-                input_ids.append(token_id)
+            tokenized_text = list(jieba.cut(example['text']))[:max_seq_length]
+            input_ids = vocab[tokenized_text]
     else:
         if is_tokenized:
             tokens = example['sentence'][:max_seq_length]

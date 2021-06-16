@@ -152,39 +152,36 @@ def apply_data_augmentation_for_cn(data,
     student model and teacher model would get at the same time.
     """
     np.random.seed(seed)
-    used_texts = [example['text'] for example in data]
-    used_texts = set(used_texts)
     new_data = []
+
     for example in data:
-        words = [word for word in jieba.cut(example['text'])]
+        text_tokenized = list(jieba.cut(example['text']))
+        words_lstm = text_tokenized
         words_bert = tokenizer.tokenize(example['text'])
         new_data.append({
-            "text": words,
+            "text": words_lstm,
             "sentence": words_bert,
             "label": example['label']
         })
         for _ in range(n_iter):
             # 1. Masking
-            words, words_bert = [], []
-            for word in jieba.cut(example['text']):
+            words_lstm, words_bert = [], []
+            for word in text_tokenized:
                 if np.random.rand() < p_mask:
-                    words.append([vocab.unk_token])
+                    words_lstm.append([vocab.unk_token])
                     words_bert.append([tokenizer.unk_token])
                 else:
-                    words.append([word])
+                    words_lstm.append([word])
                     words_bert.append(tokenizer.tokenize(word))
             # 2. N-gram sampling
-            words, words_bert = ngram_sampling(words, words_bert, p_ng,
-                                               ngram_range)
-            words, words_bert = flatten(words), flatten(words_bert)
-            new_text = "".join(words)
-            if new_text not in used_texts:
-                new_data.append({
-                    "text": words,
-                    "sentence": words_bert,
-                    "label": example['label']
-                })
-                used_texts.add(new_text)
+            words_lstm, words_bert = ngram_sampling(words_lstm, words_bert,
+                                                    p_ng, ngram_range)
+            words_lstm, words_bert = flatten(words_lstm), flatten(words_bert)
+            new_data.append({
+                "text": words_lstm,
+                "sentence": words_bert,
+                "label": example['label']
+            })
     return new_data
 
 

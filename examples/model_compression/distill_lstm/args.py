@@ -98,7 +98,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--teacher_path", type=str, help="Teacher model's path.")
+        "--teacher_dir", type=str, help="Teacher model's directory.")
 
     parser.add_argument(
         "--vocab_path",
