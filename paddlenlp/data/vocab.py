@@ -203,7 +203,7 @@ class Vocab(object):
         if isinstance(indices, (list, tuple)):
             indices = np.asarray(indices)
 
-        if len(indices.shape) > 1:
+        if isinstance(indices, (np.ndarray)) and len(indices.shape) > 1:
             raise ValueError(
                 'Token indices is invalid. Expected 1D array, but received {}D array. '.
                 format(len(indices.shape)))
