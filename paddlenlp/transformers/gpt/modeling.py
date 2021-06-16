@@ -80,8 +80,9 @@ class MultiHeadAttention(nn.Layer):
             self.out_proj = nn.Linear(
                 embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
         else:
-            assert self.head_dim % topo.mp_info.size == 0
-            self.head_dim = self.head_dim // topo.mp_info.size
+            assert self.num_heads % topo.mp_info.size == 0
+            self.num_heads = self.num_heads // topo.mp_info.size
+
             self.q_proj = paddlenlp.ops.ColumnParallelLiner(
                 (embed_dim, embed_dim),
                 topo.mp_info.size,
