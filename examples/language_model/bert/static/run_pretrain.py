@@ -29,6 +29,7 @@ import paddle
 import paddle.distributed.fleet as fleet
 from paddle.io import DataLoader, Dataset
 
+from paddlenlp.utils.tools import TimeCostAverage
 from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion
 from paddlenlp.transformers import BertTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -367,34 +368,35 @@ def do_train(args):
                                          data_holders, worker_init,
                                          paddle.static.cuda_places())
 
-            train_reader_cost = 0.0
-            train_run_cost = 0.0
+            train_cost_avg = TimeCostAverage()
+            reader_cost_avg = TimeCostAverage()
             total_samples = 0
-            reader_start = time.time()
+            batch_start = time.time()
             for step, batch in enumerate(train_data_loader):
-                train_reader_cost += time.time() - reader_start
+                train_reader_cost = time.time() - batch_start
+                reader_cost_avg.record(train_reader_cost)
                 global_step += 1
                 train_start = time.time()
                 loss_return = exe.run(main_program,
                                       feed=batch,
                                       fetch_list=[loss])
-                train_run_cost += time.time() - train_start
                 total_samples += args.batch_size
                 # In the new 2.0 api, must call this function to change the learning_rate
                 lr_scheduler.step()
+                train_run_cost = time.time() - batch_start
+                train_cost_avg.record(train_run_cost)
                 if global_step % args.logging_steps == 0:
                     print(
                         "tobal step: %d, epoch: %d, batch: %d, loss: %f, "
                         "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
-                        %
-                        (global_step, epoch, step, loss_return[0],
-                         train_reader_cost / args.logging_steps,
-                         (train_reader_cost + train_run_cost) /
-                         args.logging_steps, total_samples / args.logging_steps,
-                         total_samples / (train_reader_cost + train_run_cost)))
-                    train_reader_cost = 0.0
-                    train_run_cost = 0.0
+                        % (global_step, epoch, step, loss_return[0],
+                           reader_cost_avg.get_average(),
+                           train_cost_avg.get_average(),
+                           total_samples / args.logging_steps, total_samples /
+                           (args.logging_steps * train_cost_avg.get_average())))
                     total_samples = 0
+                    train_cost_avg.reset()
+                    reader_cost_avg.reset()
                 if global_step % args.save_steps == 0:
                     if worker_index == 0:
                         output_dir = os.path.join(args.output_dir,
@@ -410,7 +412,7 @@ def do_train(args):
                     reader_start = time.time()
                     del train_data_loader
                     return
-                reader_start = time.time()
+                batch_start = time.time()
             del train_data_loader
             train_data_loader, data_file = dataset_future.result(timeout=None)
         epoch += 1
