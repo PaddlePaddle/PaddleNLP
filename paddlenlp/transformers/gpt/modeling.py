@@ -767,7 +767,7 @@ class GPTForPretraining(GPTPretrainedModel):
         logits = self.parallel_matmul(
                 encoder_outputs,
                 self.gpt.embeddings.word_embeddings.weight,
-                False,
+                True,
                 self.gpt.topo)
 
         if use_cache:
@@ -788,8 +788,9 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
         self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
-        masked_lm_loss = self.loss_func(prediction_scores,
-                                        masked_lm_labels.unsqueeze(2))
+        masked_lm_loss = paddle.distributed.collective._c_softmax_with_cross_entropy(
+            prediction_scores, masked_lm_labels.unsqueeze(2))
+
         loss_mask = loss_mask.reshape([-1])
         masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
         loss = masked_lm_loss / loss_mask.sum()
