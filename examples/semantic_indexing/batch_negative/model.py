@@ -70,6 +70,6 @@ class SemanticIndexBatchNeg(SemanticIndexBase):
         labels = paddle.arange(0, query_cls_embedding.shape[0], dtype='int64')
         labels = paddle.reshape(labels, shape=[-1, 1])
 
-        loss = F.softmax_with_cross_entropy(logits=cosine_sim, label=labels)
+        loss = F.cross_entropy(input=cosine_sim, label=labels)
 
-        return paddle.mean(loss)
+        return loss
