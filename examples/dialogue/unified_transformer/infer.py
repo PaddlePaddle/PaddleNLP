@@ -84,7 +84,6 @@ def infer(args):
                                                    'test')
 
     if args.faster:
-        print("in faster. ")
         model = FasterUnifiedTransformer(
             model,
             decoding_lib=args.decoding_lib,
