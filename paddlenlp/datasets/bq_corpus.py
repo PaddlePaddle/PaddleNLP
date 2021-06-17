@@ -12,9 +12,11 @@ __all__ = ['BQCorpus']
 
 class BQCorpus(DatasetBuilder):
     """
-    BQCorpus: the largest dataset available for for the banking and finance sector
+    BQCorpus: A Large-scale Domain-specific Chinese Corpus For Sentence 
+    Semantic Equivalence Identification. More information please refer 
+    to `https://www.aclweb.org/anthology/D18-1536.pdf`
 
-    by frozenfish123@Wuhan University
+    Contributed by frozenfish123@Wuhan University
 
     """
     lazy = False
@@ -23,13 +25,13 @@ class BQCorpus(DatasetBuilder):
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
         'train': META_INFO(
-            os.path.join('BQCorpus', 'train.tsv'),
+            os.path.join('bq_corpus', 'bq_corpus', 'train.tsv'),
             'd37683e9ee778ee2f4326033b654adb9'),
         'dev': META_INFO(
-            os.path.join('BQCorpus', 'dev.tsv'),
+            os.path.join('bq_corpus', 'bq_corpus', 'dev.tsv'),
             '8a71f2a69453646921e9ee1aa457d1e4'),
         'test': META_INFO(
-            os.path.join('BQCorpus', 'test.tsv'),
+            os.path.join('bq_corpus', 'bq_corpus', 'test.tsv'),
             'c797995baa248b144ceaa4018b191e52'),
     }
 
@@ -47,18 +49,18 @@ class BQCorpus(DatasetBuilder):
     def _read(self, filename):
         """Reads data."""
         with open(filename, 'r', encoding='utf-8') as f:
-            head = None
             for line in f:
                 data = line.strip().split("\t")
-                if not head:
-                    head = data
-                else:
+                if len(data) == 3:
                     sentence1, sentence2, label = data
-                    yield {
-                        "sentence1": sentence1,
-                        "sentence2": sentence2,
-                        "label": label
-                    }
+                elif len(data) == 2:
+                    sentence1, sentence2 = data
+                    label = ''
+                yield {
+                    "sentence1": sentence1,
+                    "sentence2": sentence2,
+                    "label": label
+                }
 
     def get_labels(self):
         """
