@@ -640,7 +640,11 @@ class InferGptDecoding(nn.Layer):
 
 
 class InferUnifiedDecoding(nn.Layer):
-    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+    def __init__(self,
+                 model,
+                 decoding_lib=None,
+                 use_fp16_decoding=False,
+                 decoding_type_id=1):
         if decoding_lib is None:
             raise ValueError(
                 "The args decoding_lib must be set to use Faster Transformer. ")
@@ -897,8 +901,7 @@ class InferUnifiedDecoding(nn.Layer):
                 bos_id=0,
                 eos_id=1,
                 temperature=1.0,
-                beam_search_diversity_rate=0.0,
-                token_type_ids=1):
+                beam_search_diversity_rate=0.0):
         output_ids, parent_ids, sequence_length = infer_unified_decoding(
             cache_k=cache_k,
             cache_v=cache_v,
@@ -941,7 +944,7 @@ class InferUnifiedDecoding(nn.Layer):
             _eos_id=eos_id,
             _max_out_len=max_out_len,
             _beam_search_diversity_rate=beam_search_diversity_rate,
-            _type_id=token_type_ids,
+            _type_id=self._decoding_type_id,
             _unk_id=self._unk_id,
             _mask_id=self._mask_id)
         return output_ids  #, parent_ids, sequence_length

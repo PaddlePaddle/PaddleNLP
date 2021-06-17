@@ -84,7 +84,8 @@ def convert_example(example,
             task_type='knowledge',
             max_seq_len=max_seq_len,
             max_knowledge_len=max_knowledge_len,
-            add_start_token_as_response=True)
+            add_start_token_as_response=True,
+            return_length=True)
 
         if 'response' in example:
             tokenized_example['response'] = example['response']
@@ -128,7 +129,9 @@ def batchify_fn(batch_examples, pad_val, mode):
             [np.array(example['labels']) for example in batch_examples])
         return input_ids, token_type_ids, position_ids, attention_mask, masked_positions, labels
     else:
-        return input_ids, token_type_ids, position_ids, attention_mask
+        seq_len = np.asarray(
+            [example['seq_len'] for example in batch_examples]).astype("int32")
+        return input_ids, token_type_ids, position_ids, attention_mask, seq_len
 
 
 def create_data_loader(dataset, tokenizer, args, mode):
@@ -227,4 +230,24 @@ def select_response(ids,
     for preds in group:
         preds = sorted(preds, key=lambda x: -x[1])
         results.append(preds[0][0])
+    return results
+
+
+def select_response_without_scores(ids, tokenizer, keep_space=True):
+    ids = ids.numpy().transpose()
+
+    results = []
+    tmp = []
+    for pred in ids:
+        pred_token_ids, pred_tokens = post_process_response(pred, tokenizer)
+        num_token = len(pred_token_ids)
+        if keep_space:
+            response = " ".join(pred_tokens)
+        else:
+            response = "".join(pred_tokens)
+
+        in_turn_repetition = get_in_turn_repetition(
+            pred_tokens, True) or get_in_turn_repetition(pred_token_ids)
+
+        results.append(response)
     return results

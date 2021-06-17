@@ -448,7 +448,11 @@ class FasterGPT(nn.Layer):
 
 
 class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
-    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+    def __init__(self,
+                 model,
+                 decoding_lib=None,
+                 use_fp16_decoding=False,
+                 decoding_type_id=1):
         super(FasterUnifiedTransformer, self).__init__()
         self._model = model
         self.bos_token_id = model.bos_token_id
@@ -458,7 +462,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         self.decoding = InferUnifiedDecoding(
             model=self._model,
             decoding_lib=decoding_lib,
-            use_fp16_decoding=False)
+            use_fp16_decoding=False,
+            decoding_type_id=decoding_type_id)
 
     def prepare_inputs_for_generation(self,
                                       input_ids,
