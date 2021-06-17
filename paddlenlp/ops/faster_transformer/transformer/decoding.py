@@ -792,6 +792,19 @@ class InferUnifiedDecoding(nn.Layer):
                     restore_data=True,
                     reserve_var=True)
             ]
+            self.sub_modules["decoder_ln_weight"] = [
+                transfer_param(
+                    self._model.encoder.norm.weight,
+                    restore_data=True,
+                    reserve_var=True)
+            ]
+            self.sub_modules["decoder_ln_bias"] = [
+                transfer_param(
+                    self._model.encoder.norm.bias,
+                    is_bias=True,
+                    restore_data=True,
+                    reserve_var=True)
+            ]
             self.sub_modules["trans_weight"] = [
                 transfer_param(
                     self._model.lm_head.transform.weight,
@@ -805,13 +818,13 @@ class InferUnifiedDecoding(nn.Layer):
                     restore_data=True,
                     reserve_var=True)
             ]
-            self.sub_modules["decoder_ln_weight"] = [
+            self.sub_modules["lm_ln_weight"] = [
                 transfer_param(
                     self._model.lm_head.layer_norm.weight,
                     restore_data=True,
                     reserve_var=True)
             ]
-            self.sub_modules["decoder_ln_bias"] = [
+            self.sub_modules["lm_ln_bias"] = [
                 transfer_param(
                     self._model.lm_head.layer_norm.bias,
                     is_bias=True,
@@ -823,7 +836,7 @@ class InferUnifiedDecoding(nn.Layer):
                     transfer_param(
                         self._model.lm_head.decoder_weight,
                         restore_data=True,
-                        reserve_var=True))
+                        reserve_var=True), [1, 0])
             ]
             self.sub_modules["linear_bias"] = [
                 transfer_param(

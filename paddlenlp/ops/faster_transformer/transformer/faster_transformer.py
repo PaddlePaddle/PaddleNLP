@@ -462,7 +462,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         self.decoding = InferUnifiedDecoding(
             model=self._model,
             decoding_lib=decoding_lib,
-            use_fp16_decoding=False,
+            use_fp16_decoding=use_fp16_decoding,
             decoding_type_id=decoding_type_id)
 
     def prepare_inputs_for_generation(self,

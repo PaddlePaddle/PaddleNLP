@@ -331,7 +331,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
   cublasCreate(&cublas_handle_);
   cublasSetStream(cublas_handle_, stream);
 
-  switch (cache_k[0].type()) {
+  switch (self_ln_weight[0].type()) {
     case paddle::DataType::FLOAT16: {
       return unified_decoding_kernel<paddle::DataType::FLOAT16>(
           cache_k,
