@@ -151,6 +151,7 @@ def parse_args():
         "--device",
         default="gpu",
         type=str,
+        choices=["gpu", "cpu", "xpu"],
         help="The device to select to train the model, is must be cpu/gpu/xpu.")
     parser.add_argument(
         '--width_mult_list',
