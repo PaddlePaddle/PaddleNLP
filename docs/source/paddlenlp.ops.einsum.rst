@@ -1,5 +1,5 @@
 einsum
-=================================
+===========================
 
 .. automodule:: paddlenlp.ops.einsum
    :members:

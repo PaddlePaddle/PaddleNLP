@@ -163,7 +163,11 @@ def do_train(args):
         for f_id in range(num_files):
             data_file = files[f_id]
             train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                args, data_file, topo=topo, eod_id=tokenizer.eod_token_id)
+                args,
+                data_file,
+                data_world_size=topo.data_info.size,
+                data_world_rank=topo.data_info.rank,
+                eos_id=tokenizer.eos_token_id)
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.
             valid_data_loader = valid_data_loader()
@@ -181,7 +185,7 @@ def do_train(args):
                 if global_step % args.logging_freq == 0:
                     speed = args.logging_freq / (time.time() - tic_train)
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s, %.0f token/s, learning rate: %.9f"
+                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.9f"
                         % (global_step, epoch, step, loss, speed, speed *
                            default_global_tokens_num, optimizer.get_lr()))
                     log_writer.add_scalar("loss", float(loss), global_step)
@@ -212,9 +216,9 @@ def do_train(args):
                         logger.info("Save model to %s" % output_dir)
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
-                        paddle.save(
-                            optimizer.state_dict(),
-                            os.path.join(output_dir, "model_state.pdopt"))
+                        paddle.save(optimizer.state_dict(),
+                                    os.path.join(output_dir,
+                                                 "model_state.pdopt"))
 
                 if global_step >= args.max_steps:
                     run_evaluate(test_data_loader, model, criterion,

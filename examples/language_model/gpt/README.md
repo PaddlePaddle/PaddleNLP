@@ -53,7 +53,7 @@ bash decompress.sh
 
 ```shell
 python create_pretraining_data.py --input_path raw_data \
- --model_name gpt2-medium-en \
+ --model_name gpt2-en \
  --append_eod \
  --workers 8
 ```

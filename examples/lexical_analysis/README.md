@@ -106,10 +106,10 @@ python export_model.py --data_dir=./lexical_analysis_dataset_tiny --params_path=
 * `params_path`是指动态图训练保存的参数路径
 * `output_path`是指静态图参数导出路径。
 
-导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式：
+导出模型之后，可以用于部署，deploy/predict.py文件提供了python部署预测示例。运行方式：
 
 ```shell
-python deploy/python/predict.py --model_file=infer_model/static_graph_params.pdmodel --params_file=infer_model/static_graph_params.pdiparams
+python deploy/predict.py --model_file=infer_model/static_graph_params.pdmodel --params_file=infer_model/static_graph_params.pdiparams --data_dir lexical_analysis_dataset_tiny
 ```
 
 ### 模型预测

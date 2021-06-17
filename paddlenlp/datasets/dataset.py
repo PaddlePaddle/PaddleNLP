@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import atexit
 import collections
 import io
 import math
@@ -20,11 +21,12 @@ import warnings
 import sys
 import inspect
 from multiprocess import Pool, RLock
+import time
 
 import paddle.distributed as dist
 from paddle.io import Dataset, IterableDataset
 from paddle.dataset.common import md5file
-from paddle.utils.download import get_path_from_url
+from paddle.utils.download import get_path_from_url, _get_unique_endpoints
 from paddlenlp.utils.env import DATA_HOME
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 import importlib
@@ -471,42 +473,86 @@ class DatasetBuilder:
         datasets = []
         assert splits or data_files, "`data_files` and `splits` can not both be None."
 
-        if data_files:
-            assert isinstance(data_files, str) or isinstance(
-                data_files, dict
-            ) or isinstance(data_files, tuple) or isinstance(
-                data_files, list
-            ), "`data_files` should be a string or tuple or list or a dictionary whose key is split name and value is the path of data file."
-            if isinstance(data_files, str):
-                split = 'train'
-                datasets.append(self.read(filename=data_files, split=split))
-            elif isinstance(data_files, tuple) or isinstance(data_files, list):
-                split = 'train'
-                datasets += [
-                    self.read(
-                        filename=filename, split=split)
-                    for filename in data_files
-                ]
+        def remove_if_exit(filepath):
+            if isinstance(filepath, (list, tuple)):
+                for file in filepath:
+                    try:
+                        os.remove(file)
+                    except OSError:
+                        pass
             else:
-                datasets += [
-                    self.read(
-                        filename=filename, split=split)
-                    for split, filename in data_files.items()
-                ]
+                try:
+                    os.remove(filepath)
+                except OSError:
+                    pass
 
-        if splits:
+        if splits and data_files is None:
             assert isinstance(splits, str) or (
                 isinstance(splits, list) and isinstance(splits[0], str)
             ) or (
                 isinstance(splits, tuple) and isinstance(splits[0], str)
             ), "`splits` should be a string or list of string or a tuple of string."
             if isinstance(splits, str):
-                filename = self._get_data(splits)
-                datasets.append(self.read(filename=filename, split=splits))
+                splits = [splits]
+            parallel_env = dist.ParallelEnv()
+            unique_endpoints = _get_unique_endpoints(
+                parallel_env.trainer_endpoints[:])
+            # move register hook to first and register togather
+            lock_files = []
+            for split in splits:
+                lock_file = os.path.join(DATA_HOME, self.__class__.__name__)
+                if self.name is not None:
+                    lock_file = lock_file + "." + self.name
+                lock_file += "." + split + ".done" + "." + str(os.getppid())
+                lock_files.append(lock_file)
+            # Must register to all procs to make the lock file can be removed
+            # when any proc breaks. Otherwise, the single registered proc may
+            # not receive proper singal send by the parent proc to exit.
+            atexit.register(lambda: remove_if_exit(lock_files))
+            for split in splits:
+                filename = self._get_data(split)
+                lock_file = os.path.join(DATA_HOME, self.__class__.__name__)
+                if self.name is not None:
+                    lock_file = lock_file + "." + self.name
+                lock_file += "." + split + ".done" + "." + str(os.getppid())
+                # `lock_file` indicates the finished status of`_get_data`.
+                # `_get_data` only works in the `unique_endpoints` specified
+                # proc since `get_path_from_url` only work for it. The other
+                # procs wait `_get_data` to be finished.
+                if parallel_env.current_endpoint in unique_endpoints:
+                    f = open(lock_file, "w")
+                    f.close()
+                else:
+                    while not os.path.exists(lock_file):
+                        time.sleep(1)
+                datasets.append(self.read(filename=filename, split=split))
+
+        if data_files:
+            assert isinstance(data_files, str) or isinstance(
+                data_files, tuple) or isinstance(
+                    data_files, list
+                ), "`data_files` should be a string or tuple or list of strings."
+
+            if isinstance(data_files, str):
+                data_files = [data_files]
+            default_split = 'train'
+            if splits:
+                if isinstance(splits, str):
+                    splits = [splits]
+                assert len(splits) == len(
+                    data_files
+                ), "Number of `splits` and number of `data_files` should be the same if you want to specify the split of loacl data file."
+                datasets += [
+                    self.read(
+                        filename=data_files[i], split=splits[i])
+                    for i in range(len(data_files))
+                ]
             else:
-                for split in splits:
-                    filename = self._get_data(split)
-                    datasets.append(self.read(filename=filename, split=split))
+                datasets += [
+                    self.read(
+                        filename=data_files[i], split=default_split)
+                    for i in range(len(data_files))
+                ]
 
         return datasets if len(datasets) > 1 else datasets[0]
 

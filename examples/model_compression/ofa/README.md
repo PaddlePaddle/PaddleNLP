@@ -190,9 +190,10 @@ BERT-base模型是一个迁移能力很强的通用语义表示模型，但是�
 
 ### 环境依赖
 
-模型压缩功能依赖最新版本的PaddleNLP和PaddleSlim.
+模型压缩功能依赖最新版本的PaddleSlim
 ```shell
-pip install paddleslim==2.0.0 -i https://pypi.org/simple
+git clone https://github.com/PaddlePaddle/PaddleSlim
+python setup.py build && python setup.py install
 ```
 
 ### Fine-tuing
@@ -217,7 +218,7 @@ python -u ./run_glue.py \
     --logging_steps 1 \
     --save_steps 500 \
     --output_dir ./tmp/$TASK_NAME/ \
-    --n_gpu 1 \
+    --device gpu \
 ```
 参数详细含义参考[README.md](../../benchmark/glue/README.md)
 Fine-tuning 在dev上的结果如压缩结果表1-1中Result那一列所示。
@@ -225,7 +226,8 @@ Fine-tuning 在dev上的结果如压缩结果表1-1中Result那一列所示。
 
 ### 压缩训练
 
-```python
+单卡训练
+```shell
 python -u ./run_glue_ofa.py --model_type bert \
           --model_name_or_path ${task_pretrained_model_dir} \
           --task_name $TASK_NAME --max_seq_length 128     \
@@ -235,9 +237,28 @@ python -u ./run_glue_ofa.py --model_type bert \
           --logging_steps 10     \
           --save_steps 100     \
           --output_dir ./tmp/$TASK_NAME \
-          --n_gpu 1 \
+          --device gpu  \
           --width_mult_list 1.0 0.8333333333333334 0.6666666666666666 0.5
 ```
+
+多卡训练
+
+```shell
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0,1" run_glue_ofa.py  \
+          --model_type bert \
+          --model_name_or_path ${task_pretrained_model_dir} \
+          --task_name $TASK_NAME --max_seq_length 128     \
+          --batch_size 32       \
+          --learning_rate 2e-5     \
+          --num_train_epochs 6     \
+          --logging_steps 10     \
+          --save_steps 100     \
+          --output_dir ./tmp/$TASK_NAME \
+          --device gpu  \
+          --width_mult_list 1.0 0.8333333333333334 0.6666666666666666 0.5
+```
+
 
 其中参数释义如下：
 - `model_type` 指示了模型类型，当前仅支持BERT模型。
@@ -250,7 +271,7 @@ python -u ./run_glue_ofa.py --model_type bert \
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
-- `n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可；若为0，则使用CPU。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `width_mult_list` 表示压缩训练过程中，对每层Transformer Block的宽度选择的范围。
 
 压缩训练之后在dev上的结果如压缩结果表格中Result with PaddleSlim那一列所示，延时情况如表1-2所示。
@@ -267,7 +288,7 @@ python -u ./export_model.py --model_type bert \
                              --max_seq_length 128     \
                  --sub_model_output_dir ./tmp/$TASK_NAME/dynamic_model \
                              --static_sub_model ./tmp/$TASK_NAME/static_model \
-                 --n_gpu 1 \
+                 --device gpu \
                  --width_mult  0.6666666666666666
 ```
 
@@ -277,7 +298,7 @@ python -u ./export_model.py --model_type bert \
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。默认：128.
 - `sub_model_output_dir` 指示了导出子模型动态图参数的目录。
 - `static_sub_model` 指示了导出子模型静态图模型及参数的目录，设置为None，则表示不导出静态图模型。默认：None。
-- `n_gpu` 表示使用的 GPU 卡数。若希望使用多卡训练，将其设置为指定数目即可；若为0，则使用CPU。默认：1.
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `width_mult` 表示导出子模型的宽度。默认：1.0.
 
 

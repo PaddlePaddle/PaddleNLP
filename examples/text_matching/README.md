@@ -12,10 +12,15 @@
 </p>
 
 
-文本匹配任务数据每一个样本通常由两个文本组成（query，title）。类别形式为0或1，0表示query与title不匹配； 1表示匹配。
+文本匹配任务数据每一个样本通常由两个文本组成（query，title）。类别形式为 0 或 1，0 表示 query 与 title 不匹配； 1 表示匹配。
 
+本项目包含面向搜索、推荐系统排序模块、召回模块的常规解决方案，具体如下:
+- 基于单塔 Point-wise 范式的语义匹配模型 [ernie_matching](./ernie_matching/train_pointwise.py): 模型精度高、计算复杂度高, 适合直接进行语义匹配 2 分类的应用场景。
+- 基于单塔 Pair-wise 范式的语义匹配模型 [ernie_matching](./ernie_matching/train_pairwise.py): 模型精度高、计算复杂度高, 对文本相似度大小的`序关系`建模能力更强，适合将相似度特征作为上层排序模块输入特征的应用场景。
+- 基于双塔 Point-wise 范式的语义匹配模型 [SimNet](./simnet) 和 [Sentence Transformers](./sentence_transformers), 这 2 种方案计算效率更高，适合对延时要求高、根据语义相似度进行粗排的应用场景。
 
-该项目展示了使用传统的[SimNet](./simnet) 和 [Sentence Transformers](./sentence_transformers)两种方法完成本匹配任务。
+## ernie_matching
+[ernie_matching](./ernie_matching) 展示了基于预训练模型 ERNIE-Gram 训练单塔 Point-wise & Pair-wise 语义匹配模型。
 
 ## SimNet
 
@@ -23,4 +28,4 @@
 
 ## Sentence Transformers
 
-[Sentence Transformers](./sentence_transformers) 展示了如何使用以ERNIE为代表的模型Fine-tune完成文本匹配任务。
+[Sentence Transformers](./sentence_transformers) 展示了如何使用以 ERNIE 为代表的模型Fine-tune完成文本匹配任务。

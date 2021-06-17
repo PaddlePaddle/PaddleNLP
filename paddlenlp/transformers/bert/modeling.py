@@ -271,6 +271,42 @@ class BertPretrainedModel(PretrainedModel):
 @register_base_model
 class BertModel(BertPretrainedModel):
     """
+    The bare BERT Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Check the superclass documentation for the generic methods and the library implements for all its model.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (`int`):
+            Vocabulary size of the XLNet model. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling XLNetModel.
+        hidden_size (`int`, optional):
+            Dimensionality of the encoder layers and the pooler layer. Defaults to ``768``.
+        num_hidden_layers (`int`, optional):
+            Number of hidden layers in the Transformer encoder. Defaults to ``12``.
+        num_attention_heads (`int`, optional):
+            Number of attention heads for each attention layer in the Transformer encoder.
+            Defaults to ``12``.
+        intermediate_size (`int`, optional):
+            Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
+            Defaults to ``3072``.
+        hidden_act (`str`, optional):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported. Defaults to ``"gelu"``.
+        hidden_dropout_prob (`float`, optional):
+            The dropout probability for all fully connected layers in the embeddings and encoder.
+            Defaults to ``0.1``.
+        attention_probs_dropout_prob (`float`, optional):
+            The dropout probability for all fully connected layers in the pooler.
+            Defaults to ``0.1``.
+        initializer_range (`float`, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Defaults to ``0.02``.
     """
 
     def __init__(self,
@@ -308,7 +344,8 @@ class BertModel(BertPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False):
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
@@ -318,10 +355,22 @@ class BertModel(BertPretrainedModel):
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
-        encoder_outputs = self.encoder(embedding_output, attention_mask)
-        sequence_output = encoder_outputs
-        pooled_output = self.pooler(sequence_output)
-        return sequence_output, pooled_output
+        if output_hidden_states:
+            output = embedding_output
+            encoder_outputs = []
+            for mod in self.encoder.layers:
+                output = mod(output, src_mask=attention_mask)
+                encoder_outputs.append(output)
+            if self.encoder.norm is not None:
+                encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
+            pooled_output = self.pooler(encoder_outputs[-1])
+        else:
+            sequence_output = self.encoder(embedding_output, attention_mask)
+            pooled_output = self.pooler(sequence_output)
+        if output_hidden_states:
+            return encoder_outputs, pooled_output
+        else:
+            return sequence_output, pooled_output
 
 
 class BertForQuestionAnswering(BertPretrainedModel):
@@ -499,9 +548,12 @@ class BertPretrainingCriterion(paddle.nn.Layer):
     def forward(self, prediction_scores, seq_relationship_score,
                 masked_lm_labels, next_sentence_labels, masked_lm_scale):
         with paddle.static.amp.fp16_guard():
-            masked_lm_loss = paddle.nn.functional.softmax_with_cross_entropy(
-                prediction_scores, masked_lm_labels, ignore_index=-1)
+            masked_lm_loss = F.cross_entropy(
+                prediction_scores,
+                masked_lm_labels,
+                reduction='none',
+                ignore_index=-1)
             masked_lm_loss = masked_lm_loss / masked_lm_scale
-            next_sentence_loss = paddle.nn.functional.softmax_with_cross_entropy(
-                seq_relationship_score, next_sentence_labels)
+            next_sentence_loss = F.cross_entropy(
+                seq_relationship_score, next_sentence_labels, reduction='none')
         return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)

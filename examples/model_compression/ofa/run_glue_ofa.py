@@ -17,13 +17,14 @@ import logging
 import os
 import random
 import time
+import math
 from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
 from paddle.io import DataLoader
-from paddle.metric import Metric, Accuracy, Precision, Recall
+from paddle.metric import Accuracy, Precision, Recall
 
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
@@ -147,10 +148,11 @@ def parse_args():
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
-        "--n_gpu",
-        type=int,
-        default=1,
-        help="number of gpus to use, 0 for cpu.")
+        "--device",
+        default="gpu",
+        type=str,
+        choices=["gpu", "cpu", "xpu"],
+        help="The device to select to train the model, is must be cpu/gpu/xpu.")
     parser.add_argument(
         '--width_mult_list',
         nargs='+',
@@ -170,6 +172,7 @@ def set_seed(args):
     # `paddle.seed(args.seed + paddle.distributed.get_rank())`
     paddle.seed(args.seed)
 
+
 @paddle.no_grad()
 def evaluate(model, criterion, metric, data_loader, width_mult=1.0):
     model.eval()
@@ -183,28 +186,63 @@ def evaluate(model, criterion, metric, data_loader, width_mult=1.0):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
-    if isinstance(metric, AccuracyAndF1):
-        print(
-            "width_mult: %s, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
-            % (
-                width_mult,
-                loss.numpy(),
-                res[0],
-                res[1],
-                res[2],
-                res[3],
-                res[4], ),
-            end='')
-    elif isinstance(metric, Mcc):
-        print("width_mult: %s, eval loss: %f, mcc: %s, " % (str(width_mult), loss.numpy(), res[0]), end='')
-    elif isinstance(metric, PearsonAndSpearman):
-        print(
-            "width_mult: %s, eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
-            % (str(width_mult), loss.numpy(), res[0], res[1], res[2]),
-            end='')
+    # Teacher model's evaluation
+    if width_mult == 100:
+        if isinstance(metric, AccuracyAndF1):
+            print(
+                "teacher model, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
+                % (
+                    loss.numpy(),
+                    res[0],
+                    res[1],
+                    res[2],
+                    res[3],
+                    res[4], ),
+                end='')
+        elif isinstance(metric, Mcc):
+            print(
+                "teacher model, eval loss: %f, mcc: %s, " %
+                (loss.numpy(), res[0]),
+                end='')
+        elif isinstance(metric, PearsonAndSpearman):
+            print(
+                "teacher model, eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
+                % (loss.numpy(), res[0], res[1], res[2]),
+                end='')
+        else:
+            print(
+                "teacher model, eval loss: %f, acc: %s, " % (loss.numpy(), res),
+                end='')
     else:
-        print("width_mult: %s, eval loss: %f, acc: %s, " % (str(width_mult), loss.numpy(), res), end='')
+        if isinstance(metric, AccuracyAndF1):
+            print(
+                "width_mult: %s, eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
+                % (
+                    width_mult,
+                    loss.numpy(),
+                    res[0],
+                    res[1],
+                    res[2],
+                    res[3],
+                    res[4], ),
+                end='')
+        elif isinstance(metric, Mcc):
+            print(
+                "width_mult: %s, eval loss: %f, mcc: %s, " %
+                (str(width_mult), loss.numpy(), res[0]),
+                end='')
+        elif isinstance(metric, PearsonAndSpearman):
+            print(
+                "width_mult: %s, eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
+                % (str(width_mult), loss.numpy(), res[0], res[1], res[2]),
+                end='')
+        else:
+            print(
+                "width_mult: %s, eval loss: %f, acc: %s, " %
+                (str(width_mult), loss.numpy(), res),
+                end='')
     model.train()
+
 
 ### monkey patch for bert forward to accept [attention_mask, head_mask] as  attention_mask
 def bert_forward(self,
@@ -280,7 +318,7 @@ def convert_example(example,
 
 
 def do_train(args):
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -351,13 +389,9 @@ def do_train(args):
 
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
 
     # Step1: Initialize a dictionary to save the weights from the origin BERT model.
-    origin_weights = {}
-    for name, param in model.named_parameters():
-        origin_weights[name] = param
+    origin_weights = model.state_dict()
 
     # Step2: Convert origin model to supernet.
     sp_config = supernet(expand_ratio=args.width_mult_list)
@@ -406,8 +440,16 @@ def do_train(args):
         num_heads=model.bert.config['num_attention_heads'])
     reorder_neuron_head(ofa_model.model, head_importance, neuron_importance)
 
-    num_training_steps = args.max_steps if args.max_steps > 0 else len(
-        train_data_loader) * args.num_train_epochs
+    if paddle.distributed.get_world_size() > 1:
+        ofa_model.model = paddle.DataParallel(ofa_model.model)
+
+    if args.max_steps > 0:
+        num_training_steps = args.max_steps
+        num_train_epochs = math.ceil(num_training_steps /
+                                     len(train_data_loader))
+    else:
+        num_training_steps = len(train_data_loader) * args.num_train_epochs
+        num_train_epochs = args.num_train_epochs
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_steps)
@@ -427,7 +469,7 @@ def do_train(args):
 
     global_step = 0
     tic_train = time.time()
-    for epoch in range(args.num_train_epochs):
+    for epoch in range(num_train_epochs):
         # Step7: Set current epoch and task.
         ofa_model.set_epoch(epoch)
         ofa_model.set_task('width')
@@ -456,7 +498,7 @@ def do_train(args):
             optimizer.clear_grad()
 
             if global_step % args.logging_steps == 0:
-                if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+                if paddle.distributed.get_rank() == 0:
                     logger.info(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
                         % (global_step, epoch, step, loss,
@@ -485,8 +527,7 @@ def do_train(args):
                         metric,
                         dev_data_loader,
                         width_mult=100)
-                print("eval done total : %s s" %
-                      (time.time() - tic_eval))
+                print("eval done total : %s s" % (time.time() - tic_eval))
                 for idx, width_mult in enumerate(args.width_mult_list):
                     net_config = utils.dynabert_config(ofa_model, width_mult)
                     ofa_model.set_net_config(net_config)
@@ -504,8 +545,7 @@ def do_train(args):
                         print("eval done total : %s s" %
                               (time.time() - tic_eval))
 
-                    if (not args.n_gpu > 1
-                        ) or paddle.distributed.get_rank() == 0:
+                    if paddle.distributed.get_rank() == 0:
                         output_dir = os.path.join(args.output_dir,
                                                   "model_%d" % global_step)
                         if not os.path.exists(output_dir):
@@ -515,6 +555,8 @@ def do_train(args):
                             model, paddle.DataParallel) else model
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
+            if global_step >= num_training_steps:
+                return
 
 
 def print_arguments(args):
@@ -528,7 +570,4 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_gpu)
-    else:
-        do_train(args)
+    do_train(args)

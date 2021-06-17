@@ -37,7 +37,7 @@ from utils import read_by_lines, write_by_lines, load_dict
 # warnings.filterwarnings('ignore')
 """
 For All pre-trained model（English and Chinese),
-Please refer to https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/transformers.md.
+Please refer to https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/transformers.rst.
 """
 
 # yapf: disable
@@ -133,7 +133,7 @@ class DuEventExtraction(paddle.io.Dataset):
 
     def _read_tsv(self, input_file, quotechar=None):
         """Reads a tab separated value file."""
-        with open(input_file, "r") as f:
+        with open(input_file, "r", encoding="UTF-8") as f:
             reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
             headers = next(reader)
             text_indices = [
@@ -200,8 +200,8 @@ def do_train():
         convert_example, tokenizer=tokenizer, label_map=label_map, max_seq_len=args.max_seq_len)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'),
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'),
         Stack(dtype="int64")  # label
     ): fn(list(map(trans_func, samples)))
 

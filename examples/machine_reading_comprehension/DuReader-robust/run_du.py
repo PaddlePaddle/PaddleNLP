@@ -29,7 +29,10 @@ from args import parse_args
 import paddlenlp as ppnlp
 
 from paddlenlp.data import Pad, Stack, Tuple, Dict
-from paddlenlp.transformers import BertForQuestionAnswering, BertTokenizer, ErnieForQuestionAnswering, ErnieTokenizer, RobertaForQuestionAnswering, RobertaTokenizer
+from paddlenlp.transformers import BertForQuestionAnswering, BertTokenizer
+from paddlenlp.transformers import ErnieForQuestionAnswering, ErnieTokenizer
+from paddlenlp.transformers import ErnieGramForQuestionAnswering, ErnieGramTokenizer
+from paddlenlp.transformers import RobertaForQuestionAnswering, RobertaTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 from paddlenlp.datasets import load_dataset
@@ -37,6 +40,7 @@ from paddlenlp.datasets import load_dataset
 MODEL_CLASSES = {
     "bert": (BertForQuestionAnswering, BertTokenizer),
     "ernie": (ErnieForQuestionAnswering, ErnieTokenizer),
+    "ernie_gram": (ErnieGramForQuestionAnswering, ErnieGramTokenizer),
     "roberta": (RobertaForQuestionAnswering, RobertaTokenizer)
 }
 
@@ -97,13 +101,10 @@ class CrossEntropyLossForSQuAD(paddle.nn.Layer):
         start_position, end_position = label
         start_position = paddle.unsqueeze(start_position, axis=-1)
         end_position = paddle.unsqueeze(end_position, axis=-1)
-        start_loss = paddle.nn.functional.softmax_with_cross_entropy(
-            logits=start_logits, label=start_position, soft_label=False)
-        start_loss = paddle.mean(start_loss)
-        end_loss = paddle.nn.functional.softmax_with_cross_entropy(
-            logits=end_logits, label=end_position, soft_label=False)
-        end_loss = paddle.mean(end_loss)
-
+        start_loss = paddle.nn.functional.cross_entropy(
+            input=start_logits, label=start_position)
+        end_loss = paddle.nn.functional.cross_entropy(
+            input=end_logits, label=end_position)
         loss = (start_loss + end_loss) / 2
         return loss
 

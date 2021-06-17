@@ -34,8 +34,8 @@ class Perplexity(paddle.metric.Metric):
 
     Args:
         seq_len(int): Sequence length of each sample, it must be provided while
-            data is not padded. Default: 20.
-        name(str): Name of `Metric` instance. Default: 'Perplexity'.
+            data is not padded. Defaults to 20.
+        name(str): Name of `Metric` instance. Defaults to 'Perplexity'.
 
     """
 
@@ -46,9 +46,26 @@ class Perplexity(paddle.metric.Metric):
         self.total_word_num = 0
 
     def compute(self, pred, label, seq_mask=None):
-        label = paddle.unsqueeze(label, axis=2)
-        ce = F.softmax_with_cross_entropy(
-            logits=pred, label=label, soft_label=False)
+        """
+        Computes cross entropy loss.
+
+        Args:
+            pred (Tensor):
+                Predictor tensor, and its dtype is float32 or float64, and has
+                a shape of [batch_size, sequence_length, vocab_size].
+            label(Tensor):
+                Label tensor, and its dtype is int64, and has a shape of
+                [batch_size, sequence_length, 1] or [batch_size, sequence_length].
+            seq_mask(Tensor, optional):
+                Sequence mask tensor, and its type could be float32, float64,
+                int32 or int64, and has a shape of [batch_size, sequence_length].
+                It's used to calculate loss. Defaults to None.
+
+        """
+        if label.dim() == 2:
+            label = paddle.unsqueeze(label, axis=2)
+        ce = F.cross_entropy(
+            input=pred, label=label, reduction='none', soft_label=False)
         ce = paddle.squeeze(ce, axis=[2])
         if seq_mask is not None:
             ce = ce * seq_mask
@@ -57,6 +74,18 @@ class Perplexity(paddle.metric.Metric):
         return ce
 
     def update(self, ce, word_num=None):
+        """
+        Updates metric states.
+
+        Args:
+            ce (numpy.ndarray):
+                Cross entropy loss, it's calculated by `compute` and converted
+                to `numpy.ndarray`.
+            word_num (numpy.ndarray):
+               The number of words of sequence, it's calculated by `compute`
+               and converted to `numpy.ndarray`. Defaults to None.
+
+        """
         batch_ce = np.sum(ce)
         if word_num is None:
             word_num = ce.shape[0] * ce.shape[1]
@@ -66,11 +95,27 @@ class Perplexity(paddle.metric.Metric):
         self.total_word_num += word_num
 
     def reset(self):
+        """
+        Resets all metric states.
+        """
         self.total_ce = 0
         self.total_word_num = 0
 
     def accumulate(self):
+        """
+        Calculates and returns the value of perplexity.
+
+        Returns:
+            perplexity: Calculation results.
+        """
         return np.exp(self.total_ce / self.total_word_num)
 
     def name(self):
+        """
+        Returns name of the metric instance.
+
+        Returns:
+           str: The name of the metric instance.
+
+        """
         return self._name
