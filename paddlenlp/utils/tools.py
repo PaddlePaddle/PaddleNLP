@@ -57,3 +57,34 @@ def dygraph_params_to_static(model, dygraph_tensor_dict):
         ret_dict[parm.name] = dygraph_tensor_dict[name]
 
     return ret_dict
+
+
+class TimeCostAverage(object):
+    """
+    Simple tool for calcluating time average cost in the process of training and inferencing.
+    """
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        """
+        Reset the recoder state, and reset the `cnt` to zero.
+        """
+        self.cnt = 0
+        self.total_time = 0
+
+    def record(self, usetime):
+        """
+        Recoding the time cost in current step and accumulating the `cnt`.
+        """
+        self.cnt += 1
+        self.total_time += usetime
+
+    def get_average(self):
+        """
+        Returning the average time cost after the start of training.
+        """
+        if self.cnt == 0:
+            return 0
+        return self.total_time / self.cnt
