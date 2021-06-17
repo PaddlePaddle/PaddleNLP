@@ -57,7 +57,7 @@ We provide **15** network architectures and **67** pretrained models. Not only i
 from paddlenlp.transformers import *
 
 ernie = ErnieModel.from_pretrained('ernie-1.0')
-ernie_gram = ErnieGramModel.from_pretrained('ernie-gram')
+ernie_gram = ErnieGramModel.from_pretrained('ernie-gram-zh')
 bert = BertModel.from_pretrained('bert-wwm-chinese')
 albert = AlbertModel.from_pretrained('albert-chinese-tiny')
 roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
