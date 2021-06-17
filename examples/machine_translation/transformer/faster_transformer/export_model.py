@@ -29,7 +29,7 @@ def parse_args():
         help="Path of the config file. ")
     parser.add_argument(
         "--decoding_lib",
-        default="../../../../paddlenlp/ops/src/build/lib/libdecoding_op.so",
+        default="../../../../paddlenlp/ops/build/lib/libdecoding_op.so",
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(

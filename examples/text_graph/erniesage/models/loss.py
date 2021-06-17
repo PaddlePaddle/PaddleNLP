@@ -48,7 +48,7 @@ class SoftmaxWithCrossEntropy(nn.Layer):
         super(SoftmaxWithCrossEntropy, self).__init__()
 
     def forward(self, logits, label):
-        return paddle.mean(F.softmax_with_cross_entropy(logits, label))
+        return F.cross_entropy(logits, label, reduction="mean")
 
 
 class HingeLoss(nn.Layer):
