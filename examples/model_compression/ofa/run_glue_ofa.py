@@ -148,10 +148,11 @@ def parse_args():
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
-        "--n_gpu",
-        type=int,
-        default=1,
-        help="number of gpus to use, 0 for cpu.")
+        "--device",
+        default="gpu",
+        type=str,
+        choices=["gpu", "cpu", "xpu"],
+        help="The device to select to train the model, is must be cpu/gpu/xpu.")
     parser.add_argument(
         '--width_mult_list',
         nargs='+',
@@ -317,7 +318,7 @@ def convert_example(example,
 
 
 def do_train(args):
-    paddle.set_device("gpu" if args.n_gpu else "cpu")
+    paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -388,8 +389,6 @@ def do_train(args):
 
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
 
     # Step1: Initialize a dictionary to save the weights from the origin BERT model.
     origin_weights = model.state_dict()
@@ -440,6 +439,9 @@ def do_train(args):
         num_layers=model.bert.config['num_hidden_layers'],
         num_heads=model.bert.config['num_attention_heads'])
     reorder_neuron_head(ofa_model.model, head_importance, neuron_importance)
+
+    if paddle.distributed.get_world_size() > 1:
+        ofa_model.model = paddle.DataParallel(ofa_model.model)
 
     if args.max_steps > 0:
         num_training_steps = args.max_steps
@@ -496,7 +498,7 @@ def do_train(args):
             optimizer.clear_grad()
 
             if global_step % args.logging_steps == 0:
-                if (not args.n_gpu > 1) or paddle.distributed.get_rank() == 0:
+                if paddle.distributed.get_rank() == 0:
                     logger.info(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
                         % (global_step, epoch, step, loss,
@@ -543,8 +545,7 @@ def do_train(args):
                         print("eval done total : %s s" %
                               (time.time() - tic_eval))
 
-                    if (not args.n_gpu > 1
-                        ) or paddle.distributed.get_rank() == 0:
+                    if paddle.distributed.get_rank() == 0:
                         output_dir = os.path.join(args.output_dir,
                                                   "model_%d" % global_step)
                         if not os.path.exists(output_dir):
@@ -569,7 +570,4 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    if args.n_gpu > 1:
-        paddle.distributed.spawn(do_train, args=(args, ), nprocs=args.n_gpu)
-    else:
-        do_train(args)
+    do_train(args)

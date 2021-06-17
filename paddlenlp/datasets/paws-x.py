@@ -21,29 +21,28 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['LCQMC']
+__all__ = ['PAWSX']
 
 
-class LCQMC(DatasetBuilder):
+class PAWSX(DatasetBuilder):
     """
-    LCQMC:A Large-scale Chinese Question Matching Corpus
-    More information please refer to `https://www.aclweb.org/anthology/C18-1166/`
-
+    PAWS-X: A Cross-lingual Adversarial Dataset for Paraphrase Identification
+    More information please refer to `https://arxiv.org/abs/1908.11828`
+    Here we only store simplified Chinese(zh) version.
     """
-
-    URL = "https://dataset-bj.cdn.bcebos.com/qianyan/lcqmc.zip"
-    MD5 = "7069fa0cffbd2110845869c61f83814a"
+    URL = "https://dataset-bj.cdn.bcebos.com/qianyan/paws-x-zh.zip"
+    MD5 = "f1c6f2ab8afb1f29fe04a0c929e3ab1c"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
         'train': META_INFO(
-            os.path.join('lcqmc', 'lcqmc', 'train.tsv'),
-            '479d94fe575981f236319f2a5b8b3c03'),
+            os.path.join('paws-x-zh', 'paws-x-zh', 'train.tsv'),
+            '3422ba98e5151c91bbb0a785c4873a4c'),
         'dev': META_INFO(
-            os.path.join('lcqmc', 'lcqmc', 'dev.tsv'),
-            '089329fb44ef26155baef9c9c8c823ba'),
+            os.path.join('paws-x-zh', 'paws-x-zh', 'dev.tsv'),
+            'dc163453e728cf118e17b4065d6602c8'),
         'test': META_INFO(
-            os.path.join('lcqmc', 'lcqmc', 'test.tsv'),
-            'a4a483f2f871d57e0f3894fca0d0f8f0'),
+            os.path.join('paws-x-zh', 'paws-x-zh', 'test.tsv'),
+            '5b7320760e70559591092cb01b6f5955'),
     }
 
     def _get_data(self, mode, **kwargs):
@@ -62,16 +61,24 @@ class LCQMC(DatasetBuilder):
             for line in f:
                 data = line.strip().split("\t")
                 if len(data) == 3:
-                    query, title, label = data
-                    yield {"query": query, "title": title, "label": label}
+                    sentence1, sentence2, label = data
+                    yield {
+                        "sentence1": sentence1,
+                        "sentence2": sentence2,
+                        "label": label
+                    }
                 elif len(data) == 2:
-                    query, title = data
-                    yield {"query": query, "title": title, "label": ''}
+                    sentence1, sentence2 = data
+                    yield {
+                        "sentence1": sentence1,
+                        "sentence2": sentence2,
+                        "label": ''
+                    }
                 else:
                     continue
 
     def get_labels(self):
         """
-        Return labels of the LCQMC object.
+        Return labels of the PAWS-X object.
         """
         return ["0", "1"]

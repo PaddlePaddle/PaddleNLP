@@ -167,7 +167,7 @@ def do_inference(args):
     sequence_outputs = predictor.predict(test_loader, to_tokens, args.n_best,
                                          args.bos_idx, args.eos_idx)
 
-    f = open(args.output_file, "w")
+    f = open(args.output_file, "w", encoding="utf-8")
     for target in sequence_outputs:
         for sequence in target:
             f.write(sequence + "\n")

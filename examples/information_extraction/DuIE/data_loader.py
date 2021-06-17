@@ -259,7 +259,8 @@ class DuIEDataset(paddle.io.Dataset):
 
         input_ids, seq_lens, tok_to_orig_start_index, tok_to_orig_end_index, labels = (
             [] for _ in range(5))
-        dataset_scale = sum(1 for line in open(file_path, 'r'))
+        dataset_scale = sum(1 for line in open(
+            file_path, 'r', encoding="UTF-8"))
         logger.info("Preprocessing data, loaded from %s" % file_path)
         with open(file_path, "r", encoding="utf-8") as fp:
             lines = fp.readlines()

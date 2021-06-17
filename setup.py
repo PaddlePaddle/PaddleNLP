@@ -56,8 +56,8 @@ setuptools.setup(
         where='.', exclude=('examples*', 'tests*')),
     package_data={
         'paddlenlp.ops': get_package_data_files('paddlenlp.ops', [
-            'CMakeLists.txt', 'README.md', 'cmake', 'src', 'sample', 'patches',
-            'optimizer'
+            'CMakeLists.txt', 'README.md', 'cmake', 'faster_transformer',
+            'patches', 'optimizer'
         ])
     },
     setup_requires=['cython', 'numpy'],

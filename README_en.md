@@ -57,7 +57,7 @@ We provide **15** network architectures and **67** pretrained models. Not only i
 from paddlenlp.transformers import *
 
 ernie = ErnieModel.from_pretrained('ernie-1.0')
-ernie_gram = ErnieGramModel.from_pretrained('ernie-gram')
+ernie_gram = ErnieGramModel.from_pretrained('ernie-gram-zh')
 bert = BertModel.from_pretrained('bert-wwm-chinese')
 albert = AlbertModel.from_pretrained('albert-chinese-tiny')
 roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
@@ -110,7 +110,7 @@ wordemb.cosine_sim("apple", "rail")
 >>> 0.29207364
 ```
 
-For more `TokenEmbedding` usage, please refer to [Embedding API](./docs/embeddings.md)
+For more `TokenEmbedding` usage, please refer to [Embedding API](./docs/model_zoo/embeddings.md)
 
 ### More API Usage
 

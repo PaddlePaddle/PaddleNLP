@@ -59,7 +59,7 @@ pip install --upgrade paddlenlp
 from paddlenlp.transformers import *
 
 ernie = ErnieModel.from_pretrained('ernie-1.0')
-ernie_gram = ErnieGramModel.from_pretrained('ernie-gram')
+ernie_gram = ErnieGramModel.from_pretrained('ernie-gram-zh')
 bert = BertModel.from_pretrained('bert-wwm-chinese')
 albert = AlbertModel.from_pretrained('albert-chinese-tiny')
 roberta = RobertaModel.from_pretrained('roberta-wwm-ext')
@@ -135,7 +135,7 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 | :------------  | ---- |
 | [词向量](./examples/word_embedding/) | 利用`TokenEmbedding API`展示如何快速计算词之间语义距离和词的特征提取。 |
 | [词法分析](./examples/lexical_analysis/) | 基于BiGRU-CRF模型实现了分词、词性标注和命名实体识的联合训练任务。 |
-| [语言模型](./examples/language_model/)  | 提供了基于[RNNLM](./exampels/language_model/rnnlm)和[Transformer-XL]((./exampels/language_model/transformer-xl))两种结构的语言模型，支持输入词序列计算其生成概率，可用于表示模型生成句子的流利程度。 |
+| [语言模型](./examples/language_model/)  | 提供了基于[RNNLM](./examples/language_model/rnnlm)和[Transformer-XL](./examples/language_model/transformer-xl)两种结构的语言模型，支持输入词序列计算其生成概率，可用于表示模型生成句子的流利程度。 |
 | [语义解析](./examples/text_to_sql):star: | 语义解析Text-to-SQL任务是让机器自动让自然语言问题转换数据库可操作的SQL查询语句，是实现基于数据库自动问答的核心模块。|
 
 ### NLP 核心技术
