@@ -237,11 +237,6 @@ cd ../
 
 编译完成后，在 `build/bin/` 路径下将会看到 `transformer_e2e` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
 
-``` sh
-cd bin/
-./transformer_e2e <batch_size> <gpu_id> <model_directory> <dict_directory> <input_data>
-```
-
 ### 导出基于 Faster Transformer 自定义 op 的预测库可使用模型文件
 
 我们提供一个已经基于动态图训练好的 base model 的 checkpoint 以供使用，当前 checkpoint 是基于 WMT 英德翻译的任务训练。可以通过[tranformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz)下载。
@@ -249,7 +244,7 @@ cd bin/
 使用 C++ 预测库，首先，我们需要做的是将动态图的 checkpoint 导出成预测库能使用的模型文件和参数文件。可以执行 `export_model.py` 实现这个过程。
 
 ``` sh
-python export_model.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/src/build/lib/libdecoding_op.so  --decoding_strategy beam_search --beam_size 5
+python export_model.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so  --decoding_strategy beam_search --beam_size 5
 ```
 
 注意：这里的 `libdecoding_op.so` 的动态库是参照前文 **`Python 动态图使用自定义 op`** 编译出来的 lib，当前 **`C++ 预测库使用自定义 op`** 不包含编译的动态库。因此，如果在使用预测库前，还需要额外导出模型，需要编译两次：
@@ -269,7 +264,7 @@ python export_model.py --config ../configs/transformer.base.yaml --decoding_lib 
 
 ``` sh
 cd bin/
-./transformer_e2e <batch_size> <gpu_id> <model_directory> <dict_directory> <input_data>
+./transformer_e2e -batch_size <batch_size> -beam_size <beam_size> -gpu_id <gpu_id> -model_dir <model_directory> -vocab_dir <dict_directory> -data_dir <input_data>
 ```
 
 这里的 `<model_directory>` 即是上文说到导出的 paddle inference 模型。
@@ -279,7 +274,7 @@ cd bin/
 ``` sh
 cd bin/
 ../third-party/build/bin/decoding_gemm 8 5 8 64 38512 256 512 0
-./transformer_e2e 8 0 ./infer_model/ DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
+./transformer_e2e -batch_size 8 -beam_size 5 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
 其中：
