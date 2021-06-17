@@ -18,7 +18,7 @@ find_package(CUDA 10.1 REQUIRED)
 
 INCLUDE(ExternalProject)
 
-set(CXX_STD "11" CACHE STRING "C++ standard")
+set(CXX_STD "14" CACHE STRING "C++ standard")
 
 option(ON_INFER         "Compile with inference. "                                OFF)
 option(WITH_GPU         "Compile with GPU/CPU, default use CPU."                  ON)
@@ -223,4 +223,4 @@ if(ON_INFER AND WITH_GPT)
   )
 endif()
 
-add_subdirectory(src)
+add_subdirectory(faster_transformer)

@@ -109,26 +109,26 @@ def _is_punctuation(char):
 class PretrainedTokenizer(object):
     """
     The base class for all pretrained tokenizers. It mainly provides common methods
-    for pretrained tokenizers loading (construction and loading) and saving. Loading
+    for loading (construction and loading) and saving pretrained tokenizers. Loading
     and saving also rely on the following class attributes which should be overridden
     by derived classes accordingly:
 
-    - `tokenizer_config_file` (`str`): Represents the file name of tokenizer
+    - **tokenizer_config_file** (str): Represents the file name of tokenizer
       configuration for configuration saving and loading in local file system.
       The value is `tokenizer_config.json`.
-    - `resource_files_names` (`dict`): Represents resources to specific file
+    - **resource_files_names** (dict): Represents resources to specific file
       names mapping for resource saving and loading in local file system. The
       keys of dict representing resource items should be argument names in
       tokenizer's `__init__` method, and the values are file names for saving
       and loading corresponding resources. The mostly used resources here are
       vocabulary file and sentence-piece model file.
-    - `pretrained_init_configuration` (`dict`): Provides the tokenizer configurations
-      of built-in pretrained tokenizers (constract to tokenizers in local file
+    - **pretrained_init_configuration** (dict): Provides the tokenizer configurations
+      of built-in pretrained tokenizers (contrasts to tokenizers in local file
       system). It has pretrained tokenizer names as keys (the same as pretrained
       model names, such as `bert-base-uncased`), and the values are dict preserving
       corresponding configuration for tokenizer initialization.
-    - `pretrained_resource_files_map` (`dict`): Provides resource URLs of built-in
-      pretrained tokenizers (constract to tokenizers in local file system). It
+    - **pretrained_resource_files_map** (dict): Provides resource URLs of built-in
+      pretrained tokenizers (contrasts to tokenizers in local file system). It
       has the same keys as `resource_files_names`, and the values are also `dict`
       mapping specific pretrained tokenizer names (such as `bert-base-uncased`)
       to corresponding resource URLs.
@@ -136,7 +136,7 @@ class PretrainedTokenizer(object):
     Moreover, methods common to tokenizers for tokenization, token/id conversion
     and encoding as model inputs are also provided here.
 
-    Besides, metaclass `InitTrackerMeta` is used to create `PretrainedModel`,
+    Besides, metaclass `InitTrackerMeta` is used to create `PretrainedTokenizer`,
     by which subclasses can track arguments for initialization automatically
     and expose special tokens initialization used as attributes.
     """
@@ -191,21 +191,21 @@ class PretrainedTokenizer(object):
         `is_split_into_words` argument.
 
         Args:
-            text (`str`, `List[str]` or `List[List[str]]`):
+            text (str, List[str] or List[List[str]]):
                 The sequence or batch of sequences to be processed. One sequence
                 is a string or a list of strings depending on whether it has been
                 pretokenized. If each sequence is provided as a list of strings
                 (pretokenized), you must set `is_split_into_words` as `True` to
                 disambiguate with a batch of sequences.
-            text_pair (`str`, `List[str]` or `List[List[str]]`):
+            text_pair (str, List[str] or List[List[str]], optional):
                 Same as `text` argument, while it represents for the latter
                 sequence of the sequence pair.
-            max_seq_len (`int`, optional):
+            max_seq_len (int, optional):
                 If set to a number, will limit the total sequence returned so
                 that it has a maximum length. If there are overflowing tokens,
                 those overflowing tokens will be added to the returned dictionary
                 when `return_overflowing_tokens` is `True`. Defaults to `None`.
-            stride (`int`, optional):
+            stride (int, optional):
                 Only available for batch input of sequence pair and mainly for
                 question answering usage. When for QA, `text` represents questions
                 and `text_pair` represents contexts. If `stride` is set to a
@@ -215,11 +215,11 @@ class PretrainedTokenizer(object):
                 a bigger batch than inputs to include all spans. Moreover, 'overflow_to_sample'
                 and 'offset_mapping' preserving the original example and position
                 information will be added to the returned dictionary. Defaults to 0.
-            pad_to_max_seq_len (`bool`, optional):
+            pad_to_max_seq_len (bool, optional):
                 If set to `True`, the returned sequences would be padded up to
                 `max_seq_len` specified length according to padding side
                 (`self.padding_side`) and padding token id. Defaults to `False`.
-            truncation_strategy (`str`, optional):
+            truncation_strategy (str, optional):
                 String selected in the following options:
 
                 - 'longest_first' (default) Iteratively reduce the inputs sequence
@@ -231,53 +231,53 @@ class PretrainedTokenizer(object):
                 sequence is longer than `max_seq_len`).
 
                 Defaults to 'longest_first'.
-            return_position_ids (`bool`, optional):
+            return_position_ids (bool, optional):
                 Whether to include tokens position ids in the returned dictionary.
                 Defaults to `False`.
-            return_token_type_ids (`bool`, optional):
+            return_token_type_ids (bool, optional):
                 Whether to include token type ids in the returned dictionary.
                 Defaults to `True`.
-            return_attention_mask (`bool`, optional):
+            return_attention_mask (bool, optional):
                 Whether to include the attention mask in the returned dictionary.
                 Defaults to `False`.
-            return_length (`bool`, optional):
+            return_length (bool, optional):
                 Whether to include the length of each encoded inputs in the
                 returned dictionary. Defaults to `False`.
-            return_overflowing_tokens (`bool`, optional):
+            return_overflowing_tokens (bool, optional):
                 Whether to include overflowing token information in the returned
                 dictionary. Defaults to `False`.
-            return_special_tokens_mask (`bool`, optional):
+            return_special_tokens_mask (bool, optional):
                 Whether to include special tokens mask information in the returned
                 dictionary. Defaults to `False`.
 
         Returns:
-            `dict` or `list[dict]` (for batch input): 
+            dict or list[dict] (for batch input):
                 The dict has the following optional items:
 
-                - 'input_ids' (`list[int]`): List of token ids to be fed to a model. 
-                - 'position_ids' (`list[int]`): List of token position ids to be
+                - **input_ids** (list[int]): List of token ids to be fed to a model.
+                - **position_ids** (list[int], optional): List of token position ids to be
                   fed to a model. Included when `return_position_ids` is `True`
-                - 'token_type_ids' (`list[int]`): List of token type ids to be
+                - **token_type_ids** (list[int], optional): List of token type ids to be
                   fed to a model. Included when `return_token_type_ids` is `True`.
-                - 'attention_mask' (`list[int]`): List of integers valued 0 or 1,
+                - **attention_mask** (list[int], optional): List of integers valued 0 or 1,
                   where 0 specifies paddings and should not be attended to by the
                   model. Included when `return_attention_mask` is `True`.
-                - 'seq_len' (`int`): The input_ids length. Included when `return_length`
+                - **seq_len** (int, optional): The input_ids length. Included when `return_length`
                   is `True`.
-                - 'overflowing_tokens' (`list[int]`): List of overflowing tokens.
+                - **overflowing_tokens** (list[int], optional): List of overflowing tokens.
                   Included when if `max_seq_len` is specified and `return_overflowing_tokens`
                   is True.
-                - 'num_truncated_tokens' (`int`): The number of overflowing tokens.
+                - **num_truncated_tokens** (int, optional): The number of overflowing tokens.
                   Included when if `max_seq_len` is specified and `return_overflowing_tokens`
                   is True.
-                - 'special_tokens_mask' (`list[int]`): List of integers valued 0 or 1,
+                - **special_tokens_mask** (list[int], optional): List of integers valued 0 or 1,
                   with 0 specifying special added tokens and 1 specifying sequence tokens.
                   Included when `return_special_tokens_mask` is `True`.
-                - 'offset_mapping' (`list[int]`): list of pair preserving the
+                - **offset_mapping** (list[int], optional): list of pair preserving the
                   index of start and end char in original input for each token.
-                  For a sqecial token, the index pair is `(0, 0)`. Included when
+                  For a special token, the index pair is `(0, 0)`. Included when
                   `stride` works.
-                - 'overflow_to_sample' (`int`): Index of example from which this
+                - **overflow_to_sample** (int, optional): Index of example from which this
                   feature is generated. Included when `stride` works.
         """
         # Input type checking for clearer error
@@ -336,7 +336,7 @@ class PretrainedTokenizer(object):
     @property
     def all_special_tokens(self):
         """ 
-        `list`: All the special tokens ('<unk>', '<cls>'...) corresponding to
+        list: All the special tokens ('<unk>', '<cls>'...) corresponding to
             special token arguments in `__init__` (arguments end with '_end').
         """
         all_toks = []
@@ -350,7 +350,7 @@ class PretrainedTokenizer(object):
     @property
     def all_special_ids(self):
         """ 
-        `list`: All the token ids corresponding to all the special tokens.
+        list: All the token ids corresponding to all the special tokens.
         """
         all_toks = self.all_special_tokens
         all_ids = self.convert_tokens_to_ids(all_toks)
@@ -362,39 +362,39 @@ class PretrainedTokenizer(object):
         instance of `Vocab`). Override it if needed.
 
         Args：
-            tokens (`list[int]`): List of token ids.
+            tokens (list[int]): List of token ids.
 
         Returns:
-            `list`: Converted id list.
+            list: Converted id list.
         """
         return self.vocab.to_indices(tokens)
 
     def convert_tokens_to_string(self, tokens):
         """
         Converts a sequence of tokens (list of string) to a single string by
-        using `' '.join(tokens)` .
+        using ``' '.join(tokens)`` .
 
         Args:
-            tokens (`list[str]`): A sequence of tokens.
+            tokens (list[str]): A sequence of tokens.
 
         Returns:
-            `str`: Converted string.
+            str: Converted string.
         """
         return " ".join(tokens)
 
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
         """
-        Converts a token id or a sequence of token ids (interger) to a token or
+        Converts a token id or a sequence of token ids (integer) to a token or
         a sequence of tokens (str) by using the `vocab` attribute (an instance
         of `Vocab`).
 
         Args:
-            ids (`int` or `list[int]`): A token id or a sequence of token ids.
-            skip_special_tokens (`bool`, optional): Whether to skip and not
+            ids (int` or `list[int]): A token id or a sequence of token ids.
+            skip_special_tokens (bool, optional): Whether to skip and not
                 decode special tokens when converting. Defaults to `False`.
         
         Returns:
-            `str`: Converted token or token sequence.
+            str: Converted token or token sequence.
         """
         tokens = self.vocab.to_tokens(ids)
         if skip_special_tokens and isinstance(tokens, list):
@@ -407,12 +407,12 @@ class PretrainedTokenizer(object):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         """
-        Create an instance of `PretrainedTokenizer` and load related resources
-        (such as vocabulary file) for it according to a specific model name
+        Creates an instance of `PretrainedTokenizer` and loads related resources
+        (such as vocabulary file) according to a specific model name
         (such as `bert-base-uncased`) or a local file directory path.
 
         Args:
-            pretrained_model_name_or_path (`str`): A name of pretrained model
+            pretrained_model_name_or_path (str): A name of pretrained model
                 for built-in tokenizers loading, such as `bert-base-uncased`.
                 Or a local file directory path for local tokenizers loading.
             *args (tuple): position arguments for model `__init__`. If provided,
@@ -422,7 +422,7 @@ class PretrainedTokenizer(object):
                 initialization.
 
         Returns:
-            `PretrainedTokenizer`: An instance of `PretrainedTokenizer`.
+            PretrainedTokenizer: An instance of `PretrainedTokenizer`.
 
         Example:
             .. code-block::
@@ -546,7 +546,7 @@ class PretrainedTokenizer(object):
         `self.save_vocabulary(file_name, self.vocab)`. Override it if necessary.
 
         Args:
-            save_directory (`str`): Directory to save files into.
+            save_directory (str): Directory to save files into.
         """
         assert hasattr(self, 'vocab') and len(
             self.resource_files_names) == 1, "Must overwrite `save_resources`"
@@ -567,19 +567,19 @@ class PretrainedTokenizer(object):
         line number would be the index of corresponding token.
 
         Args:
-            filepath (`str`): path of file to construct vocabulary.
-            unk_token (`str`): special token for unknown token. If no need, it also
+            filepath (str): path of file to construct vocabulary.
+            unk_token (str): special token for unknown token. If no need, it also
                 could be `None`. Defaults to `None`.
-            pad_token (`str`): special token for padding token. If no need, it also
+            pad_token (str): special token for padding token. If no need, it also
                 could be `None`. Defaults to `None`.
-            bos_token (`str`): special token for bos token. If no need, it also
+            bos_token (str): special token for bos token. If no need, it also
                 could be `None`. Defaults to `None`.
-            eos_token (`str`): special token for eos token. If no need, it also
+            eos_token (str): special token for eos token. If no need, it also
                 could be `None`. Defaults to `None`.
             **kwargs (dict): keyword arguments for `Vocab.from_dict`.
 
         Returns:
-            `Vocab`: An instance of `Vocab`.
+            Vocab: An instance of `Vocab`.
         """
         token_to_idx = {}
         with io.open(filepath, 'r', encoding='utf-8') as f:
@@ -601,9 +601,9 @@ class PretrainedTokenizer(object):
         Save all tokens to a vocabulary file. The file contains a token per line,
         and the line number would be the index of corresponding token.
 
-        Agrs:
-            filepath (`str`): File path to be saved to.
-            vocab (`Vocab`|`dict`): The `Vocab` or `dict` instance to be saved.
+        Args:
+            filepath (str): File path to be saved to.
+            vocab (Vocab|dict): The `Vocab` or `dict` instance to be saved.
         """
         if isinstance(vocab, Vocab):
             tokens = vocab.idx_to_token
@@ -697,7 +697,7 @@ class PretrainedTokenizer(object):
                 Optional second list of IDs for sequence pairs.
 
         Returns:
-            :obj:`List[int]`: List of input_id with the appropriate special tokens.
+            List[int]: List of input_id with the appropriate special tokens.
         """
         if token_ids_1 is None:
             return token_ids_0
@@ -713,13 +713,13 @@ class PretrainedTokenizer(object):
         Should be overridden in a subclass if the model has a special way of building those.
 
         Args:
-            offset_mapping_ids_0 (:obj:`List[tuple]`):
+            offset_mapping_0 (List[tuple]):
                 List of char offsets to which the special tokens will be added.
-            offset_mapping_ids_1 (:obj:`List[tuple]`, `optional`):
+            offset_mapping_1 (List[tuple], optional):
                 Optional second list of char offsets for offset mapping pairs.
 
         Returns:
-            :obj:`List[tuple]`: List of char offsets with the appropriate offsets of special tokens.
+            List[tuple]: List of char offsets with the appropriate offsets of special tokens.
         """
         if offset_mapping_1 is None:
             return offset_mapping_0
@@ -736,12 +736,13 @@ class PretrainedTokenizer(object):
 
         Args:
             token_ids_0 (List[int]): List of ids of the first sequence.
-            token_ids_1 (List[int], optinal): List of ids of the second sequence.
+            token_ids_1 (List[int], optional): List of ids of the second sequence.
             already_has_special_tokens (bool, optional): Whether or not the token list is already
                 formatted with special tokens for the model. Defaults to None.
 
         Returns:
-            results (List[int]): The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
+            results (List[int]): The list of integers in the range [0, 1]:
+                1 for a special token, 0 for a sequence token.
         """
         return [0] * ((len(token_ids_1)
                        if token_ids_1 else 0) + len(token_ids_0))
@@ -755,16 +756,16 @@ class PretrainedTokenizer(object):
         Should be overridden in a subclass if the model has a special way of building those.
 
 
-        If :obj:`token_ids_1` is :obj:`None`, this method only returns the first portion of the mask (0s).
+        If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
 
         Args:
-            token_ids_0 (:obj:`List[int]`):
+            token_ids_0 (List[int]):
                 List of IDs.
-            token_ids_1 (:obj:`List[int]`, `optional`):
+            token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs.
 
         Returns:
-            :obj:`List[int]`: List of token_type_id according to the given sequence(s).
+            List[int]: List of token_type_id according to the given sequence(s).
         """
         if token_ids_1 is None:
             return len(token_ids_0) * [0]
@@ -775,11 +776,11 @@ class PretrainedTokenizer(object):
         Returns the number of added tokens when encoding a sequence with special tokens.
 
         Args:
-            pair (:obj:`bool`, `optional`, defaults to :obj:`False`):
+            pair (bool, optional):
                 Whether the number of added tokens should be computed in the case of a sequence pair or a single
-                sequence.
+                sequence. Defaults to `False`.
         Returns:
-            :obj:`int`: Number of special tokens added to sequences.
+            int: Number of special tokens added to sequences.
         """
         token_ids_0 = []
         token_ids_1 = []
@@ -805,19 +806,19 @@ class PretrainedTokenizer(object):
         is not allowed.
 
         Args:
-            text (`str`, `List[str]` or `List[int]`):
+            text (str, List[str] or List[int]):
                 The sequence to be processed. One sequence is a string, a list
                 of strings, or a list of integers depending on whether it has
                 been pretokenized and converted to ids. 
-            text_pair (`str`, `List[str]` or `List[List[str]]`):
+            text_pair (str, List[str] or List[List[str]]):
                 Same as `text` argument, while it represents for the latter
                 sequence of the sequence pair.
-            max_seq_len (`int`, optional):
+            max_seq_len (int, optional):
                 If set to a number, will limit the total sequence returned so
                 that it has a maximum length. If there are overflowing tokens,
                 those overflowing tokens will be added to the returned dictionary
                 when `return_overflowing_tokens` is `True`. Defaults to `None`.
-            stride (`int`, optional):
+            stride (int, optional):
                 Only available for batch input of sequence pair and mainly for
                 question answering usage. When for QA, `text` represents questions
                 and `text_pair` represents contexts. If `stride` is set to a
@@ -827,11 +828,11 @@ class PretrainedTokenizer(object):
                 a bigger batch than inputs to include all spans. Moreover, 'overflow_to_sample'
                 and 'offset_mapping' preserving the original example and position
                 information will be added to the returned dictionary. Defaults to 0.
-            pad_to_max_seq_len (`bool`, optional):
+            pad_to_max_seq_len (bool, optional):
                 If set to `True`, the returned sequences would be padded up to
                 `max_seq_len` specified length according to padding side
                 (`self.padding_side`) and padding token id. Defaults to `False`.
-            truncation_strategy (`str`, optional):
+            truncation_strategy (str, optional):
                 String selected in the following options:
 
                 - 'longest_first' (default) Iteratively reduce the inputs sequence
@@ -843,46 +844,46 @@ class PretrainedTokenizer(object):
                 sequence is longer than `max_seq_len`).
 
                 Defaults to 'longest_first'.
-            return_position_ids (`bool`, optional):
+            return_position_ids (bool, optional):
                 Whether to include tokens position ids in the returned dictionary.
                 Defaults to `False`.
-            return_token_type_ids (`bool`, optional):
+            return_token_type_ids (bool, optional):
                 Whether to include token type ids in the returned dictionary.
                 Defaults to `True`.
-            return_attention_mask (`bool`, optional):
+            return_attention_mask (bool, optional):
                 Whether to include the attention mask in the returned dictionary.
                 Defaults to `False`.
-            return_length (`bool`, optional):
+            return_length (bool, optional):
                 Whether to include the length of each encoded inputs in the
                 returned dictionary. Defaults to `False`.
-            return_overflowing_tokens (`bool`, optional):
+            return_overflowing_tokens (bool, optional):
                 Whether to include overflowing token information in the returned
                 dictionary. Defaults to `False`.
-            return_special_tokens_mask (`bool`, optional):
+            return_special_tokens_mask (bool, optional):
                 Whether to include special tokens mask information in the returned
                 dictionary. Defaults to `False`.
 
         Returns:
-            `dict`: 
+            dict:
                 The dict has the following optional items:
 
-                - 'input_ids' (`list[int]`): List of token ids to be fed to a model. 
-                - 'position_ids' (`list[int]`): List of token position ids to be
+                - **input_ids** (list[int]): List of token ids to be fed to a model.
+                - **position_ids** (list[int], optional): List of token position ids to be
                   fed to a model. Included when `return_position_ids` is `True`
-                - 'token_type_ids' (`list[int]`): List of token type ids to be
+                - **token_type_ids** (list[int], optional): List of token type ids to be
                   fed to a model. Included when `return_token_type_ids` is `True`.
-                - 'attention_mask' (`list[int]`): List of integers valued 0 or 1,
+                - **attention_mask** (list[int], optional): List of integers valued 0 or 1,
                   where 0 specifies paddings and should not be attended to by the
                   model. Included when `return_attention_mask` is `True`.
-                - 'seq_len' (`int`): The input_ids length. Included when `return_length`
+                - **seq_len** (int, optional): The input_ids length. Included when `return_length`
                   is `True`.
-                - 'overflowing_tokens' (`list[int]`): List of overflowing tokens.
+                - **overflowing_tokens** (list[int], optional): List of overflowing tokens.
                   Included when if `max_seq_len` is specified and `return_overflowing_tokens`
                   is True.
-                - 'num_truncated_tokens' (`int`): The number of overflowing tokens.
+                - **num_truncated_tokens** (int, optional): The number of overflowing tokens.
                   Included when if `max_seq_len` is specified and `return_overflowing_tokens`
                   is True.
-                - 'special_tokens_mask' (`list[int]`): List of integers valued 0 or 1,
+                - **special_tokens_mask** (list[int], optional): List of integers valued 0 or 1,
                   with 0 specifying special added tokens and 1 specifying sequence tokens.
                   Included when `return_special_tokens_mask` is `True`.
         """
@@ -1012,18 +1013,18 @@ class PretrainedTokenizer(object):
         inputs. It supports batch inputs of sequence or sequence pair.
 
         Args:
-            batch_text_or_text_pairs (`list`):
+            batch_text_or_text_pairs (list):
                 The element of list can be sequence or sequence pair, and the
                 sequence is a string or a list of strings depending on whether
                 it has been pretokenized. If each sequence is provided as a list
                 of strings (pretokenized), you must set `is_split_into_words` as
                 `True` to disambiguate with a sequence pair.
-            max_seq_len (`int`, optional):
+            max_seq_len (int, optional):
                 If set to a number, will limit the total sequence returned so
                 that it has a maximum length. If there are overflowing tokens,
                 those overflowing tokens will be added to the returned dictionary
                 when `return_overflowing_tokens` is `True`. Defaults to `None`.
-            stride (`int`, optional):
+            stride (int, optional):
                 Only available for batch input of sequence pair and mainly for
                 question answering usage. When for QA, `text` represents questions
                 and `text_pair` represents contexts. If `stride` is set to a
@@ -1033,11 +1034,11 @@ class PretrainedTokenizer(object):
                 a bigger batch than inputs to include all spans. Moreover, 'overflow_to_sample'
                 and 'offset_mapping' preserving the original example and position
                 information will be added to the returned dictionary. Defaults to 0.
-            pad_to_max_seq_len (`bool`, optional):
+            pad_to_max_seq_len (bool, optional):
                 If set to `True`, the returned sequences would be padded up to
                 `max_seq_len` specified length according to padding side
                 (`self.padding_side`) and padding token id. Defaults to `False`.
-            truncation_strategy (`str`, optional):
+            truncation_strategy (str, optional):
                 String selected in the following options:
 
                 - 'longest_first' (default) Iteratively reduce the inputs sequence
@@ -1049,53 +1050,53 @@ class PretrainedTokenizer(object):
                 sequence is longer than `max_seq_len`).
 
                 Defaults to 'longest_first'.
-            return_position_ids (`bool`, optional):
+            return_position_ids (bool, optional):
                 Whether to include tokens position ids in the returned dictionary.
                 Defaults to `False`.
-            return_token_type_ids (`bool`, optional):
+            return_token_type_ids (bool, optional):
                 Whether to include token type ids in the returned dictionary.
                 Defaults to `True`.
-            return_attention_mask (`bool`, optional):
+            return_attention_mask (bool, optional):
                 Whether to include the attention mask in the returned dictionary.
                 Defaults to `False`.
-            return_length (`bool`, optional):
+            return_length (bool, optional):
                 Whether to include the length of each encoded inputs in the
                 returned dictionary. Defaults to `False`.
-            return_overflowing_tokens (`bool`, optional):
+            return_overflowing_tokens (bool, optional):
                 Whether to include overflowing token information in the returned
                 dictionary. Defaults to `False`.
-            return_special_tokens_mask (`bool`, optional):
+            return_special_tokens_mask (bool, optional):
                 Whether to include special tokens mask information in the returned
                 dictionary. Defaults to `False`.
 
         Returns:
-            `list[dict]`: 
+            list[dict]:
                 The dict has the following optional items:
 
-                - 'input_ids' (`list[int]`): List of token ids to be fed to a model. 
-                - 'position_ids' (`list[int]`): List of token position ids to be
+                - **input_ids** (list[int]): List of token ids to be fed to a model.
+                - **position_ids** (list[int], optional): List of token position ids to be
                   fed to a model. Included when `return_position_ids` is `True`
-                - 'token_type_ids' (`list[int]`): List of token type ids to be
+                - **token_type_ids** (list[int], optional): List of token type ids to be
                   fed to a model. Included when `return_token_type_ids` is `True`.
-                - 'attention_mask' (`list[int]`): List of integers valued 0 or 1,
+                - **attention_mask** (list[int], optional): List of integers valued 0 or 1,
                   where 0 specifies paddings and should not be attended to by the
                   model. Included when `return_attention_mask` is `True`.
-                - 'seq_len' (`int`): The input_ids length. Included when `return_length`
+                - **seq_len** (int, optional): The input_ids length. Included when `return_length`
                   is `True`.
-                - 'overflowing_tokens' (`list[int]`): List of overflowing tokens.
+                - **overflowing_tokens** (list[int], optional): List of overflowing tokens.
                   Included when if `max_seq_len` is specified and `return_overflowing_tokens`
                   is True.
-                - 'num_truncated_tokens' (`int`): The number of overflowing tokens.
+                - **num_truncated_tokens** (int, optional): The number of overflowing tokens.
                   Included when if `max_seq_len` is specified and `return_overflowing_tokens`
                   is True.
-                - 'special_tokens_mask' (`list[int]`): List of integers valued 0 or 1,
+                - **special_tokens_mask** (list[int], optional): List of integers valued 0 or 1,
                   with 0 specifying special added tokens and 1 specifying sequence tokens.
                   Included when `return_special_tokens_mask` is `True`.
-                - 'offset_mapping' (`list[int]`): list of pair preserving the
+                - **offset_mapping** (list[int], optional): list of pair preserving the
                   index of start and end char in original input for each token.
                   For a sqecial token, the index pair is `(0, 0)`. Included when
                   `stride` works.
-                - 'overflow_to_sample' (`int`): Index of example from which this
+                - **overflow_to_sample** (int, optional): Index of example from which this
                   feature is generated. Included when `stride` works.
         """
 

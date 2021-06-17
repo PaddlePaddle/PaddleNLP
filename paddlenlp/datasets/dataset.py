@@ -472,30 +472,6 @@ class DatasetBuilder:
     def read_datasets(self, splits=None, data_files=None):
         datasets = []
         assert splits or data_files, "`data_files` and `splits` can not both be None."
-        assert splits is None or data_files is None , "Only one of `data_files` and `splits` can be set."
-
-        if data_files:
-            assert isinstance(data_files, str) or isinstance(
-                data_files, dict
-            ) or isinstance(data_files, tuple) or isinstance(
-                data_files, list
-            ), "`data_files` should be a string or tuple or list or a dictionary whose key is split name and value is the path of data file."
-            if isinstance(data_files, str):
-                split = 'train'
-                datasets.append(self.read(filename=data_files, split=split))
-            elif isinstance(data_files, tuple) or isinstance(data_files, list):
-                split = 'train'
-                datasets += [
-                    self.read(
-                        filename=filename, split=split)
-                    for filename in data_files
-                ]
-            else:
-                datasets += [
-                    self.read(
-                        filename=filename, split=split)
-                    for split, filename in data_files.items()
-                ]
 
         def remove_if_exit(filepath):
             if isinstance(filepath, (list, tuple)):
@@ -510,7 +486,7 @@ class DatasetBuilder:
                 except OSError:
                     pass
 
-        if splits:
+        if splits and data_files is None:
             assert isinstance(splits, str) or (
                 isinstance(splits, list) and isinstance(splits[0], str)
             ) or (
@@ -550,6 +526,33 @@ class DatasetBuilder:
                     while not os.path.exists(lock_file):
                         time.sleep(1)
                 datasets.append(self.read(filename=filename, split=split))
+
+        if data_files:
+            assert isinstance(data_files, str) or isinstance(
+                data_files, tuple) or isinstance(
+                    data_files, list
+                ), "`data_files` should be a string or tuple or list of strings."
+
+            if isinstance(data_files, str):
+                data_files = [data_files]
+            default_split = 'train'
+            if splits:
+                if isinstance(splits, str):
+                    splits = [splits]
+                assert len(splits) == len(
+                    data_files
+                ), "Number of `splits` and number of `data_files` should be the same if you want to specify the split of loacl data file."
+                datasets += [
+                    self.read(
+                        filename=data_files[i], split=splits[i])
+                    for i in range(len(data_files))
+                ]
+            else:
+                datasets += [
+                    self.read(
+                        filename=data_files[i], split=default_split)
+                    for i in range(len(data_files))
+                ]
 
         return datasets if len(datasets) > 1 else datasets[0]
 

@@ -388,8 +388,6 @@ def do_train(args):
 
     model = model_class.from_pretrained(
         args.model_name_or_path, num_classes=num_labels)
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
 
     # Step1: Initialize a dictionary to save the weights from the origin BERT model.
     origin_weights = model.state_dict()
@@ -440,6 +438,9 @@ def do_train(args):
         num_layers=model.bert.config['num_hidden_layers'],
         num_heads=model.bert.config['num_attention_heads'])
     reorder_neuron_head(ofa_model.model, head_importance, neuron_importance)
+
+    if paddle.distributed.get_world_size() > 1:
+        ofa_model.model = paddle.DataParallel(ofa_model.model)
 
     if args.max_steps > 0:
         num_training_steps = args.max_steps
