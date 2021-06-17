@@ -3,12 +3,13 @@
 本教程旨在辅导同学如何完成 AI Studio课程——[『NLP打卡营』实践课12：预训练模型小型化与部署实战
 ](https://aistudio.baidu.com/aistudio/projectdetail/1920541)课后作业。
 
-## 1. 对教师模型进行fine-tuning
+## 1. 对ERNIE-Gram进行fine-tuning得到教师模型
+由于我们的蒸馏是在中文情感分析ChnSentiCorp任务上，因此我们需要对PaddleNLP提供的ERNIE-Gram在我们的任务上进行Fine-tuning。下面是详细的步骤：
 
-在[PaddleNLP Transformer API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/transformers.rst#transformer%E9%A2%84%E8%AE%AD%E7%BB%83%E6%A8%A1%E5%9E%8B%E6%B1%87%E6%80%BB)查询PaddleNLP所支持的Transformer预训练模型。我们可以在这里找到ERNIE-GRAM中的**ernie-gram-zh**。
-参考AI studio教程中在中文情感分类ChnSentiCorp数据集下对**ERNIE-1.0**进行fine-tuning的方法，即对[PaddleNLP的run_glue脚本](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/benchmark/glue)进行适当修改，使其支持Ernie-Gram在中文情感分类数据上的fine-tuning。
+在[PaddleNLP Transformer API](../docs/model_zoo/transformers.rst)查询PaddleNLP所支持的Transformer预训练模型。我们可以在这里找到ERNIE-Gram中的**ernie-gram-zh**。
+参考AI studio教程中在中文情感分类ChnSentiCorp数据集下对**ERNIE-1.0**进行fine-tuning的方法，即对[PaddleNLP的run_glue脚本](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/benchmark/glue)进行适当修改，使其支持ERNIE-Gram在中文情感分类数据上的fine-tuning。
 
-我们需要导入Ernie-Gram模型所依赖的相关模块：
+我们需要导入ERNIE-Gram模型所依赖的相关模块：
 
 ```python
 from paddlenlp.transformers import ErnieGramForSequenceClassification, ErnieGramTokenizer
@@ -63,9 +64,9 @@ def convert_example(example,
         return example['input_ids'], example['token_type_ids']
 ```
 
-### b.在ChnSentiCorp上对Ernie-Gram进行fine-tuning
+### b.在ChnSentiCorp上对ERNIE-Gram进行fine-tuning
 
-现在，我们就可以对Ernie-Gram模型在ChnSentiCorp数据集上进行finetuning了~
+现在，我们就可以对ERNIE-Gram模型在ChnSentiCorp数据集上进行finetuning了~
 
 可以使用下面的命令对ERNIE的预训练模型进行finetuning：
 
@@ -88,11 +89,11 @@ python -u ./run_glue.py \
 
 ```
 
-## 2.用Fine-tuned Ernie-Gram对Bi-LSTM进行蒸馏
+## 2.用Fine-tuned ERNIE-Gram对Bi-LSTM进行蒸馏
 
-由于我们只替换了蒸馏时使用的教师模型，因此我们只需要在蒸馏前，重新导入教师模型即可。
+由于本节的作业只需要替换蒸馏时使用的教师模型，因此我们只需要在蒸馏前重新导入第一步微调得到的教师模型即可。
 
-假设我们对Ernie-Gram Fine-tuning得到的最好的模型位于./tmp/ChnSentiCorp/best_model，那么下面的脚本可以导入教师模型：
+假设我们对ERNIE-Gram Fine-tuning得到的最好的模型位于./tmp/ChnSentiCorp/best_model，那么下面的脚本可以导入教师模型：
 ```python
 from paddlenlp.transformers import ErnieGramForSequenceClassification, ErnieGramTokenizer
 teacher = ErnieGramForSequenceClassification.from_pretrained("./tmp/ChnSentiCorp/best_model")
