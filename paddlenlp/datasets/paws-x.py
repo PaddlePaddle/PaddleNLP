@@ -21,9 +21,10 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['PAWS']
+__all__ = ['PAWSX']
 
-class PAWS(DatasetBuilder):
+
+class PAWSX(DatasetBuilder):
     """
     PAWS-X: A Cross-lingual Adversarial Dataset for Paraphrase Identification
     More information please refer to `https://arxiv.org/abs/1908.11828`
@@ -60,11 +61,19 @@ class PAWS(DatasetBuilder):
             for line in f:
                 data = line.strip().split("\t")
                 if len(data) == 3:
-                    sentence1, sentence2, label = data                    
-                    yield {"sentence1": sentence1, "sentence2": sentence2, "label": label}
+                    sentence1, sentence2, label = data
+                    yield {
+                        "sentence1": sentence1,
+                        "sentence2": sentence2,
+                        "label": label
+                    }
                 elif len(data) == 2:
-                    sentence1, sentence2 = data                    
-                    yield {"sentence1": sentence1, "sentence2": sentence2, "label":''}
+                    sentence1, sentence2 = data
+                    yield {
+                        "sentence1": sentence1,
+                        "sentence2": sentence2,
+                        "label": ''
+                    }
                 else:
                     continue
 
