@@ -81,6 +81,9 @@ class MultiHeadAttention(nn.Layer):
             self.out_proj = nn.Linear(
                 embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
         else:
+            assert self.num_heads % topo.mp_info.size == 0
+            self.num_heads = self.num_heads // topo.mp_info.size
+
             self.q_proj = paddlenlp.ops.ColumnParallelLiner(
                 (embed_dim, embed_dim),
                 topo.mp_info.size,
@@ -565,6 +568,22 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
         },
+        "gpt2-small-en": { # config for CE
+            "vocab_size": 50304,
+            "hidden_size": 1024,
+            "num_hidden_layers": 4,
+            "num_attention_heads": 4,
+            "intermediate_size": 4096,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 1,  # no use
+            "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
+        },
+
 
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -705,6 +724,10 @@ class GPTModel(GPTPretrainedModel):
             attention_mask = attention_mask + causal_mask
         else:
             attention_mask = causal_mask
+
+        # The tensor returned by triu not in static graph.
+        attention_mask.stop_gradient = True
+
         encoder_outputs = self.decoder(
             embedding_output,
             memory=None,
