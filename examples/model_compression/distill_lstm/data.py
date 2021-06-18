@@ -76,7 +76,6 @@ def apply_data_augmentation(data,
         # 1. Masking
         words = []
         if not whole_word_mask:
-            # tokenized_list = tokenizer.tokenize(data)
             words = [
                 tokenizer.mask_token if np.random.rand() < p_mask else word
                 for word in tokenized_list
