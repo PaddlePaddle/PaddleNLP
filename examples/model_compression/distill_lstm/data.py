@@ -70,11 +70,13 @@ def apply_data_augmentation(data,
     directly replaced by `mask_token`, after what sampling is performed.
     """
 
-    def _data_augmentation(data, whole_word_mask=whole_word_mask):
+    def _data_augmentation(data,
+                           tokenized_list,
+                           whole_word_mask=whole_word_mask):
         # 1. Masking
         words = []
         if not whole_word_mask:
-            tokenized_list = tokenizer.tokenize(data)
+            # tokenized_list = tokenizer.tokenize(data)
             words = [
                 tokenizer.mask_token if np.random.rand() < p_mask else word
                 for word in tokenized_list
@@ -86,8 +88,7 @@ def apply_data_augmentation(data,
         # 2. N-gram sampling
         words = ngram_sampling(words, p_ng=p_ng, ngram_range=ngram_range)
         words = flatten(words) if isinstance(words[0], list) else words
-        new_text = " ".join(words)
-        return words, new_text
+        return words
 
     np.random.seed(seed)
     new_data = []
@@ -110,15 +111,15 @@ def apply_data_augmentation(data,
     for example in data:
         for _ in range(n_iter):
             if task_name == 'qqp':
-                words, new_text = _data_augmentation(example['sentence1'])
-                words_2, new_text_2 = _data_augmentation(example['sentence2'])
+                words = _data_augmentation(example['sentence1'], data_list)
+                words_2 = _data_augmentation(example['sentence2'], data_list_2)
                 new_data.append({
                     "sentence1": words,
                     "sentence2": words_2,
                     "labels": example['labels']
                 })
             else:
-                words, new_text = _data_augmentation(example['sentence'])
+                words = _data_augmentation(example['sentence'], data_list)
                 new_data.append({
                     "sentence": words,
                     "labels": example['labels']
