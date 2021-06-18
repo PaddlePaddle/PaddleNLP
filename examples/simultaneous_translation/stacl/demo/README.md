@@ -40,7 +40,7 @@
 
 ```
 
-上述models目录下的模型可以在这里[下载](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/simultaneous_translation/stacl/README.md#%E6%A8%A1%E5%9E%8B%E4%B8%8B%E8%BD%BD%E6%9B%B4%E6%96%B0%E4%B8%AD)，下载完后将解压后的`transformer.pdparams`分别放在不同的waitk策略对应的子目录下面。
+上述models目录下的模型可以在这里[下载](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/simultaneous_translation/stacl/README.md#%E6%A8%A1%E5%9E%8B%E4%B8%8B%E8%BD%BD%E6%9B%B4%E6%96%B0%E4%B8%AD) ，下载完后将解压后的`transformer.pdparams`分别放在不同的waitk策略对应的子目录下面。
 
 ### 参数说明与配置
 
@@ -54,7 +54,7 @@
 
 ##### 2. 语音同传参数配置
 需要配置`const.py`里面语音识别的应用鉴权信息，只需要将`APPID`和`APPKEY`设置为自己所申请的。  
-申请教程：[AI接入指南](https://ai.baidu.com/ai-doc/REFERENCE/Ck3dwjgn3)
+申请教程：[教程](./README_ai.md)
 
 ### 环境依赖
 ##### 1. 基本环境
@@ -79,7 +79,7 @@
 
 ### 使用说明
 
-1. 下载[预训练模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/simultaneous_translation/stacl/README.md#%E6%A8%A1%E5%9E%8B%E4%B8%8B%E8%BD%BD%E6%9B%B4%E6%96%B0%E4%B8%AD)，并放在models目录下对应的子目录里；
+1. 下载[预训练模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/simultaneous_translation/stacl/README.md#%E6%A8%A1%E5%9E%8B%E4%B8%8B%E8%BD%BD%E6%9B%B4%E6%96%B0%E4%B8%AD) ，并放在models目录下对应的子目录里；
 2. 下载词表（源语言词表，目标语言词表，BPE词表），并在配置文件`transformer_demo.yaml`中修改相应的参数；
 3. 运行`demo.py`；
 4. 出现界面，在Chinese input文本框中输入中文，按【回车键】开始实时翻译，或者按【REC】开始录音并开始实时翻译，遇到【。！？】结束整句，按【CLEAR】清空所有的输入和输出。
