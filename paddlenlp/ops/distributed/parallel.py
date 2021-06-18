@@ -20,7 +20,6 @@ from paddle.distributed.fleet import fleet
 __all__ = [
     'guard',
     'ParallelEmbedding',
-    'ParallelLinear',
     'ColumnParallelLiner',
     'RowParallelLiner',
 ]
@@ -106,16 +105,14 @@ class ParallelEmbedding(nn.Layer):
         return output
 
 
-class ParallelLinear(nn.Layer):
+class ColumnParallelLiner(nn.Layer):
     """
-    Parallel Linear
+    Parallel Linear, axis=1
     """
 
     def __init__(self,
                  size,
-                 axis,
                  num_partitions=1,
-                 input_is_parallel=False,
                  gather_out=True,
                  param_attr=None,
                  bias_attr=None,
@@ -134,39 +131,102 @@ class ParallelLinear(nn.Layer):
         # rank within a model parallel group
         inner_rank = rank % num_partitions
         self.gather_out = gather_out
-        self.input_is_parallel = input_is_parallel
-        self.axis = axis
-        if axis == 0:
-            assert size[0] % num_partitions == 0, (
-                "Number of rows of the weight for linear ({}) must be"
-                " divisible by num_partitions ({})".format(size[0],
-                                                           num_partitions))
-            self.per_part_size = size[0] // num_partitions
-            linear_size = (self.per_part_size, size[1])
 
-        elif axis == 1:
-            assert size[1] % num_partitions == 0, (
-                "Number of column of the weight for linear ({}) must be"
-                " divisible by num_partitions ({})".format(size[1],
-                                                           num_partitions))
-            self.per_part_size = size[1] // num_partitions
-            linear_size = (size[0], self.per_part_size)
-        else:
-            raise ValueError("The value of axis must be 0 or 1, but the value "
-                             "given is {}.".format(axis))
+        assert size[1] % num_partitions == 0, (
+            "Number of column of the weight for linear ({}) must be"
+            " divisible by num_partitions ({})".format(size[1],
+                                                       num_partitions))
+        self.per_part_size = size[1] // num_partitions
+        linear_size = (size[0], self.per_part_size)
 
         num_rows, num_cols = linear_size
 
         if not name:
-            name = "fc_by_row_rank_%d" % inner_rank if axis == 0 else "fc_by_col_rank_%d" % inner_rank
+            name = "fc_by_col_rank_%d" % inner_rank
         else:
-            name = name + "_by_row_rank_%d" % inner_rank if axis == 0 else name + "_by_col_rank_%d" % inner_rank
+            name = name + "_by_col_rank_%d" % inner_rank
+
+        self.linear = paddle.nn.Linear(
+            num_rows,
+            num_cols,
+            weight_attr=param_attr,
+            bias_attr=bias_attr,
+            name=name)
+
+        weight = self.linear.weight
+        weight.is_distributed = True
+        # alias for weight tensor
+        self.weight = self.linear.weight
+
+        startup_block = paddle.static.default_startup_program().global_block()
+        main_block = paddle.static.default_main_program().global_block()
+        startup_block.vars[weight.name].is_distributed = True
+        main_block.vars[weight.name].is_distributed = True
+        # set is_distributed for splited bias
+        # if a linear layer is splited by col, the bias would also be split into each rank as its weight
+        if self.linear._bias_attr != False:
+            startup_block.vars[self.linear.bias.name].is_distributed = True
+            main_block.vars[self.linear.bias.name].is_distributed = True
+
+    def forward(self, x):
+        # TODO(wangxi): dynamic group
+        group = None
+        x = paddle.distributed.collective._c_identity(
+            x, group=group)
+        output_parallel = self.linear(x)
+        if self.gather_out is False:
+            return output_parallel
+
+        return paddle.distributed.collective._concat(
+            output_parallel, group=group)
+
+
+class RowParallelLiner(nn.Layer):
+    """
+    Parallel Linear, axis=0
+    """
+
+    def __init__(self,
+                 size,
+                 num_partitions=1,
+                 input_is_parallel=False,
+                 param_attr=None,
+                 bias_attr=None,
+                 name=None):
+        super().__init__()
+
+        if in_dygraph_mode():
+            rank = paddle.distributed.get_rank()
+            nranks = paddle.distributed.get_world_size()
+        else:
+            assert fleet._role_maker, ("To use paddle.distributed.split, "
+                                       "you must call fleet.init() firstly.")
+            rank = fleet.worker_index()
+            nranks = fleet.worker_num()
+
+        # rank within a model parallel group
+        inner_rank = rank % num_partitions
+        self.input_is_parallel = input_is_parallel
+
+        assert size[0] % num_partitions == 0, (
+            "Number of rows of the weight for linear ({}) must be"
+            " divisible by num_partitions ({})".format(size[0],
+                                                       num_partitions))
+        self.per_part_size = size[0] // num_partitions
+        linear_size = (self.per_part_size, size[1])
+
+        num_rows, num_cols = linear_size
+
+        if not name:
+            name = "fc_by_row_rank_%d" % inner_rank
+        else:
+            name = name + "_by_row_rank_%d" % inner_rank
         self.linear = paddle.nn.Linear(
             num_rows,
             num_cols,
             weight_attr=param_attr,
             # NOTE(wangxi): row split, bias need add after allreduce
-            bias_attr=bias_attr if axis == 1 else False,
+            bias_attr=False,
             name=name)
 
         weight = self.linear.weight
@@ -180,12 +240,8 @@ class ParallelLinear(nn.Layer):
         main_block.vars[weight.name].is_distributed = True
         # set is_distributed for splited bias
         # if a linear layer is splited by row, each rank would hold a complete bias
-        # if a linear layer is splited by col, the bias would also be split into each rank as its weight
-        if axis == 1 and self.linear._bias_attr != False:
-            startup_block.vars[self.linear.bias.name].is_distributed = True
-            main_block.vars[self.linear.bias.name].is_distributed = True
 
-        if axis == 0 and bias_attr is not False:
+        if bias_attr is not False:
             self.bias = self.create_parameter(
                 shape=[num_cols],
                 attr=bias_attr,
@@ -198,68 +254,20 @@ class ParallelLinear(nn.Layer):
     def forward(self, x):
         # TODO(wangxi): dynamic group
         group = None
-        if self.axis == 0:
-            if self.input_is_parallel:
-                assert x.shape[-1] == self.per_part_size, (
-                    "The width ({}) of the input "
-                    "x must be equal to the height ({}) of the weight. Maybe you "
-                    "should split the input x using paddle.split.".format(
-                        x.shape[-1], self.per_part_size))
-            else:
-                # split last dim
-                # TODO(wangxi): dynamic group
-                x = paddle.distributed.collective._c_split(x, group=group)
-            output_parallel = self.linear(x)
-            output = paddle.distributed.collective._mp_allreduce(
-                output_parallel,
-                group=group,
-                use_calc_stream=True,
-                use_model_parallel=True)
-            output = output + self.bias if self.bias is not None else output
-            return output
+        if self.input_is_parallel:
+            assert x.shape[-1] == self.per_part_size, (
+                "The width ({}) of the input "
+                "x must be equal to the height ({}) of the weight. Maybe you "
+                "should split the input x using paddle.split.".format(
+                    x.shape[-1], self.per_part_size))
         else:
-            # TODO(wangxi): dynamic group
-            x = paddle.distributed.collective._c_identity(
-                x, group=group)
-            output_parallel = self.linear(x)
-            if self.gather_out is False:
-                return output_parallel
-
-            # TODO(wangxi): dynamic group
-            return paddle.distributed.collective._concat(
-                output_parallel, group=group)
-
-
-class ColumnParallelLiner(ParallelLinear):
-    def __init__(self,
-                 size,
-                 num_partitions,
-                 gather_out=False,
-                 param_attr=None,
-                 bias_attr=None,
-                 name=None):
-        super().__init__(
-            size,
-            axis=1,
-            num_partitions=num_partitions,
-            gather_out=gather_out,
-            param_attr=param_attr,
-            bias_attr=bias_attr)
-
-
-class RowParallelLiner(ParallelLinear):
-    def __init__(self,
-                 size,
-                 num_partitions,
-                 input_is_parallel=False,
-                 param_attr=None,
-                 bias_attr=None,
-                 name=None):
-        super().__init__(
-            size,
-            axis=0,
-            num_partitions=num_partitions,
-            gather_out=True,
-            input_is_parallel=input_is_parallel,
-            param_attr=param_attr,
-            bias_attr=bias_attr)
+            # split last dim
+            x = paddle.distributed.collective._c_split(x, group=group)
+        output_parallel = self.linear(x)
+        output = paddle.distributed.collective._mp_allreduce(
+            output_parallel,
+            group=group,
+            use_calc_stream=True,
+            use_model_parallel=True)
+        output = output + self.bias if self.bias is not None else output
+        return output
