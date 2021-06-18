@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import argparse
+
+from paddlenlp.utils.env import MODEL_HOME
 
 
 def parse_args():
@@ -103,7 +106,8 @@ def parse_args():
     parser.add_argument(
         "--vocab_path",
         type=str,
-        default='~/.paddlenlp/models/bert-base-uncased/bert-base-uncased-vocab.txt',
+        default=os.path.join(MODEL_HOME, 'bert-base-uncased',
+                             'bert-base-uncased-vocab.txt'),
         help="Student model's vocab path.")
 
     parser.add_argument(
