@@ -58,7 +58,8 @@ class MultiHeadAttention(nn.Layer):
                  need_weights=False,
                  weight_attr=None,
                  bias_attr=None,
-                 topo=None):
+                 topo=None,
+                 fuse=True):
         super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
@@ -66,47 +67,69 @@ class MultiHeadAttention(nn.Layer):
         self.num_heads = num_heads
         self.dropout = dropout
         self.need_weights = need_weights
+        self.fuse = fuse
 
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
         if topo is None or topo.mp_info.size == 1:
-            self.q_proj = nn.Linear(
-                embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
-            self.k_proj = nn.Linear(
-                self.kdim, embed_dim, weight_attr, bias_attr=bias_attr)
-            self.v_proj = nn.Linear(
-                self.vdim, embed_dim, weight_attr, bias_attr=bias_attr)
-            self.out_proj = nn.Linear(
-                embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
+            if self.fuse:
+                assert self.kdim == embed_dim
+                assert self.vdim == embed_dim
+                self.qkv_proj = nn.Linear(
+                    embed_dim, 3 * embed_dim, weight_attr, bias_attr=bias_attr)
+            else:
+                self.q_proj = nn.Linear(
+                    embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
+                self.k_proj = nn.Linear(
+                    self.kdim, embed_dim, weight_attr, bias_attr=bias_attr)
+                self.v_proj = nn.Linear(
+                    self.vdim, embed_dim, weight_attr, bias_attr=bias_attr)
         else:
             assert self.num_heads % topo.mp_info.size == 0
             self.num_heads = self.num_heads // topo.mp_info.size
+            if self.fuse:
+                assert self.kdim == embed_dim
+                assert self.vdim == embed_dim
+                self.qkv_proj = paddlenlp.ops.ColumnParallelLiner(
+                    (embed_dim, 3 * embed_dim),
+                    topo.mp_info.size,
+                    gather_out=False,
+                    param_attr=weight_attr,
+                    bias_attr=bias_attr)
+            else:
+                self.q_proj = paddlenlp.ops.ColumnParallelLiner(
+                    (embed_dim, embed_dim),
+                    topo.mp_info.size,
+                    gather_out=False,
+                    param_attr=weight_attr,
+                    bias_attr=bias_attr)
+                self.k_proj = paddlenlp.ops.ColumnParallelLiner(
+                    (self.kdim, embed_dim),
+                    topo.mp_info.size,
+                    gather_out=False,
+                    param_attr=weight_attr,
+                    bias_attr=bias_attr)
+                self.v_proj = paddlenlp.ops.ColumnParallelLiner(
+                    (self.vdim, embed_dim),
+                    topo.mp_info.size,
+                    gather_out=False,
+                    param_attr=weight_attr,
+                    bias_attr=bias_attr)
 
-            self.q_proj = paddlenlp.ops.ColumnParallelLiner(
-                (embed_dim, embed_dim),
-                topo.mp_info.size,
-                gather_out=False,
-                param_attr=weight_attr,
-                bias_attr=bias_attr)
-            self.k_proj = paddlenlp.ops.ColumnParallelLiner(
-                (self.kdim, embed_dim),
-                topo.mp_info.size,
-                gather_out=False,
-                param_attr=weight_attr,
-                bias_attr=bias_attr)
-            self.v_proj = paddlenlp.ops.ColumnParallelLiner(
-                (self.vdim, embed_dim),
-                topo.mp_info.size,
-                gather_out=False,
-                param_attr=weight_attr,
-                bias_attr=bias_attr)
             self.out_proj = paddlenlp.ops.RowParallelLiner(
                 (embed_dim, embed_dim),
                 topo.mp_info.size,
                 input_is_parallel=True,
                 param_attr=weight_attr,
                 bias_attr=bias_attr)
+
+    def _fuse_prepare_qkv(self, query):
+        mix_layer = self.qkv_proj(query)
+        mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_heads, 3 * self.head_dim])
+        mix_layer = paddle.transpose(mix_layer, [0, 2, 1, 3])
+        q, k, v = paddle.split(mix_layer, num_or_sections=3, axis=-1)
+        return q, k, v
 
     def _prepare_qkv(self, query, key, value, use_cache=False, cache=None):
         r"""
@@ -195,7 +218,10 @@ class MultiHeadAttention(nn.Layer):
         value = query if value is None else value
         # compute q ,k ,v
         if use_cache is False:
-            q, k, v = self._prepare_qkv(query, key, value, use_cache, cache)
+            if self.fuse:
+                q, k, v = self._fuse_prepare_qkv(query)
+            else:
+                q, k, v = self._prepare_qkv(query, key, value, use_cache, cache)
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache,
                                                cache)
