@@ -45,6 +45,10 @@ from model_demo import SimultaneousTransformerDemo
 # so it is set to UTF-8 uniformly.
 _locale._getdefaultlocale = (lambda *args: ['en_US', 'utf8'])
 
+is_win = False
+if os.name == 'nt':
+    is_win = True
+
 
 class STACLTokenizer:
     """
@@ -193,6 +197,10 @@ def process(args, tokenizer, transformers, waitks):
     font_align = ('Courier', 20)
     font_label = ('Times', 14)
 
+    if is_win:
+        font_align = ('Courier', 15)
+        font_label = ('Times', 11)
+
     window = Tk()
 
     window.title("Welcome to Simultaneous Translation")
@@ -211,16 +219,10 @@ def process(args, tokenizer, transformers, waitks):
         anchor=E,
         width=28)
     lbl1.place(x=0, y=60)
-    txt = Entry(window, font=('Courier', 24))
+    txt = Entry(window, font=font_align)
     txt.place(x=250, y=50, width=800, height=50)
 
-    button_on = Button(
-        window,
-        text='REC',
-        width=2,
-        height=2,
-        relief=tkinter.RAISED,
-        cursor="hand2")
+    button_on = Button(window, text='REC', relief='raised', cursor="hand2")
     if open_speech:
         button_on.place(x=1090, y=52)
 
@@ -623,13 +625,7 @@ def process(args, tokenizer, transformers, waitks):
         desc2.place(x=s_x + 100, y=s_y + 410)
 
     button_clear = Button(
-        window,
-        text='CLEAR',
-        width=3,
-        height=3,
-        relief="ridge",
-        cursor="hand2",
-        command=clear)
+        window, text='CLEAR', relief="raised", cursor="hand2", command=clear)
 
     button_clear.place(x=x + 840, y=y + 380)
 
