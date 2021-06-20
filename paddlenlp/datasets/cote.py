@@ -25,7 +25,7 @@ __all__ = ['Cote']
 
 class Cote(DatasetBuilder):
     """
-    COTE_DP dataset for Opinion Role Labeling task.
+    COTE_DP/COTE-BD dataset for Opinion Role Labeling task.
     More information please refer to https://aistudio.baidu.com/aistudio/competition/detail/50/?isFromLuge=1.
 
     """
@@ -46,12 +46,27 @@ class Cote(DatasetBuilder):
             },
             'labels': ["B", "I", "O"]
         },
+        'bd': {
+            'url': "https://dataset-bj.cdn.bcebos.com/qianyan/COTE-BD.zip",
+            'md5': "8d87ff9bb6f5e5d46269d72632a1b01f",
+            'splits': {
+                'train': [
+                    os.path.join('COTE-BD', 'train.tsv'),
+                    '4c08ccbcc373cb3bf05c3429d435f608', (0, 1), 1
+                ],
+                'test': [
+                    os.path.join('COTE-BD', 'test.tsv'),
+                    'aeb5c9af61488dadb12cbcc1d2180667', (1, ), 1
+                ],
+            },
+            'labels': ["B", "I", "O"]
+        },
     }
 
     def _get_data(self, mode, **kwargs):
         """Downloads dataset."""
         builder_config = self.BUILDER_CONFIGS[self.name]
-        default_root = os.path.join(DATA_HOME, 'COTE-DP')
+        default_root = os.path.join(DATA_HOME, f'COTE-{self.name.upper()}')
         filename, data_hash, _, _ = builder_config['splits'][mode]
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
