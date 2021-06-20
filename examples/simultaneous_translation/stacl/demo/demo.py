@@ -616,9 +616,13 @@ def process(args, tokenizer, transformers, waitks):
         anchor=E)
     desc1.place(x=s_x + 100, y=s_y + 380)
 
+    backspace_cnt = 19
+    if is_win:
+        backspace_cnt = 15
+
     desc2 = Label(
         window,
-        text=' ' * 19 + '2. 按【REC】开始录音并开始实时翻译，遇到【。！？】结束整句，'
+        text=' ' * backspace_cnt + '2. 按【REC】开始录音并开始实时翻译，遇到【。！？】结束整句，'
         '按【CLEAR】清空所有的输入和输出。',
         anchor=E)
     if open_speech:
