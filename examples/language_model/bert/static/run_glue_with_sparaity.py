@@ -387,7 +387,8 @@ def do_train(args):
 
         # Keep Pooler and task-specific layer dense.
         # Please note, excluded_layers must be set before calling `optimizer.minimize()`.
-        sparsity.set_excluded_layers(main_program, ['linear_72', 'linear_73',])
+        sparsity.set_excluded_layers(main_program, [model.bert.pooler.dense.full_name(),
+                                                    model.classifier.full_name()])
         # Calling sparsity.decorate() to wrap minimize() in optimizer, which 
         # will insert necessary masking operations for ASP workflow.
         optimizer = sparsity.decorate(optimizer )
