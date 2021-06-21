@@ -61,7 +61,8 @@ class MultiHeadAttention(nn.Layer):
                  need_weights=False,
                  weight_attr=None,
                  bias_attr=None,
-                 topo=None):
+                 topo=None,
+                 fuse=True):
         super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
@@ -69,43 +70,70 @@ class MultiHeadAttention(nn.Layer):
         self.num_heads = num_heads
         self.dropout = dropout
         self.need_weights = need_weights
+        self.fuse = fuse
 
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
         if topo is None or topo.mp_info.size == 1:
-            self.q_proj = nn.Linear(
-                embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
-            self.k_proj = nn.Linear(
-                self.kdim, embed_dim, weight_attr, bias_attr=bias_attr)
-            self.v_proj = nn.Linear(
-                self.vdim, embed_dim, weight_attr, bias_attr=bias_attr)
-            self.out_proj = nn.Linear(
-                embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
+            if self.fuse:
+                assert self.kdim == embed_dim
+                assert self.vdim == embed_dim
+                self.qkv_proj = nn.Linear(
+                    embed_dim, 3 * embed_dim, weight_attr, bias_attr=bias_attr)
+            else:
+                self.q_proj = nn.Linear(
+                    embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
+                self.k_proj = nn.Linear(
+                    self.kdim, embed_dim, weight_attr, bias_attr=bias_attr)
+                self.v_proj = nn.Linear(
+                    self.vdim, embed_dim, weight_attr, bias_attr=bias_attr)
         else:
             assert self.num_heads % topo.mp_info.size == 0
             self.num_heads = self.num_heads // topo.mp_info.size
+            if self.fuse:
+                assert self.kdim == embed_dim
+                assert self.vdim == embed_dim
+                self.qkv_proj = paddlenlp.ops.ColumnParallelLiner(
+                    (embed_dim, 3 * embed_dim),
+                    topo.mp_info.size,
+                    gather_out=False,
+                    param_attr=weight_attr,
+                    bias_attr=bias_attr)
+            else:
+                self.q_proj = paddlenlp.ops.ColumnParallelLiner(
+                    (embed_dim, embed_dim),
+                    topo.mp_info.size,
+                    gather_out=False,
+                    param_attr=weight_attr,
+                    bias_attr=bias_attr)
+                self.k_proj = paddlenlp.ops.ColumnParallelLiner(
+                    (self.kdim, embed_dim),
+                    topo.mp_info.size,
+                    gather_out=False,
+                    param_attr=weight_attr,
+                    bias_attr=bias_attr)
+                self.v_proj = paddlenlp.ops.ColumnParallelLiner(
+                    (self.vdim, embed_dim),
+                    topo.mp_info.size,
+                    gather_out=False,
+                    param_attr=weight_attr,
+                    bias_attr=bias_attr)
 
-            self.q_proj = paddlenlp.ops.ColumnParallelLiner(
-                (embed_dim, embed_dim),
-                topo.mp_info.size,
-                weight_attr,
-                bias_attr=bias_attr)
-            self.k_proj = paddlenlp.ops.ColumnParallelLiner(
-                (self.kdim, embed_dim),
-                topo.mp_info.size,
-                weight_attr,
-                bias_attr=bias_attr)
-            self.v_proj = paddlenlp.ops.ColumnParallelLiner(
-                (self.vdim, embed_dim),
-                topo.mp_info.size,
-                weight_attr,
-                bias_attr=bias_attr)
             self.out_proj = paddlenlp.ops.RowParallelLiner(
                 (embed_dim, embed_dim),
                 topo.mp_info.size,
-                weight_attr,
+                input_is_parallel=True,
+                param_attr=weight_attr,
                 bias_attr=bias_attr)
+
+    def _fuse_prepare_qkv(self, query):
+        mix_layer = self.qkv_proj(query)
+        mix_layer = paddle.reshape_(mix_layer,
+                                    [0, 0, self.num_heads, 3 * self.head_dim])
+        mix_layer = paddle.transpose(mix_layer, [0, 2, 1, 3])
+        q, k, v = paddle.split(mix_layer, num_or_sections=3, axis=-1)
+        return q, k, v
 
     def _prepare_qkv(self, query, key, value, use_cache=False, cache=None):
         r"""
@@ -194,7 +222,10 @@ class MultiHeadAttention(nn.Layer):
         value = query if value is None else value
         # compute q ,k ,v
         if use_cache is False:
-            q, k, v = self._prepare_qkv(query, key, value, use_cache, cache)
+            if self.fuse:
+                q, k, v = self._fuse_prepare_qkv(query)
+            else:
+                q, k, v = self._prepare_qkv(query, key, value, use_cache, cache)
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache,
                                                cache)
@@ -348,7 +379,8 @@ class TransformerDecoderLayer(nn.Layer):
             nhead,
             dropout=attn_dropout,
             weight_attr=weight_attrs[0],
-            bias_attr=bias_attrs[0])
+            bias_attr=bias_attrs[0],
+            topo=topo)
 
         if topo is None or topo.mp_info.size == 1:
             self.linear1 = nn.Linear(
@@ -365,12 +397,14 @@ class TransformerDecoderLayer(nn.Layer):
             self.linear1 = paddlenlp.ops.ColumnParallelLiner(
                 (d_model, dim_feedforward),
                 topo.mp_info.size,
-                weight_attrs[2],
+                gather_out=False,
+                param_attr=weight_attrs[2],
                 bias_attr=bias_attrs[2])
             self.linear2 = paddlenlp.ops.RowParallelLiner(
                 (dim_feedforward, d_model),
                 topo.mp_info.size,
-                weight_attrs[2],
+                input_is_parallel=True,
+                param_attr=weight_attrs[2],
                 bias_attr=bias_attrs[2])
 
         self.norm1 = nn.LayerNorm(d_model, epsilon=1e-5)
@@ -427,22 +461,22 @@ class GPTEmbeddings(nn.Layer):
                  initializer_range=0.02,
                  topo=None):
         super(GPTEmbeddings, self).__init__()
-        # TODO @ZHUI Use ParallelEmbedding
-        #if topo is None or topo.mp_info.size == 1:
-        self.word_embeddings = nn.Embedding(
-            vocab_size,
-            hidden_size,
-            weight_attr=paddle.ParamAttr(
-                name="word_embeddings",
-                initializer=nn.initializer.Normal(
+        #if True:
+        if topo is None or topo.mp_info.size == 1:
+            self.word_embeddings = nn.Embedding(
+                vocab_size,
+                hidden_size,
+                weight_attr=paddle.ParamAttr(
+                    name="word_embeddings",
+                    initializer=nn.initializer.Normal(
+                        mean=0.0, std=initializer_range)))
+        else:
+            self.word_embeddings = paddlenlp.ops.ParallelEmbedding(
+                vocab_size,
+                hidden_size,
+                topo,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
                     mean=0.0, std=initializer_range)))
-        #else:
-        #    self.word_embeddings = paddlenlp.ops.ParallelEmbedding(
-        #        vocab_size,
-        #        hidden_size,
-        #        topo.mp_info.size,
-        #        weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
-        #            mean=0.0, std=initializer_range)))
         self.position_embeddings = nn.Embedding(
             max_position_embeddings,
             hidden_size,
@@ -752,6 +786,31 @@ class GPTForPretraining(GPTPretrainedModel):
         self.gpt = gpt
         self.apply(self.init_weights)
 
+    def parallel_matmul(self, lm_output, logit_weights, parallel_output, topo):
+        #hcg = fleet.get_hybrid_communicate_group()
+        #model_parallel_group = hcg.get_model_parallel_group()
+        #world_size = hcg.get_model_parallel_world_size()
+        #rank = hcg.get_model_parallel_rank()
+        world_size = topo.mp_info.size
+        rank = topo.mp_info.rank
+
+        if world_size > 1:
+            input_parallel = paddle.distributed.collective._c_identity(
+                lm_output, group=None)
+            #lm_output, group=model_parallel_group)
+
+            logits = paddle.matmul(
+                input_parallel, logit_weights, transpose_y=True)
+
+            if parallel_output:
+                return logits
+
+            return paddle.distributed.collective._c_concat(logits, group=None)
+            #logits, group=model_parallel_group)
+        else:
+            logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+            return logits
+
     def forward(self,
                 input_ids,
                 position_ids=None,
@@ -769,10 +828,13 @@ class GPTForPretraining(GPTPretrainedModel):
         else:
             encoder_outputs = outputs
         # TODO @ZHUI Use all_to_all to
-        logits = paddle.matmul(
-            encoder_outputs,
-            self.gpt.embeddings.word_embeddings.weight,
-            transpose_y=True)
+        #logits = paddle.matmul(
+        #    encoder_outputs,
+        #    self.gpt.embeddings.word_embeddings.weight,
+        #    transpose_y=True)
+        logits = self.parallel_matmul(
+            encoder_outputs, self.gpt.embeddings.word_embeddings.weight, True,
+            self.gpt.topo)
 
         if use_cache:
             return logits, cached_kvs
@@ -792,8 +854,9 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
         self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
-        masked_lm_loss = self.loss_func(prediction_scores,
-                                        masked_lm_labels.unsqueeze(2))
+        masked_lm_loss = paddle.distributed.collective._c_softmax_with_cross_entropy(
+            prediction_scores, masked_lm_labels.unsqueeze(2))
+
         loss_mask = loss_mask.reshape([-1])
         masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
         loss = masked_lm_loss / loss_mask.sum()
