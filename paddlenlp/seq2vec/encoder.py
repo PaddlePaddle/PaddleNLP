@@ -308,8 +308,8 @@ class GRUEncoder(nn.Layer):
 
     Paddle's GRU have two outputs: the hidden state for every time step at last layer, 
     and the hidden state at the last time step for every layer.
-    If `pooling_type` is None, we perform the pooling on the hidden state of every time 
-    step at last layer to create a single vector. If not None, we use the hidden state 
+    If `pooling_type` is not None, we perform the pooling on the hidden state of every time 
+    step at last layer to create a single vector. If None, we use the hidden state 
     of the last time step at last layer as a single output (shape of `(batch_size, hidden_size)`); 
     And if direction is bidirection, the we concat the hidden state of the last forward 
     gru and backward gru layer to create a single vector (shape of `(batch_size, hidden_size * 2)`).
@@ -498,8 +498,8 @@ class LSTMEncoder(nn.Layer):
 
     Paddle's LSTM have two outputs: the hidden state for every time step at last layer, 
     and the hidden state and cell at the last time step for every layer.
-    If `pooling_type` is None, we perform the pooling on the hidden state of every time 
-    step at last layer to create a single vector. If not None, we use the hidden state 
+    If `pooling_type` is not None, we perform the pooling on the hidden state of every time 
+    step at last layer to create a single vector. If None, we use the hidden state 
     of the last time step at last layer as a single output (shape of `(batch_size, hidden_size)`); 
     And if direction is bidirection, the we concat the hidden state of the last forward 
     lstm and backward lstm layer to create a single vector (shape of `(batch_size, hidden_size * 2)`).
@@ -689,8 +689,8 @@ class RNNEncoder(nn.Layer):
 
     Paddle's RNN have two outputs: the hidden state for every time step at last layer, 
     and the hidden state at the last time step for every layer.
-    If `pooling_type` is None, we perform the pooling on the hidden state of every time 
-    step at last layer to create a single vector. If not None, we use the hidden state 
+    If `pooling_type` is not None, we perform the pooling on the hidden state of every time 
+    step at last layer to create a single vector. If None, we use the hidden state 
     of the last time step at last layer as a single output (shape of `(batch_size, hidden_size)`); 
     And if direction is bidirection, the we concat the hidden state of the last forward 
     rnn and backward rnn layer to create a single vector (shape of `(batch_size, hidden_size * 2)`).
