@@ -124,6 +124,14 @@ def get_train_data_file(args):
     return data_file
 
 
+def init_static_with_params(model, dygraph_params, topo, prog=None):
+    from paddlenlp.utils.tools import dygraph_params_to_static
+    static_params = dygraph_params_to_static(model, dygraph_params, topo)
+    if prog is None:
+        prog = paddle.static.default_main_program()
+    paddle.static.set_program_state(prog, static_params)
+
+
 def run_evaluate(data_loader,
                  exe,
                  program,
@@ -320,6 +328,15 @@ def do_train(args):
     exe.run(startup_program)
     test_program = main_program.clone(for_test=True)
 
+    if "small" in args.model_name_or_path:
+        init_dir = os.path.join(
+            os.environ['HOME'],
+            './init_checkponits/gpt2-init-small-bs32.pdparams')
+    if init_dir is not None:
+        print(init_dir)
+        init_static_with_params(model,
+                                paddle.load(init_dir), topo, main_program)
+
     global_step = 0
     tic_train = time.time()
     epoch = 0
@@ -327,7 +344,7 @@ def do_train(args):
     while True:
         fetchs = []
         if topo.is_last:
-            fetchs = [loss, learning_rate]
+            fetchs = [loss, learning_rate, tokens]
 
         # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
         # many times. and start a new random dataloader.
@@ -342,7 +359,8 @@ def do_train(args):
 
             if global_step % args.logging_freq == 0:
                 if topo.is_last:
-                    loss_return, lr_return = ret
+                    loss_return, lr_return, tk_ret = ret
+                    logger.info(tk_ret)
                     speed = args.logging_freq / (time.time() - tic_train)
                     logger.info(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f steps/s, ips: %.0f tokens/s, learning rate: %.9f"
@@ -353,7 +371,8 @@ def do_train(args):
                     log_writer.add_scalar("learning_rate", lr_return[0],
                                           global_step)
                 tic_train = time.time()
-
+            if global_step >= args.max_steps:
+                return
             if global_step % args.eval_freq == 0:
                 # TODO, check the input data of validation
                 eval_fetch = []
