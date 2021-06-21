@@ -43,6 +43,9 @@ pip install -r requirements.txt
 需要配置`const.py`里面语音识别的应用鉴权信息，只需要将`APPID`和`APPKEY`设置为自己所申请的。  
 申请教程：[教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/simultaneous_translation/stacl/demo/README_ai.md)
 
+## 5. 运行
+- 1.在Chinese input输入中文，按【回车键】开始实时翻译，遇到【。！？】结束整句，按【CLEAR】清空所有的输入和输出；
+- 2.按【REC】开始录音并实时翻译，遇到【。！？】结束整句，按【CLEAR】清空所有的输入和输出。
 
 ## ⚠️注意事项
 - 1.demo需在本地电脑运行（需要GUI界面），已在Mac/Windows系统上通过测试；
