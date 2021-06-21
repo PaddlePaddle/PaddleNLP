@@ -34,9 +34,8 @@ METRIC_CLASSES = {
 
 
 class TeacherModel(object):
-    def __init__(self, model_name, param_path):
-        self.model = BertForSequenceClassification.from_pretrained(model_name)
-        self.model.set_state_dict(paddle.load(param_path))
+    def __init__(self, teacher_dir):
+        self.model = BertForSequenceClassification.from_pretrained(teacher_dir)
         self.model.eval()
 
 
@@ -99,8 +98,7 @@ def do_train(agrs):
     metric_class = METRIC_CLASSES[args.task_name]
     metric = metric_class()
 
-    teacher = TeacherModel(
-        model_name=args.model_name, param_path=args.teacher_path)
+    teacher = TeacherModel(args.teacher_dir)
 
     print("Start to distill student model.")
 
