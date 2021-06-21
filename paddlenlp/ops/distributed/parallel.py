@@ -187,6 +187,7 @@ class ParallelLinear(nn.Layer):
         weight.is_distributed = True
         # alias for weight tensor
         self.weight = self.linear.weight
+        self.bias = self.linear.bias
 
         startup_block = paddle.static.default_startup_program().global_block()
         main_block = paddle.static.default_main_program().global_block()
