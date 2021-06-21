@@ -25,7 +25,7 @@ __all__ = ['Cote']
 
 class Cote(DatasetBuilder):
     """
-    COTE_DP/COTE-BD dataset for Opinion Role Labeling task.
+    COTE_DP/COTE-BD/COTE-MFW dataset for Opinion Role Labeling task.
     More information please refer to https://aistudio.baidu.com/aistudio/competition/detail/50/?isFromLuge=1.
 
     """
