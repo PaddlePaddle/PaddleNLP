@@ -61,6 +61,21 @@ class Cote(DatasetBuilder):
             },
             'labels': ["B", "I", "O"]
         },
+        'mfw': {
+            'url': "https://dataset-bj.cdn.bcebos.com/qianyan/COTE-MFW.zip",
+            'md5': "c85326bf2be4424d03373ea70cb32c3f",
+            'splits': {
+                'train': [
+                    os.path.join('COTE-MFW', 'train.tsv'),
+                    '01fc90b9098d35615df6b8d257eb46ca', (0, 1), 1
+                ],
+                'test': [
+                    os.path.join('COTE-MFW', 'test.tsv'),
+                    'c61a475917a461089db141c59c688343', (1, ), 1
+                ],
+            },
+            'labels': ["B", "I", "O"]
+        }
     }
 
     def _get_data(self, mode, **kwargs):
@@ -83,31 +98,35 @@ class Cote(DatasetBuilder):
             self.name]['splits'][split]
         with open(filename, 'r', encoding='utf-8') as f:
             for idx, line in enumerate(f):
-                if idx < num_discard_samples:
-                    continue
-                line_stripped = line.strip().split('\t')
-                if not line_stripped:
-                    continue
-                example = [line_stripped[indice] for indice in field_indices]
-                if split == "test":
-                    yield {"tokens": list(example[0])}
-                else:
-                    try:
-                        entity, text = example[0], example[1]
-                        start_idx = text.index(entity)
-                    except:
-                        # drop the dirty data
+                try:
+                    if idx < num_discard_samples:
                         continue
+                    line_stripped = line.strip().split('\t')
+                    if not line_stripped:
+                        continue
+                    example = [line_stripped[indice] for indice in field_indices]
+                    if split == "test":
+                        yield {"tokens": list(example[0])}
+                    else:
+                        try:
+                            entity, text = example[0], example[1]
+                            start_idx = text.index(entity)
+                        except:
+                            # drop the dirty data
+                            continue
 
-                    labels = ['O'] * len(text)
-                    labels[start_idx] = "B"
-                    for idx in range(start_idx + 1, start_idx + len(entity)):
-                        labels[idx] = "I"
-                    yield {
-                        "tokens": list(text),
-                        "labels": labels,
-                        "entity": entity
-                    }
+                        labels = ['O'] * len(text)
+                        labels[start_idx] = "B"
+                        for idx in range(start_idx + 1, start_idx + len(entity)):
+                            labels[idx] = "I"
+                        yield {
+                            "tokens": list(text),
+                            "labels": labels,
+                            "entity": entity
+                        }
+                except Exception as e:
+                    # drop the dirty data
+                    continue
 
     def get_labels(self):
         """
