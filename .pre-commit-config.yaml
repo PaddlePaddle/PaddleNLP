@@ -1,36 +1,52 @@
 repos:
+-   repo: https://github.com/Lucas-C/pre-commit-hooks.git
+    sha: v1.0.1
+    hooks:
+    -   id: remove-crlf
+        files: (?!.*third_party)^.*$ | (?!.*book)^.*$
 -   repo: https://github.com/PaddlePaddle/mirrors-yapf.git
     sha: 0d79c0c469bab64f7229c9aca2b1186ef47f0e37
     hooks:
     -   id: yapf
-        files: \.py$
+        files: (.*\.(py|bzl)|BUILD|.*\.BUILD|WORKSPACE)$
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    sha: a11d9314b22d8f8c7556443875b731ef05965464
+    sha: 5bf6c09bfa1297d3692cadd621ef95f1284e33c0
     hooks:
+    -   id: check-added-large-files
     -   id: check-merge-conflict
     -   id: check-symlinks
     -   id: detect-private-key
-        files: (?!.*paddle)^.*$
+        files: (?!.*third_party)^.*$ | (?!.*book)^.*$
     -   id: end-of-file-fixer
-        files: \.md$
-    -   id: trailing-whitespace
-        files: \.md$
--   repo: https://github.com/Lucas-C/pre-commit-hooks
-    sha: v1.0.1
-    hooks:
-    -   id: forbid-crlf
-        files: \.md$
-    -   id: remove-crlf
-        files: \.md$
-    -   id: forbid-tabs
-        files: \.md$
-    -   id: remove-tabs
-        files: \.md$
 -   repo: local
     hooks:
-    -   id: clang-format
+    -   id: clang-format-with-version-check
         name: clang-format
-        description: Format files with ClangFormat
-        entry: bash .clang_format.hook -i
+        description: Format files with ClangFormat.
+        entry: bash ./clang_format.hook -i
         language: system
-        files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|cuh|proto)$
+        files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto)$
+-   repo: local
+    hooks:
+    -   id: cpplint-cpp-source
+        name: cpplint
+        description: Check C++ code style using cpplint.py.
+        entry: bash ./cpplint_pre_commit.hook
+        language: system
+        files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx)$
+-   repo: local
+    hooks:
+    -   id: pylint-doc-string
+        name: pylint
+        description: Check python docstring style using docstring_checker.
+        entry: bash ./pylint_pre_commit.hook
+        language: system
+        files: \.(py)$
+-   repo: local
+    hooks:
+    -   id: copyright_checker
+        name: copyright_checker
+        entry: python ./copyright.hook
+        language: system
+        files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto|py|sh)$
+        exclude: (?!.*third_party)^.*$ | (?!.*book)^.*$
