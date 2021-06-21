@@ -42,3 +42,9 @@ pip install -r requirements.txt
 ### 4.3 语音同传环境（百度AI语音识别）
 需要配置`const.py`里面语音识别的应用鉴权信息，只需要将`APPID`和`APPKEY`设置为自己所申请的。  
 申请教程：[教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/simultaneous_translation/stacl/demo/README_ai.md)
+
+
+## ⭐️注意事项
+### 1. demo需在本地电脑运行（需要GUI界面），已在Mac/Windows系统上通过测试；
+### 2. 语音同传为加分项，故若语音同传环境安装失败则只启动文本同传；
+### 3. 文本同传和语音同传交替使用之前，务必按【CLEAR】清空上一状态。
