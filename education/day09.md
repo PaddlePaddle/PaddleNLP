@@ -44,7 +44,7 @@ pip install -r requirements.txt
 申请教程：[教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/simultaneous_translation/stacl/demo/README_ai.md)
 
 
-## ⭐️注意事项
+## ⚠️注意事项
 ### 1. demo需在本地电脑运行（需要GUI界面），已在Mac/Windows系统上通过测试；
 ### 2. 语音同传为加分项，故若语音同传环境安装失败则只启动文本同传；
 ### 3. 文本同传和语音同传交替使用之前，务必按【CLEAR】清空上一状态。
