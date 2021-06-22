@@ -54,7 +54,7 @@ python -u ./run_glue.py \
     --logging_steps 1 \
     --save_steps 500 \
     --output_dir ./tmp/$TASK_NAME/ \
-    --n_gpu 1 \
+    --device gpu \
 
 ```
 

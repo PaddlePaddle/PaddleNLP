@@ -49,12 +49,29 @@ class SeAbsa16(DatasetBuilder):
             },
             'labels': ["0", "1"]
         },
+        # came is short for cameras.
+        'came': {
+            'url':
+            "https://dataset-bj.cdn.bcebos.com/qianyan/SE-ABSA16_CAME.zip",
+            'md5': "3104e92217bbff80a1ed834230f1df51",
+            'splits': {
+                'train': [
+                    os.path.join('SE-ABSA16_CAME', 'train.tsv'),
+                    '8c661c0e83bb34b66c6fbf039c7fae80', (0, 1, 2), 1
+                ],
+                'test': [
+                    os.path.join('SE-ABSA16_CAME', 'test.tsv'),
+                    '8b80f77960be55adca1184d7a20501df', (1, 2), 1
+                ],
+            },
+            'labels': ["0", "1"]
+        }
     }
 
     def _get_data(self, mode, **kwargs):
         """Downloads dataset."""
         builder_config = self.BUILDER_CONFIGS[self.name]
-        default_root = os.path.join(DATA_HOME, 'SE-ABSA16_PHNS')
+        default_root = os.path.join(DATA_HOME, f'SE-ABSA16_{self.name.upper()}')
         filename, data_hash, _, _ = builder_config['splits'][mode]
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
