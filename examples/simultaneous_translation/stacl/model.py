@@ -37,9 +37,10 @@ class CrossEntropyCriterion(nn.Layer):
                     x=label, num_classes=predict.shape[-1]),
                 epsilon=self.label_smooth_eps)
 
-        cost = F.softmax_with_cross_entropy(
-            logits=predict,
+        cost = F.cross_entropy(
+            input=predict,
             label=label,
+            reduction='none',
             soft_label=True if self.label_smooth_eps else False).squeeze()
         weighted_cost = cost * weights
         sum_cost = paddle.sum(weighted_cost)
