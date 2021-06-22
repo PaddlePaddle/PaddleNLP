@@ -624,8 +624,8 @@ class GPTPretrainedModel(PretrainedModel):
             "num_attention_heads": 4,
             "intermediate_size": 4096,
             "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.0,
-            "attention_probs_dropout_prob": 0.0,
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
             "max_position_embeddings": 1024,
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,

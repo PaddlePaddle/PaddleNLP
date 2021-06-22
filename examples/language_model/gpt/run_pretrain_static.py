@@ -278,8 +278,7 @@ def do_train(args):
                 if not any(nd in n for nd in ["bias", "norm"])
             ]
             # TODO @ZHUI Use paddle.optimizer.AdamW
-            #if ops.optimizer._jit_compile():
-            if False:
+            if ops.optimizer._jit_compile():
                 optimizer = ops.optimizer.AdamwOptimizer(
                     learning_rate=lr_scheduler,
                     beta1=args.adam_beta1,
@@ -347,7 +346,7 @@ def do_train(args):
     while True:
         fetchs = []
         if topo.is_last:
-            fetchs = [loss, learning_rate, tokens]
+            fetchs = [loss, learning_rate]
 
         # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
         # many times. and start a new random dataloader.
@@ -365,8 +364,7 @@ def do_train(args):
 
             if global_step % args.logging_freq == 0:
                 if topo.is_last:
-                    loss_return, lr_return, tk_ret = ret
-                    logger.info(tk_ret)
+                    loss_return, lr_return = ret
                     speed = args.logging_freq / (time.time() - tic_train)
                     logger.info(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f steps/s, ips: %.0f tokens/s, learning rate: %.9f"
