@@ -69,7 +69,7 @@ def dygraph_params_to_static(model, dygraph_tensor_dict, topo=None):
 
             splited = np.split(
                 tensor, topo.mp_info.size, axis=dim)[topo.mp_info.rank]
-            ret_dict[parm.name] = splited  #.reshape(parm.shape)
+            ret_dict[parm.name] = splited
         else:
             ret_dict[parm.name] = tensor
 

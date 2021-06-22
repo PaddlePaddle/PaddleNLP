@@ -38,6 +38,8 @@ __all__ = [
     'GPTLMHeadModel',
 ]
 
+P = paddle.fluid.layers.Print
+
 
 # P = paddle.fluid.layers.Print
 def P(a, message=None):
