@@ -31,12 +31,12 @@ PYTHONPATH=../../../ python -u  -m paddle.distributed.fleet.launch \
     --use_recompute false \
     --max_lr 0.00015 \
     --min_lr 0.00001 \
-    --max_steps 10 \
+    --max_steps 20 \
     --save_steps 100000 \
     --decay_steps 320000 \
-    --weight_decay 0.01\
-    --warmup_rate 0.01 \
-    --grad_clip 1.0 \
+    --weight_decay 0.0\
+    --warmup_rate 0.0 \
+    --grad_clip 0.0 \
     --logging_freq 1\
     --eval_freq 1000 \
     --device "gpu"

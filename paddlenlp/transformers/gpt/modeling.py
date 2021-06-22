@@ -394,7 +394,6 @@ class TransformerDecoderLayer(nn.Layer):
             weight_attr=weight_attrs[0],
             bias_attr=bias_attrs[0],
             topo=topo)
-
         if topo is None or topo.mp_info.size == 1:
             self.linear1 = nn.Linear(
                 d_model,
@@ -624,8 +623,8 @@ class GPTPretrainedModel(PretrainedModel):
             "num_attention_heads": 4,
             "intermediate_size": 4096,
             "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
+            "hidden_dropout_prob": 0.0,
+            "attention_probs_dropout_prob": 0.0,
             "max_position_embeddings": 1024,
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
@@ -842,10 +841,10 @@ class GPTForPretraining(GPTPretrainedModel):
         else:
             encoder_outputs = outputs
         # TODO @ZHUI Use all_to_all to
-        #logits = paddle.matmul(
-        #    encoder_outputs,
-        #    self.gpt.embeddings.word_embeddings.weight,
-        #    transpose_y=True)
+        # logits = paddle.matmul(
+        #     encoder_outputs,
+        #     self.gpt.embeddings.word_embeddings.weight,
+        #     transpose_y=True)
         logits = self.parallel_matmul(
             encoder_outputs, self.gpt.embeddings.word_embeddings.weight, True,
             self.gpt.topo)
