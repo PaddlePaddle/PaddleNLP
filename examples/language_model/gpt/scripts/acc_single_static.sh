@@ -9,7 +9,7 @@ rm -rf core.*
 rm -rf start_sharding*
 rm -rf main_sharding*
 
-task_name="gpt-acc-mp"
+task_name="gpt-acc-single"
 rm -rf output/$task_name/log
 
 PYTHONPATH=../../../ python -u  -m paddle.distributed.fleet.launch \

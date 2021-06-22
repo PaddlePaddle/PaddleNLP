@@ -38,7 +38,10 @@ __all__ = [
     'GPTLMHeadModel',
 ]
 
-P = paddle.fluid.layers.Print
+
+# P = paddle.fluid.layers.Print
+def P(a, message=None):
+    pass
 
 
 class MultiHeadAttention(nn.Layer):
@@ -62,7 +65,7 @@ class MultiHeadAttention(nn.Layer):
                  weight_attr=None,
                  bias_attr=None,
                  topo=None,
-                 fuse=True):
+                 fuse=False):
         super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
@@ -88,6 +91,9 @@ class MultiHeadAttention(nn.Layer):
                     self.kdim, embed_dim, weight_attr, bias_attr=bias_attr)
                 self.v_proj = nn.Linear(
                     self.vdim, embed_dim, weight_attr, bias_attr=bias_attr)
+            self.out_proj = nn.Linear(
+                embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
+
         else:
             assert self.num_heads % topo.mp_info.size == 0
             self.num_heads = self.num_heads // topo.mp_info.size
@@ -142,8 +148,10 @@ class MultiHeadAttention(nn.Layer):
         to reduce redundant calculations.
 
         """
-
+        P(query.abs().sum(), message="in_query")
+        P(self.q_proj.weight.abs().sum(), message="q_proj_weight")
         q = self.q_proj(query)
+        P(q.abs().sum(), message="q_proj_query")
         q = tensor.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
         q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
 
@@ -232,6 +240,7 @@ class MultiHeadAttention(nn.Layer):
         # scale dot product attention
         product = layers.matmul(
             x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
+        P(product.abs().sum(), message="q_k_product")
 
         if attn_mask is not None:
             product = product + attn_mask
@@ -245,6 +254,7 @@ class MultiHeadAttention(nn.Layer):
                 mode="upscale_in_train")
 
         out = tensor.matmul(weights, v)
+        P(out.abs().sum(), message="qkv_out")
 
         # combine heads
         out = tensor.transpose(out, perm=[0, 2, 1, 3])
@@ -324,6 +334,7 @@ class TransformerDecoder(nn.Layer):
                                         cache=cache[i])
                 new_caches.append(new_cache)
             self.checkpoints.append(output.name)
+            P(output.abs().sum(), message="layer_%d_output" % i)
 
         if self.norm is not None:
             output = self.norm(output)
@@ -750,6 +761,7 @@ class GPTModel(GPTPretrainedModel):
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
 
+        P(embedding_output.abs().sum(), message="embedding_output")
         # TODO, use registered buffer
         causal_mask = paddle.tensor.triu(
             paddle.ones((paddle.shape(input_ids)[-1],
@@ -849,13 +861,16 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
     It calculates the final loss.
     """
 
-    def __init__(self):
+    def __init__(self, topo=None):
         super(GPTPretrainingCriterion, self).__init__()
-        self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
+        if topo is None or topo.mp_info.size == 1:
+            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
+        else:
+            self.loss_func = paddle.distributed.collective._c_softmax_with_cross_entropy
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
-        masked_lm_loss = paddle.distributed.collective._c_softmax_with_cross_entropy(
-            prediction_scores, masked_lm_labels.unsqueeze(2))
+        masked_lm_loss = self.loss_func(prediction_scores,
+                                        masked_lm_labels.unsqueeze(2))
 
         loss_mask = loss_mask.reshape([-1])
         masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)

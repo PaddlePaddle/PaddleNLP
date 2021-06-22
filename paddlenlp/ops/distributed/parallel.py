@@ -166,6 +166,7 @@ class ColumnParallelLiner(nn.Layer):
         if self.linear._bias_attr != False:
             startup_block.vars[self.linear.bias.name].is_distributed = True
             main_block.vars[self.linear.bias.name].is_distributed = True
+            self.bias = self.linear.bias
 
     def forward(self, x):
         # TODO(wangxi): dynamic group

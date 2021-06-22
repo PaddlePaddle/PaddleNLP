@@ -57,19 +57,19 @@ def dygraph_params_to_static(model, dygraph_tensor_dict, topo=None):
     for name, parm in state_dict.items():
         name = name.replace("gpt", "gpt2")
         if name not in dygraph_tensor_dict:
+            print("miss \t\t", name)
             continue
 
         tensor = dygraph_tensor_dict[name]
-
         if parm.is_distributed:
             assert topo is not None
-
             for dim, v in enumerate(tensor.shape):
                 if parm.shape[dim] != v:
                     break
+
             splited = np.split(
                 tensor, topo.mp_info.size, axis=dim)[topo.mp_info.rank]
-            ret_dict[parm.name] = splited
+            ret_dict[parm.name] = splited  #.reshape(parm.shape)
         else:
             ret_dict[parm.name] = tensor
 

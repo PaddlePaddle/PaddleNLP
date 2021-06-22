@@ -252,7 +252,7 @@ def do_train(args):
                 preds = model(tokens, position_ids, attention_mask)
 
                 criterion = guard(f'gpu:{args.pp_degree -1}')(
-                    GPTPretrainingCriterion)()
+                    GPTPretrainingCriterion)(topo)
                 loss = criterion(preds, labels, loss_mask)
 
             # Create the learning_rate sheduler and optimizer
