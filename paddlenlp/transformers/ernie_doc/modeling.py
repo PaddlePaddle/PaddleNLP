@@ -115,7 +115,7 @@ class MultiHeadAttention(nn.Layer):
         return paddle.transpose(x=reshaped_x, perm=[0, 2, 1, 3])
 
     def __rel_shift(self, x, klen=-1):
-        # x shape: [B, N, T, T + M]
+        # shape: [B, N, T, 2 * T + M]
         x_shape = x.shape
         x = paddle.reshape(x, [x_shape[0], x_shape[1], x_shape[3], x_shape[2]])
         x = x[:, :, 1:, :]
@@ -188,7 +188,6 @@ class ErnieDocEncoderLayer(nn.Layer):
                  d_value,
                  d_model,
                  d_inner_hid,
-                 memory_len,
                  prepostprocess_dropout,
                  attention_dropout,
                  relu_dropout,
@@ -218,34 +217,83 @@ class ErnieDocEncoderLayer(nn.Layer):
 
         weight_attrs = _convert_param_attr_to_list(weight_attr, 2)
         bias_attrs = _convert_param_attr_to_list(bias_attr, 2)
+        self.attn = MultiHeadAttention(
+            d_key,
+            d_value,
+            d_model,
+            n_head,
+            self.r_w_bias,
+            self.r_r_bias,
+            self.r_t_bias,
+            attention_dropout,
+            weight_attr=weight_attrs[0],
+            bias_attr=bias_attrs[0], )
+        self.ffn = PointwiseFFN(
+            d_inner_hid,
+            d_model,
+            relu_dropout,
+            hidden_act,
+            weight_attr=weight_attrs[1],
+            bias_attr=bias_attrs[1])
+        self.norm1 = nn.LayerNorm(d_model, epsilon=epsilon)
+        self.norm2 = nn.LayerNorm(d_model, epsilon=epsilon)
+        self.dropout1 = nn.Dropout(
+            prepostprocess_dropout, mode="upscale_in_train")
+        self.dropout2 = nn.Dropout(
+            prepostprocess_dropout, mode="upscale_in_train")
 
     def forward(self, enc_input, memory, rel_pos, rel_task, attn_mask):
-        pass
+        residual = enc_input
+        if self.normalize_before:
+            enc_input = self.norm1(enc_input)
+        attn_output = self.attn(enc_input, enc_input, enc_input, rel_pos,
+                                rel_task, memory, attn_mask)
+        attn_output = residual + self.dropout1(attn_output)
+        if not self.normalize_before:
+            attn_output = self.norm1(attn_output)
+        residual = attn_output
+        if self.normalize_before:
+            attn_output = self.norm2(attn_output)
+        ffn_output = self.ffn(attn_output)
+        output = residual + self.dropout2(ffn_output)
+        if not self.normalize_before:
+            output = self.norm2(output)
+        return output
 
 
 class ErnieDocEncoder(nn.Layer):
-    def __init__(self, num_layers, encoder_layer):
+    def __init__(self, num_layers, encoder_layer, mem_len):
         super(ErnieDocEncoder, self).__init__()
-        self.layers = LayerList([(encoder_layer if i == 0 else
-                                  type(encoder_layer)(**encoder_layer._config))
-                                 for i in range(num_layers)])
+        self.layers = nn.LayerList([(
+            encoder_layer
+            if i == 0 else type(encoder_layer)(**encoder_layer._config))
+                                    for i in range(num_layers)])
         self.num_layers = num_layers
-        self.norm = LayerNorm(
+        self.norm = nn.LayerNorm(
             self.layers[0].d_model, epsilon=self.layers[0].epsilon)
         self.normalize_before = self.layers[0].normalize_before
+        self.mem_len = mem_len
 
-    def _cache_mem(curr_out, prev_mem, mem_len=None):
-        if mem_len is None or mem_len == 0:
+    def _cache_mem(curr_out, prev_mem):
+        if self.mem_len is None or self.mem_len == 0:
             return None
         if prev_mem is None:
-            new_mem = curr[:, -mem_len:, :]
+            new_mem = curr[:, -self.mem_len:, :]
         else:
-            new_mem = paddle.concat([prev_mem, curr_out], 1)[:, -mem_len:, :]
+            new_mem = paddle.concat([prev_mem, curr_out],
+                                    1)[:, -self.mem_len:, :]
         new_mem.stop_gradient = True
         return new_mem
 
     def forward(self, enc_input, memories, rel_pos, rel_task, attn_mask):
-        pass
+        # no need to normalize enc_input, cause it's already normalized outside.
+        new_mem = []
+        for i, encoder_layer in enumerate(self.layers):
+            enc_input = encoder_layer(enc_input, memories[i], rel_pos, rel_task,
+                                      attn_mask)
+            new_mem += [self._cache_mem(enc_input, memories[i])]
+
+        return enc_input, new_mem
 
 
 class ErnieDocPretrainedModel(PretrainedModel):
