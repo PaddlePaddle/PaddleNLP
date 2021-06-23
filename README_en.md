@@ -14,7 +14,7 @@ English | [简体中文](./README.md)
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
-* [2021-06-07] **NLP Live Class** from Baidu has started!🔥🔥🔥 Click [HERE](https://aistudio.baidu.com/aistudio/course/introduce/24177) to join us!
+* [2021-06-07] **NLP Live Course** from Baidu has started!🔥🔥🔥 Click [HERE](https://aistudio.baidu.com/aistudio/course/introduce/24177) to join us!
 * [2021-06-04] [ERNIE-Gram](https://arxiv.org/abs/2010.12148) pretrained model has been released! Install v2.0.2 to try it.
 * [2021-05-20] PaddleNLP 2.0 has been officially relealsed! :tada: For more information please refer to [Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.0.0).
 
