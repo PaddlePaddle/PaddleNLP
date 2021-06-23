@@ -95,9 +95,9 @@ class MultiHeadAttention(nn.Layer):
             bias_attr=bias_attr)
         self.out_proj = nn.Linear(
             d_model, d_model, weight_attr=weight_attr, bias_attr=bias_attr)
-        self.r_w_bias = r_w_bias.unsqueeze([0, 1])
-        self.r_r_bias = r_r_bias.unsqueeze([0, 1])
-        self.r_t_bias = r_t_bias.unsqueeze([0, 1])
+        self.r_w_bias = r_w_bias
+        self.r_r_bias = r_r_bias
+        self.r_t_bias = r_t_bias
         self.dropout = nn.Dropout(
             dropout_rate, mode="upscale_in_train") if dropout_rate else None
 
@@ -152,7 +152,7 @@ class MultiHeadAttention(nn.Layer):
     def forward(self, queries, keys, values, rel_pos, rel_task, memory,
                 attn_mask):
         if memory is not None and len(memory.shape) > 1:
-            cat = paddle.concat([memorym, queries], 1)
+            cat = paddle.concat([memory, queries], 1)
         else:
             cat = queries
         keys, values = cat, cat
@@ -166,7 +166,8 @@ class MultiHeadAttention(nn.Layer):
         q, k, v, r, t = self.__compute_qkv(queries, keys, values, rel_pos,
                                            rel_task)
         q_w, q_r, q_t = list(
-            map(lambda x: q + x, [self.r_w_bias, self.r_r_bias, self.r_t_bias]))
+            map(lambda x: q + x.unsqueeze([0, 1]),
+                [self.r_w_bias, self.r_r_bias, self.r_t_bias]))
         q_w, q_r, q_t = list(
             map(lambda x: self.__split_heads(x, self.d_model, self.n_head),
                 [q_w, q_r, q_t]))
@@ -205,13 +206,8 @@ class ErnieDocEncoderLayer(nn.Layer):
         self._config.pop("self")
         self._config.pop("__class__", None)  # py3
         super(ErnieDocEncoderLayer, self).__init__()
-        if rel_pos_params_sharing:
-            assert (r_w_bias and r_r_bias and r_t_bias) is not None, \
-                    "the rel pos bias can not be None when sharing the relative position params"
-            self.r_w_bias, self.r_r_bias, self.r_t_bias = \
-                r_w_bias, r_r_bias, r_t_bias
-        else:
-            self.r_w_bias, self.r_r_bias, self.r_t_bias = \
+        if not rel_pos_params_sharing:
+            r_w_bias, r_r_bias, r_t_bias = \
                 list(map(lambda x: self.create_parameter(
                     shape=[n_head * d_key], dtype="float32"),
                     ["r_w_bias", "r_r_bias", "r_t_bias"]))
@@ -223,9 +219,9 @@ class ErnieDocEncoderLayer(nn.Layer):
             d_value,
             d_model,
             n_head,
-            self.r_w_bias,
-            self.r_r_bias,
-            self.r_t_bias,
+            r_w_bias,
+            r_r_bias,
+            r_t_bias,
             attention_dropout,
             weight_attr=weight_attrs[0],
             bias_attr=bias_attrs[0], )
@@ -273,12 +269,10 @@ class ErnieDocEncoder(nn.Layer):
             if i == 0 else type(encoder_layer)(**encoder_layer._config))
                                     for i in range(num_layers)])
         self.num_layers = num_layers
-        self.norm = nn.LayerNorm(
-            self.layers[0].d_model, epsilon=self.layers[0].epsilon)
         self.normalize_before = self.layers[0].normalize_before
         self.mem_len = mem_len
 
-    def _cache_mem(curr_out, prev_mem):
+    def _cache_mem(self, curr_out, prev_mem):
         if self.mem_len is None or self.mem_len == 0:
             return None
         if prev_mem is None:
@@ -317,7 +311,8 @@ class ErnieDocPretrainedModel(PretrainedModel):
             "task_type_vocab_size": 3,
             "vocab_size": 50265,
             "memory_len": 128,
-            "epsilon": 1e-12
+            "epsilon": 1e-12,
+            "pad_token_id": 1
         }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -341,8 +336,6 @@ class ErnieDocPretrainedModel(PretrainedModel):
                         if hasattr(self, "initializer_range") else
                         self.ernie_doc.config["initializer_range"],
                         shape=layer.weight.shape))
-        elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = 1e-5
 
 
 class ErnieDocEmbeddings(nn.Layer):
@@ -355,8 +348,9 @@ class ErnieDocEmbeddings(nn.Layer):
                  type_vocab_size=3,
                  padding_idx=0):
         super(ErnieDocEmbeddings, self).__init__()
-        self.word_emb = nn.Embedding(
-            vocab_size, d_model, padding_idx=padding_idx)
+        # self.word_emb = nn.Embedding(
+        #     vocab_size, d_model, padding_idx=padding_idx)
+        self.word_emb = nn.Embedding(vocab_size, d_model)
         self.pos_emb = nn.Embedding(max_position_embeddings * 2 + memory_len,
                                     d_model)
         self.token_type_emb = nn.Embedding(type_vocab_size, d_model)
@@ -367,27 +361,25 @@ class ErnieDocEmbeddings(nn.Layer):
 
     def forward(self, input_ids, token_type_ids, position_ids):
         # input_embeddings: [B, T, H]
-        input_embeddings = self.word_emb(input_ids)
+        input_embeddings = self.word_emb(input_ids.squeeze(-1))
         # position_embeddings: [B, 2 * T + M, H]
-        position_embeddings = self.pos_emb(position_ids)
+        position_embeddings = self.pos_emb(position_ids.squeeze(-1))
 
         batch_size = input_ids.shape[0]
         token_type_ids = paddle.concat(
             [
                 paddle.zeros(
-                    shape=[batch_size, self.memory_len], dtype="int64") +
+                    shape=[batch_size, self.memory_len, 1], dtype="int64") +
                 token_type_ids[0, 0, 0], token_type_ids
             ],
             axis=1)
         token_type_ids.stop_gradient = True
         # token_type_embeddings: [B, M + T, H]
-        token_type_embeddings = self.token_type_emb(token_type_ids)
-        # normalize each embedding
-        for i, embeddings in enumerate(
-            [input_embeddings, position_embeddings, token_type_embeddings]):
-            embeddings = self.dropouts[i](self.norms[i](embeddings))
-
-        return input_embeddings, position_embeddings, token_type_embeddings
+        token_type_embeddings = self.token_type_emb(token_type_ids.squeeze(-1))
+        embs = [input_embeddings, position_embeddings, token_type_embeddings]
+        for i in range(len(embs)):
+            embs[i] = self.dropouts[i](self.norms[i](embs[i]))
+        return embs
 
 
 class ErnieDocPooler(nn.Layer):
@@ -402,9 +394,9 @@ class ErnieDocPooler(nn.Layer):
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
-        # to the first token.
-        first_token_tensor = hidden_states[:, 0]
-        pooled_output = self.dense(first_token_tensor)
+        # to the last token.
+        last_token_tensor = hidden_states[:, -1]
+        pooled_output = self.dense(last_token_tensor)
         pooled_output = self.activation(pooled_output)
         return pooled_output
 
@@ -466,7 +458,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
             max_position_embeddings, task_type_vocab_size, pad_token_id)
         self.pooler = ErnieDocPooler(hidden_size)
 
-    def __create_n_head_attn_mask(self, attn_mask, batch_size):
+    def _create_n_head_attn_mask(self, attn_mask, batch_size):
         # attn_mask shape: [B, T, 1]
         # concat an data_mask, shape: [B, M + T, 1]
         data_mask = paddle.concat(
@@ -481,7 +473,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
         self_attn_mask = paddle.matmul(attn_mask, data_mask, transpose_y=True)
         # cast to float
         self_attn_mask = self_attn_mask.astype(self.pooler.dense.weight.dtype)
-        self_attn_mask = self_attn_mask * -1e9
+        self_attn_mask = (self_attn_mask - 1) * 1e8
         n_head_self_attn_mask = paddle.stack(
             [self_attn_mask] * self.n_head, axis=1)
         n_head_self_attn_mask.stop_gradient = True
@@ -494,8 +486,8 @@ class ErnieDocModel(ErnieDocPretrainedModel):
 
         batch_size = input_embeddings.shape[0]
         # [B, N, T, M + T]
-        n_head_self_attn_mask = self.__create_n_head_attn_mask(attn_mask,
-                                                               batch_size)
+        n_head_self_attn_mask = self._create_n_head_attn_mask(attn_mask,
+                                                              batch_size)
         # memories contains n_layer memory whose shape is [B, M, H]
         encoder_output, new_mem = self.encoder(
             enc_input=input_embeddings,
@@ -513,8 +505,7 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
         self.ernie_doc = ernie_doc
         self.linear = nn.Linear(self.ernie_doc.config["hidden_size"],
                                 num_classes)
-        self.dropout = nn.Dropout(
-            self.ernie_doc.config['relu_dropout'], mode="upscale_in_train")
+        self.dropout = nn.Dropout(0.1, mode="upscale_in_train")
         self.apply(self.init_weights)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids,
@@ -535,6 +526,7 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
             self.ernie_doc.config['relu_dropout'], mode="upscale_in_train")
         self.linear = nn.Linear(self.ernie_doc.config["hidden_size"],
                                 num_classes)
+        self.apply(self.init_weights)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids,
                 attn_mask):
@@ -552,6 +544,7 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
         self.dropout = nn.Dropout(
             self.ernie_doc.config['relu_dropout'], mode="upscale_in_train")
         self.linear = nn.Linear(self.ernie_doc.config["hidden_size"], 2)
+        self.apply(self.init_weights)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids,
                 attn_mask):

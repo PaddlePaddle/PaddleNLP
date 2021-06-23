@@ -13,7 +13,11 @@
 # limitations under the License.
 
 import numpy as np
+import random
+from collections import namedtuple
+
 import paddle
+from paddle.io import IterableDataset
 
 
 def get_related_pos(insts, seq_len, memory_len=128):
@@ -99,24 +103,34 @@ def pad_batch_data(insts,
     return return_list if len(return_list) > 1 else return_list[0]
 
 
-class BatchiFy(object):
+class ClassifierIterator(object):
     def __init__(self,
+                 dataset,
                  batch_size,
                  tokenizer,
                  trainer_num,
+                 trainer_id,
                  max_seq_length=512,
                  memory_len=128,
                  repeat_input=False,
                  in_tokens=False,
+                 mode="train",
                  is_test=False):
         self.batch_size = batch_size
         self.tokenizer = tokenizer
         self.trainer_num = trainer_num
+        self.trainer_id = trainer_id
         self.max_seq_length = max_seq_length
         self.memory_len = memory_len
         self.repeat_input = repeat_input
         self.in_tokens = in_tokens
         self.is_test = is_test
+        self.dataset = [data for data in dataset]
+        self.num_examples = None
+        self.mode = mode
+        shuffle = True if mode == "train" else False
+        if shuffle:
+            random.shuffle(self.dataset)
 
     def _cnt_list(self, inp):
         """cnt_list"""
@@ -126,8 +140,13 @@ class BatchiFy(object):
                 cnt += 1
         return cnt
 
+    def _preprocess_text(self, text):
+        text = text.strip().replace('<br /><br />', ' ')
+        text = text.replace('\t', '')
+        return text
+
     def _convert_to_features(self, example):
-        text = example["text"]
+        text = self._preprocess_text(example["text"])
         label = example["label"]
         doc_spans = []
         _DocSpan = namedtuple("DocSpan", ["start", "length"])
@@ -141,7 +160,7 @@ class BatchiFy(object):
             doc_spans.append(_DocSpan(start=start_offset, length=length))
             if start_offset + length == len(tokens_a):
                 break
-            start_offset += min(length, memory_len)
+            start_offset += min(length, self.memory_len)
 
         features = []
         Feature = namedtuple("Feature", ["src_ids", "label_id", "cal_loss"])
@@ -182,7 +201,7 @@ class BatchiFy(object):
 
     def _pad_batch_records(self, batch_records, gather_idx=[]):
         batch_token_ids = [record.src_ids for record in batch_records]
-        if batch_records[0].label_id:
+        if batch_records[0].label_id is not None:
             batch_labels = [record.label_id for record in batch_records]
             batch_labels = np.array(batch_labels).astype("int64").reshape(
                 [-1, 1])
@@ -204,13 +223,12 @@ class BatchiFy(object):
             final_cls=True, return_input_mask=True)
         padded_task_ids = np.zeros_like(padded_token_ids, dtype="int64")
         padded_position_ids = get_related_pos(padded_token_ids, \
-            self.max_seq_len, self.memory_len)
+            self.max_seq_length, self.memory_len)
 
         return_list = [
             padded_token_ids, padded_position_ids, padded_task_ids, input_mask,
             batch_labels, batch_gather_idx, need_cal_loss
         ]
-
         return return_list
 
     def _prepare_batch_data(self, examples):
@@ -234,8 +252,8 @@ class BatchiFy(object):
                               ] if example.cal_loss == 1 else []
         yield self._pad_batch_records(batch_records, gather_idx)
 
-    def __call__(self, examples):
-        print("123")
+    def _create_instances(self):
+        examples = self.dataset
         pre_batch_list = []
         insert_idx = []
         for index, example in enumerate(examples):
@@ -247,7 +265,8 @@ class BatchiFy(object):
                     insert_idx.pop(0)
                 else:
                     pre_batch_list.append(features)
-            if self._cnt_list(pre_batch_list) == batch_size * self.trainer_num:
+            if self._cnt_list(
+                    pre_batch_list) == self.batch_size * self.trainer_num:
                 assert self._cnt_list(pre_batch_list) == len(
                     pre_batch_list), "the two value must be equal"
                 assert not insert_idx, "the insert_idx must be null"
@@ -256,6 +275,32 @@ class BatchiFy(object):
                 for idx, lit in enumerate(pre_batch_list):
                     if not lit:
                         insert_idx.append(idx)
-
                 for batch_records in self._prepare_batch_data(sample_batch):
                     yield batch_records
+
+        if self.mode != "train":
+            if self._cnt_list(pre_batch_list):
+                pre_batch_list += [
+                    []
+                    for _ in range(self.batch_size * self.trainer_num -
+                                   self._cnt_list(pre_batch_list))
+                ]
+                sample_batch = self._get_samples(pre_batch_list, is_last=True)
+                for batch_records in self._prepare_batch_data(sample_batch):
+                    yield batch_records
+
+    def __call__(self):
+        all_dev_batches = []
+        for batch_records in self._create_instances():
+            if len(all_dev_batches) < self.trainer_num:
+                all_dev_batches.append(batch_records)
+            if len(all_dev_batches) == self.trainer_num:
+                yield all_dev_batches[self.trainer_id]
+                all_dev_batches = []
+
+    def get_num_examples(self):
+        if self.num_examples is None:
+            self.num_examples = 0
+            for example in self.dataset:
+                self.num_examples += len(self._convert_to_features(example))
+        return self.num_examples

@@ -30,7 +30,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack
 
-from batching import BatchiFy
+from data import ClassifierIterator
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -68,7 +68,7 @@ def set_seed(args):
 
 def init_memory(batch_size, memory_length, d_model, n_layers):
     return [
-        np.zeros(
+        paddle.zeros(
             [batch_size, memory_length, d_model], dtype="float32")
         for _ in range(n_layers)
     ]
@@ -86,38 +86,29 @@ def evaluate(model, criterion, metric, data_loader, memories0):
         metric(obj:`paddle.metric.Metric`): The evaluation metric.
     """
     model.eval()
-    metric.reset()
     losses = []
     memories = memories0
-    for batch in data_loader:
-        # TODO(zhoushunjie): need to modify
+    tic_train = time.time()
+    eval_logging_step = 500
+    for step, batch in enumerate(data_loader, start=1):
         input_ids, position_ids, token_type_ids, attn_mask, labels, gather_idxs, need_cal_loss = batch
         logits, memories = model(input_ids, memories, token_type_ids,
                                  position_ids, attn_mask)
-        loss = criterion(logits, labels)
-        losses.append(loss.numpy())
-        correct = metric.compute(logits, labels)
+        logits, labels = list(
+            map(lambda x: paddle.gather(x, gather_idxs), [logits, labels]))
+        loss = criterion(logits, labels) * need_cal_loss
+        losses.append(loss.mean().numpy())
+        correct = metric.compute(logits, labels) * need_cal_loss
         metric.update(correct)
-        accu = metric.accumulate()
-    logger.info("eval loss: %.5f, accu: %.5f" % (np.mean(losses), accu))
+        if step % eval_logging_step == 0:
+            logger.info("Step %d: loss:  %.5f, accu: %.5f, speed: %.5f steps/s"
+                        % (step, np.mean(losses), metric.accumulate(),
+                           eval_logging_step / (time.time() - tic_train)))
+            tic_train = time.time()
+    logger.info("Eval loss: %.5f, accu: %.5f" %
+                (np.mean(losses), metric.accumulate()))
     model.train()
     metric.reset()
-
-
-def create_dataloader(dataset, mode='train', batch_size=1, batchify_fn=None):
-    shuffle = True if mode == 'train' else False
-    if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
-    else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
-
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
 
 
 def do_train(args):
@@ -129,12 +120,16 @@ def do_train(args):
     set_seed(args)
     # if rank == 0:
     #     if os.path.exists(args.model_name_or_path):
-    #         print("init checkpoint from %s" % args.model_name_or_path)
+    #         logger.info("init checkpoint from %s" % args.model_name_or_path)
     # TODO(zhoushunjie):need to use pretraining params.
     # model = ErnieDocForSequenceClassification.from_pretrained(args.model_name_or_path)
     ernie_doc = ErnieDocModel(
         **ErnieDocModel.pretrained_init_configuration["ernie-doc-base-en"])
     model = ErnieDocForSequenceClassification(ernie_doc, args.num_labels)
+    state_dict = paddle.load('ernie-doc-base-en.pdparams')
+    model.set_state_dict(state_dict)
+    del state_dict
+
     model_config = model.ernie_doc.config
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -142,19 +137,33 @@ def do_train(args):
 
     train_ds, test_ds = load_dataset("imdb", splits=["train", "test"])
 
-    batchify_fn = BatchiFy(args.batch_size, tokenizer, trainer_num)
-    train_data_loader = create_dataloader(
+    train_ds_iter = ClassifierIterator(
         train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn)
-    test_data_loader = create_dataloader(
+        args.batch_size,
+        tokenizer,
+        trainer_num,
+        trainer_id=rank,
+        memory_len=model_config["memory_len"],
+        max_seq_length=args.max_seq_length)
+    test_ds_iter = ClassifierIterator(
         test_ds,
-        mode='test',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn)
+        args.batch_size,
+        tokenizer,
+        trainer_num,
+        trainer_id=rank,
+        memory_len=model_config["memory_len"],
+        max_seq_length=args.max_seq_length,
+        mode="test")
 
-    num_training_steps = len(train_data_loader) * args.epochs
+    train_dataloader = paddle.io.DataLoader.from_generator(
+        capacity=70, return_list=True)
+    train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
+    test_dataloader = paddle.io.DataLoader.from_generator(
+        capacity=70, return_list=True)
+    test_dataloader.set_batch_generator(test_ds_iter, paddle.get_device())
+
+    num_training_examples = train_ds_iter.get_num_examples()
+    num_training_steps = args.epochs * num_training_examples // args.batch_size // trainer_num
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
@@ -173,26 +182,56 @@ def do_train(args):
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
+    eval_metric = paddle.metric.Accuracy()
 
-    global_step = 0
-    memories = paddle.to_tensor(
-        init_memory(args.batch_size, args.memory_length, model_config[
-            "hidden_size"], model_config["num_hidden_layers"]))
-
+    global_steps = 0
+    memories0 = init_memory(args.batch_size, args.memory_length,
+                            model_config["hidden_size"],
+                            model_config["num_hidden_layers"])
+    memories = memories0
+    tic_train = time.time()
     for epoch in range(args.epochs):
-        print("epoch: {}, number of train_data_loader: {}".format(
-            epoch, len(train_data_loader)))
-        for step, batch in enumerate(train_data_loader):
-            input_ids, position_ids, token_type_ids, input_mask, labels, gather_idx, need_cal_loss = batch
-            print("step {}:".format(step))
-            print("input_ids: ", input_ids)
-            print("position_ids: ", position_ids)
-            print("token_type_ids: ", token_type_ids)
-            print("input_mask: ", input_mask)
-            print("labels: ", labels)
-            print("gather_idx: ", gather_idx)
-            print("need_cal_loss:", need_cal_loss)
-            # logits, memories = model(input_ids, memories, token_type_ids, position_ids, attn_mask)
+        for step, batch in enumerate(train_dataloader, start=1):
+            global_steps += 1
+            input_ids, position_ids, token_type_ids, attn_mask, labels, gather_idx, need_cal_loss = batch
+            logits, memories = model(input_ids, memories, token_type_ids,
+                                     position_ids, attn_mask)
+
+            logits, labels = list(
+                map(lambda x: paddle.gather(x, gather_idx), [logits, labels]))
+            loss = criterion(logits, labels) * need_cal_loss
+            mean_loss = loss.mean()
+            mean_loss.backward()
+            optimizer.step()
+            lr_scheduler.step()
+            optimizer.clear_grad()
+
+            acc = metric.compute(logits, labels) * need_cal_loss
+            metric.update(acc)
+
+            if global_steps % args.logging_steps == 0:
+                logger.info(
+                    "train: global step %d, epoch: %d, loss: %f, acc:%f, lr: %f, speed: %.2f step/s"
+                    % (global_steps, epoch, mean_loss, metric.accumulate(),
+                       lr_scheduler.get_lr(),
+                       args.logging_steps / (time.time() - tic_train)))
+                tic_train = time.time()
+
+            if global_steps % args.save_steps == 0 or global_steps == num_training_steps:
+                # evaluate
+                logger.info("Eval:")
+                evaluate(model, criterion, eval_metric, test_dataloader,
+                         memories0)
+                # save
+                if rank == 0:
+                    output_dir = os.path.join(
+                        args.output_dir, "model_%d.pdparams" % (global_steps))
+                    if not os.path.exists(output_dir):
+                        os.makedirs(output_dir)
+                    model_to_save = model._layers if isinstance(
+                        model, paddle.DataParallel) else model
+                    model_to_save.save_pretrained(output_dir)
+                    # tokenizer.save_pretrained(output_dir)
 
 
 if __name__ == "__main__":

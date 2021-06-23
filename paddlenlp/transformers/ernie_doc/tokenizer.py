@@ -162,7 +162,6 @@ class Encoder(object):
         self.decoder = {v: k for k, v in self.encoder.items()}
         self.errors = errors  # how to handle errors in decoding
         self.byte_encoder = bytes_to_unicode()
-        # print('111',self.byte_encoder)
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = {}
@@ -215,6 +214,7 @@ class Encoder(object):
                 pairs = get_pairs(word)
         word = ' '.join(word)
         self.cache[token] = word
+
         return word
 
     def tokenize(self, text):
@@ -252,12 +252,8 @@ class Encoder(object):
         if self.is_special_token(token):
             return [token.strip()]  # remove space for convert_to_ids
         else:
-            if six.PY2:
-                token = ''.join(self.byte_encoder[ord(b)]
-                                for b in token.encode('utf-8'))
-            else:
-                token = ''.join(self.byte_encoder[b]
-                                for b in token.encode('utf-8'))
+
+            token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
             return [
                 self.encoder[bpe_token]
                 for bpe_token in self.bpe(token).split(' ')
@@ -332,7 +328,12 @@ class BPETokenizer(PretrainedTokenizer):
                  cls_token="[CLS]",
                  mask_token="[MASK]",
                  params=None):
-        self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
+        self.vocab = self.load_vocabulary(
+            vocab_file,
+            unk_token=unk_token,
+            sep_token=sep_token,
+            cls_token=cls_token,
+            mask_token=mask_token)
         self.encoder = get_encoder(encoder_json_path, vocab_bpe_path)
 
     def tokenize(self, text, is_sentencepiece=True):
