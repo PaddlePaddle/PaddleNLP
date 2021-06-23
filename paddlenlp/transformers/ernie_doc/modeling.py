@@ -36,6 +36,7 @@ class PointwiseFFN(nn.Layer):
                  hidden_act,
                  weight_attr=None,
                  bias_attr=None):
+        super(PointwiseFFN, self).__init__()
         self.linear1 = nn.Linear(
             d_hid, d_inner_hid, weight_attr, bias_attr=bias_attr)
         self.dropout = nn.Dropout(dropout_rate, mode="upscale_in_train")
@@ -203,7 +204,6 @@ class ErnieDocEncoderLayer(nn.Layer):
         self._config = locals()
         self._config.pop("self")
         self._config.pop("__class__", None)  # py3
-
         super(ErnieDocEncoderLayer, self).__init__()
         if rel_pos_params_sharing:
             assert (r_w_bias and r_r_bias and r_t_bias) is not None, \
@@ -242,6 +242,9 @@ class ErnieDocEncoderLayer(nn.Layer):
             prepostprocess_dropout, mode="upscale_in_train")
         self.dropout2 = nn.Dropout(
             prepostprocess_dropout, mode="upscale_in_train")
+        self.d_model = d_model
+        self.epsilon = epsilon
+        self.normalize_before = normalize_before
 
     def forward(self, enc_input, memory, rel_pos, rel_task, attn_mask):
         residual = enc_input
@@ -300,9 +303,29 @@ class ErnieDocEncoder(nn.Layer):
 class ErnieDocPretrainedModel(PretrainedModel):
     # TODO(zhoushunjie): need to set the config
     model_config_file = "model_config.json"
-    pretrained_init_configuration = {"ernie-doc-base-en": {}, }
+    pretrained_init_configuration = {
+        "ernie-doc-base-en": {
+            "attention_probs_dropout_prob": 0.0,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.0,
+            "relu_dropout": 0.0,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
+            "vocab_size": 50265,
+            "memory_len": 128,
+            "epsilon": 1e-12
+        }
+    }
     resource_files_names = {"model_state": "model_state.pdparams"}
-    pretrained_resource_files_map = {"model_state": {"ernie-doc-base-en": "", }}
+    pretrained_resource_files_map = {
+        "model_state": {
+            "ernie-doc-base-en": "123",
+        }
+    }
     base_model_prefix = "ernie_doc"
 
     def init_weights(self, layer):
@@ -316,7 +339,7 @@ class ErnieDocPretrainedModel(PretrainedModel):
                         mean=0.0,
                         std=self.initializer_range
                         if hasattr(self, "initializer_range") else
-                        self.bigbird.config["initializer_range"],
+                        self.ernie_doc.config["initializer_range"],
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-5
@@ -331,7 +354,7 @@ class ErnieDocEmbeddings(nn.Layer):
                  max_position_embeddings=512,
                  type_vocab_size=3,
                  padding_idx=0):
-        self.pad_token_id = pad_token_id
+        super(ErnieDocEmbeddings, self).__init__()
         self.word_emb = nn.Embedding(
             vocab_size, d_model, padding_idx=padding_idx)
         self.pos_emb = nn.Embedding(max_position_embeddings * 2 + memory_len,
@@ -389,40 +412,41 @@ class ErnieDocPooler(nn.Layer):
 @register_base_model
 class ErnieDocModel(ErnieDocPretrainedModel):
     def __init__(self,
-                 n_layer,
-                 n_head,
-                 d_key,
-                 d_value,
-                 d_model,
-                 d_inner_hid,
-                 prepostprocess_dropout,
-                 attention_dropout,
+                 num_hidden_layers,
+                 num_attention_heads,
+                 hidden_size,
+                 hidden_dropout_prob,
+                 attention_probs_dropout_prob,
                  relu_dropout,
                  hidden_act,
                  memory_len,
                  vocab_size,
                  max_position_embeddings,
-                 type_vocab_size=3,
+                 task_type_vocab_size=3,
                  normalize_before=False,
                  epsilon=1e-5,
                  rel_pos_params_sharing=False,
+                 initializer_range=0.02,
                  pad_token_id=0):
+        super(ErnieDocModel, self).__init__()
 
         r_w_bias, r_r_bias, r_t_bias = None, None, None
         if rel_pos_params_sharing:
             r_w_bias, r_r_bias, r_t_bias = \
                 list(map(lambda x: self.create_parameter(
-                    shape=[n_head * d_key], dtype="float32"),
+                    shape=[num_attention_heads * d_key], dtype="float32"),
                     ["r_w_bias", "r_r_bias", "r_t_bias"]))
-
+        d_key = hidden_size // num_attention_heads
+        d_value = hidden_size // num_attention_heads
+        d_inner_hid = hidden_size * 4
         encoder_layer = ErnieDocEncoderLayer(
-            n_head,
+            num_attention_heads,
             d_key,
             d_value,
-            d_model,
+            hidden_size,
             d_inner_hid,
-            prepostprocess_dropout,
-            attention_dropout,
+            hidden_dropout_prob,
+            attention_probs_dropout_prob,
             relu_dropout,
             hidden_act,
             normalize_before=normalize_before,
@@ -431,17 +455,16 @@ class ErnieDocModel(ErnieDocPretrainedModel):
             r_w_bias=r_w_bias,
             r_r_bias=r_r_bias,
             r_t_bias=r_t_bias)
-        self.n_head = n_head
-        self.d_model = d_model
-        self.padding_idx = padding_idx
+        self.n_head = num_attention_heads
+        self.d_model = hidden_size
         self.memory_len = memory_len
-        self.encoder = ErnieDocEncoder(n_layer, encoder_layer, memory_len)
+        self.encoder = ErnieDocEncoder(num_hidden_layers, encoder_layer,
+                                       memory_len)
         self.pad_token_id = pad_token_id
         self.embeddings = ErnieDocEmbeddings(
-            vocab_size, d_model, hidden_dropout_prob, memory_len,
-            max_position_embeddings, type_vocab_size, padding_idx)
-        self.pooler = ErnieDocPooler(d_model)
-        self.apply(self.init_weights)
+            vocab_size, hidden_size, hidden_dropout_prob, memory_len,
+            max_position_embeddings, task_type_vocab_size, pad_token_id)
+        self.pooler = ErnieDocPooler(hidden_size)
 
     def __create_n_head_attn_mask(self, attn_mask, batch_size):
         # attn_mask shape: [B, T, 1]
@@ -473,7 +496,6 @@ class ErnieDocModel(ErnieDocPretrainedModel):
         # [B, N, T, M + T]
         n_head_self_attn_mask = self.__create_n_head_attn_mask(attn_mask,
                                                                batch_size)
-        enc_input, memories, rel_pos, rel_task, attn_mask
         # memories contains n_layer memory whose shape is [B, M, H]
         encoder_output, new_mem = self.encoder(
             enc_input=input_embeddings,
@@ -489,7 +511,8 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
     def __init__(self, ernie_doc, num_classes):
         super(ErnieDocForSequenceClassification, self).__init__()
         self.ernie_doc = ernie_doc
-        self.linear = nn.Linear(self.ernie_doc.config["d_model"], num_classes)
+        self.linear = nn.Linear(self.ernie_doc.config["hidden_size"],
+                                num_classes)
         self.dropout = nn.Dropout(
             self.ernie_doc.config['relu_dropout'], mode="upscale_in_train")
         self.apply(self.init_weights)
@@ -505,11 +528,13 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
 
 class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
     def __init__(self, ernie_doc, num_classes):
+        super(ErnieDocForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie_doc = ernie_doc  # allow ernie_doc to be config
         self.dropout = nn.Dropout(
             self.ernie_doc.config['relu_dropout'], mode="upscale_in_train")
-        self.linear = nn.Linear(self.ernie_doc.config["d_model"], num_classes)
+        self.linear = nn.Linear(self.ernie_doc.config["hidden_size"],
+                                num_classes)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids,
                 attn_mask):
@@ -522,10 +547,11 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
 
 class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
     def __init__(self, ernie_doc):
+        super(ErnieDocForQuestionAnswering, self).__init__()
         self.ernie_doc = ernie_doc  # allow ernie_doc to be config
         self.dropout = nn.Dropout(
             self.ernie_doc.config['relu_dropout'], mode="upscale_in_train")
-        self.linear = nn.Linear(self.ernie_doc.config["d_model"], 2)
+        self.linear = nn.Linear(self.ernie_doc.config["hidden_size"], 2)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids,
                 attn_mask):

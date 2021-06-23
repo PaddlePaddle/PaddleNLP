@@ -14,14 +14,36 @@
 import os
 import pickle
 import shutil
+import json
+import regex as re
 from nltk import tokenize
+try:
+    from functools import lru_cache
+except ImportError:
+    from backports.functools_lru_cache import lru_cache
 
 from paddle.utils import try_import
 from paddlenlp.utils.env import MODEL_HOME
-from .. import PretrainedTokenizer, convert_to_unicode
+from .. import PretrainedTokenizer
 from ..ernie.tokenizer import ErnieTokenizer
 
 __all__ = ['ErnieDocTokenizer', 'BPETokenizer']
+
+
+def convert_to_unicode(text):
+    """
+    Converts `text` to Unicode (if it's not already), assuming utf-8 input.
+    Args:
+        text (str|bytes): Text to be converted to unicode.
+    Returns:
+        str: converted text.
+    """
+    if isinstance(text, str):
+        return text
+    elif isinstance(text, bytes):
+        return text.decode("utf-8", "ignore")
+    else:
+        raise ValueError("Unsupported string type: %s" % (type(text)))
 
 
 class ErnieDocTokenizer(ErnieTokenizer):
@@ -304,6 +326,11 @@ class BPETokenizer(PretrainedTokenizer):
                  vocab_file,
                  encoder_json_path="./configs/encoder.json",
                  vocab_bpe_path="./configs/vocab.bpe",
+                 unk_token="[UNK]",
+                 sep_token="[SEP]",
+                 pad_token="[PAD]",
+                 cls_token="[CLS]",
+                 mask_token="[MASK]",
                  params=None):
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.encoder = get_encoder(encoder_json_path, vocab_bpe_path)
