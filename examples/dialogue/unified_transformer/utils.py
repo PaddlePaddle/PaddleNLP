@@ -164,7 +164,7 @@ def post_process_response(token_ids, tokenizer):
             eos_pos = i
             break
     token_ids = token_ids[:eos_pos]
-    tokens = tokenizer.convert_ids_to_tokens(token_ids)
+    tokens = tokenizer.convert_ids_to_tokens(token_ids.tolist())
     tokens = tokenizer.merge_subword(tokens)
     return token_ids, tokens
 
