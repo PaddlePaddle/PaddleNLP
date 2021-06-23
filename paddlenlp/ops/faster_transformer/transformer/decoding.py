@@ -960,4 +960,12 @@ class InferUnifiedDecoding(nn.Layer):
             _type_id=self._decoding_type_id,
             _unk_id=self._unk_id,
             _mask_id=self._mask_id)
-        return output_ids  #, parent_ids, sequence_length
+
+        ids = finalize(
+            self._beam_size,
+            output_ids,
+            parent_ids,
+            sequence_length,
+            decoding_strategy=decoding_strategy)
+
+        return ids
