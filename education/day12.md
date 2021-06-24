@@ -1,7 +1,8 @@
 # Day12 预训练模型小型化与部署实战作业辅导
 
-本教程旨在辅导同学如何完成 AI Studio课程——[『NLP打卡营』实践课12：预训练模型小型化与部署实战
-](https://aistudio.baidu.com/aistudio/projectdetail/2114383)课后作业。
+本教程旨在辅导同学如何完成产业实践开放性题目（参照ERNIE-1.0的压缩部署流程，改用ERNIE-Gram的Teacher模型进行蒸馏）——[『NLP打卡营』实践课12：预训练模型小型化与部署实战](https://aistudio.baidu.com/aistudio/projectdetail/2114383)
+
+必修作业是跑通原项目即可噢。
 
 ## 1. 对ERNIE-Gram进行fine-tuning得到教师模型
 由于我们的蒸馏是在中文情感分析ChnSentiCorp任务上，因此我们需要对PaddleNLP提供的ERNIE-Gram在我们的任务上进行Fine-tuning。下面是详细的步骤：
