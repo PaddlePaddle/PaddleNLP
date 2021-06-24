@@ -55,9 +55,13 @@
 
 .. note::
 
-    对于某些数据集，不同的split的读取方式不同。对于这种情况则需要在 :attr:`data_files` 参数中以字典的形式传入split信息。以 **COLA** 数据集为例：
+    对于某些数据集，不同的split的读取方式不同。对于这种情况则需要在 :attr:`splits` 参数中以传入与 :attr:`data_files` **一一对应** 的split信息。
+    
+    此时 :attr:`splits` 不再代表选取的内置数据集，而代表以何种格式读取本地数据集。
+    
+    下面以 **COLA** 数据集为例：
 
     .. code-block::
 
         >>> from paddlenlp.datasets import load_dataset
-        >>> train_ds, test_ds = load_dataset("glue", "cola", data_files={"train": "my_train_file.csv", "test": "my_test_file.csv"})
+        >>> train_ds, test_ds = load_dataset("glue", "cola", splits=["train", "test"], data_files=["my_train_file.csv", "my_test_file.csv"])
