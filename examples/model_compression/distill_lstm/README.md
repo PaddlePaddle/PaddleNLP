@@ -65,7 +65,7 @@ python -u ./run_glue.py \
     --logging_steps 10 \
     --save_steps 10 \
     --output_dir ../model_compression/distill_lstm/pretrained_models/$TASK_NAME/ \
-    --n_gpu 1 \
+    --device gpu \
 
 ```
 
