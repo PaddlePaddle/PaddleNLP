@@ -67,11 +67,11 @@ class Cote(DatasetBuilder):
             'splits': {
                 'train': [
                     os.path.join('COTE-MFW', 'train.tsv'),
-                    '01fc90b9098d35615df6b8d257eb46ca', (0, 1), 1
+                    '01fc90b9098d35615df6b8d257eb46ca'
                 ],
                 'test': [
                     os.path.join('COTE-MFW', 'test.tsv'),
-                    'c61a475917a461089db141c59c688343', (1, ), 1
+                    'c61a475917a461089db141c59c688343'
                 ],
             },
             'labels': ["B", "I", "O"]
@@ -82,7 +82,7 @@ class Cote(DatasetBuilder):
         """Downloads dataset."""
         builder_config = self.BUILDER_CONFIGS[self.name]
         default_root = os.path.join(DATA_HOME, f'COTE-{self.name.upper()}')
-        filename, data_hash, _, _ = builder_config['splits'][mode]
+        filename, data_hash = builder_config['splits'][mode]
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
@@ -94,39 +94,34 @@ class Cote(DatasetBuilder):
 
     def _read(self, filename, split):
         """Reads data"""
-        _, _, field_indices, num_discard_samples = self.BUILDER_CONFIGS[
-            self.name]['splits'][split]
         with open(filename, 'r', encoding='utf-8') as f:
             for idx, line in enumerate(f):
-                try:
-                    if idx < num_discard_samples:
-                        continue
-                    line_stripped = line.strip().split('\t')
-                    if not line_stripped:
-                        continue
-                    example = [line_stripped[indice] for indice in field_indices]
-                    if split == "test":
-                        yield {"tokens": list(example[0])}
-                    else:
-                        try:
-                            entity, text = example[0], example[1]
-                            start_idx = text.index(entity)
-                        except:
-                            # drop the dirty data
-                            continue
-
-                        labels = ['O'] * len(text)
-                        labels[start_idx] = "B"
-                        for idx in range(start_idx + 1, start_idx + len(entity)):
-                            labels[idx] = "I"
-                        yield {
-                            "tokens": list(text),
-                            "labels": labels,
-                            "entity": entity
-                        }
-                except Exception as e:
-                    # drop the dirty data
+                if idx == 0:
+                    # ignore first line about title
                     continue
+                line_stripped = line.strip().split('\t')
+                if not line_stripped:
+                    continue
+                if split == "test":
+                    yield {"tokens": list(line_stripped[1])}
+                else:
+                    try:
+                        entity, text = line_stripped[0], line_stripped[1]
+                        start_idx = text.index(entity)
+                    except:
+                        # drop the dirty data
+                        continue
+
+                    labels = ['O'] * len(text)
+                    labels[start_idx] = "B"
+                    for idx in range(start_idx + 1, start_idx + len(entity)):
+                        labels[idx] = "I"
+                    yield {
+                        "tokens": list(text),
+                        "labels": labels,
+                        "entity": entity
+                    }
+
 
     def get_labels(self):
         """
