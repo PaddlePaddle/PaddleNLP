@@ -121,4 +121,3 @@
     - 贡献数据集时 :func:`get_labels` 和 :func:`get_vocab` 方法是可选的，视具体数据集内容而定。 :func:`_read` 和 :func:`_get_data` 方法是 **必须包含** 的。
     - 如果您不希望在数据获取过程中进行md5值校验，可以不用给出相关成员变量和校验代码。
 
-关于 :class:`DatasetBuilder` 类生成数据集的过程和其他方法，请参考DatasetBuilder。
