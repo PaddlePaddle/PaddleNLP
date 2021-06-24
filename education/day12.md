@@ -99,4 +99,4 @@ from paddlenlp.transformers import ErnieGramForSequenceClassification, ErnieGram
 teacher = ErnieGramForSequenceClassification.from_pretrained("./tmp/ChnSentiCorp/best_model")
 ```
 
-蒸馏的过程同AI studio教程，这里就不再赘述啦~同学们按着与教程相同的步骤进行即可。
+蒸馏的过程同AI studio教程，这里就不再赘述啦~同学们按着与教程相同的步骤进行即可。同时，本repo中也提供了一个[从BERT到Bi-LSTM蒸馏](../examples/model_compression/distill_lstm)的例子可供参考。
