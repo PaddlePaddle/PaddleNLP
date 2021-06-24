@@ -214,6 +214,10 @@ def do_train(args):
 
     # Define the input data in the static mode
 
+    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    pretrained_models_list = list(
+        model_class.pretrained_init_configuration.keys())
+
     data_file = get_train_data_file(args)
     main_program = paddle.static.default_main_program()
     startup_program = paddle.static.default_startup_program()
@@ -224,16 +228,9 @@ def do_train(args):
                 [tokens, loss_mask, attention_mask, position_ids,
                  labels] = data_holders
 
-                model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
                 tokenizer = tokenizer_class.from_pretrained(
                     args.model_name_or_path)
                 eos_id = tokenizer.eos_token_id
-                model_config = model_class.pretrained_init_configuration[
-                    args.model_name_or_path]
-                if model_config["vocab_size"] % 8 != 0:
-                    model_config["vocab_size"] += 8 - (
-                        model_config["vocab_size"] % 8)
-                model_config["topo"] = topo
 
                 train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
                     args,
@@ -246,9 +243,21 @@ def do_train(args):
                     data_holders=data_holders,
                     pipeline_mode=False, )
 
+                if args.model_name_or_path in pretrained_models_list:
+                    model_config = model_class.pretrained_init_configuration[
+                        args.model_name_or_path]
+                    if model_config["vocab_size"] % 8 != 0:
+                        model_config["vocab_size"] += 8 - (
+                            model_config["vocab_size"] % 8)
+                    model_config["topo"] = topo
+                    model = guard(f'gpu:{args.pp_degree -1}')(
+                        GPTForPretraining)(guard(f'gpu:0')(GPTModel)(
+                            **model_config))
+                else:
+                    model, _ = GPTForPretraining.from_pretrained(
+                        args.model_name_or_path, topo=topo)
+
                 # Create the model for the gpt pretrain
-                model = guard(f'gpu:{args.pp_degree -1}')(GPTForPretraining)(
-                    guard(f'gpu:0')(GPTModel)(**model_config))
                 preds = model(tokens, position_ids, attention_mask)
 
                 criterion = guard(f'gpu:{args.pp_degree -1}')(
@@ -330,14 +339,33 @@ def do_train(args):
     exe.run(startup_program)
     test_program = main_program.clone(for_test=True)
 
-    if "small" in args.model_name_or_path:
-        init_dir = os.path.join(
-            os.environ['HOME'],
-            './init_checkponits/gpt2-init-small-bs32.pdparams')
-    if init_dir is not None:
-        print(init_dir)
-        init_static_with_params(model,
-                                paddle.load(init_dir), topo, main_program)
+    if args.model_name_or_path not in pretrained_models_list:
+        logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
+        dygrah_path = os.path.join(args.model_name_or_path,
+                                   "model_state.pdparams")
+        static_path = os.path.join(args.model_name_or_path, "static_vars")
+
+        flag_loaded = False
+        if os.path.exists(static_path):
+            if args.mp_degree > 1:
+                logger.warning("MP should init with dygraph params")
+            else:
+                paddle.static.load(main_program, static_path, exe)
+                flag_loaded = True
+
+        if os.path.exists(dygrah_path):
+            if args.sharding_degree > 1:
+                logger.warning("Sharding should init with static vars")
+            else:
+                init_static_with_params(
+                    model,
+                    paddle.load(
+                        dygrah_path, return_numpy=True),
+                    topo,
+                    main_program)
+                flag_loaded = True
+        if not flag_loaded:
+            logger.error("No checkpoint load.")
 
     global_step = 0
     tic_train = time.time()
@@ -367,7 +395,7 @@ def do_train(args):
                     loss_return, lr_return = ret
                     speed = args.logging_freq / (time.time() - tic_train)
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f steps/s, ips: %.0f tokens/s, learning rate: %.9f"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, speed: %.2f steps/s, ips: %.0f tokens/s, learning rate: %.5e"
                         % (global_step, epoch, step, loss_return[0], speed,
                            speed * args.global_batch_size * args.max_seq_len,
                            lr_return[0]))
@@ -375,8 +403,13 @@ def do_train(args):
                     log_writer.add_scalar("learning_rate", lr_return[0],
                                           global_step)
                 tic_train = time.time()
-            if global_step >= args.max_steps:
-                return
+
+            if args.check_accuracy:
+                if global_step >= args.max_steps:
+                    return
+                else:
+                    continue
+
             if global_step % args.eval_freq == 0:
                 # TODO, check the input data of validation
                 eval_fetch = []
@@ -392,7 +425,11 @@ def do_train(args):
                 output_dir = os.path.join(args.output_dir,
                                           "model_%d" % global_step)
                 logger.debug("saving models to {}".format(output_dir))
-                save_persistables(exe, output_dir, main_program)
+                save_persistables(exe,
+                                  os.path.join(output_dir, "static_vars"),
+                                  main_program)
+                model.save_pretrained(output_dir)
+                tokenizer.save_pretrained(output_dir)
                 tic_train = time.time()
 
             if global_step >= args.max_steps:

@@ -55,9 +55,8 @@ def dygraph_params_to_static(model, dygraph_tensor_dict, topo=None):
 
     ret_dict = dict()
     for name, parm in state_dict.items():
-        name = name.replace("gpt", "gpt2")
         if name not in dygraph_tensor_dict:
-            print("miss \t\t", name)
+            print("Miss \t\t", name)
             continue
 
         tensor = dygraph_tensor_dict[name]

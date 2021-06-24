@@ -1,7 +1,7 @@
 set -x
 export PADDLE_WITH_GLOO=0
 export FLAGS_call_stack_level=2
-export FLAGS_allocator_strategy=naive_best_fit
+#export FLAGS_allocator_strategy=naive_best_fit
 export GLOG_v=-1
 unset CUDA_VISIBLE_DEVICES
 
@@ -10,14 +10,14 @@ rm -rf core.*
 rm -rf start_sharding*
 rm -rf main_sharding*
 
-task_name="gpt-small-mp-sharding"
+task_name="gpt-benchmark-mp-static"
 rm -rf output/$task_name/log
 
 PYTHONPATH=../../../ python -u  -m paddle.distributed.fleet.launch \
     --gpus "0,1" \
     --log_dir "output/$task_name/log" run_pretrain_static.py \
     --model_type "gpt" \
-    --model_name_or_path "gpt2-small-en" \
+    --model_name_or_path "./ckpt/gpt2-small-en-init-checkpoint"\
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --max_seq_len 1024 \

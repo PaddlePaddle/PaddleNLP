@@ -805,10 +805,10 @@ class GPTForPretraining(GPTPretrainedModel):
         #model_parallel_group = hcg.get_model_parallel_group()
         #world_size = hcg.get_model_parallel_world_size()
         #rank = hcg.get_model_parallel_rank()
-        world_size = topo.mp_info.size
-        rank = topo.mp_info.rank
+        # world_size = topo.mp_info.size
+        # rank = topo.mp_info.rank
 
-        if world_size > 1:
+        if topo is not None and topo.mp_info.size > 1:
             input_parallel = paddle.distributed.collective._c_identity(
                 lm_output, group=None)
             #lm_output, group=model_parallel_group)
