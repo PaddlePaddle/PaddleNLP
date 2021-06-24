@@ -17,23 +17,21 @@ import jieba
 import numpy as np
 
 
-def convert_small_example(example,
-                          task_name,
-                          vocab,
-                          is_tokenized=False,
-                          max_seq_length=128,
-                          is_test=False):
+def convert_example_for_lstm(example,
+                             task_name,
+                             vocab,
+                             is_tokenized=False,
+                             max_seq_length=128,
+                             is_test=False):
+    """convert a example for lstm's input"""
     input_ids = []
     if task_name == 'chnsenticorp':
         if is_tokenized:
-            example['text'] = example['text'][:max_seq_length]
-            input_ids = [vocab[token] for token in example['text']]
+            lstm_tokens = example['lstm_tokens'][:max_seq_length]
+            input_ids = [vocab[token] for token in lstm_tokens]
         else:
-            for i, token in enumerate(jieba.cut(example['text'])):
-                if i == max_seq_length:
-                    break
-                token_id = vocab[token]
-                input_ids.append(token_id)
+            tokenized_text = list(jieba.cut(example['text']))[:max_seq_length]
+            input_ids = vocab[tokenized_text]
     else:
         if is_tokenized:
             tokens = example['sentence'][:max_seq_length]
@@ -57,12 +55,12 @@ def convert_pair_example(example,
                          is_tokenized=True,
                          max_seq_length=128,
                          is_test=False):
-    seq1 = convert_small_example({
+    seq1 = convert_example_for_lstm({
         "sentence": example['sentence1'],
         "labels": example['labels']
     }, task_name, vocab, is_tokenized, max_seq_length, is_test)[:2]
 
-    seq2 = convert_small_example({
+    seq2 = convert_example_for_lstm({
         "sentence": example['sentence2'],
         "labels": example['labels']
     }, task_name, vocab, is_tokenized, max_seq_length, is_test)
@@ -71,15 +69,15 @@ def convert_pair_example(example,
     return pair_features
 
 
-def convert_two_example(example,
-                        task_name,
-                        tokenizer,
-                        label_list,
-                        max_seq_length,
-                        vocab,
-                        is_tokenized=True,
-                        is_test=False):
-    bert_features = convert_example(
+def convert_example_for_distill(example,
+                                task_name,
+                                tokenizer,
+                                label_list,
+                                max_seq_length,
+                                vocab,
+                                is_tokenized=True,
+                                is_test=False):
+    bert_features = convert_example_for_bert(
         example,
         tokenizer=tokenizer,
         label_list=label_list,
@@ -90,18 +88,18 @@ def convert_two_example(example,
         small_features = convert_pair_example(
             example, task_name, vocab, is_tokenized, max_seq_length, is_test)
     else:
-        small_features = convert_small_example(
+        small_features = convert_example_for_lstm(
             example, task_name, vocab, is_tokenized, max_seq_length, is_test)
     return bert_features[:2] + small_features
 
 
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    is_tokenized=False,
-                    max_seq_length=512,
-                    is_test=False):
-    """convert a example into necessary features"""
+def convert_example_for_bert(example,
+                             tokenizer,
+                             label_list,
+                             is_tokenized=False,
+                             max_seq_length=512,
+                             is_test=False):
+    """convert a example for bert's input"""
     if not is_test:
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
@@ -116,10 +114,14 @@ def convert_example(example,
             max_seq_len=max_seq_length,
             is_split_into_words=is_tokenized)
     else:
+        if 'sentence' in example:
+            text = example['sentence']
+        elif 'text' in example:
+            text = example['text']
+        else:
+            text = example['bert_tokens']
         example = tokenizer(
-            example['sentence'] if 'sentence' in example else example['text'],
-            max_seq_len=max_seq_length,
-            is_split_into_words=is_tokenized)
+            text, max_seq_len=max_seq_length, is_split_into_words=is_tokenized)
 
     if not is_test:
         return example['input_ids'], example['token_type_ids'], label
