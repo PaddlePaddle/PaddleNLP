@@ -23,7 +23,7 @@ PaddleNLP已有的模型结构（15个网络结构，如bert，ernie，roberta�
 
 3. 准备提交pull request的文件
 ------------------------------------------
-参考 pr 示例
+参考 pr 示例：需要model_config.json，model_state.pdparams，tokenizer_config.json，vocab.txt这四个文件
 
 4. 提交PR，等待review
 ------------------------------------------
