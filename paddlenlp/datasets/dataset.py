@@ -126,8 +126,6 @@ def load_dataset(path_or_read_func,
             )
 
         selected_splits = []
-        selected_splits += data_files.keys() if isinstance(
-            data_files, dict) else selected_splits
         if isinstance(splits, list) or isinstance(splits, tuple):
             selected_splits.extend(splits)
         else:
