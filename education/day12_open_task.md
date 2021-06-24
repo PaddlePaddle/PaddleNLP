@@ -1,4 +1,4 @@
-# Day12 预训练模型小型化与部署实战作业辅导
+# Day12 预训练模型小型化与部署 - 【开放性题目】辅导
 
 本教程旨在辅导同学如何完成产业实践开放性题目（参照ERNIE-1.0的压缩部署流程，改用ERNIE-Gram的Teacher模型进行蒸馏）——[『NLP打卡营』实践课12：预训练模型小型化与部署实战](https://aistudio.baidu.com/aistudio/projectdetail/2114383)
 
