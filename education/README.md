@@ -2,23 +2,126 @@
 
 # NLP 12日直播打卡营
 
-欢迎加入《基于深度学习的自然语言处理打》直播打卡课程，百度自然语言处理部 & PaddlePaddle研发团队直播授课，6月7日起，每天1.5小时，共1+12次直播课程（第一节为导论课程），深入剖析NLP前沿技术和实践应用，提供基于最新飞桨框架和飞桨PaddleNLP文本领域开发库的代码实践。
+欢迎加入《基于深度学习的自然语言处理》直播打卡课程，百度自然语言处理部 & PaddlePaddle研发团队直播授课，深入剖析NLP前沿技术和实践应用，提供基于最新飞桨框架和飞桨PaddleNLP文本领域开发库的代码实践。
 
-直播链接：http://live.bilibili.com/21689802
+直播链接：
 
-直播日期：6月7日～6月24日直播授课，6月25日结营直播。
+6.24部署课直播链接：https://live.bilibili.com/21863531
+
+6.25打卡营结营直播链接：http://live.bilibili.com/21689802
+
+
+
+## 😍GitHub提交作业指南😍
+
+**Bonus🤩：大家可以在GitHub上建立repo开源自己的作品（有自己思考与改进的作业、开放性项目、比赛方案均可|内容可与AI Studio项目相同），并将PaddleNLP加入你的repo的requirements.txt中，最后将repo链接登记在AI Studio课程讨论区即可被评选为优秀，算力、键盘、超级会员等你来领°˖✧◝(⁰▿⁰)◜✧˖°。**
+
+**这里给大家简单提示下如何在GitHub上建立repo来开源自己的作品，奖项评选标准和截止日期往下滑就可以看到哦**
+
+### Step 0：创建GitHub账号
+
+对于还未创建GitHub账号的同学们，可以先创建账号，创建后，**可以先对[PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP)点击Star完成关注哟⸜(ّᶿധّᶿ)⸝**，这样你就能及时掌握repo的资讯更新啦~
+
+### Step 1：创建自己的GitHub repo
+
+对于还未有自己的repo的同学（fork他人项目不算噢）可以点进自己的主页，点击【New】创建一个新的repo，并予以命名。
 
 <p align="center">
-  <img src="images/course.png" width="800" height ="410" />
+  <img src="images/github1.png" width="800" height ="310" />
 </p>
 
 
+### Step 2：新增requirements.txt文件
 
-致敬开源、鼓励分享：开课期间发布原创优秀技术经验贴、有价值的开源项目、视频等，即可获得额外加分，加分直接体现在总成绩上。希望你收获更强的自己，如有问题，欢迎加入课程qq群（618354318）交流讨论。
+Requirements.txt文件中包含了你创建的repo中所使用其他开发者的repo名称，代表了对于其他开发者的内容版权的尊重，类似于【转载自】。
+
+点击Step 1	中新创建的repo，选择【Add file】中的【Create new file】，将其命名为【requirements.txt】。
 
 <p align="center">
-  <img src="https://paddlenlp.bj.bcebos.com/images/edu/qq.jpeg" width="170" height ="230" />
+  <img src="images/github2.png" width="800" height ="280" />
 </p>
+
+
+这样，文件列表中即新增【requirements.txt】~
+
+### Step 3：在requirements.txt文件中加上”paddlenlp“
+
+点击step 3中创建的【requirements.txt】，在其中增加”paddlenlp“即可。
+
+<p align="center">
+  <img src="images/github3.png" width="800" height ="210" />
+</p>
+
+
+### Step 4：提交作业
+
+从AI Studio中将作业导出为ipynb格式：
+
+<p align="center">
+  <img src="images/notebook1.png" width="800" height ="270" />
+</p>
+
+
+回到Step 1中创建的repo的主页，同创建【requirements.txt】步骤一样，选择【Add file】中的【Upload files】上传自己作业即可。
+
+### Step 5：在课程讨论区登记GitHub repo链接（repo里别忘了写requirements.txt哦）
+
+**期待大家的作品噢(〜￣▽￣)〜〜(￣▽￣〜)**
+
+
+
+## ⭐️⭐️ 奖项评选标准和截止日期
+
+
+
+**1、结业证书与奖学金｜6月25日截止**
+
+**【结业标准与奖励】**
+
+  结业标准：完成**作业区全部作业且均达到及格** + **大作业（指定NLP比赛：情感分析｜提交截止6月25日10:00）**
+
+  你将获得：百度飞桨官方颁发的**结业证书**（写有你的名字）+ 100小时的 Tesla V100 GPU**算力卡**
+
+ （**大作业比赛报名地址：https://aistudio.baidu.com/aistudio/competition/detail/50**）
+
+**【领取奖学金】**
+
+  评选依据：**作业总成绩**（含预习作业、客观题、实战题、大作业的成绩）
+
+  奖学金标准（京东卡）：Top10获得**500元**奖学金、Top20获得**200元**奖学金、Top50获得**100元**奖学金
+
+【结业与奖学金颁奖】6月25日 20:30 直播结营与颁奖典礼｜欢迎各位同学直播连线！
+
+
+
+**2、优秀奖（开放性项目、指定千言比赛）7月25日截止**
+ 优秀奖奖励：百度网盘超级会员月卡+100小时GPU算力卡
+ 评选标准：以下三项内容完成一项即可获得优秀奖，完成多项可累加奖励，上不封顶！
+ 基本要求：所有比赛、项目代码**必须开源在AI Studio及Github上，并且在讨论区登记！！！**否则评分的老师们很难找到你的作品哦～ 
+
+ **(1)**课程中任何一次实战题表现突出
+
+ **(2)**自选任意感兴趣的开放性项目，完成并将项目开源在AI Studio及Github上
+    基于情感分析课程，完成观点抽取任务，将项目发布在AI Studio上，加精即可获奖
+    更多选题随课开放，也可自行发挥～
+
+ **(3)**基于Paddle完成指定NLP比赛（见下）并进入比赛总成绩排行榜前50名（榜单见课程左侧讨论区）
+    文本相似度、信息抽取、阅读理解、语义解析、开放域对话、机器同传
+    以上比赛地址：https://aistudio.baidu.com/aistudio/competition/4/1
+   （前300位课程学员，报名即可获得100h算力支持）
+
+ 
+
+**3、开源贡献奖｜7月25日截止**
+ 评选标准：为Paddle框架、PaddleNLP开发库贡献 issues、产品建议等｜需在此登记，我们将选出其中最有价值部分予以鼓励（至少10个）
+ 你将获得：Cherry机械键盘
+
+
+
+
+
+
+
 
 ## 萌新学习经验 ：不求全部吸收，但求各有收货
 
@@ -39,6 +142,15 @@
 | 作业1 - 选择题        | 巩固课上重要知识点                                           | 无                                                           |
 | 作业2 - 代码实践题    | 1. 跑通baseline参加千言竞赛<br />2. 简单实践，如将BOW网络换RNN<br />3. 模型压缩和部署 | 1. 通过模型调优等方式提高千言竞赛成绩<br />2. 模型复现、模型创新<br />3. 花样部署 |
 | 代码3 - 开放题        | 无                                                           | 闲聊；机器同传                                               |
+
+致敬开源、鼓励分享：开课期间发布原创优秀技术经验贴、有价值的开源项目、视频等，即可获得额外加分，加分直接体现在总成绩上。希望你收获更强的自己，如有问题，欢迎加入课程qq群（618354318）交流讨论。
+
+<p align="center">
+  <img src="https://paddlenlp.bj.bcebos.com/images/edu/qq.jpeg" width="170" height ="230" />
+</p>
+
+
+## 
 
 ## 课程安排
 
@@ -70,74 +182,7 @@
 
 **6月25日 20:30-21:30 结营啦**
 
-## 作业
 
-作业提交规则：作业提交均在AI Studio上，
-
-作业评讲：每日作业评讲均在第二天的课程开头10min。
-
-**Bonus🤩：鼓励大家除了在AI Studio上完成作业外，也可自行创建GitHub repo，在repo上完成作业（内容可和AI Studio一样），并将PaddleNLP加入你的repo的requirements.txt中，最后将repo链接放在AI Studio项目中即可获得加分，最终有机会获得大奖°˖✧◝(⁰▿⁰)◜✧˖°。**
-
-
-
-## 😍GitHub提交作业指南😍
-
-**各位学员们，加分的机会来啦！在自己的GitHub repo上上传完成的作业，并在requirements.txt中加上paddlenlp即可获得额外加分5分🤓**
-
-由于考虑到大家对于GitHub可能不太熟悉，所以，我们将所有作业**在GitHub上的提交截止日期放在了结营日前一天--6.24日**，下面就来简单介绍如何在GitHub上提交作业。
-
-### Step 0：创建GitHub账号
-
-对于还未创建GitHub账号的同学们，可以先创建账号，创建后，**可以先对[PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP)点击Star完成关注哟⸜(ّᶿധّᶿ)⸝**，这样你就能及时掌握repo的资讯更新啦~
-
-### Step 1：创建自己的GitHub repo
-
-对于还未有自己的repo的同学（fork他人项目不算噢）可以点进自己的主页，点击【New】创建一个新的repo，并予以命名。
-
-<p align="center">
-  <img src="images/github1.png" width="800" height ="310" />
-</p>
-
-### Step 2：新增requirements.txt文件
-
-Requirements.txt文件中包含了你创建的repo中所使用其他开发者的repo名称，代表了对于其他开发者的内容版权的尊重，类似于【转载自】。
-
-点击Step 1	中新创建的repo，选择【Add file】中的【Create new file】，将其命名为【requirements.txt】。
-
-<p align="center">
-  <img src="images/github2.png" width="800" height ="280" />
-</p>
-
-这样，文件列表中即新增【requirements.txt】~
-
-### Step 3：在requirements.txt文件中加上”paddlenlp“
-
-点击step 3中创建的【requirements.txt】，在其中增加”paddlenlp“即可。
-
-<p align="center">
-  <img src="images/github3.png" width="800" height ="210" />
-</p>
-
-### Step 4：提交作业
-
-从AI Studio中将作业导出为ipynb格式：
-
-<p align="center">
-  <img src="images/notebook1.png" width="800" height ="270" />
-</p>
-
-回到Step 1中创建的repo的主页，同创建【requirements.txt】步骤一样，选择【Add file】中的【Upload files】上传自己作业即可。
-
-### Step 5：在AI Studio提交作业中增加GitHub repo作业链接以及requirements.txt截图
-
-这样就完成啦，就能获得5分加分噢！
-
-**⭐总结下，所需提交内容⭐：**
-
-1. **GitHub作业链接**
-2. **requirements.txt中加上paddlenlp的截图**
-
-**期待大家的作业噢(〜￣▽￣)〜〜(￣▽￣〜)**
 
 ## 奖品列表
 
