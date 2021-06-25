@@ -49,6 +49,7 @@ METRIC_CLASSES = {
     "mnli": Accuracy,
     "qnli": Accuracy,
     "rte": Accuracy,
+    "chnsenticorp": Accuracy,
 }
 
 MODEL_CLASSES = {
@@ -56,6 +57,7 @@ MODEL_CLASSES = {
     "electra": (ElectraForSequenceClassification, ElectraTokenizer),
     "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
     "albert": (AlbertForSequenceClassification, AlbertTokenizer),
+    "ernie-gram": (ErnieGramForSequenceClassification, ErnieGramTokenizer),
 }
 
 
@@ -221,13 +223,13 @@ def convert_example(example,
         label = example['labels']
         label = np.array([label], dtype=label_dtype)
     # Convert raw text to feature
-    if (int(is_test) + len(example)) == 2:
-        example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
-    else:
-        example = tokenizer(
-            example['sentence1'],
-            text_pair=example['sentence2'],
-            max_seq_len=max_seq_length)
+    #if (int(is_test) + len(example)) == 2:
+    example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
+    #else:
+        #example = tokenizer(
+            #example['sentence1'],
+            #text_pair=example['sentence2'],
+            #max_seq_len=max_seq_length)
 
     if not is_test:
         return example['input_ids'], example['token_type_ids'], label
