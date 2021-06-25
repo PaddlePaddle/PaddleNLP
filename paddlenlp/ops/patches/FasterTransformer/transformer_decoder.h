@@ -49,21 +49,6 @@ public:
   cudaStream_t stream;
 };
 
-// template <OperationType OpType_>
-// class DecoderTransformerTraits;
-
-// template <>
-// class DecoderTransformerTraits<OperationType::FP32> : public
-// TransformerTraits<OperationType::FP32>
-// {
-// };
-
-// template <>
-// class DecoderTransformerTraits<OperationType::FP16> : public
-// TransformerTraits<OperationType::FP16>
-// {
-// };
-
 template <OperationType OpType_>
 class OpenTransformerDecoder {
 private:
@@ -137,8 +122,8 @@ public:
       fclose(fd);
     }
     if (err != 7) {
-      // printf("[WARNING] decoder loading GEMM algorithms error, using default
-      // GEMM algorithms!\n");
+      // [WARNING] decoder loading GEMM algorithms error, using default
+      // GEMM algorithms!
       int default_algo;
       if (Traits_::OpType == OperationType::FP32) {
         default_algo = CUBLAS_GEMM_DEFAULT;
