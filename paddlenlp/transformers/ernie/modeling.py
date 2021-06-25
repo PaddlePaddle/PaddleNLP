@@ -435,7 +435,7 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
         """
@@ -520,7 +520,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
                 model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
 
@@ -616,7 +616,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
         sequence_output, _ = self.ernie(
@@ -757,7 +757,7 @@ class ErnieForPretraining(ErniePretrainedModel):
                 model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
         """
