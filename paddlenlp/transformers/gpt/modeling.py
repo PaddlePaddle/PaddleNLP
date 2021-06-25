@@ -460,7 +460,6 @@ class GPTEmbeddings(nn.Layer):
                  initializer_range=0.02,
                  topo=None):
         super(GPTEmbeddings, self).__init__()
-        #if True:
         if topo is None or topo.mp_info.size == 1:
             self.word_embeddings = nn.Embedding(
                 vocab_size,
@@ -473,7 +472,8 @@ class GPTEmbeddings(nn.Layer):
             self.word_embeddings = paddlenlp.ops.ParallelEmbedding(
                 vocab_size,
                 hidden_size,
-                topo,
+                topo.mp_info.rank,
+                topo.mp_info.size,
                 weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
                     mean=0.0, std=initializer_range)))
         self.position_embeddings = nn.Embedding(
@@ -610,8 +610,8 @@ class GPTPretrainedModel(PretrainedModel):
             "num_attention_heads": 4,
             "intermediate_size": 4096,
             "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.0,
-            "attention_probs_dropout_prob": 0.0,
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
             "max_position_embeddings": 1024,
             "type_vocab_size": 1,  # no use
             "initializer_range": 0.02,
@@ -787,17 +787,9 @@ class GPTForPretraining(GPTPretrainedModel):
         self.apply(self.init_weights)
 
     def parallel_matmul(self, lm_output, logit_weights, parallel_output, topo):
-        #hcg = fleet.get_hybrid_communicate_group()
-        #model_parallel_group = hcg.get_model_parallel_group()
-        #world_size = hcg.get_model_parallel_world_size()
-        #rank = hcg.get_model_parallel_rank()
-        # world_size = topo.mp_info.size
-        # rank = topo.mp_info.rank
-
         if topo is not None and topo.mp_info.size > 1:
             input_parallel = paddle.distributed.collective._c_identity(
                 lm_output, group=None)
-            #lm_output, group=model_parallel_group)
 
             logits = paddle.matmul(
                 input_parallel, logit_weights, transpose_y=True)
@@ -806,7 +798,6 @@ class GPTForPretraining(GPTPretrainedModel):
                 return logits
 
             return paddle.distributed.collective._c_concat(logits, group=None)
-            #logits, group=model_parallel_group)
         else:
             logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
             return logits
@@ -827,11 +818,6 @@ class GPTForPretraining(GPTPretrainedModel):
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        # TODO @ZHUI Use all_to_all to
-        # logits = paddle.matmul(
-        #     encoder_outputs,
-        #     self.gpt.embeddings.word_embeddings.weight,
-        #     transpose_y=True)
         logits = self.parallel_matmul(
             encoder_outputs, self.gpt.embeddings.word_embeddings.weight, True,
             self.gpt.topo)

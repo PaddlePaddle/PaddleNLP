@@ -51,12 +51,13 @@ class ParallelEmbedding(nn.Layer):
     def __init__(self,
                  num_embeddings,
                  embedding_dim,
-                 topo,
+                 rank,
+                 world_size,
                  weight_attr=None,
                  name=None):
         super(ParallelEmbedding, self).__init__()
-        self.rank = topo.mp_info.rank
-        self.world_size = topo.mp_info.size
+        self.rank = rank
+        self.world_size = world_size
         self.num_embeddings = num_embeddings
         self.is_mp = (self.world_size > 1)
 

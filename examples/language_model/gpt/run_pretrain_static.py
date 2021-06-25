@@ -83,8 +83,6 @@ def dist_optimizer(args, topo):
     dist_strategy.recompute = args.use_recompute
     dist_strategy.pipeline = args.pp_degree > 1
 
-    #dist_strategy.without_graph_optimization = True
-
     if args.use_amp:
         dist_strategy.amp = True
         dist_strategy.amp_configs = {
