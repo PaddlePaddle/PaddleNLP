@@ -25,7 +25,3 @@ PYTHONPATH=../../../../ python -m paddle.distributed.launch \
     --eval_freq 500\
     --check_accuracy  true\
     --device "gpu"
-
-# global step 01: loss1: 11.051176071 loss2: 11.035275459 mean: 11.043225765 single_card: 11.043229103
-# global step 20, loss1: 10.900309563 loss2: 10.871219635 mean: 10.885764599 single_card: 10.885766983
-

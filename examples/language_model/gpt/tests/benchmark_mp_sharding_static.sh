@@ -10,7 +10,7 @@ rm -rf core.*
 rm -rf start_sharding*
 rm -rf main_sharding*
 
-task_name="gpt-benchmark-mp-static"
+task_name="gpt-benchmark-mp-sharding-static"
 rm -rf output/$task_name/log
 
 PYTHONPATH=../../../ python -u  -m paddle.distributed.fleet.launch \
