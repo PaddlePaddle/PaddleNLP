@@ -14,7 +14,7 @@ task_name="gpt-benchmark-mp-static"
 rm -rf output/$task_name/log
 
 PYTHONPATH=../../../ python -u  -m paddle.distributed.fleet.launch \
-    --gpus "0,1, 3, 4" \
+    --gpus "0,1,2,3" \
     --log_dir "output/$task_name/log" run_pretrain_static.py \
     --model_type "gpt" \
     --model_name_or_path "./ckpt/gpt2-small-en-init-checkpoint"\

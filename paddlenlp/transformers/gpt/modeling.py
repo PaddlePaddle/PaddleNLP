@@ -675,6 +675,7 @@ class GPTModel(GPTPretrainedModel):
                  eol_token_id=3,
                  topo=None):
         super(GPTModel, self).__init__()
+
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         self.topo = topo

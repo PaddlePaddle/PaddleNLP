@@ -179,6 +179,7 @@ class PretrainedModel(Layer, GenerationMixin):
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}
         init_configuration = {}
+
         if pretrained_model_name_or_path in pretrained_models:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 resource_files[file_id] = map_list[
@@ -384,6 +385,10 @@ class PretrainedModel(Layer, GenerationMixin):
         # Save model config
         self.save_model_config(save_dir)
         # Save model
-        file_name = os.path.join(save_dir,
-                                 list(self.resource_files_names.values())[0])
-        paddle.save(self.state_dict(), file_name)
+        if paddle.in_dynamic_mode():
+            file_name = os.path.join(
+                save_dir, list(self.resource_files_names.values())[0])
+            paddle.save(self.state_dict(), file_name)
+        else:
+            logger.warning(
+                "Save pretrained model only supported dygraph mode for now!")

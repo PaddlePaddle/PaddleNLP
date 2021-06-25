@@ -103,6 +103,8 @@ class GPTAccuarcy(unittest.TestCase):
                       (task_name, k, gt[k]["loss"], mean))
                 self.assertAlmostEqual(gt[k]["loss"], mean, delta=5e-6)
 
+    @unittest.skipIf(not ops.optimizer._jit_compile(),
+                     "The paddle.optimizer.AdamW not compatible with Sharding")
     def test_acc_sharding_static(self):
         check_dataset()
         check_init_checkpoint()

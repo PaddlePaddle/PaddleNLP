@@ -106,9 +106,15 @@ def do_train(args):
     if args.model_name_or_path in pretrained_models_list:
         model_config = model_class.pretrained_init_configuration[
             args.model_name_or_path]
+        model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
+        model_config[
+            "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
         model = GPTForPretraining(GPTModel(**model_config))
     else:
-        model = GPTForPretraining.from_pretrained(args.model_name_or_path)
+        model = GPTForPretraining.from_pretrained(
+            args.model_name_or_path,
+            hidden_dropout_prob=args.hidden_dropout_prob,
+            attention_probs_dropout_prob=args.attention_probs_dropout_prob)
 
     # Create the critrion for the gpt model
     criterion = GPTPretrainingCriterion()

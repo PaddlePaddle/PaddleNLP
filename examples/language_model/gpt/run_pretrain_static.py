@@ -167,7 +167,6 @@ def run_evaluate(data_loader,
 
 
 def do_train(args):
-    args.test_iters = args.eval_iters * 5
     # Initialize the paddle and paddle fleet execute environment
     paddle.enable_static()
     fleet.init(is_collective=True)
@@ -246,16 +245,23 @@ def do_train(args):
                 if args.model_name_or_path in pretrained_models_list:
                     model_config = model_class.pretrained_init_configuration[
                         args.model_name_or_path]
-                    if model_config["vocab_size"] % 8 != 0:
-                        model_config["vocab_size"] += 8 - (
-                            model_config["vocab_size"] % 8)
+
+                    model_config[
+                        "hidden_dropout_prob"] = args.hidden_dropout_prob
+                    model_config[
+                        "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
                     model_config["topo"] = topo
+
                     model = guard(f'gpu:{args.pp_degree -1}')(
                         GPTForPretraining)(guard(f'gpu:0')(GPTModel)(
                             **model_config))
                 else:
                     model, _ = GPTForPretraining.from_pretrained(
-                        args.model_name_or_path, topo=topo)
+                        args.model_name_or_path,
+                        hidden_dropout_prob=args.hidden_dropout_prob,
+                        attention_probs_dropout_prob=args.
+                        attention_probs_dropout_prob,
+                        topo=topo)
 
                 # Create the model for the gpt pretrain
                 preds = model(tokens, position_ids, attention_mask)
@@ -297,15 +303,18 @@ def do_train(args):
                     weight_decay=args.weight_decay,
                     apply_decay_param_fun=lambda x: x in decay_param)
             else:
-                optimizer = paddle.fluid.optimizer.AdamOptimizer(
+                if args.sharding_degree > 1:
+                    raise ValueError(
+                        "The paddle.optimizer.AdamW not compatible with Sharding!"
+                    )
+                optimizer = paddle.optimizer.AdamW(
                     learning_rate=lr_scheduler,
                     beta1=args.adam_beta1,
                     beta2=args.adam_beta2,
                     epsilon=args.adam_epsilon,
-                    grad_clip=clip)
-                logger.error(
-                    "Compile custom adamw failed, use fluid.Adam and on WEIGHT DECAY!!!!"
-                )
+                    grad_clip=clip,
+                    weight_decay=args.weight_decay,
+                    apply_decay_param_fun=lambda x: x in decay_param)
 
             if args.use_recompute:
                 dist_strategy.recompute = True
@@ -428,6 +437,7 @@ def do_train(args):
                 save_persistables(exe,
                                   os.path.join(output_dir, "static_vars"),
                                   main_program)
+                model.init_config["init_args"][0].init_config.pop("topo", None)
                 model.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
                 tic_train = time.time()
