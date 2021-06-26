@@ -19,6 +19,7 @@ import os
 import random
 from functools import partial
 import time
+import string
 
 import numpy as np
 import paddle
@@ -47,6 +48,7 @@ parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"],
 parser.add_argument("--seed", type=int, default=8, help="Random seed for initialization.")
 # yapf: enable
 args = parser.parse_args()
+TRANSLATOR = str.maketrans('', '', string.punctuation)
 
 
 def set_seed(args):
@@ -75,7 +77,8 @@ def create_dataloader(batch_size,
     def _collate_data(data, stack_fn=Stack()):
         num_fields = len(data[0])
         out = [None] * num_fields
-        out[0] = stack_fn([_tokenize(x['text']) for x in data])
+        out[0] = stack_fn(
+            [_tokenize(x['text'].translate(TRANSLATOR)) for x in data])
         out[1] = stack_fn([x['label'] for x in data])
         seq_len = len(out[0][0])
         # Construct the random attention mask for the random attention
