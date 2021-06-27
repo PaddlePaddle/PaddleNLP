@@ -215,7 +215,7 @@ class Vocab(object):
 
         tokens = []
         for idx in indices:
-            if not isinstance(idx, int):
+            if not isinstance(idx, (int, np.integer)):
                 warnings.warn(
                     "The type of `to_tokens()`'s input `indices` is not `int` which will be forcibly transfered to `int`. "
                 )
