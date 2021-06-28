@@ -147,6 +147,7 @@ std::vector<paddle::Tensor> gpt2_kernel(
 
   delete gpt2_decoding;
   delete[] params;
+  cublasDestroy(cublas_handle_);
 
   return {output_ids};
 }
