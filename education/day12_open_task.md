@@ -1,7 +1,8 @@
-# Day12 预训练模型小型化与部署实战作业辅导
+# Day12 预训练模型小型化与部署 - 【开放性题目】辅导
 
-本教程旨在辅导同学如何完成 AI Studio课程——[『NLP打卡营』实践课12：预训练模型小型化与部署实战
-](https://aistudio.baidu.com/aistudio/projectdetail/2017520)课后作业。
+本教程旨在辅导同学如何完成产业实践开放性题目（参照ERNIE-1.0的压缩部署流程，改用ERNIE-Gram的Teacher模型进行蒸馏）——[『NLP打卡营』实践课12：预训练模型小型化与部署实战](https://aistudio.baidu.com/aistudio/projectdetail/2114383)
+
+必修作业是跑通原项目即可噢。
 
 ## 1. 对ERNIE-Gram进行fine-tuning得到教师模型
 由于我们的蒸馏是在中文情感分析ChnSentiCorp任务上，因此我们需要对PaddleNLP提供的ERNIE-Gram在我们的任务上进行Fine-tuning。下面是详细的步骤：
@@ -99,4 +100,4 @@ from paddlenlp.transformers import ErnieGramForSequenceClassification, ErnieGram
 teacher = ErnieGramForSequenceClassification.from_pretrained("./tmp/ChnSentiCorp/best_model")
 ```
 
-蒸馏的过程同AI studio教程，这里就不再赘述啦~同学们按着与教程相同的步骤进行即可。
+蒸馏的过程同AI studio教程，这里就不再赘述啦~同学们按着与教程相同的步骤进行即可。同时，本repo中也提供了一个[从BERT到Bi-LSTM蒸馏](../examples/model_compression/distill_lstm)的例子可供参考。

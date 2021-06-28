@@ -147,6 +147,8 @@ def apply_data_augmentation_for_cn(data,
     new_data = []
 
     for example in data:
+        if not example['text']:
+            continue
         text_tokenized = list(jieba.cut(example['text']))
         lstm_tokens = text_tokenized
         bert_tokens = tokenizer.tokenize(example['text'])
@@ -170,11 +172,12 @@ def apply_data_augmentation_for_cn(data,
                                                       p_ng, ngram_range)
             lstm_tokens, bert_tokens = flatten(lstm_tokens), flatten(
                 bert_tokens)
-            new_data.append({
-                "lstm_tokens": lstm_tokens,
-                "bert_tokens": bert_tokens,
-                "label": example['label']
-            })
+            if lstm_tokens and bert_tokens:
+                new_data.append({
+                    "lstm_tokens": lstm_tokens,
+                    "bert_tokens": bert_tokens,
+                    "label": example['label']
+                })
     return new_data
 
 

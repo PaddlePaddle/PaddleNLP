@@ -80,9 +80,9 @@ text = tokenizer('自然语言处理')
 model = ErnieModel.from_pretrained('ernie-1.0')
 pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
 # 文本分类 & 句对匹配
-model = ErnieForSequenceClassifiation.from_pretrained('ernie-1.0')
+model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
 # 序列标注
-model = ErnieForTokenClassifiation.from_pretrained('ernie-1.0')
+model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
 # 问答
 model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
 ```
