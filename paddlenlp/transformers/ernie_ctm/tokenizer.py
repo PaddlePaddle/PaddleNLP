@@ -71,10 +71,12 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
     }
     pretrained_init_configuration = {
         "ernie-ctm": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "summary_num": 2
         },
         "wordtag": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "summary_num": 2
         }
     }
 
