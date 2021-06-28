@@ -378,7 +378,7 @@ PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用�
     from paddlenlp.datasets import load_dataset
     from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 
-    train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
+    train_ds = load_dataset("chnsenticorp", splits=["train"])
 
     model = BertForSequenceClassification.from_pretrained("bert-wwm-chinese", num_classes=len(train_ds.label_list))
 
@@ -400,7 +400,6 @@ PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用�
     for input_ids, token_type_ids, labels in train_data_loader():
         logits = model(input_ids, token_type_ids)
         loss = criterion(logits, labels)
-        probs = paddle.nn.functional.softmax(logits, axis=1)
         loss.backward()
         optimizer.step()
         optimizer.clear_grad()
