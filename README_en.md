@@ -78,9 +78,9 @@ text = tokenizer('natural language understanding')
 model = ErnieModel.from_pretrained('ernie-1.0')
 pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
 # Text Classificaiton and Matching
-model = ErnieForSequenceClassifiation.from_pretrained('ernie-1.0')
+model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
 # Sequence Labeling
-model = ErnieForTokenClassifiation.from_pretrained('ernie-1.0')
+model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
 # Question Answering
 model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
 ```
