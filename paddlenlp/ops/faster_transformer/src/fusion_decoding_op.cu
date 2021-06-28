@@ -282,6 +282,7 @@ std::vector<paddle::Tensor> decoding_kernel(
         "Faster Transformer. ");
   }
   delete[] params;
+  cublasDestroy(cublas_handle_);
 
   return {output_ids, parent_ids, sequence_length};
 }
