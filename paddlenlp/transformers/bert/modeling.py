@@ -254,7 +254,9 @@ class BertPretrainedModel(PretrainedModel):
             "pad_token_id": 0,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
+
+    resource_files_names = {"model_state": "model_state.pdparams",
+                            "model_config": "model_config.json"}
     pretrained_resource_files_map = {
         "model_state": {
             "bert-base-uncased":
@@ -279,6 +281,30 @@ class BertPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-base-chinese.pdparams",
             "macbert-large-chinese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-large-chinese.pdparams",
+        },
+        "model_config": {
+            "bert-base-uncased":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/bert-base-uncased.pdparams",
+            "bert-large-uncased":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/bert-large-uncased.pdparams",
+            "bert-base-multilingual-uncased":
+                "http://paddlenlp.bj.bcebos.com/models/transformers/bert-base-multilingual-uncased.pdparams",
+            "bert-base-cased":
+                "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-base-cased.pdparams",
+            "bert-base-chinese":
+                "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-base-chinese.pdparams",
+            "bert-base-multilingual-cased":
+                "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-base-multilingual-cased.pdparams",
+            "bert-large-cased":
+                "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-large-cased.pdparams",
+            "bert-wwm-chinese":
+                "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-wwm-chinese.pdparams",
+            "bert-wwm-ext-chinese":
+                "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-wwm-ext-chinese.pdparams",
+            "macbert-base-chinese":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-base-chinese.pdparams",
+            "macbert-large-chinese":
+                "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-large-chinese.pdparams",
         }
     }
     base_model_prefix = "bert"

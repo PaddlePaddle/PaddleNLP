@@ -19,6 +19,7 @@ import os
 import six
 import logging
 import inspect
+from urllib.parse import urlparse
 
 import paddle
 from paddle.nn import Layer
@@ -103,19 +104,22 @@ class PretrainedModel(Layer, GenerationMixin):
     Besides, metaclass `InitTrackerMeta` is used to create `PretrainedModel`,
     by which subclasses can track arguments for initialization automatically.
     """
+
     model_config_file = "model_config.json"
     pretrained_init_configuration = {}
-    # TODO: more flexible resource handle, namedtuple with fileds as:
+
+    # TODO: more flexible resource handle, namedtuple with fields as:
     # resource_name, saved_file, handle_name_for_load(None for used as __init__
     # arguments), handle_name_for_save
-    resource_files_names = {"model_state": "model_state.pdparams"}
+    resource_files_names = {"model_state": "model_state.pdparams",
+                            "model_config": "model_config.json"}
     pretrained_resource_files_map = {}
     base_model_prefix = ""
 
     def _wrap_init(self, original_init, *args, **kwargs):
         """
         It would be hooked after `__init__` to add a dict including arguments of
-        `__init__` as a attribute named `config` of the prtrained model instance.
+        `__init__` as a attribute named `config` of the pretrained model instance.
         """
         init_dict = fn_args_to_dict(original_init, *((self, ) + args), **kwargs)
         self.config = init_dict
@@ -135,6 +139,7 @@ class PretrainedModel(Layer, GenerationMixin):
         list: Contains all supported built-in pretrained model names of the
             current PretrainedModel class.
         """
+        # todo: return all model name
         return list(self.pretrained_init_configuration.keys())
 
     def get_input_embeddings(self):
@@ -148,7 +153,7 @@ class PretrainedModel(Layer, GenerationMixin):
         return None  # Overwrite for models with output embeddings
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, config_path=None, *args, **kwargs):
         """
         Creates an instance of `PretrainedModel` and load pretrained model weights
         for it according to a specific model name (such as `bert-base-uncased`)
@@ -156,6 +161,9 @@ class PretrainedModel(Layer, GenerationMixin):
 
         Args:
             pretrained_model_name_or_path (str): Name of pretrained model
+                for built-in pretrained models loading, such as `bert-base-uncased`.
+                Or a local file directory path for local trained models loading.
+            model_config_path (str): Name of pretrained model
                 for built-in pretrained models loading, such as `bert-base-uncased`.
                 Or a local file directory path for local trained models loading.
             *args (tuple): Position arguments for model `__init__`. If provided,
@@ -177,8 +185,10 @@ class PretrainedModel(Layer, GenerationMixin):
                 model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
         """
         pretrained_models = list(cls.pretrained_init_configuration.keys())
+        pretrained_models_bos = dict()
         resource_files = {}
         init_configuration = {}
+
         if pretrained_model_name_or_path in pretrained_models:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 resource_files[file_id] = map_list[
@@ -186,25 +196,30 @@ class PretrainedModel(Layer, GenerationMixin):
             init_configuration = copy.deepcopy(
                 cls.pretrained_init_configuration[
                     pretrained_model_name_or_path])
+        elif pretrained_model_name_or_path in pretrained_models_bos:
+            for file_id in cls.resource_files_names.keys():
+                resource_files[file_id] = pretrained_models_bos[pretrained_model_name_or_path][file_id]
+        elif os.path.isdir(pretrained_model_name_or_path):
+            for file_id, file_name in cls.resource_files_names.items():
+                full_file_name = os.path.join(pretrained_model_name_or_path,
+                                              file_name)
+                resource_files[file_id] = full_file_name
+            if config_path is not None:
+                resource_files["model_config"] = config_path
+        elif os.path.isfile(pretrained_model_name_or_path) or \
+                urlparse(pretrained_model_name_or_path).scheme in ("http", "https"):
+            resource_files["model_state"] = pretrained_model_name_or_path
+            resource_files["model_config"] = config_path
         else:
-            if os.path.isdir(pretrained_model_name_or_path):
-                for file_id, file_name in cls.resource_files_names.items():
-                    full_file_name = os.path.join(pretrained_model_name_or_path,
-                                                  file_name)
-                    resource_files[file_id] = full_file_name
-                resource_files["model_config_file"] = os.path.join(
-                    pretrained_model_name_or_path, cls.model_config_file)
-            else:
-                raise ValueError(
-                    "Calling {}.from_pretrained() with a model identifier or the "
-                    "path to a directory instead. The supported model "
-                    "identifiers are as follows: {}, but got: {}".format(
-                        cls.__name__,
-                        cls.pretrained_init_configuration.keys(
-                        ), pretrained_model_name_or_path))
+            raise ValueError(
+                "Calling {}.from_pretrained() with a model identifier or the "
+                "path to a directory instead. The supported model "
+                "identifiers are as follows: {}, but got: {}".format(
+                    cls.__name__,
+                    cls.pretrained_init_configuration.keys(
+                    ), pretrained_model_name_or_path))
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-
         resolved_resource_files = {}
         for file_id, file_path in resource_files.items():
             path = os.path.join(default_root, file_path.split('/')[-1])
@@ -221,7 +236,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # Prepare model initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
-        model_config_file = resolved_resource_files.pop("model_config_file",
+        model_config_file = resolved_resource_files.pop("model_config",
                                                         None)
         if model_config_file is not None:
             with io.open(model_config_file, encoding="utf-8") as f:
