@@ -225,6 +225,34 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
         },
+        "macbert-base-chinese": {
+            "vocab_size": 21128,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
+        "macbert-large-chinese": {
+            "vocab_size": 21128,
+            "hidden_size": 1024,
+            "num_hidden_layers": 24,
+            "num_attention_heads": 16,
+            "intermediate_size": 4096,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -247,6 +275,10 @@ class BertPretrainedModel(PretrainedModel):
             "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-wwm-chinese.pdparams",
             "bert-wwm-ext-chinese":
             "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-wwm-ext-chinese.pdparams",
+            "macbert-base-chinese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-base-chinese.pdparams",
+            "macbert-large-chinese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-large-chinese.pdparams",
         }
     }
     base_model_prefix = "bert"
@@ -344,7 +376,8 @@ class BertModel(BertPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False):
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
@@ -354,10 +387,22 @@ class BertModel(BertPretrainedModel):
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
-        encoder_outputs = self.encoder(embedding_output, attention_mask)
-        sequence_output = encoder_outputs
-        pooled_output = self.pooler(sequence_output)
-        return sequence_output, pooled_output
+        if output_hidden_states:
+            output = embedding_output
+            encoder_outputs = []
+            for mod in self.encoder.layers:
+                output = mod(output, src_mask=attention_mask)
+                encoder_outputs.append(output)
+            if self.encoder.norm is not None:
+                encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
+            pooled_output = self.pooler(encoder_outputs[-1])
+        else:
+            sequence_output = self.encoder(embedding_output, attention_mask)
+            pooled_output = self.pooler(sequence_output)
+        if output_hidden_states:
+            return encoder_outputs, pooled_output
+        else:
+            return sequence_output, pooled_output
 
 
 class BertForQuestionAnswering(BertPretrainedModel):
@@ -456,7 +501,7 @@ class BertLMPredictionHead(Layer):
         self.activation = getattr(nn.functional, activation)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.decoder_weight = self.create_parameter(
-            shape=[hidden_size, vocab_size],
+            shape=[vocab_size, hidden_size],
             dtype=self.transform.weight.dtype,
             is_bias=False) if embedding_weights is None else embedding_weights
         self.decoder_bias = self.create_parameter(

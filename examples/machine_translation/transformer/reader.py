@@ -149,7 +149,7 @@ def prepare_train_input(insts, bos_idx, eos_idx, pad_idx, pad_seq=1):
     """
     Put all padded data needed by training into a list.
     """
-    word_pad = Pad(pad_idx)
+    word_pad = Pad(pad_idx, dtype="int64")
     src_max_len = (
         max([len(inst[0]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
     trg_max_len = (
@@ -176,7 +176,7 @@ def prepare_infer_input(insts, bos_idx, eos_idx, pad_idx, pad_seq=1):
     """
     Put all padded data needed by beam search decoder into a list.
     """
-    word_pad = Pad(pad_idx)
+    word_pad = Pad(pad_idx, dtype="int64")
     src_max_len = (
         max([len(inst[0]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
     src_word = word_pad([

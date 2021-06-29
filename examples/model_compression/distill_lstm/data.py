@@ -23,7 +23,7 @@ from paddlenlp.data import Stack, Tuple, Pad, Vocab
 from paddlenlp.transformers import BertTokenizer
 from paddlenlp.datasets import load_dataset
 
-from utils import convert_small_example, convert_two_example, convert_pair_example
+from utils import convert_example_for_lstm, convert_example_for_distill, convert_pair_example
 
 
 def load_vocab(vocab_file):
@@ -70,11 +70,12 @@ def apply_data_augmentation(data,
     directly replaced by `mask_token`, after what sampling is performed.
     """
 
-    def _data_augmentation(data, whole_word_mask=whole_word_mask):
+    def _data_augmentation(data,
+                           tokenized_list,
+                           whole_word_mask=whole_word_mask):
         # 1. Masking
         words = []
         if not whole_word_mask:
-            tokenized_list = tokenizer.tokenize(data)
             words = [
                 tokenizer.mask_token if np.random.rand() < p_mask else word
                 for word in tokenized_list
@@ -86,11 +87,10 @@ def apply_data_augmentation(data,
         # 2. N-gram sampling
         words = ngram_sampling(words, p_ng=p_ng, ngram_range=ngram_range)
         words = flatten(words) if isinstance(words[0], list) else words
-        new_text = " ".join(words)
-        return words, new_text
+        return words
 
     np.random.seed(seed)
-    used_texts, new_data = [], []
+    new_data = []
     for example in data:
         if task_name == 'qqp':
             data_list = tokenizer.tokenize(example['sentence1'])
@@ -100,7 +100,6 @@ def apply_data_augmentation(data,
                 "sentence2": data_list_2,
                 "labels": example['labels']
             })
-            used_texts.append(" ".join(data_list_2))
         else:
             data_list = tokenizer.tokenize(example['sentence'])
             new_data.append({
@@ -108,29 +107,22 @@ def apply_data_augmentation(data,
                 "labels": example['labels']
             })
 
-        used_texts.append(" ".join(data_list))
-    used_texts = set(used_texts)
-
     for example in data:
         for _ in range(n_iter):
             if task_name == 'qqp':
-                words, new_text = _data_augmentation(example['sentence1'])
-                words_2, new_text_2 = _data_augmentation(example['sentence2'])
-                if new_text not in used_texts or new_text_2 not in used_texts:
-                    new_data.append({
-                        "sentence1": words,
-                        "sentence2": words_2,
-                        "labels": example['labels']
-                    })
-                    used_texts.add(new_text_2)
+                words = _data_augmentation(example['sentence1'], data_list)
+                words_2 = _data_augmentation(example['sentence2'], data_list_2)
+                new_data.append({
+                    "sentence1": words,
+                    "sentence2": words_2,
+                    "labels": example['labels']
+                })
             else:
-                words, new_text = _data_augmentation(example['sentence'])
-                if new_text not in used_texts:
-                    new_data.append({
-                        "sentence": words,
-                        "labels": example['labels']
-                    })
-            used_texts.add(new_text)
+                words = _data_augmentation(example['sentence'], data_list)
+                new_data.append({
+                    "sentence": words,
+                    "labels": example['labels']
+                })
     return new_data
 
 
@@ -152,39 +144,40 @@ def apply_data_augmentation_for_cn(data,
     student model and teacher model would get at the same time.
     """
     np.random.seed(seed)
-    used_texts = [example['text'] for example in data]
-    used_texts = set(used_texts)
     new_data = []
+
     for example in data:
-        words = [word for word in jieba.cut(example['text'])]
-        words_bert = tokenizer.tokenize(example['text'])
+        if not example['text']:
+            continue
+        text_tokenized = list(jieba.cut(example['text']))
+        lstm_tokens = text_tokenized
+        bert_tokens = tokenizer.tokenize(example['text'])
         new_data.append({
-            "text": words,
-            "sentence": words_bert,
+            "lstm_tokens": lstm_tokens,
+            "bert_tokens": bert_tokens,
             "label": example['label']
         })
         for _ in range(n_iter):
             # 1. Masking
-            words, words_bert = [], []
-            for word in jieba.cut(example['text']):
+            lstm_tokens, bert_tokens = [], []
+            for word in text_tokenized:
                 if np.random.rand() < p_mask:
-                    words.append([vocab.unk_token])
-                    words_bert.append([tokenizer.unk_token])
+                    lstm_tokens.append([vocab.unk_token])
+                    bert_tokens.append([tokenizer.unk_token])
                 else:
-                    words.append([word])
-                    words_bert.append(tokenizer.tokenize(word))
+                    lstm_tokens.append([word])
+                    bert_tokens.append(tokenizer.tokenize(word))
             # 2. N-gram sampling
-            words, words_bert = ngram_sampling(words, words_bert, p_ng,
-                                               ngram_range)
-            words, words_bert = flatten(words), flatten(words_bert)
-            new_text = "".join(words)
-            if new_text not in used_texts:
+            lstm_tokens, bert_tokens = ngram_sampling(lstm_tokens, bert_tokens,
+                                                      p_ng, ngram_range)
+            lstm_tokens, bert_tokens = flatten(lstm_tokens), flatten(
+                bert_tokens)
+            if lstm_tokens and bert_tokens:
                 new_data.append({
-                    "text": words,
-                    "sentence": words_bert,
+                    "lstm_tokens": lstm_tokens,
+                    "bert_tokens": bert_tokens,
                     "label": example['label']
                 })
-                used_texts.add(new_text)
     return new_data
 
 
@@ -214,7 +207,7 @@ def create_data_loader_for_small_model(task_name,
         pad_val = vocab.pad_token_id
 
     trans_fn = partial(
-        convert_small_example,
+        convert_example_for_lstm,
         task_name=task_name,
         vocab=vocab,
         max_seq_length=max_seq_length,
@@ -280,7 +273,7 @@ def create_distill_loader(task_name,
     print("Data augmentation has been applied.")
 
     trans_fn = partial(
-        convert_two_example,
+        convert_example_for_distill,
         task_name=task_name,
         tokenizer=tokenizer,
         label_list=train_ds.label_list,
@@ -288,7 +281,7 @@ def create_distill_loader(task_name,
         vocab=vocab)
 
     trans_fn_dev = partial(
-        convert_two_example,
+        convert_example_for_distill,
         task_name=task_name,
         tokenizer=tokenizer,
         label_list=train_ds.label_list,

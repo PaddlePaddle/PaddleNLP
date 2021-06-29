@@ -14,6 +14,7 @@
 
 import numpy as np
 import paddle
+import paddle.nn.functional as F
 from paddlenlp.transformers.ernie.modeling import ErniePretrainingCriterion, ErniePretrainedModel, ErniePretrainingHeads
 
 
@@ -87,7 +88,7 @@ class ErnieMLMCriterion(paddle.nn.Layer):
         masked_lm_labels = paddle.reshape(masked_lm_labels, shape=[-1, 1])
 
         with paddle.static.amp.fp16_guard():
-            masked_lm_loss = paddle.nn.functional.softmax_with_cross_entropy(
-                prediction_scores, masked_lm_labels, ignore_index=-1)
+            masked_lm_loss = F.cross_entropy(
+                input=prediction_scores, label=masked_lm_labels)
             masked_lm_loss = masked_lm_loss / masked_lm_scale
-            return paddle.mean(masked_lm_loss)
+            return masked_lm_loss

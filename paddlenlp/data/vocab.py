@@ -15,6 +15,7 @@
 import collections
 import io
 import json
+import numpy as np
 import os
 import warnings
 
@@ -91,18 +92,22 @@ class Vocab(object):
                 assert special_token in token_to_idx, '{} is not in token_to_idx'.format(
                     special_token)
             self._token_to_idx = token_to_idx
-            self._idx_to_token = sorted(
-                self._token_to_idx.keys(),
-                key=lambda token: self._token_to_idx[token])
+            self._idx_to_token = {
+                idx: token
+                for token, idx in token_to_idx.items()
+            }
             if unk_token:
                 unk_index = self._token_to_idx[unk_token]
                 self._token_to_idx = collections.defaultdict(lambda: unk_index)
                 self._token_to_idx.update(token_to_idx)
         else:
-            self._idx_to_token = list(special_tokens)
+            self._idx_to_token = {
+                idx: special_token
+                for idx, special_token in enumerate(special_tokens)
+            }
             self._token_to_idx = collections.defaultdict()
             self._token_to_idx.update(
-                (token, idx) for idx, token in enumerate(self._idx_to_token))
+                (token, idx) for idx, token in self._idx_to_token.items())
             self._index_counter_keys(counter, special_tokens, max_size,
                                      min_freq)
             if token_to_idx:
@@ -137,8 +142,9 @@ class Vocab(object):
             if freq < min_freq or len(self._idx_to_token) == max_size:
                 break
             if token not in special_tokens:
-                self._idx_to_token.append(token)
-                self._token_to_idx[token] = len(self._idx_to_token) - 1
+                self._idx_to_token[max(list(self._idx_to_token.keys()) + [-1]) +
+                                   1] = token
+                self._token_to_idx[token] = max(self._idx_to_token.keys())
 
     def _sort_index_according_to_user_specification(self, token_to_idx):
         # Sanity checks
@@ -171,7 +177,8 @@ class Vocab(object):
         Maps the input indices to token list.
 
         Args:
-            indices (int|list[int]|tuple[int]): The input indice(s) for mapping.
+            indices (int|list[int]|tuple[int]|numpy.ndarray): The input indice(s) for mapping.
+                Must be an `int` or 1D `list[int]`|`tuple[int]`|`numpy.ndarray`.
 
         Returns:
             str|list[str]: Obtained token(s). If `indices` is an integer, it 
@@ -195,24 +202,31 @@ class Vocab(object):
                 # ['[PAD]', '[UNK]', '一斤三', '意面屋']
         """
         to_reduce = False
-        if not isinstance(indices, (list, tuple)):
+        if not isinstance(indices, (list, tuple, np.ndarray)):
             indices = [indices]
             to_reduce = True
+        if isinstance(indices, (list, tuple)):
+            indices = np.asarray(indices)
 
-        max_idx = len(self._idx_to_token) - 1
+        if isinstance(indices, (np.ndarray)) and len(indices.shape) > 1:
+            raise ValueError(
+                'Token indices is invalid. Expected 1D array, but received {}D array. '.
+                format(len(indices.shape)))
 
         tokens = []
         for idx in indices:
-            if not isinstance(idx, int):
+            if not isinstance(idx, (int, np.integer)):
                 warnings.warn(
                     "The type of `to_tokens()`'s input `indices` is not `int` which will be forcibly transfered to `int`. "
                 )
                 idx = int(idx)
-            if idx > max_idx:
+
+            try:
+                tokens.append(self._idx_to_token[idx])
+            except KeyError:
                 raise ValueError(
                     'Token index {} in the provided `indices` is invalid.'.
                     format(idx))
-            tokens.append(self._idx_to_token[idx])
 
         return tokens[0] if to_reduce else tokens
 
@@ -307,7 +321,7 @@ class Vocab(object):
                 json_str = vocab.to_json(path='./vocab.json')
         """
         vocab_dict = {}
-        vocab_dict['idx_to_token'] = self.idx_to_token
+        vocab_dict['idx_to_token'] = dict(self.idx_to_token)
         vocab_dict['token_to_idx'] = dict(self.token_to_idx)
         vocab_dict['unk_token'] = self.unk_token
         vocab_dict['identifiers_to_tokens'] = self._identifiers_to_tokens

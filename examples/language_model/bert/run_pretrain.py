@@ -31,6 +31,7 @@ import paddle.distributed as dist
 from paddle.io import DataLoader, Dataset
 
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.utils.tools import TimeCostAverage
 from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion
 from paddlenlp.transformers import ErnieForPretraining, ErnieModel, ErniePretrainingCriterion
 from paddlenlp.transformers import BertTokenizer, ErnieTokenizer
@@ -155,6 +156,11 @@ def parse_args():
         type=float,
         default=2**15,
         help="The value of scale_loss for fp16.")
+    parser.add_argument(
+        "--to_static",
+        type=distutils.util.strtobool,
+        default=False,
+        help="Enable training under @to_static.")
     args = parser.parse_args()
     return args
 
@@ -221,6 +227,20 @@ def create_pretraining_dataset(input_file, max_pred_length, shared_list, args,
         return_list=True)
     return train_data_loader, input_file
 
+
+def create_input_specs():
+    input_ids = paddle.static.InputSpec(
+        name="input_ids", shape=[-1, -1], dtype="int64")
+    segment_ids = paddle.static.InputSpec(
+        name="segment_ids", shape=[-1, -1], dtype="int64")
+    position_ids = None
+    input_mask = paddle.static.InputSpec(
+        name="input_mask", shape=[-1, 1, 1, -1], dtype="float32")
+    masked_lm_positions = paddle.static.InputSpec(
+        name="masked_lm_positions", shape=[-1], dtype="int32")
+    return [
+        input_ids, segment_ids, position_ids, input_mask, masked_lm_positions
+    ]
 
 class PretrainingDataset(Dataset):
     def __init__(self, input_file, max_pred_length):
@@ -301,10 +321,16 @@ def do_train(args):
         model = model_class.from_pretrained(args.model_name_or_path)
     criterion = criterion_class(
         getattr(model, model_class.base_model_prefix).config["vocab_size"])
+    # decorate @to_static for benchmark, skip it by default.
+    if args.to_static:
+        specs = create_input_specs()
+        model = paddle.jit.to_static(model, input_spec=specs)
+        logger.info("Successfully to apply @to_static with specs: {}".format(specs))
+
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    # If use defalut last_epoch, lr of the first iteration is 0.
+    # If use default last_epoch, lr of the first iteration is 0.
     # Use `last_epoch = 0` to be consistent with nv bert.
     num_training_steps = args.max_steps if args.max_steps > 0 else len(
         train_data_loader) * args.num_train_epochs
@@ -377,13 +403,13 @@ def do_train(args):
             dataset_future = pool.submit(create_pretraining_dataset, data_file,
                                          args.max_predictions_per_seq,
                                          shared_file_list, args, worker_init)
-            train_reader_cost = 0.0
-            train_run_cost = 0.0
+            train_cost_avg = TimeCostAverage()
+            reader_cost_avg = TimeCostAverage()
             total_samples = 0
-            reader_start = time.time()
+            batch_start = time.time()
             for step, batch in enumerate(train_data_loader):
-                train_reader_cost += time.time() - reader_start
-                train_start = time.time()
+                train_reader_cost = time.time() - batch_start
+                reader_cost_avg.record(train_reader_cost)
                 global_step += 1
                 (input_ids, segment_ids, input_mask, masked_lm_positions,
                  masked_lm_labels, next_sentence_labels,
@@ -407,22 +433,23 @@ def do_train(args):
                     optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
-                train_run_cost += time.time() - train_start
                 total_samples += args.batch_size
+                train_run_cost = time.time() - batch_start
+                train_cost_avg.record(train_run_cost)
                 if global_step % args.logging_steps == 0:
                     if paddle.distributed.get_rank() == 0:
                         logger.info(
                             "global step: %d, epoch: %d, batch: %d, loss: %f, "
                             "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
                             % (global_step, epoch, step, loss,
-                               train_reader_cost / args.logging_steps,
-                               (train_reader_cost + train_run_cost) /
-                               args.logging_steps, total_samples /
-                               args.logging_steps, total_samples /
-                               (train_reader_cost + train_run_cost)))
-                    train_reader_cost = 0.0
-                    train_run_cost = 0.0
+                               reader_cost_avg.get_average(),
+                               train_cost_avg.get_average(), total_samples /
+                               args.logging_steps, total_samples / (
+                                   args.logging_steps *
+                                   train_cost_avg.get_average())))
                     total_samples = 0
+                    train_cost_avg.reset()
+                    reader_cost_avg.reset()
                 if global_step % args.save_steps == 0:
                     if paddle.distributed.get_rank() == 0:
                         output_dir = os.path.join(args.output_dir,
@@ -440,7 +467,7 @@ def do_train(args):
                 if global_step >= args.max_steps:
                     del train_data_loader
                     return
-                reader_start = time.time()
+                batch_start = time.time()
 
             del train_data_loader
             train_data_loader, data_file = dataset_future.result(timeout=None)
