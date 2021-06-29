@@ -379,9 +379,12 @@ class PretrainedModel(Layer, GenerationMixin):
                 # reload from save_directory
                 model = BertForSequenceClassification.from_pretrained('./trained_model/')
         """
-        assert os.path.isdir(
-            save_dir), "save_dir ({}) is not available.".format(save_dir)
-        # Save model config 
+        assert not os.path.isfile(
+            save_dir
+        ), "Saving directory ({}) should be a directory, not a file".format(
+            save_dir)
+        os.makedirs(save_dir, exist_ok=True)
+        # Save model config
         self.save_model_config(save_dir)
         # Save model
         file_name = os.path.join(save_dir,
