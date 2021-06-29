@@ -28,13 +28,19 @@ class BartTokenizer(GPTTokenizer):
     }
     pretrained_resource_files_map = {
         "vocab_file": {
-            "bart-base": "",
+            "bart-base":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-base-vocab.json",
+            "bart-large":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-large-vocab.json",
         },
         "merges_file": {
-            "bart-base": "",
+            "bart-base":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-base-merges.txt",
+            "bart-large":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-large-merges.txt",
         }
     }
-    pretrained_init_configuration = {"bart-base": {}}
+    pretrained_init_configuration = {"bart-base": {}, "bart-large": {}}
 
     def __init__(
             self,

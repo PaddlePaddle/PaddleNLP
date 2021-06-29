@@ -89,7 +89,14 @@ class BartPretrainedModel(PretrainedModel):
         }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
-    pretrained_resource_files_map = {}
+    pretrained_resource_files_map = {
+        "model_state": {
+            "bart-base":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-base.pdparams",
+            "bart-large":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-large.pdparams"
+        }
+    }
     base_model_prefix = "bart"
 
     def init_weights(self, layer):
