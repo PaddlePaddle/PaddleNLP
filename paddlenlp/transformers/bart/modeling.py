@@ -291,7 +291,12 @@ class BartForSequenceClassification(BartPretrainedModel):
             raise ValueError(
                 'All examples must have the same number of <eos> tokens.')
 
-        sentence_representation = output[:, -1, :]
+        output_shape = paddle.shape(output)
+        output = output.masked_select(
+            eos_mask.unsqueeze(-1).astype('bool').tile(
+                [1, 1, output_shape[-1]]))
+        sentence_representation = output.reshape(
+            [output_shape[0], -1, output_shape[-1]])[:, -1, :]
         logits = self.classifier(sentence_representation)
         return logits
 
