@@ -858,7 +858,7 @@ class GPTLMHead(nn.Layer):
     def __init__(self, hidden_size, vocab_size, embedding_weights=None):
         super(GPTLMHead, self).__init__()
         self.decoder_weight = self.create_parameter(
-            shape=[hidden_size, vocab_size],
+            shape=[vocab_size, hidden_size],
             dtype=paddle.get_default_dtype(),
             is_bias=True) if embedding_weights is None else embedding_weights
 

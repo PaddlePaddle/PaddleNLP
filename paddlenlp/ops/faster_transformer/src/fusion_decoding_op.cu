@@ -340,9 +340,11 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
   cublasCreate(&cublas_handle_);
   cublasSetStream(cublas_handle_, stream);
 
+  std::vector<paddle::Tensor> ret;
+
   switch (input.type()) {
     case paddle::DataType::FLOAT16: {
-      return decoding_kernel<paddle::DataType::FLOAT16>(
+      ret = decoding_kernel<paddle::DataType::FLOAT16>(
           input,
           mem_seq_len,
           word_embedding,
@@ -393,9 +395,10 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           beam_search_diversity_rate,
           cublas_handle_,
           stream);
+      break;
     }
     case paddle::DataType::FLOAT32: {
-      return decoding_kernel<paddle::DataType::FLOAT32>(
+      ret = decoding_kernel<paddle::DataType::FLOAT32>(
           input,
           mem_seq_len,
           word_embedding,
@@ -446,11 +449,16 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           beam_search_diversity_rate,
           cublas_handle_,
           stream);
+      break;
     }
     default: {
       PD_THROW(
           "NOT supported data type. "
           "Only float16 and float32 are supported. ");
+      break;
     }
   }
+
+  cublasDestroy(cublas_handle_);
+  return ret;
 }
