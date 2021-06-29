@@ -192,6 +192,44 @@ python -u ./predict_glue.py \
 - `batch_size` 表示每个预测批次的样本数目。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 
+
+需要注意的是，如果使用TensorRT预测引擎进行预测，需要参考[PaddlePaddle官网](https://www.paddlepaddle.org.cn/documentation/docs/zh/install/index_cn.html)安装带有TensorRT的Paddle包。如果环境与官网提供环境不一致，或者对飞桨源代码有修改需求可以下载[TensorRT库](https://developer.nvidia.com/zh-cn/tensorrt)之后，使用[源码编译](https://paddle-inference.readthedocs.io/en/latest/user_guides/source_compile.html)带有TensorRT预测引擎的Paddle包。更多的使用TensorRT的样例可以参考[Paddle-Inference-Demo](https://github.com/PaddlePaddle/Paddle-Inference-Demo/blob/master/docs/optimize/paddle_trt.rst)。
+
+使用TensroRT预测时，通常需要设置动态shape的范围，在本案例中，需要通过先设置--collect_shape参数，生成动态shape的范围的文件，再去掉--colect_shape参数，进行预测。在本例中，需要按照如下的方式进行预测：
+
+```shell
+#先设置--collect_shape参数，生成动态shape范围文件shape_range_info.pbtxt
+python -u ./predict_glue.py \
+    --task_name SST-2 \
+    --model_type bert \
+    --model_path ./infer_model/model \
+    --use_trt \
+    --collect_shape \
+    --shape_range_info_filename shape_range_info.pbtxt \
+
+#去掉--collect_shape利用动态shape范围文件shape_range_info.pbtxt进行预测
+python -u ./predict_glue.py \
+    --task_name SST-2 \
+    --model_type bert \
+    --model_path ./infer_model/model \
+    --use_trt \
+    --shape_range_info_filename shape_range_info.pbtxt \
+
+```
+
+其中参数释义如下：
+- `use_trt` 是否使用 TensorRT 预测引擎，默认不使用。使用时需要带上参数--use_trt。
+- `collect_shape` 此次运行是否是用于先生成动态shape范围的文件，默认无此选项，使用时需要加上参数--collect_shape。
+- `shape_range_info_filename` 保存动态shape范围信息的文件名，默认是`shape_range_info.pbtxt` 。
+
+
+下面是在NVIDIA Tesla V100 16GB的GPU卡，cuda10.1，cudnn7.6版本的环境下，使用TensorRT的动态shape模式预测与不使用TensorRT时预测时间的对比(batch_size: 32，单位: s)：
+|                       | SST-2(s) | RTE(s) | QNLI(s) |
+| --------------------- | -------- | ------ | ------- |
+| 未使用TensorRT        | 0.2760   | 0.0818 | 0.6246  |
+| 使用TensorRT(Float32) | 0.1368   | 0.1218 | 0.4424  |
+
+
 同时支持使用输入样例数据的方式进行预测任务，这里仅以文本情感分类数据[SST-2](https://nlp.stanford.edu/sentiment/index.html)为例，输出样例数据的分类预测结果：
 
 ```shell

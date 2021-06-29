@@ -64,6 +64,20 @@ def parse_args():
         type=int,
         help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.", )
+    parser.add_argument(
+        "--collect_shape",
+        action='store_true',
+        help="Whether to collect dynamic shape info for TensorRT inference.", )
+    parser.add_argument(
+        "--use_trt",
+        action='store_true',
+        help="Whether to use inference engin TensorRT.", )
+    parser.add_argument(
+        "--shape_range_info_filename",
+        default="shape_range_info.pbtxt",
+        type=str,
+        required=False,
+        help="Name of shape range info file.", )
     args = parser.parse_args()
     return args
 
@@ -89,6 +103,27 @@ class Predictor(object):
             # set XPU configs accordingly
             config.enable_xpu(100)
         config.switch_use_feed_fetch_ops(False)
+        if args.use_trt:
+            config.enable_tensorrt_engine(
+                workspace_size=1 << 30,
+                precision_mode=inference.PrecisionType.Float32,
+                max_batch_size=1,
+                min_subgraph_size=5,
+                use_static=False,
+                use_calib_mode=False)
+            print("Enable TensorRT is: {}".format(
+                config.tensorrt_engine_enabled()))
+            # Shape info file should be generated first before using TensorRT.
+            if args.collect_shape:
+                config.collect_shape_range_info(args.shape_range_info_filename)
+            else:
+                assert os.path.exists(args.shape_range_info_filename), \
+                    'Please run the script with --collect_shape first to generate shape range info file, \
+                    and then run without --collect_shape again.'
+
+                config.enable_tuned_tensorrt_dynamic_shape(
+                    args.shape_range_info, True)
+
         predictor = paddle.inference.create_predictor(config)
         input_handles = [
             predictor.get_input_handle(name)
