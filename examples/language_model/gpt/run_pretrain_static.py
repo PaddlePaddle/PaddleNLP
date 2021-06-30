@@ -87,7 +87,7 @@ def dist_optimizer(args, topo):
     if args.use_amp:
         dist_strategy.amp = True
         dist_strategy.amp_configs = {
-            "custom_white_list": ['softmax', 'layer_norm', 'gelu'],
+            "custom_white_list": ['softmax', 'layer_norm', 'gelu', 'fused_elemwise_activation'],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
         }
@@ -160,7 +160,9 @@ def do_train(args):
     args.test_iters = args.eval_iters * 5
     # Initialize the paddle and paddle fleet execute environment
     paddle.enable_static()
-    fleet.init(is_collective=True)
+
+    worker_num = paddle.distributed.get_world_size()
+    worker_index = paddle.distributed.get_rank()
 
     # Create the random seed for the worker
     random.seed(args.seed)
@@ -168,15 +170,12 @@ def do_train(args):
     paddle.seed(args.seed)
     get_rng_state_tracker().add('global_seed', args.seed)
     get_rng_state_tracker().add('local_seed',
-                                args.seed + fleet.worker_index() + 2021)
+                                args.seed + worker_index + 2021)
 
     assert args.device in [
         "cpu", "gpu", "xpu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
     place = paddle.set_device(args.device)
-
-    worker_num = fleet.worker_num()
-    worker_index = fleet.worker_index()
 
     topo = Topology(
         device_rank=worker_index,
@@ -189,6 +188,11 @@ def do_train(args):
     logger.info(f"The topo of hybrid parallelism:\n{topo}")
 
     dist_strategy = dist_optimizer(args, topo)
+
+    fleet.init(is_collective=True, strategy=dist_strategy)
+
+    hcg = fleet.get_hybrid_communicate_group()
+    print('model group={}'.format(hcg.get_model_parallel_group()))
 
     # Create log write, train results show on last card of pipeline.
     if topo.is_last:

@@ -391,12 +391,15 @@ class TransformerDecoderLayer(nn.Layer):
                 weight_attrs[2],
                 bias_attr=bias_attrs[2])
         else:
+            self.fuse_bias_gelu = False
+            #self.fuse_bias_gelu = True
             self.linear1 = paddlenlp.ops.ColumnParallelLiner(
                 (d_model, dim_feedforward),
                 topo.mp_info.size,
                 gather_out=False,
                 param_attr=weight_attrs[2],
-                bias_attr=bias_attrs[2])
+                bias_attr=bias_attrs[2],
+                skip_bias_add=self.fuse_bias_gelu)
             self.linear2 = paddlenlp.ops.RowParallelLiner(
                 (dim_feedforward, d_model),
                 topo.mp_info.size,
@@ -428,9 +431,16 @@ class TransformerDecoderLayer(nn.Layer):
         residual = tgt
         if self.normalize_before:
             tgt = self.norm2(tgt)
-        tgt = self.dropout2(
-            self.linear2(F.gelu(
-                self.linear1(tgt), approximate=True)))
+
+        if self.fuse_bias_gelu:
+            tgt, bias = self.linear1(tgt)
+            tgt = paddle.fluid.contrib.layers.fused_elemwise_activation(
+                tgt, bias, ['gelu', 'elementwise_add'], save_intermediate_out=False)
+        else:
+            tgt = self.linear1(tgt)
+            tgt = F.gelu(tgt, approximate=True)
+
+        tgt = self.dropout2(self.linear2(tgt))
         tgt = residual + tgt
 
         if not self.normalize_before:

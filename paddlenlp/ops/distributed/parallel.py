@@ -105,6 +105,29 @@ class ParallelEmbedding(nn.Layer):
         return output
 
 
+def _get_rank():
+    if in_dygraph_mode():
+        rank = paddle.distributed.get_rank()
+        nranks = paddle.distributed.get_world_size()
+    else:
+        assert fleet._role_maker, ("To use paddle.distributed.split, "
+                                   "you must call fleet.init() firstly.")
+        rank = fleet.worker_index()
+        nranks = fleet.worker_num()
+    return rank, nranks
+
+
+def _set_var_distributed(var):
+    if var is None:
+        return
+
+    var.is_distributed = True
+    startup_block = paddle.static.default_startup_program().global_block()
+    main_block = paddle.static.default_main_program().global_block()
+    startup_block.vars[var.name].is_distributed = True
+    main_block.vars[var.name].is_distributed = True
+
+
 class ColumnParallelLiner(nn.Layer):
     """
     Parallel Linear, axis=1
@@ -116,21 +139,16 @@ class ColumnParallelLiner(nn.Layer):
                  gather_out=True,
                  param_attr=None,
                  bias_attr=None,
+                 skip_bias_add=False,
                  name=None):
-        super().__init__()
+        super(ColumnParallelLiner, self).__init__()
 
-        if in_dygraph_mode():
-            rank = paddle.distributed.get_rank()
-            nranks = paddle.distributed.get_world_size()
-        else:
-            assert fleet._role_maker, ("To use paddle.distributed.split, "
-                                       "you must call fleet.init() firstly.")
-            rank = fleet.worker_index()
-            nranks = fleet.worker_num()
+        self.gather_out = gather_out
+        self.skip_bias_add = skip_bias_add
 
+        rank, nranks = _get_rank()
         # rank within a model parallel group
         inner_rank = rank % num_partitions
-        self.gather_out = gather_out
 
         assert size[1] % num_partitions == 0, (
             "Number of column of the weight for linear ({}) must be"
@@ -150,35 +168,43 @@ class ColumnParallelLiner(nn.Layer):
             num_rows,
             num_cols,
             weight_attr=param_attr,
-            bias_attr=bias_attr,
+            bias_attr=False,
             name=name)
 
-        weight = self.linear.weight
-        weight.is_distributed = True
+        if bias_attr is not False:
+            self.bias = self.create_parameter(
+                shape=[num_cols],
+                attr=bias_attr,
+                dtype=self._dtype,
+                is_bias=True
+            )
+        else:
+            self.bias = None
+
         # alias for weight tensor
         self.weight = self.linear.weight
 
-        startup_block = paddle.static.default_startup_program().global_block()
-        main_block = paddle.static.default_main_program().global_block()
-        startup_block.vars[weight.name].is_distributed = True
-        main_block.vars[weight.name].is_distributed = True
-        # set is_distributed for splited bias
+        _set_var_distributed(self.weight)
         # if a linear layer is splited by col, the bias would also be split into each rank as its weight
-        if self.linear._bias_attr != False:
-            startup_block.vars[self.linear.bias.name].is_distributed = True
-            main_block.vars[self.linear.bias.name].is_distributed = True
+        _set_var_distributed(self.bias)
 
     def forward(self, x):
         # TODO(wangxi): dynamic group
         group = None
         x = paddle.distributed.collective._c_identity(
             x, group=group)
-        output_parallel = self.linear(x)
-        if self.gather_out is False:
-            return output_parallel
 
-        return paddle.distributed.collective._concat(
-            output_parallel, group=group)
+        bias = self.bias if not self.skip_bias_add else None
+        output_parallel = paddle.nn.functional.linear(x, self.weight, bias)
+
+        if self.gather_out:
+            output = paddle.distributed.collective._concat(output_parallel, group=group)
+        else:
+            output = output_parallel
+
+        if self.skip_bias_add:
+            return output, self.bias
+        return output
 
 
 class RowParallelLiner(nn.Layer):
