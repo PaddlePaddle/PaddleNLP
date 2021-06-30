@@ -207,7 +207,7 @@ std::vector<std::vector<int64_t>> DecodingInferShape(
   } else if (decoding_strategy == "topk_sampling" ||
              decoding_strategy == "topp_sampling") {
     output_dims = {max_len, batch_size};
-    return {output_dims, {0}, sequence_length_dims};
+    return {output_dims, {1}, sequence_length_dims};
   } else {
     PD_THROW("Not supported decoding strategy. ");
   }

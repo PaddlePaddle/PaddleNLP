@@ -21,6 +21,7 @@ import json
 import os
 import six
 import unicodedata
+from shutil import copyfile
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 
 from paddlenlp.utils.downloader import get_path_from_url
@@ -525,9 +526,12 @@ class PretrainedTokenizer(object):
                 # reload from save_directory
                 tokenizer = BertTokenizer.from_pretrained('trained_model')
         """
-        assert os.path.isdir(
+        assert not os.path.isfile(
             save_directory
-        ), "Saving directory ({}) should be a directory".format(save_directory)
+        ), "Saving directory ({}) should be a directory, not a file".format(
+            save_directory)
+        os.makedirs(save_directory, exist_ok=True)
+
         tokenizer_config_file = os.path.join(save_directory,
                                              self.tokenizer_config_file)
         # init_config is set in metaclass created `__init__`,
@@ -540,19 +544,16 @@ class PretrainedTokenizer(object):
     def save_resources(self, save_directory):
         """
         Save tokenizer related resources to `resource_files_names` indicating
-        files under `save_directory`.
-        
-        Currently, it only can support saving `vocab` of tokenizer by using
-        `self.save_vocabulary(file_name, self.vocab)`. Override it if necessary.
+        files under `save_directory` by copying directly. Override it if necessary.
 
         Args:
             save_directory (str): Directory to save files into.
         """
-        assert hasattr(self, 'vocab') and len(
-            self.resource_files_names) == 1, "Must overwrite `save_resources`"
-        file_name = os.path.join(save_directory,
-                                 list(self.resource_files_names.values())[0])
-        self.save_vocabulary(file_name, self.vocab)
+        for name, file_name in self.resource_files_names.items():
+            src_path = self.init_config[name]
+            dst_path = os.path.join(save_directory, file_name)
+            if os.path.abspath(src_path) != os.path.abspath(dst_path):
+                copyfile(src_path, dst_path)
 
     @staticmethod
     def load_vocabulary(filepath,

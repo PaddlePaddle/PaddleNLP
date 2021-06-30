@@ -325,7 +325,7 @@ class RobertaModel(RobertaPretrainedModel):
                 model = RobertaModel.from_pretrained('roberta-wwm-ext')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 sequence_output, pooled_output = model(**inputs)
 
         """
@@ -413,7 +413,7 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
                 model = RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
         """
@@ -509,7 +509,7 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 model = RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
         """
@@ -603,7 +603,7 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
                 model = RobertaForTokenClassification.from_pretrained('roberta-wwm-ext')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
         """
