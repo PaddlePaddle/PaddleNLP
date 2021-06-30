@@ -237,7 +237,7 @@ def parse_args(MODEL_CLASSES):
         type=str2bool,
         nargs='?',
         const=False,
-        help="check accuracy for training process.")
+        help="Check accuracy for training process.")
     parser.add_argument(
         "--device",
         type=str,

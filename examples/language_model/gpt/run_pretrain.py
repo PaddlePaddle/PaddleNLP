@@ -158,7 +158,8 @@ def do_train(args):
             opt_dict = paddle.load(opt_path)
             optimizer.set_state_dict(opt_dict)
         else:
-            logger.warning("No checkpoint file found in %s." % opt_path)
+            logger.warning("No optimizer checkpoint file found in %s." %
+                           opt_path)
 
     global_step = 0
     tic_train = time.time()
