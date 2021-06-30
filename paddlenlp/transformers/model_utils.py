@@ -163,9 +163,8 @@ class PretrainedModel(Layer, GenerationMixin):
             pretrained_model_name_or_path (str): Name of pretrained model
                 for built-in pretrained models loading, such as `bert-base-uncased`.
                 Or a local file directory path for local trained models loading.
-            model_config_path (str): Name of pretrained model
-                for built-in pretrained models loading, such as `bert-base-uncased`.
-                Or a local file directory path for local trained models loading.
+            config_path (str): Model configuration file path. A json file defines
+                the configuration of the pretrained_model.
             *args (tuple): Position arguments for model `__init__`. If provided,
                 use these as position argument values for model initialization.
             **kwargs (dict): Keyword arguments for model `__init__`. If provided,
@@ -306,7 +305,7 @@ class PretrainedModel(Layer, GenerationMixin):
             model = cls(*derived_args, **derived_kwargs)
 
         # Maybe need more ways to load resources.
-        weight_path = list(resolved_resource_files.values())[0]
+        weight_path = resolved_resource_files["model_state"]
         assert weight_path.endswith(
             ".pdparams"), "suffix of weight must be .pdparams"
         state_dict = paddle.load(weight_path)

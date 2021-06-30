@@ -23,6 +23,7 @@ import six
 import unicodedata
 from shutil import copyfile
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
+from urllib.parse import urlparse
 
 from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.utils.env import MODEL_HOME
@@ -406,7 +407,7 @@ class PretrainedTokenizer(object):
         return tokens
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, config_path=None, *args, **kwargs):
         """
         Creates an instance of `PretrainedTokenizer` and loads related resources
         (such as vocabulary file) according to a specific model name
@@ -416,6 +417,7 @@ class PretrainedTokenizer(object):
             pretrained_model_name_or_path (str): A name of pretrained model
                 for built-in tokenizers loading, such as `bert-base-uncased`.
                 Or a local file directory path for local tokenizers loading.
+            config_path (str): A name of pretrained tokenizer config.
             *args (tuple): position arguments for model `__init__`. If provided,
                 use these as position argument values for tokenizer initialization.
             **kwargs (dict): keyword arguments for model `__init__`. If provided,
@@ -433,6 +435,7 @@ class PretrainedTokenizer(object):
                 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         """
         pretrained_models = list(cls.pretrained_init_configuration.keys())
+        pretrained_models_bos = dict()
         vocab_files = {}
         init_configuration = {}
         if pretrained_model_name_or_path in pretrained_models:
@@ -441,20 +444,31 @@ class PretrainedTokenizer(object):
             init_configuration = copy.deepcopy(
                 cls.pretrained_init_configuration[
                     pretrained_model_name_or_path])
-        else:
-            if os.path.isdir(pretrained_model_name_or_path):
-                for file_id, file_name in cls.resource_files_names.items():
-                    full_file_name = os.path.join(pretrained_model_name_or_path,
-                                                  file_name)
-                    vocab_files[file_id] = full_file_name
+        elif pretrained_model_name_or_path in pretrained_models_bos:
+            for file_id in cls.resource_files_names.keys():
+                vocab_files[file_id] = pretrained_models_bos[pretrained_model_name_or_path][file_id]
+        elif os.path.isdir(pretrained_model_name_or_path):
+            for file_id, file_name in cls.resource_files_names.items():
+                full_file_name = os.path.join(pretrained_model_name_or_path,
+                                              file_name)
+                vocab_files[file_id] = full_file_name
+            if config_path is not None:
+                vocab_files["tokenizer_config_file"] = config_path
+            else:
                 vocab_files["tokenizer_config_file"] = os.path.join(
                     pretrained_model_name_or_path, cls.tokenizer_config_file)
-            else:
-                raise ValueError(
-                    "Calling {}.from_pretrained() with a model identifier or the "
-                    "path to a directory instead. The supported model "
-                    "identifiers are as follows: {}".format(
-                        cls.__name__, cls.pretrained_init_configuration.keys()))
+        elif os.path.isfile(pretrained_model_name_or_path) or \
+                urlparse(pretrained_model_name_or_path).scheme in ("http", "https"):
+            for file_id in cls.resource_files_names.keys():
+                vocab_files[file_id] = pretrained_model_name_or_path
+            if config_path is not None:
+                vocab_files["tokenizer_config_file"] = config_path
+        else:
+            raise ValueError(
+                "Calling {}.from_pretrained() with a model identifier or the "
+                "path to a directory instead. The supported model "
+                "identifiers are as follows: {}".format(
+                    cls.__name__, cls.pretrained_init_configuration.keys()))
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_vocab_files = {}
