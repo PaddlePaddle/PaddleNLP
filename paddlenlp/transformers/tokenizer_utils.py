@@ -454,15 +454,10 @@ class PretrainedTokenizer(object):
                 vocab_files[file_id] = full_file_name
             if config_path is not None:
                 vocab_files["tokenizer_config_file"] = config_path
-            else:
-                vocab_files["tokenizer_config_file"] = os.path.join(
-                    pretrained_model_name_or_path, cls.tokenizer_config_file)
         elif os.path.isfile(pretrained_model_name_or_path) or \
                 urlparse(pretrained_model_name_or_path).scheme in ("http", "https"):
-            for file_id in cls.resource_files_names.keys():
-                vocab_files[file_id] = pretrained_model_name_or_path
-            if config_path is not None:
-                vocab_files["tokenizer_config_file"] = config_path
+            vocab_files["vocab_file"] = pretrained_model_name_or_path
+            vocab_files["tokenizer_config_file"] = config_path
         else:
             raise ValueError(
                 "Calling {}.from_pretrained() with a model identifier or the "
