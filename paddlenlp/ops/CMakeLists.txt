@@ -34,9 +34,9 @@ if(WITH_TRANSFORMER)
   list(APPEND decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu)
 endif()
 
-if(WITH_GPT)
-  list(APPEND decoding_op_files fusion_gpt_op.cc fusion_gpt_op.cu)
-endif()
+# if(WITH_GPT)
+#   list(APPEND decoding_op_files fusion_gpt_op.cc fusion_gpt_op.cu)
+# endif()
 
 if(NOT WITH_TRANSFORMER AND NOT WITH_GPT)
   message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON must be set to use FasterTransformer. ")
@@ -51,7 +51,7 @@ set(CMAKE_C_FLAGS    "${CMAKE_C_FLAGS}")
 set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}  -Xcompiler -Wall")
 
-if (SM STREQUAL 80 OR
+#[[if (SM STREQUAL 80 OR
     SM STREQUAL 86 OR
     SM STREQUAL 70 OR
     SM STREQUAL 75 OR
@@ -76,6 +76,51 @@ set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}  -DWMMA")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DWMMA")
 
 message("-- Assign GPU architecture (sm=70,75)")
+endif()]]
+
+# set(SM_SETS 52 60 61 70 75 80)
+set(SM_SETS 52 60 61 70 75)
+set(USING_WMMA False)
+set(FIND_SM False)
+
+foreach(SM_NUM IN LISTS SM_SETS)
+  string(FIND "${SM}" "${SM_NUM}" SM_POS)
+  if(SM_POS GREATER -1)
+    if(FIND_SM STREQUAL False)
+      set(ENV{TORCH_CUDA_ARCH_LIST} "")
+    endif()
+    set(FIND_SM True)
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode=arch=compute_${SM_NUM},code=\\\"sm_${SM_NUM},compute_${SM_NUM}\\\"")
+
+    if (SM_NUM STREQUAL 70 OR SM_NUM STREQUAL 75 OR SM_NUM STREQUAL 80 OR SM_NUM STREQUAL 86)
+      set(USING_WMMA True)
+    endif()
+
+    set(CMAKE_CUDA_ARCHITECTURES ${SM_NUM})
+    message("-- Assign GPU architecture (sm=${SM_NUM})")
+  endif()
+endforeach()
+
+if(USING_WMMA STREQUAL True)
+  set(CMAKE_C_FLAGS    "${CMAKE_C_FLAGS}    -DWMMA")
+  set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}  -DWMMA")
+  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DWMMA")
+  message("-- Use WMMA")
+endif()
+
+if(NOT (FIND_SM STREQUAL True))
+  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}  \
+                        -gencode=arch=compute_70,code=\\\"sm_70,compute_70\\\" \
+                        -gencode=arch=compute_75,code=\\\"sm_75,compute_75\\\" \
+                        ")
+  #                      -gencode=arch=compute_80,code=\\\"sm_80,compute_80\\\" \
+  #                      -rdc=true")
+  set(CMAKE_C_FLAGS    "${CMAKE_C_FLAGS}    -DWMMA")
+  set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}  -DWMMA")
+  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DWMMA")
+  # set(CMAKE_CUDA_ARCHITECTURES 70 75 80)
+  set(CMAKE_CUDA_ARCHITECTURES 70 75)
+  message("-- Assign GPU architecture (sm=70,75)")
 endif()
 
 set(CMAKE_C_FLAGS_DEBUG    "${CMAKE_C_FLAGS_DEBUG}    -Wall -O0")
@@ -111,21 +156,21 @@ include(external/boost)
 
 set(OPS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/allocator.h allocator_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/allocator.h allocator_dst)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/utils/allocator.h allocator_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/utils/allocator.h allocator_dst)
 
-file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/common.h common_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/common.h common_dst)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/utils/common.h common_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/utils/common.h common_dst)
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/CMakeLists.txt cmakelists_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/CMakeLists.txt cmakelists_dst)
 
-file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/topk_kernels.cu topk_kernels_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cu topk_kernels_dst)
+#file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/topk_kernels.cu topk_kernels_src)
+#file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cu topk_kernels_dst)
 
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
-set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} && cp ${common_src} ${common_dst} && cp ${cmakelists_src} ${cmakelists_dst} && cp ${topk_kernels_src} ${topk_kernels_dst} && ${MUTE_COMMAND})
+set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} && cp ${common_src} ${common_dst} && cp ${cmakelists_src} ${cmakelists_dst} && ${MUTE_COMMAND}) # && cp ${topk_kernels_src} ${topk_kernels_dst}
 
 ######################################################################################
 # A function for automatic detection of GPUs installed  (if autodetection is enabled)
@@ -181,13 +226,13 @@ detect_installed_gpus(SM)
 ExternalProject_Add(
   extern_${THIRD_PARTY_NAME}
   GIT_REPOSITORY    https://github.com/NVIDIA/FasterTransformer.git
-  GIT_TAG           v3.1
+  GIT_TAG           v4.0
   PREFIX            ${THIRD_PATH}
   SOURCE_DIR        ${THIRD_PATH}/source/${THIRD_PARTY_NAME}
   PATCH_COMMAND     ${FT_PATCH_COMMAND}
   BINARY_DIR        ${THIRD_PATH}/build/${THIRD_PARTY_NAME}
   INSTALL_COMMAND   ""
-  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DPY_CMD=${PY_CMD}
+  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DPY_CMD=${PY_CMD} -DBUILD_GPT=${WITH_GPT}
 )
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} BINARY_DIR)
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} SOURCE_DIR)

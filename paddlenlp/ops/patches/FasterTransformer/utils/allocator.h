@@ -22,8 +22,8 @@
 
 #include <cuda_runtime.h>
 #include <vector>
-#include "fastertransformer/common.h"
-#include "fastertransformer/utils.h"
+#include "fastertransformer/utils/common.h"
+#include "fastertransformer/utils/utils.h"
 
 #ifdef PADDLE_CUDA
 #ifdef PADDLE_ON_INFERENCE

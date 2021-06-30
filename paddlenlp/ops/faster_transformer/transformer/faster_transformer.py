@@ -144,14 +144,6 @@ class FasterTransformer(TransformerModel):
                 "trg_word_embedding.word_embedding.weight"])
         else:
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
-        # NOTE: the data type of the embedding bias for logits is different
-        # between decoding with beam search and top-k/top-p sampling in
-        # Faster Transformer when using float16.
-        bias_dtype = "float32"
-        if self.use_fp16_decoding and "beam_search" != self.decoding_strategy:
-            bias_dtype = "float16"
-        model_dict["decoding_linear.bias"] = np.zeros(
-            [self.trg_vocab_size], dtype=bias_dtype)
 
         # To avoid a longer length than training, reset the size of position
         # encoding to max_length
@@ -170,6 +162,8 @@ class FasterTransformer(TransformerModel):
                 model_dict["trg_word_embedding.word_embedding.weight"])
             model_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
                 model_dict["trg_pos_embedding.pos_encoder.weight"])
+            model_dict["decoding_linear.bias"] = np.zeros(
+                [self.trg_vocab_size], dtype="float16")
 
         self.load_dict(model_dict)
 
@@ -190,14 +184,6 @@ class FasterTransformer(TransformerModel):
                 "trg_word_embedding.word_embedding.weight"])
         else:
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
-        # NOTE: the data type of the embedding bias for logits is different
-        # between decoding with beam search and top-k/top-p sampling in
-        # Faster Transformer when using float16.
-        bias_dtype = "float32"
-        if self.use_fp16_decoding and "beam_search" != self.decoding_strategy:
-            bias_dtype = "float16"
-        model_dict["decoding_linear.bias"] = np.zeros(
-            [self.trg_vocab_size], dtype=bias_dtype)
 
         # To avoid a longer length than training, reset the size of position
         # encoding to max_length
@@ -216,6 +202,8 @@ class FasterTransformer(TransformerModel):
                 model_dict["trg_word_embedding.word_embedding.weight"])
             model_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
                 model_dict["trg_pos_embedding.pos_encoder.weight"])
+            model_dict["decoding_linear.bias"] = np.zeros(
+                [self.trg_vocab_size], dtype="float16")
 
         for item in self.state_dict():
             param = self
