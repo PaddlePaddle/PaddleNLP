@@ -53,8 +53,8 @@ class BartPretrainedModel(PretrainedModel):
             "eos_token_id": 2,
             "decoder_start_token_id": 2,
             "d_model": 768,
-            "encoder_layers": 6,
-            "decoder_layers": 6,
+            "num_encoder_layers": 6,
+            "num_decoder_layers": 6,
             "encoder_attention_heads": 12,
             "decoder_attention_heads": 12,
             "encoder_ffn_dim": 3072,
@@ -73,8 +73,8 @@ class BartPretrainedModel(PretrainedModel):
             "eos_token_id": 2,
             "decoder_start_token_id": 2,
             "d_model": 1024,
-            "encoder_layers": 12,
-            "decoder_layers": 12,
+            "num_encoder_layers": 12,
+            "num_decoder_layers": 12,
             "encoder_attention_heads": 16,
             "decoder_attention_heads": 16,
             "encoder_ffn_dim": 4096,
@@ -149,8 +149,8 @@ class BartModel(BartPretrainedModel):
                  eos_token_id=2,
                  decoder_start_token_id=2,
                  d_model=768,
-                 encoder_layers=6,
-                 decoder_layers=6,
+                 num_encoder_layers=6,
+                 num_decoder_layers=6,
                  encoder_attention_heads=12,
                  decoder_attention_heads=12,
                  encoder_ffn_dim=3072,
@@ -193,8 +193,8 @@ class BartModel(BartPretrainedModel):
             attn_dropout=attention_dropout,
             act_dropout=activation_dropout)
 
-        self.encoder = nn.TransformerEncoder(encoder_layer, encoder_layers)
-        self.decoder = nn.TransformerDecoder(decoder_layer, decoder_layers)
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers)
+        self.decoder = nn.TransformerDecoder(decoder_layer, num_decoder_layers)
         self.apply(self.init_weights)
 
     def get_encoder(self):
