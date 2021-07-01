@@ -104,7 +104,7 @@ def dist_optimizer(args, topo):
     if args.pp_degree > 1:
         dist_strategy.pipeline_configs = {
             "schedule_mode": "1F1B",
-            "micro_micro_batch_size": micro_batch_size,
+            "micro_batch_size": micro_batch_size,
             "accumulate_steps": acc_steps,
         }
     else:
@@ -192,7 +192,7 @@ def do_train(args):
     fleet.init(is_collective=True, strategy=dist_strategy)
 
     hcg = fleet.get_hybrid_communicate_group()
-    print('model group={}'.format(hcg.get_model_parallel_group()))
+    #print('model group={}'.format(hcg.get_model_parallel_group()))
 
     # Create log write, train results show on last card of pipeline.
     if topo.is_last:
@@ -245,7 +245,7 @@ def do_train(args):
                 preds = model(tokens, position_ids, attention_mask)
 
                 criterion = guard(f'gpu:{args.pp_degree -1}')(
-                    GPTPretrainingCriterion)()
+                    GPTPretrainingCriterion)(topo)
                 loss = criterion(preds, labels, loss_mask)
 
             # Create the learning_rate sheduler and optimizer

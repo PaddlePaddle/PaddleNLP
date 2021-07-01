@@ -85,6 +85,8 @@ class MultiHeadAttention(nn.Layer):
                     self.kdim, embed_dim, weight_attr, bias_attr=bias_attr)
                 self.v_proj = nn.Linear(
                     self.vdim, embed_dim, weight_attr, bias_attr=bias_attr)
+            self.out_proj = nn.Linear(
+                embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
         else:
             assert self.num_heads % topo.mp_info.size == 0
             self.num_heads = self.num_heads // topo.mp_info.size
@@ -379,6 +381,8 @@ class TransformerDecoderLayer(nn.Layer):
             bias_attr=bias_attrs[0],
             topo=topo)
 
+        # fuse elementwise_add gelu
+        self.fuse_bias_gelu = False
         if topo is None or topo.mp_info.size == 1:
             self.linear1 = nn.Linear(
                 d_model,
@@ -391,7 +395,6 @@ class TransformerDecoderLayer(nn.Layer):
                 weight_attrs[2],
                 bias_attr=bias_attrs[2])
         else:
-            self.fuse_bias_gelu = False
             #self.fuse_bias_gelu = True
             self.linear1 = paddlenlp.ops.ColumnParallelLiner(
                 (d_model, dim_feedforward),
@@ -819,12 +822,15 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
     It calculates the final loss.
     """
 
-    def __init__(self):
+    def __init__(self, topo=None):
         super(GPTPretrainingCriterion, self).__init__()
-        self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
+        if topo is None or topo.mp_info.size == 1:
+            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
+        else:
+            self.loss_func = paddle.distributed.collective._c_softmax_with_cross_entropy
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
-        masked_lm_loss = paddle.distributed.collective._c_softmax_with_cross_entropy(
+        masked_lm_loss = self.loss_func(
             prediction_scores, masked_lm_labels.unsqueeze(2))
 
         loss_mask = loss_mask.reshape([-1])
