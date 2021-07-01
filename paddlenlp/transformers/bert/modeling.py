@@ -256,7 +256,7 @@ class BertPretrainedModel(PretrainedModel):
     }
 
     resource_files_names = {"model_state": "model_state.pdparams",
-                            "model_config": "model_config.json"}
+                            "model_config_file": "model_config.json"}
     pretrained_resource_files_map = {
         "model_state": {
             "bert-base-uncased":

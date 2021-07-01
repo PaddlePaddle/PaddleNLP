@@ -456,7 +456,7 @@ class PretrainedTokenizer(object):
                 vocab_files["tokenizer_config_file"] = config_path
         elif os.path.isfile(pretrained_model_name_or_path) or \
                 urlparse(pretrained_model_name_or_path).scheme in ("http", "https"):
-            vocab_files["vocab_file"] = pretrained_model_name_or_path
+            vocab_files[list(cls.resource_files_names.keys())[0]] = pretrained_model_name_or_path
             vocab_files["tokenizer_config_file"] = config_path
         else:
             raise ValueError(

@@ -112,7 +112,7 @@ class PretrainedModel(Layer, GenerationMixin):
     # resource_name, saved_file, handle_name_for_load(None for used as __init__
     # arguments), handle_name_for_save
     resource_files_names = {"model_state": "model_state.pdparams",
-                            "model_config": "model_config.json"}
+                            "model_config_file": "model_config.json"}
     pretrained_resource_files_map = {}
     base_model_prefix = ""
 
@@ -204,11 +204,11 @@ class PretrainedModel(Layer, GenerationMixin):
                                               file_name)
                 resource_files[file_id] = full_file_name
             if config_path is not None:
-                resource_files["model_config"] = config_path
+                resource_files["model_config_file"] = config_path
         elif os.path.isfile(pretrained_model_name_or_path) or \
                 urlparse(pretrained_model_name_or_path).scheme in ("http", "https"):
             resource_files["model_state"] = pretrained_model_name_or_path
-            resource_files["model_config"] = config_path
+            resource_files["model_config_file"] = config_path
         else:
             raise ValueError(
                 "Calling {}.from_pretrained() with a model identifier or the "
@@ -235,7 +235,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # Prepare model initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
-        model_config_file = resolved_resource_files.pop("model_config",
+        model_config_file = resolved_resource_files.pop("model_config_file",
                                                         None)
         if model_config_file is not None:
             with io.open(model_config_file, encoding="utf-8") as f:
