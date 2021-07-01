@@ -36,7 +36,7 @@ class ErnieCtmEmbeddings(Layer):
                  max_position_embeddings=512,
                  type_vocab_size=16,
                  padding_idx=0,
-                 summary_sum=2):
+                 cls_num=2):
         super().__init__()
         self.word_embeddings = nn.Embedding(
             vocab_size, embedding_size, padding_idx=padding_idx)
@@ -46,17 +46,17 @@ class ErnieCtmEmbeddings(Layer):
                                                   embedding_size)
         self.layer_norm = nn.LayerNorm(embedding_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
-        self.summary_sum = summary_sum
+        self.cls_num = cls_num
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None):
         if position_ids is None:
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
 
-            content_len = paddle.shape(input_ids)[1] - self.summary_sum
+            content_len = paddle.shape(input_ids)[1] - self.cls_num
             position_ids = paddle.concat([
                 paddle.zeros(
-                    shape=[self.summary_sum], dtype="int64"), paddle.linspace(
+                    shape=[self.cls_num], dtype="int64"), paddle.linspace(
                         1, content_len, content_len, dtype="int64")
             ])
             position_ids.stop_gradient = True
@@ -118,7 +118,7 @@ class ErnieCtmPretrainedModel(PretrainedModel):
             "pad_token_id": 0,
             "use_content_summary": True,
             "content_summary_index": 1,
-            "summary_sum": 2,
+            "cls_num": 2,
         },
         "wordtag": {
             "vocab_size": 23000,
@@ -135,7 +135,7 @@ class ErnieCtmPretrainedModel(PretrainedModel):
             "pad_token_id": 0,
             "use_content_summary": True,
             "content_summary_index": 1,
-            "summary_sum": 2,
+            "cls_num": 2,
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -222,6 +222,9 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
         content_summary_index (`int`, optional):
             The number of the content summary tokens. Only valid when use_content_summary is True.
             Defaults to ``1``.
+        cls_num (`int`, optional):
+            The number of the CLS tokens. Only valid when use_content_summary is True.
+            Defaults to ``2``.
     """
 
     def __init__(self,
@@ -239,7 +242,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
                  pad_token_id=0,
                  use_content_summary=True,
                  content_summary_index=1,
-                 summary_sum=2):
+                 cls_num=2):
         super(ErnieCtmModel, self).__init__()
 
         self.pad_token_id = pad_token_id
@@ -252,7 +255,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             max_position_embeddings=max_position_embeddings,
             type_vocab_size=type_vocab_size,
             padding_idx=pad_token_id,
-            summary_sum=summary_sum)
+            cls_num=cls_num)
         self.embedding_hidden_mapping_in = nn.Linear(embedding_size,
                                                      hidden_size)
         encoder_layer = nn.TransformerEncoderLayer(
