@@ -276,16 +276,13 @@ def create_pretrained_dataset(
             drop_last=True)
 
         if pipeline_mode:
-
             def data_gen():
                 for data in dataset:
-                    yield tuple(
-                        [np.expand_dims(
-                            np.array(x), axis=0) for x in data])
+                    yield tuple([np.expand_dims(x, 0) for x in data])
 
             data_loader = paddle.fluid.io.DataLoader.from_generator(
                 feed_list=data_holders, capacity=70, iterable=False)
-            data_loader.set_batch_generator(data_gen, places)
+            data_loader.set_sample_generator(data_gen, batch_size=args.micro_batch_size, places=places)
         else:
             data_loader = DataLoader(
                 dataset=dataset,
@@ -354,7 +351,7 @@ class GPTDataset(paddle.io.Dataset):
         self._length = self.sample_idx.shape[0] - 1
 
     def _construct_sample(self, tokens):
-        tokens = np.array(tokens).astype("int64").tolist()
+        tokens = np.array(tokens).astype("int64")
         labels = tokens[1:]
         tokens = tokens[:-1]
         seq_length = len(tokens)
