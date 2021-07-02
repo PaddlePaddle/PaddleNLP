@@ -290,7 +290,8 @@ class ErnieDocEncoder(nn.Layer):
             enc_input = encoder_layer(enc_input, memories[i], rel_pos, rel_task,
                                       attn_mask)
             new_mem += [self._cache_mem(enc_input, memories[i])]
-
+            # free the old memories explicitly to save gpu memory
+            memories[i] = None
         return enc_input, new_mem
 
 

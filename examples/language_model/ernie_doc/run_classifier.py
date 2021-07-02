@@ -87,7 +87,8 @@ def evaluate(model, criterion, metric, data_loader, memories0):
     """
     model.eval()
     losses = []
-    memories = memories0
+    # copy the memory
+    memories = list(memories0)
     tic_train = time.time()
     eval_logging_step = 500
     for step, batch in enumerate(data_loader, start=1):
@@ -188,7 +189,8 @@ def do_train(args):
     memories0 = init_memory(args.batch_size, args.memory_length,
                             model_config["hidden_size"],
                             model_config["num_hidden_layers"])
-    memories = memories0
+    # copy the memory
+    memories = list(memories0)
     tic_train = time.time()
     for epoch in range(args.epochs):
         for step, batch in enumerate(train_dataloader, start=1):
