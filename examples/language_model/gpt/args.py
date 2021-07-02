@@ -244,7 +244,12 @@ def parse_args(MODEL_CLASSES):
         default="gpu",
         choices=["cpu", "gpu", "xpu"],
         help="select cpu, gpu, xpu devices.")
-
+    parser.add_argument(
+        "--lr_decay_style",
+        type=str,
+        default="cosine",
+        choices=["cosine", "none"],
+        help="Learning rate decay style.")
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10
 

@@ -282,8 +282,7 @@ def do_train(args):
 
             clip = None
             if args.grad_clip > 0:
-                # TODO @ZHUI Use nn.ClipGradByNorm
-                clip = paddle.fluid.clip.GradientClipByNorm(
+                clip = paddle.fluid.clip.GradientClipByGlobalNorm(
                     clip_norm=args.grad_clip)
 
             decay_param = [
