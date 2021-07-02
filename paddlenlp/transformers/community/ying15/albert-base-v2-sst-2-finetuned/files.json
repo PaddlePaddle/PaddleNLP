@@ -2,5 +2,5 @@
   "model_config_file": "/Users/yingyibiao/Desktop/github/PaddleNLP/model_config.jsonmodel_state.pdparams",
   "model_state": "/Users/yingyibiao/Desktop/github/PaddleNLP/model_state.pdparams",
   "tokenizer_config_file": "/Users/yingyibiao/Desktop/github/PaddleNLP/tokenizer_config.json",
-  "vocab_file": "/Users/yingyibiao/Desktop/github/PaddleNLP/spiece.model"
+  "sentencepiece_model_file": "/Users/yingyibiao/Desktop/github/PaddleNLP/spiece.model"
 }

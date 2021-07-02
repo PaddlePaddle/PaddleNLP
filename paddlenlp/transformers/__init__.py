@@ -49,4 +49,4 @@ from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
 from .nezha.modeling import *
 from .nezha.tokenizer import *
-from .community import ying15
+from .community import *
