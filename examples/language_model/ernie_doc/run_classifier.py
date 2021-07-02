@@ -23,7 +23,7 @@ import time
 import numpy as np
 import paddle
 import paddle.nn as nn
-from paddle.io import DataLoader, Dataset
+from paddle.io import DataLoader
 from paddlenlp.transformers import ErnieDocModel, ErnieDocForSequenceClassification, BPETokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
@@ -106,10 +106,11 @@ def evaluate(model, criterion, metric, data_loader, memories0):
                         % (step, np.mean(losses), metric.accumulate(),
                            eval_logging_step / (time.time() - tic_train)))
             tic_train = time.time()
-    logger.info("Eval loss: %.5f, accu: %.5f" %
-                (np.mean(losses), metric.accumulate()))
+    acc = metric.accumulate()
+    logger.info("Eval loss: %.5f, accu: %.5f" % (np.mean(losses), acc))
     model.train()
     metric.reset()
+    return acc
 
 
 def do_train(args):
@@ -192,6 +193,7 @@ def do_train(args):
     eval_metric = paddle.metric.Accuracy()
 
     global_steps = 0
+    best_acc = -1
     memories0 = init_memory(args.batch_size, args.memory_length,
                             model_config["hidden_size"],
                             model_config["num_hidden_layers"])
@@ -230,8 +232,8 @@ def do_train(args):
             if global_steps % args.save_steps == 0 or global_steps == num_training_steps:
                 # evaluate
                 logger.info("Eval:")
-                evaluate(model, criterion, eval_metric, test_dataloader,
-                         memories0)
+                eval_acc = evaluate(model, criterion, eval_metric,
+                                    test_dataloader, memories0)
                 # save
                 if rank == 0:
                     output_dir = os.path.join(
@@ -242,6 +244,14 @@ def do_train(args):
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     # tokenizer.save_pretrained(output_dir)
+                    if eval_acc > best_acc:
+                        best_acc = eval_acc
+                        best_model_dir = os.path.join(args.output_dir,
+                                                      "best_model.pdparams")
+                        if not os.path.exists(best_model_dir):
+                            os.makedirs(best_model_dir)
+                        model_to_save.save_pretrained(best_model_dir)
+                        # tokenizer.save_pretrained(output_dir)
 
 
 if __name__ == "__main__":
