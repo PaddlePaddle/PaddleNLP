@@ -46,7 +46,7 @@ parser.add_argument("--epochs", type=int, default=3, help="Number of epoches for
 parser.add_argument("--attn_dropout", type=float, default=0.0, help="Attention ffn model dropout.")
 parser.add_argument("--hidden_dropout_prob", type=float, default=0.0, help="The dropout rate for the embedding pooler.")
 parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
-parser.add_argument("--seed", type=int, default=8, help="Random seed for initialization.")
+parser.add_argument("--seed", type=int, default=1, help="Random seed for initialization.")
 parser.add_argument("--memory_length", type=int, default=128, help="Random seed for initialization.")
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
@@ -145,7 +145,8 @@ def do_train(args):
         trainer_num,
         trainer_id=rank,
         memory_len=model_config["memory_len"],
-        max_seq_length=args.max_seq_length)
+        max_seq_length=args.max_seq_length,
+        random_seed=args.seed)
     test_ds_iter = ClassifierIterator(
         test_ds,
         args.batch_size,
@@ -165,6 +166,11 @@ def do_train(args):
 
     num_training_examples = train_ds_iter.get_num_examples()
     num_training_steps = args.epochs * num_training_examples // args.batch_size // trainer_num
+    logger.info("Device count: %d, trainer_id: %d" % (trainer_num, rank))
+    logger.info("Num train examples: %d" % num_training_examples)
+    logger.info("Max train steps: %d" % num_training_steps)
+    logger.info("Num warmup steps: %d" % int(num_training_steps *
+                                             args.warmup_proportion))
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
@@ -193,6 +199,8 @@ def do_train(args):
     memories = list(memories0)
     tic_train = time.time()
     for epoch in range(args.epochs):
+        train_ds_iter.shuffle_sample()
+        train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
         for step, batch in enumerate(train_dataloader, start=1):
             global_steps += 1
             input_ids, position_ids, token_type_ids, attn_mask, labels, gather_idx, need_cal_loss = batch

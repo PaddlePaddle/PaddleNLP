@@ -111,9 +111,9 @@ class MultiHeadAttention(nn.Layer):
 
     def __split_heads(self, x, d_model, n_head):
         # x shape: [B, T, H]
-        reshaped_x = paddle.reshape(x, shape=[0, 0, n_head, d_model // n_head])
+        x = x.reshape(shape=[0, 0, n_head, d_model // n_head])
         # shape: [B, N, T, HH]
-        return paddle.transpose(x=reshaped_x, perm=[0, 2, 1, 3])
+        return paddle.transpose(x=x, perm=[0, 2, 1, 3])
 
     def __rel_shift(self, x, klen=-1):
         # shape: [B, N, T, 2 * T + M]
@@ -147,7 +147,7 @@ class MultiHeadAttention(nn.Layer):
         # x shape: [B, N, T, HH]
         x = paddle.transpose(x, [0, 2, 1, 3])
         # target shape:[B, T, H]
-        return paddle.reshape(x, [0, 0, x.shape[2] * x.shape[3]])
+        return x.reshape([0, 0, x.shape[2] * x.shape[3]])
 
     def forward(self, queries, keys, values, rel_pos, rel_task, memory,
                 attn_mask):

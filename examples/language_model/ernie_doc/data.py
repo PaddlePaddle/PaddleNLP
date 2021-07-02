@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import numpy as np
-import random
 from collections import namedtuple
 
 import paddle
@@ -115,7 +114,7 @@ class ClassifierIterator(object):
                  repeat_input=False,
                  in_tokens=False,
                  mode="train",
-                 is_test=False):
+                 random_seed=None):
         self.batch_size = batch_size
         self.tokenizer = tokenizer
         self.trainer_num = trainer_num
@@ -124,13 +123,18 @@ class ClassifierIterator(object):
         self.memory_len = memory_len
         self.repeat_input = repeat_input
         self.in_tokens = in_tokens
-        self.is_test = is_test
         self.dataset = [data for data in dataset]
         self.num_examples = None
         self.mode = mode
-        shuffle = True if mode == "train" else False
-        if shuffle:
-            random.shuffle(self.dataset)
+        self.shuffle = True if mode == "train" else False
+        if random_seed is None:
+            random_seed = 12345
+        self.random_seed = random_seed
+
+    def shuffle_sample(self):
+        if self.shuffle:
+            self.global_rng = np.random.RandomState(self.random_seed)
+            self.global_rng.shuffle(self.dataset)
 
     def _cnt_list(self, inp):
         """cnt_list"""
