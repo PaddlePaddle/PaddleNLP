@@ -129,7 +129,7 @@ def do_train(args):
     model_config = model.ernie_doc.config
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
-    tokenizer = BPETokenizer("vocab.txt")
+    tokenizer = BPETokenizer.from_pretrained(args.model_name_or_path)
 
     train_ds, test_ds = load_dataset("imdb", splits=["train", "test"])
 
@@ -237,7 +237,7 @@ def do_train(args):
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
-                    # tokenizer.save_pretrained(output_dir)
+                    tokenizer.save_pretrained(output_dir)
                     if eval_acc > best_acc:
                         best_acc = eval_acc
                         best_model_dir = os.path.join(args.output_dir,
@@ -245,7 +245,7 @@ def do_train(args):
                         if not os.path.exists(best_model_dir):
                             os.makedirs(best_model_dir)
                         model_to_save.save_pretrained(best_model_dir)
-                        # tokenizer.save_pretrained(output_dir)
+                        tokenizer.save_pretrained(output_dir)
 
 
 if __name__ == "__main__":

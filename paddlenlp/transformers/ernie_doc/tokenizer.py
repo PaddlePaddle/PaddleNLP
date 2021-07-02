@@ -317,6 +317,30 @@ def get_encoder(encoder_json_path, vocab_bpe_path):
 
 class BPETokenizer(PretrainedTokenizer):
     """ Runs bpe tokenize """
+    resource_files_names = {
+        "vocab_file": "vocab.txt",
+        "encoder_json_path": "encoder.json",
+        "vocab_bpe_path": "vocab.bpe"
+    }  # for save_pretrained
+    pretrained_resource_files_map = {
+        "vocab_file": {
+            "ernie-doc-base-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-doc-base-en/vocab.txt"
+        },
+        "encoder_json_path": {
+            "ernie-doc-base-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-doc-base-en/encoder.json"
+        },
+        "vocab_bpe_path": {
+            "ernie-doc-base-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-doc-base-en/vocab.bpe"
+        }
+    }
+    pretrained_init_configuration = {
+        "ernie-doc-base-en": {
+            "unk_token": "[UNK]"
+        },
+    }
 
     def __init__(self,
                  vocab_file,
@@ -334,6 +358,8 @@ class BPETokenizer(PretrainedTokenizer):
             sep_token=sep_token,
             cls_token=cls_token,
             mask_token=mask_token)
+        self.encoder_json_path = encoder_json_path
+        self.vocab_bpe_path = vocab_bpe_path
         self.encoder = get_encoder(encoder_json_path, vocab_bpe_path)
 
     def tokenize(self, text, is_sentencepiece=True):
@@ -346,3 +372,27 @@ class BPETokenizer(PretrainedTokenizer):
             bpe_ids = self.encoder.encode(text)
         tokens = [str(bpe_id) for bpe_id in bpe_ids]
         return tokens
+
+    def save_resources(self, save_directory):
+        """
+        Save tokenizer related resources to `resource_files_names` indicating
+        files under `save_directory`.
+        
+        Currently, it only can support saving `vocab` of tokenizer by using
+        `self.save_vocabulary(file_name, self.vocab)`. Override it if necessary.
+
+        Args:
+            save_directory (str): Directory to save files into.
+        """
+
+        vocab_file_name = os.path.join(save_directory,
+                                       self.resource_files_names["vocab_file"])
+        self.save_vocabulary(vocab_file_name, self.vocab)
+        # copy file
+        encoder_json_path = os.path.join(
+            save_directory, self.resource_files_names["encoder_json_path"])
+        shutil.copy(self.encoder_json_path, encoder_json_path)
+
+        vocab_bpe_path = os.path.join(
+            save_directory, self.resource_files_names["vocab_bpe_path"])
+        shutil.copy(self.vocab_bpe_path, vocab_bpe_path)
