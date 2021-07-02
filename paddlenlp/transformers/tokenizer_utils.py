@@ -20,6 +20,7 @@ import io
 import json
 import os
 import six
+import pkg_resources
 import unicodedata
 from shutil import copyfile
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
@@ -444,9 +445,13 @@ class PretrainedTokenizer(object):
             init_configuration = copy.deepcopy(
                 cls.pretrained_init_configuration[
                     pretrained_model_name_or_path])
-        elif pretrained_model_name_or_path in pretrained_models_bos:
-            for file_id in cls.resource_files_names.keys():
-                vocab_files[file_id] = pretrained_models_bos[pretrained_model_name_or_path][file_id]
+        elif pkg_resources.resource_exists('paddlenlp.transformers.community', pretrained_model_name_or_path):
+            json_file = pkg_resources.resource_filename('paddlenlp.transformers.community',
+                                                        pretrained_model_name_or_path + "/files.json")
+            with io.open(json_file, encoding="utf-8") as f:
+                file_paths = json.load(f)
+                for file_id in cls.resource_files_names.keys():
+                    vocab_files[file_id] = file_paths[file_id] if file_id in file_paths else None
         elif os.path.isdir(pretrained_model_name_or_path):
             for file_id, file_name in cls.resource_files_names.items():
                 full_file_name = os.path.join(pretrained_model_name_or_path,

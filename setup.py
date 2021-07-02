@@ -58,7 +58,8 @@ setuptools.setup(
         'paddlenlp.ops': get_package_data_files('paddlenlp.ops', [
             'CMakeLists.txt', 'README.md', 'cmake', 'faster_transformer',
             'patches', 'optimizer'
-        ])
+        ]),
+        'paddlenlp.transformers.community': ["*.json"]
     },
     setup_requires=['cython', 'numpy'],
     install_requires=REQUIRED_PACKAGES,
