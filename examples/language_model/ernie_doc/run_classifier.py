@@ -35,7 +35,7 @@ from data import ClassifierIterator
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--model_name_or_path", type=str, default="", help="pretraining model name or path")
+parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-en", help="pretraining model name or path")
 parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--learning_rate", type=float, default=7e-5, help="Learning rate used to train.")
 parser.add_argument("--max_steps", default=10000, type=int, help="Max training steps to train.")
@@ -120,17 +120,11 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
     rank = paddle.distributed.get_rank()
     set_seed(args)
-    # if rank == 0:
-    #     if os.path.exists(args.model_name_or_path):
-    #         logger.info("init checkpoint from %s" % args.model_name_or_path)
-    # TODO(zhoushunjie):need to use pretraining params.
-    # model = ErnieDocForSequenceClassification.from_pretrained(args.model_name_or_path)
-    ernie_doc = ErnieDocModel(
-        **ErnieDocModel.pretrained_init_configuration["ernie-doc-base-en"])
-    model = ErnieDocForSequenceClassification(ernie_doc, args.num_labels)
-    state_dict = paddle.load('ernie-doc-base-en.pdparams')
-    model.set_state_dict(state_dict)
-    del state_dict
+    if rank == 0:
+        if os.path.exists(args.model_name_or_path):
+            logger.info("init checkpoint from %s" % args.model_name_or_path)
+    model = ErnieDocForSequenceClassification.from_pretrained(
+        args.model_name_or_path, num_classes=2)
 
     model_config = model.ernie_doc.config
     if paddle.distributed.get_world_size() > 1:
@@ -236,8 +230,8 @@ def do_train(args):
                                     test_dataloader, memories0)
                 # save
                 if rank == 0:
-                    output_dir = os.path.join(
-                        args.output_dir, "model_%d.pdparams" % (global_steps))
+                    output_dir = os.path.join(args.output_dir,
+                                              "model_%d" % (global_steps))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     model_to_save = model._layers if isinstance(
@@ -247,7 +241,7 @@ def do_train(args):
                     if eval_acc > best_acc:
                         best_acc = eval_acc
                         best_model_dir = os.path.join(args.output_dir,
-                                                      "best_model.pdparams")
+                                                      "best_model")
                         if not os.path.exists(best_model_dir):
                             os.makedirs(best_model_dir)
                         model_to_save.save_pretrained(best_model_dir)

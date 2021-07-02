@@ -319,7 +319,8 @@ class ErnieDocPretrainedModel(PretrainedModel):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "ernie-doc-base-en": "123",
+            "ernie-doc-base-en":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-doc-base-en/ernie-doc-base-en.pdparams",
         }
     }
     base_model_prefix = "ernie_doc"
