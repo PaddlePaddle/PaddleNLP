@@ -105,7 +105,6 @@ class PretrainedModel(Layer, GenerationMixin):
     Besides, metaclass `InitTrackerMeta` is used to create `PretrainedModel`,
     by which subclasses can track arguments for initialization automatically.
     """
-
     model_config_file = "model_config.json"
     pretrained_init_configuration = {}
 
@@ -140,7 +139,7 @@ class PretrainedModel(Layer, GenerationMixin):
         list: Contains all supported built-in pretrained model names of the
             current PretrainedModel class.
         """
-        # todo: return all model name
+        # Todo: return all model name
         return list(self.pretrained_init_configuration.keys())
 
     def get_input_embeddings(self):
@@ -185,7 +184,6 @@ class PretrainedModel(Layer, GenerationMixin):
                 model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
         """
         pretrained_models = list(cls.pretrained_init_configuration.keys())
-        pretrained_models_bos = dict()
         resource_files = {}
         init_configuration = {}
 

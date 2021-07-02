@@ -20,11 +20,11 @@ import io
 import json
 import os
 import six
-import pkg_resources
 import unicodedata
+import pkg_resources
+from urllib.parse import urlparse
 from shutil import copyfile
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
-from urllib.parse import urlparse
 
 from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.utils.env import MODEL_HOME
@@ -436,7 +436,6 @@ class PretrainedTokenizer(object):
                 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         """
         pretrained_models = list(cls.pretrained_init_configuration.keys())
-        pretrained_models_bos = dict()
         vocab_files = {}
         init_configuration = {}
         if pretrained_model_name_or_path in pretrained_models:
