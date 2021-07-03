@@ -757,6 +757,12 @@ class GPTForPretraining(GPTPretrainedModel):
         self.gpt = gpt
         self.apply(self.init_weights)
 
+        self.share_param = False
+        self.weight = self.gpt.embeddings.word_embeddings.weight
+        if not self.share_param:
+            self.linear = paddle.nn.Linear(self.gpt.embeddings.word_embeddings.weight.shape[0], self.gpt.embeddings.word_embeddings.weight.shape[1])
+            self.weight = self.linear.weight
+
     def parallel_matmul(self, lm_output, logit_weights, parallel_output, topo):
         #hcg = fleet.get_hybrid_communicate_group()
         #model_parallel_group = hcg.get_model_parallel_group()
@@ -780,6 +786,7 @@ class GPTForPretraining(GPTPretrainedModel):
                 #logits, group=model_parallel_group)
         else:
             logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+            #logits = paddle.matmul(lm_output, self.linear.weight, transpose_y=True)
             return logits
 
     def forward(self,
@@ -798,14 +805,9 @@ class GPTForPretraining(GPTPretrainedModel):
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        # TODO @ZHUI Use all_to_all to
-        #logits = paddle.matmul(
-        #    encoder_outputs,
-        #    self.gpt.embeddings.word_embeddings.weight,
-        #    transpose_y=True)
         logits = self.parallel_matmul(
                 encoder_outputs,
-                self.gpt.embeddings.word_embeddings.weight,
+                self.weight,
                 True,
                 self.gpt.topo)
 

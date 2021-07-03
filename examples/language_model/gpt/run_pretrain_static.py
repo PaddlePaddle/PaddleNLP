@@ -237,7 +237,7 @@ def do_train(args):
                     max_seq_len=args.max_seq_len,
                     places=paddle.static.cuda_places(),
                     data_holders=data_holders,
-                    pipeline_mode=False, )
+                    pipeline_mode=True)
 
                 # Create the model for the gpt pretrain
                 model = guard(f'gpu:{args.pp_degree -1}')(GPTForPretraining)(
@@ -302,14 +302,18 @@ def do_train(args):
             optimizer = fleet.distributed_optimizer(
                 optimizer, strategy=dist_strategy)
 
+            program_desc_dir = os.path.join(args.output_dir, "program_desc")
+            if not os.path.isdir(program_desc_dir):
+                os.mkdir(program_desc_dir)
+
+            with open(program_desc_dir + "/forward_program.txt.%d" %
+                      (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
+                f.write(str(main_program))
+
             optimizer.minimize(loss)
             logger.info(f'final strategy: {fleet._final_strategy()}')
             logger.info("The training meta optimizer is/are %s" %
                         fleet._get_applied_meta_list())
-
-    program_desc_dir = os.path.join(args.output_dir, "program_desc")
-    if not os.path.isdir(program_desc_dir):
-        os.mkdir(program_desc_dir)
 
     with open(program_desc_dir + "/main_program.txt.%d" %
               (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
@@ -324,49 +328,42 @@ def do_train(args):
     exe.run(startup_program)
     test_program = main_program.clone(for_test=True)
 
-    global_step = 0
-    tic_train = time.time()
-    epoch = 0
+    fetchs = []
     learning_rate = main_program.global_block().vars["learning_rate_0"]
+    if topo.is_last:
+        fetchs = [loss, learning_rate]
+        if args.use_amp:
+            fetchs += [optimizer.get_loss_scaling()]
+
+    global_step = 0
+    epoch = 0
+    tic_train = time.time()
+
     while True:
-        fetchs = []
-        if topo.is_last:
-            fetchs = [loss, learning_rate]
-
-        # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
-        # many times. and start a new random dataloader.
-        valid_data_loader = valid_data_loader()
-        test_data_loader = test_data_loader()
-
-        for step, batch in enumerate(train_data_loader()):
+        train_data_loader.start()
+        step = -1
+        while(True):
             global_step += 1
-            ret = exe.run(main_program, feed=batch, fetch_list=fetchs, use_program_cache=True)
+            step += 1
+            ret = exe.run(main_program, fetch_list=fetchs, use_program_cache=True)
             # In the new 2.0 api, must call this function to change the learning_rate
             lr_scheduler.step()
 
             if global_step % args.logging_freq == 0:
                 if topo.is_last:
-                    loss_return, lr_return = ret
+                    loss_scaling = 1.0
+                    if args.use_amp:
+                        loss_return, lr_return, loss_scaling = ret
+                    else:
+                        loss_return, lr_return = ret
                     speed = args.logging_freq / (time.time() - tic_train)
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f steps/s, ips: %.0f tokens/s, learning rate: %.9f"
+                            "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f steps/s, ips: %.0f tokens/s, learning rate: %.9f, loss_scale: %.9f"
                         % (global_step, epoch, step, loss_return[0], speed,
-                           speed * args.global_batch_size * args.max_seq_len,
-                           lr_return[0]))
+                           speed * args.global_batch_size * args.max_seq_len, lr_return[0], loss_scaling))
                     log_writer.add_scalar("loss", loss_return[0], global_step)
                     log_writer.add_scalar("learning_rate", lr_return[0],
                                           global_step)
-                tic_train = time.time()
-
-            if global_step % args.eval_freq == 0:
-                # TODO, check the input data of validation
-                eval_fetch = []
-                if topo.is_last:
-                    eval_fetch = [loss]
-
-                run_evaluate(valid_data_loader, exe, test_program,
-                             args.eval_iters, log_writer, global_step, args,
-                             epoch, topo.is_last, eval_fetch, "valid")
                 tic_train = time.time()
 
             if global_step % args.save_steps == 0 or global_step >= args.max_steps:
@@ -375,17 +372,6 @@ def do_train(args):
                 logger.debug("saving models to {}".format(output_dir))
                 save_persistables(exe, output_dir, main_program)
                 tic_train = time.time()
-
-            if global_step >= args.max_steps:
-                eval_fetch = []
-                if topo.is_last:
-                    eval_fetch = [loss]
-
-                run_evaluate(test_data_loader, exe, test_program,
-                             args.test_iters, log_writer, global_step, args,
-                             epoch, topo.is_last, eval_fetch, "test")
-                del train_data_loader
-                return
         epoch += 1
 
 
