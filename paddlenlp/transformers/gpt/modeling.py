@@ -760,21 +760,16 @@ class GPTForPretraining(GPTPretrainedModel):
         self.share_param = False
         self.weight = self.gpt.embeddings.word_embeddings.weight
         if not self.share_param:
-            self.linear = paddle.nn.Linear(self.gpt.embeddings.word_embeddings.weight.shape[0], self.gpt.embeddings.word_embeddings.weight.shape[1])
-            self.weight = self.linear.weight
+            self.weight = self.create_parameter(shape=self.weight.shape)
 
     def parallel_matmul(self, lm_output, logit_weights, parallel_output, topo):
-        #hcg = fleet.get_hybrid_communicate_group()
-        #model_parallel_group = hcg.get_model_parallel_group()
-        #world_size = hcg.get_model_parallel_world_size()
-        #rank = hcg.get_model_parallel_rank()
         world_size = topo.mp_info.size
         rank = topo.mp_info.rank
 
         if world_size > 1:
+            model_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
             input_parallel = paddle.distributed.collective._c_identity(
-                lm_output, group=None)
-                #lm_output, group=model_parallel_group)
+                lm_output, group=model_group)
 
             logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
 
@@ -782,11 +777,9 @@ class GPTForPretraining(GPTPretrainedModel):
                 return logits
 
             return paddle.distributed.collective._c_concat(
-                logits, group=None)
-                #logits, group=model_parallel_group)
+                logits, group=model_group)
         else:
             logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
-            #logits = paddle.matmul(lm_output, self.linear.weight, transpose_y=True)
             return logits
 
     def forward(self,

@@ -82,6 +82,9 @@ class ParallelEmbedding(nn.Layer):
         main_block = paddle.static.default_main_program().global_block()
         startup_block.vars[self.weight.name].is_distributed = True
         main_block.vars[self.weight.name].is_distributed = True
+        if self.is_mp:
+            self.model_group = \
+                fleet.get_hybrid_communicate_group().get_model_parallel_group()
 
     def forward(self, x):
         if self.is_mp:
@@ -92,7 +95,7 @@ class ParallelEmbedding(nn.Layer):
                 name=self._name)
             output = paddle.distributed.collective._mp_allreduce(
                 output_parallel,
-                group=None,
+                group=self.model_group,  # None is ok in static
                 use_calc_stream=True,
                 use_model_parallel=True)
         else:
@@ -188,17 +191,21 @@ class ColumnParallelLiner(nn.Layer):
         # if a linear layer is splited by col, the bias would also be split into each rank as its weight
         _set_var_distributed(self.bias)
 
+        self.model_group = \
+            fleet.get_hybrid_communicate_group().get_model_parallel_group()
+
     def forward(self, x):
-        # TODO(wangxi): dynamic group
-        group = None
         x = paddle.distributed.collective._c_identity(
-            x, group=group)
+            x, group=self.model_group)  # None is ok in static
 
         bias = self.bias if not self.skip_bias_add else None
         output_parallel = paddle.nn.functional.linear(x, self.weight, bias)
 
         if self.gather_out:
-            output = paddle.distributed.collective._concat(output_parallel, group=group)
+            # must be model_group when hybrid because rank
+            # and nranks not given
+            output = paddle.distributed.collective._concat(
+                output_parallel, group=self.model_group)
         else:
             output = output_parallel
 
@@ -219,16 +226,10 @@ class RowParallelLiner(nn.Layer):
                  param_attr=None,
                  bias_attr=None,
                  name=None):
-        super().__init__()
+        super(RowParallelLiner, self).__init__()
 
-        if in_dygraph_mode():
-            rank = paddle.distributed.get_rank()
-            nranks = paddle.distributed.get_world_size()
-        else:
-            assert fleet._role_maker, ("To use paddle.distributed.split, "
-                                       "you must call fleet.init() firstly.")
-            rank = fleet.worker_index()
-            nranks = fleet.worker_num()
+        # TODO(wangxi): use model_group
+        rank, nranks = _get_rank()
 
         # rank within a model parallel group
         inner_rank = rank % num_partitions
@@ -255,17 +256,9 @@ class RowParallelLiner(nn.Layer):
             bias_attr=False,
             name=name)
 
-        weight = self.linear.weight
-        weight.is_distributed = True
         # alias for weight tensor
         self.weight = self.linear.weight
-
-        startup_block = paddle.static.default_startup_program().global_block()
-        main_block = paddle.static.default_main_program().global_block()
-        startup_block.vars[weight.name].is_distributed = True
-        main_block.vars[weight.name].is_distributed = True
-        # set is_distributed for splited bias
-        # if a linear layer is splited by row, each rank would hold a complete bias
+        _set_var_distributed(self.weight)
 
         if bias_attr is not False:
             self.bias = self.create_parameter(
@@ -277,9 +270,10 @@ class RowParallelLiner(nn.Layer):
         else:
             self.bias = None
 
+        self.model_group = \
+            fleet.get_hybrid_communicate_group().get_model_parallel_group()
+
     def forward(self, x):
-        # TODO(wangxi): dynamic group
-        group = None
         if self.input_is_parallel:
             assert x.shape[-1] == self.per_part_size, (
                 "The width ({}) of the input "
@@ -288,11 +282,13 @@ class RowParallelLiner(nn.Layer):
                     x.shape[-1], self.per_part_size))
         else:
             # split last dim
-            x = paddle.distributed.collective._c_split(x, group=group)
+            # must be model_group when hybrid because rank
+            # and nranks not given
+            x = paddle.distributed.collective._c_split(x, group=self.model_group)
         output_parallel = self.linear(x)
         output = paddle.distributed.collective._mp_allreduce(
             output_parallel,
-            group=group,
+            group=self.model_group,  # None is ok in static
             use_calc_stream=True,
             use_model_parallel=True)
         output = output + self.bias if self.bias is not None else output
