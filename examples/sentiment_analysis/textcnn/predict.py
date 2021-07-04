@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"
 # you may not use this file except in compliance with the License.
@@ -16,9 +16,10 @@ import argparse
 import paddle
 import paddle.nn.functional as F
 import paddlenlp as ppnlp
-from paddlenlp.data import JiebaTokenizer, Stack, Tuple, Pad, Vocab
+from paddlenlp.data import JiebaTokenizer, Pad, Vocab
 
 from model import TextCNNModel
+from data import preprocess_prediction_data
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
@@ -29,35 +30,14 @@ parser.add_argument("--params_path", type=str, default='./checkpoints/final.pdpa
 args = parser.parse_args()
 # yapf: enable
 
-def preprocess_prediction_data(data, tokenizer, pad_token_id=0, max_gram_filter_size=3):
-    """
-    It process the prediction data as the format used as training.
-    Args:
-        data (obj:`List[str]`): The prediction data whose each element is  a tokenized text.
-        tokenizer(obj: paddlenlp.data.JiebaTokenizer): It use jieba to cut the chinese string.
-    Returns:
-        examples (obj:`List(Example)`): The processed data whose each element is a Example (numedtuple) object.
-            A Example object contains `text`(word_ids) and `seq_len`(sequence length).
-    """
-    examples = []
-    for text in data:
-        ids = tokenizer.encode(text)
-        # Sequence length should larger or equal than the maximum ngram_filter_size in TextCNN model
-        if len(ids) < max_gram_filter_size:
-            ids.extend([pad_token_id] * (max_gram_filter_size - len(ids)))
-            examples.append([ids, max_gram_filter_size])
-        else:
-            examples.append([ids, len(ids)])
-    return examples
-
 def predict(model, data, label_map, batch_size=1, pad_token_id=0):
     """
     Predicts the data labels.
 
     Args:
         model (obj:`paddle.nn.Layer`): A model to classify texts.
-        data (obj:`List(Example)`): The processed data whose each element is a Example (numedtuple) object.
-            A Example object contains `text`(word_ids) and `se_len`(sequence length).
+        data (obj:`List(Example)`): The processed data whose each element is a Example (numedpad) object.
+            A Example object contains `text`(word_ids).
         label_map(obj:`dict`): The label id (key) to label str (value) map.
         batch_size(obj:`int`, defaults to 1): The number of batch.
         pad_token_id(obj:`int`, optional, defaults to 0): The pad token index.
@@ -70,18 +50,15 @@ def predict(model, data, label_map, batch_size=1, pad_token_id=0):
     batches = [
         data[idx:idx + batch_size] for idx in range(0, len(data), batch_size)
     ]
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=pad_token_id),  # input_ids
-        Stack(dtype="int64"),  # seq len
+    batchify_fn = lambda samples, fn=Pad(
+        axis=0, pad_val=pad_token_id
     ): [data for data in fn(samples)]
 
     results = []
     model.eval()
     for batch in batches:
-        texts, seq_lens = batchify_fn(batch)
-        texts = paddle.to_tensor(texts)
-        seq_lens = paddle.to_tensor(seq_lens)
-        logits = model(texts, seq_lens)
+        texts = paddle.to_tensor(batchify_fn(batch))
+        logits = model(texts)
         probs = F.softmax(logits, axis=1)
         idx = paddle.argmax(probs, axis=1).numpy()
         idx = idx.tolist()
@@ -106,7 +83,8 @@ if __name__ == "__main__":
     model = TextCNNModel(
         vocab_size, 
         num_classes, 
-        padding_idx=pad_token_id)
+        padding_idx=pad_token_id,
+        ngram_filter_sizes=(1, 2, 3))
 
     # Load model parameters.
     state_dict = paddle.load(args.params_path)
@@ -121,7 +99,7 @@ if __name__ == "__main__":
     ]
     tokenizer = JiebaTokenizer(vocab)
     examples = preprocess_prediction_data(data, tokenizer, pad_token_id)
-
+    
     results = predict(
         model,
         examples,

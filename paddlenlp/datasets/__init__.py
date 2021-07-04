@@ -35,4 +35,3 @@ from .seabsa16 import *
 from .cote import *
 from .clue import *
 from .nlpcc14_sc import *
-from .robotchat import *

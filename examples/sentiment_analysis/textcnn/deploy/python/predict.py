@@ -14,11 +14,12 @@
 
 import argparse
 
-import numpy as np
 import paddle
+import paddle.nn.functional as F
 from paddle import inference
-from paddlenlp.data import JiebaTokenizer, Stack, Tuple, Pad, Vocab
-from scipy.special import softmax
+from paddlenlp.data import JiebaTokenizer, Pad, Vocab
+
+from data import preprocess_prediction_data
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -35,24 +36,6 @@ parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'],
     default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
-
-
-def preprocess_prediction_data(text, tokenizer):
-    """
-    It process the prediction data as the format used as training.
-
-    Args:
-        text (obj:`str`): The input text.
-        tokenizer(obj: `paddlenlp.data.JiebaTokenizer`): It use jieba to cut the chinese string.
-
-    Returns:
-        input_ids (obj: `list[int]`): The word ids of the `text`.
-        seq_len (obj: `int`): The length of words.
-    """
-    input_id = tokenizer.encode(text)
-    seq_len = len(input_id)
-    return input_id, seq_len
-
 
 class Predictor(object):
     def __init__(self, model_file, params_file, device, max_seq_length):
@@ -82,56 +65,40 @@ class Predictor(object):
 
     def predict(self,
                 data,
-                tokenizer,
                 label_map,
                 batch_size=1,
-                pad_token_id=0,
-                max_gram_filter_size=3):
+                pad_token_id=0):
         """
         Predicts the data labels.
 
         Args:
             model (obj:`paddle.nn.Layer`): A model to classify texts.
-            data (obj:`List(Example)`): The processed data whose each element is a Example (numedtuple) object.
-                A Example object contains `text`(word_ids) and `se_len`(sequence length).
-            tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from 
-                :class:`~paddlenlp.transformers.PretrainedTokenizer` which contains most of the methods.
-                 Users should refer to the superclass for more information regarding methods.
+            data (obj:`List(Example)`): The processed data whose each element is a Example (pad) object.
+                A Example object contains `text`(word_ids).
             label_map(obj:`dict`): The label id (key) to label str (value) map.
             batch_size(obj:`int`, defaults to 1): The number of batch.
+            pad_token_id(obj:`int`, optional, defaults to 0): The pad token index.
 
         Returns:
             results(obj:`dict`): All the predictions labels.
         """
-        examples = []
-        for text in data:
-            input_id, seq_len = preprocess_prediction_data(text, tokenizer)
-            # Sequence length should larger or equal than the maximum ngram_filter_size in TextCNN model
-            if seq_len < max_gram_filter_size:
-                input_id.extend([pad_token_id] * (max_gram_filter_size - seq_len))
-                seq_len = max_gram_filter_size
-            examples.append((input_id, seq_len))
-
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.vocab.token_to_idx.get("[PAD]", 0)),  # input_id
-            Stack()  # seq_len
-        ): fn(samples)
 
         # Seperates data into some batches.
         batches = [
-            examples[idx:idx + batch_size]
-            for idx in range(0, len(examples), batch_size)
+            data[idx:idx + batch_size] for idx in range(0, len(data), batch_size)
         ]
+        batchify_fn = lambda samples, fn=Pad(
+            axis=0, pad_val=pad_token_id
+        ): [data for data in fn(samples)]
 
         results = []
         for batch in batches:
-            input_ids, seq_lens = batchify_fn(batch)
+            input_ids = batchify_fn(batch)
             self.input_handles[0].copy_from_cpu(input_ids)
             self.predictor.run()
-            logits = self.output_handle.copy_to_cpu()
-            probs = softmax(logits, axis=1)
-            print(probs)
-            idx = np.argmax(probs, axis=1)
+            logits = paddle.to_tensor(self.output_handle.copy_to_cpu())
+            probs = F.softmax(logits, axis=1)
+            idx = paddle.argmax(probs, axis=1).numpy()
             idx = idx.tolist()
             labels = [label_map[i] for i in idx]
             results.extend(labels)
@@ -143,21 +110,22 @@ if __name__ == "__main__":
     predictor = Predictor(args.model_file, args.params_file, args.device,
                           args.max_seq_length)
 
-    # Firstly pre-processing prediction data  and then do predict.
-    data = [
-        '你再骂我我真的不跟你聊了',
-        '你看看我附近有什么好吃的',
-        '我喜欢画画也喜欢唱歌'
-    ]
     vocab = Vocab.load_vocabulary(
         args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
     pad_token_id = vocab.to_indices('[PAD]')
     tokenizer = JiebaTokenizer(vocab)
     label_map = {0: 'negative', 1: 'neutral', 2: 'positive'}
+    
+    # Firstly pre-processing prediction data and then do predict.
+    data = [
+        '你再骂我我真的不跟你聊了',
+        '你看看我附近有什么好吃的',
+        '我喜欢画画也喜欢唱歌'
+    ]
+    examples = preprocess_prediction_data(data, tokenizer, pad_token_id)
 
     results = predictor.predict(
-        data,
-        tokenizer,
+        examples,
         label_map,
         batch_size=args.batch_size,
         pad_token_id=pad_token_id)
