@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,12 +49,11 @@ class TextCNNModel(nn.Layer):
         self.fc = nn.Linear(self.encoder.get_output_dim(), fc_hidden_size)
         self.output_layer = nn.Linear(fc_hidden_size, num_classes)
 
-    def forward(self, text, seq_len=None):
+    def forward(self, text):
         # Shape: (batch_size, num_tokens, embedding_dim)
         embedded_text = self.embedder(text)
         # Shape: (batch_size, len(ngram_filter_sizes) * num_filter)
-        encoder_out = self.encoder(embedded_text)
-        encoder_out = paddle.tanh(encoder_out)
+        encoder_out = paddle.tanh(self.encoder(embedded_text))
         # Shape: (batch_size, fc_hidden_size)
         fc_out = paddle.tanh(self.fc(encoder_out))
         # Shape: (batch_size, num_classes)

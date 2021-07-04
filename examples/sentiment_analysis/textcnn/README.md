@@ -24,14 +24,12 @@ textcnn/
 
 ### 数据准备
 
-#### 使用PaddleNLP内置数据集
-
 这里我们提供一份已标注的机器人聊天数据集，包括训练集（train.tsv），开发集（dev.tsv）和测试集（test.tsv）。
+完整数据集可以通过以下命令下载并解压：
 
-```python
-from paddlenlp.datasets import load_dataset
-
-train_ds, dev_ds, test_ds = load_dataset("robotchat", splits=["train", "dev", "test"])
+```shell
+wget https://paddlenlp.bj.bcebos.com/datasets/RobotChat.tar.gz
+tar xvf RobotChat.tar.gz
 ```
 
 ### 词表下载
@@ -54,7 +52,7 @@ wget https://paddlenlp.bj.bcebos.com/models/textcnn.pdparams
 
 ### 模型训练
 
-我们以机器人聊天数据集为例，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证，这里通过`--init_from_ckpt=./textcnn.pdparams`指定TextCNN预训练模型。
+在下载好词表和预训练模型后就可以在机器人聊天数据集上进行finetune，通过运行以下命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证，这里通过`--init_from_ckpt=./textcnn.pdparams`指定TextCNN预训练模型。
 
 CPU 启动：
 
@@ -62,10 +60,11 @@ CPU 启动：
 python train.py --vocab_path=./robot_chat_word_dict.txt \
     --init_from_ckpt=./textcnn.pdparams \
     --device=cpu \
-    --lr=5e-4 \
+    --lr=5e-5 \
     --batch_size=64 \
     --epochs=10 \
-    --save_dir=./checkpoints
+    --save_dir=./checkpoints \
+    --data_path=./RobotChat
 ```
 
 GPU 启动：
@@ -74,12 +73,13 @@ GPU 启动：
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
     --vocab_path=./robot_chat_word_dict.txt \
-    —-init_from_ckpt=./textcnn.pdparams \
+    --init_from_ckpt=./textcnn.pdparams \
     --device=gpu \
-    --lr=5e-4 \
+    --lr=5e-5 \
     --batch_size=64 \
     --epochs=10 \
-    --save_dir=./checkpoints
+    --save_dir=./checkpoints \
+    --data_path=./RobotChat
 ```
 
 XPU启动：
@@ -88,21 +88,23 @@ XPU启动：
 python train.py --vocab_path=./robot_chat_word_dict.txt \
     --init_from_ckpt=./textcnn.pdparams \
     --device=xpu \
-    --lr=5e-4 \
+    --lr=5e-5 \
     --batch_size=64 \
     --epochs=10 \
-    --save_dir=./checkpoints
+    --save_dir=./checkpoints \
+    --data_path=./RobotChat
 ```
 
 以上参数表示：
 
 * `vocab_path`: 词汇表文件路径。
+* `init_from_ckpt`: 恢复模型训练的断点路径。
 * `device`: 选用什么设备进行训练，可选cpu、gpu或xpu。如使用gpu训练则参数gpus指定GPU卡号。
 * `lr`: 学习率， 默认为5e-5。
 * `batch_size`: 运行一个batch大小，默认为64。
 * `epochs`: 训练轮次，默认为10。
 * `save_dir`: 训练保存模型的文件路径。
-* `init_from_ckpt`: 恢复模型训练的断点路径。
+* `data_path`: 数据集文件路径。
 
 
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存模型在指定的`save_dir`中。
@@ -186,5 +188,4 @@ Data: 我喜欢画画也喜欢唱歌       Label: positive
 
 TextCNN参考论文：
 
-- https://arxiv.org/pdf/1408.5882.pdf
-- https://arxiv.org/pdf/1510.03820.pdf
+- [EMNLP2014-Convolutional Neural Networks for Sentence Classification](https://aclanthology.org/D14-1181.pdf)

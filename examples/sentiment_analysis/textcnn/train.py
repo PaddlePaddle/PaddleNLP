@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"
 # you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@ import argparse
 import os
 import random
 
-
 import numpy as np
 import paddle
 from paddlenlp.datasets import load_dataset
-
 from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
+
+from data import create_dataloader, convert_example, read_custom_data
 from model import TextCNNModel
 
 # yapf: disable
@@ -31,6 +31,7 @@ parser.add_argument("--epochs", type=int, default=10, help="Number of epoches fo
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate used to train.")
 parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
+parser.add_argument("--data_path", type=str, default='./RobotChat', help="The path of datasets to be loaded")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
 parser.add_argument("--vocab_path", type=str, default="./robot_chat_word_dict.txt", help="The directory to dataset.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
@@ -42,53 +43,6 @@ def set_seed(seed=1000):
     random.seed(seed)
     np.random.seed(seed)
     paddle.seed(seed)
-
-def create_dataloader(dataset,
-                      mode='train',
-                      batch_size=1,
-                      batchify_fn=None):
-    """
-    Create dataloader.
-
-    Args:
-        dataset(obj:`paddle.io.Dataset`): Dataset instance.
-        trans_fn(obj:`callable`, optional, defaults to `None`): function to convert a data sample to input ids, etc.
-        mode(obj:`str`, optional, defaults to obj:`train`): If mode is 'train', it will shuffle the dataset randomly.
-        batch_size(obj:`int`, optional, defaults to 1): The sample number of a mini-batch.
-        batchify_fn(obj:`callable`, optional, defaults to `None`): function to generate mini-batch data by merging
-            the sample list, None for only stack each fields of sample in axis
-            0(same as :attr::`np.stack(..., axis=0)`).
-
-    Returns:
-        dataloader(obj:`paddle.io.DataLoader`): The dataloader which generates batches.
-    """
-    if trans_fn:
-        dataset = dataset.map(trans_fn)
-
-    shuffle = True if mode == 'train' else False
-    if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
-    else:
-        sampler = paddle.io.BatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(
-        dataset, batch_sampler=sampler, collate_fn=batchify_fn)
-    return dataloader
-
-
-def convert_example(example, tokenizer, is_test=False):
-
-    input_ids = tokenizer.encode(example["text"])
-    valid_length = np.array(len(input_ids), dtype='int64')
-    input_ids = np.array(input_ids, dtype='int64')
-
-    if not is_test:
-        label = np.array(example["label"], dtype="int64")
-        return input_ids, valid_length, label
-    else:
-        return input_ids, valid_length
-
 
 if __name__ == "__main__":
     paddle.set_device(args.device)
@@ -102,34 +56,50 @@ if __name__ == "__main__":
     vocab = Vocab.load_vocabulary(
         args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
 
-    train_ds, dev_ds = load_dataset("robotchat", splits=["train", "dev"])
+    # Load datasets.
+    dataset_names = ['train.tsv', 'dev.tsv', 'test.tsv']
+    train_ds, dev_ds, test_ds = [load_dataset(read_custom_data, \
+        filename=os.path.join(args.data_path, dataset_name), lazy=False) for dataset_name in dataset_names]
 
     tokenizer = JiebaTokenizer(vocab)
-    trans_fn = partial(convert_example, tokenizer=tokenizer, is_test=False)
+    trans_fn = partial(convert_example, tokenizer=tokenizer)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=vocab.token_to_idx.get('[PAD]', 0)),
-        Stack(dtype="int64"),  # seq len
-        Stack(dtype="int64")  # label
+        Stack(dtype='int64')  # label
     ): [data for data in fn(samples)]
     train_loader = create_dataloader(
         train_ds,
         batch_size=args.batch_size,
         mode='train',
-        batchify_fn=batchify_fn)
+        batchify_fn=batchify_fn,
+        trans_fn=trans_fn)
     dev_loader = create_dataloader(
         dev_ds,
         batch_size=args.batch_size,
         mode='validation',
-        batchify_fn=batchify_fn)
+        batchify_fn=batchify_fn,
+        trans_fn=trans_fn)
+    test_loader = create_dataloader(
+        test_ds,
+        batch_size=args.batch_size,
+        mode='test',
+        batchify_fn=batchify_fn,
+        trans_fn=trans_fn)
 
+    label_map = {0: 'negative', 1: 'neutral', 2: 'positive'}
     vocab_size = len(vocab)
-    num_classes = len(train_ds.label_list)
+    num_classes = len(label_map)
     pad_token_id = vocab.to_indices('[PAD]')
-    
+
     model = TextCNNModel(
         vocab_size, 
         num_classes, 
-        padding_idx=pad_token_id)
+        padding_idx=pad_token_id,
+        ngram_filter_sizes=(1, 2, 3))
+
+    if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
+        state_dict = paddle.load(args.init_from_ckpt)
+        model.set_dict(state_dict)
 
     model = paddle.Model(model)
 
@@ -137,7 +107,7 @@ if __name__ == "__main__":
         parameters=model.parameters(), learning_rate=args.lr)
 
     # Define loss and metric.
-    criterion = paddle.nn.CrossEntropyLoss(ignore_index=pad_token_id)
+    criterion = paddle.nn.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
 
     model.prepare(optimizer, criterion, metric)
@@ -149,5 +119,7 @@ if __name__ == "__main__":
               epochs=args.epochs,
               save_dir=args.save_dir,
               callbacks=callback)
-    
 
+    # Evaluate on test dataset
+    print('Start to evaluate on test dataset...')
+    model.evaluate(test_loader, log_freq=len(test_loader))
