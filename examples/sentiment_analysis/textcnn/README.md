@@ -15,6 +15,7 @@ textcnn/
 ├── deploy # 部署
 │   └── python
 │       └── predict.py # python预测部署示例
+├── data.py # 数据处理脚本
 ├── export_model.py # 动态图参数导出静态图参数脚本
 ├── model.py # 模型组网脚本
 ├── predict.py # 模型预测脚本
