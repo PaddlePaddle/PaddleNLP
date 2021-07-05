@@ -17,6 +17,7 @@ import paddle.nn as nn
 
 from paddlenlp.seq2vec import CNNEncoder
 
+
 class TextCNNModel(nn.Layer):
     """
     This class implements the Text Convolution Neural Network model.

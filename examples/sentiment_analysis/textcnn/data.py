@@ -16,6 +16,7 @@ import numpy as np
 import paddle
 from paddlenlp.datasets import load_dataset
 
+
 def create_dataloader(dataset,
                       mode='train',
                       batch_size=1,
@@ -26,12 +27,12 @@ def create_dataloader(dataset,
 
     Args:
         dataset(obj:`paddle.io.Dataset`): Dataset instance.
-        trans_fn(obj:`callable`, optional, defaults to `None`): function to convert a data sample to input ids, etc.
         mode(obj:`str`, optional, defaults to obj:`train`): If mode is 'train', it will shuffle the dataset randomly.
         batch_size(obj:`int`, optional, defaults to 1): The sample number of a mini-batch.
         batchify_fn(obj:`callable`, optional, defaults to `None`): function to generate mini-batch data by merging
             the sample list, None for only stack each fields of sample in axis
             0(same as :attr::`np.stack(..., axis=0)`).
+        trans_fn(obj:`callable`, optional, defaults to `None`): function to convert a data sample to input ids, etc.
 
     Returns:
         dataloader(obj:`paddle.io.DataLoader`): The dataloader which generates batches.
@@ -53,16 +54,20 @@ def create_dataloader(dataset,
 def preprocess_prediction_data(data, tokenizer, pad_token_id=0, max_ngram_filter_size=3):
     """
     It process the prediction data as the format used as training.
+
     Args:
-        data (obj:`List[str]`): The prediction data whose each element is a tokenized text.
+        data (obj:`list[str]`): The prediction data whose each element is a tokenized text.
         tokenizer(obj: paddlenlp.data.JiebaTokenizer): It use jieba to cut the chinese string.
         pad_token_id(obj:`int`, optional, defaults to 0): The pad token index.
         max_ngram_filter_size (obj:`int`, optional, defaults to 3) Max n-gram size in TextCNN model.
             Users should refer to the ngram_filter_sizes setting in TextCNN, if ngram_filter_sizes=(1, 2, 3)
             then max_ngram_filter_size=3
+
     Returns:
-        examples (obj:`List(Example)`): The processed data whose each element is a Example (pad) object.
-            A Example object contains `text`(word_ids).
+        examples (obj:`list`): The processed data whose each element 
+            is a `list` object, which contains 
+            
+            - word_ids(obj:`list[int]`): The list of word ids.
     """
     examples = []
     for text in data:

@@ -47,7 +47,8 @@ def main():
     model = TextCNNModel(
         vocab_size, 
         num_classes, 
-        padding_idx=pad_token_id)
+        padding_idx=pad_token_id,
+        ngram_filter_sizes=(1, 2, 3))
 
     # Load model parameters.
     state_dict = paddle.load(args.params_path)
