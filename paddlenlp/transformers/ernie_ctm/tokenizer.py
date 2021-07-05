@@ -50,7 +50,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
             The token used for padding, for example when batching sequences of different lengths. Defaults to `"[PAD]"`
         cls_token_template (`str`, optional)
             The template of summary token for multiple summary placeholders. Defauts to `"[CLS{}]"`
-        summary_num (`int`, optional):
+        cls_num (`int`, optional):
             Summary placeholder used in ernie-ctm model. For catching a sentence global feature from multiple aware.
             Defaults to 1
         mask_token (`str`, optional):
@@ -71,10 +71,12 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
     }
     pretrained_init_configuration = {
         "ernie-ctm": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "cls_num": 2
         },
         "wordtag": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "cls_num": 2
         }
     }
 
@@ -86,7 +88,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token_template="[CLS{}]",
-                 summary_num=1,
+                 cls_num=1,
                  mask_token="[MASK]",
                  **kwargs):
         if not os.path.isfile(vocab_file):
@@ -97,7 +99,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                 .format(vocab_file))
         self.do_lower_case = do_lower_case
         self.cls_token_template = cls_token_template
-        self.summary_num = summary_num
+        self.cls_num = cls_num
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
 
     @property
@@ -127,7 +129,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         """
         cls_token_ids = [
             self.convert_tokens_to_ids(self.cls_token_template.format(sid))
-            for sid in range(self.summary_num)
+            for sid in range(self.cls_num)
         ]
         if token_ids_1 is None:
             return cls_token_ids + token_ids_0 + [self.sep_token_id]
@@ -208,8 +210,8 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         """
         sep = [self.sep_token_id]
         if token_ids_1 is None:
-            return (self.summary_num + len(token_ids_0 + sep)) * [0]
-        return (self.summary_num + len(token_ids_0 + sep)
+            return (self.cls_num + len(token_ids_0 + sep)) * [0]
+        return (self.cls_num + len(token_ids_0 + sep)
                 ) * [0] + len(token_ids_1 + sep) * [1]
 
     def num_special_tokens_to_add(self, pair=False):
@@ -229,9 +231,9 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
             int: Number of tokens added to sequences.
         """
         if pair is True:
-            return self.summary_num + 2
+            return self.cls_num + 2
         else:
-            return self.summary_num + 1
+            return self.cls_num + 1
 
     def _tokenize(self, text, **kwargs):
         r"""

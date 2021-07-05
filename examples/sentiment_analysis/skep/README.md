@@ -36,7 +36,7 @@
         <td><center>中文</td>
         <td><center>ACC</td>
         <td><center>96.08</td>
-        <td><center><a href="https://ernie.bj.bcebos.com/task_data_zh.tgz" >下载地址</a></td>
+        <td><center><a href="https://dataset-bj.cdn.bcebos.com/qianyan/ChnSentiCorp.zip" >下载地址</a></td>
     </tr>
     <tr>
         <td rowspan="1"><center>评价对象级的<br /><center>情感分类</td>
