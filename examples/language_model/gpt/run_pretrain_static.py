@@ -356,13 +356,15 @@ def do_train(args):
             if args.mp_degree > 1:
                 logger.warning("MP should init with dygraph params")
             else:
+                logger.info("Loading parameters from %s" % static_path)
                 paddle.static.load(main_program, static_path, exe)
                 flag_loaded = True
 
-        if os.path.exists(dygrah_path):
+        if not flag_loaded and os.path.exists(dygrah_path):
             if args.sharding_degree > 1:
                 logger.warning("Sharding should init with static vars")
             else:
+                logger.info("Loading parameters from %s" % dygrah_path)
                 init_static_with_params(
                     model,
                     paddle.load(
