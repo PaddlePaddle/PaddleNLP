@@ -107,7 +107,6 @@ class PretrainedModel(Layer, GenerationMixin):
     """
     model_config_file = "model_config.json"
     pretrained_init_configuration = {}
-
     # TODO: more flexible resource handle, namedtuple with fields as:
     # resource_name, saved_file, handle_name_for_load(None for used as __init__
     # arguments), handle_name_for_save
@@ -155,16 +154,35 @@ class PretrainedModel(Layer, GenerationMixin):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, config_path=None, *args, **kwargs):
         """
-        Creates an instance of `PretrainedModel` and load pretrained model weights
-        for it according to a specific model name (such as `bert-base-uncased`)
-        or a local file directory path.
+        Creates an instance of `PretrainedModel`. Model weights are loaded
+        by specifying name of a built-in pretrained model, or a community contributed model,
+        or a local file directory path, or a local file path, or a remote URL path.
 
         Args:
-            pretrained_model_name_or_path (str): Name of pretrained model
-                for built-in pretrained models loading, such as `bert-base-uncased`.
-                Or a local file directory path for local trained models loading.
-            config_path (str): Model configuration file path. A json file defines
-                the configuration of the pretrained_model.
+            pretrained_model_name_or_path (str): Name of pretrained model or path of
+                model to load. The string can be:
+
+                - Name of built-in pretrained model or community contributed model
+                - Local directory path which contains model weights file("model_state.pdparams")
+                    and model config file ("model_config.json").
+                - Local file path of model weights file
+                - URL path of model weights file
+            config_path (str, optional): Model configuration file path. A json file defines
+                the configuration of the pretrained_model. Defaults to None.
+
+                .. note::
+                    - If `pretrained_model_name_or_path` is the name of built-in pretrained model or
+                        community contributed model, we will automatically use the corresponding
+                        model configuration. Thus `config_path` should be set to None.
+                        If not None, this arg will not take any effect anyway.
+                    - If `pretrained_model_name_or_path` is a local directory path, then
+                        model config file("model_config.json") under this directory will be loaded.
+                        If `config_path` is not None, then we update the model config file as `config_path`.
+                    - If `pretrained_model_name_or_path` is a local file path of model weights file,
+                        then `config_path` must be provided to get correct model configuration
+                    - If `pretrained_model_name_or_path` is an URL path of model weights file,
+                        then `config_path` must be provided to get correct model configuration
+
             *args (tuple): Position arguments for model `__init__`. If provided,
                 use these as position argument values for model initialization.
             **kwargs (dict): Keyword arguments for model `__init__`. If provided,
@@ -181,7 +199,22 @@ class PretrainedModel(Layer, GenerationMixin):
 
                 from paddlenlp.transformers import BertForSequenceClassification
 
+                # Name of built-in pretrained model
                 model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
+
+                # Name of community contributed model
+                model = BertForSequenceClassification.from_pretrained('ying15/albert-base-v2-sst-2-finetuned')
+
+                # Load from local directory path
+                model = BertForSequenceClassification.from_pretrained('./my_bert/')
+                model = BertForSequenceClassification.from_pretrained('./my_bert/', config_path='./model_config.json')
+
+                # Load from local path of model weights file
+                model = BertForSequenceClassification.from_pretrained('./my_bert/my_bert_weights.pdparams',
+                    config_path='./my_bert/my_bert_config.json')
+
+                # Load from remote URL path of model weights file
+                model = BertForSequenceClassification.from_pretrained('', config='')
         """
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}

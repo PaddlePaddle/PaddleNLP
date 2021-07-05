@@ -410,15 +410,35 @@ class PretrainedTokenizer(object):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, config_path=None, *args, **kwargs):
         """
-        Creates an instance of `PretrainedTokenizer` and loads related resources
-        (such as vocabulary file) according to a specific model name
-        (such as `bert-base-uncased`) or a local file directory path.
+        Creates an instance of `PretrainedTokenizer`. Related resources are loaded
+        by specifying name of a built-in pretrained model, or a community contributed model,
+        or a local file directory path, or a local file path, or a remote URL path.
 
         Args:
-            pretrained_model_name_or_path (str): A name of pretrained model
-                for built-in tokenizers loading, such as `bert-base-uncased`.
-                Or a local file directory path for local tokenizers loading.
-            config_path (str): A name of pretrained tokenizer config.
+            pretrained_model_name_or_path (str): Name of pretrained model or path of
+                model to load. The string can be:
+
+                - Name of built-in pretrained model or community contributed model
+                - Local directory path which contains tokenizer related resources
+                    and tokenizer config file ("tokenizer_config.json").
+                - Local file path of tokenizer vocab file
+                - URL path of tokenizer vocab file
+            config_path (str, optional): Tokenizer configuration file path. A json file defines
+                the configuration of the tokenizer. Defaults to None.
+
+                .. note::
+                    - If `pretrained_model_name_or_path` is the name of built-in pretrained model or
+                        community contributed model, we will automatically use the corresponding
+                        tokenizer configuration. Thus `config_path` should be set to None.
+                        If not None, this arg will not take any effect anyway.
+                    - If `pretrained_model_name_or_path` is a local directory path, then
+                        tokenizer config file("tokenizer_config.json") under this directory will be loaded.
+                        If `config_path` is not None, then we update the tokenizer config file as `config_path`.
+                    - If `pretrained_model_name_or_path` is a local file path of tokenizer vocab file,
+                        then `config_path` must be provided to get correct tokenizer configuration
+                    - If `pretrained_model_name_or_path` is an URL path of tokenizer weights file,
+                        then `config_path` must be provided to get correct tokenizer configuration
+
             *args (tuple): position arguments for model `__init__`. If provided,
                 use these as position argument values for tokenizer initialization.
             **kwargs (dict): keyword arguments for model `__init__`. If provided,
@@ -433,7 +453,22 @@ class PretrainedTokenizer(object):
 
                 from paddlenlp.transformers import BertTokenizer
 
+                # Name of built-in pretrained model
                 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+                # Name of community contributed model
+                tokenizer = BertTokenizer.from_pretrained('ying15/albert-base-v2-sst-2-finetuned')
+
+                # Load from local directory path
+                tokenizer = BertTokenizer.from_pretrained('./my_bert/')
+                tokenizer = BertTokenizer.from_pretrained('./my_bert/', config_path='./tokenizer_config.json')
+
+                # Load from local path of tokenizer vocab file
+                tokenizer = BertTokenizer.from_pretrained('./my_bert/vocab.txt',
+                    config_path='./my_bert/my_tokenizer_config.json')
+
+                # Load from remote URL path of tokenizer vocab file
+                tokenizer = BertTokenizer.from_pretrained('', config='')
         """
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         vocab_files = {}
