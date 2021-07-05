@@ -15,8 +15,6 @@ import os
 import pickle
 import shutil
 import json
-import regex as re
-from nltk import tokenize
 try:
     from functools import lru_cache
 except ImportError:
@@ -165,7 +163,7 @@ class Encoder(object):
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = {}
-        self.re = re
+        self.re = try_import("regex")
         self.special_tokens = special_tokens
 
         # Should haved added re.IGNORECASE so BPE merges can happen for capitalized versions of contractions
@@ -365,8 +363,9 @@ class BPETokenizer(PretrainedTokenizer):
     def tokenize(self, text, is_sentencepiece=True):
         text = convert_to_unicode(text)
         text = " ".join(text.split())  # remove duplicate whitespace
+        nltk = try_import('nltk')
         if is_sentencepiece:
-            sents = tokenize.sent_tokenize(text)
+            sents = nltk.tokenize.sent_tokenize(text)
             bpe_ids = sum([self.encoder.encode(sent) for sent in sents], [])
         else:
             bpe_ids = self.encoder.encode(text)
