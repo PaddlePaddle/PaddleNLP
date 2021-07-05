@@ -28,6 +28,7 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
+from paddlenlp.transformers import ErnieCtmForTokenClassification, ErnieCtmTokenizer
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 
 parser = argparse.ArgumentParser()
@@ -51,6 +52,7 @@ parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", 
 # yapf: enable
 
 
+@paddle.no_grad()
 def evaluate(model, loss_fct, metric, data_loader, label_num):
     model.eval()
     metric.reset()
@@ -100,6 +102,7 @@ def do_train(args):
         'msra_ner', splits=('train', 'test'), lazy=False)
 
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
+    #tokenizer = ErnieCtmTokenizer.from_pretrained("ernie-ctm")
 
     label_list = train_ds.label_list
     label_num = len(label_list)
@@ -144,6 +147,8 @@ def do_train(args):
     # Define the model netword and its loss
     model = BertForTokenClassification.from_pretrained(
         args.model_name_or_path, num_classes=label_num)
+    #model = ErnieCtmForTokenClassification.from_pretrained(
+    #    args.model_name_or_path, num_classes=label_num)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 

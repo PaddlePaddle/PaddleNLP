@@ -96,9 +96,9 @@ URLS = {
     "TermTree.V1.0":
     "https://kg-concept.bj.bcebos.com/TermTree/TermTree.V1.0.tar.gz",
     "termtree_type.csv":
-    "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree_type.csv",
+    "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_type.csv",
     "termtree_tags.txt":
-    "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree_tags.txt",
+    "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_tags_pos.txt",
 }
 
 
@@ -274,10 +274,8 @@ class WordtagPredictor(object):
         short_input_texts = self._split_long_text2short_text_list(
             input_texts, max_predict_len)
         for text in short_input_texts:
-            tokens = ["[CLS%i]" % i
-                      for i in range(1, self.summary_num)] + list(text)
             tokenized_input = self._tokenizer(
-                tokens,
+                list(text),
                 return_length=True,
                 is_split_into_words=True,
                 max_seq_len=max_seq_len)
