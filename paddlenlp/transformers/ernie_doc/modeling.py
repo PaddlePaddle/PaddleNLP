@@ -469,8 +469,6 @@ class ErnieDocModel(ErnieDocPretrainedModel):
         data_mask.stop_gradient = True
         # create a self_attn_mask, shape: [B, T, M + T]
         self_attn_mask = paddle.matmul(attn_mask, data_mask, transpose_y=True)
-        # cast to float
-        self_attn_mask = self_attn_mask.astype(self.pooler.dense.weight.dtype)
         self_attn_mask = (self_attn_mask - 1) * 1e8
         n_head_self_attn_mask = paddle.stack(
             [self_attn_mask] * self.n_head, axis=1)
