@@ -457,7 +457,7 @@ class PretrainedTokenizer(object):
                 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
                 # Name of community contributed model
-                tokenizer = BertTokenizer.from_pretrained('ying15/albert-base-v2-sst-2-finetuned')
+                tokenizer = BertTokenizer.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
 
                 # Load from local directory path
                 tokenizer = BertTokenizer.from_pretrained('./my_bert/')

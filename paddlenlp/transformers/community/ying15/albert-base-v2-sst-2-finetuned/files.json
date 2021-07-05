@@ -1,6 +1,0 @@
-{
-  "model_config_file": "/Users/yingyibiao/Desktop/github/PaddleNLP/model_config.json",
-  "model_state": "/Users/yingyibiao/Desktop/github/PaddleNLP/model_state.pdparams",
-  "tokenizer_config_file": "/Users/yingyibiao/Desktop/github/PaddleNLP/tokenizer_config.json",
-  "sentencepiece_model_file": "/Users/yingyibiao/Desktop/github/PaddleNLP/spiece.model"
-}

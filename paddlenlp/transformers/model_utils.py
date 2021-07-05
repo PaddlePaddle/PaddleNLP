@@ -203,7 +203,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
 
                 # Name of community contributed model
-                model = BertForSequenceClassification.from_pretrained('ying15/albert-base-v2-sst-2-finetuned')
+                model = BertForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
 
                 # Load from local directory path
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
