@@ -30,20 +30,23 @@ parser.add_argument("--params_path", type=str, default='./checkpoints/final.pdpa
 args = parser.parse_args()
 # yapf: enable
 
+
 def predict(model, data, label_map, batch_size=1, pad_token_id=0):
     """
     Predicts the data labels.
 
     Args:
         model (obj:`paddle.nn.Layer`): A model to classify texts.
-        data (obj:`List(Example)`): The processed data whose each element is a Example (numedpad) object.
-            A Example object contains `text`(word_ids).
+        data (obj:`list`): The processed data whose each element 
+            is a `list` object, which contains 
+            
+            - word_ids(obj:`list[int]`): The list of word ids.
         label_map(obj:`dict`): The label id (key) to label str (value) map.
         batch_size(obj:`int`, defaults to 1): The number of batch.
         pad_token_id(obj:`int`, optional, defaults to 0): The pad token index.
 
     Returns:
-        results(obj:`dict`): All the predictions labels.
+        results(obj:`dict`): All the predictions labels.     
     """
 
     # Seperates data into some batches.

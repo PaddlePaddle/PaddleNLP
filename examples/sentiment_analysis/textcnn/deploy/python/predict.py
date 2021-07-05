@@ -37,6 +37,7 @@ parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'],
 args = parser.parse_args()
 # yapf: enable
 
+
 class Predictor(object):
     def __init__(self, model_file, params_file, device, max_seq_length):
         self.max_seq_length = max_seq_length
@@ -72,9 +73,10 @@ class Predictor(object):
         Predicts the data labels.
 
         Args:
-            model (obj:`paddle.nn.Layer`): A model to classify texts.
-            data (obj:`List(Example)`): The processed data whose each element is a Example (pad) object.
-                A Example object contains `text`(word_ids).
+            data (obj:`list`): The processed data whose each element 
+                is a `list` object, which contains 
+            
+                - word_ids(obj:`list[int]`): The list of word ids.
             label_map(obj:`dict`): The label id (key) to label str (value) map.
             batch_size(obj:`int`, defaults to 1): The number of batch.
             pad_token_id(obj:`int`, optional, defaults to 0): The pad token index.
@@ -123,7 +125,7 @@ if __name__ == "__main__":
         '我喜欢画画也喜欢唱歌'
     ]
     examples = preprocess_prediction_data(data, tokenizer, pad_token_id)
-
+    
     results = predictor.predict(
         examples,
         label_map,

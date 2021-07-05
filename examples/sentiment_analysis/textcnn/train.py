@@ -38,6 +38,7 @@ parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path o
 args = parser.parse_args()
 # yapf: enable
 
+
 def set_seed(seed=1000):
     """Sets random seed."""
     random.seed(seed)

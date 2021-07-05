@@ -179,7 +179,7 @@ python predict.py --vocab_path=./robot_chat_word_dict.txt \
 如
 
 ```text
-Data: 下周星期一就要考试了我害怕我考试不会考考的很差     Label: negative
+Data: 你再骂我我真的不跟你聊了    Label: negative
 Data: 你看看我附近有什么好吃的   Label: neutral
 Data: 我喜欢画画也喜欢唱歌       Label: positive
 ```
