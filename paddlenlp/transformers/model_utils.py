@@ -162,26 +162,26 @@ class PretrainedModel(Layer, GenerationMixin):
             pretrained_model_name_or_path (str): Name of pretrained model or path of
                 model to load. The string can be:
 
-                - Name of built-in pretrained model or community contributed model
+                - Name of built-in pretrained model or community contributed model.
                 - Local directory path which contains model weights file("model_state.pdparams")
-                and model config file ("model_config.json").
-                - Local file path of model weights file
-                - URL path of model weights file
+                  and model config file ("model_config.json").
+                - Local file path of model weights file.
+                - URL path of model weights file.
             config_path (str, optional): Model configuration file path. A json file defines
                 the configuration of the pretrained_model. Defaults to None.
 
                 .. note::
                     - If `pretrained_model_name_or_path` is the name of built-in pretrained model or
-                    community contributed model, we will automatically use the corresponding
-                    model configuration. Thus `config_path` should be set to None.
-                    If not None, this arg will not take any effect anyway.
+                      community contributed model, we will automatically use the corresponding
+                      model configuration. Thus `config_path` should be set to None.
+                      If not None, this arg will not take any effect anyway.
                     - If `pretrained_model_name_or_path` is a local directory path, then
-                    model config file("model_config.json") under this directory will be loaded.
-                    If `config_path` is not None, then we update the model config file as `config_path`.
+                      model config file("model_config.json") under this directory will be loaded.
+                      If `config_path` is not None, then we update the model config file as `config_path`.
                     - If `pretrained_model_name_or_path` is a local file path of model weights file,
-                    then `config_path` must be provided to get correct model configuration
+                      then `config_path` must be provided to get correct model configuration.
                     - If `pretrained_model_name_or_path` is an URL path of model weights file,
-                    then `config_path` must be provided to get correct model configuration
+                      then `config_path` must be provided to get correct model configuration.
 
             *args (tuple): Position arguments for model `__init__`. If provided,
                 use these as position argument values for model initialization.

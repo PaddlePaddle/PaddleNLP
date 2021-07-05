@@ -420,7 +420,7 @@ class PretrainedTokenizer(object):
 
                 - Name of built-in pretrained model or community contributed model
                 - Local directory path which contains tokenizer related resources
-                and tokenizer config file ("tokenizer_config.json").
+                  and tokenizer config file ("tokenizer_config.json").
                 - Local file path of tokenizer vocab file
                 - URL path of tokenizer vocab file
             config_path (str, optional): Tokenizer configuration file path. A json file defines
@@ -428,16 +428,16 @@ class PretrainedTokenizer(object):
 
                 .. note::
                     - If `pretrained_model_name_or_path` is the name of built-in pretrained model or
-                    community contributed model, we will automatically use the corresponding
-                    tokenizer configuration. Thus `config_path` should be set to None.
-                    If not None, this arg will not take any effect anyway.
+                      community contributed model, we will automatically use the corresponding
+                      tokenizer configuration. Thus `config_path` should be set to None.
+                      If not None, this arg will not take any effect anyway.
                     - If `pretrained_model_name_or_path` is a local directory path, then
-                    tokenizer config file("tokenizer_config.json") under this directory will be loaded.
-                    If `config_path` is not None, then we update the tokenizer config file as `config_path`.
+                      tokenizer config file("tokenizer_config.json") under this directory will be loaded.
+                      If `config_path` is not None, then we update the tokenizer config file as `config_path`.
                     - If `pretrained_model_name_or_path` is a local file path of tokenizer vocab file,
-                    then `config_path` must be provided to get correct tokenizer configuration
+                      then `config_path` must be provided to get correct tokenizer configuration
                     - If `pretrained_model_name_or_path` is an URL path of tokenizer weights file,
-                    then `config_path` must be provided to get correct tokenizer configuration
+                      then `config_path` must be provided to get correct tokenizer configuration
 
             *args (tuple): position arguments for model `__init__`. If provided,
                 use these as position argument values for tokenizer initialization.
