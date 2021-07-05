@@ -106,9 +106,15 @@ def do_train(args):
     if args.model_name_or_path in pretrained_models_list:
         model_config = model_class.pretrained_init_configuration[
             args.model_name_or_path]
+        model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
+        model_config[
+            "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
         model = GPTForPretraining(GPTModel(**model_config))
     else:
-        model = GPTForPretraining.from_pretrained(args.model_name_or_path)
+        model = GPTForPretraining.from_pretrained(
+            args.model_name_or_path,
+            hidden_dropout_prob=args.hidden_dropout_prob,
+            attention_probs_dropout_prob=args.attention_probs_dropout_prob)
 
     # Create the critrion for the gpt model
     criterion = GPTPretrainingCriterion()
@@ -144,11 +150,16 @@ def do_train(args):
         weight_decay=args.weight_decay,
         grad_clip=clip,
         apply_decay_param_fun=lambda x: x in decay_params)
+
     if args.model_name_or_path not in pretrained_models_list:
-        logger.info("Try to load checkpoint from ", args.model_name_or_path)
-        opt_dict = paddle.load(
-            os.path.join(args.model_name_or_path, "model_state.pdopt"))
-        optimizer.set_state_dict(opt_dict)
+        logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
+        opt_path = os.path.join(args.model_name_or_path, "model_state.pdopt")
+        if os.path.exists(opt_path):
+            opt_dict = paddle.load(opt_path)
+            optimizer.set_state_dict(opt_dict)
+        else:
+            logger.warning("No optimizer checkpoint file found in %s." %
+                           opt_path)
 
     global_step = 0
     tic_train = time.time()
@@ -185,7 +196,7 @@ def do_train(args):
                 if global_step % args.logging_freq == 0:
                     speed = args.logging_freq / (time.time() - tic_train)
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.9f"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.5e"
                         % (global_step, epoch, step, loss, speed, speed *
                            default_global_tokens_num, optimizer.get_lr()))
                     log_writer.add_scalar("loss", float(loss), global_step)
@@ -197,6 +208,12 @@ def do_train(args):
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
+
+                if args.check_accuracy:
+                    if global_step >= args.max_steps:
+                        return
+                    else:
+                        continue
 
                 if global_step % args.eval_freq == 0:
                     # Since the valid data broardcast to all devices, we do evaluate on all device.

@@ -16,7 +16,6 @@ import collections
 import json
 import io
 import os
-import string
 
 import numpy as np
 
@@ -54,8 +53,6 @@ class Imdb(DatasetBuilder):
         return data_dir
 
     def _read(self, data_dir, *args):
-        translator = str.maketrans('', '', string.punctuation)
-
         for label in ["pos", "neg"]:
             root = os.path.join(data_dir, label)
             data_files = os.listdir(root)
@@ -69,7 +66,7 @@ class Imdb(DatasetBuilder):
                 f = os.path.join(root, f)
                 with io.open(f, 'r', encoding='utf8') as fr:
                     data = fr.readlines()
-                    data = data[0].translate(translator)
+                    data = data[0]
                     yield {"text": data, "label": label_id}
 
     def get_labels(self):
