@@ -166,8 +166,7 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds, dev_ds, test_ds = load_dataset(
-        "lcqmc", splits=["train", "dev", "test"])
+    train_ds, dev_ds = load_dataset("lcqmc", splits=["train", "dev"])
 
     # If you wanna use bert/roberta pretrained model,
     # pretrained_model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese')
@@ -202,12 +201,6 @@ def do_train():
     dev_data_loader = create_dataloader(
         dev_ds,
         mode='dev',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
-    test_data_loader = create_dataloader(
-        test_ds,
-        mode='test',
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
@@ -273,10 +266,6 @@ def do_train():
                 save_param_path = os.path.join(save_dir, 'model_state.pdparams')
                 paddle.save(model.state_dict(), save_param_path)
                 tokenizer.save_pretrained(save_dir)
-
-    if rank == 0:
-        print('Evaluating on test data.')
-        evaluate(model, criterion, metric, test_data_loader)
 
 
 if __name__ == "__main__":
