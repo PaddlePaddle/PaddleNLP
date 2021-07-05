@@ -118,10 +118,9 @@ class MultiHeadAttention(nn.Layer):
     def __rel_shift(self, x, klen=-1):
         # shape: [B, N, T, 2 * T + M]
         x_shape = x.shape
-        x = paddle.reshape(x, [x_shape[0], x_shape[1], x_shape[3], x_shape[2]])
+        x = x.reshape([x_shape[0], x_shape[1], x_shape[3], x_shape[2]])
         x = x[:, :, 1:, :]
-        x = paddle.reshape(
-            x, [x_shape[0], x_shape[1], x_shape[2], x_shape[3] - 1])
+        x = x.reshape([x_shape[0], x_shape[1], x_shape[2], x_shape[3] - 1])
         return x[:, :, :, :klen]
 
     def __scaled_dot_product_attention(self, q, k, v, r, t, attn_mask):
@@ -296,7 +295,6 @@ class ErnieDocEncoder(nn.Layer):
 
 
 class ErnieDocPretrainedModel(PretrainedModel):
-    # TODO(zhoushunjie): need to set the config
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "ernie-doc-base-en": {
@@ -350,8 +348,6 @@ class ErnieDocEmbeddings(nn.Layer):
                  type_vocab_size=3,
                  padding_idx=0):
         super(ErnieDocEmbeddings, self).__init__()
-        # self.word_emb = nn.Embedding(
-        #     vocab_size, d_model, padding_idx=padding_idx)
         self.word_emb = nn.Embedding(vocab_size, d_model)
         self.pos_emb = nn.Embedding(max_position_embeddings * 2 + memory_len,
                                     d_model)

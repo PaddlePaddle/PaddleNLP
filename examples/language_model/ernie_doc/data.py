@@ -92,10 +92,7 @@ def pad_batch_data(insts,
         return_list += [num_token]
 
     if return_seq_lens:
-        if paddle.__version__[:3] <= '1.5':
-            seq_lens_type = [-1, 1]
-        else:
-            seq_lens_type = [-1]
+        seq_lens_type = [-1]
         seq_lens = np.array([len(inst) for inst in insts])
         return_list += [seq_lens.astype("int64").reshape(seq_lens_type)]
 
@@ -294,13 +291,11 @@ class ClassifierIterator(object):
                     yield batch_records
 
     def __call__(self):
-        all_dev_batches = []
+        curr_id = 0
         for batch_records in self._create_instances():
-            if len(all_dev_batches) < self.trainer_num:
-                all_dev_batches.append(batch_records)
-            if len(all_dev_batches) == self.trainer_num:
-                yield all_dev_batches[self.trainer_id]
-                all_dev_batches = []
+            if curr_id == self.trainer_id:
+                yield batch_records
+            curr_id = (curr_id + 1) % self.trainer_num
 
     def get_num_examples(self):
         if self.num_examples is None:

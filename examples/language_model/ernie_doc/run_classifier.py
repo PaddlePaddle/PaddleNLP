@@ -127,7 +127,7 @@ def do_train(args):
         args.model_name_or_path, num_classes=2)
 
     model_config = model.ernie_doc.config
-    if paddle.distributed.get_world_size() > 1:
+    if trainer_num > 1:
         model = paddle.DataParallel(model)
     tokenizer = BPETokenizer.from_pretrained(args.model_name_or_path)
 
@@ -188,11 +188,11 @@ def do_train(args):
 
     global_steps = 0
     best_acc = -1
-    memories0 = init_memory(args.batch_size, args.memory_length,
+    create_memory = partial(init_memory, args.batch_size, args.memory_length,
                             model_config["hidden_size"],
                             model_config["num_hidden_layers"])
     # copy the memory
-    memories = list(memories0)
+    memories = create_memory()
     tic_train = time.time()
     for epoch in range(args.epochs):
         train_ds_iter.shuffle_sample()
@@ -227,7 +227,7 @@ def do_train(args):
                 # evaluate
                 logger.info("Eval:")
                 eval_acc = evaluate(model, criterion, eval_metric,
-                                    test_dataloader, memories0)
+                                    test_dataloader, create_memory())
                 # save
                 if rank == 0:
                     output_dir = os.path.join(args.output_dir,
