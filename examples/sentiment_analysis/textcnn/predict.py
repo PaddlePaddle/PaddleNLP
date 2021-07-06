@@ -71,7 +71,7 @@ def predict(model, data, label_map, batch_size=1, pad_token_id=0):
 
 
 if __name__ == "__main__":
-    paddle.set_device(args.device.lower())
+    paddle.set_device(args.device)
 
     # Load vocab.
     vocab = Vocab.load_vocabulary(
