@@ -33,6 +33,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack
 
 from data import ClassifierIterator, preprocess_imdb
+from optimization import AdamLW
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -40,19 +41,17 @@ parser.add_argument("--batch_size", default=16, type=int, help="Batch size per G
 parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-en", help="pretraining model name or path")
 parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--learning_rate", type=float, default=7e-5, help="Learning rate used to train.")
-parser.add_argument("--max_steps", default=10000, type=int, help="Max training steps to train.")
 parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
 parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
 parser.add_argument("--output_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
 parser.add_argument("--epochs", type=int, default=3, help="Number of epoches for training.")
-parser.add_argument("--attn_dropout", type=float, default=0.0, help="Attention ffn model dropout.")
-parser.add_argument("--hidden_dropout_prob", type=float, default=0.0, help="The dropout rate for the embedding pooler.")
 parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
 parser.add_argument("--seed", type=int, default=1, help="Random seed for initialization.")
 parser.add_argument("--memory_length", type=int, default=128, help="Random seed for initialization.")
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--dataset", default="imdb", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str, help="The training dataset")
+parser.add_argument("--layerwise_decay", default=1.0, type=float, help="layerwise decay ratio")
 
 # yapf: enable
 args = parser.parse_args()
@@ -201,11 +200,13 @@ def do_train(args):
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
-    optimizer = paddle.optimizer.AdamW(
+    optimizer = AdamLW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+        n_layers=model_config["num_hidden_layers"],
+        layerwise_decay=args.layerwise_decay)
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()

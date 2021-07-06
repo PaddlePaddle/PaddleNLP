@@ -293,16 +293,13 @@ class ClassifierIterator(object):
                 for batch_records in self._prepare_batch_data(sample_batch):
                     yield batch_records
 
-        if self.mode != "train":
-            if self._cnt_list(pre_batch_list):
-                pre_batch_list += [
-                    []
-                    for _ in range(self.batch_size * self.trainer_num -
-                                   self._cnt_list(pre_batch_list))
-                ]
-                sample_batch = self._get_samples(pre_batch_list, is_last=True)
-                for batch_records in self._prepare_batch_data(sample_batch):
-                    yield batch_records
+        if self._cnt_list(pre_batch_list):
+            pre_batch_list += [[]
+                               for _ in range(self.batch_size * self.trainer_num
+                                              - self._cnt_list(pre_batch_list))]
+            sample_batch = self._get_samples(pre_batch_list, is_last=True)
+            for batch_records in self._prepare_batch_data(sample_batch):
+                yield batch_records
 
     def __call__(self):
         curr_id = 0
