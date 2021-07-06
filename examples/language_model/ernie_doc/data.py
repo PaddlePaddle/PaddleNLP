@@ -155,7 +155,11 @@ class ClassifierIterator(object):
         return text
 
     def _convert_to_features(self, example):
-        text = example["text"]
+        if "text" in example:  # imdb
+            text = example["text"]
+        elif "sentence" in example:  # iflytek
+            text = example["sentence"]
+
         if self.preprocess_text_fn:
             text = self.preprocess_text_fn(text)
         label = example["label"]

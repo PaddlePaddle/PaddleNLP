@@ -85,10 +85,18 @@ class ErnieDocTokenizer(ErnieTokenizer):
 
 
     """
-    # TODO(zhoushunjie): need to add vocab.txt url
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
-    pretrained_resource_files_map = {"vocab_file": {}}
-    pretrained_init_configuration = {"": {"": True}, }
+    pretrained_resource_files_map = {
+        "vocab_file": {
+            "ernie-doc-base-zh":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-doc-base-zh/vocab.txt",
+        }
+    }
+    pretrained_init_configuration = {
+        "ernie-doc-base-zh": {
+            "do_lower_case": True
+        },
+    }
 
     def __init__(self,
                  vocab_file,

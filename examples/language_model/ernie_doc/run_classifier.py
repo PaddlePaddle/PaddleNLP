@@ -52,18 +52,20 @@ parser.add_argument("--seed", type=int, default=1, help="Random seed for initial
 parser.add_argument("--memory_length", type=int, default=128, help="Random seed for initialization.")
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
-parser.add_argument("--num_labels", default=2, type=int, help="The number of labels.")
 parser.add_argument("--dataset", default="imdb", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str, help="The training dataset")
 
 # yapf: enable
 args = parser.parse_args()
 
 # tokenizer, num_classes, test_name, preprocess_text_fn
+# BPETokenizer for English Tasks
+# ErnieDocTokenizer for Chinese Tasks
+
 DATASET_INFO = {
-    "imdb": (BPETokenizer, 2, "test", preprocess_imdb),
-    "hyp": (BPETokenizer, 0, "dev", None),
-    "iflytek": (ErnieDocTokenizer, 0, "dev", None),
-    "thucnews": (ErnieDocTokenizer, 0, "dev", None)
+    "imdb": (BPETokenizer, "test", preprocess_imdb),
+    "hyp": (BPETokenizer, "dev", None),
+    "iflytek": (ErnieDocTokenizer, "dev", None),
+    "thucnews": (ErnieDocTokenizer, "dev", None)
 }
 
 
@@ -126,9 +128,18 @@ def evaluate(model, criterion, metric, data_loader, memories0):
 
 def do_train(args):
     set_seed(args)
-    tokenizer_class, num_classes, test_name, preprocess_text_fn = DATASET_INFO[
-        args.dataset]
+    tokenizer_class, test_name, preprocess_text_fn = DATASET_INFO[args.dataset]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+
+    # get dataset
+    if args.dataset == "iflytek":
+        train_ds, test_ds = load_dataset(
+            "clue", name=args.dataset, splits=["train", test_name])
+    else:
+        train_ds, test_ds = load_dataset(
+            args.dataset, splits=["train", test_name])
+
+    num_classes = len(train_ds.label_list)
 
     # initialize model 
     paddle.set_device(args.device)
@@ -144,13 +155,6 @@ def do_train(args):
     model_config = model.ernie_doc.config
     if trainer_num > 1:
         model = paddle.DataParallel(model)
-
-    if args.dataset == "iflytek":
-        train_ds, test_ds = load_dataset(
-            "clue", name=args.dataset, splits=["train", test_name])
-    else:
-        train_ds, test_ds = load_dataset(
-            args.dataset, splits=["train", test_name])
 
     train_ds_iter = ClassifierIterator(
         train_ds,

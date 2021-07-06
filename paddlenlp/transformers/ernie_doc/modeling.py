@@ -312,6 +312,22 @@ class ErnieDocPretrainedModel(PretrainedModel):
             "memory_len": 128,
             "epsilon": 1e-12,
             "pad_token_id": 1
+        },
+        "ernie-doc-base-zh": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "relu_dropout": 0.0,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
+            "vocab_size": 28000,
+            "memory_len": 128,
+            "epsilon": 1e-12,
+            "pad_token_id": 0
         }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -319,6 +335,8 @@ class ErnieDocPretrainedModel(PretrainedModel):
         "model_state": {
             "ernie-doc-base-en":
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-doc-base-en/ernie-doc-base-en.pdparams",
+            "ernie-doc-base-zh":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-doc-base-zh/ernie-doc-base-zh.pdparams",
         }
     }
     base_model_prefix = "ernie_doc"
