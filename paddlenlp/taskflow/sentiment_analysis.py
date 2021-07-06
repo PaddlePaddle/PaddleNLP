@@ -68,6 +68,15 @@ class BoWModel(nn.Layer):
 
 
 class LSTMModel(nn.Layer):
+    """
+    This class implements the Bag of Words Classification Network model to classify texts.
+    At a high level, the model starts by embedding the tokens and running them through
+    a word embedding. Then, we encode these epresentations with a `BoWEncoder`.
+    Lastly, we take the output of the encoder to create a final representation,
+    which is passed through some feed-forward layers to output a logits (`output_layer`).
+
+    """
+
     def __init__(self,
                  vocab_size,
                  num_classes,
@@ -109,13 +118,18 @@ class LSTMModel(nn.Layer):
 
 
 class SentaTask(Task):
+    """The one task of sentiment_analysis which use the RNN or Bow model to analysis the input text. 
+    """
+
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        self._model, self._tokenizer, _ = self._construct_model_tokenizer(
-            model, **self.kwargs)
+        self._tokenizer = self._construct_tokenizer(model)
+        self._model = self._construct_model(model)
         self._label_map = {0: 'negative', 1: 'positive'}
 
     def _download_resoures(self, save_dir, name, filename):
+        """Download the resources from the cloud.
+        """
         default_root = os.path.join(MODEL_HOME, save_dir)
         fullname = os.path.join(default_root, filename)
         url = URLS[name]
@@ -123,24 +137,17 @@ class SentaTask(Task):
             get_path_from_url(url, default_root)
         return fullname
 
-    def _construct_model_tokenizer(self, model, **kwargs):
-        # Download the vocab from the url 
-        full_name = self._download_resoures("senta", "senta_vocab",
-                                            "senta_word_dict.txt")
-        vocab = Vocab.load_vocabulary(
-            full_name, unk_token='[UNK]', pad_token='[PAD]')
-
-        vocab_size = len(vocab)
-        pad_token_id = vocab.to_indices('[PAD]')
+    def _construct_model(self, model):
+        """Construct the inference model for the predictor.
+        """
+        vocab_size = self.kwargs['vocab_size']
+        pad_token_id = self.kwargs['pad_token_id']
         num_classes = 2
-
-        # Construct the tokenizer form the JiebaToeknizer
-        tokenizer = JiebaTokenizer(vocab)
 
         # Select the senta network for the inference
         network = "bow"
-        if 'network' in kwargs:
-            network = kwargs['network']
+        if 'network' in self.kwargs:
+            network = self.kwargs['network']
         if network == "bow":
             model = BoWModel(vocab_size, num_classes, padding_idx=pad_token_id)
             model_full_name = self._download_resoures("senta", "senta_bow",
@@ -156,21 +163,42 @@ class SentaTask(Task):
                                                       "senta_lstm.pdparams")
         else:
             raise ValueError(
-                "Unknown network: %s, it must be one of bow, lstm, bilstm, cnn, gru, bigru, rnn, birnn and bilstm_attn."
-                % network)
+                "Unknown network: {}, it must be one of bow, lstm.".format(
+                    network))
 
         # Load the model parameter for the predict
         state_dict = paddle.load(model_full_name)
         model.set_dict(state_dict)
-        return model, tokenizer, kwargs
+        return model
 
-    def _text_tokenize(self, inputs, padding=True, add_special_tokens=True):
+    def _construct_tokenizer(self, model):
+        """Construct the tokenizer for the predictor.
+        """
+        full_name = self._download_resoures("senta", "senta_vocab",
+                                            "senta_word_dict.txt")
+        vocab = Vocab.load_vocabulary(
+            full_name, unk_token='[UNK]', pad_token='[PAD]')
+
+        vocab_size = len(vocab)
+        pad_token_id = vocab.to_indices('[PAD]')
+        # Construct the tokenizer form the JiebaToeknizer
+        self.kwargs['pad_token_id'] = pad_token_id
+        self.kwargs['vocab_size'] = vocab_size
+        tokenizer = JiebaTokenizer(vocab)
+        return tokenizer
+
+    def _preprocess(self, inputs, padding=True, add_special_tokens=True):
+        """
+        Transform the raw text to the model inputs, two steps involved:
+           1) Transform the raw text to token ids.
+           2) Generate the other model inputs from the raw text and token ids.
+        """
         inputs = inputs[0]
         if isinstance(inputs, str):
             inputs = [inputs]
         if not isinstance(inputs, str) and not isinstance(inputs, list):
             raise TypeError(
-                f"Bad inputs, input text should be str or list of str, {type(inputs)} found!"
+                "Invalid inputs, input text should be str or list of str, {type(inputs)} found!"
             )
         infer_data = []
         for i in range(0, len(inputs)):
@@ -200,6 +228,8 @@ class SentaTask(Task):
         return outputs
 
     def _run_model(self, inputs):
+        """Run the task model from the outputs of the `_tokenize` function. 
+        """
         results = []
         with paddle.no_grad():
             for batch in inputs['data_loader']:
@@ -214,6 +244,8 @@ class SentaTask(Task):
         return inputs
 
     def _postprocess(self, inputs):
+        """The model output is allways the logits and pros, this function will convert the model output to raw text.
+        """
         final_results = []
         for text, label in zip(inputs['text'], inputs['result']):
             result = {}

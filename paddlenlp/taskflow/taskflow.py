@@ -1,6 +1,8 @@
 import warnings
+import paddle
 from .text2knowledge import Text2KnowledgeTask
 from .sentiment_analysis import SentaTask
+from ..utils.tools import get_env_device
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -8,8 +10,7 @@ TASKS = {
     "text2knowledge": {
         "models": {
             "wordtag": {
-                "model_class": Text2KnowledgeTask,
-                "max_seq_len": 128,
+                "model_class": Text2KnowledgeTask
             }
         },
         "default": {
@@ -52,7 +53,15 @@ class TaskFlow(object):
             )), "The model name:{} is not in task:[{}]".format(model)
         else:
             model = TASKS[task]['default']['model']
+        # Set the device for the task
+        device = get_env_device()
+        if device == 'cpu' or device_id == -1:
+            paddle.set_device('cpu')
+        else:
+            paddle.set_device(device + ":" + str(device_id))
+
         self.model = model
+        # Update the task config to kwargs
         config_kwargs = TASKS[self.task]['models'][self.model]
         kwargs.update(config_kwargs)
         self.kwargs = kwargs

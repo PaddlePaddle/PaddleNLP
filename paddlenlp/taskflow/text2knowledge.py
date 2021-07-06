@@ -85,17 +85,21 @@ URLS = {
     "https://kg-concept.bj.bcebos.com/TermTree/TermTree.V1.0.tar.gz",
     "termtree_type.csv":
     "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_type.csv",
-    "termtree_tags.txt":
+    "termtree_tags_pos.txt":
     "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_tags_pos.txt",
 }
 
 
 class Text2KnowledgeTask(Task):
+    """This the NER(Named Entity Recognition) task that convert the raw text to entities. And the task with the `wordtag` 
+    model will link the more meesage with the entity.
+    """
+
     def __init__(self, model, task, **kwargs):
         super().__init__(model=model, task=task, **kwargs)
         term_schema_path = self._download_termtree("termtree_type.csv")
         term_data_path = self._download_termtree("TermTree.V1.0")
-        tag_path = self._download_termtree("termtree_tags.txt")
+        tag_path = self._download_termtree("termtree_tags_pos.txt")
         self._tags_to_index, self._index_to_tags = self._load_labels(tag_path)
 
         if term_schema_path is not None:
@@ -106,9 +110,8 @@ class Text2KnowledgeTask(Task):
             self._linking = True
         else:
             self._linking = False
-        self._model, self._tokenizer, kwargs = self._construct_model_tokenizer(
-            model, **self.kwargs)
-        self.kwargs.update(**kwargs)
+        self._tokenizer = self._construct_tokenizer(model)
+        self._model = self._construct_model(model)
         self._summary_num = self._model.ernie_ctm.content_summary_index + 1
 
     def _download_termtree(self, filename):
@@ -145,7 +148,7 @@ class Text2KnowledgeTask(Task):
 
     @staticmethod
     def _load_schema(schema_path):
-        schema_df = pd.read_csv(schema_path, sep="\t", encoding="gb2312")
+        schema_df = pd.read_csv(schema_path, sep="\t", encoding="utf8")
         schema = {}
         for idx in range(schema_df.shape[0]):
             if not isinstance(schema_df["type-1"][idx], float):
@@ -187,7 +190,10 @@ class Text2KnowledgeTask(Task):
                         term_dict[alia][data["termtype"]].append(data["termid"])
         return term_dict
 
-    def _split_long_text2short_text_list(self, input_texts, max_text_len):
+    def _split_long_text_input(self, input_texts, max_text_len):
+        """Split the long text to list of short text, the max_seq_len of input text is 512,
+           if the text length greater than 512, will this function that spliting the long text.
+        """
         short_input_texts = []
         short_input_texts_lens = []
         for text in input_texts:
@@ -216,7 +222,10 @@ class Text2KnowledgeTask(Task):
                             self._split_long_text2short_text_list([temp_text]))
         return short_input_texts
 
-    def _convert_short_text2long_text_result(self, input_texts, results):
+    def _concat_short_text_reuslts(self, input_texts, results):
+        """
+        Concat the model output of short texts to the total result of long text.
+        """
         long_text_lens = [len(text) for text in input_texts]
         concat_results = []
         single_results = {}
@@ -237,7 +246,8 @@ class Text2KnowledgeTask(Task):
                     single_results = {}
                     break
                 else:
-                    raise Exception("The len of text must same as raw text.")
+                    raise Exception(
+                        "The length of input text and raw text is not equal.")
         for result in concat_results:
             pred_words = result['items']
             pred_words = self._reset_offset(pred_words)
@@ -245,17 +255,19 @@ class Text2KnowledgeTask(Task):
 
         return concat_results
 
-    def _pre_process_text(self, input_texts, **kwargs):
+    def _preprocess_text(self, input_texts):
+        """Create the dataset and dataloader for the predict.
+        """
         batch_size = 1
-        if 'batch_size' in kwargs:
-            batch_size = kwargs['batch_size']
+        if 'batch_size' in self.kwargs:
+            batch_size = self.kwargs['batch_size']
         max_seq_length = 128
-        if 'max_position_embedding' in kwargs:
-            max_seq_length = kwargs['max_position_embedding']
+        if 'max_position_embedding' in self.kwargs:
+            max_seq_length = self.kwargs['max_position_embedding']
         infer_data = []
         max_predict_len = max_seq_length - self.summary_num - 1
-        short_input_texts = self._split_long_text2short_text_list(
-            input_texts, max_predict_len)
+        short_input_texts = self._split_long_text_input(input_texts,
+                                                        max_predict_len)
         for text in short_input_texts:
             tokenized_output = self._tokenizer(
                 list(text),
@@ -274,7 +286,8 @@ class Text2KnowledgeTask(Task):
             Stack(dtype='int64'),  # seq_len
         ): fn(samples)
 
-        num_workers = kwargs['num_workers'] if 'num_workers' in kwargs else 0
+        num_workers = self.kwargs[
+            'num_workers'] if 'num_workers' in self.kwargs else 0
         infer_data_loader = paddle.io.DataLoader(
             infer_ds,
             collate_fn=batchify_fn,
@@ -387,21 +400,34 @@ class Text2KnowledgeTask(Task):
                 item["termid"] = term_id
         pass
 
-    def _construct_model_tokenizer(self, model, **kwargs):
+    def _construct_model(self, model):
+        """
+        Construct the inference model for the predictor.
+        """
         model_instance = ErnieCtmWordtagModel.from_pretrained(
             model,
             num_cls_label=4,
             num_tag=len(self._tags_to_index),
             ignore_index=self._tags_to_index["O"])
-        tokenizer_instance = ErnieCtmTokenizer.from_pretrained(model)
-        # Update the model config for the kwargs
         config_keys = ErnieCtmWordtagModel.pretrained_init_configuration[
             self.model]
-        kwargs.update(config_keys)
+        self.kwargs.update(config_keys)
         model_instance.eval()
-        return model_instance, tokenizer_instance, kwargs
+        return model_instance
 
-    def _text_tokenize(self, inputs, padding=True, add_special_tokens=True):
+    def _construct_tokenizer(self, model):
+        """
+        Construct the tokenizer for the predictor.
+        """
+        tokenizer_instance = ErnieCtmTokenizer.from_pretrained(model)
+        return tokenizer_instance
+
+    def _preprocess(self, inputs, padding=True, add_special_tokens=True):
+        """
+        Transform the raw text to the model inputs, two steps involved:
+           1) Transform the raw text to token ids.
+           2) Generate the other model inputs from the raw text and token ids.
+        """
         inputs = inputs[0]
 
         if isinstance(inputs, str):
@@ -410,11 +436,14 @@ class Text2KnowledgeTask(Task):
             raise TypeError(
                 f"Bad inputs, input text should be str or list of str, {type(inputs)} found!"
             )
-        outputs = self._pre_process_text(inputs, **self.kwargs)
+        outputs = self._preprocess_text(inputs)
         outputs['inputs'] = inputs
         return outputs
 
     def _run_model(self, inputs):
+        """
+        Run the task model from the outputs of the `_tokenize` function. 
+        """
         all_pred_tags = []
         with paddle.no_grad():
             for batch in inputs['data_loader']:
@@ -429,10 +458,12 @@ class Text2KnowledgeTask(Task):
         return inputs
 
     def _postprocess(self, inputs):
+        """
+        The model output is allways the logits and pros, this function will convert the model output to raw text.
+        """
         results = self._decode(inputs['short_input_texts'],
                                inputs['all_pred_tags'])
-        resulte = self._convert_short_text2long_text_result(inputs['inputs'],
-                                                            results)
+        resulte = self._concat_short_text_reuslts(inputs['inputs'], results)
         if self.linking is True:
             for res in results:
                 self._term_linking(res)
