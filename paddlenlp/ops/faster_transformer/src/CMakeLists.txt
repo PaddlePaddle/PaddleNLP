@@ -1,5 +1,7 @@
 add_definitions(-DNDEBUG)
 add_definitions(-DPADDLE_CUDA)
+# Default is 1 in standard c++ when using gcc8.2
+add_definitions(-D_GLIBCXX_USE_CXX11_ABI=1)
 
 if(ON_INFER)
   add_definitions(-DPADDLE_ON_INFERENCE)

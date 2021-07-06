@@ -487,7 +487,7 @@ def do_train(args):
                     input_ids, segment_ids, attention_mask=[None, None])
                 rep_loss = ofa_model.calc_distill_loss()
                 if args.task_name == 'sts-b':
-                    logit_loss = 0.0
+                    logit_loss = paddle.zeros(shape=[1], dtype='float32')
                 else:
                     logit_loss = soft_cross_entropy(logits,
                                                     teacher_logits.detach())
