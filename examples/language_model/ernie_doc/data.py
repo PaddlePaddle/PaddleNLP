@@ -99,6 +99,12 @@ def pad_batch_data(insts,
     return return_list if len(return_list) > 1 else return_list[0]
 
 
+def preprocess_imdb(text):
+    text = text.strip().replace('<br /><br />', ' ')
+    text = text.replace('\t', '')
+    return text
+
+
 class ClassifierIterator(object):
     def __init__(self,
                  dataset,
@@ -111,7 +117,8 @@ class ClassifierIterator(object):
                  repeat_input=False,
                  in_tokens=False,
                  mode="train",
-                 random_seed=None):
+                 random_seed=None,
+                 preprocess_text_fn=None):
         self.batch_size = batch_size
         self.tokenizer = tokenizer
         self.trainer_num = trainer_num
@@ -127,6 +134,7 @@ class ClassifierIterator(object):
         if random_seed is None:
             random_seed = 12345
         self.random_seed = random_seed
+        self.preprocess_text_fn = preprocess_text_fn
 
     def shuffle_sample(self):
         if self.shuffle:
@@ -147,7 +155,9 @@ class ClassifierIterator(object):
         return text
 
     def _convert_to_features(self, example):
-        text = self._preprocess_text(example["text"])
+        text = example["text"]
+        if self.preprocess_text_fn:
+            text = self.preprocess_text_fn(text)
         label = example["label"]
         doc_spans = []
         _DocSpan = namedtuple("DocSpan", ["start", "length"])

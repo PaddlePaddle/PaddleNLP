@@ -24,13 +24,15 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.io import DataLoader
-from paddlenlp.transformers import ErnieDocModel, ErnieDocForSequenceClassification, BPETokenizer
+from paddlenlp.transformers import ErnieDocModel
+from paddlenlp.transformers import ErnieDocForSequenceClassification
+from paddlenlp.transformers import BPETokenizer, ErnieDocTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack
 
-from data import ClassifierIterator
+from data import ClassifierIterator, preprocess_imdb
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -51,9 +53,18 @@ parser.add_argument("--memory_length", type=int, default=128, help="Random seed 
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--num_labels", default=2, type=int, help="The number of labels.")
+parser.add_argument("--dataset", default="imdb", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str, help="The training dataset")
 
 # yapf: enable
 args = parser.parse_args()
+
+# tokenizer, num_classes, test_name, preprocess_text_fn
+DATASET_INFO = {
+    "imdb": (BPETokenizer, 2, "test", preprocess_imdb),
+    "hyp": (BPETokenizer, 0, "dev", None),
+    "iflytek": (ErnieDocTokenizer, 0, "dev", None),
+    "thucnews": (ErnieDocTokenizer, 0, "dev", None)
+}
 
 
 def set_seed(args):
@@ -114,24 +125,32 @@ def evaluate(model, criterion, metric, data_loader, memories0):
 
 
 def do_train(args):
+    set_seed(args)
+    tokenizer_class, num_classes, test_name, preprocess_text_fn = DATASET_INFO[
+        args.dataset]
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+
+    # initialize model 
     paddle.set_device(args.device)
     trainer_num = paddle.distributed.get_world_size()
     if trainer_num > 1:
         paddle.distributed.init_parallel_env()
     rank = paddle.distributed.get_rank()
-    set_seed(args)
     if rank == 0:
         if os.path.exists(args.model_name_or_path):
             logger.info("init checkpoint from %s" % args.model_name_or_path)
     model = ErnieDocForSequenceClassification.from_pretrained(
-        args.model_name_or_path, num_classes=2)
-
+        args.model_name_or_path, num_classes=num_classes)
     model_config = model.ernie_doc.config
     if trainer_num > 1:
         model = paddle.DataParallel(model)
-    tokenizer = BPETokenizer.from_pretrained(args.model_name_or_path)
 
-    train_ds, test_ds = load_dataset("imdb", splits=["train", "test"])
+    if args.dataset == "iflytek":
+        train_ds, test_ds = load_dataset(
+            "clue", name=args.dataset, splits=["train", test_name])
+    else:
+        train_ds, test_ds = load_dataset(
+            args.dataset, splits=["train", test_name])
 
     train_ds_iter = ClassifierIterator(
         train_ds,
@@ -141,7 +160,8 @@ def do_train(args):
         trainer_id=rank,
         memory_len=model_config["memory_len"],
         max_seq_length=args.max_seq_length,
-        random_seed=args.seed)
+        random_seed=args.seed,
+        preprocess_text_fn=preprocess_text_fn)
     test_ds_iter = ClassifierIterator(
         test_ds,
         args.batch_size,
@@ -150,7 +170,8 @@ def do_train(args):
         trainer_id=rank,
         memory_len=model_config["memory_len"],
         max_seq_length=args.max_seq_length,
-        mode="test")
+        mode="test",
+        preprocess_text_fn=preprocess_text_fn)
 
     train_dataloader = paddle.io.DataLoader.from_generator(
         capacity=70, return_list=True)
