@@ -86,7 +86,12 @@ def dist_optimizer(args, topo):
     if args.use_amp:
         dist_strategy.amp = True
         dist_strategy.amp_configs = {
-            "custom_white_list": ['softmax', 'layer_norm', 'gelu'],
+            "custom_white_list": [
+                'softmax',
+                'layer_norm',
+                'gelu',
+            ],
+            "custom_black_list": ['c_softmax_with_cross_entropy'],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
         }
@@ -282,8 +287,7 @@ def do_train(args):
 
             clip = None
             if args.grad_clip > 0:
-                # TODO @ZHUI Use nn.ClipGradByNorm
-                clip = paddle.fluid.clip.GradientClipByNorm(
+                clip = paddle.fluid.clip.GradientClipByGlobalNorm(
                     clip_norm=args.grad_clip)
 
             decay_param = [
@@ -292,6 +296,7 @@ def do_train(args):
             ]
             # TODO @ZHUI Use paddle.optimizer.AdamW
             if ops.optimizer._jit_compile():
+                logger.info("Using paddlenlp custom AdamW optimizer.")
                 optimizer = ops.optimizer.AdamwOptimizer(
                     learning_rate=lr_scheduler,
                     beta1=args.adam_beta1,
@@ -305,6 +310,7 @@ def do_train(args):
                     raise ValueError(
                         "The paddle.optimizer.AdamW not compatible with Sharding!"
                     )
+                logger.info("Using paddle.optimizer.AdamW.")
                 optimizer = paddle.optimizer.AdamW(
                     learning_rate=lr_scheduler,
                     beta1=args.adam_beta1,
@@ -313,6 +319,8 @@ def do_train(args):
                     grad_clip=clip,
                     weight_decay=args.weight_decay,
                     apply_decay_param_fun=lambda x: x in decay_param)
+                # alias
+                optimizer.apply_optimize = optimizer._apply_optimize
 
             if args.use_recompute:
                 dist_strategy.recompute = True
@@ -357,13 +365,15 @@ def do_train(args):
             if args.mp_degree > 1:
                 logger.warning("MP should init with dygraph params")
             else:
+                logger.info("Loading parameters from %s" % static_path)
                 paddle.static.load(main_program, static_path, exe)
                 flag_loaded = True
 
-        if os.path.exists(dygrah_path):
+        if not flag_loaded and os.path.exists(dygrah_path):
             if args.sharding_degree > 1:
                 logger.warning("Sharding should init with static vars")
             else:
+                logger.info("Loading parameters from %s" % dygrah_path)
                 init_static_with_params(
                     model,
                     paddle.load(
@@ -371,6 +381,7 @@ def do_train(args):
                     topo,
                     main_program)
                 flag_loaded = True
+
         if not flag_loaded:
             logger.error("No checkpoint load.")
 
@@ -435,7 +446,9 @@ def do_train(args):
                 save_persistables(exe,
                                   os.path.join(output_dir, "static_vars"),
                                   main_program)
-                model.init_config["init_args"][0].init_config.pop("topo", None)
+                if global_step == args.save_steps:
+                    model.init_config["init_args"][0].init_config.pop("topo",
+                                                                      None)
                 model.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
                 tic_train = time.time()
