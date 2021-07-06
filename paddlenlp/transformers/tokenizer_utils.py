@@ -408,7 +408,11 @@ class PretrainedTokenizer(object):
         return tokens
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, config_path=None, *args, **kwargs):
+    def from_pretrained(cls,
+                        pretrained_model_name_or_path,
+                        config_path=None,
+                        *args,
+                        **kwargs):
         """
         Creates an instance of `PretrainedTokenizer`. Related resources are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
@@ -461,6 +465,7 @@ class PretrainedTokenizer(object):
 
                 # Load from local directory path
                 tokenizer = BertTokenizer.from_pretrained('./my_bert/')
+                # Load from local directory path and update config with provided config_path
                 tokenizer = BertTokenizer.from_pretrained('./my_bert/', config_path='./tokenizer_config.json')
 
                 # Load from local path of tokenizer vocab file
@@ -479,13 +484,16 @@ class PretrainedTokenizer(object):
             init_configuration = copy.deepcopy(
                 cls.pretrained_init_configuration[
                     pretrained_model_name_or_path])
-        elif pkg_resources.resource_exists('paddlenlp.transformers.community', pretrained_model_name_or_path):
-            json_file = pkg_resources.resource_filename('paddlenlp.transformers.community',
-                                                        pretrained_model_name_or_path + "/files.json")
+        elif pkg_resources.resource_exists('paddlenlp.transformers.community',
+                                           pretrained_model_name_or_path):
+            json_file = pkg_resources.resource_filename(
+                'paddlenlp.transformers.community',
+                pretrained_model_name_or_path + "/files.json")
             with io.open(json_file, encoding="utf-8") as f:
                 file_paths = json.load(f)
                 for file_id in cls.resource_files_names.keys():
-                    vocab_files[file_id] = file_paths[file_id] if file_id in file_paths else None
+                    vocab_files[file_id] = file_paths[
+                        file_id] if file_id in file_paths else None
         elif os.path.isdir(pretrained_model_name_or_path):
             for file_id, file_name in cls.resource_files_names.items():
                 full_file_name = os.path.join(pretrained_model_name_or_path,
@@ -495,14 +503,19 @@ class PretrainedTokenizer(object):
                 vocab_files["tokenizer_config_file"] = config_path
         elif os.path.isfile(pretrained_model_name_or_path) or \
                 urlparse(pretrained_model_name_or_path).scheme in ("http", "https"):
-            vocab_files[list(cls.resource_files_names.keys())[0]] = pretrained_model_name_or_path
+            vocab_files[list(cls.resource_files_names.keys())[
+                0]] = pretrained_model_name_or_path
             vocab_files["tokenizer_config_file"] = config_path
         else:
             raise ValueError(
-                "Calling {}.from_pretrained() with a model identifier or the "
-                "path to a directory instead. The supported model "
-                "identifiers are as follows: {}".format(
-                    cls.__name__, cls.pretrained_init_configuration.keys()))
+                "Calling {}.from_pretrained(pretrained_model_name_or_path, config_path=None)"
+                "where pretrained_model_name_or_path should be"
+                "a correct built-in pretrained model identifier,"
+                "or a correct community contributed model identifier,"
+                "or a local dir path with corresponding vocab file and tokenizer_config file,"
+                "or a local file path of corresponding vocab file,"
+                "or an URL path of corresponding vocab file.".format(
+                    cls.__name__, ))
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_vocab_files = {}

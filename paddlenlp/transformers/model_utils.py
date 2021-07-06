@@ -110,8 +110,10 @@ class PretrainedModel(Layer, GenerationMixin):
     # TODO: more flexible resource handle, namedtuple with fields as:
     # resource_name, saved_file, handle_name_for_load(None for used as __init__
     # arguments), handle_name_for_save
-    resource_files_names = {"model_state": "model_state.pdparams",
-                            "model_config_file": "model_config.json"}
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "model_config_file": "model_config.json"
+    }
     pretrained_resource_files_map = {}
     base_model_prefix = ""
 
@@ -152,7 +154,11 @@ class PretrainedModel(Layer, GenerationMixin):
         return None  # Overwrite for models with output embeddings
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, config_path=None, *args, **kwargs):
+    def from_pretrained(cls,
+                        pretrained_model_name_or_path,
+                        config_path=None,
+                        *args,
+                        **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
@@ -207,6 +213,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
                 # Load from local directory path
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
+                # Load from local directory path and update config with provided config_path
                 model = BertForSequenceClassification.from_pretrained('./my_bert/', config_path='./model_config.json')
 
                 # Load from local path of model weights file
@@ -227,13 +234,16 @@ class PretrainedModel(Layer, GenerationMixin):
             init_configuration = copy.deepcopy(
                 cls.pretrained_init_configuration[
                     pretrained_model_name_or_path])
-        elif pkg_resources.resource_exists('paddlenlp.transformers.community', pretrained_model_name_or_path):
-            json_file = pkg_resources.resource_filename('paddlenlp.transformers.community',
-                                                        pretrained_model_name_or_path + "/files.json")
+        elif pkg_resources.resource_exists('paddlenlp.transformers.community',
+                                           pretrained_model_name_or_path):
+            json_file = pkg_resources.resource_filename(
+                'paddlenlp.transformers.community',
+                pretrained_model_name_or_path + "/files.json")
             with io.open(json_file, encoding="utf-8") as f:
                 file_paths = json.load(f)
                 for file_id in cls.resource_files_names.keys():
-                    resource_files[file_id] = file_paths[file_id] if file_id in file_paths else None
+                    resource_files[file_id] = file_paths[
+                        file_id] if file_id in file_paths else None
         elif os.path.isdir(pretrained_model_name_or_path):
             for file_id, file_name in cls.resource_files_names.items():
                 full_file_name = os.path.join(pretrained_model_name_or_path,
@@ -247,12 +257,14 @@ class PretrainedModel(Layer, GenerationMixin):
             resource_files["model_config_file"] = config_path
         else:
             raise ValueError(
-                "Calling {}.from_pretrained() with a model identifier or the "
-                "path to a directory instead. The supported model "
-                "identifiers are as follows: {}, but got: {}".format(
-                    cls.__name__,
-                    cls.pretrained_init_configuration.keys(
-                    ), pretrained_model_name_or_path))
+                "Calling {}.from_pretrained(pretrained_model_name_or_path, config_path=None)"
+                "where pretrained_model_name_or_path should be"
+                "a correct built-in pretrained model identifier,"
+                "or a correct community contributed model identifier,"
+                "or a local dir path with corresponding model_weights file and model_config file,"
+                "or a local file path of corresponding model_weights file,"
+                "or an URL path of corresponding model_weights file.".format(
+                    cls.__name__))
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
