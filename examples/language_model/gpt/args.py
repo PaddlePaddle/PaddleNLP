@@ -14,6 +14,9 @@
 
 import argparse
 
+import paddle
+from paddlenlp.utils.log import logger
+
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -217,17 +220,53 @@ def parse_args(MODEL_CLASSES):
         default=128,
         help="The value of scale_loss for fp16. This is only used for AMP training."
     )
-
+    parser.add_argument(
+        "--hidden_dropout_prob",
+        type=float,
+        default=0.1,
+        help="The hidden dropout prob.")
+    parser.add_argument(
+        "--attention_probs_dropout_prob",
+        type=float,
+        default=0.1,
+        help="The attention probs dropout prob.")
     # Other config
     parser.add_argument(
         "--seed", type=int, default=1234, help="Random seed for initialization")
+    parser.add_argument(
+        "--check_accuracy",
+        type=str2bool,
+        nargs='?',
+        const=False,
+        help="Check accuracy for training process.")
     parser.add_argument(
         "--device",
         type=str,
         default="gpu",
         choices=["cpu", "gpu", "xpu"],
         help="select cpu, gpu, xpu devices.")
-
+    parser.add_argument(
+        "--lr_decay_style",
+        type=str,
+        default="cosine",
+        choices=["cosine", "none"],
+        help="Learning rate decay style.")
     args = parser.parse_args()
-    args.test_iters = args.eval_iters
+    args.test_iters = args.eval_iters * 10
+
+    if args.check_accuracy:
+        if args.hidden_dropout_prob != 0:
+            args.hidden_dropout_prob = .0
+            logger.warning(
+                "The hidden_dropout_prob should set to 0 for accuracy checking.")
+        if args.attention_probs_dropout_prob != 0:
+            args.attention_probs_dropout_prob = .0
+            logger.warning(
+                "The attention_probs_dropout_prob should set to 0 for accuracy checking."
+            )
+
+    logger.info('{:20}:{}'.format("paddle commit id", paddle.version.commit))
+    for arg in vars(args):
+        logger.info('{:20}:{}'.format(arg, getattr(args, arg)))
+
     return args

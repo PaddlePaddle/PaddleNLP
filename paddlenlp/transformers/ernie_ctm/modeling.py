@@ -20,7 +20,9 @@ from paddlenlp.layers.crf import LinearChainCrf, ViterbiDecoder, LinearChainCrfL
 
 from .. import PretrainedModel, register_base_model
 
-__all__ = ['ErnieCtmModel', 'ErnieCtmWordtagModel']
+__all__ = [
+    'ErnieCtmModel', 'ErnieCtmWordtagModel', 'ErnieCtmForTokenClassification'
+]
 
 
 class ErnieCtmEmbeddings(Layer):
@@ -33,7 +35,8 @@ class ErnieCtmEmbeddings(Layer):
                  hidden_dropout_prob=0.1,
                  max_position_embeddings=512,
                  type_vocab_size=16,
-                 padding_idx=0):
+                 padding_idx=0,
+                 cls_num=2):
         super().__init__()
         self.word_embeddings = nn.Embedding(
             vocab_size, embedding_size, padding_idx=padding_idx)
@@ -43,13 +46,19 @@ class ErnieCtmEmbeddings(Layer):
                                                   embedding_size)
         self.layer_norm = nn.LayerNorm(embedding_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.cls_num = cls_num
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None):
         if position_ids is None:
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
 
-            position_ids = seq_length - ones
+            content_len = paddle.shape(input_ids)[1] - self.cls_num
+            position_ids = paddle.concat([
+                paddle.zeros(
+                    shape=[self.cls_num], dtype="int64"), paddle.linspace(
+                        1, content_len, content_len, dtype="int64")
+            ])
             position_ids.stop_gradient = True
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
@@ -109,6 +118,7 @@ class ErnieCtmPretrainedModel(PretrainedModel):
             "pad_token_id": 0,
             "use_content_summary": True,
             "content_summary_index": 1,
+            "cls_num": 2,
         },
         "wordtag": {
             "vocab_size": 23000,
@@ -125,15 +135,16 @@ class ErnieCtmPretrainedModel(PretrainedModel):
             "pad_token_id": 0,
             "use_content_summary": True,
             "content_summary_index": 1,
+            "cls_num": 2,
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-ctm":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/ernie_ctm_base.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/ernie_ctm_base_pos.pdparams",
             "wordtag":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/wordtag.pdparams"
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/wordtag_pos.pdparams"
         }
     }
     base_model_prefix = "ernie_ctm"
@@ -211,6 +222,9 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
         content_summary_index (`int`, optional):
             The number of the content summary tokens. Only valid when use_content_summary is True.
             Defaults to ``1``.
+        cls_num (`int`, optional):
+            The number of the CLS tokens. Only valid when use_content_summary is True.
+            Defaults to ``2``.
     """
 
     def __init__(self,
@@ -227,7 +241,8 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
                  initializer_range=0.02,
                  pad_token_id=0,
                  use_content_summary=True,
-                 content_summary_index=1):
+                 content_summary_index=1,
+                 cls_num=2):
         super(ErnieCtmModel, self).__init__()
 
         self.pad_token_id = pad_token_id
@@ -239,7 +254,8 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             hidden_dropout_prob=hidden_dropout_prob,
             max_position_embeddings=max_position_embeddings,
             type_vocab_size=type_vocab_size,
-            padding_idx=pad_token_id)
+            padding_idx=pad_token_id,
+            cls_num=cls_num)
         self.embedding_hidden_mapping_in = nn.Linear(embedding_size,
                                                      hidden_size)
         encoder_layer = nn.TransformerEncoderLayer(
@@ -422,3 +438,30 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
             return total_loss, seq_logits, cls_logits
         else:
             return seq_logits, cls_logits
+
+
+class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
+    def __init__(self, ernie_ctm, num_classes=2, dropout=None):
+        super(ErnieCtmForTokenClassification, self).__init__()
+        self.num_classes = num_classes
+        self.ernie_ctm = ernie_ctm  # allow ernie_ctm to be config
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.ernie_ctm.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.ernie_ctm.config["hidden_size"],
+                                    num_classes)
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        sequence_output, _, _ = self.ernie_ctm(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+
+        sequence_output = self.dropout(sequence_output)
+        logits = self.classifier(sequence_output)
+        return logits
