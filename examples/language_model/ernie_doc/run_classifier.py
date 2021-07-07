@@ -269,7 +269,7 @@ def do_train(args):
                        args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
 
-            if global_steps % args.save_steps == 0 or global_steps == num_training_steps:
+            if global_steps % args.save_steps == 0:
                 # evaluate
                 logger.info("Eval:")
                 eval_acc = evaluate(model, criterion, eval_metric,
@@ -292,6 +292,25 @@ def do_train(args):
                             os.makedirs(best_model_dir)
                         model_to_save.save_pretrained(best_model_dir)
                         tokenizer.save_pretrained(output_dir)
+
+    logger.info("Final result:")
+    eval_acc = evaluate(model, criterion, eval_metric, test_dataloader,
+                        create_memory())
+    if rank == 0:
+        output_dir = os.path.join(args.output_dir, "model_%d" % (global_steps))
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        model_to_save = model._layers if isinstance(
+            model, paddle.DataParallel) else model
+        model_to_save.save_pretrained(output_dir)
+        tokenizer.save_pretrained(output_dir)
+        if eval_acc > best_acc:
+            best_acc = eval_acc
+            best_model_dir = os.path.join(args.output_dir, "best_model")
+            if not os.path.exists(best_model_dir):
+                os.makedirs(best_model_dir)
+            model_to_save.save_pretrained(best_model_dir)
+            tokenizer.save_pretrained(output_dir)
 
 
 if __name__ == "__main__":
