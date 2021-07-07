@@ -149,11 +149,6 @@ class ClassifierIterator(object):
                 cnt += 1
         return cnt
 
-    def _preprocess_text(self, text):
-        text = text.strip().replace('<br /><br />', ' ')
-        text = text.replace('\t', '')
-        return text
-
     def _convert_to_features(self, example):
         if "text" in example:  # imdb
             text = example["text"]
@@ -306,7 +301,7 @@ class ClassifierIterator(object):
     def __call__(self):
         curr_id = 0
         for batch_records in self._create_instances():
-            if curr_id == self.trainer_id:
+            if curr_id == self.trainer_id or self.mode != "train":
                 yield batch_records
             curr_id = (curr_id + 1) % self.trainer_num
 
