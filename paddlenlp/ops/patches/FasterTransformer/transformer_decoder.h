@@ -61,7 +61,8 @@ private:
   int memory_hidden_units_;
   bool normalization_before_;
 
-  DataType_ *norm_from_tensor_buf_, *query_buf_;
+  DataType_ *norm_from_tensor_buf_, *ffn_out_buf_;
+  DataType_ *query_buf_;
   DataType_ *context_buf_, *masked_output_buf_, *masked_output_tmp_buf_;
   DataType_ *norm_masked_output_buf_, *cross_output_buf_;
   DataType_ *norm_cross_output_buf_, *ffn_inner_buf_;
@@ -162,6 +163,7 @@ public:
     param_ = param;
     const int buf_size = batch_size_ * hidden_units_;
     norm_from_tensor_buf_ = buf;
+    ffn_out_buf_ = buf;
     query_buf_ = buf + buf_size;  // store the query values (from_tensor * Q) in
                                   // both masked and multi-head attention
     key_buf_ = buf + 2 * buf_size;
@@ -222,24 +224,33 @@ public:
     try {
       /* masked multi-head attention */
       /* layernorm(from_tensor) -> norm_from_tensor_buf_ */
-      decoder_norm1(from_tensor,
-                    param_.self_layernorm.gamma,
-                    param_.self_layernorm.beta,
-                    norm_from_tensor_buf_,
-                    m,
-                    n);
-
+      if (normalization_before_) {
+        decoder_norm1(from_tensor,
+                      param_.self_layernorm.gamma,
+                      param_.self_layernorm.beta,
+                      norm_from_tensor_buf_,
+                      m,
+                      n);
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
-      self_multi_head_attention(norm_from_tensor_buf_,
-                                memory_sequence_length,
-                                key_cache_,
-                                value_cache_,
-                                masked_output_buf_,
-                                step + start_len,
-                                start_len);
+        self_multi_head_attention(norm_from_tensor_buf_,
+                                  memory_sequence_length,
+                                  key_cache_,
+                                  value_cache_,
+                                  masked_output_buf_,
+                                  step + start_len,
+                                  start_len);
+      } else {
+        self_multi_head_attention(from_tensor,
+                                  memory_sequence_length,
+                                  key_cache_,
+                                  value_cache_,
+                                  masked_output_buf_,
+                                  step + start_len,
+                                  start_len);
+      }
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
@@ -257,24 +268,47 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
 
-      if (!normalization_before_) {
-        masked_output_buf_ = norm_masked_output_buf_;
-      }
-      // For GPT-2 decoder
-      ffn(norm_masked_output_buf_,
-          ffn_inner_buf_,
-          decoder_output,
-          m,
-          4 * n,
-          n,
-          ActivationType::GELU);
+      if (normalization_before_) {
+        // For GPT-2 decoder
+        ffn(norm_masked_output_buf_,
+            ffn_inner_buf_,
+            decoder_output,
+            m,
+            4 * n,
+            n,
+            ActivationType::GELU);
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
-      add_bias_input(decoder_output, masked_output_buf_, m, n);
+        add_bias_input(decoder_output, masked_output_buf_, m, n);
+      } else {
+        masked_output_buf_ = norm_masked_output_buf_;
 
-      if (!normalization_before_) {
+        // For GPT-2 decoder
+        ffn(norm_masked_output_buf_,
+            ffn_inner_buf_,
+            ffn_out_buf_,
+            m,
+            4 * n,
+            n,
+            ActivationType::GELU);
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
+        add_bias_input(ffn_out_buf_, masked_output_buf_, m, n);
+
+        decoder_norm1(ffn_out_buf_,
+                      param_.self_layernorm.gamma,
+                      param_.self_layernorm.beta,
+                      decoder_output,
+                      m,
+                      n);
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
         masked_output_buf_ = masked_output_tmp_buf_;
       }
     }
