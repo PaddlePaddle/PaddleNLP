@@ -15,9 +15,10 @@
 
 import warnings
 import paddle
+from ..utils.tools import get_env_device
+from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
 from .text2knowledge import Text2KnowledgeTask
 from .sentiment_analysis import SentaTask
-from ..utils.tools import get_env_device
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -25,7 +26,7 @@ TASKS = {
     "text2knowledge": {
         "models": {
             "wordtag": {
-                "model_class": Text2KnowledgeTask
+                "task_class": Text2KnowledgeTask,
             }
         },
         "default": {
@@ -35,7 +36,7 @@ TASKS = {
     'sentiment_analysis': {
         "models": {
             "senta": {
-                "model_class": SentaTask
+                "task_class": SentaTask
             },
         },
         "default": {
@@ -80,12 +81,12 @@ class TaskFlow(object):
         config_kwargs = TASKS[self.task]['models'][self.model]
         kwargs.update(config_kwargs)
         self.kwargs = kwargs
-        model_class = TASKS[self.task]['models'][self.model]['model_class']
-        self.model_instance = model_class(
+        task_class = TASKS[self.task]['models'][self.model]['task_class']
+        self.task_instance = task_class(
             model=self.model, task=self.task, **self.kwargs)
 
     def __call__(self, *inputs):
-        results = self.model_instance(inputs)
+        results = self.task_instance(inputs)
         return results
 
     def help(self):

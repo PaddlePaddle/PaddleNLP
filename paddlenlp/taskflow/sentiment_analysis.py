@@ -20,122 +20,27 @@ import os
 import copy
 import itertools
 
-import pandas as pd
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import paddlenlp as nlp
 from ..datasets import MapDataset
 from ..data import Stack, Pad, Tuple, Vocab, JiebaTokenizer
 from .utils import download_file
+from .model import BoWModel, LSTMModel
 from .task import Task
 
 URLS = {
-    "senta_vocab": [
-        "https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt",
-        'df714f0bfd6d749f88064679b4c97fd5'
-    ],
+    "senta_vocab":
+    ["https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt", None],
     "senta_bow": [
         "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/senta/senta_bow.pdparams",
-        '4fde27dd15487e37ea3799c35270bddf'
+        None
     ],
     "senta_lstm": [
         "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/senta/senta_lstm.pdparams",
-        '7e183c8a87d62f0b2a1bcebe9686c064'
+        None
     ]
 }
-
-
-class BoWModel(nn.Layer):
-    """
-    This class implements the Bag of Words Classification Network model to classify texts.
-    At a high level, the model starts by embedding the tokens and running them through
-    a word embedding. Then, we encode these epresentations with a `BoWEncoder`.
-    Lastly, we take the output of the encoder to create a final representation,
-    which is passed through some feed-forward layers to output a logits (`output_layer`).
-
-    """
-
-    def __init__(self,
-                 vocab_size,
-                 num_classes,
-                 emb_dim=128,
-                 padding_idx=0,
-                 hidden_size=128,
-                 fc_hidden_size=96):
-        super().__init__()
-        self.embedder = nn.Embedding(
-            vocab_size, emb_dim, padding_idx=padding_idx)
-        self.bow_encoder = nlp.seq2vec.BoWEncoder(emb_dim)
-        self.fc1 = nn.Linear(self.bow_encoder.get_output_dim(), hidden_size)
-        self.fc2 = nn.Linear(hidden_size, fc_hidden_size)
-        self.output_layer = nn.Linear(fc_hidden_size, num_classes)
-
-    def forward(self, text, seq_len=None):
-        # Shape: (batch_size, num_tokens, embedding_dim)
-        embedded_text = self.embedder(text)
-
-        # Shape: (batch_size, embedding_dim)
-        summed = self.bow_encoder(embedded_text)
-        encoded_text = paddle.tanh(summed)
-
-        # Shape: (batch_size, hidden_size)
-        fc1_out = paddle.tanh(self.fc1(encoded_text))
-        # Shape: (batch_size, fc_hidden_size)
-        fc2_out = paddle.tanh(self.fc2(fc1_out))
-        # Shape: (batch_size, num_classes)
-        logits = self.output_layer(fc2_out)
-        return logits
-
-
-class LSTMModel(nn.Layer):
-    """
-    This class implements the Bag of Words Classification Network model to classify texts.
-    At a high level, the model starts by embedding the tokens and running them through
-    a word embedding. Then, we encode these epresentations with a `BoWEncoder`.
-    Lastly, we take the output of the encoder to create a final representation,
-    which is passed through some feed-forward layers to output a logits (`output_layer`).
-
-    """
-
-    def __init__(self,
-                 vocab_size,
-                 num_classes,
-                 emb_dim=128,
-                 padding_idx=0,
-                 lstm_hidden_size=198,
-                 direction='forward',
-                 lstm_layers=1,
-                 dropout_rate=0.0,
-                 pooling_type=None,
-                 fc_hidden_size=96):
-        super().__init__()
-        self.embedder = nn.Embedding(
-            num_embeddings=vocab_size,
-            embedding_dim=emb_dim,
-            padding_idx=padding_idx)
-        self.lstm_encoder = nlp.seq2vec.LSTMEncoder(
-            emb_dim,
-            lstm_hidden_size,
-            num_layers=lstm_layers,
-            direction=direction,
-            dropout=dropout_rate,
-            pooling_type=pooling_type)
-        self.fc = nn.Linear(self.lstm_encoder.get_output_dim(), fc_hidden_size)
-        self.output_layer = nn.Linear(fc_hidden_size, num_classes)
-
-    def forward(self, text, seq_len):
-        # Shape: (batch_size, num_tokens, embedding_dim)
-        embedded_text = self.embedder(text)
-        # Shape: (batch_size, num_tokens, num_directions*lstm_hidden_size)
-        # num_directions = 2 if direction is 'bidirect'
-        # if not, num_directions = 1
-        text_repr = self.lstm_encoder(embedded_text, sequence_length=seq_len)
-        # Shape: (batch_size, fc_hidden_size)
-        fc_out = paddle.tanh(self.fc(text_repr))
-        # Shape: (batch_size, num_classes)
-        logits = self.output_layer(fc_out)
-        return logits
 
 
 class SentaTask(Task):

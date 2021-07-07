@@ -23,9 +23,9 @@ import itertools
 import paddle
 import paddle.nn as nn
 import pandas as pd
-from paddlenlp.datasets import MapDataset
-from paddlenlp.data import Stack, Pad, Tuple
-from paddlenlp.transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
+from ..datasets import MapDataset
+from ..data import Stack, Pad, Tuple
+from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
 from .utils import download_file
 from .task import Task
 

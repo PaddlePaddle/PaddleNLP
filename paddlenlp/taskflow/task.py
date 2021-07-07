@@ -62,4 +62,5 @@ class Task(metaclass=abc.ABCMeta):
     def __call__(self, *args):
         inputs = self._preprocess(*args)
         outputs = self._run_model(inputs)
-        return self._postprocess(outputs)
+        results = self._postprocess(outputs)
+        return results
