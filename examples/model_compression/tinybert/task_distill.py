@@ -382,11 +382,8 @@ def do_train(args):
     teacher = teacher_model_class.from_pretrained(
         args.teacher_path, num_classes=num_classes)
 
-    teacher.to_distill = to_distill
-    student.to_distill = to_distill
-
-    teacher = teacher.to_distill(teacher)
-    student = student.to_distill(student)
+    teacher = to_distill(teacher)
+    student = to_distill(student)
 
     global_step = 0
     tic_train = time.time()
