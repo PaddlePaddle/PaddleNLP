@@ -367,6 +367,7 @@ public:
 
   ~OpenTransformerDecoder() {
     norm_from_tensor_buf_ = nullptr;
+    ffn_out_buf_ = nullptr;
     query_buf_ = nullptr;
     key_buf_ = nullptr;
     value_buf_ = nullptr;
