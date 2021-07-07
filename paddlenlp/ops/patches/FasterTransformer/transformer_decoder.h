@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
- * Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +17,6 @@
  * Decoder for a Single Step of a Single Layer
  **/
 
-#pragma once
-#include <assert.h>
-#include <cuda_fp16.h>
-#include <cuda_runtime.h>
-#include "fastertransformer/allocator.h"
-#include "fastertransformer/common.h"
-#include "fastertransformer/common_structure.h"
-#include "fastertransformer/open_decoder.h"
 
 namespace fastertransformer {
 
