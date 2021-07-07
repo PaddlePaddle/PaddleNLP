@@ -1,3 +1,18 @@
+# coding:utf-8
+# Copyright (c) 2021  PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import glob
 import json
 import math
@@ -10,9 +25,8 @@ import paddle.nn as nn
 import pandas as pd
 from paddlenlp.datasets import MapDataset
 from paddlenlp.data import Stack, Pad, Tuple
-from paddlenlp.utils.downloader import get_path_from_url
-from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
+from .utils import download_file
 from .task import Task
 
 LABEL_TO_SCHEMA = {
@@ -82,11 +96,15 @@ LABEL_TO_SCHEMA = {
 
 URLS = {
     "TermTree.V1.0":
-    "https://kg-concept.bj.bcebos.com/TermTree/TermTree.V1.0.tar.gz",
-    "termtree_type.csv":
-    "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_type.csv",
-    "termtree_tags_pos.txt":
-    "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_tags_pos.txt",
+    ["https://kg-concept.bj.bcebos.com/TermTree/TermTree.V1.0.tar.gz", None],
+    "termtree_type": [
+        "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_type.csv",
+        None
+    ],
+    "termtree_tags_pos": [
+        "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_tags_pos.txt",
+        None
+    ],
 }
 
 
@@ -97,9 +115,15 @@ class Text2KnowledgeTask(Task):
 
     def __init__(self, model, task, **kwargs):
         super().__init__(model=model, task=task, **kwargs)
-        term_schema_path = self._download_termtree("termtree_type.csv")
-        term_data_path = self._download_termtree("TermTree.V1.0")
-        tag_path = self._download_termtree("termtree_tags_pos.txt")
+        term_schema_path = download_file(self.model, "termtree_type.csv",
+                                         URLS['termtree_type'][0],
+                                         URLS['termtree_type'][1])
+        term_data_path = download_file(self.model, "TermTree.V1.0",
+                                       URLS['TermTree.V1.0'][0],
+                                       URLS['TermTree.V1.0'][1])
+        tag_path = download_file(self.model, "termtree_tags_pos.txt",
+                                 URLS['termtree_tags_pos'][0],
+                                 URLS['termtree_tags_pos'][1])
         self._tags_to_index, self._index_to_tags = self._load_labels(tag_path)
 
         if term_schema_path is not None:

@@ -1,3 +1,18 @@
+# coding:utf-8
+# Copyright (c) 2021  PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import glob
 import json
 import math
@@ -12,16 +27,22 @@ import paddle.nn.functional as F
 import paddlenlp as nlp
 from ..datasets import MapDataset
 from ..data import Stack, Pad, Tuple, Vocab, JiebaTokenizer
-from ..utils.downloader import get_path_from_url
-from ..utils.env import MODEL_HOME
+from .utils import download_file
 from .task import Task
 
 URLS = {
-    "senta_vocab": "https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt",
-    "senta_bow":
-    "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/senta/senta_bow.pdparams",
-    "senta_lstm":
-    "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/senta/senta_lstm.pdparams"
+    "senta_vocab": [
+        "https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt",
+        'df714f0bfd6d749f88064679b4c97fd5'
+    ],
+    "senta_bow": [
+        "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/senta/senta_bow.pdparams",
+        '4fde27dd15487e37ea3799c35270bddf'
+    ],
+    "senta_lstm": [
+        "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/senta/senta_lstm.pdparams",
+        '7e183c8a87d62f0b2a1bcebe9686c064'
+    ]
 }
 
 
@@ -124,18 +145,8 @@ class SentaTask(Task):
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._tokenizer = self._construct_tokenizer(model)
-        self._model = self._construct_model(model)
+        self._model_instance = self._construct_model(model)
         self._label_map = {0: 'negative', 1: 'positive'}
-
-    def _download_resoures(self, save_dir, name, filename):
-        """Download the resources from the cloud.
-        """
-        default_root = os.path.join(MODEL_HOME, save_dir)
-        fullname = os.path.join(default_root, filename)
-        url = URLS[name]
-        if not os.path.exists(fullname):
-            get_path_from_url(url, default_root)
-        return fullname
 
     def _construct_model(self, model):
         """Construct the inference model for the predictor.
@@ -150,8 +161,9 @@ class SentaTask(Task):
             network = self.kwargs['network']
         if network == "bow":
             model = BoWModel(vocab_size, num_classes, padding_idx=pad_token_id)
-            model_full_name = self._download_resoures("senta", "senta_bow",
-                                                      "senta_bow.pdparams")
+            model_full_name = download_file(self.model, "senta_bow.pdparams",
+                                            URLS['senta_bow'][0],
+                                            URLS['senta_bow'][1])
         elif network == "lstm":
             model = LSTMModel(
                 vocab_size,
@@ -159,8 +171,9 @@ class SentaTask(Task):
                 direction='forward',
                 padding_idx=pad_token_id,
                 pooling_type='max')
-            model_full_name = self._download_resoures("senta", "senta_lstm",
-                                                      "senta_lstm.pdparams")
+            model_full_name = download_file(self.model, "senta_lstm.pdparams",
+                                            URLS['senta_lstm'][0],
+                                            URLS['senta_lstm'][1])
         else:
             raise ValueError(
                 "Unknown network: {}, it must be one of bow, lstm.".format(
@@ -174,8 +187,9 @@ class SentaTask(Task):
     def _construct_tokenizer(self, model):
         """Construct the tokenizer for the predictor.
         """
-        full_name = self._download_resoures("senta", "senta_vocab",
-                                            "senta_word_dict.txt")
+        full_name = download_file(self.model, "senta_word_dict.txt",
+                                  URLS['senta_vocab'][0],
+                                  URLS['senta_vocab'][1])
         vocab = Vocab.load_vocabulary(
             full_name, unk_token='[UNK]', pad_token='[PAD]')
 
@@ -234,7 +248,7 @@ class SentaTask(Task):
         with paddle.no_grad():
             for batch in inputs['data_loader']:
                 input_ids, seq_len = batch
-                logits = self._model(input_ids, seq_len)
+                logits = self._model_instance(input_ids, seq_len)
                 probs = F.softmax(logits, axis=1)
                 idx = paddle.argmax(probs, axis=1).numpy()
                 idx = idx.tolist()
