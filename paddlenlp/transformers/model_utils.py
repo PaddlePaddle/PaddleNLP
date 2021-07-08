@@ -45,10 +45,10 @@ def register_base_model(cls):
 
     Args:
         cls (PretrainedModel): The class (inherited from PretrainedModel) to be decorated .
-    
+
     Returns:
         PretrainedModel: The input class `cls` after decorating.
-    
+
     Example:
         .. code-block::
 
@@ -168,7 +168,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
         Returns:
             PretrainedModel: An instance of `PretrainedModel`.
-        
+
         Example:
             .. code-block::
 
@@ -179,6 +179,7 @@ class PretrainedModel(Layer, GenerationMixin):
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}
         init_configuration = {}
+
         if pretrained_model_name_or_path in pretrained_models:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 resource_files[file_id] = map_list[
@@ -327,8 +328,8 @@ class PretrainedModel(Layer, GenerationMixin):
         if len(unexpected_keys) > 0:
             logger.info("Weights from pretrained model not used in {}: {}".
                         format(model.__class__.__name__, unexpected_keys))
-        model_to_load.set_state_dict(state_to_load)
         if paddle.in_dynamic_mode():
+            model_to_load.set_state_dict(state_to_load)
             return model
         return model, state_to_load
 
@@ -387,6 +388,10 @@ class PretrainedModel(Layer, GenerationMixin):
         # Save model config
         self.save_model_config(save_dir)
         # Save model
-        file_name = os.path.join(save_dir,
-                                 list(self.resource_files_names.values())[0])
-        paddle.save(self.state_dict(), file_name)
+        if paddle.in_dynamic_mode():
+            file_name = os.path.join(
+                save_dir, list(self.resource_files_names.values())[0])
+            paddle.save(self.state_dict(), file_name)
+        else:
+            logger.warning(
+                "Save pretrained model only supported dygraph mode for now!")
