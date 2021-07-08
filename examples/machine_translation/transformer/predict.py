@@ -111,8 +111,8 @@ if __name__ == "__main__":
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
-        pprint(args)
     args.benchmark = ARGS.benchmark
     args.test_file = ARGS.test_file
+    pprint(args)
 
     do_predict(args)
