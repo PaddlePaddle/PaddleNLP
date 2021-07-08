@@ -30,6 +30,7 @@ class THUCNews(DatasetBuilder):
     MD5 = "97626b2268f902662a29aadf222f22cc"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     LABELS = None
+    LABEL_PATH = os.path.join('thucnews', 'label.txt')
     SPLITS = {
         'train': META_INFO(
             os.path.join('thucnews', 'train.txt'),
@@ -65,8 +66,9 @@ class THUCNews(DatasetBuilder):
     def get_labels(self):
         if not self.LABELS:
             self.LABELS = []
-            labels_path = os.path.join('thucnews', 'label.txt')
-            with open(labels_path, "r", encoding='utf8') as f:
+            filename = os.path.join(DATA_HOME, self.__class__.__name__,
+                                    self.LABEL_PATH)
+            with open(filename, "r", encoding='utf8') as f:
                 while True:
                     label = f.readline().strip()
                     if label == '':
