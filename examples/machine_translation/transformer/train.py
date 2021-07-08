@@ -34,6 +34,18 @@ def parse_args():
         default=None,
         type=int,
         help="The maximum iteration for training. ")
+    parser.add_argument(
+        "--train_file",
+        default=None,
+        type=str,
+        help="The file for training. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. "
+    )
+    parser.add_argument(
+        "--dev_file",
+        default=None,
+        type=str,
+        help="The file for validation. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. "
+    )
     args = parser.parse_args()
     return args
 
@@ -250,5 +262,7 @@ if __name__ == "__main__":
     args.benchmark = ARGS.benchmark
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
+    args.train_file = ARGS.train_file
+    args.dev_file = ARGS.dev_file
 
     do_train(args)

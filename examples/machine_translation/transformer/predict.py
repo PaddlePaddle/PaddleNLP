@@ -24,6 +24,12 @@ def parse_args():
         action="store_true",
         help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
     )
+    parser.add_argument(
+        "--test_file",
+        default=None,
+        type=str,
+        help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
+    )
     args = parser.parse_args()
     return args
 
@@ -107,5 +113,6 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
     args.benchmark = ARGS.benchmark
+    args.test_file = ARGS.test_file
 
     do_predict(args)
