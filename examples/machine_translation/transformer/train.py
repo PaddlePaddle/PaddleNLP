@@ -36,15 +36,17 @@ def parse_args():
         help="The maximum iteration for training. ")
     parser.add_argument(
         "--train_file",
+        nargs='+',
         default=None,
         type=str,
-        help="The file for training. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. "
+        help="The files for training, including source language file and target language file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. "
     )
     parser.add_argument(
         "--dev_file",
+        nargs='+',
         default=None,
         type=str,
-        help="The file for validation. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. "
+        help="The files for validation, including source language file and target language file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. "
     )
     args = parser.parse_args()
     return args
