@@ -822,7 +822,7 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
         if topo is None or topo.mp_info.size == 1:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
         else:
-            self.loss_func = paddle.distributed.collective._c_softmax_with_cross_entropy
+            self.loss_func = paddle.distributed.fleet.meta_parallel.ParallelCrossEntropy()
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
         masked_lm_loss = self.loss_func(
