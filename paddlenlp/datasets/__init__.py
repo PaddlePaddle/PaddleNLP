@@ -36,3 +36,4 @@ from .cote import *
 from .clue import *
 from .nlpcc14_sc import *
 from .hyp import *
+from .thucnews import *
