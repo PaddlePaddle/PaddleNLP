@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import collections
-import json
 import os
 import xml.dom.minidom
 
@@ -25,7 +24,12 @@ from . import DatasetBuilder
 
 class HYP(DatasetBuilder):
     """
-    Hyperpartisan News Detection: https://pan.webis.de/semeval19/semeval19-web/
+    Hyperpartisan News Detection
+    Task: Given a news article text, decide whether it follows a hyperpartisan 
+    argumentation, i.e., whether it exhibits blind, prejudiced, or unreasoning 
+    allegiance to one party, faction, cause, or person.
+    
+    More detail at https://pan.webis.de/semeval19/semeval19-web/
     """
     URL = "https://paddlenlp.bj.bcebos.com/datasets/hyp.zip"
     MD5 = "125c504b4da6882c2d163ae9962b6220"
