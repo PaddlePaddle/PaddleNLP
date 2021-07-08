@@ -168,7 +168,7 @@ class ClassifierIterator(object):
                 cnt += 1
         return cnt
 
-    def _convert_to_features(self, example):
+    def _convert_to_features(self, example, qid=None):
         if "text" in example:  # imdb
             text = example["text"]
         elif "sentence" in example:  # iflytek
@@ -286,7 +286,7 @@ class ClassifierIterator(object):
         pre_batch_list = []
         insert_idx = []
         for index, example in enumerate(examples):
-            features = self._convert_to_features(example)
+            features = self._convert_to_features(example, index)
             if self._cnt_list(
                     pre_batch_list) < self.batch_size * self.trainer_num:
                 if insert_idx:
