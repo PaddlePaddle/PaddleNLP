@@ -21,6 +21,7 @@ from .bert.tokenizer import *
 from .ernie.modeling import *
 from .ernie.tokenizer import *
 from .gpt.modeling import *
+from .gpt.training import *
 from .gpt.tokenizer import *
 from .roberta.modeling import *
 from .roberta.tokenizer import *

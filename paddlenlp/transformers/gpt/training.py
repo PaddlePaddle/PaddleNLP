@@ -30,12 +30,9 @@ from .. import PretrainedModel, register_base_model
 import paddlenlp
 
 __all__ = [
-    'GPTModel',
-    "GPTPretrainedModel",
-    'GPTForPretraining',
-    'GPTPretrainingCriterion',
-    'GPTForGreedyGeneration',
-    'GPTLMHeadModel',
+    'GPTTrainModel',
+    'GPTTrainForPretraining',
+    'GPTTrainPretrainingCriterion',
 ]
 
 
@@ -73,20 +70,60 @@ class MultiHeadAttention(nn.Layer):
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
-        if self.fuse:
-            assert self.kdim == embed_dim
-            assert self.vdim == embed_dim
-            self.qkv_proj = nn.Linear(
-                embed_dim, 3 * embed_dim, weight_attr, bias_attr=bias_attr)
-        else:
-            self.q_proj = nn.Linear(
+        if topo is None or topo.mp_info.size == 1:
+            if self.fuse:
+                assert self.kdim == embed_dim
+                assert self.vdim == embed_dim
+                self.qkv_proj = nn.Linear(
+                    embed_dim, 3 * embed_dim, weight_attr, bias_attr=bias_attr)
+            else:
+                self.q_proj = nn.Linear(
+                    embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
+                self.k_proj = nn.Linear(
+                    self.kdim, embed_dim, weight_attr, bias_attr=bias_attr)
+                self.v_proj = nn.Linear(
+                    self.vdim, embed_dim, weight_attr, bias_attr=bias_attr)
+            self.out_proj = nn.Linear(
                 embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
-            self.k_proj = nn.Linear(
-                self.kdim, embed_dim, weight_attr, bias_attr=bias_attr)
-            self.v_proj = nn.Linear(
-                self.vdim, embed_dim, weight_attr, bias_attr=bias_attr)
-        self.out_proj = nn.Linear(
-            embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
+
+        else:
+            assert self.num_heads % topo.mp_info.size == 0
+            self.num_heads = self.num_heads // topo.mp_info.size
+            if self.fuse:
+                assert self.kdim == embed_dim
+                assert self.vdim == embed_dim
+                self.qkv_proj = paddlenlp.ops.ColumnParallelLiner(
+                    (embed_dim, 3 * embed_dim),
+                    topo.mp_info.size,
+                    gather_out=False,
+                    param_attr=weight_attr,
+                    bias_attr=bias_attr)
+            else:
+                self.q_proj = paddlenlp.ops.ColumnParallelLiner(
+                    (embed_dim, embed_dim),
+                    topo.mp_info.size,
+                    gather_out=False,
+                    param_attr=weight_attr,
+                    bias_attr=bias_attr)
+                self.k_proj = paddlenlp.ops.ColumnParallelLiner(
+                    (self.kdim, embed_dim),
+                    topo.mp_info.size,
+                    gather_out=False,
+                    param_attr=weight_attr,
+                    bias_attr=bias_attr)
+                self.v_proj = paddlenlp.ops.ColumnParallelLiner(
+                    (self.vdim, embed_dim),
+                    topo.mp_info.size,
+                    gather_out=False,
+                    param_attr=weight_attr,
+                    bias_attr=bias_attr)
+
+            self.out_proj = paddlenlp.ops.RowParallelLiner(
+                (embed_dim, embed_dim),
+                topo.mp_info.size,
+                input_is_parallel=True,
+                param_attr=weight_attr,
+                bias_attr=bias_attr)
 
     def _fuse_prepare_qkv(self, query):
         mix_layer = self.qkv_proj(query)
@@ -341,10 +378,30 @@ class TransformerDecoderLayer(nn.Layer):
             weight_attr=weight_attrs[0],
             bias_attr=bias_attrs[0],
             topo=topo)
-        self.linear1 = nn.Linear(
-            d_model, dim_feedforward, weight_attrs[2], bias_attr=bias_attrs[2])
-        self.linear2 = nn.Linear(
-            dim_feedforward, d_model, weight_attrs[2], bias_attr=bias_attrs[2])
+        if topo is None or topo.mp_info.size == 1:
+            self.linear1 = nn.Linear(
+                d_model,
+                dim_feedforward,
+                weight_attrs[2],
+                bias_attr=bias_attrs[2])
+            self.linear2 = nn.Linear(
+                dim_feedforward,
+                d_model,
+                weight_attrs[2],
+                bias_attr=bias_attrs[2])
+        else:
+            self.linear1 = paddlenlp.ops.ColumnParallelLiner(
+                (d_model, dim_feedforward),
+                topo.mp_info.size,
+                gather_out=False,
+                param_attr=weight_attrs[2],
+                bias_attr=bias_attrs[2])
+            self.linear2 = paddlenlp.ops.RowParallelLiner(
+                (dim_feedforward, d_model),
+                topo.mp_info.size,
+                input_is_parallel=True,
+                param_attr=weight_attrs[2],
+                bias_attr=bias_attrs[2])
 
         self.norm1 = nn.LayerNorm(d_model, epsilon=1e-5)
         self.norm2 = nn.LayerNorm(d_model, epsilon=1e-5)
@@ -386,7 +443,7 @@ class TransformerDecoderLayer(nn.Layer):
         return incremental_cache
 
 
-class GPTEmbeddings(nn.Layer):
+class GPTTrainEmbeddings(nn.Layer):
     """
     Include embeddings from word, position and token_type embeddings
     """
@@ -399,15 +456,23 @@ class GPTEmbeddings(nn.Layer):
                  type_vocab_size=16,
                  initializer_range=0.02,
                  topo=None):
-        super(GPTEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(
-            vocab_size,
-            hidden_size,
-            weight_attr=paddle.ParamAttr(
-                name="word_embeddings",
-                initializer=nn.initializer.Normal(
+        super(GPTTrainEmbeddings, self).__init__()
+        if topo is None or topo.mp_info.size == 1:
+            self.word_embeddings = nn.Embedding(
+                vocab_size,
+                hidden_size,
+                weight_attr=paddle.ParamAttr(
+                    name="word_embeddings",
+                    initializer=nn.initializer.Normal(
+                        mean=0.0, std=initializer_range)))
+        else:
+            self.word_embeddings = paddlenlp.ops.ParallelEmbedding(
+                vocab_size,
+                hidden_size,
+                topo.mp_info.rank,
+                topo.mp_info.size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
                     mean=0.0, std=initializer_range)))
-
         self.position_embeddings = nn.Embedding(
             max_position_embeddings,
             hidden_size,
@@ -431,7 +496,7 @@ class GPTEmbeddings(nn.Layer):
         return embeddings
 
 
-class GPTPretrainedModel(PretrainedModel):
+class GPTTrainPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained GPT models. It provides GPT related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
@@ -584,7 +649,7 @@ class GPTPretrainedModel(PretrainedModel):
 
 
 @register_base_model
-class GPTModel(GPTPretrainedModel):
+class GPTTrainModel(GPTTrainPretrainedModel):
     """
     The base model of gpt.
     """
@@ -606,7 +671,7 @@ class GPTModel(GPTPretrainedModel):
                  bos_token_id=0,
                  eol_token_id=3,
                  topo=None):
-        super(GPTModel, self).__init__()
+        super(GPTTrainModel, self).__init__()
 
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -614,15 +679,23 @@ class GPTModel(GPTPretrainedModel):
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
 
-        self.embeddings = GPTEmbeddings(
+        self.pipline_mode = topo is not None and topo.pp_info.size > 1
+        if self.pipline_mode:
+            self.layer_per_stage = num_hidden_layers // self.topo.pp_info.size
+
+        self.embeddings = GPTTrainEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
             max_position_embeddings, type_vocab_size, self.initializer_range,
             topo)
 
         decoder_layers = nn.LayerList()
         for i in range(num_hidden_layers):
+            DecoderLayer = TransformerDecoderLayer
+            if self.pipline_mode:
+                DecoderLayer = paddlenlp.ops.guard('gpu:{}'.format(
+                    i // self.layer_per_stage))(TransformerDecoderLayer)
             decoder_layers.append(
-                TransformerDecoderLayer(
+                DecoderLayer(
                     d_model=hidden_size,
                     nhead=num_attention_heads,
                     dim_feedforward=intermediate_size,
@@ -636,7 +709,13 @@ class GPTModel(GPTPretrainedModel):
                     bias_attr=None,
                     topo=topo))
 
-        self.decoder = TransformerDecoder(
+        if self.pipline_mode:
+            Decoder = paddlenlp.ops.guard('gpu:{}'.format(
+                self.topo.pp_info.size - 1))(TransformerDecoder)
+        else:
+            Decoder = TransformerDecoder
+
+        self.decoder = Decoder(
             decoder_layers,
             num_hidden_layers,
             norm="LayerNorm",
@@ -668,18 +747,6 @@ class GPTModel(GPTPretrainedModel):
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
 
-        # TODO, use registered buffer
-        causal_mask = paddle.tensor.triu(
-            paddle.ones((paddle.shape(input_ids)[-1],
-                         paddle.shape(input_ids)[-1])) * -1e9,
-            diagonal=1)
-
-        if attention_mask is not None:
-            attention_mask = attention_mask + causal_mask
-        else:
-            attention_mask = causal_mask
-
-        # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
         encoder_outputs = self.decoder(
@@ -692,7 +759,7 @@ class GPTModel(GPTPretrainedModel):
         return encoder_outputs
 
 
-class GPTForPretraining(GPTPretrainedModel):
+class GPTTrainForPretraining(GPTTrainPretrainedModel):
     """
     The pretraining model of GPT.
 
@@ -700,9 +767,25 @@ class GPTForPretraining(GPTPretrainedModel):
     """
 
     def __init__(self, gpt):
-        super(GPTForPretraining, self).__init__()
+        super(GPTTrainForPretraining, self).__init__()
         self.gpt = gpt
         self.apply(self.init_weights)
+
+    def parallel_matmul(self, lm_output, logit_weights, parallel_output, topo):
+        if topo is not None and topo.mp_info.size > 1:
+            input_parallel = paddle.distributed.collective._c_identity(
+                lm_output, group=None)
+
+            logits = paddle.matmul(
+                input_parallel, logit_weights, transpose_y=True)
+
+            if parallel_output:
+                return logits
+
+            return paddle.distributed.collective._c_concat(logits, group=None)
+        else:
+            logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+            return logits
 
     def forward(self,
                 input_ids,
@@ -720,10 +803,9 @@ class GPTForPretraining(GPTPretrainedModel):
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        logits = paddle.matmul(
-            encoder_outputs,
-            self.gpt.embeddings.word_embeddings.weight,
-            transpose_y=True)
+        logits = self.parallel_matmul(
+            encoder_outputs, self.gpt.embeddings.word_embeddings.weight, True,
+            self.gpt.topo)
 
         if use_cache:
             return logits, cached_kvs
@@ -731,7 +813,7 @@ class GPTForPretraining(GPTPretrainedModel):
             return logits
 
 
-class GPTPretrainingCriterion(paddle.nn.Layer):
+class GPTTrainPretrainingCriterion(paddle.nn.Layer):
     """
     Criterion for GPT.
 
@@ -739,8 +821,11 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
     """
 
     def __init__(self, topo=None):
-        super(GPTPretrainingCriterion, self).__init__()
-        self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
+        super(GPTTrainPretrainingCriterion, self).__init__()
+        if topo is None or topo.mp_info.size == 1:
+            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
+        else:
+            self.loss_func = paddle.distributed.collective._c_softmax_with_cross_entropy
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
         masked_lm_loss = self.loss_func(prediction_scores,
@@ -750,142 +835,3 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
         masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
         loss = masked_lm_loss / loss_mask.sum()
         return loss
-
-
-class GPTForGreedyGeneration(GPTPretrainedModel):
-    """
-    The generate model for GPT-2.
-    It use the greedy stategy and generate the next word with highest probablity.
-    """
-
-    def __init__(self, gpt, max_predict_len):
-        super(GPTForGreedyGeneration, self).__init__()
-        self.gpt = gpt
-        self.max_predict_len = max_predict_len
-        self.apply(self.init_weights)
-
-    def model(self,
-              input_ids,
-              position_ids=None,
-              attention_mask=None,
-              masked_positions=None,
-              use_cache=False,
-              cache=None):
-        outputs = self.gpt(input_ids,
-                           position_ids=position_ids,
-                           attention_mask=attention_mask,
-                           use_cache=use_cache,
-                           cache=cache)
-        if use_cache:
-            encoder_outputs, cached_kvs = outputs[:2]
-        else:
-            encoder_outputs = outputs
-        logits = paddle.matmul(
-            encoder_outputs,
-            self.gpt.embeddings.word_embeddings.weight,
-            transpose_y=True)
-
-        if use_cache:
-            return logits, cached_kvs
-        else:
-            return logits
-
-    def forward(self, input_ids, end_id):
-        output, cached_kvs = self.model(input_ids, use_cache=True, cache=None)
-        src_ids = input_ids
-        nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
-        src_ids = paddle.concat([src_ids, nid], axis=1)
-        cur_len = 0
-        while (cur_len < self.max_predict_len):
-            output, cached_kvs = self.model(
-                nid, use_cache=True, cache=cached_kvs)
-
-            nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
-            src_ids = paddle.concat([src_ids, nid], axis=1)
-            cur_len += 1
-            if paddle.max(nid) == end_id:
-                break
-        return src_ids
-
-
-class GPTLMHead(nn.Layer):
-    def __init__(self, hidden_size, vocab_size, embedding_weights=None):
-        super(GPTLMHead, self).__init__()
-        self.decoder_weight = self.create_parameter(
-            shape=[vocab_size, hidden_size],
-            dtype=paddle.get_default_dtype(),
-            is_bias=True) if embedding_weights is None else embedding_weights
-
-    def forward(self, hidden_states):
-        logits = paddle.tensor.matmul(
-            hidden_states, self.decoder_weight, transpose_y=True)
-        return logits
-
-
-class GPTLMHeadModel(GPTPretrainedModel):
-    def __init__(self, gpt):
-        super(GPTLMHeadModel, self).__init__()
-        self.gpt = gpt
-        self.lm_head = GPTLMHead(self.gpt.config["hidden_size"],
-                                 self.gpt.config["vocab_size"],
-                                 self.gpt.embeddings.word_embeddings.weight)
-        self.apply(self.init_weights)
-
-    def forward(self,
-                input_ids,
-                position_ids=None,
-                attention_mask=None,
-                use_cache=False,
-                cache=None):
-        outputs = self.gpt(input_ids,
-                           position_ids=position_ids,
-                           attention_mask=attention_mask,
-                           use_cache=use_cache,
-                           cache=cache)
-
-        if use_cache:
-            encoder_outputs, cached_kvs = outputs[:2]
-        else:
-            encoder_outputs = outputs
-
-        logits = self.lm_head(encoder_outputs)
-
-        if use_cache:
-            return logits, cached_kvs
-        else:
-            return logits
-
-    def prepare_inputs_for_generation(self,
-                                      input_ids,
-                                      use_cache=False,
-                                      cache=None,
-                                      **kwargs):
-        # only last token for inputs_ids if cache is defined in kwargs
-        position_ids = kwargs.get("position_ids", None)
-        attention_mask = kwargs.get("attention_mask", None)
-        if cache is not None:
-            input_ids = input_ids[:, -1].unsqueeze(-1)
-            if position_ids is not None:
-                position_ids = position_ids[:, -1].unsqueeze(-1)
-            if attention_mask is not None:
-                attention_mask = attention_mask[:, :, -1, :].unsqueeze(2)
-
-        return {
-            "input_ids": input_ids,
-            "position_ids": position_ids,
-            "attention_mask": attention_mask,
-            "use_cache": use_cache,
-            "cache": cache
-        }
-
-    def __getattr__(self, name):
-        try:
-            return super().__getattr__(name)
-        except AttributeError as e:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                try:
-                    return getattr(self, self.base_model_prefix).config[name]
-                except KeyError:
-                    raise e

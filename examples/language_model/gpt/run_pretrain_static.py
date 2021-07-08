@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Pretrain  GPT-2 in static graph mode.
+Pretrain  GPT in static graph mode.
 """
 import argparse
 import math
@@ -27,7 +27,7 @@ import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
 from paddle.distributed.fleet.meta_optimizers.sharding.utils import save_persistables
-from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCriterion
+from paddlenlp.transformers import GPTTrainModel, GPTTrainForPretraining, GPTTrainPretrainingCriterion
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.ops import guard, Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger
@@ -39,8 +39,8 @@ from args import parse_args
 import lr
 
 MODEL_CLASSES = {
-    "gpt": (GPTForPretraining, GPTTokenizer),
-    "gpt-cn": (GPTForPretraining, GPTChineseTokenizer),
+    "gpt": (GPTTrainForPretraining, GPTTokenizer),
+    "gpt-cn": (GPTTrainForPretraining, GPTChineseTokenizer),
 }
 
 
@@ -256,10 +256,10 @@ def do_train(args):
                     model_config["topo"] = topo
 
                     model = guard(f'gpu:{args.pp_degree -1}')(
-                        GPTForPretraining)(guard(f'gpu:0')(GPTModel)(
+                        GPTTrainForPretraining)(guard(f'gpu:0')(GPTTrainModel)(
                             **model_config))
                 else:
-                    model, _ = GPTForPretraining.from_pretrained(
+                    model, _ = GPTTrainForPretraining.from_pretrained(
                         args.model_name_or_path,
                         hidden_dropout_prob=args.hidden_dropout_prob,
                         attention_probs_dropout_prob=args.
@@ -270,7 +270,7 @@ def do_train(args):
                 preds = model(tokens, position_ids, attention_mask)
 
                 criterion = guard(f'gpu:{args.pp_degree -1}')(
-                    GPTPretrainingCriterion)(topo)
+                    GPTTrainPretrainingCriterion)(topo)
                 loss = criterion(preds, labels, loss_mask)
 
             # Create the learning_rate sheduler and optimizer
