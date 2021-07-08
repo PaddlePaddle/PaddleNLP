@@ -168,7 +168,10 @@ class ClassifierIterator(object):
                 cnt += 1
         return cnt
 
-    def _convert_to_features(self, example, qid=None):
+    def _convert_to_features(self, example, qid):
+        """
+        Convert example to features fed into model
+        """
         if "text" in example:  # imdb
             text = example["text"]
         elif "sentence" in example:  # iflytek
@@ -192,14 +195,15 @@ class ClassifierIterator(object):
             start_offset += min(length, self.memory_len)
 
         features = []
-        Feature = namedtuple("Feature", ["src_ids", "label_id", "cal_loss"])
+        Feature = namedtuple("Feature",
+                             ["src_ids", "label_id", "qid", "cal_loss"])
         for (doc_span_index, doc_span) in enumerate(doc_spans):
             tokens = tokens_a[doc_span.start:doc_span.start +
                               doc_span.length] + ["[SEP]"] + ["[CLS]"]
             token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
             features.append(
                 Feature(
-                    src_ids=token_ids, label_id=label, cal_loss=1))
+                    src_ids=token_ids, label_id=label, qid=qid, cal_loss=1))
 
         if self.repeat_input:
             features_repeat = features
@@ -236,6 +240,12 @@ class ClassifierIterator(object):
                 [-1, 1])
         else:
             batch_labels = np.array([]).astype("int64").reshape([-1, 1])
+        # qid
+        if batch_records[-1].qid is not None:
+            batch_qids = [record.qid for record in batch_records]
+            batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
+        else:
+            batch_qids = np.array([]).astype("int64").reshape([-1, 1])
 
         if gather_idx:
             batch_gather_idx = np.array(gather_idx).astype("int64").reshape(
@@ -256,7 +266,7 @@ class ClassifierIterator(object):
 
         return_list = [
             padded_token_ids, padded_position_ids, padded_task_ids, input_mask,
-            batch_labels, batch_gather_idx, need_cal_loss
+            batch_labels, batch_qids, batch_gather_idx, need_cal_loss
         ]
         return return_list
 
@@ -285,8 +295,8 @@ class ClassifierIterator(object):
         examples = self.dataset
         pre_batch_list = []
         insert_idx = []
-        for index, example in enumerate(examples):
-            features = self._convert_to_features(example, index)
+        for qid, example in enumerate(examples):
+            features = self._convert_to_features(example, qid)
             if self._cnt_list(
                     pre_batch_list) < self.batch_size * self.trainer_num:
                 if insert_idx:
@@ -327,6 +337,7 @@ class ClassifierIterator(object):
     def get_num_examples(self):
         if self.num_examples is None:
             self.num_examples = 0
-            for example in self.dataset:
-                self.num_examples += len(self._convert_to_features(example))
+            for qid, example in enumerate(self.dataset):
+                self.num_examples += len(
+                    self._convert_to_features(example, qid))
         return self.num_examples

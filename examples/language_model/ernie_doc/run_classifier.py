@@ -14,6 +14,7 @@
 
 import argparse
 import collections
+from collections import namedtuple, defaultdict
 
 import os
 import random
@@ -90,6 +91,9 @@ def init_memory(batch_size, memory_length, d_model, n_layers):
 def evaluate(model, criterion, metric, data_loader, memories0):
     """
     Given a dataset, it evals model and computes the metric.
+    Because the same sample may be splited into several samples and evaluated in 
+    different steps, the method to compute ERNIE-DOC classification acc has slightly
+    different. It merges the same sample results into one result. 
 
     Args:
         model(obj:`paddle.nn.Layer`): A model to classify texts.
@@ -103,22 +107,53 @@ def evaluate(model, criterion, metric, data_loader, memories0):
     memories = list(memories0)
     tic_train = time.time()
     eval_logging_step = 500
+
+    probs_dict = defaultdict(list)
+    label_dict = dict()
+    global_steps = 0
     for step, batch in enumerate(data_loader, start=1):
-        input_ids, position_ids, token_type_ids, attn_mask, labels, gather_idxs, need_cal_loss = batch
+        input_ids, position_ids, token_type_ids, attn_mask, labels, qids, \
+            gather_idxs, need_cal_loss = batch
         logits, memories = model(input_ids, memories, token_type_ids,
                                  position_ids, attn_mask)
-        logits, labels = list(
-            map(lambda x: paddle.gather(x, gather_idxs), [logits, labels]))
-        loss = criterion(logits, labels) * need_cal_loss
+        logits, labels, qids = list(
+            map(lambda x: paddle.gather(x, gather_idxs),
+                [logits, labels, qids]))
+        # need to collect probs for each qid, so use softmax_with_cross_entropy
+        loss, probs = nn.functional.softmax_with_cross_entropy(
+            logits, labels, return_softmax=True)
         losses.append(loss.mean().numpy())
-        correct = metric.compute(logits, labels) * need_cal_loss
-        metric.update(correct)
+        # shape: [B, NUM_LABELS]
+        np_probs = probs.numpy()
+        # shape: [B, 1]
+        np_qids = qids.numpy()
+        np_labels = labels.numpy().flatten()
+        for i, qid in enumerate(np_qids.flatten()):
+            probs_dict[qid].append(np_probs[i])
+            label_dict[qid] = np_labels[i]  # same qid share same label.
+
+        global_steps += 1
+        # loss = criterion(logits, labels) * need_cal_loss
+        # correct = metric.compute(logits, labels) * need_cal_loss
+        # metric.update(correct)
         if step % eval_logging_step == 0:
-            logger.info("Step %d: loss:  %.5f, accu: %.5f, speed: %.5f steps/s"
-                        % (step, np.mean(losses), metric.accumulate(),
-                           eval_logging_step / (time.time() - tic_train)))
+            logger.info("Step %d: loss:  %.5f, speed: %.5f steps/s" %
+                        (step, np.mean(losses),
+                         eval_logging_step / (time.time() - tic_train)))
             tic_train = time.time()
-    acc = metric.accumulate()
+
+    # calculate the acc
+    predict_labels = []
+    labels = []
+    for qid, probs in probs_dict.items():
+        mean_prob = np.mean(np.array(probs), axis=0)
+        predict_labels.append(np.argmax(mean_prob))
+        labels.append(label_dict[qid])
+
+    predict_labels = np.array(predict_labels, dtype='int64')
+    labels = np.array(labels, dtype='int64')
+    acc = (predict_labels == labels).sum() * 1.0 / labels.size
+
     logger.info("Eval loss: %.5f, accu: %.5f" % (np.mean(losses), acc))
     model.train()
     metric.reset()
@@ -245,7 +280,8 @@ def do_train(args):
         train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
         for step, batch in enumerate(train_dataloader, start=1):
             global_steps += 1
-            input_ids, position_ids, token_type_ids, attn_mask, labels, gather_idx, need_cal_loss = batch
+            input_ids, position_ids, token_type_ids, attn_mask, labels, qids, \
+                gather_idx, need_cal_loss = batch
             logits, memories = model(input_ids, memories, token_type_ids,
                                      position_ids, attn_mask)
 
@@ -257,7 +293,7 @@ def do_train(args):
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
-
+            # rough acc result, not a precise acc
             acc = metric.compute(logits, labels) * need_cal_loss
             metric.update(acc)
 
