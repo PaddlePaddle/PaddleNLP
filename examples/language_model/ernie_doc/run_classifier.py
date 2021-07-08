@@ -32,7 +32,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack
 
-from data import ClassifierIterator, preprocess_imdb
+from data import ClassifierIterator, ImdbTextPreProcessor, HYPTextPreProcessor
 from optimization import AdamWDL
 
 # yapf: disable
@@ -61,8 +61,8 @@ args = parser.parse_args()
 # ErnieDocTokenizer for Chinese Tasks
 
 DATASET_INFO = {
-    "imdb": (BPETokenizer, "test", preprocess_imdb),
-    "hyp": (BPETokenizer, "dev", None),
+    "imdb": (BPETokenizer, "test", ImdbTextPreProcessor()),
+    "hyp": (BPETokenizer, "dev", HYPTextPreProcessor()),
     "iflytek": (ErnieDocTokenizer, "dev", None),
     "thucnews": (ErnieDocTokenizer, "dev", None)
 }

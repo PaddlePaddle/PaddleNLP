@@ -17,6 +17,9 @@ from collections import namedtuple
 
 import paddle
 from paddle.io import IterableDataset
+from paddle.utils import try_import
+
+__all__ = ['ClassifierIterator', 'ImdbTextPreProcessor', 'HYPTextPreProcessor']
 
 
 def get_related_pos(insts, seq_len, memory_len=128):
@@ -99,10 +102,26 @@ def pad_batch_data(insts,
     return return_list if len(return_list) > 1 else return_list[0]
 
 
-def preprocess_imdb(text):
-    text = text.strip().replace('<br /><br />', ' ')
-    text = text.replace('\t', '')
-    return text
+class TextPreProcessor(object):
+    def __call__(self, text):
+        raise NotImplementedError("TextPreProcessor object can't be called")
+
+
+class ImdbTextPreProcessor(TextPreProcessor):
+    def __call__(self, text):
+        text = text.strip().replace('<br /><br />', ' ')
+        text = text.replace('\t', '')
+        return text
+
+
+class HYPTextPreProcessor(TextPreProcessor):
+    def __init__(self):
+        self.bs4 = try_import('bs4')
+
+    def __call__(self, text):
+        text = self.bs4.BeautifulSoup(text, "html.parser").get_text()
+        text = text.strip().replace('\n', '').replace('\t', '')
+        return text
 
 
 class ClassifierIterator(object):
