@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import random
 import time
@@ -24,6 +23,7 @@ import numpy as np
 import paddle
 from paddle.io import DataLoader
 
+from paddlenlp.utils.log import logger
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.utils.tools import TimeCostAverage
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -31,10 +31,6 @@ from paddlenlp.transformers import TinyBertForPretraining, TinyBertTokenizer
 from paddlenlp.transformers import RobertaModel, RobertaTokenizer
 
 from paddlenlp.transformers.distill_utils import to_distill, calc_minilm_loss
-
-FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
 
 MODEL_CLASSES = {
     "roberta": (RobertaModel, RobertaTokenizer),
@@ -225,9 +221,6 @@ class PretrainingDataset(paddle.io.Dataset):
         for i, line in enumerate(f):
             tokenized_example = tokenizer(line, max_seq_len=max_seq_length)
             input_ids.append(tokenized_example['input_ids'])
-            if i % 10000 == 0 and i > 0:
-                print("%d samples have been tokenized." % (i))
-                break
         self.inputs = np.asarray(input_ids)
         f.close()
 
@@ -281,11 +274,6 @@ def do_train(args):
 
     teacher = to_distill(teacher, num_relation_heads=args.num_relation_heads)
     student = to_distill(student, num_relation_heads=args.num_relation_heads)
-
-    accumulated_steps = int(512 / args.batch_size /
-                            paddle.distributed.get_world_size())
-    print("MINILM needs batch_size 512, so our accumulated_steps is: ",
-          accumulated_steps)
 
     global_step = 0
     tic_train = time.time()
@@ -342,7 +330,6 @@ def do_train(args):
             kl_loss_fct = paddle.nn.KLDivLoss('sum')
             ce_loss_fct = paddle.nn.CrossEntropyLoss(soft_label=True)
             train_cost_avg = TimeCostAverage()
-            reader_cost_avg = TimeCostAverage()
             total_samples = 0
             batch_start = time.time()
             for step, batch in enumerate(train_data_loader):
@@ -364,28 +351,23 @@ def do_train(args):
                 loss = loss_qr + loss_kr + loss_vr
                 loss.backward()
 
-                if global_step % accumulated_steps == 0:
-                    optimizer.step()
-                    lr_scheduler.step()
-                    optimizer.clear_grad()
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.clear_grad()
 
                 total_samples += args.batch_size
                 train_run_cost = time.time() - batch_start
                 train_cost_avg.record(train_run_cost)
                 if global_step % args.logging_steps == 0:
-                    if paddle.distributed.get_rank() == 0:
-                        logger.info(
-                            "global step: %d, epoch: %d, batch: %d, loss: %f, "
-                            "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
-                            % (global_step, epoch, step, loss,
-                               reader_cost_avg.get_average(),
-                               train_cost_avg.get_average(), total_samples /
-                               args.logging_steps, total_samples / (
-                                   args.logging_steps *
-                                   train_cost_avg.get_average())))
+                    logger.info(
+                        "global step: %d, epoch: %d, batch: %d, loss: %f, "
+                        "lr: %f, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
+                        % (global_step, epoch, step, loss, optimizer.get_lr(),
+                           train_cost_avg.get_average(),
+                           total_samples / args.logging_steps, total_samples /
+                           (args.logging_steps * train_cost_avg.get_average())))
                     total_samples = 0
                     train_cost_avg.reset()
-                    reader_cost_avg.reset()
                 if global_step % args.save_steps == 0 or global_step == num_training_steps:
                     if paddle.distributed.get_rank() == 0:
                         output_dir = os.path.join(args.output_dir,
@@ -393,14 +375,14 @@ def do_train(args):
                         if not os.path.exists(output_dir):
                             os.makedirs(output_dir)
                         # need better way to get inner model of DataParallel
-                        model_to_save = model._layers if isinstance(
-                            model, paddle.DataParallel) else model
+                        model_to_save = student._layers if isinstance(
+                            student, paddle.DataParallel) else student
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
                         paddle.save(
                             optimizer.state_dict(),
                             os.path.join(output_dir, "model_state.pdopt"))
-                if global_step * accumulated_steps >= args.max_steps:
+                if global_step >= args.max_steps:
                     del train_data_loader
                     return
                 batch_start = time.time()
