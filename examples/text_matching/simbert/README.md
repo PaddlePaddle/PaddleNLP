@@ -24,7 +24,7 @@ export CUDA_VISIBLE_DEVICES=0
 python predict.py --input_file ./datasets/lcqmc/dev.tsv
 ```
 
-将待预测数据如以下示例：
+待预测数据如以下示例：
 
 
 ```text
