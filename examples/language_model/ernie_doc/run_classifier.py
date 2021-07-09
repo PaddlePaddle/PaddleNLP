@@ -330,8 +330,8 @@ def do_train(args):
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
-                    logger.info("Save best model......")
                     if eval_acc > best_acc:
+                        logger.info("Save best model......")
                         best_acc = eval_acc
                         best_model_dir = os.path.join(args.output_dir,
                                                       "best_model")
