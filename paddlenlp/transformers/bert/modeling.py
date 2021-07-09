@@ -388,7 +388,7 @@ class BertModel(BertPretrainedModel):
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = BertPooler(hidden_size,with_pool)
+        self.pooler = BertPooler(hidden_size, with_pool)
         self.apply(self.init_weights)
 
     def forward(self,
