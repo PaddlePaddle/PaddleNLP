@@ -35,6 +35,7 @@ from paddlenlp.data import Stack
 
 from data import ClassifierIterator, ImdbTextPreProcessor, HYPTextPreProcessor
 from optimization import AdamWDL
+from metrics import Acc, F1
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -57,15 +58,15 @@ parser.add_argument("--layerwise_decay", default=1.0, type=float, help="layerwis
 # yapf: enable
 args = parser.parse_args()
 
-# tokenizer, num_classes, test_name, preprocess_text_fn
+# tokenizer, num_classes, eval_dataset, test_dataset, preprocess_text_fn, metric
 # BPETokenizer for English Tasks
 # ErnieDocTokenizer for Chinese Tasks
 
 DATASET_INFO = {
-    "imdb": (BPETokenizer, "test", ImdbTextPreProcessor()),
-    "hyp": (BPETokenizer, "dev", HYPTextPreProcessor()),
-    "iflytek": (ErnieDocTokenizer, "dev", None),
-    "thucnews": (ErnieDocTokenizer, "dev", None)
+    "imdb": (BPETokenizer, "test", "test", ImdbTextPreProcessor(), Acc()),
+    "hyp": (BPETokenizer, "dev", "test", HYPTextPreProcessor(), F1()),
+    "iflytek": (ErnieDocTokenizer, "dev", "dev", None, Acc()),
+    "thucnews": (ErnieDocTokenizer, "dev", "test", None, Acc())
 }
 
 
@@ -132,46 +133,43 @@ def evaluate(model, criterion, metric, data_loader, memories0):
             probs_dict[qid].append(np_probs[i])
             label_dict[qid] = np_labels[i]  # same qid share same label.
 
-        global_steps += 1
-        # loss = criterion(logits, labels) * need_cal_loss
-        # correct = metric.compute(logits, labels) * need_cal_loss
-        # metric.update(correct)
         if step % eval_logging_step == 0:
             logger.info("Step %d: loss:  %.5f, speed: %.5f steps/s" %
                         (step, np.mean(losses),
                          eval_logging_step / (time.time() - tic_train)))
             tic_train = time.time()
 
-    # calculate the acc
-    predict_labels = []
+    # collect predicted labels
+    preds = []
     labels = []
     for qid, probs in probs_dict.items():
         mean_prob = np.mean(np.array(probs), axis=0)
-        predict_labels.append(np.argmax(mean_prob))
+        preds.append(np.argmax(mean_prob))
         labels.append(label_dict[qid])
 
-    predict_labels = np.array(predict_labels, dtype='int64')
+    preds = np.array(preds, dtype='int64')
     labels = np.array(labels, dtype='int64')
-    acc = (predict_labels == labels).sum() * 1.0 / labels.size
 
-    logger.info("Eval loss: %.5f, accu: %.5f" % (np.mean(losses), acc))
+    acc_or_f1 = metric(preds, labels)
+    logger.info("Eval loss: %.5f, %s: %.5f" %
+                (np.mean(losses), metric.__class__.__name__, acc_or_f1))
     model.train()
-    metric.reset()
-    return acc
+    return acc_or_f1
 
 
 def do_train(args):
     set_seed(args)
-    tokenizer_class, test_name, preprocess_text_fn = DATASET_INFO[args.dataset]
+    tokenizer_class, eval_name, test_name, preprocess_text_fn, eval_metric = DATASET_INFO[
+        args.dataset]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     # get dataset
     if args.dataset == "iflytek":
-        train_ds, test_ds = load_dataset(
-            "clue", name=args.dataset, splits=["train", test_name])
+        train_ds, eval_ds, test_ds = load_dataset(
+            "clue", name=args.dataset, splits=["train", eval_name, test_name])
     else:
-        train_ds, test_ds = load_dataset(
-            args.dataset, splits=["train", test_name])
+        train_ds, eval_ds, test_ds = load_dataset(
+            args.dataset, splits=["train", eval_name, test_name])
 
     num_classes = len(train_ds.label_list)
 
@@ -200,6 +198,16 @@ def do_train(args):
         max_seq_length=args.max_seq_length,
         random_seed=args.seed,
         preprocess_text_fn=preprocess_text_fn)
+    eval_ds_iter = ClassifierIterator(
+        eval_ds,
+        args.batch_size,
+        tokenizer,
+        trainer_num,
+        trainer_id=rank,
+        memory_len=model_config["memory_len"],
+        max_seq_length=args.max_seq_length,
+        mode="eval",
+        preprocess_text_fn=preprocess_text_fn)
     test_ds_iter = ClassifierIterator(
         test_ds,
         args.batch_size,
@@ -214,6 +222,9 @@ def do_train(args):
     train_dataloader = paddle.io.DataLoader.from_generator(
         capacity=70, return_list=True)
     train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
+    eval_dataloader = paddle.io.DataLoader.from_generator(
+        capacity=70, return_list=True)
+    eval_dataloader.set_batch_generator(eval_ds_iter, paddle.get_device())
     test_dataloader = paddle.io.DataLoader.from_generator(
         capacity=70, return_list=True)
     test_dataloader.set_batch_generator(test_ds_iter, paddle.get_device())
@@ -265,7 +276,6 @@ def do_train(args):
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
-    eval_metric = paddle.metric.Accuracy()
 
     global_steps = 0
     best_acc = -1
@@ -309,7 +319,7 @@ def do_train(args):
                 # evaluate
                 logger.info("Eval:")
                 eval_acc = evaluate(model, criterion, eval_metric,
-                                    test_dataloader, create_memory())
+                                    eval_dataloader, create_memory())
                 # save
                 if rank == 0:
                     output_dir = os.path.join(args.output_dir,
@@ -320,6 +330,7 @@ def do_train(args):
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
+                    logger.info("Save best model......")
                     if eval_acc > best_acc:
                         best_acc = eval_acc
                         best_model_dir = os.path.join(args.output_dir,
@@ -329,7 +340,7 @@ def do_train(args):
                         model_to_save.save_pretrained(best_model_dir)
                         tokenizer.save_pretrained(output_dir)
 
-    logger.info("Final result:")
+    logger.info("Final test result:")
     eval_acc = evaluate(model, criterion, eval_metric, test_dataloader,
                         create_memory())
     if rank == 0:
@@ -341,6 +352,7 @@ def do_train(args):
         model_to_save.save_pretrained(output_dir)
         tokenizer.save_pretrained(output_dir)
         if eval_acc > best_acc:
+            logger.info("Save best model......")
             best_acc = eval_acc
             best_model_dir = os.path.join(args.output_dir, "best_model")
             if not os.path.exists(best_model_dir):
