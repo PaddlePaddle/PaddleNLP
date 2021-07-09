@@ -228,6 +228,7 @@ def do_train(args):
                     model_config["vocab_size"] += 8 - (
                         model_config["vocab_size"] % 8)
                 model_config["topo"] = topo
+                model_config["split_layers"] = args.split_layers
 
                 train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
                     args,

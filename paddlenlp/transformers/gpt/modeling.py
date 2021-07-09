@@ -651,7 +651,8 @@ class GPTModel(GPTPretrainedModel):
                  type_vocab_size=16,
                  initializer_range=0.02,
                  pad_token_id=0,
-                 topo=None):
+                 topo=None,
+                 split_layers=None):
         super(GPTModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -659,21 +660,39 @@ class GPTModel(GPTPretrainedModel):
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
 
-        self.pipline_mode = topo is not None and topo.pp_info.size > 1
-        if self.pipline_mode:
-            self.layer_per_stage = num_hidden_layers // self.topo.pp_info.size
-
         self.embeddings = GPTEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
             max_position_embeddings, type_vocab_size, self.initializer_range,
             topo)
 
+        self.pipline_mode = topo is not None and topo.pp_info.size > 1
+        if self.pipline_mode:
+            pp_size = self.topo.pp_info.size
+
+            # average split
+            if split_layers is None:
+                assert num_hidden_layers % pp_size == 0
+                layer_per_stage = num_hidden_layers // pp_size
+                split_layers = [layer_per_stage for _ in range(pp_size)]
+            else:
+                split_layers = [int(s) for s in split_layers.split(',')]
+
+            assert len(split_layers) == pp_size
+            for i in range(pp_size - 1):
+                split_layers[i + 1] += split_layers[i]
+
         decoder_layers = nn.LayerList()
         for i in range(num_hidden_layers):
             DecoderLayer = TransformerDecoderLayer
             if self.pipline_mode:
+                stage = pp_size - 1
+                for j in range(pp_size):
+                    if i < split_layers[j]:
+                        stage = j
+                        break
+
                 DecoderLayer = paddlenlp.ops.guard(
-                    f'gpu:{i//self.layer_per_stage}')(TransformerDecoderLayer)
+                    f'gpu:{stage}')(TransformerDecoderLayer)
             decoder_layers.append(
                 DecoderLayer(
                     d_model=hidden_size,

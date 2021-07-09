@@ -227,6 +227,11 @@ def parse_args(MODEL_CLASSES):
         default="gpu",
         choices=["cpu", "gpu", "xpu"],
         help="select cpu, gpu, xpu devices.")
+    parser.add_argument(
+        "--split_layers",
+        type=str,
+        default=None,
+        help="split pipeline layers")
 
     args = parser.parse_args()
     args.test_iters = args.eval_iters
