@@ -106,7 +106,7 @@ def batchify_fn(batch_examples, pad_val, mode):
         attention_mask = np.expand_dims(attention_mask, axis=1)
         return attention_mask
 
-    pad_func = Pad(pad_val=pad_val, pad_right=False)
+    pad_func = Pad(pad_val=pad_val, pad_right=False, dtype='int64')
 
     input_ids = pad_func([example['input_ids'] for example in batch_examples])
     token_type_ids = pad_func(
