@@ -25,22 +25,41 @@ from paddlenlp.transformers import TinyBertForPretraining
 __all__ = ['to_distill', 'calc_minilm_loss']
 
 
-def calc_minilm_loss(loss_fct, s, t):
-    head_num, pad_seq_len = s.shape[1], s.shape[2]
+def calc_minilm_loss(loss_fct, s, t, attn_mask, num_relation_heads=0):
+    # Initialize head_num
+    head_num = s.shape[1]
+    if num_relation_heads > 0 and num_relation_heads != s.shape[1]:
+        # s'shape: [bs, seq_len, head_num, head_dim]
+        s = tensor.transpose(x=s, perm=[0, 2, 1, 3])
+        # s'shape: [bs, seq_len, num_relation_heads, head_dim_new]
+        s = tensor.reshape(x=s, shape=[0, 0, num_relation_heads, -1])
+        #s's shape: [bs, num_relation_heads, seq_len,, head_dim_new]
+        s = tensor.transpose(x=s, perm=[0, 2, 1, 3])
+        head_num = num_relation_heads
+    if num_relation_heads > 0 and num_relation_heads != t.shape[1]:
+        t = tensor.transpose(x=t, perm=[0, 2, 1, 3])
+        t = tensor.reshape(x=t, shape=[0, 0, num_relation_heads, -1])
+        t = tensor.transpose(x=t, perm=[0, 2, 1, 3])
+        head_num = num_relation_heads
+
+    pad_seq_len = s.shape[2]
     s_head_dim, t_head_dim = s.shape[3], t.shape[3]
     scaled_dot_product_s = tensor.matmul(
         x=s, y=s, transpose_y=True) / math.sqrt(s_head_dim)
     del s
+    scaled_dot_product_s += attn_mask
+
     scaled_dot_product_t = tensor.matmul(
         x=t, y=t, transpose_y=True) / math.sqrt(t_head_dim)
     del t
+    scaled_dot_product_t += attn_mask
     loss = loss_fct(
         F.log_softmax(scaled_dot_product_s), F.softmax(scaled_dot_product_t))
     loss /= head_num * pad_seq_len
     return loss
 
 
-def to_distill(self, num_relation_heads=0):
+def to_distill(self):
     """
     Can be bound to object with transformer encoder layers, and make model
     expose attributes `outputs.qs`, `outputs.ks`, `outputs.vs`,
@@ -49,7 +68,6 @@ def to_distill(self, num_relation_heads=0):
     """
     logger.warning("`to_distill` is an experimental API and subject to change.")
     MultiHeadAttention._forward = attention_forward
-    MultiHeadAttention._prepare_qkv_func = _prepare_qkv
     TransformerEncoderLayer._forward = transformer_encoder_layer_forward
     TransformerEncoder._forward = transformer_encoder_forward
     TinyBertForPretraining._forward = minilm_pretraining_forward
@@ -58,9 +76,6 @@ def to_distill(self, num_relation_heads=0):
         if isinstance(layer, (MultiHeadAttention, TransformerEncoderLayer,
                               TransformerEncoder, TinyBertForPretraining)):
             layer.forward = layer._forward
-            if isinstance(layer, MultiHeadAttention):
-                layer._prepare_qkv = layer._prepare_qkv_func
-                layer.num_relation_heads = num_relation_heads
 
     for layer in self.children():
         layer.apply(init_func)
@@ -92,36 +107,6 @@ def _convert_attention_mask(attn_mask, dtype):
     return attn_mask
 
 
-def _prepare_qkv(self, query, key, value, cache=None):
-    """
-    Redefines the `_prepare_qkv` function of `paddle.nn.MultiHeadAttention`.
-    While using MINILMv2's strategy and teacher's head num is not equal to
-    student's head num, head num dim should be unified to a relation head num.
-    """
-    q = self.q_proj(query)
-    if self.num_relation_heads != 0 and self.num_relation_heads != self.num_heads:
-        assert self.num_heads * self.head_dim % self.num_relation_heads == 0, \
-            "`num_relation_heads` must be divisible by `hidden_size`."
-        self.head_dim = int(self.num_heads * self.head_dim /
-                            self.num_relation_heads)
-        self.num_heads = self.num_relation_heads
-    q = tensor.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
-    q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
-    if isinstance(cache, self.StaticCache):
-        # for encoder-decoder attention in inference and has cached
-        k, v = cache.k, cache.v
-    else:
-        k, v = self.compute_kv(key, value)
-
-    if isinstance(cache, self.Cache):
-        # for decoder self-attention in inference
-        k = tensor.concat([cache.k, k], axis=2)
-        v = tensor.concat([cache.v, v], axis=2)
-        cache = self.Cache(k, v)
-
-    return (q, k, v) if cache is None else (q, k, v, cache)
-
-
 def attention_forward(self,
                       query,
                       key=None,
@@ -142,14 +127,13 @@ def attention_forward(self,
     # scale dot product attention
     product = tensor.matmul(x=q, y=k, transpose_y=True)
     product /= math.sqrt(self.head_dim)
-    self.scaled_qk = product
 
     if attn_mask is not None:
         # Support bool or int mask
         attn_mask = _convert_attention_mask(attn_mask, product.dtype)
         product = product + attn_mask
 
-    self.attention_matrix = product
+    # self.attention_matrix = product
     weights = F.softmax(product)
     if self.dropout:
         weights = F.dropout(
@@ -192,7 +176,7 @@ def transformer_encoder_layer_forward(self, src, src_mask=None, cache=None):
         src = self.self_attn(src, src, src, src_mask)
     else:
         src, incremental_cache = self.self_attn(src, src, src, src_mask, cache)
-    self.attention_matrix = self.self_attn.attention_matrix
+    # self.attention_matrix = self.self_attn.attention_matrix
     src = residual + self.dropout1(src)
     if not self.normalize_before:
         src = self.norm1(src)
@@ -204,7 +188,6 @@ def transformer_encoder_layer_forward(self, src, src_mask=None, cache=None):
     src = residual + self.dropout2(src)
     if not self.normalize_before:
         src = self.norm2(src)
-    self.scaled_qk = self.self_attn.scaled_qk
     self.q = self.self_attn.q
     self.k = self.self_attn.k
     self.v = self.self_attn.v
@@ -219,26 +202,24 @@ def transformer_encoder_forward(self, src, src_mask=None, cache=None):
 
     output = src
     new_caches = []
-    self.attentions = []
-    self.hidden_states = []
-    self.scaled_qks = []
+    # self.attentions = []
+    # self.hidden_states = []
     self.qs, self.ks, self.vs = [], [], []
     for i, mod in enumerate(self.layers):
-        self.hidden_states.append(output)
+        # self.hidden_states.append(output)
         if cache is None:
             output = mod(output, src_mask=src_mask)
         else:
             output, new_cache = mod(output, src_mask=src_mask, cache=cache[i])
             new_caches.append(new_cache)
-        self.attentions.append(mod.attention_matrix)
-        self.scaled_qks.append(mod.scaled_qk)
+        # self.attentions.append(mod.attention_matrix)
         self.qs.append(mod.q)
         self.ks.append(mod.k)
         self.vs.append(mod.v)
 
     if self.norm is not None:
         output = self.norm(output)
-    self.hidden_states.append(output)
+    # self.hidden_states.append(output)
     return output if cache is None else (output, new_caches)
 
 

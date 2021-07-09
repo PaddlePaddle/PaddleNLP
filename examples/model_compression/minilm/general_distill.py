@@ -107,7 +107,7 @@ def parse_args():
         "--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
     parser.add_argument(
         "--num_train_epochs",
-        default=400000,
+        default=3,
         type=int,
         help="Total number of training epochs to perform.", )
     parser.add_argument(
@@ -138,7 +138,7 @@ def parse_args():
         help="Weight decay if we apply some.")
     parser.add_argument(
         "--warmup_steps",
-        default=4000,
+        default=-1,
         type=int,
         help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
     )
@@ -252,7 +252,8 @@ def do_train(args):
     teacher_model_class, _ = MODEL_CLASSES[args.teacher_model_type]
     teacher = teacher_model_class.from_pretrained(
         args.teacher_model_name_or_path)
-
+    pad_token_id = student.pretrained_init_configuration[
+        args.student_model_name_or_path]['pad_token_id']
     if paddle.distributed.get_world_size() > 1:
         student = paddle.DataParallel(student, find_unused_parameters=True)
         teacher = paddle.DataParallel(teacher, find_unused_parameters=True)
@@ -272,8 +273,8 @@ def do_train(args):
 
     pool = ThreadPoolExecutor(1)
 
-    teacher = to_distill(teacher, num_relation_heads=args.num_relation_heads)
-    student = to_distill(student, num_relation_heads=args.num_relation_heads)
+    teacher = to_distill(teacher)
+    student = to_distill(student)
 
     global_step = 0
     tic_train = time.time()
@@ -328,25 +329,37 @@ def do_train(args):
                                          tokenizer)
 
             kl_loss_fct = paddle.nn.KLDivLoss('sum')
-            ce_loss_fct = paddle.nn.CrossEntropyLoss(soft_label=True)
             train_cost_avg = TimeCostAverage()
             total_samples = 0
             batch_start = time.time()
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
                 logits = input_ids = batch[0]
-                student(input_ids)
+                attention_mask = paddle.unsqueeze(
+                    (input_ids == pad_token_id
+                     ).astype(paddle.get_default_dtype()) * -1e9,
+                    axis=[1, 2])
+                student(input_ids, attention_mask=attention_mask)
                 with paddle.no_grad():
-                    teacher(input_ids)
+                    teacher(input_ids, attention_mask=attention_mask)
                 # Q-Q relation
                 q_t, q_s = teacher.outputs.qs[-6], student.outputs.qs[-1]
-                loss_qr = calc_minilm_loss(kl_loss_fct, q_s, q_t)
+                loss_qr = calc_minilm_loss(kl_loss_fct, q_s, q_t,
+                                           attention_mask,
+                                           args.num_relation_heads)
+                del q_t, q_s
                 # K-K relation
                 k_t, k_s = teacher.outputs.ks[-6], student.outputs.ks[-1]
-                loss_kr = calc_minilm_loss(kl_loss_fct, k_s, k_t)
+                loss_kr = calc_minilm_loss(kl_loss_fct, k_s, k_t,
+                                           attention_mask,
+                                           args.num_relation_heads)
+                del k_t, k_s
                 # V-V relation
                 v_t, v_s = teacher.outputs.vs[-6], student.outputs.vs[-1]
-                loss_vr = calc_minilm_loss(kl_loss_fct, v_s, v_t)
+                loss_vr = calc_minilm_loss(kl_loss_fct, v_s, v_t,
+                                           attention_mask,
+                                           args.num_relation_heads)
+                del v_t, v_s
 
                 loss = loss_qr + loss_kr + loss_vr
                 loss.backward()
