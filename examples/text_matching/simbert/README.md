@@ -27,8 +27,6 @@ python predict.py --input_file ./datasets/lcqmc/dev.tsv
 将待预测数据如以下示例：
 
 
-如以下示例：
-
 ```text
 世界上什么东西最小   世界上什么东西最小？
 光眼睛大就好看吗  眼睛好看吗？
