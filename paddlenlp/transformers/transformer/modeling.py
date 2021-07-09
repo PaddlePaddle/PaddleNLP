@@ -536,8 +536,10 @@ class TransformerModel(nn.Layer):
             The size of target vocabulary.
         max_length (int):
             The maximum length of input sequences.
-        n_layer (int):
-            The number of sub-layers to be stacked in the encoder and decoder.
+        num_encoder_layers (int):
+            The number of sub-layers to be stacked in the encoder.
+        num_decoder_layers (int):
+            The number of sub-layers to be stacked in the decoder.
         n_head (int):
             The number of head used in multi-head attention.
         d_model (int):
@@ -550,6 +552,12 @@ class TransformerModel(nn.Layer):
             Dropout rates. Used for pre-process, activation and inside attention.
         weight_sharing (bool):
             Whether to use weight sharing. 
+        attn_dropout (float):
+            The dropout probability used in MHA to drop some attention target.
+            If None, use the value of dropout. Defaults to None.
+        act_dropout (float):
+            The dropout probability used after FFN activition. If None, use
+            the value of dropout. Defaults to None.
         bos_id (int, optional):
             The start token id and also be used as padding id. Defaults to 0.
         eos_id (int, optional):
@@ -560,12 +568,15 @@ class TransformerModel(nn.Layer):
                  src_vocab_size,
                  trg_vocab_size,
                  max_length,
-                 n_layer,
+                 num_encoder_layers,
+                 num_decoder_layers,
                  n_head,
                  d_model,
                  d_inner_hid,
                  dropout,
                  weight_sharing,
+                 attn_dropout=None,
+                 act_dropout=None,
                  bos_id=0,
                  eos_id=1):
         super(TransformerModel, self).__init__()
@@ -594,10 +605,12 @@ class TransformerModel(nn.Layer):
         self.transformer = paddle.nn.Transformer(
             d_model=d_model,
             nhead=n_head,
-            num_encoder_layers=n_layer,
-            num_decoder_layers=n_layer,
+            num_encoder_layers=num_encoder_layers,
+            num_decoder_layers=num_decoder_layers,
             dim_feedforward=d_inner_hid,
             dropout=dropout,
+            attn_dropout=attn_dropout,
+            act_dropout=act_dropout,
             activation="relu",
             normalize_before=True)
 
@@ -642,7 +655,8 @@ class TransformerModel(nn.Layer):
                     src_vocab_size=30000,
                     trg_vocab_size=30000,
                     max_length=257,
-                    n_layer=6,
+                    num_encoder_layers=6,
+                    num_decoder_layers=6,
                     n_head=8,
                     d_model=512,
                     d_inner_hid=2048,
@@ -711,8 +725,10 @@ class InferTransformerModel(TransformerModel):
             The size of target vocabulary.
         max_length (int):
             The maximum length of input sequences.
-        n_layer (int):
-            The number of sub-layers to be stacked in the encoder and decoder.
+        num_encoder_layers (int):
+            The number of sub-layers to be stacked in the encoder.
+        num_decoder_layers (int):
+            The number of sub-layers to be stacked in the decoder.
         n_head (int):
             The number of head used in multi-head attention.
         d_model (int):
@@ -725,6 +741,12 @@ class InferTransformerModel(TransformerModel):
             Dropout rates. Used for pre-process, activation and inside attention.
         weight_sharing (bool):
             Whether to use weight sharing. 
+        attn_dropout (float):
+            The dropout probability used in MHA to drop some attention target.
+            If None, use the value of dropout. Defaults to None.
+        act_dropout (float):
+            The dropout probability used after FFN activition. If None, use
+            the value of dropout. Defaults to None.
         bos_id (int, optional):
             The start token id and also is used as padding id. Defaults to 0.
         eos_id (int, optional):
@@ -744,12 +766,15 @@ class InferTransformerModel(TransformerModel):
                  src_vocab_size,
                  trg_vocab_size,
                  max_length,
-                 n_layer,
+                 num_encoder_layers,
+                 num_decoder_layers,
                  n_head,
                  d_model,
                  d_inner_hid,
                  dropout,
                  weight_sharing,
+                 attn_dropout=None,
+                 act_dropout=None,
                  bos_id=0,
                  eos_id=1,
                  beam_size=4,
@@ -797,7 +822,8 @@ class InferTransformerModel(TransformerModel):
                     src_vocab_size=30000,
                     trg_vocab_size=30000,
                     max_length=256,
-                    n_layer=6,
+                    num_encoder_layers=6,
+                    num_decoder_layers=6,
                     n_head=8,
                     d_model=512,
                     d_inner_hid=2048,
