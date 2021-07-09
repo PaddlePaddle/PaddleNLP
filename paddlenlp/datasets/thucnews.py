@@ -29,7 +29,6 @@ class THUCNews(DatasetBuilder):
     URL = "https://paddlenlp.bj.bcebos.com/datasets/thucnews.zip"
     MD5 = "97626b2268f902662a29aadf222f22cc"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
-    LABELS = None
     LABEL_PATH = os.path.join('thucnews', 'label.txt')
     SPLITS = {
         'train': META_INFO(
@@ -64,14 +63,13 @@ class THUCNews(DatasetBuilder):
                 yield {'text': text, 'label': label}
 
     def get_labels(self):
-        if not self.LABELS:
-            self.LABELS = []
-            filename = os.path.join(DATA_HOME, self.__class__.__name__,
-                                    self.LABEL_PATH)
-            with open(filename, "r", encoding='utf8') as f:
-                while True:
-                    label = f.readline().strip()
-                    if label == '':
-                        break
-                    self.LABELS.append(label)
-        return self.LABELS
+        labels = []
+        filename = os.path.join(DATA_HOME, self.__class__.__name__,
+                                self.LABEL_PATH)
+        with open(filename, "r", encoding='utf8') as f:
+            while True:
+                label = f.readline().strip()
+                if label == '':
+                    break
+                labels.append(label)
+        return labels
