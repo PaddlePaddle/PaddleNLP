@@ -11,11 +11,21 @@ SimBERT的模型权重是以Google开源的BERT模型为基础，基于微软的
 
 ```text
 simbert/
+├── data.py #训练样本的数据加载以及转换
 ├── predict.py # 模型预测
 └── README.md # 文档说明
 ```
 
 ### 模型预测
+
+启动预测：
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python predict.py --input_file ./datasets/lcqmc/dev.tsv
+```
+
+将待预测数据如以下示例：
+
 
 如以下示例：
 
@@ -30,7 +40,13 @@ simbert/
 如
 
 ```text
-Data: ['世界上什么东西最小', '世界上什么东西最小？']     similarity: 0.9927250146865845
-Data: ['光眼睛大就好看吗', '眼睛好看吗？']       similarity: 0.7450271248817444
-Data: ['小蝌蚪找妈妈怎么样', '小蝌蚪找妈妈是谁画的']     similarity: 0.8192148804664612
+{'query': '世界上什么东西最小', 'title': '世界上什么东西最小？', 'similarity': 0.992725}
+{'query': '光眼睛大就好看吗', 'title': '眼睛好看吗？', 'similarity': 0.74502724}
+{'query': '小蝌蚪找妈妈怎么样', 'title': '小蝌蚪找妈妈是谁画的', 'similarity': 0.8192148}
 ```
+
+## Reference
+
+关于SimBERT更多信息参考[科学空间](https://spaces.ac.cn/archives/7427)
+
+SimBERT项目地址 https://github.com/ZhuiyiTechnology/simbert
