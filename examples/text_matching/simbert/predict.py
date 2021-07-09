@@ -43,7 +43,7 @@ args = parser.parse_args()
 
 def predict(model, data_loader):
     """
-    Predicts the data labels.
+    Predicts the similarity.
 
     Args:
         model (obj:`SemanticIndexBase`): A model to extract text embedding or calculate similarity of text pair.
@@ -84,11 +84,6 @@ def predict(model, data_loader):
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    # If you want to use ernie1.0 model, plesace uncomment the following code
-    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
-
-    # ErnieTinyTokenizer is special for ernie-tiny pretained model.
     model = ppnlp.transformers.BertModel.from_pretrained(
         'simbert-base-chinese', with_pool='linear')
     tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
