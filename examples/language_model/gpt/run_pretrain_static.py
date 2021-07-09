@@ -43,6 +43,36 @@ MODEL_CLASSES = {
     "gpt-cn": (GPTForPretraining, GPTChineseTokenizer),
 }
 
+class Profile(object):
+    pr = None
+
+    @staticmethod
+    def nv_profile(step):
+        import paddle.fluid.core as core
+        if step == 50:
+            core.nvprof_start()
+            core.nvprof_enable_record_event()
+            core.nvprof_nvtx_push(str(step))
+        if step == 60:
+            core.nvprof_nvtx_pop()
+            core.nvprof_stop()
+            exit(0)
+        if step > 50 and step < 60:
+            core.nvprof_nvtx_pop()
+            core.nvprof_nvtx_push(str(step))
+
+    @staticmethod
+    def py_profile(step):
+        import cProfile, pstats
+        if step == 50:
+            pr = cProfile.Profile()
+            pr.enable()
+            Profile.pr = pr
+        if step == 60:
+            pr = Profile.pr
+            pr.disable()
+            pstats.Stats(pr).sort_stats(pstats.SortKey.CUMULATIVE, pstats.SortKey.TIME).print_stats()
+            exit(0)
 
 def create_data_holder(args):
     """creat data holder"""
@@ -346,6 +376,10 @@ def do_train(args):
         while(True):
             global_step += 1
             step += 1
+
+            #Profile.nv_profile(step)
+            #Profile.py_profile(step)
+
             ret = exe.run(main_program, fetch_list=fetchs, use_program_cache=True)
             # In the new 2.0 api, must call this function to change the learning_rate
             lr_scheduler.step()
