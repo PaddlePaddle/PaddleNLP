@@ -81,23 +81,26 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         "model_file": "sentencepiece.model"
     }  # for save_pretrained
 
-    cpm_modle_link = "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-cn-sentencepiece.model"
+    cpm_model_link = "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-cn-sentencepiece.model"
     pretrained_resource_files_map = {
         "model_file": {
-            "gpt-cpm-large-cn": cpm_modle_link,
-            "gpt-cpm-small-cn-distill": cpm_modle_link,
+            "gpt-cpm-large-cn": cpm_model_link,
+            "gpt-cpm-small-cn-distill": cpm_model_link,
         }
     }
-    pretrained_init_configuration = {"gpt-cpm-large-cn": {}, "gpt-cpm-small-cn-distill": {}, }
+    pretrained_init_configuration = {
+        "gpt-cpm-large-cn": {},
+        "gpt-cpm-small-cn-distill": {},
+    }
 
     def __init__(
             self,
             model_file,
             max_len=512,
             unk_token='<unk>',
-            bod_token='<bod>',
-            eod_token='<eod>',
-            stop_token='\u2583',  # The token of newline.
+            bos_token='<bod>',
+            eos_token='<eod>',
+            eol_token='\u2583',  # The token of newline.
     ):
         self._model_file = model_file
         if not os.path.isfile(model_file):
@@ -209,12 +212,14 @@ class GPTTokenizer(PretrainedTokenizer):
             "gpt3-1.3B-en": gpt_vocab_link,
             "gpt2-medium-en": gpt_vocab_link,
             "gpt2-en": gpt_vocab_link,
+            "gpt2-small-en": gpt_vocab_link,
         },
         "merges_file": {
             "gpt3-13B-en": gpt_merges_link,
             "gpt3-1.3B-en": gpt_merges_link,
             "gpt2-medium-en": gpt_merges_link,
             "gpt2-en": gpt_merges_link,
+            "gpt2-small-en": gpt_merges_link,
         }
     }
     pretrained_init_configuration = {
@@ -222,6 +227,7 @@ class GPTTokenizer(PretrainedTokenizer):
         "gpt3-1.3B-en": {},
         "gpt2-medium-en": {},
         "gpt2-en": {},
+        "gpt2-small-en": {},
     }
 
     def __init__(
@@ -232,8 +238,8 @@ class GPTTokenizer(PretrainedTokenizer):
             max_len=None,
             special_tokens=None,
             pad_token='<|endoftext|>',
-            eod_token='<|endoftext|>',
-            stop_token='\u010a',  # The token of newline.
+            eos_token='<|endoftext|>',
+            eol_token='\u010a',  # The token of newline.
     ):
         self._vocab_file = vocab_file
         self._merges_file = merges_file

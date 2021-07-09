@@ -372,7 +372,7 @@ class UnifiedTransformerLMHead(nn.Layer):
         self.activation = getattr(nn.functional, activation)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.decoder_weight = self.create_parameter(
-            shape=[hidden_size, vocab_size],
+            shape=[vocab_size, hidden_size],
             dtype=self.transform.weight.dtype,
             is_bias=False) if embedding_weights is None else embedding_weights
         self.decoder_bias = self.create_parameter(

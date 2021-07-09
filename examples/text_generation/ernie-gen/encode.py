@@ -40,7 +40,7 @@ def convert_example(tokenizer,
                 labels, max_seq_len=max_decode_len, pad_to_max_seq_len=False)
             tgt_ids, tgt_sids = encoded_tgt["input_ids"], encoded_tgt[
                 "token_type_ids"]
-            tgt_ids = np.array(tgt_ids)
+            tgt_ids = np.array(tgt_ids).astype("int64")
             tgt_sids = np.array(tgt_sids) + tgt_type_id
             tgt_pids = np.arange(len(tgt_ids)) + len(src_ids)
 

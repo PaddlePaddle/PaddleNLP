@@ -569,7 +569,7 @@ class BigBirdLMPredictionHead(Layer):
         self.activation = getattr(nn.functional, activation)
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=1e-12)
         self.decoder_weight = self.create_parameter(
-            shape=[hidden_size, vocab_size],
+            shape=[vocab_size, hidden_size],
             dtype=self.transform.weight.dtype,
             is_bias=False) if embedding_weights is None else embedding_weights
         self.decoder_bias = self.create_parameter(
@@ -862,14 +862,17 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
                                 masked_lm_scale, masked_lm_weights)
                 print(loss)
         """
-        masked_lm_loss = paddle.nn.functional.softmax_with_cross_entropy(
-            prediction_scores, masked_lm_labels, ignore_index=self.ignore_index)
+        masked_lm_loss = F.cross_entropy(
+            prediction_scores,
+            masked_lm_labels,
+            ignore_index=self.ignore_index,
+            reduction='none')
         masked_lm_loss = paddle.transpose(masked_lm_loss, [1, 0])
         masked_lm_loss = paddle.sum(masked_lm_loss * masked_lm_weights) / (
             paddle.sum(masked_lm_weights) + 1e-5)
         scale = 1.0
         if not self.use_nsp:
             scale = 0.0
-        next_sentence_loss = paddle.nn.functional.softmax_with_cross_entropy(
-            seq_relationship_score, next_sentence_labels)
+        next_sentence_loss = F.cross_entropy(
+            seq_relationship_score, next_sentence_labels, reduction='none')
         return masked_lm_loss + paddle.mean(next_sentence_loss) * scale

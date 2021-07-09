@@ -65,7 +65,7 @@ python -u ./run_glue.py \
     --logging_steps 10 \
     --save_steps 10 \
     --output_dir ../model_compression/distill_lstm/pretrained_models/$TASK_NAME/ \
-    --n_gpu 1 \
+    --device gpu \
 
 ```
 
@@ -135,7 +135,7 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --dropout_prob 0.1 \
     --batch_size 64 \
     --model_name bert-wwm-ext-chinese \
-    --teacher_path pretrained_models/chnsenticorp/best_bert_wwm_ext_model_880/model_state.pdparams \
+    --teacher_dir pretrained_models/chnsenticorp/best_bert_wwm_ext_model_880 \
     --vocab_path senta_word_dict.txt \
     --output_dir distilled_models/chnsenticorp \
     --save_steps 10000 \
@@ -153,7 +153,7 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --batch_size 128 \
     --model_name bert-base-uncased \
     --output_dir distilled_models/SST-2 \
-    --teacher_path pretrained_models/SST-2/best_model_610/model_state.pdparams \
+    --teacher_dir pretrained_models/SST-2/best_model_610 \
     --save_steps 10000 \
     --embedding_name w2v.google_news.target.word-word.dim300.en \
 
@@ -170,7 +170,7 @@ CUDA_VISIBLE_DEVICES=0 python bert_distill.py \
     --model_name bert-base-uncased \
     --n_iter 10 \
     --output_dir distilled_models/QQP \
-    --teacher_path pretrained_models/QQP/best_model_17000/model_state.pdparams \
+    --teacher_dir pretrained_models/QQP/best_model_17000 \
     --save_steps 10000 \
     --embedding_name w2v.google_news.target.word-word.dim300.en \
 

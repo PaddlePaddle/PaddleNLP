@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .transformer.decoding import *
-from .transformer.faster_transformer import *
+from .faster_transformer.transformer.decoding import *
+from .faster_transformer.transformer.faster_transformer import *
 from .einsum import *
 from .distributed import *
 from . import optimizer

@@ -106,9 +106,15 @@ def do_train(args):
     if args.model_name_or_path in pretrained_models_list:
         model_config = model_class.pretrained_init_configuration[
             args.model_name_or_path]
+        model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
+        model_config[
+            "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
         model = GPTForPretraining(GPTModel(**model_config))
     else:
-        model = GPTForPretraining.from_pretrained(args.model_name_or_path)
+        model = GPTForPretraining.from_pretrained(
+            args.model_name_or_path,
+            hidden_dropout_prob=args.hidden_dropout_prob,
+            attention_probs_dropout_prob=args.attention_probs_dropout_prob)
 
     # Create the critrion for the gpt model
     criterion = GPTPretrainingCriterion()
@@ -119,15 +125,21 @@ def do_train(args):
     if args.decay_steps is None:
         args.decay_steps = args.max_steps
     warmup_step = args.warmup_rate * args.decay_steps
-    lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
-        max_lr=args.max_lr,
-        min_lr=args.min_lr,
-        warmup_step=warmup_step,
-        decay_step=args.decay_steps)
+
+    lr_scheduler = None
+
+    if args.lr_decay_style == "none":
+        lr_scheduler = None
+    elif args.lr_decay_style == "cosine":
+        lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
+            max_lr=args.max_lr,
+            min_lr=args.min_lr,
+            warmup_step=warmup_step,
+            decay_step=args.decay_steps)
 
     clip = None
     if args.grad_clip > 0:
-        clip = paddle.nn.ClipGradByNorm(clip_norm=args.grad_clip)
+        clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.grad_clip)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
@@ -136,7 +148,7 @@ def do_train(args):
         if not any(nd in n for nd in ["bias", "norm"])
     ]
     optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
+        learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
         beta1=args.adam_beta1,
         beta2=args.adam_beta2,
         epsilon=args.adam_epsilon,
@@ -144,11 +156,16 @@ def do_train(args):
         weight_decay=args.weight_decay,
         grad_clip=clip,
         apply_decay_param_fun=lambda x: x in decay_params)
+
     if args.model_name_or_path not in pretrained_models_list:
-        logger.info("Try to load checkpoint from ", args.model_name_or_path)
-        opt_dict = paddle.load(
-            os.path.join(args.model_name_or_path, "model_state.pdopt"))
-        optimizer.set_state_dict(opt_dict)
+        logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
+        opt_path = os.path.join(args.model_name_or_path, "model_state.pdopt")
+        if os.path.exists(opt_path):
+            opt_dict = paddle.load(opt_path)
+            optimizer.set_state_dict(opt_dict)
+        else:
+            logger.warning("No optimizer checkpoint file found in %s." %
+                           opt_path)
 
     global_step = 0
     tic_train = time.time()
@@ -163,7 +180,11 @@ def do_train(args):
         for f_id in range(num_files):
             data_file = files[f_id]
             train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                args, data_file, topo=topo, eod_id=tokenizer.eod_token_id)
+                args,
+                data_file,
+                data_world_size=topo.data_info.size,
+                data_world_rank=topo.data_info.rank,
+                eos_id=tokenizer.eos_token_id)
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.
             valid_data_loader = valid_data_loader()
@@ -181,7 +202,7 @@ def do_train(args):
                 if global_step % args.logging_freq == 0:
                     speed = args.logging_freq / (time.time() - tic_train)
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.9f"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.5e"
                         % (global_step, epoch, step, loss, speed, speed *
                            default_global_tokens_num, optimizer.get_lr()))
                     log_writer.add_scalar("loss", float(loss), global_step)
@@ -191,8 +212,15 @@ def do_train(args):
                     tic_train = time.time()
                 loss.backward()
                 optimizer.step()
-                lr_scheduler.step()
+                if lr_scheduler is not None:
+                    lr_scheduler.step()
                 optimizer.clear_grad()
+
+                if args.check_accuracy:
+                    if global_step >= args.max_steps:
+                        return
+                    else:
+                        continue
 
                 if global_step % args.eval_freq == 0:
                     # Since the valid data broardcast to all devices, we do evaluate on all device.
@@ -212,9 +240,9 @@ def do_train(args):
                         logger.info("Save model to %s" % output_dir)
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
-                        paddle.save(
-                            optimizer.state_dict(),
-                            os.path.join(output_dir, "model_state.pdopt"))
+                        paddle.save(optimizer.state_dict(),
+                                    os.path.join(output_dir,
+                                                 "model_state.pdopt"))
 
                 if global_step >= args.max_steps:
                     run_evaluate(test_data_loader, model, criterion,

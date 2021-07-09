@@ -14,6 +14,7 @@
 
 import paddle
 import paddle.nn as nn
+import paddle.nn.functional as F
 
 from .. import PretrainedModel, register_base_model
 
@@ -133,6 +134,19 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 30522,
             "pad_token_id": 0,
         },
+        "ernie-2.0-en-finetuned-squad": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 4,
+            "vocab_size": 30522,
+            "pad_token_id": 0,
+        },
         "ernie-2.0-large-en": {
             "attention_probs_dropout_prob": 0.1,
             "intermediate_size": 4096,  # special for ernie-2.0-large-en
@@ -157,6 +171,8 @@ class ErniePretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_tiny/ernie_tiny.pdparams",
             "ernie-2.0-en":
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/ernie_v2_eng_base.pdparams",
+            "ernie-2.0-en-finetuned-squad":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_base/ernie_v2_eng_base_finetuned_squad.pdparams",
             "ernie-2.0-large-en":
             "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_v2_large/ernie_v2_eng_large.pdparams",
         }
@@ -419,7 +435,7 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
         """
@@ -504,7 +520,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
                 model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
 
@@ -600,7 +616,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
         sequence_output, _ = self.ernie(
@@ -629,7 +645,7 @@ class ErnieLMPredictionHead(nn.Layer):
         self.activation = getattr(nn.functional, activation)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.decoder_weight = self.create_parameter(
-            shape=[hidden_size, vocab_size],
+            shape=[vocab_size, hidden_size],
             dtype=self.transform.weight.dtype,
             is_bias=False) if embedding_weights is None else embedding_weights
         self.decoder_bias = self.create_parameter(
@@ -741,7 +757,7 @@ class ErnieForPretraining(ErniePretrainedModel):
                 model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
         """
@@ -772,9 +788,12 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
     def forward(self, prediction_scores, seq_relationship_score,
                 masked_lm_labels, next_sentence_labels, masked_lm_scale):
         with paddle.static.amp.fp16_guard():
-            masked_lm_loss = paddle.nn.functional.softmax_with_cross_entropy(
-                prediction_scores, masked_lm_labels, ignore_index=-1)
+            masked_lm_loss = F.cross_entropy(
+                prediction_scores,
+                masked_lm_labels,
+                ignore_index=-1,
+                reduction='none')
             masked_lm_loss = masked_lm_loss / masked_lm_scale
-            next_sentence_loss = paddle.nn.functional.softmax_with_cross_entropy(
-                seq_relationship_score, next_sentence_labels)
+            next_sentence_loss = F.cross_entropy(
+                seq_relationship_score, next_sentence_labels, reduction='none')
             return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)

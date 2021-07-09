@@ -19,7 +19,7 @@ find_package(CUDA 10.1 REQUIRED)
 
 option(BUILD_TRT "Build in TensorRT mode" OFF)
 
-set(CXX_STD "11" CACHE STRING "C++ standard")
+set(CXX_STD "14" CACHE STRING "C++ standard")
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 
