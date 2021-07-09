@@ -31,7 +31,6 @@ from paddlenlp.transformers import BPETokenizer, ErnieDocTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack
 
 from data import ClassifierIterator, ImdbTextPreProcessor, HYPTextPreProcessor
 from optimization import AdamWDL
@@ -89,7 +88,7 @@ def init_memory(batch_size, memory_length, d_model, n_layers):
 
 
 @paddle.no_grad()
-def evaluate(model, criterion, metric, data_loader, memories0):
+def evaluate(model, metric, data_loader, memories0):
     """
     Given a dataset, it evals model and computes the metric.
     Because the same sample may be splited into several samples and evaluated in 
@@ -99,7 +98,6 @@ def evaluate(model, criterion, metric, data_loader, memories0):
     Args:
         model(obj:`paddle.nn.Layer`): A model to classify texts.
         data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
-        criterion(obj:`paddle.nn.Layer`): It can compute the loss.
         metric(obj:`paddle.metric.Metric`): The evaluation metric.
     """
     model.eval()
@@ -318,8 +316,8 @@ def do_train(args):
             if global_steps % args.save_steps == 0:
                 # evaluate
                 logger.info("Eval:")
-                eval_acc = evaluate(model, criterion, eval_metric,
-                                    eval_dataloader, create_memory())
+                eval_acc = evaluate(model, eval_metric, eval_dataloader,
+                                    create_memory())
                 # save
                 if rank == 0:
                     output_dir = os.path.join(args.output_dir,
@@ -341,8 +339,7 @@ def do_train(args):
                         tokenizer.save_pretrained(output_dir)
 
     logger.info("Final test result:")
-    eval_acc = evaluate(model, criterion, eval_metric, test_dataloader,
-                        create_memory())
+    eval_acc = evaluate(model, eval_metric, test_dataloader, create_memory())
     if rank == 0:
         output_dir = os.path.join(args.output_dir, "model_%d" % (global_steps))
         if not os.path.exists(output_dir):
