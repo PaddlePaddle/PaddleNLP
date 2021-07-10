@@ -34,6 +34,20 @@ def parse_args():
         default=None,
         type=int,
         help="The maximum iteration for training. ")
+    parser.add_argument(
+        "--train_file",
+        nargs='+',
+        default=None,
+        type=str,
+        help="The files for training, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. "
+    )
+    parser.add_argument(
+        "--dev_file",
+        nargs='+',
+        default=None,
+        type=str,
+        help="The files for validation, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. "
+    )
     args = parser.parse_args()
     return args
 
@@ -247,9 +261,11 @@ if __name__ == "__main__":
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
-        pprint(args)
     args.benchmark = ARGS.benchmark
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
+    args.train_file = ARGS.train_file
+    args.dev_file = ARGS.dev_file
+    pprint(args)
 
     do_train(args)
