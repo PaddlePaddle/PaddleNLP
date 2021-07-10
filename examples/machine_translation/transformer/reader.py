@@ -34,7 +34,18 @@ def min_max_filer(data, max_len, min_len=0):
 
 
 def create_data_loader(args, places=None):
-    datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
+    if args.train_file is not None and args.dev_file is not None:
+        datasets = load_dataset(
+            'wmt14ende',
+            datafiles={'train': args.train_file,
+                       'dev': args.dev_file},
+            splits=('train', 'dev'))
+    elif args.train_file is None and args.dev_file is None:
+        datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
+    else:
+        raise ValueError(
+            "--train_file and --dev_file must be both or neither set. ")
+
     if not args.benchmark:
         src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
     else:
@@ -92,7 +103,12 @@ def create_data_loader(args, places=None):
 
 
 def create_infer_loader(args):
-    dataset = load_dataset('wmt14ende', splits=('test'))
+    if args.test_file is not None:
+        dataset = load_dataset(
+            'wmt14ende', datafiles={'test': args.test_file}, splits=('test'))
+    else:
+        dataset = load_dataset('wmt14ende', splits=('test'))
+
     if not args.benchmark:
         src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
     else:
