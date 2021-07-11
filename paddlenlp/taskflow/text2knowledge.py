@@ -23,10 +23,10 @@ import itertools
 import paddle
 import paddle.nn as nn
 import pandas as pd
-from ..datasets import MapDataset
+from ..datasets import MapDataset, load_dataset
 from ..data import Stack, Pad, Tuple
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .utils import download_file
+from .utils import download_file, add_docstrings
 from .task import Task
 
 LABEL_TO_SCHEMA = {
@@ -107,10 +107,26 @@ URLS = {
     ],
 }
 
+useage = r"""
+          from paddlenlp.taskflow import TaskFlow 
+          task = TaskFlow("text2knowledge")
+          task("中国是一个伟大的国家")
+          '''
+          [{'text': '中国是一个伟大的国家', 'items': [{'item': '中国', 'offset': 0, 'wordtag_label': '世界地区类', 'length': 2, 'termid': '中国地区_cb_中国'}, {'item': '是', 'offset': 2, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '一个', 'offset': 3, 'wordtag_label': '数量词', 'length': 2}, {'item': '伟大', 'offset': 5, 'wordtag_label': '修饰词', 'length': 2, 'termid': '修饰词_cb_伟大'}, {'item': '的', 'offset': 7, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '国家', 'offset': 8, 'wordtag_label': '世界地区类', 'length': 2, 'termid': '国家_cb_国家'}]}]
+          '''
+          """
 
+
+@add_docstrings(useage)
 class Text2KnowledgeTask(Task):
-    """This the NER(Named Entity Recognition) task that convert the raw text to entities. And the task with the `wordtag` 
+    """
+    This the NER(Named Entity Recognition) task that convert the raw text to entities. And the task with the `wordtag` 
     model will link the more meesage with the entity.
+    Args:
+        task(string): The name of task.
+        model(string): The model name in the task.
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+
     """
 
     def __init__(self, model, task, **kwargs):
@@ -137,6 +153,7 @@ class Text2KnowledgeTask(Task):
         self._tokenizer = self._construct_tokenizer(model)
         self._model = self._construct_model(model)
         self._summary_num = self._model.ernie_ctm.content_summary_index + 1
+        self._useage = useage
 
     def _download_termtree(self, filename):
         default_root = os.path.join(MODEL_HOME, 'ernie-ctm')
@@ -148,13 +165,15 @@ class Text2KnowledgeTask(Task):
 
     @property
     def summary_num(self):
-        """Number of model summary token
+        """
+        Number of model summary token
         """
         return self._summary_num
 
     @property
     def linking(self):
-        """Whether to do term linking.
+        """
+        Whether to do term linking.
         """
         return self._linking
 
@@ -215,8 +234,9 @@ class Text2KnowledgeTask(Task):
         return term_dict
 
     def _split_long_text_input(self, input_texts, max_text_len):
-        """Split the long text to list of short text, the max_seq_len of input text is 512,
-           if the text length greater than 512, will this function that spliting the long text.
+        """
+        Split the long text to list of short text, the max_seq_len of input text is 512,
+        if the text length greater than 512, will this function that spliting the long text.
         """
         short_input_texts = []
         short_input_texts_lens = []
@@ -280,11 +300,17 @@ class Text2KnowledgeTask(Task):
         return concat_results
 
     def _preprocess_text(self, input_texts):
-        """Create the dataset and dataloader for the predict.
+        """
+        Create the dataset and dataloader for the predict.
         """
         batch_size = 1
-        if 'batch_size' in self.kwargs:
-            batch_size = self.kwargs['batch_size']
+        batch_size = self.kwargs[
+            'batch_size'] if 'batch_size' in self.kwargs else 1
+        num_workers = self.kwargs[
+            'num_workers'] if 'num_workers' in self.kwargs else 0
+        data_lazy = self.kwargs[
+            'data_lazy'] if 'data_lazy' in self.kwargs else False
+
         max_seq_length = 128
         if 'max_position_embedding' in self.kwargs:
             max_seq_length = self.kwargs['max_position_embedding']
@@ -292,26 +318,24 @@ class Text2KnowledgeTask(Task):
         max_predict_len = max_seq_length - self.summary_num - 1
         short_input_texts = self._split_long_text_input(input_texts,
                                                         max_predict_len)
-        for text in short_input_texts:
-            tokenized_output = self._tokenizer(
-                list(text),
-                return_length=True,
-                is_split_into_words=True,
-                max_seq_len=max_seq_length)
-            infer_data.append([
-                tokenized_output['input_ids'],
-                tokenized_output['token_type_ids'], tokenized_output['seq_len']
-            ])
 
-        infer_ds = MapDataset(infer_data)
+        def read(inputs):
+            for text in inputs:
+                tokenized_output = self._tokenizer(
+                    list(text),
+                    return_length=True,
+                    is_split_into_words=True,
+                    max_seq_len=max_seq_length)
+                yield tokenized_output['input_ids'], tokenized_output[
+                    'token_type_ids'], tokenized_output['seq_len']
+
+        infer_ds = load_dataset(read, inputs=short_input_texts, lazy=data_lazy)
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self._tokenizer.pad_token_id,dtype='int64'),  # input_ids
             Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id,dtype='int64'),  # token_type_ids
             Stack(dtype='int64'),  # seq_len
         ): fn(samples)
 
-        num_workers = self.kwargs[
-            'num_workers'] if 'num_workers' in self.kwargs else 0
         infer_data_loader = paddle.io.DataLoader(
             infer_ds,
             collate_fn=batchify_fn,

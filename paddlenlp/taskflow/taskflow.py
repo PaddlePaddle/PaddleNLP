@@ -84,10 +84,26 @@ class TaskFlow(object):
         task_class = TASKS[self.task]['models'][self.model]['task_class']
         self.task_instance = task_class(
             model=self.model, task=self.task, **self.kwargs)
+        task_list = TASKS.keys()
+        TaskFlow.task_list = task_list
 
     def __call__(self, *inputs):
+        """
+        The main work function in the taskflow.
+        """
         results = self.task_instance(inputs)
         return results
 
     def help(self):
-        pass
+        """
+        Return the task useage message.
+        """
+        return self.task_instance.help()
+
+    @staticmethod
+    def tasks():
+        """
+        Return the available task list.
+        """
+        task_list = list(TASKS.keys())
+        return task_list

@@ -23,9 +23,9 @@ import itertools
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from ..datasets import MapDataset
+from ..datasets import load_dataset, MapDataset
 from ..data import Stack, Pad, Tuple, Vocab, JiebaTokenizer
-from .utils import download_file
+from .utils import download_file, add_docstrings
 from .model import BoWModel, LSTMModel
 from .task import Task
 
@@ -42,9 +42,28 @@ URLS = {
     ]
 }
 
+useage = r"""
+           from paddlenlp.taskflow import TaskFlow 
+           task = TaskFlow("sentiment_analysis")
+           task("中国是一个伟大的国家")
+           '''
+           [{'text': '中国是一个伟大的国家', 'label': 'positive'}]
+           '''
+           task = TaskFlow("sentiment_analysis", network="lstm")
+           task("中国是一个伟大的国家")
+           '''
+           [{'text': '中国是一个伟大的国家', 'label': 'positive'}]
+           '''
+           """
+
 
 class SentaTask(Task):
-    """The one task of sentiment_analysis which use the RNN or Bow model to analysis the input text. 
+    """
+    The one task of sentiment_analysis which use the RNN or Bow model to analysis the input text. 
+    Args:
+        task(string): The name of task.
+        model(string): The model name in the task.
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
     def __init__(self, task, model, **kwargs):
@@ -52,9 +71,11 @@ class SentaTask(Task):
         self._tokenizer = self._construct_tokenizer(model)
         self._model_instance = self._construct_model(model)
         self._label_map = {0: 'negative', 1: 'positive'}
+        self._useage = useage
 
     def _construct_model(self, model):
-        """Construct the inference model for the predictor.
+        """
+        Construct the inference model for the predictor.
         """
         vocab_size = self.kwargs['vocab_size']
         pad_token_id = self.kwargs['pad_token_id']
@@ -90,7 +111,8 @@ class SentaTask(Task):
         return model
 
     def _construct_tokenizer(self, model):
-        """Construct the tokenizer for the predictor.
+        """
+        Construct the tokenizer for the predictor.
         """
         full_name = download_file(self.model, "senta_word_dict.txt",
                                   URLS['senta_vocab'][0],
@@ -119,21 +141,26 @@ class SentaTask(Task):
             raise TypeError(
                 "Invalid inputs, input text should be str or list of str, {type(inputs)} found!"
             )
-        infer_data = []
-        for i in range(0, len(inputs)):
-            ids = self._tokenizer.encode(inputs[i])
-            lens = len(ids)
-            infer_data.append([ids, lens])
-        infer_ds = MapDataset(infer_data)
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.vocab.token_to_idx.get('[PAD]', 0)),  # input_ids
-            Stack(dtype='int64'),  # seq_len
-        ): fn(samples)
-
+        # Get the config from the kwargs
         batch_size = self.kwargs[
             'batch_size'] if 'batch_size' in self.kwargs else 1
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
+        data_lazy = self.kwargs[
+            'data_lazy'] if 'data_lazy' in self.kwargs else False
+        infer_data = []
+
+        def read(inputs):
+            for input_data in inputs:
+                ids = self._tokenizer.encode(input_data)
+                lens = len(ids)
+                yield ids, lens
+
+        infer_ds = load_dataset(read, inputs=inputs, lazy=data_lazy)
+        batchify_fn = lambda samples, fn=Tuple(
+            Pad(axis=0, pad_val=self._tokenizer.vocab.token_to_idx.get('[PAD]', 0)),  # input_ids
+            Stack(dtype='int64'),  # seq_len
+        ): fn(samples)
         infer_data_loader = paddle.io.DataLoader(
             infer_ds,
             collate_fn=batchify_fn,
@@ -147,7 +174,8 @@ class SentaTask(Task):
         return outputs
 
     def _run_model(self, inputs):
-        """Run the task model from the outputs of the `_tokenize` function. 
+        """
+        Run the task model from the outputs of the `_tokenize` function. 
         """
         results = []
         with paddle.no_grad():
@@ -163,7 +191,8 @@ class SentaTask(Task):
         return inputs
 
     def _postprocess(self, inputs):
-        """The model output is allways the logits and pros, this function will convert the model output to raw text.
+        """
+        The model output is allways the logits and pros, this function will convert the model output to raw text.
         """
         final_results = []
         for text, label in zip(inputs['text'], inputs['result']):

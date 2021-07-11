@@ -18,6 +18,11 @@ from paddle.dataset.common import md5file
 from ..utils.downloader import get_path_from_url
 from ..utils.env import MODEL_HOME
 
+DOC_FORMAT = r"""
+    Examples:
+        .. code-block:: python
+               """
+
 
 def download_file(save_dir, filename, url, md5=None):
     """
@@ -39,3 +44,15 @@ def download_file(save_dir, filename, url, md5=None):
     else:
         get_path_from_url(url, default_root, md5)
     return fullname
+
+
+def add_docstrings(*docstr):
+    """
+    The function that add the doc string to doc of class.
+    """
+
+    def docstring_decorator(fn):
+        fn.__doc__ = fn.__doc__ + "".join(DOC_FORMAT) + "".join(docstr)
+        return fn
+
+    return docstring_decorator

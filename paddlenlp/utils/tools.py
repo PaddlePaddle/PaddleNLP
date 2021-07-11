@@ -107,6 +107,9 @@ class TimeCostAverage(object):
 
 
 def get_env_device():
+    """
+    Return the device name of running enviroment.
+    """
     if paddle.is_compiled_with_cuda():
         return 'gpu'
     elif paddle.is_compiled_with_npu():
