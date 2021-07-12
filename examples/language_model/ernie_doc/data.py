@@ -319,6 +319,7 @@ class ClassifierIterator(object):
                         insert_idx.append(idx)
                 for batch_records in self._prepare_batch_data(sample_batch):
                     yield batch_records
+
         if self.mode != "train":
             if self._cnt_list(pre_batch_list):
                 pre_batch_list += [
@@ -385,6 +386,11 @@ class MRCIterator(ClassifierIterator):
         self.features_all = []
         self._preprocess_data()
 
+    def shuffle_sample(self):
+        if self.shuffle:
+            self.global_rng = np.random.RandomState(self.random_seed)
+            self.global_rng.shuffle(self.features_all)
+
     def _convert_qa_to_examples(self):
         Example = namedtuple('Example', [
             'qas_id', 'question_text', 'doc_tokens', 'orig_answer_text',
@@ -404,7 +410,7 @@ class MRCIterator(ClassifierIterator):
                         "For training, each question should have exactly 1 answer."
                     )
                 orig_answer_text = qa["answers"][0]
-                answer_offset = qa["answer_start"][0]
+                answer_offset = qa["answer_starts"][0]
                 answer_length = len(orig_answer_text)
                 doc_tokens = [
                     context[:answer_offset],
@@ -600,7 +606,7 @@ class MRCIterator(ClassifierIterator):
         """pad batch data"""
         batch_token_ids = [record.src_ids for record in batch_records]
 
-        if self.modes == "train":
+        if self.mode == "train":
             batch_start_position = [
                 record.start_position for record in batch_records
             ]
@@ -651,7 +657,7 @@ class MRCIterator(ClassifierIterator):
         """generate batch records"""
         pre_batch_list = []
         insert_idx = []
-        for qid, example in enumerate(self.features_all):
+        for qid, features in enumerate(self.features_all):
             if self._cnt_list(
                     pre_batch_list) < self.batch_size * self.trainer_num:
                 if insert_idx:
