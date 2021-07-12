@@ -45,8 +45,8 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 |  [CHIDF](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中的成语阅读理解填空, 根据文本内容从候选 7 个成语中预测正确的成语 | `paddlenlp.datasets.load_dataset('fewclue', 'chid')`|
 |  [CSLF](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中的论文关键词识别，判断关键词是否全部为真实关键词，二分类任务 | `paddlenlp.datasets.load_dataset('fewclue', 'csl')`|
 |  [CLUEWSCF](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中的 WSC Winograd 模式挑战中文版，代词消歧任务，二分类任务 | `paddlenlp.datasets.load_dataset('fewclue', 'cluewsc')`|
-
-
+| [THUCNews](https://github.com/gaussic/text-classification-cnn-rnn#%E6%95%B0%E6%8D%AE%E9%9B%86) |  THUCNews中文新闻类别分类 | `paddlenlp.datasets.load_dataset('thucnews')` |
+| [HYP](https://pan.webis.de/semeval19/semeval19-web/) | 英文政治新闻情感分类语料  | `paddlenlp.datasets.load_dataset('hyp')` |
 
 ## 序列标注
 
