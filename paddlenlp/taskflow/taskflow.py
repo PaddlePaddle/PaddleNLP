@@ -17,7 +17,7 @@ import warnings
 import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .text2knowledge import Text2KnowledgeTask
+from .text2knowledge import WordTagTask
 from .sentiment_analysis import SentaTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
@@ -26,7 +26,7 @@ TASKS = {
     "text2knowledge": {
         "models": {
             "wordtag": {
-                "task_class": Text2KnowledgeTask,
+                "task_class": WordTagTask,
             }
         },
         "default": {

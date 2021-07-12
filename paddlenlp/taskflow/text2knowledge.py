@@ -134,7 +134,7 @@ usage = r"""
 
 
 @add_docstrings(usage)
-class Text2KnowledgeTask(Task):
+class WordTagTask(Task):
     """
     This the NER(Named Entity Recognition) task that convert the raw text to entities. And the task with the `wordtag` 
     model will link the more meesage with the entity.
