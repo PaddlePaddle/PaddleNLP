@@ -51,7 +51,7 @@ class TaskFlow(object):
     The TaskFlow is the end2end inferface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
         1) Convert the raw text to task result.
         2) Convert the model to the inference model.
-        3) Offer the usesage and help message.
+        3) Offer the usage and help message.
     Args:
         task (str): The task name for the TaskFlow, and get the task class from the name.
         model (str, optional): The model name in the task, if set None, will use the default model.  
