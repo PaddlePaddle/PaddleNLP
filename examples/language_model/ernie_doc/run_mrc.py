@@ -57,12 +57,8 @@ args = parser.parse_args()
 
 
 def set_seed(args):
-    # Use the same data seed(for data shuffle) for all procs to guarantee data
-    # consistency after sharding.
     random.seed(args.seed)
     np.random.seed(args.seed)
-    # Maybe different op seeds(for dropout) for different procs is better. By:
-    # `paddle.seed(args.seed + paddle.distributed.get_rank())`
     paddle.seed(args.seed)
 
 

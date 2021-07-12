@@ -19,6 +19,9 @@ import paddle
 from paddle.io import IterableDataset
 from paddle.utils import try_import
 
+from paddlenlp.utils.log import logger
+from paddlenlp.transformers import tokenize_chinese_chars
+
 __all__ = ['ClassifierIterator', 'ImdbTextPreProcessor', 'HYPTextPreProcessor']
 
 
@@ -341,3 +344,341 @@ class ClassifierIterator(object):
                 self.num_examples += len(
                     self._convert_to_features(example, qid))
         return self.num_examples
+
+
+class MRCIterator(ClassifierIterator):
+    """
+    Machine Reading Comprehension iterator. Only for answer extraction.
+    """
+
+    def __init__(self,
+                 dataset,
+                 batch_size,
+                 tokenizer,
+                 trainer_num,
+                 trainer_id,
+                 max_seq_length=512,
+                 memory_len=128,
+                 repeat_input=False,
+                 in_tokens=False,
+                 mode="train",
+                 random_seed=None,
+                 doc_stride=128,
+                 max_query_length=64):
+        super(MRCIterator, self).__init__(
+            dataset,
+            batch_size,
+            tokenizer,
+            trainer_num,
+            trainer_id,
+            max_seq_length,
+            memory_len,
+            repeat_input,
+            in_tokens,
+            mode,
+            random_seed,
+            preprocess_text_fn=None)
+        self.doc_stride = doc_stride
+        self.max_query_length = max_query_length
+        self.examples = []
+        self.features = []
+        self.features_all = []
+        self._preprocess_data()
+
+    def _convert_qa_to_examples(self):
+        Example = namedtuple('Example', [
+            'qas_id', 'question_text', 'doc_tokens', 'orig_answer_text',
+            'start_position', 'end_position'
+        ])
+        examples = []
+        for qa in self.dataset:
+            qas_id = qa["id"]
+            question_text = qa["question"]
+            context = qa["context"]
+            start_pos = None
+            end_pos = None
+            orig_answer_text = None
+            if self.mode == 'train':
+                if len(qa["answers"]) != 1:
+                    raise ValueError(
+                        "For training, each question should have exactly 1 answer."
+                    )
+                orig_answer_text = qa["answers"][0]
+                answer_offset = qa["answer_start"][0]
+                answer_length = len(orig_answer_text)
+                doc_tokens = [
+                    context[:answer_offset],
+                    context[answer_offset:answer_offset + answer_length],
+                    context[answer_offset + answer_length:]
+                ]
+
+                start_pos = 1
+                end_pos = 1
+
+                actual_text = " ".join(doc_tokens[start_pos:(end_pos + 1)])
+                if actual_text.find(orig_answer_text) == -1:
+                    logger.info("Could not find answer: '%s' vs. '%s'" %
+                                (actual_text, orig_answer_text))
+                    continue
+
+            else:
+                doc_tokens = tokenize_chinese_chars(context)
+
+            example = Example(
+                qas_id=qas_id,
+                question_text=question_text,
+                doc_tokens=doc_tokens,
+                orig_answer_text=orig_answer_text,
+                start_position=start_pos,
+                end_position=end_pos)
+            examples.append(example)
+        return examples
+
+    def _convert_example_to_feature(self, examples):
+        Feature = namedtuple("Feature", [
+            "qid", "example_index", "doc_span_index", "tokens",
+            "token_to_orig_map", "token_is_max_context", "src_ids",
+            "start_position", "end_position", "cal_loss"
+        ])
+        features = []
+        self.features_all = []
+        unique_id = 1000
+        is_training = self.mode == "train"
+        for (example_index, example) in enumerate(examples):
+            query_tokens = self.tokenizer.tokenize(example.question_text)
+            if len(query_tokens) > self.max_query_length:
+                query_tokens = query_tokens[0:self.max_query_length]
+            tok_to_orig_index = []
+            orig_to_tok_index = []
+            all_doc_tokens = []
+            for (i, token) in enumerate(example.doc_tokens):
+                orig_to_tok_index.append(len(all_doc_tokens))
+                sub_tokens = self.tokenizer.tokenize(token)
+                for sub_token in sub_tokens:
+                    tok_to_orig_index.append(i)
+                    all_doc_tokens.append(sub_token)
+
+            tok_start_position = None
+            tok_end_position = None
+            if is_training:
+                tok_start_position = orig_to_tok_index[example.start_position]
+                if example.end_position < len(example.doc_tokens) - 1:
+                    tok_end_position = orig_to_tok_index[example.end_position +
+                                                         1] - 1
+                else:
+                    tok_end_position = len(all_doc_tokens) - 1
+                (tok_start_position,
+                 tok_end_position) = self._improve_answer_span(
+                     all_doc_tokens, tok_start_position, tok_end_position,
+                     example.orig_answer_text)
+
+            max_tokens_for_doc = self.max_seq_length - len(query_tokens) - 3
+            _DocSpan = namedtuple("DocSpan", ["start", "length"])
+            doc_spans = []
+            start_offset = 0
+            while start_offset < len(all_doc_tokens):
+                length = len(all_doc_tokens) - start_offset
+                if length > max_tokens_for_doc:
+                    length = max_tokens_for_doc
+                doc_spans.append(_DocSpan(start=start_offset, length=length))
+                if start_offset + length == len(all_doc_tokens):
+                    break
+                start_offset += min(length, self.doc_stride)
+
+            features_each = []
+            for (doc_span_index, doc_span) in enumerate(doc_spans):
+                tokens = []
+                token_to_orig_map = {}
+                token_is_max_context = {}
+                tokens.append("[CLS]")
+
+                for i in range(doc_span.length):
+                    split_token_index = doc_span.start + i
+                    token_to_orig_map[len(tokens)] = tok_to_orig_index[
+                        split_token_index]
+
+                    is_max_context = self._check_is_max_context(
+                        doc_spans, doc_span_index, split_token_index)
+                    token_is_max_context[len(tokens)] = is_max_context
+                    tokens.append(all_doc_tokens[split_token_index])
+                tokens.append("[SEP]")
+
+                for token in query_tokens:
+                    tokens.append(token)
+                tokens.append("[SEP]")
+
+                token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+                start_position = None
+                end_position = None
+                if is_training:
+                    doc_start = doc_span.start
+                    doc_end = doc_span.start + doc_span.length - 1
+                    out_of_span = False
+                    if not (tok_start_position >= doc_start and
+                            tok_end_position <= doc_end):
+                        out_of_span = True
+                    if out_of_span:
+                        start_position = 0
+                        end_position = 0
+                    else:
+                        doc_offset = 1  #len(query_tokens) + 2
+                        start_position = tok_start_position - doc_start + doc_offset
+                        end_position = tok_end_position - doc_start + doc_offset
+
+                feature = Feature(
+                    qid=unique_id,
+                    example_index=example_index,
+                    doc_span_index=doc_span_index,
+                    tokens=tokens,
+                    token_to_orig_map=token_to_orig_map,
+                    token_is_max_context=token_is_max_context,
+                    src_ids=token_ids,
+                    start_position=start_position,
+                    end_position=end_position,
+                    cal_loss=1)
+                features.append(feature)
+                features_each.append(feature)
+
+                unique_id += 1
+
+            #repeat
+            if self.repeat_input:
+                features_each_repeat = features_each
+                features_each = list(
+                    map(lambda x: x._replace(cla_loss=0), features_each))
+                features_each += features_each_repeat
+
+            self.features_all.append(features_each)
+
+        return features
+
+    def _preprocess_data(self):
+        # construct examples
+        self.examples = self._convert_qa_to_examples()
+        # construct features
+        self.features = self._convert_example_to_feature(self.examples)
+
+    def get_num_examples(self):
+        if not self.features_all:
+            self._preprocess_data()
+        return len(sum(self.features_all, []))
+
+    def _improve_answer_span(self, doc_tokens, input_start, input_end,
+                             orig_answer_text):
+        """improve answer span"""
+        tok_answer_text = " ".join(self.tokenizer.tokenize(orig_answer_text))
+
+        for new_start in range(input_start, input_end + 1):
+            for new_end in range(input_end, new_start - 1, -1):
+                text_span = " ".join(doc_tokens[new_start:(new_end + 1)])
+                if text_span == tok_answer_text:
+                    return (new_start, new_end)
+
+        return (input_start, input_end)
+
+    def _check_is_max_context(self, doc_spans, cur_span_index, position):
+        """chech is max context"""
+        best_score = None
+        best_span_index = None
+        for (span_index, doc_span) in enumerate(doc_spans):
+            end = doc_span.start + doc_span.length - 1
+            if position < doc_span.start:
+                continue
+            if position > end:
+                continue
+            num_left_context = position - doc_span.start
+            num_right_context = end - position
+            score = min(num_left_context,
+                        num_right_context) + 0.01 * doc_span.length
+            if best_score is None or score > best_score:
+                best_score = score
+                best_span_index = span_index
+
+        return cur_span_index == best_span_index
+
+    def _pad_batch_records(self, batch_records, gather_idx=[]):
+        """pad batch data"""
+        batch_token_ids = [record.src_ids for record in batch_records]
+
+        if self.modes == "train":
+            batch_start_position = [
+                record.start_position for record in batch_records
+            ]
+            batch_end_position = [
+                record.end_position for record in batch_records
+            ]
+            batch_start_position = np.array(batch_start_position).astype(
+                "int64").reshape([-1, 1])
+            batch_end_position = np.array(batch_end_position).astype(
+                "int64").reshape([-1, 1])
+        else:
+            batch_size = len(batch_token_ids)
+            batch_start_position = np.zeros(
+                shape=[batch_size, 1], dtype="int64")
+            batch_end_position = np.zeros(shape=[batch_size, 1], dtype="int64")
+
+        batch_qids = [record.qid for record in batch_records]
+        batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
+
+        if gather_idx:
+            batch_gather_idx = np.array(gather_idx).astype("int64").reshape(
+                [-1, 1])
+            need_cal_loss = np.array([1]).astype("int64")
+        else:
+            batch_gather_idx = np.array(list(range(len(batch_records)))).astype(
+                "int64").reshape([-1, 1])
+            need_cal_loss = np.array([0]).astype("int64")
+
+        # padding
+        padded_token_ids, input_mask = pad_batch_data(
+            batch_token_ids,
+            pad_idx=self.tokenizer.pad_token_id,
+            pad_max_len=self.max_seq_length,
+            return_input_mask=True)
+        padded_task_ids = np.zeros_like(padded_token_ids, dtype="int64")
+        padded_position_ids = get_related_pos(
+            padded_task_ids, self.max_seq_length, self.memory_len)
+
+        return_list = [
+            padded_token_ids, padded_position_ids, padded_task_ids, input_mask,
+            batch_start_position, batch_end_position, batch_qids,
+            batch_gather_idx, need_cal_loss
+        ]
+
+        return return_list
+
+    def _create_instances(self):
+        """generate batch records"""
+        pre_batch_list = []
+        insert_idx = []
+        for qid, example in enumerate(self.features_all):
+            if self._cnt_list(
+                    pre_batch_list) < self.batch_size * self.trainer_num:
+                if insert_idx:
+                    pre_batch_list[insert_idx[0]] = features
+                    insert_idx.pop(0)
+                else:
+                    pre_batch_list.append(features)
+            if self._cnt_list(
+                    pre_batch_list) == self.batch_size * self.trainer_num:
+                assert self._cnt_list(pre_batch_list) == len(
+                    pre_batch_list), "the two value must be equal"
+                assert not insert_idx, "the insert_idx must be null"
+                sample_batch = self._get_samples(pre_batch_list)
+
+                for idx, lit in enumerate(pre_batch_list):
+                    if not lit:
+                        insert_idx.append(idx)
+                for batch_records in self._prepare_batch_data(sample_batch):
+                    yield batch_records
+
+        if self.mode != "train":
+            if self._cnt_list(pre_batch_list):
+                pre_batch_list += [
+                    []
+                    for _ in range(self.batch_size * self.trainer_num -
+                                   self._cnt_list(pre_batch_list))
+                ]
+                sample_batch = self._get_samples(pre_batch_list, is_last=True)
+                for batch_records in self._prepare_batch_data(sample_batch):
+                    yield batch_records
