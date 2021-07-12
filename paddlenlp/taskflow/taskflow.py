@@ -96,7 +96,7 @@ class TaskFlow(object):
 
     def help(self):
         """
-        Return the task useage message.
+        Return the task usage message.
         """
         return self.task_instance.help()
 

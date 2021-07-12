@@ -107,17 +107,33 @@ URLS = {
     ],
 }
 
-useage = r"""
+usage = r"""
           from paddlenlp.taskflow import TaskFlow 
+
           task = TaskFlow("text2knowledge")
-          task("中国是一个伟大的国家")
+          task("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
           '''
-          [{'text': '中国是一个伟大的国家', 'items': [{'item': '中国', 'offset': 0, 'wordtag_label': '世界地区类', 'length': 2, 'termid': '中国地区_cb_中国'}, {'item': '是', 'offset': 2, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '一个', 'offset': 3, 'wordtag_label': '数量词', 'length': 2}, {'item': '伟大', 'offset': 5, 'wordtag_label': '修饰词', 'length': 2, 'termid': '修饰词_cb_伟大'}, {'item': '的', 'offset': 7, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '国家', 'offset': 8, 'wordtag_label': '世界地区类', 'length': 2, 'termid': '国家_cb_国家'}]}]
+          [{'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5, 'termid': '时间阶段_cb_2010年'}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5, 'termid': '组织机构_eb_九州出版社'}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_出版'}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '小说_cb_小说'}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2, 'termid': '人物_cb_作者'}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
+          '''
+
+          task = TaskFlow("text2knowledge", lazy_load=True)
+          task("热梅茶是一道以梅子为主要原料制作的茶饮")
+          '''
+          [{'text': '热梅茶是一道以梅子为主要原料制作的茶饮', 'items': [{'item': '热梅茶', 'offset': 0, 'wordtag_label': '饮食类_饮品', 'length': 3}, {'item': '是', 'offset': 3, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '一道', 'offset': 4, 'wordtag_label': '数量词', 'length': 2}, {'item': '以', 'offset': 6, 'wordtag_label': '介词', 'length': 1, 'termid': '介词_cb_以'}, {'item': '梅子', 'offset': 7, 'wordtag_label': '饮食类', 'length': 2, 'termid': '饮食_cb_梅'}, {'item': '为', 'offset': 9, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_为'}, {'item': '主要原料', 'offset': 10, 'wordtag_label': '物体类', 'length': 4, 'termid': '物品_cb_主要原料'}, {'item': '制作', 'offset': 14, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_制作'}, {'item': '的', 'offset': 16, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '茶饮', 'offset': 17, 'wordtag_label': '饮食类_饮品', 'length': 2, 'termid': '饮品_cb_茶饮'}]}]
+          '''
+
+          task = TaskFlow("text2knowledge", batch_size=2)
+          task(["热梅茶是一道以梅子为主要原料制作的茶饮",
+                "《孤女》是2010年九州出版社出版的小说，作者是余兼羽",
+                "中山中环广场，位于广东省中山市东区，地址是东区兴政路1号",
+                "宫之王是一款打发休闲时光的迷宫游戏"])
+          '''
+          [{'text': '热梅茶是一道以梅子为主要原料制作的茶饮', 'items': [{'item': '热梅茶', 'offset': 0, 'wordtag_label': '饮食类_饮品', 'length': 3}, {'item': '是', 'offset': 3, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '一道', 'offset': 4, 'wordtag_label': '数量词', 'length': 2}, {'item': '以', 'offset': 6, 'wordtag_label': '介词', 'length': 1, 'termid': '介词_cb_以'}, {'item': '梅子', 'offset': 7, 'wordtag_label': '饮食类', 'length': 2, 'termid': '饮食_cb_梅'}, {'item': '为', 'offset': 9, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_为'}, {'item': '主要原料', 'offset': 10, 'wordtag_label': '物体类', 'length': 4, 'termid': '物品_cb_主要原料'}, {'item': '制作', 'offset': 14, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_制作'}, {'item': '的', 'offset': 16, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '茶饮', 'offset': 17, 'wordtag_label': '饮食类_饮品', 'length': 2, 'termid': '饮品_cb_茶饮'}]}, {'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5, 'termid': '时间阶段_cb_2010年'}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5, 'termid': '组织机构_eb_九州出版社'}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_出版'}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '小说_cb_小说'}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2, 'termid': '人物_cb_作者'}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}, {'text': '中山中环广场，位于广东省中山市东区，地址是东区兴政路1号', 'items': [{'item': '中山中环广场', 'offset': 0, 'wordtag_label': '场所类', 'length': 6}, {'item': '，', 'offset': 6, 'wordtag_label': 'w', 'length': 1}, {'item': '位于', 'offset': 7, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_位于'}, {'item': '广东省', 'offset': 9, 'wordtag_label': '世界地区类', 'length': 3, 'termid': '中国地区_cb_广东省'}, {'item': '中山市东', 'offset': 12, 'wordtag_label': '世界地区类', 'length': 4}, {'item': '区', 'offset': 16, 'wordtag_label': '词汇用语', 'length': 1}, {'item': '，', 'offset': 17, 'wordtag_label': 'w', 'length': 1}, {'item': '地址', 'offset': 18, 'wordtag_label': '场所类', 'length': 2, 'termid': '区域场所_cb_地址'}, {'item': '是', 'offset': 20, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '东区', 'offset': 21, 'wordtag_label': '位置方位', 'length': 2, 'termid': '位置方位_cb_东区'}, {'item': '兴政路1号', 'offset': 23, 'wordtag_label': '世界地区类', 'length': 5}]}, {'text': '宫之王是一款打发休闲时光的迷宫游戏', 'items': [{'item': '宫之王', 'offset': 0, 'wordtag_label': '人物类_实体', 'length': 3}, {'item': '是', 'offset': 3, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '一款', 'offset': 4, 'wordtag_label': '数量词', 'length': 2}, {'item': '打发', 'offset': 6, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_打发'}, {'item': '休闲', 'offset': 8, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_休闲'}, {'item': '时光', 'offset': 10, 'wordtag_label': '时间类', 'length': 2, 'termid': '时间阶段_cb_时光'}, {'item': '的', 'offset': 12, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '迷宫游戏', 'offset': 13, 'wordtag_label': '作品类_概念', 'length': 4}]}]
           '''
           """
 
 
-@add_docstrings(useage)
+@add_docstrings(usage)
 class Text2KnowledgeTask(Task):
     """
     This the NER(Named Entity Recognition) task that convert the raw text to entities. And the task with the `wordtag` 
@@ -153,7 +169,7 @@ class Text2KnowledgeTask(Task):
         self._tokenizer = self._construct_tokenizer(model)
         self._model = self._construct_model(model)
         self._summary_num = self._model.ernie_ctm.content_summary_index + 1
-        self._useage = useage
+        self._usage = usage
 
     def _download_termtree(self, filename):
         default_root = os.path.join(MODEL_HOME, 'ernie-ctm')
@@ -308,8 +324,8 @@ class Text2KnowledgeTask(Task):
             'batch_size'] if 'batch_size' in self.kwargs else 1
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
-        data_lazy = self.kwargs[
-            'data_lazy'] if 'data_lazy' in self.kwargs else False
+        lazy_load = self.kwargs[
+            'lazy_load'] if 'lazy_load' in self.kwargs else False
 
         max_seq_length = 128
         if 'max_position_embedding' in self.kwargs:
@@ -329,7 +345,7 @@ class Text2KnowledgeTask(Task):
                 yield tokenized_output['input_ids'], tokenized_output[
                     'token_type_ids'], tokenized_output['seq_len']
 
-        infer_ds = load_dataset(read, inputs=short_input_texts, lazy=data_lazy)
+        infer_ds = load_dataset(read, inputs=short_input_texts, lazy=lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self._tokenizer.pad_token_id,dtype='int64'),  # input_ids
             Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id,dtype='int64'),  # token_type_ids

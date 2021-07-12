@@ -27,7 +27,7 @@ class Task(metaclass=abc.ABCMeta):
         self.model = model
         self.task = task
         self.kwargs = kwargs
-        self._useage = ""
+        self._usage = ""
 
     @abstractmethod
     def _construct_model(self, model):
@@ -65,7 +65,7 @@ class Task(metaclass=abc.ABCMeta):
         """
         Return the usesage message of the current task.
         """
-        print("Examples:\n{}".format(self._useage))
+        print("Examples:\n{}".format(self._usage))
 
     def __call__(self, *args):
         inputs = self._preprocess(*args)

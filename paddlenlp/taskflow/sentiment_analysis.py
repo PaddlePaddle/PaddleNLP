@@ -42,24 +42,41 @@ URLS = {
     ]
 }
 
-useage = r"""
+usage = r"""
            from paddlenlp.taskflow import TaskFlow 
+
            task = TaskFlow("sentiment_analysis")
-           task("中国是一个伟大的国家")
+           task("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
            '''
-           [{'text': '中国是一个伟大的国家', 'label': 'positive'}]
+           [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'positive'}]
            '''
+
            task = TaskFlow("sentiment_analysis", network="lstm")
-           task("中国是一个伟大的国家")
+           task("作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。")
            '''
-           [{'text': '中国是一个伟大的国家', 'label': 'positive'}]
+           [{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive'}]
+           '''
+
+           task = TaskFlow("sentiment_analysis", lazy_load="True")
+           task("作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。")
+           '''
+           [{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive'}]
+           '''
+
+           task = TaskFlow("sentiment_analysis", batch_size=2)
+           task(["作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。", 
+                 "怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片",
+                 "这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般",
+                 "２００１年来福州就住在这里，这次感觉房间就了点，温泉水还是有的．总的来说很满意．早餐简单了些．"])
+           '''
+           [{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive'}, {'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'}, {'text': '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般', 'label': 'negative'}, {'text': '２００１年来福州就住在这里，这次感觉房间就了点，温泉水还是有的．总的来说很满意．早餐简单了些．', 'label': 'positive'}]
            '''
            """
 
 
 class SentaTask(Task):
     """
-    The one task of sentiment_analysis which use the RNN or Bow model to analysis the input text. 
+    Sentiment analysis task using RNN or BOW model to predict sentiment opinion on Chinese text. 
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
@@ -71,7 +88,7 @@ class SentaTask(Task):
         self._tokenizer = self._construct_tokenizer(model)
         self._model_instance = self._construct_model(model)
         self._label_map = {0: 'negative', 1: 'positive'}
-        self._useage = useage
+        self._usage = usage
 
     def _construct_model(self, model):
         """
@@ -146,8 +163,8 @@ class SentaTask(Task):
             'batch_size'] if 'batch_size' in self.kwargs else 1
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
-        data_lazy = self.kwargs[
-            'data_lazy'] if 'data_lazy' in self.kwargs else False
+        lazy_load = self.kwargs[
+            'lazy_load'] if 'lazy_load' in self.kwargs else False
         infer_data = []
 
         def read(inputs):
@@ -156,7 +173,7 @@ class SentaTask(Task):
                 lens = len(ids)
                 yield ids, lens
 
-        infer_ds = load_dataset(read, inputs=inputs, lazy=data_lazy)
+        infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self._tokenizer.vocab.token_to_idx.get('[PAD]', 0)),  # input_ids
             Stack(dtype='int64'),  # seq_len
