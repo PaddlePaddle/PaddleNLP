@@ -63,7 +63,7 @@ class Task(metaclass=abc.ABCMeta):
 
     def help(self):
         """
-        Return the usesage message of the current task.
+        Return the usage message of the current task.
         """
         print("Examples:\n{}".format(self._usage))
 
