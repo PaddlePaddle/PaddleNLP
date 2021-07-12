@@ -108,7 +108,7 @@ def parse_decodes(ds, decodes, lens, label_vocab):
         tags_out = []
         words = ""
         for s, t in zip(sent, tags):
-            if t.endswith('B-') or t == 'O':
+            if t.startswith('B-') or t == 'O':
                 if len(words):
                     sent_out.append(words)
                 if t.startswith('B-'):
