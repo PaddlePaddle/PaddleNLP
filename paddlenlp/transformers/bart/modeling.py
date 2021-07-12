@@ -22,9 +22,9 @@ from paddle.nn import Layer, Embedding
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'BartModel', 'BartPretrainedModel', 'BartClassificationHead',
-    'BartForSequenceClassification', 'BartForQuestionAnswering',
-    'BartForConditionalGeneration'
+    'BartModel', 'BartPretrainedModel', 'BartEncoder', 'BartDecoder',
+    'BartClassificationHead', 'BartForSequenceClassification',
+    'BartForQuestionAnswering', 'BartForConditionalGeneration'
 ]
 
 
@@ -137,6 +137,135 @@ class BartLearnedPositionalEmbedding(Embedding):
         return super().forward(positions + self.offset)
 
 
+class BartEncoder(BartPretrainedModel):
+    def __init__(self,
+                 embed_tokens,
+                 vocab_size,
+                 pad_token_id=1,
+                 d_model=768,
+                 num_encoder_layers=6,
+                 encoder_attention_heads=12,
+                 encoder_ffn_dim=3072,
+                 dropout=0.1,
+                 activation_function='gelu',
+                 attention_dropout=0.1,
+                 activation_dropout=0.1,
+                 max_position_embeddings=1024,
+                 init_std=0.02):
+        super().__init__()
+        self.init_std = init_std
+        self.pad_token_id = pad_token_id
+        if embed_tokens is not None:
+            self.embed_tokens = embed_tokens
+        else:
+            self.embed_tokens = nn.Embedding(vocab_size, d_model, pad_token_id)
+
+        self.encoder_embed_positions = BartLearnedPositionalEmbedding(
+            max_position_embeddings, d_model, pad_token_id)
+
+        self.encoder_dropout = nn.Dropout(dropout)
+        self.encoder_layernorm_embedding = nn.LayerNorm(d_model)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=encoder_attention_heads,
+            dim_feedforward=encoder_ffn_dim,
+            dropout=dropout,
+            activation=activation_function,
+            attn_dropout=attention_dropout,
+            act_dropout=activation_dropout)
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers)
+        self.apply(self.init_weights)
+
+    def forward(
+            self,
+            input_ids=None,
+            attention_mask=None, ):
+        if input_ids is None:
+            raise ValueError("Input_ids cannot be None.")
+        inputs_embeds = self.embed_tokens(input_ids)
+        inputs_embed_pos = self.encoder_embed_positions(input_ids.shape)
+        hidden_states = inputs_embeds + inputs_embed_pos
+        hidden_states = self.encoder_layernorm_embedding(hidden_states)
+        encoder_input = self.encoder_dropout(hidden_states)
+
+        if attention_mask is None:
+            attention_mask = paddle.cast(
+                input_ids == self.pad_token_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+            attention_mask.stop_gradient = True
+
+        encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
+        return encoder_output
+
+
+class BartDecoder(BartPretrainedModel):
+    def __init__(self,
+                 embed_tokens,
+                 vocab_size,
+                 pad_token_id=1,
+                 d_model=768,
+                 num_decoder_layers=6,
+                 decoder_attention_heads=12,
+                 decoder_ffn_dim=3072,
+                 dropout=0.1,
+                 activation_function='gelu',
+                 attention_dropout=0.1,
+                 activation_dropout=0.1,
+                 max_position_embeddings=1024,
+                 init_std=0.02):
+        super().__init__()
+        self.init_std = init_std
+        if embed_tokens is not None:
+            self.embed_tokens = embed_tokens
+        else:
+            self.embed_tokens = nn.Embedding(vocab_size, d_model, pad_token_id)
+
+        self.decoder_embed_positions = BartLearnedPositionalEmbedding(
+            max_position_embeddings, d_model, pad_token_id)
+        self.decoder_dropout = nn.Dropout(dropout)
+        self.decoder_layernorm_embedding = nn.LayerNorm(d_model)
+
+        decoder_layer = nn.TransformerDecoderLayer(
+            d_model=d_model,
+            nhead=decoder_attention_heads,
+            dim_feedforward=decoder_ffn_dim,
+            dropout=dropout,
+            activation=activation_function,
+            attn_dropout=attention_dropout,
+            act_dropout=activation_dropout)
+        self.decoder = nn.TransformerDecoder(decoder_layer, num_decoder_layers)
+        self.apply(self.init_weights)
+
+    def forward(self,
+                decoder_input_ids=None,
+                decoder_attention_mask=None,
+                encoder_output=None,
+                memory_mask=None,
+                cache=None):
+        if decoder_attention_mask is None:
+            decoder_length = paddle.shape(decoder_input_ids)[-1]
+            decoder_attention_mask = paddle.tensor.triu(
+                (paddle.full(
+                    (decoder_length, decoder_length),
+                    -np.inf,
+                    dtype=paddle.get_default_dtype())),
+                1)
+        decoder_inputs_embeds = self.embed_tokens(decoder_input_ids)
+        decoder_inputs_embed_pos = self.decoder_embed_positions(
+            decoder_input_ids.shape)
+        hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
+        hidden_states = self.decoder_layernorm_embedding(hidden_states)
+        decoder_input = self.decoder_dropout(hidden_states)
+
+        decoder_output = self.decoder(
+            tgt=decoder_input,
+            memory=encoder_output,
+            tgt_mask=decoder_attention_mask,
+            memory_mask=memory_mask,
+            cache=cache)
+        return decoder_output
+
+
 @register_base_model
 class BartModel(BartPretrainedModel):
     """
@@ -163,92 +292,44 @@ class BartModel(BartPretrainedModel):
                  init_std=0.02):
         super().__init__()
         self.init_std = init_std
-        self.padding_idx = pad_token_id
+        self.pad_token_id = pad_token_id
         self.decoder_start_token_id = decoder_start_token_id
-        self.embed_tokens = nn.Embedding(vocab_size, d_model, self.padding_idx)
-        self.encoder_embed_positions = BartLearnedPositionalEmbedding(
-            max_position_embeddings, d_model, self.padding_idx)
-        self.decoder_embed_positions = BartLearnedPositionalEmbedding(
-            max_position_embeddings, d_model, self.padding_idx)
-        self.encoder_dropout = nn.Dropout(dropout)
-        self.decoder_dropout = nn.Dropout(dropout)
-        self.encoder_layernorm_embedding = nn.LayerNorm(d_model)
-        self.decoder_layernorm_embedding = nn.LayerNorm(d_model)
+        self.shared = nn.Embedding(vocab_size, d_model, pad_token_id)
+        self.encoder = BartEncoder(
+            self.shared, vocab_size, pad_token_id, d_model, num_encoder_layers,
+            encoder_attention_heads, encoder_ffn_dim, dropout,
+            activation_function, attention_dropout, activation_dropout,
+            max_position_embeddings, init_std)
 
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model,
-            nhead=encoder_attention_heads,
-            dim_feedforward=encoder_ffn_dim,
-            dropout=dropout,
-            activation=activation_function,
-            attn_dropout=attention_dropout,
-            act_dropout=activation_dropout)
-
-        decoder_layer = nn.TransformerDecoderLayer(
-            d_model=d_model,
-            nhead=decoder_attention_heads,
-            dim_feedforward=decoder_ffn_dim,
-            dropout=dropout,
-            activation=activation_function,
-            attn_dropout=attention_dropout,
-            act_dropout=activation_dropout)
-
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers)
-        self.decoder = nn.TransformerDecoder(decoder_layer, num_decoder_layers)
+        self.decoder = BartDecoder(
+            self.shared, vocab_size, pad_token_id, d_model, num_decoder_layers,
+            decoder_attention_heads, decoder_ffn_dim, dropout,
+            activation_function, attention_dropout, activation_dropout,
+            max_position_embeddings, init_std)
         self.apply(self.init_weights)
-
-    def get_encoder(self):
-        return self.encoder
-
-    def get_decoder(self):
-        return self.decoder
 
     def forward(self,
                 input_ids,
                 attention_mask=None,
                 decoder_input_ids=None,
-                decoder_attention_mask=None):
+                decoder_attention_mask=None,
+                encoder_output=None,
+                cache=None):
         # different to other models, Bart automatically creates decoder_input_ids from
         # inputBartForSequenceClassification_ids if no decoder_input_ids are provided
-        if attention_mask is None:
-            attention_mask = paddle.cast(
-                input_ids == self.padding_idx,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
-            attention_mask.stop_gradient = True
-
-        memory_mask = attention_mask
-        memory_mask.stop_gradient = True
-
         if decoder_input_ids is None:
             decoder_input_ids = shift_tokens_right(input_ids,
                                                    self.decoder_start_token_id)
-        if decoder_attention_mask is None:
-            decoder_length = paddle.shape(decoder_input_ids)[-1]
-            decoder_attention_mask = paddle.tensor.triu(
-                (paddle.ones(
-                    (decoder_length, decoder_length),
-                    dtype=paddle.get_default_dtype()) * -np.inf),
-                1)
+        if encoder_output is None:
+            encoder_output = self.encoder(input_ids, attention_mask)
 
-        inputs_embeds = self.embed_tokens(input_ids)
-        inputs_embed_pos = self.encoder_embed_positions(input_ids.shape)
-        hidden_states = inputs_embeds + inputs_embed_pos
-        hidden_states = self.encoder_layernorm_embedding(hidden_states)
-        encoder_input = self.encoder_dropout(hidden_states)
+        memory_mask = paddle.cast(
+            input_ids == self.pad_token_id,
+            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+        memory_mask.stop_gradient = True
 
-        decoder_inputs_embeds = self.embed_tokens(decoder_input_ids)
-        decoder_inputs_embed_pos = self.decoder_embed_positions(
-            decoder_input_ids.shape)
-        hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
-        hidden_states = self.decoder_layernorm_embedding(hidden_states)
-        decoder_input = self.decoder_dropout(hidden_states)
-
-        memory = self.encoder(encoder_input, src_mask=attention_mask)
-        decoder_output = self.decoder(
-            decoder_input,
-            memory,
-            tgt_mask=decoder_attention_mask,
-            memory_mask=memory_mask)
+        decoder_output = self.decoder(decoder_input_ids, decoder_attention_mask,
+                                      encoder_output, memory_mask, cache)
 
         return decoder_output
 
@@ -288,16 +369,19 @@ class BartForSequenceClassification(BartPretrainedModel):
                 input_ids,
                 attention_mask=None,
                 decoder_input_ids=None,
-                decoder_attention_mask=None):
+                decoder_attention_mask=None,
+                encoder_output=None,
+                cache=None):
         output = self.bart(input_ids, attention_mask, decoder_input_ids,
-                           decoder_attention_mask)
+                           decoder_attention_mask, encoder_output, cache)
         eos_mask = paddle.cast(
             input_ids == self.bart.config['eos_token_id'], dtype='int64')
         if len(paddle.unique(paddle.sum(eos_mask, axis=1))) > 1:
             raise ValueError(
                 'All examples must have the same number of <eos> tokens.')
 
-        output_shape = paddle.shape(output)
+        output_shape = paddle.shape(output if cache is None else output[0])
+        # TODO(gongenlei): support bool tensor index
         output = output.masked_select(
             eos_mask.unsqueeze(-1).astype('bool').tile(
                 [1, 1, output_shape[-1]]))
@@ -318,10 +402,12 @@ class BartForQuestionAnswering(BartPretrainedModel):
                 input_ids,
                 attention_mask=None,
                 decoder_input_ids=None,
-                decoder_attention_mask=None):
+                decoder_attention_mask=None,
+                encoder_output=None,
+                cache=None):
         output = self.bart(input_ids, attention_mask, decoder_input_ids,
-                           decoder_attention_mask)
-        logits = self.classifier(output)
+                           decoder_attention_mask, encoder_output, cache)
+        logits = self.classifier(output if cache is None else output[0])
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
         return start_logits, end_logits
@@ -335,7 +421,7 @@ class BartForConditionalGeneration(BartPretrainedModel):
             shape=[
                 self.bart.config['vocab_size'], self.bart.config['d_model']
             ],
-            dtype=self.bart.embed_tokens.weight.dtype,
+            dtype=self.bart.shared.weight.dtype,
             is_bias=False)
         self.register_buffer("final_logits_bias",
                              paddle.zeros((1, self.bart.config['vocab_size'])))
@@ -345,10 +431,14 @@ class BartForConditionalGeneration(BartPretrainedModel):
                 input_ids,
                 attention_mask=None,
                 decoder_input_ids=None,
-                decoder_attention_mask=None):
+                decoder_attention_mask=None,
+                encoder_output=None,
+                cache=None):
         output = self.bart(input_ids, attention_mask, decoder_input_ids,
-                           decoder_attention_mask)
+                           decoder_attention_mask, encoder_output, cache)
         lm_logits = paddle.tensor.matmul(
-            output, self.lm_head_weight,
+            output if cache is None else output[0],
+            self.lm_head_weight,
             transpose_y=True) + self.final_logits_bias
+
         return lm_logits
