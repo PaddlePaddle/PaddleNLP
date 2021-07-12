@@ -123,9 +123,16 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/topk_kernels.cu topk_kernels_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cu topk_kernels_dst)
 
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_decoder.cu open_decoder_cu_dst)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/open_decoder.h open_decoder_header_dst)
+
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/transformer_decoder.cu trans_decoder_cu_src)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/transformer_decoder.h trans_decoder_header_src)
+set(trans_dst ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/)
+
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
-set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} && cp ${common_src} ${common_dst} && cp ${cmakelists_src} ${cmakelists_dst} && cp ${topk_kernels_src} ${topk_kernels_dst} && ${MUTE_COMMAND})
+set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} && cp ${common_src} ${common_dst} && cp ${cmakelists_src} ${cmakelists_dst} && cp ${topk_kernels_src} ${topk_kernels_dst} && cat ${trans_decoder_cu_src} >> ${open_decoder_cu_dst} && cat ${trans_decoder_header_src} >> ${open_decoder_header_dst} && ${MUTE_COMMAND})
 
 ######################################################################################
 # A function for automatic detection of GPUs installed  (if autodetection is enabled)
