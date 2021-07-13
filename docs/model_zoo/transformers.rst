@@ -118,7 +118,7 @@ Transformer预训练模型汇总
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``simbert-base-chinese``             | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                     |              | 12-heads, 108M parameters.              |
-|                    |                                     |              | Trained on cased 22 million pairs of    |
+|                    |                                     |              | Trained on 22 million pairs of          |
 |                    |                                     |              | similar sentences crawed from Baidu Know|
 +--------------------+-------------------------------------+--------------+-----------------------------------------+
 |BigBird_            |``bigbird-base-uncased``             | English      | 12-layer, 768-hidden,                   |
