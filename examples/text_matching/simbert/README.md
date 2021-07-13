@@ -1,7 +1,7 @@
 # SimBERT模型
 
 ## 模型简介
-SimBERT的模型权重是以Google开源的BERT模型为基础，基于微软的UniLM思想设计了融检索与生成于一体的任务，来进一步微调后得到的模型，所以它同时具备相似问生成和相似句检索能力。
+[SimBERT](https://github.com/ZhuiyiTechnology/simbert)的模型权重是以Google开源的BERT模型为基础，基于微软的UniLM思想设计了融检索与生成于一体的任务，来进一步微调后得到的模型，所以它同时具备相似问生成和相似句检索能力。
 
 ## 快速开始
 
