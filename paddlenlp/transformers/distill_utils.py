@@ -27,7 +27,6 @@ __all__ = ['to_distill', 'calc_minilm_loss']
 
 def calc_minilm_loss(loss_fct, s, t, attn_mask, num_relation_heads=0):
     # Initialize head_num
-    head_num = s.shape[1]
     if num_relation_heads > 0 and num_relation_heads != s.shape[1]:
         # s'shape: [bs, seq_len, head_num, head_dim]
         s = tensor.transpose(x=s, perm=[0, 2, 1, 3])
@@ -35,12 +34,10 @@ def calc_minilm_loss(loss_fct, s, t, attn_mask, num_relation_heads=0):
         s = tensor.reshape(x=s, shape=[0, 0, num_relation_heads, -1])
         #s's shape: [bs, num_relation_heads, seq_len,, head_dim_new]
         s = tensor.transpose(x=s, perm=[0, 2, 1, 3])
-        head_num = num_relation_heads
     if num_relation_heads > 0 and num_relation_heads != t.shape[1]:
         t = tensor.transpose(x=t, perm=[0, 2, 1, 3])
         t = tensor.reshape(x=t, shape=[0, 0, num_relation_heads, -1])
         t = tensor.transpose(x=t, perm=[0, 2, 1, 3])
-        head_num = num_relation_heads
 
     pad_seq_len = s.shape[2]
     s_head_dim, t_head_dim = s.shape[3], t.shape[3]
@@ -55,11 +52,14 @@ def calc_minilm_loss(loss_fct, s, t, attn_mask, num_relation_heads=0):
     scaled_dot_product_t += attn_mask
     loss = loss_fct(
         F.log_softmax(scaled_dot_product_s), F.softmax(scaled_dot_product_t))
-    loss /= head_num * pad_seq_len
     return loss
 
 
-def to_distill(self):
+def to_distill(self,
+               return_qkv=False,
+               return_attentions=False,
+               return_layer_outputs=False,
+               layer_index=-1):
     """
     Can be bound to object with transformer encoder layers, and make model
     expose attributes `outputs.qs`, `outputs.ks`, `outputs.vs`,
@@ -76,6 +76,12 @@ def to_distill(self):
         if isinstance(layer, (MultiHeadAttention, TransformerEncoderLayer,
                               TransformerEncoder, TinyBertForPretraining)):
             layer.forward = layer._forward
+            if isinstance(layer, TransformerEncoder):
+                layer.return_layer_outputs = return_layer_outputs
+                layer.layer_index = layer_index
+            if isinstance(layer, MultiHeadAttention):
+                layer.return_attentions = return_attentions
+                layer.return_qkv = return_qkv
 
     for layer in self.children():
         layer.apply(init_func)
@@ -133,7 +139,7 @@ def attention_forward(self,
         attn_mask = _convert_attention_mask(attn_mask, product.dtype)
         product = product + attn_mask
 
-    # self.attention_matrix = product
+    self.attention_matrix = product if self.return_attentions else None
     weights = F.softmax(product)
     if self.dropout:
         weights = F.dropout(
@@ -143,9 +149,10 @@ def attention_forward(self,
             mode="upscale_in_train")
 
     out = tensor.matmul(weights, v)
-    self.q = q
-    self.k = k
-    self.v = v
+    if self.return_qkv:
+        self.q = q
+        self.k = k
+        self.v = v
 
     # combine heads
     out = tensor.transpose(out, perm=[0, 2, 1, 3])
@@ -176,7 +183,6 @@ def transformer_encoder_layer_forward(self, src, src_mask=None, cache=None):
         src = self.self_attn(src, src, src, src_mask)
     else:
         src, incremental_cache = self.self_attn(src, src, src, src_mask, cache)
-    # self.attention_matrix = self.self_attn.attention_matrix
     src = residual + self.dropout1(src)
     if not self.normalize_before:
         src = self.norm1(src)
@@ -188,9 +194,12 @@ def transformer_encoder_layer_forward(self, src, src_mask=None, cache=None):
     src = residual + self.dropout2(src)
     if not self.normalize_before:
         src = self.norm2(src)
-    self.q = self.self_attn.q
-    self.k = self.self_attn.k
-    self.v = self.self_attn.v
+    if hasattr(self.self_attn, 'attention_matrix'):
+        self.attention_matrix = self.self_attn.attention_matrix
+    if hasattr(self.self_attn, 'q'):
+        self.q = self.self_attn.q
+        self.k = self.self_attn.k
+        self.v = self.self_attn.v
     return src if cache is None else (src, incremental_cache)
 
 
@@ -202,24 +211,29 @@ def transformer_encoder_forward(self, src, src_mask=None, cache=None):
 
     output = src
     new_caches = []
-    # self.attentions = []
-    # self.hidden_states = []
-    self.qs, self.ks, self.vs = [], [], []
+
+    self.attentions = []
+    self.hidden_states = []
+
     for i, mod in enumerate(self.layers):
-        # self.hidden_states.append(output)
+        if self.return_layer_outputs:
+            self.hidden_states.append(output)
         if cache is None:
             output = mod(output, src_mask=src_mask)
         else:
             output, new_cache = mod(output, src_mask=src_mask, cache=cache[i])
             new_caches.append(new_cache)
-        # self.attentions.append(mod.attention_matrix)
-        self.qs.append(mod.q)
-        self.ks.append(mod.k)
-        self.vs.append(mod.v)
+        if hasattr(mod, 'attention_matrix'):
+            self.attentions.append(mod.attention_matrix)
+        if i == self.layer_index and hasattr(mod, 'q'):
+            self.q = mod.q
+            self.k = mod.k
+            self.v = mod.v
 
     if self.norm is not None:
         output = self.norm(output)
-    # self.hidden_states.append(output)
+    if self.return_layer_outputs:
+        self.hidden_states.append(output)
     return output if cache is None else (output, new_caches)
 
 
@@ -241,4 +255,4 @@ def minilm_pretraining_forward(self,
 
     sequence_output, pooled_output = model(input_ids, token_type_ids,
                                            attention_mask)
-    return encoder.qs, encoder.ks, encoder.vs
+    return encoder.q, encoder.k, encoder.v

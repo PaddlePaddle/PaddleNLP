@@ -219,6 +219,7 @@ class PretrainingDataset(paddle.io.Dataset):
         f = open(input_file, 'r')
         input_ids = []
         for i, line in enumerate(f):
+            line = line[:max_seq_length]
             tokenized_example = tokenizer(line, max_seq_len=max_seq_length)
             input_ids.append(tokenized_example['input_ids'])
         self.inputs = np.asarray(input_ids)
@@ -273,8 +274,8 @@ def do_train(args):
 
     pool = ThreadPoolExecutor(1)
 
-    teacher = to_distill(teacher)
-    student = to_distill(student)
+    teacher = to_distill(teacher, return_qkv=True, layer_index=18)
+    student = to_distill(student, return_qkv=True, layer_index=5)
 
     global_step = 0
     tic_train = time.time()
@@ -321,7 +322,6 @@ def do_train(args):
             else:
                 data_file = files[(f_id * paddle.distributed.get_world_size() +
                                    paddle.distributed.get_rank()) % num_files]
-
             previous_file = data_file
             dataset_future = pool.submit(create_pretraining_dataset, data_file,
                                          args.max_predictions_per_seq,
@@ -334,7 +334,7 @@ def do_train(args):
             batch_start = time.time()
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
-                logits = input_ids = batch[0]
+                input_ids = batch[0]
                 attention_mask = paddle.unsqueeze(
                     (input_ids == pad_token_id
                      ).astype(paddle.get_default_dtype()) * -1e9,
@@ -343,25 +343,29 @@ def do_train(args):
                 with paddle.no_grad():
                     teacher(input_ids, attention_mask=attention_mask)
                 # Q-Q relation
-                q_t, q_s = teacher.outputs.qs[-6], student.outputs.qs[-1]
+                q_t, q_s = teacher.outputs.q, student.outputs.q
+                batch_size = q_t.shape[0]
+                pad_seq_len = q_t.shape[2]
                 loss_qr = calc_minilm_loss(kl_loss_fct, q_s, q_t,
                                            attention_mask,
                                            args.num_relation_heads)
                 del q_t, q_s
                 # K-K relation
-                k_t, k_s = teacher.outputs.ks[-6], student.outputs.ks[-1]
+                k_t, k_s = teacher.outputs.k, student.outputs.k
                 loss_kr = calc_minilm_loss(kl_loss_fct, k_s, k_t,
                                            attention_mask,
                                            args.num_relation_heads)
                 del k_t, k_s
                 # V-V relation
-                v_t, v_s = teacher.outputs.vs[-6], student.outputs.vs[-1]
+                v_t, v_s = teacher.outputs.v, student.outputs.v
                 loss_vr = calc_minilm_loss(kl_loss_fct, v_s, v_t,
                                            attention_mask,
                                            args.num_relation_heads)
+
                 del v_t, v_s
 
                 loss = loss_qr + loss_kr + loss_vr
+                loss /= args.num_relation_heads * pad_seq_len * batch_size
                 loss.backward()
 
                 optimizer.step()
