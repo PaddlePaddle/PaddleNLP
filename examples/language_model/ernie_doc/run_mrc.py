@@ -34,6 +34,7 @@ from paddlenlp.datasets import load_dataset
 
 from data import MRCIterator
 from optimization import AdamWDL
+from metrics import compute_qa_predictions, EM_AND_F1
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -51,7 +52,10 @@ parser.add_argument("--memory_length", type=int, default=128, help="Random seed 
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--layerwise_decay", default=0.8, type=float, help="layerwise decay ratio")
-
+parser.add_argument("--n_best_size", default=20, type=int, help="The total number of n-best predictions to generate in the nbest_predictions.json output file.")
+parser.add_argument("--max_answer_length", default=100, type=int, help="Max answer length.")
+parser.add_argument("--do_lower_case", action='store_false', help="Whether to lower case the input text. Should be True for uncased models and False for cased models.")
+parser.add_argument("--verbose", action='store_true', help="Whether to output verbose log.")
 # yapf: enable
 args = parser.parse_args()
 
@@ -86,8 +90,60 @@ class CrossEntropyLossForQA(paddle.nn.Layer):
 
 
 @paddle.no_grad()
-def evaluate(model, metric, data_loader, memories0):
-    pass
+def evaluate(args, model, criterion, metric, data_loader, memories0, tokenizer):
+    RawResult = namedtuple("RawResult",
+                           ["unique_id", "start_logits", "end_logits"])
+    model.eval()
+    all_results = []
+    tic_eval = time.time()
+    memories = list(memories0)
+
+    # collect result
+    logger.info("The example number eval data loader: {}".format(
+        len(data_loader._batch_reader.features)))
+    for step, batch in enumerate(data_loader, start=1):
+        input_ids, position_ids, token_type_ids, attn_mask, start_position, \
+            end_position, qids, gather_idx, need_cal_loss = batch
+
+        start_logits, end_logits, memories = model(
+            input_ids, memories, token_type_ids, position_ids, attn_mask)
+
+        start_logits, end_logits, qids = list(
+            map(lambda x: paddle.gather(x, gather_idx),
+                [start_logits, end_logits, qids]))
+        np_qids = qids.numpy()
+        np_start_logits = start_logits.numpy()
+        np_end_logits = end_logits.numpy()
+
+        if int(need_cal_loss.numpy()) == 1:
+            for idx in range(qids.shape[0]):
+                if len(all_results) % 1000 == 0 and len(all_results):
+                    print("Processing example: %d" % len(all_results))
+                    print('time per 1000:', time.time() - tic_eval)
+                    tic_eval = time.time()
+
+                qid_each = int(np_qids[idx])
+                start_logits_each = [
+                    float(x) for x in np_start_logits[idx].flat
+                ]
+                end_logits_each = [float(x) for x in np_end_logits[idx].flat]
+                all_results.append(
+                    RawResult(
+                        unique_id=qid_each,
+                        start_logits=start_logits_each,
+                        end_logits=end_logits_each))
+
+    # compute_predictions
+    all_predictions_eval, all_nbest_eval = compute_qa_predictions(
+        data_loader._batch_reader.examples, data_loader._batch_reader.features,
+        all_results, args.n_best_size, args.max_answer_length,
+        args.do_lower_case, tokenizer, args.verbose)
+
+    EM, F1, AVG, TOTAL = metric(all_predictions_eval,
+                                data_loader._batch_reader.dataset)
+
+    logger.info("EM: {}, F1: {}, AVG: {}, TOTAL: {}".format(EM, F1, AVG, TOTAL))
+    model.train()
 
 
 def do_train(args):
@@ -244,7 +300,9 @@ def do_train(args):
                 # evaluate
                 logger.info("Eval:")
                 # TODO(zhoushunjie): metric from None->EM_F1
-                evaluate(model, None, eval_dataloader, create_memory())
+                evaluate(args, model, criterion,
+                         EM_AND_F1(), eval_dataloader,
+                         create_memory(), tokenizer)
                 if rank == 0:
                     output_dir = os.path.join(args.output_dir,
                                               "model_%d" % (global_steps))
