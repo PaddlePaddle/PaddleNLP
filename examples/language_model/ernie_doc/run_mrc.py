@@ -56,6 +56,7 @@ parser.add_argument("--n_best_size", default=20, type=int, help="The total numbe
 parser.add_argument("--max_answer_length", default=100, type=int, help="Max answer length.")
 parser.add_argument("--do_lower_case", action='store_false', help="Whether to lower case the input text. Should be True for uncased models and False for cased models.")
 parser.add_argument("--verbose", action='store_true', help="Whether to output verbose log.")
+parser.add_argument("--dropout", default=0.1, type=float, help="dropout ratio of ernie_doc")
 # yapf: enable
 args = parser.parse_args()
 
@@ -163,7 +164,7 @@ def do_train(args):
             logger.info("init checkpoint from %s" % args.model_name_or_path)
 
     model = ErnieDocForQuestionAnswering.from_pretrained(
-        args.model_name_or_path)
+        args.model_name_or_path, dropout=args.dropout)
     model_config = model.ernie_doc.config
     if trainer_num > 1:
         model = paddle.DataParallel(model)

@@ -514,12 +514,12 @@ class ErnieDocModel(ErnieDocPretrainedModel):
 
 
 class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
-    def __init__(self, ernie_doc, num_classes):
+    def __init__(self, ernie_doc, num_classes, dropout=0.1):
         super(ErnieDocForSequenceClassification, self).__init__()
         self.ernie_doc = ernie_doc
         self.linear = nn.Linear(self.ernie_doc.config["hidden_size"],
                                 num_classes)
-        self.dropout = nn.Dropout(0.1, mode="upscale_in_train")
+        self.dropout = nn.Dropout(dropout, mode="upscale_in_train")
         self.apply(self.init_weights)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids,
@@ -532,12 +532,11 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
 
 
 class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
-    def __init__(self, ernie_doc, num_classes):
+    def __init__(self, ernie_doc, num_classes, dropout=0.1):
         super(ErnieDocForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie_doc = ernie_doc  # allow ernie_doc to be config
-        self.dropout = nn.Dropout(
-            self.ernie_doc.config['relu_dropout'], mode="upscale_in_train")
+        self.dropout = nn.Dropout(dropout, mode="upscale_in_train")
         self.linear = nn.Linear(self.ernie_doc.config["hidden_size"],
                                 num_classes)
         self.apply(self.init_weights)
@@ -552,11 +551,10 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
 
 
 class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
-    def __init__(self, ernie_doc):
+    def __init__(self, ernie_doc, dropout=0.1):
         super(ErnieDocForQuestionAnswering, self).__init__()
         self.ernie_doc = ernie_doc  # allow ernie_doc to be config
-        self.dropout = nn.Dropout(
-            self.ernie_doc.config['relu_dropout'], mode="upscale_in_train")
+        self.dropout = nn.Dropout(dropout, mode="upscale_in_train")
         self.linear = nn.Linear(self.ernie_doc.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
