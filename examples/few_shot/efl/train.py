@@ -104,7 +104,7 @@ def parse_args():
     parser.add_argument(
         '--save_steps',
         type=int,
-        default=10000,
+        default=100000,
         help="Inteval steps to save checkpoint")
     return parser.parse_args()
 
