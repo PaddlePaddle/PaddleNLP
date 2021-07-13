@@ -96,11 +96,13 @@ def evaluate(args, model, criterion, metric, data_loader, memories0, tokenizer):
                            ["unique_id", "start_logits", "end_logits"])
     model.eval()
     all_results = []
+
+    tic_start = time.time()
     tic_eval = time.time()
     memories = list(memories0)
 
     # collect result
-    logger.info("The example number eval data loader: {}".format(
+    logger.info("The example number of eval_dataloader: {}".format(
         len(data_loader._batch_reader.features)))
     for step, batch in enumerate(data_loader, start=1):
         input_ids, position_ids, token_type_ids, attn_mask, start_position, \
@@ -119,8 +121,8 @@ def evaluate(args, model, criterion, metric, data_loader, memories0, tokenizer):
         if int(need_cal_loss.numpy()) == 1:
             for idx in range(qids.shape[0]):
                 if len(all_results) % 1000 == 0 and len(all_results):
-                    print("Processing example: %d" % len(all_results))
-                    print('time per 1000:', time.time() - tic_eval)
+                    logger.info("Processing example: %d" % len(all_results))
+                    logger.info('time per 1000:', time.time() - tic_eval)
                     tic_eval = time.time()
 
                 qid_each = int(np_qids[idx])
@@ -143,7 +145,8 @@ def evaluate(args, model, criterion, metric, data_loader, memories0, tokenizer):
     EM, F1, AVG, TOTAL = metric(all_predictions_eval,
                                 data_loader._batch_reader.dataset)
 
-    logger.info("EM: {}, F1: {}, AVG: {}, TOTAL: {}".format(EM, F1, AVG, TOTAL))
+    logger.info("EM: {}, F1: {}, AVG: {}, TOTAL: {}, TIME: {}".format(
+        EM, F1, AVG, TOTAL, time.time() - tic_start))
     model.train()
 
 
@@ -152,7 +155,7 @@ def do_train(args):
 
     tokenizer = ErnieDocTokenizer.from_pretrained(args.model_name_or_path)
     train_ds, eval_ds, test_ds = load_dataset(
-        'dureader_robust', splits=['train', 'dev', 'dev'])
+        'drcd', splits=['train', 'dev', 'dev'])
 
     paddle.set_device(args.device)
     trainer_num = paddle.distributed.get_world_size()
