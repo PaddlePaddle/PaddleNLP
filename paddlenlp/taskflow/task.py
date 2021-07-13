@@ -18,7 +18,8 @@ from abc import abstractmethod
 
 
 class Task(metaclass=abc.ABCMeta):
-    """ The meta classs of task in TaskFlow. The meta class has the five abstract function,
+    """
+    The meta classs of task in TaskFlow. The meta class has the five abstract function,
         the subclass need to inherit from the meta class.
     """
 
@@ -26,6 +27,7 @@ class Task(metaclass=abc.ABCMeta):
         self.model = model
         self.task = task
         self.kwargs = kwargs
+        self._usage = ""
 
     @abstractmethod
     def _construct_model(self, model):
@@ -58,6 +60,12 @@ class Task(metaclass=abc.ABCMeta):
         """
         The model output is allways the logits and pros, this function will convert the model output to raw text.
         """
+
+    def help(self):
+        """
+        Return the usage message of the current task.
+        """
+        print("Examples:\n{}".format(self._usage))
 
     def __call__(self, *args):
         inputs = self._preprocess(*args)
