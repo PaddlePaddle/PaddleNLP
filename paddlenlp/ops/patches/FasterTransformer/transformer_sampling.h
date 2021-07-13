@@ -478,21 +478,24 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
 
-      // TODO(): repeat penalty vertification.
-      apply_penalties_Launcher(step,
-                               logits_buf_,
-                               nullptr, /*current_ids*/
-                               nullptr, /*previous_ids*/
-                               nullptr, /*parent_ids*/
-                               args_.batch_size_,
-                               1,
-                               args_.vocab_size_,
-                               args_.end_id_,
-                               args_.temperature_,
-                               args_.len_penalty,
-                               args_.repeat_penalty,
-                               decoding_params.stream,
-                               vocab_mask_buf_);
+      if (vocab_mask || args_.temperature_ != 1.0 || args_.len_penalty != 1.0 ||
+          args_.repeat_penalty != 1.0) {
+        // TODO(): repeat penalty vertification.
+        apply_penalties_Launcher(step,
+                                 logits_buf_,
+                                 nullptr, /*current_ids*/
+                                 nullptr, /*previous_ids*/
+                                 nullptr, /*parent_ids*/
+                                 args_.batch_size_,
+                                 1,
+                                 args_.vocab_size_,
+                                 args_.end_id_,
+                                 args_.temperature_,
+                                 args_.len_penalty,
+                                 args_.repeat_penalty,
+                                 decoding_params.stream,
+                                 vocab_mask_buf_);
+      }
 
       if (args_.candidate_num_ != 0) {
         // top k sampling
