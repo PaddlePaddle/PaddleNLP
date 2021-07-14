@@ -105,19 +105,19 @@ def pad_batch_data(insts,
     return return_list if len(return_list) > 1 else return_list[0]
 
 
-class TextPreProcessor(object):
+class TextPreprocessor(object):
     def __call__(self, text):
-        raise NotImplementedError("TextPreProcessor object can't be called")
+        raise NotImplementedError("TextPreprocessor object can't be called")
 
 
-class ImdbTextPreProcessor(TextPreProcessor):
+class ImdbTextPreprocessor(TextPreprocessor):
     def __call__(self, text):
         text = text.strip().replace('<br /><br />', ' ')
         text = text.replace('\t', '')
         return text
 
 
-class HYPTextPreProcessor(TextPreProcessor):
+class HYPTextPreprocessor(TextPreprocessor):
     def __init__(self):
         self.bs4 = try_import('bs4')
 

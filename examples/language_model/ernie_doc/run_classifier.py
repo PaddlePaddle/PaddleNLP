@@ -32,7 +32,7 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 from paddlenlp.datasets import load_dataset
 
-from data import ClassifierIterator, ImdbTextPreProcessor, HYPTextPreProcessor
+from data import ClassifierIterator, ImdbTextPreprocessor, HYPTextPreprocessor
 from optimization import AdamWDL
 from metrics import Acc, F1
 
@@ -62,8 +62,8 @@ args = parser.parse_args()
 # ErnieDocTokenizer for Chinese Tasks
 
 DATASET_INFO = {
-    "imdb": (BPETokenizer, "test", "test", ImdbTextPreProcessor(), Acc()),
-    "hyp": (BPETokenizer, "dev", "test", HYPTextPreProcessor(), F1()),
+    "imdb": (BPETokenizer, "test", "test", ImdbTextPreprocessor(), Acc()),
+    "hyp": (BPETokenizer, "dev", "test", HYPTextPreprocessor(), F1()),
     "iflytek": (ErnieDocTokenizer, "dev", "dev", None, Acc()),
     "thucnews": (ErnieDocTokenizer, "dev", "test", None, Acc())
 }
