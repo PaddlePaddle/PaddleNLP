@@ -185,7 +185,7 @@ class Predictor(object):
                 time_keys=[
                     'preprocess_time', 'inference_time', 'postprocess_time'
                 ],
-                warmup=10,
+                warmup=0,
                 logger=logger)
 
     def predict(self, data, tokenizer, label_map):
@@ -219,24 +219,16 @@ class Predictor(object):
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
         ): fn(samples)
 
-        # # Seperates data into some batches.
-        # batches = [
-        #     examples[idx:idx + self.batch_size]
-        #     for idx in range(0, len(examples), self.batch_size)
-        # ]
         if args.benchmark:
             self.autolog.times.stamp()
 
-        # results = []
-        # for batch in batches:
         input_ids, segment_ids = batchify_fn(examples)
         self.input_handles[0].copy_from_cpu(input_ids)
         self.input_handles[1].copy_from_cpu(segment_ids)
         self.predictor.run()
         logits = self.output_handle.copy_to_cpu()
-        # results.append(logits)
-        # if args.benchmark:
-        #     self.autolog.times.stamp()
+        if args.benchmark:
+            self.autolog.times.stamp()
 
         probs = softmax(logits, axis=1)
         idx = np.argmax(probs, axis=1)
@@ -271,3 +263,5 @@ if __name__ == "__main__":
         results.extend(predictor.predict(batch_data, tokenizer, label_map))
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))
+    if args.benchmark:
+        predictor.autolog.report()

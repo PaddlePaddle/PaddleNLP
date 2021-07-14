@@ -3,7 +3,7 @@ model_name:ernie_text_cls
 python:python
 gpu_list:0|0,1
 Global.auto_cast:null
---epoch:10
+--epoch:1
 --save_dir:./output/
 --batch_size:32
 Global.use_gpu:null
