@@ -57,7 +57,7 @@ parser.add_argument("--max_answer_length", default=100, type=int, help="Max answ
 parser.add_argument("--do_lower_case", action='store_false', help="Whether to lower case the input text. Should be True for uncased models and False for cased models.")
 parser.add_argument("--verbose", action='store_true', help="Whether to output verbose log.")
 parser.add_argument("--dropout", default=0.1, type=float, help="dropout ratio of ernie_doc")
-parser.add_argument("--dataset", default="dureader_robust", type=str, choices=["dureader_robust", ""], help="The avaliable Q&A dataset")
+parser.add_argument("--dataset", default="dureader_robust", type=str, choices=["dureader_robust", "cmrc2018", "drcd"], help="The avaliable Q&A dataset")
 # yapf: enable
 args = parser.parse_args()
 
@@ -139,7 +139,8 @@ def evaluate(args, model, criterion, metric, data_loader, memories0, tokenizer):
             for idx in range(qids.shape[0]):
                 if len(all_results) % 1000 == 0 and len(all_results):
                     logger.info("Processing example: %d" % len(all_results))
-                    logger.info('time per 1000:', time.time() - tic_eval)
+                    logger.info('time per 1000: {} s'.format(time.time() -
+                                                             tic_eval))
                     tic_eval = time.time()
 
                 qid_each = int(np_qids[idx])
