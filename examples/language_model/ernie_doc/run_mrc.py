@@ -57,8 +57,25 @@ parser.add_argument("--max_answer_length", default=100, type=int, help="Max answ
 parser.add_argument("--do_lower_case", action='store_false', help="Whether to lower case the input text. Should be True for uncased models and False for cased models.")
 parser.add_argument("--verbose", action='store_true', help="Whether to output verbose log.")
 parser.add_argument("--dropout", default=0.1, type=float, help="dropout ratio of ernie_doc")
+parser.add_argument("--dataset", default="dureader_robust", type=str, choices=["dureader_robust", ""], help="The avaliable Q&A dataset")
 # yapf: enable
 args = parser.parse_args()
+
+# eval_dataset, test_dataset, 
+DATASET_INFO = {
+    "dureader_robust": [
+        "dev",
+        "dev",
+    ],
+    "cmrc2018": [
+        "dev",
+        "dev",
+    ],
+    "drcd": [
+        "dev",
+        "test",
+    ]
+}
 
 
 def set_seed(args):
@@ -148,14 +165,17 @@ def evaluate(args, model, criterion, metric, data_loader, memories0, tokenizer):
     logger.info("EM: {}, F1: {}, AVG: {}, TOTAL: {}, TIME: {}".format(
         EM, F1, AVG, TOTAL, time.time() - tic_start))
     model.train()
+    return EM, F1, AVG
 
 
 def do_train(args):
     set_seed(args)
 
     tokenizer = ErnieDocTokenizer.from_pretrained(args.model_name_or_path)
+
+    dev, test = DATASET_INFO[args.dataset]
     train_ds, eval_ds, test_ds = load_dataset(
-        'drcd', splits=['train', 'dev', 'dev'])
+        args.dataset, splits=['train', dev, test])
 
     paddle.set_device(args.device)
     trainer_num = paddle.distributed.get_world_size()
@@ -270,6 +290,7 @@ def do_train(args):
 
     memories = create_memory()
     tic_train = time.time()
+    best_avg_metric = -1
     for epoch in range(args.epochs):
         train_ds_iter.shuffle_sample()
         train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
@@ -303,10 +324,9 @@ def do_train(args):
             if global_steps % args.save_steps == 0:
                 # evaluate
                 logger.info("Eval:")
-                # TODO(zhoushunjie): metric from None->EM_F1
-                evaluate(args, model, criterion,
-                         EM_AND_F1(), eval_dataloader,
-                         create_memory(), tokenizer)
+                EM, F1, AVG = evaluate(args, model, criterion,
+                                       EM_AND_F1(), eval_dataloader,
+                                       create_memory(), tokenizer)
                 if rank == 0:
                     output_dir = os.path.join(args.output_dir,
                                               "model_%d" % (global_steps))
@@ -316,6 +336,26 @@ def do_train(args):
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
+                    if best_avg_metric < AVG:
+                        output_dir = os.path.join(args.output_dir, "best_model")
+                        if not os.path.exists(output_dir):
+                            os.makedirs(output_dir)
+                        model_to_save = model._layers if isinstance(
+                            model, paddle.DataParallel) else model
+                        model_to_save.save_pretrained(output_dir)
+                        tokenizer.save_pretrained(output_dir)
+
+    logger.info("Test:")
+    evaluate(args, model, criterion,
+             EM_AND_F1(), test_dataloader, create_memory(), tokenizer)
+    if rank == 0:
+        output_dir = os.path.join(args.output_dir, "model_%d" % (global_steps))
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        model_to_save = model._layers if isinstance(
+            model, paddle.DataParallel) else model
+        model_to_save.save_pretrained(output_dir)
+        tokenizer.save_pretrained(output_dir)
 
 
 if __name__ == "__main__":

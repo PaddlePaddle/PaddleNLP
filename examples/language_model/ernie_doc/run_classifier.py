@@ -57,7 +57,7 @@ parser.add_argument("--layerwise_decay", default=1.0, type=float, help="layerwis
 # yapf: enable
 args = parser.parse_args()
 
-# tokenizer, num_classes, eval_dataset, test_dataset, preprocess_text_fn, metric
+# tokenizer, eval_dataset, test_dataset, preprocess_text_fn, metric
 # BPETokenizer for English Tasks
 # ErnieDocTokenizer for Chinese Tasks
 
