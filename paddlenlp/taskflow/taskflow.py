@@ -17,7 +17,7 @@ import warnings
 import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .text2knowledge import Text2KnowledgeTask
+from .text2knowledge import WordTagTask
 from .sentiment_analysis import SentaTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
@@ -26,7 +26,7 @@ TASKS = {
     "text2knowledge": {
         "models": {
             "wordtag": {
-                "task_class": Text2KnowledgeTask,
+                "task_class": WordTagTask,
             }
         },
         "default": {
@@ -51,7 +51,7 @@ class TaskFlow(object):
     The TaskFlow is the end2end inferface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
         1) Convert the raw text to task result.
         2) Convert the model to the inference model.
-        3) Offer the usesage and help message.
+        3) Offer the usage and help message.
     Args:
         task (str): The task name for the TaskFlow, and get the task class from the name.
         model (str, optional): The model name in the task, if set None, will use the default model.  
@@ -84,10 +84,26 @@ class TaskFlow(object):
         task_class = TASKS[self.task]['models'][self.model]['task_class']
         self.task_instance = task_class(
             model=self.model, task=self.task, **self.kwargs)
+        task_list = TASKS.keys()
+        TaskFlow.task_list = task_list
 
     def __call__(self, *inputs):
+        """
+        The main work function in the taskflow.
+        """
         results = self.task_instance(inputs)
         return results
 
     def help(self):
-        pass
+        """
+        Return the task usage message.
+        """
+        return self.task_instance.help()
+
+    @staticmethod
+    def tasks():
+        """
+        Return the available task list.
+        """
+        task_list = list(TASKS.keys())
+        return task_list
