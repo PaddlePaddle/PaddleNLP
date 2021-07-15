@@ -62,6 +62,12 @@ def parse_args():
         "--profile",
         action="store_true",
         help="Whether to profile the performance using newstest2014 dataset. ")
+    parser.add_argument(
+        "--test_file",
+        default=None,
+        type=str,
+        help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
+    )
     args = parser.parse_args()
     return args
 
@@ -98,7 +104,8 @@ def do_predict(args):
         src_vocab_size=args.src_vocab_size,
         trg_vocab_size=args.trg_vocab_size,
         max_length=args.max_length + 1,
-        n_layer=args.n_layer,
+        num_encoder_layers=args.n_layer,
+        num_decoder_layers=args.n_layer,
         n_head=args.n_head,
         d_model=args.d_model,
         d_inner_hid=args.d_inner_hid,
@@ -177,6 +184,7 @@ if __name__ == "__main__":
     args.benchmark = False
     if ARGS.batch_size:
         args.infer_batch_size = ARGS.batch_size
+    args.test_file = ARGS.test_file
     pprint(args)
 
     do_predict(args)
