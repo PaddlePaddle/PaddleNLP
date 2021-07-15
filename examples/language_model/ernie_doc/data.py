@@ -688,3 +688,262 @@ class MRCIterator(ClassifierIterator):
                 sample_batch = self._get_samples(pre_batch_list, is_last=True)
                 for batch_records in self._prepare_batch_data(sample_batch):
                     yield batch_records
+
+
+class MCQIterator(ClassifierIterator):
+    """
+    Multiple choice question iterator. 
+    """
+
+    def __init__(self,
+                 dataset,
+                 batch_size,
+                 tokenizer,
+                 trainer_num,
+                 trainer_id,
+                 max_seq_length=512,
+                 memory_len=128,
+                 repeat_input=False,
+                 in_tokens=False,
+                 mode="train",
+                 random_seed=None,
+                 doc_stride=128,
+                 max_query_length=64,
+                 choice_num=4):
+        super(MCQIterator, self).__init__(
+            dataset,
+            batch_size,
+            tokenizer,
+            trainer_num,
+            trainer_id,
+            max_seq_length,
+            memory_len,
+            repeat_input,
+            in_tokens,
+            mode,
+            random_seed,
+            preprocess_text_fn=None)
+        self.doc_stride = doc_stride
+        self.max_query_length = max_query_length
+        self.choice_num = choice_num
+        self.examples = []
+        self.features = []
+        self.features_all = []
+        self._preprocess_data()
+
+    def shuffle_sample(self):
+        if self.shuffle:
+            self.global_rng = np.random.RandomState(self.random_seed)
+            self.global_rng.shuffle(self.features_all)
+
+    def _preprocess_data(self):
+        # construct examples
+        self.examples = self._convert_qa_to_examples()
+        # construct features
+        self.features = self._convert_example_to_feature(self.examples)
+
+    def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):
+        """Truncates a sequence pair in place to the maximum length."""
+
+        # This is a simple heuristic which will always truncate the longer sequence
+        # one token at a time. This makes more sense than truncating an equal percent
+        # of tokens from each, since if one sequence is very short then each token
+        # that's truncated likely contains more information than a longer sequence.
+        tokens_a = list(tokens_a)
+        tokens_b = list(tokens_b)
+        while True:
+            total_length = len(tokens_a) + len(tokens_b)
+            if total_length <= max_length:
+                break
+            if len(tokens_a) > len(tokens_b):
+                tokens_a.pop()
+            else:
+                tokens_b.pop()
+        return tokens_a, tokens_b
+
+    def _convert_qa_to_examples(self):
+        Example = namedtuple(
+            'Example', ['qas_id', 'context', 'question', 'choice', 'label'])
+        examples = []
+        for qas_id, qa in enumerate(self.dataset):
+            context = qa['context']
+            question = qa['question']
+            choice = qa['choice']
+            # pad empty choice
+            for k in range(len(choice), self.choice_num):
+                choice.append('')
+            answer = qa['answer']
+            label = choice.index(answer)
+            example = Example(
+                qas_id=qas_id,
+                context=context,
+                question=question,
+                choice=choice,
+                label=label)
+            examples.append(example)
+        return examples
+
+    def _convert_example_to_feature(self, examples):
+        Feature = nametuple('Feature', [
+            'qid', 'input_ids', 'segment_ids', 'label', 'cal_loss'
+        ])
+        features = []
+        self.features_all = []
+        pad_token_id = self.tokenizer.pad_token_id
+        for (ex_index, example) in enumerate(examples):
+            context_tokens = self.tokenizer.tokenize(example.context)
+            question_tokens = self.tokenizer.tokenize(example.question)
+            choice_tokens_lst = [
+                self.tokenizer.tokenize(choice) for choice in example.choice
+            ]
+
+            # nums = 4
+            question_choice_pairs = \
+                [self._truncate_seq_pair(question_tokens, choice_tokens, self.max_query_length - 2)
+                for choice_tokens in choice_tokens_lst]
+            total_qc_num = sum(
+                [(len(q) + len(c)) for q, c in question_choice_pairs])
+            max_tokens_for_doc = (self.max_seq_length - total_qc_num
+                                  ) // self.choice_num - 4
+            _DocSpan = namedtuple("DocSpan", ["start", "length"])
+            doc_spans = []
+            start_offset = 0
+
+            while start_offset < len(context_tokens):
+                length = len(context_tokens) - start_offset
+                if length > max_tokens_for_doc:
+                    length = max_tokens_for_doc
+                doc_spans.append(_DocSpan(start=start_offset, length=length))
+                if start_offset + length == len(all_doc_tokens):
+                    break
+                start_offset += min(length, self.doc_stride)
+
+            features_each = []
+            for (doc_span_index, doc_span) in enumerate(doc_spans):
+                tokens = []
+                segments_ids = []
+                for q_tokens, c_tokens in question_choice_pairs:
+                    segment_tokens = ['[CLS]']
+                    token_type_ids = [0]
+
+                    segment_tokens += context_tokens[
+                        doc_span.start:doc_span.start + doc_span.length]
+                    token_type_ids += [0] * doc_span.length
+
+                    segment_tokens += ['[SEP]']
+                    token_type_ids += [0]
+
+                    segment_tokens += q_tokens
+                    token_type_ids += [1] * len(q_tokens)
+
+                    segment_tokens += ['[SEP]']
+                    token_type_ids += [1]
+
+                    segment_tokens += c_tokens
+                    token_type_ids += [1] * len(c_tokens)
+
+                    segment_tokens += ['[SEP]']
+                    token_type_ids += [1]
+
+                    tokens += segment_tokens
+                    segments_ids = token_type_ids
+                input_ids = tokenizer.convert_tokens_to_ids(tokens)
+                feature = Feature(
+                    qid=example.qas_id,
+                    label=example.label,
+                    input_ids=input_ids,
+                    segment_ids=segments_ids,
+                    cal_loss=1)
+                features.append(feature)
+                features_each.append(feature)
+
+            #repeat
+            if self.repeat_input:
+                features_each_repeat = features_each
+                features_each = list(
+                    map(lambda x: x._replace(cla_loss=0), features_each))
+                features_each += features_each_repeat
+
+            self.features_all.append(features_each)
+
+        return features
+
+    def _pad_batch_records(self, batch_records, gather_idx=[]):
+        batch_token_ids = [record.input_ids for record in batch_records]
+        if batch_records[0].label is not None:
+            batch_labels = [record.label for record in batch_records]
+            batch_labels = np.array(batch_labels).astype("int64").reshape(
+                [-1, 1])
+        else:
+            batch_labels = np.array([]).astype("int64").reshape([-1, 1])
+        # qid
+        batch_qids = [record.qid for record in batch_records]
+        batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
+
+        if gather_idx:
+            batch_gather_idx = np.array(gather_idx).astype("int64").reshape(
+                [-1, 1])
+            need_cal_loss = np.array([1]).astype("int64")
+        else:
+            batch_gather_idx = np.array(list(range(len(batch_records)))).astype(
+                "int64").reshape([-1, 1])
+            need_cal_loss = np.array([0]).astype("int64")
+
+        batch_task_ids = [record.segment_ids for record in batch_records]
+
+        # padding
+        padded_token_ids, input_mask = pad_batch_data(
+            batch_token_ids,
+            pad_idx=self.tokenizer.pad_token_id,
+            pad_max_len=self.max_seq_length,
+            return_input_mask=True)
+
+        padded_task_ids = pad_batch_data(
+            batch_task_ids,
+            pad_idx=self.tokenizer.pad_token_id,
+            pad_max_len=self.max_seq_length)
+
+        padded_position_ids = get_related_pos(
+            padded_task_ids, self.max_seq_length, self.memory_len)
+
+        return_list = [
+            padded_token_ids, padded_position_ids, padded_task_ids, input_mask,
+            batch_labels, batch_qids, batch_gather_idx, need_cal_loss
+        ]
+        return return_list
+
+    def _create_instances(self):
+        """generate batch records"""
+        pre_batch_list = []
+        insert_idx = []
+        for qid, features in enumerate(self.features_all):
+            if self._cnt_list(
+                    pre_batch_list) < self.batch_size * self.trainer_num:
+                if insert_idx:
+                    pre_batch_list[insert_idx[0]] = features
+                    insert_idx.pop(0)
+                else:
+                    pre_batch_list.append(features)
+            if self._cnt_list(
+                    pre_batch_list) == self.batch_size * self.trainer_num:
+                assert self._cnt_list(pre_batch_list) == len(
+                    pre_batch_list), "the two value must be equal"
+                assert not insert_idx, "the insert_idx must be null"
+                sample_batch = self._get_samples(pre_batch_list)
+
+                for idx, lit in enumerate(pre_batch_list):
+                    if not lit:
+                        insert_idx.append(idx)
+                for batch_records in self._prepare_batch_data(sample_batch):
+                    yield batch_records
+
+        if self.mode != "train":
+            if self._cnt_list(pre_batch_list):
+                pre_batch_list += [
+                    []
+                    for _ in range(self.batch_size * self.trainer_num -
+                                   self._cnt_list(pre_batch_list))
+                ]
+                sample_batch = self._get_samples(pre_batch_list, is_last=True)
+                for batch_records in self._prepare_batch_data(sample_batch):
+                    yield batch_records
