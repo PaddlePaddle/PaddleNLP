@@ -222,7 +222,6 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   if ("beam_search" == decoding_strategy) {
     TransformerBeamsearch<DecodingTraits_::OpType>*
         unified_decoding_beamsearch_;
-    std::cout << "type id is " << type_id << std::endl;
 
     unified_decoding_beamsearch_ =
         new TransformerBeamsearch<DecodingTraits_::OpType>(
@@ -240,7 +239,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             end_id_,
             type_id,
             beam_search_diversity_rate_,
-            false, /*is_fuse_topk_softMax*/
+            false, /*is_fuse_topk_softMax set false cause topk reason*/
             true,  /*normalization_before*/
             unk_id,
             mask_id,

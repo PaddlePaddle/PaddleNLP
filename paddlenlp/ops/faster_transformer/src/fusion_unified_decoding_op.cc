@@ -89,9 +89,17 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
       paddle::Tensor(cache_k[0].place(), sequence_length_dims);
 
   if (cache_k[0].place() == paddle::PlaceType::kGPU) {
+    auto sequence_length = paddle::Tensor(paddle::PlaceType::kGPU);
+
+    if (mem_seq_len.place() != paddle::PlaceType::kGPU) {
+      sequence_length = mem_seq_len.copy_to<int>(paddle::PlaceType::kGPU);
+    } else {
+      sequence_length = mem_seq_len;
+    }
+
     return UnifiedDecodingCUDAForward(cache_k,
                                       cache_v,
-                                      mem_seq_len,
+                                      sequence_length,
                                       word_embedding,
                                       self_ln_weight,
                                       self_ln_bias,
