@@ -55,10 +55,10 @@ Term-Linking示例程序可以对无标签数据可以启动模型预测, 例如
 执行下面的脚本即可快速获取上面两段文本的百科知识树链接的结果
 
 ```bash
-python -u predict.py \
-    --max_seq_len 128 \
-    --batch_size 32   \
-    --device "gpu"
+from paddlenlp.taskflow import TaskFlow
+task = TaskFlow("text2knowledge", model="wordtag")
+task(["热梅茶是一道以梅子为主要原料制作的茶饮",
+      "《孤女》是2010年九州出版社出版的小说，作者是余兼羽"])
 ```
 下面是运行WordTag工具后的知识链接的预测结果
 
