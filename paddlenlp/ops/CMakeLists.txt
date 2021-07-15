@@ -152,13 +152,13 @@ set(FT_PATCH_COMMAND
   && cp ${common_src} ${common_dst}
   && cp ${cmakelists_src} ${cmakelists_dst}
   && cp ${topk_kernels_src} ${topk_kernels_dst}
+  && cp ${beamsearch_h_src} ${trans_dst}
+  && cp ${sampling_h_src} ${trans_dst}
+  && cp ${arguments_h_src} ${trans_dst}
   && cat ${trans_decoder_cu_src} >> ${open_decoder_cu_dst}
   && cat ${trans_decoder_h_src} >> ${open_decoder_h_dst}
   && cat ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
-  && cp ${beamsearch_h_src} ${trans_dst}
-  && cp ${sampling_h_src} ${trans_dst}
-  && cp ${arguments_h_src} ${trans_dst}
   && ${MUTE_COMMAND}
 )
 
