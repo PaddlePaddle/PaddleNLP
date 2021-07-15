@@ -403,16 +403,17 @@ class ErnieDocPooler(nn.Layer):
     get pool output
     """
 
-    def __init__(self, hidden_size):
+    def __init__(self, hidden_size, cls_token_idx=-1):
         super(ErnieDocPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.activation = nn.Tanh()
+        self.cls_token_idx = cls_token_idx
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
         # to the last token.
-        last_token_tensor = hidden_states[:, -1]
-        pooled_output = self.dense(last_token_tensor)
+        cls_token_tensor = hidden_states[:, self.cls_token_idx]
+        pooled_output = self.dense(cls_token_tensor)
         pooled_output = self.activation(pooled_output)
         return pooled_output
 
@@ -435,7 +436,8 @@ class ErnieDocModel(ErnieDocPretrainedModel):
                  epsilon=1e-5,
                  rel_pos_params_sharing=False,
                  initializer_range=0.02,
-                 pad_token_id=0):
+                 pad_token_id=0,
+                 cls_token_idx=-1):
         super(ErnieDocModel, self).__init__()
 
         r_w_bias, r_r_bias, r_t_bias = None, None, None
@@ -472,7 +474,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
         self.embeddings = ErnieDocEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob, memory_len,
             max_position_embeddings, task_type_vocab_size, pad_token_id)
-        self.pooler = ErnieDocPooler(hidden_size)
+        self.pooler = ErnieDocPooler(hidden_size, cls_token_idx)
 
     def _create_n_head_attn_mask(self, attn_mask, batch_size):
         # attn_mask shape: [B, T, 1]
