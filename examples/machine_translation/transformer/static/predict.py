@@ -43,6 +43,12 @@ def parse_args():
         action="store_true",
         help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
     )
+    parser.add_argument(
+        "--test_file",
+        default=None,
+        type=str,
+        help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
+    )
     args = parser.parse_args()
     return args
 
@@ -103,11 +109,11 @@ def do_predict(args):
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
 
-    assert (
-        args.init_from_params), "must set init_from_params to load parameters"
-    paddle.static.load(test_program,
-                       os.path.join(args.init_from_params, "transformer"), exe)
-    print("finish initing model from params from %s" % (args.init_from_params))
+    # assert (
+    #     args.init_from_params), "must set init_from_params to load parameters"
+    # paddle.static.load(test_program,
+    #                    os.path.join(args.init_from_params, "transformer"), exe)
+    # print("finish initing model from params from %s" % (args.init_from_params))
 
     # cast weights from fp16 to fp32 after loading
     if args.use_pure_fp16:
@@ -136,7 +142,8 @@ if __name__ == "__main__":
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
-        pprint(args)
     args.benchmark = ARGS.benchmark
+    args.test_file = ARGS.test_file
+    pprint(args)
 
     do_predict(args)
