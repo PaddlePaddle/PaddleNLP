@@ -340,9 +340,11 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
   cublasCreate(&cublas_handle_);
   cublasSetStream(cublas_handle_, stream);
 
+  std::vector<paddle::Tensor> ret;
+
   switch (self_ln_weight[0].type()) {
     case paddle::DataType::FLOAT16: {
-      return unified_decoding_kernel<paddle::DataType::FLOAT16>(
+      ret = unified_decoding_kernel<paddle::DataType::FLOAT16>(
           cache_k,
           cache_v,
           mem_seq_len,
@@ -396,7 +398,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           stream);
     }
     case paddle::DataType::FLOAT32: {
-      return unified_decoding_kernel<paddle::DataType::FLOAT32>(
+      ret = unified_decoding_kernel<paddle::DataType::FLOAT32>(
           cache_k,
           cache_v,
           mem_seq_len,
@@ -455,4 +457,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           "Only float16 and float32 are supported. ");
     }
   }
+
+  cublasDestroy(cublas_handle_);
+  return ret;
 }
