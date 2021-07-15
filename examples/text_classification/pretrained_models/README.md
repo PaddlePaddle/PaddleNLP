@@ -144,14 +144,14 @@ checkpoints/
   运行方式：
 
 ```shell
-python export_model.py --params_path=./checkpoint/model_900/model_state.pdparams --output_path=./static_graph_params
+python export_model.py --params_path=./checkpoint/model_900/model_state.pdparams --output_path=./output
 ```
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 
 导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式：
 
 ```shell
-python deploy/python/predict.py --model_file=static_graph_params.pdmodel --params_file=static_graph_params.pdiparams
+python deploy/python/predict.py --model_dir=./output
 ```
 
 ### 模型预测
@@ -190,8 +190,8 @@ Data: 作为老的四星酒店，房间依然很整洁，相当不错。机场�
 Inference模型参数文件：
 | 文件                          | 说明                                   |
 |-------------------------------|----------------------------------------|
-| static_graph_params.pdiparams | 模型权重文件，供推理时加载使用            |
-| static_graph_params.pdmodel   | 模型结构文件，供推理时加载使用            |
+| inference.pdiparams | 模型权重文件，供推理时加载使用            |
+| inference.pdmodel   | 模型结构文件，供推理时加载使用            |
 
 
 ### 依赖安装
@@ -223,8 +223,8 @@ pip install paddle-serving-app paddle-serving-client
 ```shell
 python -u deploy/serving/export_servable_model.py \
     --inference_model_dir ./ \
-    --model_file static_graph_params.pdmodel \
-    --params_file static_graph_params.pdiparams
+    --model_file ./output/inference.pdmodel \
+    --params_file ./output/inference.pdiparams
 ```
 
 可支持配置的参数：
