@@ -109,11 +109,11 @@ def do_predict(args):
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
 
-    # assert (
-    #     args.init_from_params), "must set init_from_params to load parameters"
-    # paddle.static.load(test_program,
-    #                    os.path.join(args.init_from_params, "transformer"), exe)
-    # print("finish initing model from params from %s" % (args.init_from_params))
+    assert (
+        args.init_from_params), "must set init_from_params to load parameters"
+    paddle.static.load(test_program,
+                       os.path.join(args.init_from_params, "transformer"), exe)
+    print("finish initing model from params from %s" % (args.init_from_params))
 
     # cast weights from fp16 to fp32 after loading
     if args.use_pure_fp16:
