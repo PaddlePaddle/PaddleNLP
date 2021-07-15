@@ -89,7 +89,6 @@ class FasterTransformer(TransformerModel):
             word_embedding=self.trg_word_embedding.word_embedding,
             positional_embedding=self.trg_pos_embedding.pos_encoder,
             linear=self.decoding_linear,
-            num_encoder_layers=num_encoder_layers,
             num_decoder_layers=num_decoder_layers,
             n_head=n_head,
             d_model=d_model,
