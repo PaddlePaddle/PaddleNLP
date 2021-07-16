@@ -53,4 +53,4 @@ MODEL_HOME = _get_sub_home('models')
 DATA_HOME = _get_sub_home('datasets')
 DOWNLOAD_SERVER = "http://paddlepaddle.org.cn/paddlehub"
 FAILED_STATUS = -1
-SUCCESS_STATUS = 1
+SUCCESS_STATUS = 0

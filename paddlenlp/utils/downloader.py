@@ -399,8 +399,6 @@ class DownloaderCheck(threading.Thread):
             payload['hub_version'] = " "
             payload['paddle_version'] = paddle.__version__.split('-')[0]
             payload['extra'] = json.dumps(extra)
-            print(payload)
-            print(api_url)
             r = requests.get(api_url, payload, timeout=1).json()
             if r.get("update_cache", 0) == 1:
                 return SUCCESS_STATUS
