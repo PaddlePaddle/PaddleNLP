@@ -244,6 +244,7 @@ def _md5(text):
     """
     Calculate the md5 value of the input text.
     """
+
     md5code = hashlib.md5(text.encode())
     return md5code.hexdigest()
 
@@ -360,7 +361,7 @@ class DownloaderCheck(threading.Thread):
         self.command = command
         self.task = task
         self.addition = addition
-        self.hash_flag = _md5(str(uuid.uuid1())[-12:]) + "-" + str(
+        self.hash_flag = _md5(str(uuid.uuid1())[9:18]) + "-" + str(
             int(time.time()))
 
     def uri_path(self, server_url, api):
