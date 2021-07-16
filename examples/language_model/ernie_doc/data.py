@@ -742,6 +742,11 @@ class MCQIterator(ClassifierIterator):
         # construct features
         self.features = self._convert_example_to_feature(self.examples)
 
+    def get_num_examples(self):
+        if not self.features_all:
+            self._preprocess_data()
+        return len(sum(self.features_all, []))
+
     def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):
         """Truncates a sequence pair in place to the maximum length."""
 
@@ -766,13 +771,13 @@ class MCQIterator(ClassifierIterator):
             'Example', ['qas_id', 'context', 'question', 'choice', 'label'])
         examples = []
         for qas_id, qa in enumerate(self.dataset):
-            context = qa['context']
-            question = qa['question']
-            choice = qa['choice']
+            context = '\n'.join(qa['context']).lower()
+            question = qa['question'].lower()
+            choice = [c.lower() for c in qa['choice']]
             # pad empty choice
             for k in range(len(choice), self.choice_num):
                 choice.append('')
-            answer = qa['answer']
+            answer = qa['answer'].lower()
             label = choice.index(answer)
             example = Example(
                 qas_id=qas_id,
@@ -784,9 +789,8 @@ class MCQIterator(ClassifierIterator):
         return examples
 
     def _convert_example_to_feature(self, examples):
-        Feature = nametuple('Feature', [
-            'qid', 'input_ids', 'segment_ids', 'label', 'cal_loss'
-        ])
+        Feature = namedtuple(
+            'Feature', ['qid', 'src_ids', 'segment_ids', 'label', 'cal_loss'])
         features = []
         self.features_all = []
         pad_token_id = self.tokenizer.pad_token_id
@@ -814,7 +818,7 @@ class MCQIterator(ClassifierIterator):
                 if length > max_tokens_for_doc:
                     length = max_tokens_for_doc
                 doc_spans.append(_DocSpan(start=start_offset, length=length))
-                if start_offset + length == len(all_doc_tokens):
+                if start_offset + length == len(context_tokens):
                     break
                 start_offset += min(length, self.doc_stride)
 
@@ -847,13 +851,14 @@ class MCQIterator(ClassifierIterator):
 
                     tokens += segment_tokens
                     segments_ids = token_type_ids
-                input_ids = tokenizer.convert_tokens_to_ids(tokens)
+                input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
                 feature = Feature(
                     qid=example.qas_id,
                     label=example.label,
-                    input_ids=input_ids,
+                    src_ids=input_ids,
                     segment_ids=segments_ids,
                     cal_loss=1)
+
                 features.append(feature)
                 features_each.append(feature)
 
@@ -869,7 +874,7 @@ class MCQIterator(ClassifierIterator):
         return features
 
     def _pad_batch_records(self, batch_records, gather_idx=[]):
-        batch_token_ids = [record.input_ids for record in batch_records]
+        batch_token_ids = [record.src_ids for record in batch_records]
         if batch_records[0].label is not None:
             batch_labels = [record.label for record in batch_records]
             batch_labels = np.array(batch_labels).astype("int64").reshape(
