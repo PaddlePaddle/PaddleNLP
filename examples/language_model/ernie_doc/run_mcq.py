@@ -177,7 +177,8 @@ def do_train(args):
         trainer_id=rank,
         memory_len=model_config["memory_len"],
         max_seq_length=args.max_seq_length,
-        random_seed=args.seed)
+        random_seed=args.seed,
+        choice_num=num_classes)
 
     eval_ds_iter = MCQIterator(
         train_ds,
@@ -187,7 +188,8 @@ def do_train(args):
         trainer_id=rank,
         memory_len=model_config["memory_len"],
         max_seq_length=args.max_seq_length,
-        random_seed=args.seed)
+        random_seed=args.seed,
+        choice_num=num_classes)
 
     test_ds_iter = MCQIterator(
         train_ds,
@@ -197,7 +199,8 @@ def do_train(args):
         trainer_id=rank,
         memory_len=model_config["memory_len"],
         max_seq_length=args.max_seq_length,
-        random_seed=args.seed)
+        random_seed=args.seed,
+        choice_num=num_classes)
 
     train_dataloader = paddle.io.DataLoader.from_generator(
         capacity=70, return_list=True)

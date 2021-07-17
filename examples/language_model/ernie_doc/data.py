@@ -850,7 +850,7 @@ class MCQIterator(ClassifierIterator):
                     token_type_ids += [1]
 
                     tokens += segment_tokens
-                    segments_ids = token_type_ids
+                    segments_ids += token_type_ids
                 input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
                 feature = Feature(
                     qid=example.qas_id,
@@ -902,7 +902,6 @@ class MCQIterator(ClassifierIterator):
             pad_idx=self.tokenizer.pad_token_id,
             pad_max_len=self.max_seq_length,
             return_input_mask=True)
-
         padded_task_ids = pad_batch_data(
             batch_task_ids,
             pad_idx=self.tokenizer.pad_token_id,
