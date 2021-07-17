@@ -45,7 +45,7 @@ parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning 
 parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
 parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
 parser.add_argument("--output_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
-parser.add_argument("--epochs", type=int, default=3, help="Number of epoches for training.")
+parser.add_argument("--epochs", type=int, default=8, help="Number of epoches for training.")
 parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
 parser.add_argument("--seed", type=int, default=1, help="Random seed for initialization.")
 parser.add_argument("--memory_length", type=int, default=128, help="Random seed for initialization.")
@@ -57,7 +57,7 @@ parser.add_argument("--layerwise_decay", default=0.8, type=float, help="layerwis
 # yapf: enable
 args = parser.parse_args()
 
-DATASET_INFO = {"c3": (ErnieDocTokenizer, "dev", "dev", Acc()), }
+DATASET_INFO = {"c3": (ErnieDocTokenizer, "dev", "test", Acc()), }
 
 
 def set_seed(args):
@@ -189,6 +189,7 @@ def do_train(args):
         memory_len=model_config["memory_len"],
         max_seq_length=args.max_seq_length,
         random_seed=args.seed,
+        mode="eval",
         choice_num=num_classes)
 
     test_ds_iter = MCQIterator(
@@ -200,6 +201,7 @@ def do_train(args):
         memory_len=model_config["memory_len"],
         max_seq_length=args.max_seq_length,
         random_seed=args.seed,
+        mode="test",
         choice_num=num_classes)
 
     train_dataloader = paddle.io.DataLoader.from_generator(

@@ -22,7 +22,10 @@ from paddle.utils import try_import
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import tokenize_chinese_chars
 
-__all__ = ['ClassifierIterator', 'ImdbTextPreProcessor', 'HYPTextPreProcessor']
+__all__ = [
+    'ClassifierIterator', 'MRCIterator', 'MCQIterator', 'ImdbTextPreProcessor',
+    'HYPTextPreProcessor'
+]
 
 
 def get_related_pos(insts, seq_len, memory_len=128):
