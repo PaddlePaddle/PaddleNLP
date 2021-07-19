@@ -325,7 +325,9 @@ def do_train(args):
                         os.makedirs(output_dir)
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
-                    model_to_save.save_pretrained(output_dir)
+                    save_param_path = os.path.join(output_dir,
+                                                   'model_state.pdparams')
+                    paddle.save(model_to_save.state_dict(), save_param_path)
                     tokenizer.save_pretrained(output_dir)
                     if eval_acc > best_acc:
                         logger.info("Save best model......")
@@ -334,7 +336,10 @@ def do_train(args):
                                                       "best_model")
                         if not os.path.exists(best_model_dir):
                             os.makedirs(best_model_dir)
-                        model_to_save.save_pretrained(best_model_dir)
+
+                        save_param_path = os.path.join(best_model_dir,
+                                                       'model_state.pdparams')
+                        paddle.save(model_to_save.state_dict(), save_param_path)
                         tokenizer.save_pretrained(output_dir)
 
     logger.info("Final test result:")
@@ -346,7 +351,8 @@ def do_train(args):
             os.makedirs(output_dir)
         model_to_save = model._layers if isinstance(
             model, paddle.DataParallel) else model
-        model_to_save.save_pretrained(output_dir)
+        save_param_path = os.path.join(output_dir, 'model_state.pdparams')
+        paddle.save(model_to_save.state_dict(), save_param_path)
         tokenizer.save_pretrained(output_dir)
         if eval_acc > best_acc:
             logger.info("Save best model......")
@@ -354,7 +360,9 @@ def do_train(args):
             best_model_dir = os.path.join(args.output_dir, "best_model")
             if not os.path.exists(best_model_dir):
                 os.makedirs(best_model_dir)
-            model_to_save.save_pretrained(best_model_dir)
+            save_param_path = os.path.join(best_model_dir,
+                                           'model_state.pdparams')
+            paddle.save(model_to_save.state_dict(), save_param_path)
             tokenizer.save_pretrained(output_dir)
 
 
