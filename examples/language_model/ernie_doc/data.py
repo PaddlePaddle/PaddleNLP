@@ -887,3 +887,158 @@ class MCQIterator(MRCIterator):
             batch_labels, batch_qids, batch_gather_idx, need_cal_loss
         ]
         return return_list
+
+
+class SemanticMatchingIterator(MRCIterator):
+    def _convert_qa_to_examples(self):
+        Example = namedtuple('Example',
+                             ['qid', 'text_a', 'text_b', 'text_c', 'label'])
+        examples = []
+        for qid, qa in enumerate(self.dataset):
+            text_a, text_b, text_c = list(
+                map(lambda x: x.replace('\n', '').strip(),
+                    [qa["text_a"], qa["text_b"], qa["text_c"]]))
+
+            example = Example(
+                qid=qid,
+                text_a=text_a,
+                text_b=text_b,
+                text_c=text_c,
+                label=qa["label"])
+            examples += [example]
+        return examples
+
+    def _convert_example_to_feature(self, examples):
+        Feature = namedtuple(
+            'Feature', ['qid', 'src_ids', 'segment_ids', 'label', 'cal_loss'])
+        features = []
+        self.features_all = []
+        pad_token_id = self.tokenizer.pad_token_id
+        # Example = namedtuple(
+        #     'Example', ['qid', 'text_a', 'text_b', 'text_c', 'label'])
+        for (ex_index, example) in enumerate(examples):
+            text_a_tokens = self.tokenizer.tokenize(example.text_a)
+            text_b_tokens = self.tokenizer.tokenize(example.text_b)
+            text_c_tokens = self.tokenizer.tokenize(example.text_c)
+            a_len, b_len, c_len = list(
+                map(lambda x: len(x),
+                    [text_a_tokens, text_b_tokens, text_c_tokens]))
+
+            # align 3 text
+            min_text_len = min([a_len, b_len, c_len])
+            text_a_tokens = text_a_tokens[:min_text_len]
+            text_b_tokens = text_b_tokens[:min_text_len]
+            text_c_tokens = text_c_tokens[:min_text_len]
+
+            _DocSpan = namedtuple("DocSpan", ["start", "length"])
+            doc_spans = []
+            start_offset = 0
+
+            max_tokens_for_doc = (self.max_seq_length - 5) // 4
+
+            while start_offset < len(text_a_tokens):
+                length = len(text_a_tokens) - start_offset
+                if length > max_tokens_for_doc:
+                    length = max_tokens_for_doc
+                doc_spans.append(_DocSpan(start=start_offset, length=length))
+                if start_offset + length == len(text_a_tokens):
+                    break
+                start_offset += min(length, self.doc_stride)
+
+            features_each = []
+            for (doc_span_index, doc_span) in enumerate(doc_spans):
+                tokens = ['[CLS]']
+                token_type_ids = [0]
+
+                tokens += text_a_tokens[doc_span.start:doc_span.start +
+                                        doc_span.length]
+                token_type_ids += [0] * doc_span.length
+
+                tokens += ['[SEP]']
+                token_type_ids += [0]
+
+                tokens += text_b_tokens[doc_span.start:doc_span.start +
+                                        doc_span.length]
+                token_type_ids += [0] * doc_span.length
+
+                tokens += ['[SEP]']
+                token_type_ids += [0]
+
+                tokens += text_a_tokens[doc_span.start:doc_span.start +
+                                        doc_span.length]
+                token_type_ids += [1] * doc_span.length
+
+                tokens += ['[SEP]']
+                token_type_ids += [1]
+
+                tokens += text_c_tokens[doc_span.start:doc_span.start +
+                                        doc_span.length]
+                token_type_ids += [1] * doc_span.length
+
+                tokens += ['[SEP]']
+                token_type_ids += [1]
+
+                input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+                feature = Feature(
+                    qid=example.qid,
+                    label=example.label,
+                    src_ids=input_ids,
+                    segment_ids=token_type_ids,
+                    cal_loss=1)
+
+                features.append(feature)
+                features_each.append(feature)
+
+            #repeat
+            if self.repeat_input:
+                features_each_repeat = features_each
+                features_each = list(
+                    map(lambda x: x._replace(cla_loss=0), features_each))
+                features_each += features_each_repeat
+
+            self.features_all.append(features_each)
+
+        return features
+
+    def _pad_batch_records(self, batch_records, gather_idx=[]):
+        batch_token_ids = [record.src_ids for record in batch_records]
+        if batch_records[0].label is not None:
+            batch_labels = [record.label for record in batch_records]
+            batch_labels = np.array(batch_labels).astype("int64").reshape(
+                [-1, 1])
+        else:
+            batch_labels = np.array([]).astype("int64").reshape([-1, 1])
+        # qid
+        batch_qids = [record.qid for record in batch_records]
+        batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
+
+        if gather_idx:
+            batch_gather_idx = np.array(gather_idx).astype("int64").reshape(
+                [-1, 1])
+            need_cal_loss = np.array([1]).astype("int64")
+        else:
+            batch_gather_idx = np.array(list(range(len(batch_records)))).astype(
+                "int64").reshape([-1, 1])
+            need_cal_loss = np.array([0]).astype("int64")
+
+        batch_task_ids = [record.segment_ids for record in batch_records]
+
+        # padding
+        padded_token_ids, input_mask = pad_batch_data(
+            batch_token_ids,
+            pad_idx=self.tokenizer.pad_token_id,
+            pad_max_len=self.max_seq_length,
+            return_input_mask=True)
+        padded_task_ids = pad_batch_data(
+            batch_task_ids,
+            pad_idx=self.tokenizer.pad_token_id,
+            pad_max_len=self.max_seq_length)
+
+        padded_position_ids = get_related_pos(
+            padded_task_ids, self.max_seq_length, self.memory_len)
+
+        return_list = [
+            padded_token_ids, padded_position_ids, padded_task_ids, input_mask,
+            batch_labels, batch_qids, batch_gather_idx, need_cal_loss
+        ]
+        return return_list
