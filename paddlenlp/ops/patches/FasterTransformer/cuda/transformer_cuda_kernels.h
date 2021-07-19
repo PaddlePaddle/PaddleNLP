@@ -43,12 +43,12 @@ void init_cache_kernel_launcher(const float* cache_k,
                                 cudaStream_t stream);
 
 template <typename T>
-void init_vocab_mask_Launcher(T* vocab_mask,
-                              int vocab_size,
-                              int start_id,
-                              int unk_id,
-                              int mask_id,
-                              cudaStream_t stream);
+void init_logits_mask_Launcher(T* logits_mask,
+                               int vocab_size,
+                               int start_id,
+                               int unk_id,
+                               int mask_id,
+                               cudaStream_t stream);
 
 template <typename T>
 void apply_penalties_Launcher(int step,
@@ -64,5 +64,5 @@ void apply_penalties_Launcher(int step,
                               float len_penalty,
                               float repeat_penalty,
                               cudaStream_t stream,
-                              T* vocab_mask);
+                              const T* logits_mask);
 }

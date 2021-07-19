@@ -129,37 +129,37 @@ void init_cache_kernel_launcher(const float* cache_k,
 }
 
 template <typename T>
-__global__ void init_vocab_mask_kernel(T* vocab_mask,
-                                       int vocab_size,
-                                       int start_id = -1,
-                                       int unk_id = -1,
-                                       int mask_id = -1) {
+__global__ void init_logits_mask_kernel(T* logits_mask,
+                                        int vocab_size,
+                                        int start_id = -1,
+                                        int unk_id = -1,
+                                        int mask_id = -1) {
   int bid = blockIdx.x;
   int tid = threadIdx.x;
 
   if (bid * blockDim.x + tid == start_id) {
-    vocab_mask[bid * blockDim.x + tid] = static_cast<T>(-1e20f);
+    logits_mask[bid * blockDim.x + tid] = static_cast<T>(-1e20f);
   } else if (bid * blockDim.x + tid == unk_id) {
-    vocab_mask[bid * blockDim.x + tid] = static_cast<T>(-1e20f);
+    logits_mask[bid * blockDim.x + tid] = static_cast<T>(-1e20f);
   } else if (bid * blockDim.x + tid == mask_id) {
-    vocab_mask[bid * blockDim.x + tid] = static_cast<T>(-1e20f);
+    logits_mask[bid * blockDim.x + tid] = static_cast<T>(-1e20f);
   } else if (bid * blockDim.x + tid < vocab_size) {
-    vocab_mask[bid * blockDim.x + tid] = static_cast<T>(0.0f);
+    logits_mask[bid * blockDim.x + tid] = static_cast<T>(0.0f);
   }
 }
 
 template <typename T>
-void init_vocab_mask_Launcher(T* vocab_mask,
-                              int vocab_size,
-                              int start_id,
-                              int unk_id,
-                              int mask_id,
-                              cudaStream_t stream) {
+void init_logits_mask_Launcher(T* logits_mask,
+                               int vocab_size,
+                               int start_id,
+                               int unk_id,
+                               int mask_id,
+                               cudaStream_t stream) {
   dim3 block(256);
   dim3 grid((vocab_size + block.x - 1) / block.x);
 
-  init_vocab_mask_kernel<T><<<grid, block, 0, stream>>>(
-      vocab_mask, vocab_size, start_id, unk_id, mask_id);
+  init_logits_mask_kernel<T><<<grid, block, 0, stream>>>(
+      logits_mask, vocab_size, start_id, unk_id, mask_id);
 }
 
 template <typename T>
@@ -174,7 +174,7 @@ __global__ void apply_penalties_kernel(int step,
                                        float inv_temp,
                                        float len_penalty,
                                        float repeat_penalty,
-                                       T* vocab_mask = nullptr) {
+                                       const T* logits_mask = nullptr) {
   int tid = threadIdx.x;
   int bid = blockIdx.x;
   int bbid = blockIdx.y;   // batch_size * beam_size
@@ -239,10 +239,10 @@ __global__ void apply_penalties_kernel(int step,
     }
   }
 
-  if (vocab_mask) {
+  if (logits_mask) {
     for (int i = tid + bid * blockDim.x; i < vocab_size;
          i += blockDim.x * gridDim.x) {
-      log_probs[i + bbid * vocab_size] += vocab_mask[i];
+      log_probs[i + bbid * vocab_size] += logits_mask[i];
     }
   }
 }
@@ -261,7 +261,7 @@ void apply_penalties_Launcher(int step,
                               float len_penalty,
                               float repeat_penalty,
                               cudaStream_t stream,
-                              T* vocab_mask = nullptr) {
+                              const T* logits_mask = nullptr) {
   dim3 block(256);
   dim3 grid((vocab_size + block.x - 1) / block.x, beam_width * batch_size);
 
@@ -276,7 +276,7 @@ void apply_penalties_Launcher(int step,
                                                         1.f / temperature,
                                                         len_penalty,
                                                         repeat_penalty,
-                                                        vocab_mask);
+                                                        logits_mask);
 }
 
 template void embeddings_kernel_launcher(float* from_tensor,
@@ -327,19 +327,19 @@ template void init_cache_kernel_launcher(const float* cache_k,
                                          int beam_size,
                                          cudaStream_t stream);
 
-template void init_vocab_mask_Launcher(float* vocab_mask,
-                                       int vocab_size,
-                                       int start_id,
-                                       int unk_id,
-                                       int mask_id,
-                                       cudaStream_t stream);
+template void init_logits_mask_Launcher(float* logits_mask,
+                                        int vocab_size,
+                                        int start_id,
+                                        int unk_id,
+                                        int mask_id,
+                                        cudaStream_t stream);
 
-template void init_vocab_mask_Launcher(half* vocab_mask,
-                                       int vocab_size,
-                                       int start_id,
-                                       int unk_id,
-                                       int mask_id,
-                                       cudaStream_t stream);
+template void init_logits_mask_Launcher(half* logits_mask,
+                                        int vocab_size,
+                                        int start_id,
+                                        int unk_id,
+                                        int mask_id,
+                                        cudaStream_t stream);
 
 template void apply_penalties_Launcher(int step,
                                        float* log_probs,
@@ -354,7 +354,7 @@ template void apply_penalties_Launcher(int step,
                                        float len_penalty,
                                        float repeat_penalty,
                                        cudaStream_t stream,
-                                       float* vocab_mask);
+                                       const float* logits_mask);
 
 template void apply_penalties_Launcher(int step,
                                        half* log_probs,
@@ -369,5 +369,5 @@ template void apply_penalties_Launcher(int step,
                                        float len_penalty,
                                        float repeat_penalty,
                                        cudaStream_t stream,
-                                       half* vocab_mask);
+                                       const half* logits_mask);
 }

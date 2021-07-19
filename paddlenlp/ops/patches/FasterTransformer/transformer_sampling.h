@@ -53,8 +53,6 @@ private:
   DataType_ *embedding_buf_;
   DataType_ *lm_normed_result_buf_;
   DataType_ *logits_buf_;
-  // Used for ignore unk and so on.
-  DataType_ *vocab_mask_buf_;
   int *word_ids_buf_;
   bool *finished_buf_;
 
@@ -143,7 +141,6 @@ public:
     int cache_size = args_.batch_size_ * (args_.seq_len_ + args_.start_len_) *
                      args_.hidden_units_;                         // type T
     int logits_buf_size = args_.batch_size_ * args_.vocab_size_;  // type T
-    int vocab_mask_buf_size = args_.vocab_size_;                  // type T
 
     int word_ids_buf_size = args_.batch_size_;            // type int
     int finished_buf_size = args_.batch_size_;            // type bool
@@ -155,7 +152,6 @@ public:
 
     // prevent memory misalinged address
     logits_buf_size = (int)(ceil(logits_buf_size / 4.)) * 4;
-    vocab_mask_buf_size = (int)(ceil(vocab_mask_buf_size / 4.)) * 4;
     word_ids_buf_size = (int)(ceil(word_ids_buf_size / 4.)) * 4;
     finished_buf_size = (int)(ceil(finished_buf_size / 32.)) * 32;
 
@@ -189,8 +185,7 @@ public:
                             decoder_normed_result_buffer_size * 3;
 
     buf_ = reinterpret_cast<void *>(allocator_.malloc(
-        sizeof(DataType_) *
-            (datatype_buf_size + logits_buf_size + vocab_mask_buf_size) +
+        sizeof(DataType_) * (datatype_buf_size + logits_buf_size) +
         sizeof(int) * word_ids_buf_size + sizeof(bool) * finished_buf_size +
         sizeof(int) * finished_count_size +
         sizeof(int) * (topp_id_vals_buf_size + topp_offset_buf_size) +
@@ -216,8 +211,7 @@ public:
     lm_normed_result_buf_ =
         (decoder_normed_result_buf_ + decoder_normed_result_buffer_size);
     logits_buf_ = lm_normed_result_buf_ + decoder_normed_result_buffer_size;
-    vocab_mask_buf_ = logits_buf_ + logits_buf_size;
-    word_ids_buf_ = (int *)(vocab_mask_buf_ + vocab_mask_buf_size);
+    word_ids_buf_ = (int *)(logits_buf_ + logits_buf_size);
     finished_buf_ = (bool *)(word_ids_buf_ + word_ids_buf_size);
     finished_count_buf_ = (int *)(finished_buf_ + finished_buf_size);
     topp_id_vals_buf_ = (int *)(finished_count_buf_ + finished_count_size);
@@ -300,22 +294,6 @@ public:
     cudaDeviceSynchronize();
     check_cuda_error(cudaGetLastError());
 #endif
-
-    if (args_.start_id_ != -1 || args_.unk_id_ != -1 || args_.mask_id_ != -1) {
-      init_vocab_mask_Launcher(vocab_mask_buf_,
-                               args_.vocab_size_,
-                               args_.start_id_,
-                               args_.unk_id_,
-                               args_.mask_id_,
-                               decoding_params.stream);
-
-#ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
-#endif
-    } else {
-      vocab_mask_buf_ = nullptr;
-    }
 
     int cache_size = args_.batch_size_ * (args_.seq_len_ + args_.start_len_) *
                      args_.hidden_units_;  // type T
@@ -537,7 +515,7 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
 
-      if (vocab_mask_buf_ || args_.temperature_ != 1.0 ||
+      if (decoding_params.logits_mask_T || args_.temperature_ != 1.0 ||
           args_.len_penalty != 1.0 || args_.repeat_penalty != 1.0) {
         // TODO(): repeat penalty vertification.
         apply_penalties_Launcher(step,
@@ -553,7 +531,7 @@ public:
                                  args_.len_penalty,
                                  args_.repeat_penalty,
                                  decoding_params.stream,
-                                 vocab_mask_buf_);
+                                 decoding_params.logits_mask_T);
       }
 
       if (args_.candidate_num_ != 0) {

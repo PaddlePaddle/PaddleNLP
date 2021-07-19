@@ -31,6 +31,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const std::vector<paddle::Tensor>& cache_k,
     const std::vector<paddle::Tensor>& cache_v,
     const paddle::Tensor& memory_sequence_length,
+    const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_emb,
     const std::vector<paddle::Tensor>& self_layernorm_weight,
     const std::vector<paddle::Tensor>& self_layernorm_bias,
@@ -206,12 +207,14 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   // Faster Transformer when using float16.
   if ("beam_search" == decoding_strategy) {
     // for matmul bias
-    decoding_params.embedding_bias =
-        reinterpret_cast<const float*>(embedding_bias.data<float>());
+    decoding_params.embedding_bias = embedding_bias.data<float>();
+    decoding_params.logits_mask = logits_mask.data<float>();
   } else if ("topk_sampling" == decoding_strategy ||
              "topp_sampling" == decoding_strategy) {
     decoding_params.embedding_bias_T =
         reinterpret_cast<const DataType_*>(embedding_bias.data<data_t_>());
+    decoding_params.logits_mask_T =
+        reinterpret_cast<const DataType_*>(logits_mask.data<data_t_>());
   }
   decoding_params.position_encoding_table = reinterpret_cast<const DataType_*>(
       position_encoding_table.data<data_t_>());
@@ -288,6 +291,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const std::vector<paddle::Tensor>& cache_k,
     const std::vector<paddle::Tensor>& cache_v,
     const paddle::Tensor& mem_seq_len,
+    const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_embedding,
     const std::vector<paddle::Tensor>& self_ln_weight,
     const std::vector<paddle::Tensor>& self_ln_bias,
@@ -347,6 +351,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           cache_k,
           cache_v,
           mem_seq_len,
+          logits_mask,
           word_embedding,
           self_ln_weight,
           self_ln_bias,
@@ -401,6 +406,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           cache_k,
           cache_v,
           mem_seq_len,
+          logits_mask,
           word_embedding,
           self_ln_weight,
           self_ln_bias,

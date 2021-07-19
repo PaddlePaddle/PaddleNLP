@@ -56,6 +56,9 @@ public:
   LayerNormWeight<T> layernorm;
   LayerNormWeight<T> lm_layernorm;
 
+  const T *logits_mask_T = nullptr;
+  const float *logits_mask = nullptr;
+
   int *output_ids = nullptr;
   int *parent_ids = nullptr;
   int *sequence_length = nullptr;

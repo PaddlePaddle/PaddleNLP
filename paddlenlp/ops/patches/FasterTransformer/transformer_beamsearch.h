@@ -53,7 +53,6 @@ private:
   DataType_ *embedding_buf_;
   DataType_ *lm_normed_result_buf_;
   float *logits_buf_;
-  float *vocab_mask_buf_;
   float *cum_log_buf_;
   int *word_ids_buf_;
   bool *finished_buf_;
@@ -134,7 +133,6 @@ public:
 
     int logits_buf_size = args_.batch_size_ * args_.beam_width_ *
                           args_.vocab_size_;                       // type float
-    int vocab_mask_buf_size = args_.vocab_size_;                   // type float
     int cum_log_buf_size = args_.batch_size_ * args_.beam_width_;  // type float
     int word_ids_buf_size = args_.batch_size_ * args_.beam_width_;  // type int
     int finished_buf_size = args_.batch_size_ * args_.beam_width_;  // type bool
@@ -148,7 +146,6 @@ public:
 
     // prevent memory misalinged address
     logits_buf_size = (int)(ceil(logits_buf_size / 4.)) * 4;
-    vocab_mask_buf_size = (int)(ceil(vocab_mask_buf_size / 4.)) * 4;
     cum_log_buf_size = (int)(ceil(cum_log_buf_size / 4.)) * 4;
     word_ids_buf_size = (int)(ceil(word_ids_buf_size / 4.)) * 4;
     finished_buf_size = (int)(ceil(finished_buf_size / 32.)) * 32;
@@ -168,8 +165,7 @@ public:
 
     buf_ = reinterpret_cast<void *>(allocator_.malloc(
         sizeof(DataType_) * datatype_buf_size +
-        sizeof(float) *
-            (logits_buf_size + cum_log_buf_size + vocab_mask_buf_size) +
+        sizeof(float) * (logits_buf_size + cum_log_buf_size) +
         sizeof(int) * word_ids_buf_size + sizeof(bool) * finished_buf_size +
         topk_workspace_size_ +
         sizeof(float) * args_.temp_storage_size_ +  // should be always float
@@ -200,8 +196,7 @@ public:
         (decoder_normed_result_buf_ + decoder_normed_result_buffer_size);
     logits_buf_ =
         (float *)(lm_normed_result_buf_ + decoder_normed_result_buffer_size);
-    vocab_mask_buf_ = (float *)(logits_buf_ + logits_buf_size);
-    cum_log_buf_ = (float *)(vocab_mask_buf_ + vocab_mask_buf_size);
+    cum_log_buf_ = (float *)(logits_buf_ + logits_buf_size);
     word_ids_buf_ = (int *)(cum_log_buf_ + cum_log_buf_size);
     finished_buf_ = (bool *)(word_ids_buf_ + word_ids_buf_size);
     temp_storage_ = (float *)(finished_buf_ + finished_buf_size);
@@ -295,22 +290,6 @@ public:
     cudaDeviceSynchronize();
     check_cuda_error(cudaGetLastError());
 #endif
-
-    if (args_.start_id_ != -1 || args_.unk_id_ != -1 || args_.mask_id_ != -1) {
-      init_vocab_mask_Launcher<float>(vocab_mask_buf_,
-                                      args_.vocab_size_,
-                                      args_.start_id_,
-                                      args_.unk_id_,
-                                      args_.mask_id_,
-                                      decoding_params.stream);
-
-#ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
-#endif
-    } else {
-      vocab_mask_buf_ = nullptr;
-    }
 
     for (int step = 1; step <= args_.seq_len_; ++step) {
       // we use two-way buffer
@@ -521,7 +500,7 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
 
-      if (vocab_mask_buf_ || args_.temperature_ != 1.0 ||
+      if (decoding_params.logits_mask || args_.temperature_ != 1.0 ||
           args_.len_penalty != 1.0 || args_.repeat_penalty != 1.0) {
         // TODO(): repeat penalty vertification.
         apply_penalties_Launcher<float>(step,
@@ -537,7 +516,7 @@ public:
                                         args_.len_penalty,
                                         args_.repeat_penalty,
                                         decoding_params.stream,
-                                        vocab_mask_buf_);
+                                        decoding_params.logits_mask);
       }
 
       // Beamsearch
