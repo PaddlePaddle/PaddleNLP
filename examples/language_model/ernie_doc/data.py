@@ -693,7 +693,7 @@ class MRCIterator(ClassifierIterator):
                     yield batch_records
 
 
-class MCQIterator(ClassifierIterator):
+class MCQIterator(MRCIterator):
     """
     Multiple choice question iterator. 
     """
@@ -713,42 +713,11 @@ class MCQIterator(ClassifierIterator):
                  doc_stride=128,
                  max_query_length=64,
                  choice_num=4):
-        super(MCQIterator, self).__init__(
-            dataset,
-            batch_size,
-            tokenizer,
-            trainer_num,
-            trainer_id,
-            max_seq_length,
-            memory_len,
-            repeat_input,
-            in_tokens,
-            mode,
-            random_seed,
-            preprocess_text_fn=None)
-        self.doc_stride = doc_stride
-        self.max_query_length = max_query_length
         self.choice_num = choice_num
-        self.examples = []
-        self.features = []
-        self.features_all = []
-        self._preprocess_data()
-
-    def shuffle_sample(self):
-        if self.shuffle:
-            self.global_rng = np.random.RandomState(self.random_seed)
-            self.global_rng.shuffle(self.features_all)
-
-    def _preprocess_data(self):
-        # construct examples
-        self.examples = self._convert_qa_to_examples()
-        # construct features
-        self.features = self._convert_example_to_feature(self.examples)
-
-    def get_num_examples(self):
-        if not self.features_all:
-            self._preprocess_data()
-        return len(sum(self.features_all, []))
+        super(MCQIterator, self).__init__(
+            dataset, batch_size, tokenizer, trainer_num, trainer_id,
+            max_seq_length, memory_len, repeat_input, in_tokens, mode,
+            random_seed)
 
     def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):
         """Truncates a sequence pair in place to the maximum length."""
@@ -918,39 +887,3 @@ class MCQIterator(ClassifierIterator):
             batch_labels, batch_qids, batch_gather_idx, need_cal_loss
         ]
         return return_list
-
-    def _create_instances(self):
-        """generate batch records"""
-        pre_batch_list = []
-        insert_idx = []
-        for qid, features in enumerate(self.features_all):
-            if self._cnt_list(
-                    pre_batch_list) < self.batch_size * self.trainer_num:
-                if insert_idx:
-                    pre_batch_list[insert_idx[0]] = features
-                    insert_idx.pop(0)
-                else:
-                    pre_batch_list.append(features)
-            if self._cnt_list(
-                    pre_batch_list) == self.batch_size * self.trainer_num:
-                assert self._cnt_list(pre_batch_list) == len(
-                    pre_batch_list), "the two value must be equal"
-                assert not insert_idx, "the insert_idx must be null"
-                sample_batch = self._get_samples(pre_batch_list)
-
-                for idx, lit in enumerate(pre_batch_list):
-                    if not lit:
-                        insert_idx.append(idx)
-                for batch_records in self._prepare_batch_data(sample_batch):
-                    yield batch_records
-
-        if self.mode != "train":
-            if self._cnt_list(pre_batch_list):
-                pre_batch_list += [
-                    []
-                    for _ in range(self.batch_size * self.trainer_num -
-                                   self._cnt_list(pre_batch_list))
-                ]
-                sample_batch = self._get_samples(pre_batch_list, is_last=True)
-                for batch_records in self._prepare_batch_data(sample_batch):
-                    yield batch_records
