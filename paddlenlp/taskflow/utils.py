@@ -15,7 +15,7 @@
 
 import os
 from paddle.dataset.common import md5file
-from ..utils.downloader import get_path_from_url
+from ..utils.downloader import get_path_from_url, DownloaderCheck
 from ..utils.env import MODEL_HOME
 
 DOC_FORMAT = r"""
@@ -24,7 +24,7 @@ DOC_FORMAT = r"""
                """
 
 
-def download_file(save_dir, filename, url, md5=None):
+def download_file(save_dir, filename, url, md5=None, task=None):
     """
     Download the file from the url to specified directory. 
     Check md5 value when the file is exists, if the md5 value is the same as the existed file, just use 
@@ -36,6 +36,7 @@ def download_file(save_dir, filename, url, md5=None):
         url(string): The url downling the file.
         md5(string, optional): The md5 value that checking the version downloaded. 
     """
+    DownloaderCheck(task).start()
     default_root = os.path.join(MODEL_HOME, save_dir)
     fullname = os.path.join(default_root, filename)
     if os.path.exists(fullname):
