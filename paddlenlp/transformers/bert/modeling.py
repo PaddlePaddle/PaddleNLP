@@ -75,18 +75,18 @@ class BertPooler(Layer):
     """
     """
 
-    def __init__(self, hidden_size, with_pool):
+    def __init__(self, hidden_size, pool_act="tanh"):
         super(BertPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.activation = nn.Tanh()
-        self.with_pool = with_pool
+        self.pool_act = pool_act
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
         # to the first token.
         first_token_tensor = hidden_states[:, 0]
         pooled_output = self.dense(first_token_tensor)
-        if self.with_pool == 'tanh':
+        if self.pool_act == "tanh":
             pooled_output = self.activation(pooled_output)
         return pooled_output
 
@@ -372,7 +372,7 @@ class BertModel(BertPretrainedModel):
                  type_vocab_size=16,
                  initializer_range=0.02,
                  pad_token_id=0,
-                 with_pool='tanh'):
+                 pool_act="tanh"):
         super(BertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -388,7 +388,7 @@ class BertModel(BertPretrainedModel):
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = BertPooler(hidden_size, with_pool)
+        self.pooler = BertPooler(hidden_size, pool_act)
         self.apply(self.init_weights)
 
     def forward(self,
