@@ -104,9 +104,9 @@ class SentaTask(Task):
             network = self.kwargs['network']
         if network == "bow":
             model = BoWModel(vocab_size, num_classes, padding_idx=pad_token_id)
-            model_full_name = download_file(self.model, "senta_bow.pdparams",
-                                            URLS['senta_bow'][0],
-                                            URLS['senta_bow'][1])
+            model_full_name = download_file(
+                self.model, "senta_bow.pdparams", URLS['senta_bow'][0],
+                URLS['senta_bow'][1], "sentiment_analysis")
         elif network == "lstm":
             model = LSTMModel(
                 vocab_size,
@@ -114,9 +114,9 @@ class SentaTask(Task):
                 direction='forward',
                 padding_idx=pad_token_id,
                 pooling_type='max')
-            model_full_name = download_file(self.model, "senta_lstm.pdparams",
-                                            URLS['senta_lstm'][0],
-                                            URLS['senta_lstm'][1])
+            model_full_name = download_file(
+                self.model, "senta_lstm.pdparams", URLS['senta_lstm'][0],
+                URLS['senta_lstm'][1], "sentiment_analysis")
         else:
             raise ValueError(
                 "Unknown network: {}, it must be one of bow, lstm.".format(

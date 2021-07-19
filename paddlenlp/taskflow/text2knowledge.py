@@ -147,9 +147,9 @@ class WordTagTask(Task):
 
     def __init__(self, model, task, **kwargs):
         super().__init__(model=model, task=task, **kwargs)
-        term_schema_path = download_file(self.model, "termtree_type.csv",
-                                         URLS['termtree_type'][0],
-                                         URLS['termtree_type'][1])
+        term_schema_path = download_file(
+            self.model, "termtree_type.csv", URLS['termtree_type'][0],
+            URLS['termtree_type'][1], "text2knowledge")
         term_data_path = download_file(self.model, "TermTree.V1.0",
                                        URLS['TermTree.V1.0'][0],
                                        URLS['TermTree.V1.0'][1])
