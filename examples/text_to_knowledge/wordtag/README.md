@@ -59,6 +59,9 @@ from paddlenlp.taskflow import TaskFlow
 task = TaskFlow("text2knowledge", model="wordtag")
 task(["热梅茶是一道以梅子为主要原料制作的茶饮",
       "《孤女》是2010年九州出版社出版的小说，作者是余兼羽"])
+# Support the input text directly
+task("热梅茶是一道以梅子为主要原料制作的茶饮")
+
 ```
 下面是运行WordTag工具后的知识链接的预测结果
 
