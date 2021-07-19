@@ -145,7 +145,7 @@ class LinearChainCrf(nn.Layer):
         if self.with_start_stop_tag:
             # The last one step
             alpha += self.transitions[self.stop_idx].unsqueeze(0)
-        norm_score = log_sum_exp(alpha, 1).squeeze(-1)
+        norm_score = log_sum_exp(alpha, 1)  #.squeeze(-1)
         return norm_score
 
     def gold_score(self, inputs, labels, lengths):

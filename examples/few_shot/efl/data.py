@@ -199,10 +199,9 @@ class TnewsProcessor(DataProcessor):
         """Creates examples for the training and dev sets."""
 
         examples = []
-
         if phase == "train":
             for example in datasets:
-                true_label = example["label"]
+                true_label = str(example["label"])
                 neg_examples = []
                 for label, label_description in task_label_description.items():
                     new_example = dict()
