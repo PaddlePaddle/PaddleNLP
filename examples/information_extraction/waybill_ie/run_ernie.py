@@ -83,8 +83,8 @@ if __name__ == '__main__':
 
     ignore_label = -1
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),  # token_type_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # token_type_ids
         Stack(dtype='int64'),  # seq_len
         Pad(axis=0, pad_val=ignore_label, dtype='int64')  # labels
     ): fn(samples)
