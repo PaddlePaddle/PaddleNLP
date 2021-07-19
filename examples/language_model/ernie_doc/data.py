@@ -908,14 +908,22 @@ class SemanticMatchingIterator(MRCIterator):
             examples += [example]
         return examples
 
+    def _create_tokens_and_type_id(self, text_a_tokens, text_b_tokens, start,
+                                   length):
+        tokens = ['[CLS]'] + text_a_tokens[start:start + length] + [
+            '[SEP]'
+        ] + text_b_tokens[start:start + length] + ['[SEP]']
+        token_type_ids = [0] + [0] * (length + 1) + [1] * (length + 1)
+        return tokens, token_type_ids
+
     def _convert_example_to_feature(self, examples):
-        Feature = namedtuple(
-            'Feature', ['qid', 'src_ids', 'segment_ids', 'label', 'cal_loss'])
+        Feature = namedtuple('Feature', [
+            'qid', 'src_ids', 'segment_ids', 'pair_src_ids', 'pair_segment_ids',
+            'label', 'cal_loss'
+        ])
         features = []
         self.features_all = []
         pad_token_id = self.tokenizer.pad_token_id
-        # Example = namedtuple(
-        #     'Example', ['qid', 'text_a', 'text_b', 'text_c', 'label'])
         for (ex_index, example) in enumerate(examples):
             text_a_tokens = self.tokenizer.tokenize(example.text_a)
             text_b_tokens = self.tokenizer.tokenize(example.text_b)
@@ -934,7 +942,7 @@ class SemanticMatchingIterator(MRCIterator):
             doc_spans = []
             start_offset = 0
 
-            max_tokens_for_doc = (self.max_seq_length - 5) // 4
+            max_tokens_for_doc = (self.max_seq_length - 3) // 2
 
             while start_offset < len(text_a_tokens):
                 length = len(text_a_tokens) - start_offset
@@ -947,43 +955,22 @@ class SemanticMatchingIterator(MRCIterator):
 
             features_each = []
             for (doc_span_index, doc_span) in enumerate(doc_spans):
-                tokens = ['[CLS]']
-                token_type_ids = [0]
+                tokens1, token_type_ids1 = self._create_tokens_and_type_id(
+                    text_a_tokens, text_b_tokens, doc_span.start,
+                    doc_span.length)
+                tokens2, token_type_ids2 = self._create_tokens_and_type_id(
+                    text_a_tokens, text_c_tokens, doc_span.start,
+                    doc_span.length)
 
-                tokens += text_a_tokens[doc_span.start:doc_span.start +
-                                        doc_span.length]
-                token_type_ids += [0] * doc_span.length
-
-                tokens += ['[SEP]']
-                token_type_ids += [0]
-
-                tokens += text_b_tokens[doc_span.start:doc_span.start +
-                                        doc_span.length]
-                token_type_ids += [0] * doc_span.length
-
-                tokens += ['[SEP]']
-                token_type_ids += [0]
-
-                tokens += text_a_tokens[doc_span.start:doc_span.start +
-                                        doc_span.length]
-                token_type_ids += [1] * doc_span.length
-
-                tokens += ['[SEP]']
-                token_type_ids += [1]
-
-                tokens += text_c_tokens[doc_span.start:doc_span.start +
-                                        doc_span.length]
-                token_type_ids += [1] * doc_span.length
-
-                tokens += ['[SEP]']
-                token_type_ids += [1]
-
-                input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+                input_ids1 = self.tokenizer.convert_tokens_to_ids(tokens1)
+                input_ids2 = self.tokenizer.convert_tokens_to_ids(tokens2)
                 feature = Feature(
                     qid=example.qid,
                     label=example.label,
-                    src_ids=input_ids,
-                    segment_ids=token_type_ids,
+                    src_ids=input_ids1,
+                    segment_ids=token_type_ids1,
+                    pair_src_ids=input_ids2,
+                    pair_segment_ids=token_type_ids2,
                     cal_loss=1)
 
                 features.append(feature)
@@ -1000,8 +987,33 @@ class SemanticMatchingIterator(MRCIterator):
 
         return features
 
+    def _create_pad_ids(self, batch_records, prefix=""):
+        src_ids = prefix + "src_ids"
+        segment_ids = prefix + "segment_ids"
+        batch_token_ids = [getattr(record, src_ids) for record in batch_records]
+        batch_task_ids = [
+            getattr(record, segment_ids) for record in batch_records
+        ]
+
+        # padding
+        padded_token_ids, input_mask = pad_batch_data(
+            batch_token_ids,
+            pad_idx=self.tokenizer.pad_token_id,
+            pad_max_len=self.max_seq_length,
+            return_input_mask=True)
+        padded_task_ids = pad_batch_data(
+            batch_task_ids,
+            pad_idx=self.tokenizer.pad_token_id,
+            pad_max_len=self.max_seq_length)
+
+        padded_position_ids = get_related_pos(
+            padded_task_ids, self.max_seq_length, self.memory_len)
+
+        return [
+            padded_token_ids, padded_position_ids, padded_task_ids, input_mask
+        ]
+
     def _pad_batch_records(self, batch_records, gather_idx=[]):
-        batch_token_ids = [record.src_ids for record in batch_records]
         if batch_records[0].label is not None:
             batch_labels = [record.label for record in batch_records]
             batch_labels = np.array(batch_labels).astype("int64").reshape(
@@ -1021,24 +1033,7 @@ class SemanticMatchingIterator(MRCIterator):
                 "int64").reshape([-1, 1])
             need_cal_loss = np.array([0]).astype("int64")
 
-        batch_task_ids = [record.segment_ids for record in batch_records]
-
-        # padding
-        padded_token_ids, input_mask = pad_batch_data(
-            batch_token_ids,
-            pad_idx=self.tokenizer.pad_token_id,
-            pad_max_len=self.max_seq_length,
-            return_input_mask=True)
-        padded_task_ids = pad_batch_data(
-            batch_task_ids,
-            pad_idx=self.tokenizer.pad_token_id,
-            pad_max_len=self.max_seq_length)
-
-        padded_position_ids = get_related_pos(
-            padded_task_ids, self.max_seq_length, self.memory_len)
-
-        return_list = [
-            padded_token_ids, padded_position_ids, padded_task_ids, input_mask,
-            batch_labels, batch_qids, batch_gather_idx, need_cal_loss
-        ]
+        return_list = self._create_pad_ids(batch_records) \
+                    + self._create_pad_ids(batch_records, "pair_") \
+                    + [batch_labels, batch_qids, batch_gather_idx, need_cal_loss]
         return return_list

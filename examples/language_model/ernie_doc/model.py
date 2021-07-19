@@ -18,11 +18,12 @@ import paddle.nn.functional as F
 
 
 class ErnieDocSimNet(nn.Layer):
-    def __init__(self, ernie_doc, dropout=None):
+    def __init__(self, ernie_doc, num_classes=2, dropout=None):
         super().__init__()
         self.ernie_doc = ernie_doc
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
-        self.classifier = nn.Linear(ernie_doc.config["hidden_size"], 2)
+        self.classifier = nn.Linear(ernie_doc.config["hidden_size"],
+                                    num_classes)
 
     def forward(self,
                 query_input_ids,
@@ -47,4 +48,4 @@ class ErnieDocSimNet(nn.Layer):
         diff_pooled_output = query_pooled_output - title_pooled_output
         diff_pooled_output = self.dropout(diff_pooled_output)
         output = self.classifier(diff_pooled_output)
-        return output
+        return output, query_mem, title_mem

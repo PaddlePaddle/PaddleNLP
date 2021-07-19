@@ -35,10 +35,11 @@ from paddlenlp.datasets import load_dataset
 from data import SemanticMatchingIterator
 from optimization import AdamWDL
 from metrics import Acc, F1
+from model import ErnieDocSimNet
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--batch_size", default=6, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="pretraining model name or path")
 parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--learning_rate", type=float, default=5e-5, help="Learning rate used to train.")
@@ -52,6 +53,7 @@ parser.add_argument("--memory_length", type=int, default=128, help="Random seed 
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--dataset", default="cail2019_scm", choices=["cail2019_scm"], type=str, help="The training dataset")
+parser.add_argument("--dropout", default=0.1, type=float, help="dropout ratio of ernie_doc")
 parser.add_argument("--layerwise_decay", default=1.0, type=float, help="layerwise decay ratio")
 
 # yapf: enable
@@ -75,7 +77,7 @@ def init_memory(batch_size, memory_length, d_model, n_layers):
 
 
 @paddle.no_grad()
-def evaluate(model, metric, data_loader, memories0):
+def evaluate(model, metric, data_loader, memories0, pair_memories0):
     """
     Given a dataset, it evals model and computes the metric.
     Because the same sample may be splited into several samples and evaluated in 
@@ -91,6 +93,7 @@ def evaluate(model, metric, data_loader, memories0):
     losses = []
     # copy the memory
     memories = list(memories0)
+    pair_memories = list(pair_memories0)
     tic_train = time.time()
     eval_logging_step = 500
 
@@ -98,13 +101,16 @@ def evaluate(model, metric, data_loader, memories0):
     label_dict = dict()
     global_steps = 0
     for step, batch in enumerate(data_loader, start=1):
-        input_ids, position_ids, token_type_ids, attn_mask, labels, qids, \
-            gather_idxs, need_cal_loss = batch
-        logits, memories = model(input_ids, memories, token_type_ids,
-                                 position_ids, attn_mask)
+        input_ids, position_ids, token_type_ids, attn_mask, \
+            pair_input_ids, pair_position_ids, pair_token_type_ids, pair_attn_mask, \
+            labels, qids, gather_idx, need_cal_loss = batch
+
+        logits, memories, pair_memories = model(
+            input_ids, pair_input_ids, memories, pair_memories, token_type_ids,
+            position_ids, attn_mask, pair_token_type_ids, pair_position_ids,
+            pair_attn_mask)
         logits, labels, qids = list(
-            map(lambda x: paddle.gather(x, gather_idxs),
-                [logits, labels, qids]))
+            map(lambda x: paddle.gather(x, gather_idx), [logits, labels, qids]))
         # need to collect probs for each qid, so use softmax_with_cross_entropy
         loss, probs = nn.functional.softmax_with_cross_entropy(
             logits, labels, return_softmax=True)
@@ -163,8 +169,11 @@ def do_train(args):
     if rank == 0:
         if os.path.exists(args.model_name_or_path):
             logger.info("init checkpoint from %s" % args.model_name_or_path)
-    model = ErnieDocForSequenceClassification.from_pretrained(
-        args.model_name_or_path, num_classes=num_classes, cls_token_idx=0)
+
+    ernie_doc = ErnieDocModel.from_pretrained(
+        args.model_name_or_path, cls_token_idx=0)
+    model = ErnieDocSimNet(ernie_doc, num_classes, args.dropout)
+
     model_config = model.ernie_doc.config
     if trainer_num > 1:
         model = paddle.DataParallel(model)
@@ -266,6 +275,7 @@ def do_train(args):
                             model_config["num_hidden_layers"])
     # copy the memory
     memories = create_memory()
+    pair_memories = create_memory()
     tic_train = time.time()
 
     for epoch in range(args.epochs):
@@ -273,10 +283,14 @@ def do_train(args):
         train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
         for step, batch in enumerate(train_dataloader, start=1):
             global_steps += 1
-            input_ids, position_ids, token_type_ids, attn_mask, labels, qids, \
-                gather_idx, need_cal_loss = batch
-            logits, memories = model(input_ids, memories, token_type_ids,
-                                     position_ids, attn_mask)
+            input_ids, position_ids, token_type_ids, attn_mask, \
+                pair_input_ids, pair_position_ids, pair_token_type_ids, pair_attn_mask, \
+                labels, qids, gather_idx, need_cal_loss = batch
+
+            logits, memories, pair_memories = model(
+                input_ids, pair_input_ids, memories, pair_memories,
+                token_type_ids, position_ids, attn_mask, pair_token_type_ids,
+                pair_position_ids, pair_attn_mask)
 
             logits, labels = list(
                 map(lambda x: paddle.gather(x, gather_idx), [logits, labels]))
@@ -302,7 +316,7 @@ def do_train(args):
                 # evaluate
                 logger.info("Eval:")
                 eval_acc = evaluate(model, eval_metric, eval_dataloader,
-                                    create_memory())
+                                    create_memory(), create_memory())
                 # save
                 if rank == 0:
                     output_dir = os.path.join(args.output_dir,
@@ -324,7 +338,8 @@ def do_train(args):
                         tokenizer.save_pretrained(output_dir)
 
     logger.info("Final test result:")
-    eval_acc = evaluate(model, eval_metric, test_dataloader, create_memory())
+    eval_acc = evaluate(model, eval_metric, test_dataloader,
+                        create_memory(), create_memory())
     if rank == 0:
         output_dir = os.path.join(args.output_dir, "model_%d" % (global_steps))
         if not os.path.exists(output_dir):
