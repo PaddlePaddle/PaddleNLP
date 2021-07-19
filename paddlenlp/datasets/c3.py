@@ -25,8 +25,11 @@ __all__ = ['C3']
 
 class C3(DatasetBuilder):
     '''
-    The first free-form multiple-Choice Chinese machine reading Comprehension dataset.
-    See more details on https://github.com/nlpdata/c3.
+    C3 is the first free-form multiple-Choice Chinese machine reading Comprehension dataset,
+    containing 13,369 documents (dialogues or more formally written mixed-genre texts)
+    and their associated 19,577 multiple-choice free-form questions collected from
+    Chinese-as-a-second-language examinations.
+    See more details on https://arxiv.org/abs/1904.09679.
     '''
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
     SPLITS = {
