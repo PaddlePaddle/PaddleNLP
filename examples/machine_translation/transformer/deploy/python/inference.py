@@ -10,7 +10,9 @@ from pprint import pprint
 import paddle
 from paddle import inference
 
-sys.path.append("../../")
+sys.path.append(
+    os.path.abspath(
+        os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)))
 import reader
 
 
@@ -44,6 +46,12 @@ def parse_args():
     )
     parser.add_argument(
         "--profile", action="store_true", help="Whether to profile. ")
+    parser.add_argument(
+        "--test_file",
+        default=None,
+        type=str,
+        help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
+    )
     args = parser.parse_args()
     return args
 
@@ -179,7 +187,6 @@ if __name__ == "__main__":
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
-        pprint(args)
     args.benchmark = ARGS.benchmark
     args.device = ARGS.device
     args.use_mkl = ARGS.use_mkl
@@ -190,6 +197,8 @@ if __name__ == "__main__":
     args.model_name = "transformer_base" if "base" in ARGS.config else "transformer_big"
     if ARGS.model_dir != "":
         args.inference_model_dir = ARGS.model_dir
+    args.test_file = ARGS.test_file
+    pprint(args)
 
     if args.profile:
         from utils.recorder import Recorder
