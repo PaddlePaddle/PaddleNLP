@@ -467,16 +467,6 @@ class PretrainedTokenizer(object):
                                               file_name)
                 vocab_files[file_id] = full_file_name
 
-            raise ValueError(
-                "Calling {}.from_pretrained(pretrained_model_name_or_path, config_path=None)"
-                "where pretrained_model_name_or_path should be"
-                "a correct built-in pretrained model identifier,"
-                "or a correct community contributed model identifier,"
-                "or a local dir path with corresponding vocab file and tokenizer_config file,"
-                "or a local file path of corresponding vocab file,"
-                "or an URL path of corresponding vocab file.".format(
-                    cls.__name__, ))
-
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_vocab_files = {}
         for file_id, file_path in vocab_files.items():

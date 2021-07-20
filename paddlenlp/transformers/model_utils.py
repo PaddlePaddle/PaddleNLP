@@ -211,7 +211,6 @@ class PretrainedModel(Layer, GenerationMixin):
                 resource_files[file_id] = full_file_name
         else:
             # Assuming from community-contributed pretrained models
-            #
             for file_id, file_name in cls.resource_files_names.items():
                 full_file_name = os.path.join(COMMUNITY_MODEL_PREFIX,
                                               pretrained_model_name_or_path,
