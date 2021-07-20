@@ -749,8 +749,8 @@ class MCQIterator(MRCIterator):
             # pad empty choice
             for k in range(len(choice), self.choice_num):
                 choice.append('')
-            answer = qa['answer'].lower()
-            label = choice.index(answer)
+            label = qa['label']
+
             example = Example(
                 qas_id=qas_id,
                 context=context,
