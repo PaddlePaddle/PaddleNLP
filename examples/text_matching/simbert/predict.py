@@ -85,7 +85,7 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
 
     model = ppnlp.transformers.BertModel.from_pretrained(
-        'simbert-base-chinese', with_pool='linear')
+        'simbert-base-chinese', pool_act='linear')
     tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
         'simbert-base-chinese')
 

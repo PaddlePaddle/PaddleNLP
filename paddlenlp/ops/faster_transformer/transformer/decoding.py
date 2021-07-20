@@ -196,7 +196,7 @@ class InferTransformerDecoding(nn.Layer):
                  word_embedding,
                  positional_embedding,
                  linear,
-                 n_layer,
+                 num_decoder_layers,
                  n_head,
                  d_model,
                  bos_id=0,
@@ -376,7 +376,7 @@ class InferTransformerDecoding(nn.Layer):
             self.linear_weight, self.linear_bias, self.pos_emb,
             self._decoding_strategy, self._beam_size, self._topk, self._topp,
             self._n_head,
-            int(self._d_model / self._n_head), self._n_layer, self._bos_id,
+            int(self._d_model / self._n_head), self._num_decoder_layers, self._bos_id,
             self._eos_id, self._max_out_len, self._beam_search_diversity_rate)
 
         ids = finalize(
