@@ -95,3 +95,5 @@ weight_sharing: False
 waitk: -1
 # Mixed precision training
 use_amp: False
+# Maximum iteration for training.
+max_iter: None
