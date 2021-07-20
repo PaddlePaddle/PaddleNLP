@@ -254,8 +254,9 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 - 现在就加入PaddleNLP的QQ技术交流群，一起交流NLP技术吧！⬇️
 
 <div align="center">
-  <img src="./docs/imgs/QQ.png" width="200" height="200" />
+  <img src="./docs/imgs/qq.png" width="200" height="200" />
 </div>  
+
 
 
 ## 版本更新
