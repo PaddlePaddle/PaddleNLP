@@ -26,6 +26,7 @@ from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 
 from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.log import logger
 
 from ..data.vocab import Vocab
 from .utils import InitTrackerMeta, fn_args_to_dict
