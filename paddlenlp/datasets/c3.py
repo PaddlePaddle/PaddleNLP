@@ -89,11 +89,13 @@ class C3(DatasetBuilder):
                         question = qa['question']
                         choice = qa['choice']
                         answer = qa['answer']
+                        label = str(choice.index(answer))
                         yield {
                             'context': context,
                             'question': question,
                             'choice': choice,
                             'answer': answer,
+                            'label': label
                         }
 
     def get_labels(self):
