@@ -246,8 +246,10 @@ class BertTokenizer(PretrainedTokenizer):
             # the following line get: 'he was a puppeteer'
             tokenizer.convert_tokens_to_string(tokens)
     """
-    resource_files_names = {"vocab_file": "vocab.txt",
-                            "tokenizer_config_file": "tokenizer_config.json"}  # for save_pretrained
+    resource_files_names = {
+        "vocab_file": "vocab.txt",
+        "tokenizer_config_file": "tokenizer_config.json"
+    }  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
             "bert-base-uncased":

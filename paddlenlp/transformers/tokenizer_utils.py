@@ -21,12 +21,10 @@ import json
 import os
 import six
 import unicodedata
-import pkg_resources
-from urllib.parse import urlparse
 from shutil import copyfile
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 
-from paddlenlp.utils.downloader import get_path_from_url
+from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 
 from ..data.vocab import Vocab
@@ -408,41 +406,20 @@ class PretrainedTokenizer(object):
         return tokens
 
     @classmethod
-    def from_pretrained(cls,
-                        pretrained_model_name_or_path,
-                        config_path=None,
-                        *args,
-                        **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         """
         Creates an instance of `PretrainedTokenizer`. Related resources are loaded
-        by specifying name of a built-in pretrained model, or a community contributed model,
-        or a local file directory path, or a local file path, or a remote URL path.
+        by specifying name of a built-in pretrained model, or a community-contributed
+        pretrained model, or a local file directory path.
 
         Args:
-            pretrained_model_name_or_path (str): Name of pretrained model or path of
-                model to load. The string can be:
+            pretrained_model_name_or_path (str): Name of pretrained model or dir path
+                to load from. The string can be:
 
-                - Name of built-in pretrained model or community contributed model
+                - Name of built-in pretrained model
+                - Name of a community-contributed pretrained model.
                 - Local directory path which contains tokenizer related resources
                   and tokenizer config file ("tokenizer_config.json").
-                - Local file path of tokenizer vocab file
-                - URL path of tokenizer vocab file
-            config_path (str, optional): Tokenizer configuration file path. A json file defines
-                the configuration of the tokenizer. Defaults to None.
-
-                .. note::
-                    - If `pretrained_model_name_or_path` is the name of built-in pretrained model or
-                      community contributed model, we will automatically use the corresponding
-                      tokenizer configuration. Thus `config_path` should be set to None.
-                      If not None, this arg will not take any effect anyway.
-                    - If `pretrained_model_name_or_path` is a local directory path, then
-                      tokenizer config file("tokenizer_config.json") under this directory will be loaded.
-                      If `config_path` is not None, then we update the tokenizer config file as `config_path`.
-                    - If `pretrained_model_name_or_path` is a local file path of tokenizer vocab file,
-                      then `config_path` must be provided to get correct tokenizer configuration
-                    - If `pretrained_model_name_or_path` is an URL path of tokenizer weights file,
-                      then `config_path` must be provided to get correct tokenizer configuration
-
             *args (tuple): position arguments for model `__init__`. If provided,
                 use these as position argument values for tokenizer initialization.
             **kwargs (dict): keyword arguments for model `__init__`. If provided,
@@ -460,53 +437,36 @@ class PretrainedTokenizer(object):
                 # Name of built-in pretrained model
                 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
-                # Name of community contributed model
+                # Name of community-contributed pretrained model
                 tokenizer = BertTokenizer.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
 
                 # Load from local directory path
                 tokenizer = BertTokenizer.from_pretrained('./my_bert/')
-                # Load from local directory path and update config with provided config_path
-                tokenizer = BertTokenizer.from_pretrained('./my_bert/', config_path='./tokenizer_config.json')
-
-                # Load from local path of tokenizer vocab file
-                tokenizer = BertTokenizer.from_pretrained('./my_bert/vocab.txt',
-                    config_path='./my_bert/my_tokenizer_config.json')
-
-                # Load from remote URL path of tokenizer vocab file
-                tokenizer = BertTokenizer.from_pretrained('', config='')
         """
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         vocab_files = {}
         init_configuration = {}
+        # From built-in pretrained models
         if pretrained_model_name_or_path in pretrained_models:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 vocab_files[file_id] = map_list[pretrained_model_name_or_path]
             init_configuration = copy.deepcopy(
                 cls.pretrained_init_configuration[
                     pretrained_model_name_or_path])
-        elif pkg_resources.resource_exists('paddlenlp.transformers.community',
-                                           pretrained_model_name_or_path):
-            json_file = pkg_resources.resource_filename(
-                'paddlenlp.transformers.community',
-                pretrained_model_name_or_path + "/files.json")
-            with io.open(json_file, encoding="utf-8") as f:
-                file_paths = json.load(f)
-                for file_id in cls.resource_files_names.keys():
-                    vocab_files[file_id] = file_paths[
-                        file_id] if file_id in file_paths else None
+        # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
             for file_id, file_name in cls.resource_files_names.items():
                 full_file_name = os.path.join(pretrained_model_name_or_path,
                                               file_name)
                 vocab_files[file_id] = full_file_name
-            if config_path is not None:
-                vocab_files["tokenizer_config_file"] = config_path
-        elif os.path.isfile(pretrained_model_name_or_path) or \
-                urlparse(pretrained_model_name_or_path).scheme in ("http", "https"):
-            vocab_files[list(cls.resource_files_names.keys())[
-                0]] = pretrained_model_name_or_path
-            vocab_files["tokenizer_config_file"] = config_path
         else:
+            # Assuming from community-contributed pretrained models
+            for file_id, file_name in cls.resource_files_names.items():
+                full_file_name = os.path.join(COMMUNITY_MODEL_PREFIX,
+                                              pretrained_model_name_or_path,
+                                              file_name)
+                vocab_files[file_id] = full_file_name
+
             raise ValueError(
                 "Calling {}.from_pretrained(pretrained_model_name_or_path, config_path=None)"
                 "where pretrained_model_name_or_path should be"
@@ -520,10 +480,27 @@ class PretrainedTokenizer(object):
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_vocab_files = {}
         for file_id, file_path in vocab_files.items():
-            resolved_vocab_files[
-                file_id] = file_path if file_path is None or os.path.isfile(
-                    file_path) else get_path_from_url(file_path, default_root,
-                                                      None)
+            path = os.path.join(default_root, file_path.split('/')[-1])
+            if file_path is None or os.path.isfile(file_path):
+                resolved_vocab_files[file_id] = file_path
+            elif os.path.exists(path):
+                logger.info("Already cached %s" % path)
+                resolved_vocab_files[file_id] = path
+            else:
+                logger.info("Downloading %s and saved to %s" %
+                            (file_path, default_root))
+                try:
+                    resolved_vocab_files[file_id] = get_path_from_url(
+                        file_path, default_root)
+                except RuntimeError as err:
+                    logger.error(err)
+                    raise RuntimeError(
+                        f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n\n"
+                        f"Please make sure that:\n\n"
+                        f"- '{pretrained_model_name_or_path}' is a correct model-identifier of built-in pretrained models\n\n"
+                        f"- or '{pretrained_model_name_or_path}' is a correct model-identifier of community-contributed pretrained models\n\n"
+                        f"- or '{pretrained_model_name_or_path}' is the correct path to a directory containing relevant tokenizer files.\n\n"
+                    )
 
         # Prepare tokenizer initialization kwargs
         # Did we saved some inputs and kwargs to reload ?

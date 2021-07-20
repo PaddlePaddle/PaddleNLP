@@ -19,13 +19,11 @@ import os
 import six
 import logging
 import inspect
-import pkg_resources
-from urllib.parse import urlparse
 
 import paddle
 from paddle.nn import Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddlenlp.utils.downloader import get_path_from_url
+from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
@@ -154,41 +152,20 @@ class PretrainedModel(Layer, GenerationMixin):
         return None  # Overwrite for models with output embeddings
 
     @classmethod
-    def from_pretrained(cls,
-                        pretrained_model_name_or_path,
-                        config_path=None,
-                        *args,
-                        **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
-        or a local file directory path, or a local file path, or a remote URL path.
+        or a local file directory path.
 
         Args:
-            pretrained_model_name_or_path (str): Name of pretrained model or path of
-                model to load. The string can be:
+            pretrained_model_name_or_path (str): Name of pretrained model or dir path
+                to load from. The string can be:
 
-                - Name of built-in pretrained model or community contributed model.
+                - Name of a built-in pretrained model
+                - Name of a community-contributed pretrained model.
                 - Local directory path which contains model weights file("model_state.pdparams")
                   and model config file ("model_config.json").
-                - Local file path of model weights file.
-                - URL path of model weights file.
-            config_path (str, optional): Model configuration file path. A json file defines
-                the configuration of the pretrained_model. Defaults to None.
-
-                .. note::
-                    - If `pretrained_model_name_or_path` is the name of built-in pretrained model or
-                      community contributed model, we will automatically use the corresponding
-                      model configuration. Thus `config_path` should be set to None.
-                      If not None, this arg will not take any effect anyway.
-                    - If `pretrained_model_name_or_path` is a local directory path, then
-                      model config file("model_config.json") under this directory will be loaded.
-                      If `config_path` is not None, then we update the model config file as `config_path`.
-                    - If `pretrained_model_name_or_path` is a local file path of model weights file,
-                      then `config_path` must be provided to get correct model configuration.
-                    - If `pretrained_model_name_or_path` is an URL path of model weights file,
-                      then `config_path` must be provided to get correct model configuration.
-
             *args (tuple): Position arguments for model `__init__`. If provided,
                 use these as position argument values for model initialization.
             **kwargs (dict): Keyword arguments for model `__init__`. If provided,
@@ -208,25 +185,17 @@ class PretrainedModel(Layer, GenerationMixin):
                 # Name of built-in pretrained model
                 model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
 
-                # Name of community contributed model
+                # Name of community-contributed pretrained model
                 model = BertForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
 
                 # Load from local directory path
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
-                # Load from local directory path and update config with provided config_path
-                model = BertForSequenceClassification.from_pretrained('./my_bert/', config_path='./model_config.json')
-
-                # Load from local path of model weights file
-                model = BertForSequenceClassification.from_pretrained('./my_bert/my_bert_weights.pdparams',
-                    config_path='./my_bert/my_bert_config.json')
-
-                # Load from remote URL path of model weights file
-                model = BertForSequenceClassification.from_pretrained('', config='')
         """
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}
         init_configuration = {}
 
+        # From built-in pretrained models
         if pretrained_model_name_or_path in pretrained_models:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 resource_files[file_id] = map_list[
@@ -234,37 +203,20 @@ class PretrainedModel(Layer, GenerationMixin):
             init_configuration = copy.deepcopy(
                 cls.pretrained_init_configuration[
                     pretrained_model_name_or_path])
-        elif pkg_resources.resource_exists('paddlenlp.transformers.community',
-                                           pretrained_model_name_or_path):
-            json_file = pkg_resources.resource_filename(
-                'paddlenlp.transformers.community',
-                pretrained_model_name_or_path + "/files.json")
-            with io.open(json_file, encoding="utf-8") as f:
-                file_paths = json.load(f)
-                for file_id in cls.resource_files_names.keys():
-                    resource_files[file_id] = file_paths[
-                        file_id] if file_id in file_paths else None
+        # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
             for file_id, file_name in cls.resource_files_names.items():
                 full_file_name = os.path.join(pretrained_model_name_or_path,
                                               file_name)
                 resource_files[file_id] = full_file_name
-            if config_path is not None:
-                resource_files["model_config_file"] = config_path
-        elif os.path.isfile(pretrained_model_name_or_path) or \
-                urlparse(pretrained_model_name_or_path).scheme in ("http", "https"):
-            resource_files["model_state"] = pretrained_model_name_or_path
-            resource_files["model_config_file"] = config_path
         else:
-            raise ValueError(
-                "Calling {}.from_pretrained(pretrained_model_name_or_path, config_path=None)"
-                "where pretrained_model_name_or_path should be"
-                "a correct built-in pretrained model identifier,"
-                "or a correct community contributed model identifier,"
-                "or a local dir path with corresponding model_weights file and model_config file,"
-                "or a local file path of corresponding model_weights file,"
-                "or an URL path of corresponding model_weights file.".format(
-                    cls.__name__))
+            # Assuming from community-contributed pretrained models
+            #
+            for file_id, file_name in cls.resource_files_names.items():
+                full_file_name = os.path.join(COMMUNITY_MODEL_PREFIX,
+                                              pretrained_model_name_or_path,
+                                              file_name)
+                resource_files[file_id] = full_file_name
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
@@ -278,8 +230,18 @@ class PretrainedModel(Layer, GenerationMixin):
             else:
                 logger.info("Downloading %s and saved to %s" %
                             (file_path, default_root))
-                resolved_resource_files[file_id] = get_path_from_url(
-                    file_path, default_root)
+                try:
+                    resolved_resource_files[file_id] = get_path_from_url(
+                        file_path, default_root)
+                except RuntimeError as err:
+                    logger.error(err)
+                    raise RuntimeError(
+                        f"Can't load weights for '{pretrained_model_name_or_path}'.\n\n"
+                        f"Please make sure that:\n\n"
+                        f"- '{pretrained_model_name_or_path}' is a correct model-identifier of built-in pretrained models\n\n"
+                        f"- or '{pretrained_model_name_or_path}' is a correct model-identifier of community-contributed pretrained models\n\n"
+                        f"- or '{pretrained_model_name_or_path}' is the correct path to a directory containing relevant files(model_weights and model_config).\n\n"
+                    )
 
         # Prepare model initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
