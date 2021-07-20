@@ -486,11 +486,11 @@ class PretrainedTokenizer(object):
                 except RuntimeError as err:
                     logger.error(err)
                     raise RuntimeError(
-                        f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n\n"
-                        f"Please make sure that:\n\n"
-                        f"- '{pretrained_model_name_or_path}' is a correct model-identifier of built-in pretrained models\n\n"
-                        f"- or '{pretrained_model_name_or_path}' is a correct model-identifier of community-contributed pretrained models\n\n"
-                        f"- or '{pretrained_model_name_or_path}' is the correct path to a directory containing relevant tokenizer files.\n\n"
+                        f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
+                        f"Please make sure that:\n"
+                        f"- '{pretrained_model_name_or_path}' is a correct model-identifier of built-in pretrained models\n"
+                        f"- or '{pretrained_model_name_or_path}' is a correct model-identifier of community-contributed pretrained models\n"
+                        f"- or '{pretrained_model_name_or_path}' is the correct path to a directory containing relevant tokenizer files.\n"
                     )
 
         # Prepare tokenizer initialization kwargs
