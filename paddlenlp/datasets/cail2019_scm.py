@@ -27,8 +27,10 @@ __all__ = ['CAIL2019_SCM']
 class CAIL2019_SCM(DatasetBuilder):
     '''
     CAIL2019-SCM contains 8,964 triplets of cases published by the Supreme People's 
-    Court of China. CAIL2019-SCM focuses on detecting similar cases, and the participants
-    are required to check which two cases are more similar in the triplets.
+    Court of China. The input of CAIL2019-SCM is a triplet (A, B, C), where A, B, C 
+    are fact descriptions of three cases. The task of CAIL2019-SCM is to predict 
+    whether sim(A, B) > sim(A, C) or sim(A, C) > sim(A, B).
+
     See more details on https://arxiv.org/abs/1911.08962.
     '''
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
@@ -62,7 +64,6 @@ class CAIL2019_SCM(DatasetBuilder):
 
     def _read(self, filename, *args):
         with open(filename, "r", encoding="utf8") as f:
-            docs = []
             for line in f.readlines():
                 dic = json.loads(line)
                 yield {
@@ -74,6 +75,6 @@ class CAIL2019_SCM(DatasetBuilder):
 
     def get_labels(self):
         """
-        Return labels of the Imdb object.
+        Return labels of the CAIL2019_SCM object.
         """
         return ["B", "C"]

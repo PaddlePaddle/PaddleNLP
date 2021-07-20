@@ -68,20 +68,18 @@ class C3(DatasetBuilder):
     def _get_data(self, mode, **kwargs):
         default_root = os.path.join(DATA_HOME, self.__class__.__name__, mode)
         meta_info_list = self.SPLITS[mode]
-
+        fullnames = []
         for meta_info in meta_info_list:
             filename, data_hash, URL = meta_info
             fullname = os.path.join(default_root, filename)
             if not os.path.exists(fullname) or (
                     data_hash and not md5file(fullname) == data_hash):
                 get_path_from_url(URL, default_root)
+            fullnames.append(fullname)
+        return fullnames
 
-        return default_root
-
-    def _read(self, data_dir, *args):
-        data_files = os.listdir(data_dir)
-        for files in data_files:
-            fullname = os.path.join(data_dir, files)
+    def _read(self, data_files, *args):
+        for fullname in data_files:
             with open(fullname, "r", encoding='utf8') as fr:
                 samples = json.load(fr)
                 for sample in samples:
