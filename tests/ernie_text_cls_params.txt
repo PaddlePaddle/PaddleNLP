@@ -39,7 +39,7 @@ inference:../examples/text_classification/pretrained_models/deploy/python/predic
 --enable_mkldnn:True|False
 --cpu_threads:1|6
 --batch_size:32
---use_tensorrt:False|False
+--use_tensorrt:False|True
 --precision:fp32|fp16|int8
 --model_dir:./tests/output/norm_gpus_0_autocast_null/
 --image_dir:null
