@@ -71,15 +71,17 @@ def load_dataset(path_or_read_func,
     For all the names of datasets in PaddleNLP library, see here:  `dataset_list 
     <https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html>`__.
 
+    Either `splits` or `data_files` must be specified.
+
     Args:
         path_or_read_func (str|callable): Name of the dataset processing script 
             in PaddleNLP library or a custom data reading function.
         name (str, optional): Additional name to select a more specific dataset.
             Default to None.
         data_files (str|list|tuple|dict, optional): Defineing the path of dataset 
-            files. Default to None.
-        splits (str|list|tuple, optional): Which split of the data to load.
-            Default to None.
+            files. If None. `splits` must be specified. Default to None. 
+        splits (str|list|tuple, optional): Which split of the data to load. If None.
+            `data_files` must be specified. Default to None. 
         lazy (bool, optional): Wheather to return `MapDataset` or an `IterDataset`.
             True for `IterDataset`. False for `MapDataset`. If None, return the 
             default type of this dataset.
