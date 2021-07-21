@@ -227,6 +227,7 @@ __global__ void apply_penalties_kernel(int step,
     }
 
     // apply length penalty
+    // NOTE: The length penalty has different implementation. May be update.
     if (len_penalty != 1.0) {
       if (log_probs[end_id + bbid * vocab_size] > T(0)) {
         log_probs[end_id + bbid * vocab_size] =

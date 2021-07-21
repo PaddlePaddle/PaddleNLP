@@ -520,6 +520,7 @@ public:
       }
 
       // Beamsearch
+      // NOTE: k is limited.
       if (is_fuse_topk_softMax_ && k == 1 && k == 2 && k == 3 && k == 4 &&
           k == 8 && k == 16) {
         topK_softMax(logits_buf_,
