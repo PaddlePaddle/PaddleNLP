@@ -271,6 +271,8 @@ class BertTokenizer(PretrainedTokenizer):
             "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-chinese-vocab.txt",
             "macbert-base-chinese":
             "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-chinese-vocab.txt",
+            "simbert-base-chinese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -306,6 +308,9 @@ class BertTokenizer(PretrainedTokenizer):
         },
         "macbert-base-chinese": {
             "do_lower_case": False
+        },
+        "simbert-base-chinese":{
+            "do_lower_case": True
         },
     }
     padding_side = 'right'

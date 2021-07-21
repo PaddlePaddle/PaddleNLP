@@ -86,7 +86,7 @@ def convert_to_unicode(text):
 def load_vocab(vocab_file):
     """Loads a vocabulary file into a dictionary."""
     vocab = collections.OrderedDict()
-    fin = open(vocab_file)
+    fin = open(vocab_file, 'r', encoding="UTF-8")
     for num, line in enumerate(fin):
         items = convert_to_unicode(line.rstrip()).split("\t")
         if len(items) > 2:
