@@ -202,7 +202,7 @@ python interaction.py \
 - `top_k` 表示采用"sampling"解码策略时，token的概率按从大到小排序，生成的token只从前`top_k`个中进行采样。
 - `device` 表示使用的设备。
 
-**NOTE:** 输入"[EXIT]"退出交互程序，输入"[NEXT]"开启下一轮新的对话。
+**NOTE:** 输入"[EXIT]"退出交互程序，输入"[NEXT]"开启下一轮新的对话。需要注意使用退格会导致错误。
 
 ## Reference
 
