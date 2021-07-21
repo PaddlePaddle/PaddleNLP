@@ -77,6 +77,29 @@ def predict(model, data_loader, ds, label_vocab):
     return results
 
 
+def create_dataloader(dataset,
+                      mode='train',
+                      batch_size=1,
+                      batchify_fn=None,
+                      trans_fn=None):
+    if trans_fn:
+        dataset = dataset.map(trans_fn)
+
+    shuffle = True if mode == 'train' else False
+    if mode == 'train':
+        batch_sampler = paddle.io.DistributedBatchSampler(
+            dataset, batch_size=batch_size, shuffle=shuffle)
+    else:
+        batch_sampler = paddle.io.BatchSampler(
+            dataset, batch_size=batch_size, shuffle=shuffle)
+
+    return paddle.io.DataLoader(
+        dataset=dataset,
+        batch_sampler=batch_sampler,
+        collate_fn=batchify_fn,
+        return_list=True)
+
+
 if __name__ == '__main__':
     paddle.set_device('gpu')
     rank = paddle.distributed.get_rank()
@@ -107,21 +130,23 @@ if __name__ == '__main__':
         Pad(axis=0, pad_val=ignore_label, dtype='int64')  # labels
     ): fn(samples)
 
-    train_loader = paddle.io.DataLoader(
+    train_loader = create_dataloader(
         dataset=train_ds,
+        mode='train',
         batch_size=args.batch_size,
-        return_list=True,
-        collate_fn=batchify_fn)
-    dev_loader = paddle.io.DataLoader(
+        batchify_fn=batchify_fn)
+
+    dev_loader = create_dataloader(
         dataset=dev_ds,
+        mode='dev',
         batch_size=args.batch_size,
-        return_list=True,
-        collate_fn=batchify_fn)
-    test_loader = paddle.io.DataLoader(
+        batchify_fn=batchify_fn)
+
+    test_loader = create_dataloader(
         dataset=test_ds,
+        mode='test',
         batch_size=args.batch_size,
-        return_list=True,
-        collate_fn=batchify_fn)
+        batchify_fn=batchify_fn)
 
     # Define the model netword and its loss
     model = ErnieForTokenClassification.from_pretrained(
@@ -149,12 +174,13 @@ if __name__ == '__main__':
         paddle.save(model_to_save.state_dict(),
                     os.path.join(args.save_dir, 'model_%d.pdparams' % step))
 
-    preds = predict(model, test_loader, test_ds, label_vocab)
-    file_path = "ernie_results.txt"
-    with open(file_path, "w", encoding="utf8") as fout:
-        fout.write("\n".join(preds))
-    # Print some examples
-    print(
-        "The results have been saved in the file: %s, some examples are shown below: "
-        % file_path)
-    print("\n".join(preds[:10]))
+    if rank == 0:
+        preds = predict(model, test_loader, test_ds, label_vocab)
+        file_path = "ernie_results.txt"
+        with open(file_path, "w", encoding="utf8") as fout:
+            fout.write("\n".join(preds))
+        # Print some examples
+        print(
+            "The results have been saved in the file: %s, some examples are shown below: "
+            % file_path)
+        print("\n".join(preds[:10]))
