@@ -192,7 +192,6 @@ class Predictor(object):
             self.autolog.times.stamp()
 
         #probs = softmax(logits, axis=1)
-        print("probs:{}".format(probs))
         idx = np.argmax(probs, axis=1)
         idx = idx.tolist()
         labels = [label_map[i] for i in idx]
