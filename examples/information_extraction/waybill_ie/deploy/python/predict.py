@@ -207,14 +207,25 @@ class Predictor(object):
                 warmup=0,
                 logger=logger)
 
-    def predict(self, data_loader, label_vocab):
+    def predict(self, dataset, batchify_fn, tokenizer, label_vocab):
         all_preds = []
         all_lens = []
-        for input_ids, seg_ids, lens in data_loader:
+        num_of_examples = len(dataset)
+        trans_func = partial(convert_to_features, tokenizer=tokenizer)
+        start_idx = 0
+        while start_idx < num_of_examples:
+            end_idx = start_idx + self.batch_size
+            end_idx = end_idx if end_idx < num_of_examples else num_of_examples
+            batch_data = [
+                trans_func(example) for example in dataset[start_idx:end_idx]
+            ]
+            input_ids, segment_ids, lens = batchify_fn(batch_data)
+
             self.input_handles[0].copy_from_cpu(input_ids)
-            self.input_handles[1].copy_from_cpu(seg_ids)
+            self.input_handles[1].copy_from_cpu(segment_ids)
             self.predictor.run()
             logits = self.output_handle.copy_to_cpu()
+
             if args.benchmark:
                 self.autolog.times.stamp()
             preds = np.argmax(logits, axis=-1)
@@ -223,7 +234,9 @@ class Predictor(object):
             all_preds.append(preds)
             all_lens.append(lens)
 
-        sentences = [example[0] for example in data_loader.dataset.data]
+            start_idx += self.batch_size
+
+        sentences = [example[0] for example in dataset.data]
         results = parse_decodes(sentences, all_preds, all_lens, label_vocab)
         return results
 
@@ -232,8 +245,6 @@ if __name__ == '__main__':
     tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
     test_ds = load_dataset(
         read, data_path=os.path.join(args.data_dir, 'test.txt'), lazy=False)
-    trans_func = partial(convert_to_features, tokenizer=tokenizer)
-    test_ds.map(trans_func)
     label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
 
     batchify_fn = lambda samples, fn=Tuple(
@@ -242,17 +253,11 @@ if __name__ == '__main__':
         Stack(dtype='int64'),  # seq_len
     ): fn(samples)
 
-    test_loader = paddle.io.DataLoader(
-        dataset=test_ds,
-        batch_size=args.batch_size,
-        return_list=True,
-        collate_fn=batchify_fn)
-
     predictor = Predictor(args.model_dir, args.device, args.batch_size,
                           args.use_tensorrt, args.precision, args.enable_mkldnn,
                           args.benchmark, args.save_log_path)
 
-    results = predictor.predict(test_loader, label_vocab)
+    results = predictor.predict(test_ds, batchify_fn, tokenizer, label_vocab)
     print("\n".join(results))
     if args.benchmark:
         predictor.autolog.report()
