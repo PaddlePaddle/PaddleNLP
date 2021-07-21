@@ -32,9 +32,6 @@ args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-    # The number of labels should be in accordance with the training dataset.
-    label_map = {0: 'negative', 1: 'positive'}
-
     # If you want to use ernie1.0 model, plesace uncomment the following code
     # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
     # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
