@@ -18,6 +18,10 @@
 
 ```
 ernie_matching/
+├── deply # 部署
+|   └── python
+|       └── predict.py # python 预测部署示例
+├── export_model.py # 动态图参数导出静态图参数脚本
 ├── model.py # Point-wise & Pair-wise 匹配模型组网
 ├── data.py # Point-wise & Pair-wise 训练样本的转换逻辑 、Pair-wise 生成随机负例的逻辑
 ├── train_pointwise.py # Point-wise 单塔匹配模型训练脚本
