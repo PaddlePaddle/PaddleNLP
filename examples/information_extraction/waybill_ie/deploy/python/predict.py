@@ -208,6 +208,8 @@ class Predictor(object):
                 logger=logger)
 
     def predict(self, dataset, batchify_fn, tokenizer, label_vocab):
+        if args.benchmark:
+            self.autolog.times.start()
         all_preds = []
         all_lens = []
         num_of_examples = len(dataset)
@@ -219,8 +221,10 @@ class Predictor(object):
             batch_data = [
                 trans_func(example) for example in dataset[start_idx:end_idx]
             ]
-            input_ids, segment_ids, lens = batchify_fn(batch_data)
 
+            if args.benchmark:
+                self.autolog.times.stamp()
+            input_ids, segment_ids, lens = batchify_fn(batch_data)
             self.input_handles[0].copy_from_cpu(input_ids)
             self.input_handles[1].copy_from_cpu(segment_ids)
             self.predictor.run()
@@ -236,6 +240,8 @@ class Predictor(object):
 
             start_idx += self.batch_size
 
+        if args.benchmark:
+            self.autolog.times.end(stamp=True)
         sentences = [example[0] for example in dataset.data]
         results = parse_decodes(sentences, all_preds, all_lens, label_vocab)
         return results
