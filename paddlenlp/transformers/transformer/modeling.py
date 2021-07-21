@@ -5,6 +5,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.fluid.framework import in_dygraph_mode
 from paddle.fluid.layers.utils import map_structure
 
 __all__ = [
@@ -515,10 +516,74 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
             logits=cell_outputs,
             next_cell_states=next_cell_states,
             beam_state=states)
+
+        if kwargs.get("trg_word", None) is not None:
+            if in_dygraph_mode():
+                if paddle.shape(kwargs.get("trg_word"))[1] > time:
+                    beam_search_output, beam_search_state = self.force_decoding(
+                        beam_search_output, beam_search_state,
+                        kwargs.get("trg_word"), kwargs.get("trg_length"), time)
+            else:
+
+                def condition(trg_word, time):
+                    return paddle.shape(trg_word)[1] > time
+
+                def default_fn(beam_search_output, beam_search_state):
+                    return beam_search_output, beam_search_state
+
+                beam_search_output, beam_search_state = paddle.static.nn.case(
+                    [(condition(kwargs.get("trg_word"), time),
+                      self.force_decoding(beam_search_output, beam_search_state,
+                                          kwargs.get("trg_word"),
+                                          kwargs.get("trg_length"), time))],
+                    default=default_fn(beam_search_output, beam_search_state))
+
         next_inputs, finished = (beam_search_output.predicted_ids,
                                  beam_search_state.finished)
 
         return (beam_search_output, beam_search_state, next_inputs, finished)
+
+    def force_decoding(self, beam_search_output, beam_search_state, trg_word,
+                       trg_length, time):
+        batch_size = paddle.shape(beam_search_output.predicted_ids)[0]
+        beam_size = paddle.shape(beam_search_output.predicted_ids)[1]
+
+        ids_dtype = beam_search_output.predicted_ids.dtype
+        scores_dtype = beam_search_output.scores.dtype
+        parent_ids = paddle.zeros(shape=[batch_size, 1], dtype=ids_dtype)
+        scores = paddle.ones(
+            shape=[batch_size, beam_size], dtype=scores_dtype) * -10e9
+        scores = paddle.scatter(
+            scores.flatten(),
+            paddle.arange(
+                0, batch_size * beam_size, step=beam_size),
+            paddle.zeros([batch_size])).reshape([batch_size, beam_size])
+
+        force_position = paddle.unsqueeze(trg_length > time, [1])
+        anti_force = paddle.logical_not(force_position)
+
+        predicted_ids = beam_search_output.predicted_ids * paddle.cast(
+            anti_force, dtype=ids_dtype) + paddle.slice(
+                trg_word, axes=[1], starts=[time],
+                ends=[time + 1]) * paddle.cast(
+                    force_position, dtype=ids_dtype)
+        scores = beam_search_output.scores * paddle.cast(
+            anti_force, dtype=scores_dtype) + scores * paddle.cast(
+                force_position, dtype=scores_dtype)
+        parent_ids = beam_search_output.parent_ids * paddle.cast(
+            anti_force, dtype=ids_dtype) + parent_ids * paddle.cast(
+                force_position, dtype=ids_dtype)
+
+        cell_states = beam_search_state.cell_states
+        log_probs = beam_search_state.log_probs * paddle.cast(
+            anti_force, dtype=scores_dtype) + scores * paddle.cast(
+                force_position, dtype=scores_dtype)
+        finished = beam_search_state.finished
+        lengths = beam_search_state.lengths
+
+        return self.OutputWrapper(scores, predicted_ids,
+                                  parent_ids), self.StateWrapper(
+                                      cell_states, log_probs, finished, lengths)
 
 
 class TransformerModel(nn.Layer):
