@@ -49,3 +49,5 @@ from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
 from .nezha.modeling import *
 from .nezha.tokenizer import *
+from .bart.modeling import *
+from .bart.tokenizer import *
