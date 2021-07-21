@@ -28,9 +28,8 @@ __global__ void embeddings_kernels(T* from_tensor,
                                    const int batch_size,
                                    const int hidden_units) {
   // 1. lookup from embedding table
-  // 2. multiply hidden_dim**0.5
-  // 3. add the position encoding
-  // T scale = (T)sqrtf(float(hidden_units));
+  // 2. add the position encoding
+  // 3. add the token type embedding
   for (int index = blockIdx.x * blockDim.x + threadIdx.x;
        index < batch_size * hidden_units;
        index += blockDim.x * gridDim.x) {
