@@ -28,7 +28,7 @@ from paddlenlp.transformers import ErnieTokenizer
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--model_dir", type=str, default='./output', help="The path to parameters in static graph.")
-parser.add_argument("--data_dir", type=str, default="./data", help="The folder where the dataset is located.")
+parser.add_argument("--data_dir", type=str, default="./waybill_ie/data", help="The folder where the dataset is located.")
 parser.add_argument("--batch_size", type=int, default=200, help="The number of sequences contained in a mini-batch.")
 parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
 parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False], help='Enable to use tensorrt to speed up.')

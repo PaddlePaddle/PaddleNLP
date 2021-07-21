@@ -13,6 +13,8 @@
 # limitations under the License.
 
 from functools import partial
+import argparse
+import os
 
 import paddle
 from paddlenlp.data import Stack, Tuple, Pad
@@ -20,6 +22,17 @@ from paddlenlp.transformers import ErnieTokenizer, ErnieForTokenClassification
 from paddlenlp.metrics import ChunkEvaluator
 
 from data import load_dict, load_dataset, parse_decodes
+
+parser = argparse.ArgumentParser()
+
+# yapf: disable
+parser.add_argument("--save_dir", default='./ernie_ckpt', type=str, help="The output directory where the model checkpoints will be written.")
+parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
+parser.add_argument("--batch_size", default=200, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--data_dir", default='./waybill_ie/data', type=str, help="The folder where the dataset is located.")
+
+args = parser.parse_args()
+# yapf: enable
 
 
 def convert_to_features(example, tokenizer, label_vocab):
@@ -66,12 +79,17 @@ def predict(model, data_loader, ds, label_vocab):
 
 if __name__ == '__main__':
     paddle.set_device('gpu')
-
+    rank = paddle.distributed.get_rank()
+    trainer_num = paddle.distributed.get_world_size()
+    if trainer_num > 1:
+        paddle.distributed.init_parallel_env()
     # Create dataset, tokenizer and dataloader.
-    train_ds, dev_ds, test_ds = load_dataset(datafiles=(
-        './data/train.txt', './data/dev.txt', './data/test.txt'))
+    train_ds, dev_ds, test_ds = load_dataset(
+        datafiles=(os.path.join(args.data_dir, 'train.txt'),
+                   os.path.join(args.data_dir, 'dev.txt'),
+                   os.path.join(args.data_dir, 'test.txt')))
 
-    label_vocab = load_dict('./data/tag.dic')
+    label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
     tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
     trans_func = partial(
@@ -91,30 +109,32 @@ if __name__ == '__main__':
 
     train_loader = paddle.io.DataLoader(
         dataset=train_ds,
-        batch_size=200,
+        batch_size=args.batch_size,
         return_list=True,
         collate_fn=batchify_fn)
     dev_loader = paddle.io.DataLoader(
         dataset=dev_ds,
-        batch_size=200,
+        batch_size=args.batch_size,
         return_list=True,
         collate_fn=batchify_fn)
     test_loader = paddle.io.DataLoader(
         dataset=test_ds,
-        batch_size=200,
+        batch_size=args.batch_size,
         return_list=True,
         collate_fn=batchify_fn)
 
     # Define the model netword and its loss
     model = ErnieForTokenClassification.from_pretrained(
         "ernie-1.0", num_classes=len(label_vocab))
+    if trainer_num > 1:
+        model = paddle.DataParallel(model)
     metric = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
     loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label)
     optimizer = paddle.optimizer.AdamW(
         learning_rate=2e-5, parameters=model.parameters())
 
     step = 0
-    for epoch in range(10):
+    for epoch in range(args.epochs):
         for input_ids, token_type_ids, length, labels in train_loader:
             logits = model(input_ids, token_type_ids)
             loss = paddle.mean(loss_fn(logits, labels))
@@ -124,8 +144,10 @@ if __name__ == '__main__':
             step += 1
             print("[TRAIN] Epoch:%d - Step:%d - Loss: %f" % (epoch, step, loss))
         evaluate(model, metric, dev_loader)
-
-        paddle.save(model.state_dict(), './ernie_ckpt/model_%d.pdparams' % step)
+        model_to_save = model._layers if isinstance(
+            model, paddle.DataParallel) else model
+        paddle.save(model_to_save.state_dict(),
+                    os.path.join(args.save_dir, 'model_%d.pdparams' % step))
 
     preds = predict(model, test_loader, test_ds, label_vocab)
     file_path = "ernie_results.txt"

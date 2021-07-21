@@ -11,7 +11,7 @@
 执行以下命令，下载并解压示例数据集：
 
 ```bash
-python download.py --data_dir ./  
+python download.py --data_dir ./waybill_ie
 ```
 
 数据示例如下：
