@@ -48,6 +48,7 @@ def interaction(args, model, tokenizer):
                 add_start_token_as_response=True,
                 return_tensors=True,
                 is_split_into_words=False)
+            inputs['input_ids'] = inputs['input_ids'].astype('int64')
             ids, scores = model.generate(
                 input_ids=inputs['input_ids'],
                 token_type_ids=inputs['token_type_ids'],
