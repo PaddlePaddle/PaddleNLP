@@ -19,7 +19,6 @@ import random
 import time
 
 import numpy as np
-from sklearn.metrics import f1_score
 import paddle
 import paddle.nn.functional as F
 
@@ -45,6 +44,7 @@ parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path o
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument("--device", choices=["cpu", "gpu", "xpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--data_path", type=str, default="./data", help="The path of datasets to be loaded")
+parser.add_argument("--do_eval", type=bool, default=False, help="Whether to do the evaluation")
 args = parser.parse_args()
 # yapf: enable
 
@@ -74,11 +74,13 @@ def evaluate(model, criterion, metric, data_loader):
         logits = model(input_ids, token_type_ids)
         loss = criterion(logits, labels)
         probs = F.sigmoid(logits)
+
         losses.append(loss.numpy())
-        correct = metric.compute(probs, labels)
-        metric.update(correct)
-        accu = metric.accumulate()
-    print("eval loss: %.5f, accu: %.5f" % (np.mean(losses), accu))
+        preds = paddle.where(probs<0.5, x=paddle.zeros_like(probs), y=paddle.ones_like(probs))
+
+        metric.update(preds, labels)
+        f1 = metric.accumulate()
+    print("eval loss: %.5f, f1 score: %.5f" % (np.mean(losses), f1))
     model.train()
     metric.reset()
 
@@ -116,6 +118,15 @@ def do_train():
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
+    if args.do_eval:
+        dataset_name = 'valid.csv'
+        dev_ds = load_dataset(read_custom_data, filename=os.path.join(args.data_path, dataset_name), is_test=False, lazy=False)
+        dev_data_loader = create_dataloader(
+            train_ds,
+            mode='dev',
+            batch_size=args.batch_size,
+            batchify_fn=batchify_fn,
+            trans_fn=trans_func)   
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -150,17 +161,14 @@ def do_train():
             loss = criterion(logits, labels)
             probs = F.sigmoid(logits)
 
-            zero = paddle.zeros_like(probs)
-            one = paddle.ones_like(probs)
-            preds = paddle.where(probs<0.5, x=zero, y=one)
-
+            preds = paddle.where(probs<0.5, x=paddle.zeros_like(probs), y=paddle.ones_like(probs))
             metric.update(preds, labels)
             f1 = metric.accumulate()
 
             global_step += 1
             if global_step % 10 == 0 and rank == 0:
                 print(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, micro-f1: %.5f, speed: %.2f step/s"
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, f1 score: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, step, loss, f1,
                        10 / (time.time() - tic_train)))
                 tic_train = time.time()
@@ -172,7 +180,8 @@ def do_train():
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                #evaluate(model, criterion, metric, dev_data_loader)
+                if args.do_eval:
+                    evaluate(model, criterion, metric, dev_data_loader)
                 model._layers.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
 
