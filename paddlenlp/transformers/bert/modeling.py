@@ -29,6 +29,7 @@ __all__ = [
     'BertForSequenceClassification',
     'BertForTokenClassification',
     'BertForQuestionAnswering',
+    'BertForMultiLabelTextClassification',
 ]
 
 
@@ -75,19 +76,17 @@ class BertPooler(Layer):
     """
     """
 
-    def __init__(self, hidden_size, pool_act="tanh"):
+    def __init__(self, hidden_size):
         super(BertPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.activation = nn.Tanh()
-        self.pool_act = pool_act
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
         # to the first token.
         first_token_tensor = hidden_states[:, 0]
         pooled_output = self.dense(first_token_tensor)
-        if self.pool_act == "tanh":
-            pooled_output = self.activation(pooled_output)
+        pooled_output = self.activation(pooled_output)
         return pooled_output
 
 
@@ -255,20 +254,6 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
         },
-        "simbert-base-chinese": {
-            "vocab_size": 13685,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -295,8 +280,6 @@ class BertPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-base-chinese.pdparams",
             "macbert-large-chinese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-large-chinese.pdparams",
-            "simbert-base-chinese":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/simbert-base-chinese-v1.pdparams",
         }
     }
     base_model_prefix = "bert"
@@ -371,8 +354,7 @@ class BertModel(BertPretrainedModel):
                  max_position_embeddings=512,
                  type_vocab_size=16,
                  initializer_range=0.02,
-                 pad_token_id=0,
-                 pool_act="tanh"):
+                 pad_token_id=0):
         super(BertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -388,7 +370,7 @@ class BertModel(BertPretrainedModel):
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = BertPooler(hidden_size, pool_act)
+        self.pooler = BertPooler(hidden_size)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -481,7 +463,6 @@ class BertForSequenceClassification(BertPretrainedModel):
         logits = self.classifier(pooled_output)
         return logits
 
-
 class BertForTokenClassification(BertPretrainedModel):
     def __init__(self, bert, num_classes=2, dropout=None):
         super(BertForTokenClassification, self).__init__()
@@ -508,6 +489,41 @@ class BertForTokenClassification(BertPretrainedModel):
         logits = self.classifier(sequence_output)
         return logits
 
+class BertForMultiLabelTextClassification(BertPretrainedModel):
+    """
+    Model for multi label text classification task with BERT.
+    Args:
+        bert (BertModel): An instance of BertModel.
+        num_labels (int, optional): The number of labels. Default 2
+        dropout (float, optional): The dropout probability for output of BERT.
+            If None, use the same value as `hidden_dropout_prob` of `BertModel`
+            instance `bert`. Default None
+    """
+
+    def __init__(self, bert, num_labels=2, dropout=None):
+        super(BertForMultiLabelTextClassification, self).__init__()
+        self.num_labels = num_labels
+        self.bert = bert  # allow bert to be config
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.bert.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.bert.config["hidden_size"],
+                                    num_labels)
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        _, pooled_output = self.bert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)
+        return logits
 
 class BertLMPredictionHead(Layer):
     def __init__(self,
