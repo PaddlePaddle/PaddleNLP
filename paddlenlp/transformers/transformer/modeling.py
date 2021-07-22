@@ -532,12 +532,19 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
                 def default_fn(beam_search_output, beam_search_state):
                     return beam_search_output, beam_search_state
 
+                from functools import partial
                 beam_search_output, beam_search_state = paddle.static.nn.case(
-                    [(condition(kwargs.get("trg_word"), time),
-                      self.force_decoding(beam_search_output, beam_search_state,
-                                          kwargs.get("trg_word"),
-                                          kwargs.get("trg_length"), time))],
-                    default=default_fn(beam_search_output, beam_search_state))
+                    [(condition(kwargs.get("trg_word"), time), partial(
+                        self.force_decoding,
+                        beam_search_output=beam_search_output,
+                        beam_search_state=beam_search_state,
+                        trg_word=kwargs.get("trg_word"),
+                        trg_length=kwargs.get("trg_length"),
+                        time=time))],
+                    default=partial(
+                        default_fn,
+                        beam_search_output=beam_search_output,
+                        beam_search_state=beam_search_state))
 
         next_inputs, finished = (beam_search_output.predicted_ids,
                                  beam_search_state.finished)
