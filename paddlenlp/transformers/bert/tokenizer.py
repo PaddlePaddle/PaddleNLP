@@ -267,6 +267,12 @@ class BertTokenizer(PretrainedTokenizer):
             "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-wwm-chinese-vocab.txt",
             "bert-wwm-ext-chinese":
             "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-wwm-ext-chinese-vocab.txt",
+            "macbert-large-chinese":
+            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-chinese-vocab.txt",
+            "macbert-base-chinese":
+            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-chinese-vocab.txt",
+            "simbert-base-chinese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -296,6 +302,15 @@ class BertTokenizer(PretrainedTokenizer):
         },
         "bert-wwm-ext-chinese": {
             "do_lower_case": False
+        },
+        "macbert-large-chinese": {
+            "do_lower_case": False
+        },
+        "macbert-base-chinese": {
+            "do_lower_case": False
+        },
+        "simbert-base-chinese":{
+            "do_lower_case": True
         },
     }
     padding_side = 'right'

@@ -16,6 +16,7 @@ PLATO-2的训练过程及其他细节详见 [Knover](https://github.com/PaddlePa
 
 ### 环境依赖
 
+- python 3.7+
 - sentencepiece
 - termcolor  
 

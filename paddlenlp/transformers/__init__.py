@@ -51,3 +51,5 @@ from .nezha.modeling import *
 from .nezha.tokenizer import *
 from .ernie_doc.modeling import *
 from .ernie_doc.tokenizer import *
+from .bart.modeling import *
+from .bart.tokenizer import *

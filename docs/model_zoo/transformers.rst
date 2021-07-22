@@ -9,8 +9,8 @@ PaddleNLP为用户提供了常用的 ``BERT``、``ERNIE``、``ALBERT``、``RoBER
 Transformer预训练模型汇总
 ------------------------------------
 
-下表汇总了介绍了目前PaddleNLP支持的各类预训练模型以及对应预训练权重。我们目前提供了 **67** 种预训练的参数权重供用户使用，
-其中包含了 **32** 种中文语言模型的预训练权重。
+下表汇总了介绍了目前PaddleNLP支持的各类预训练模型以及对应预训练权重。我们目前提供了 **68** 种预训练的参数权重供用户使用，
+其中包含了 **33** 种中文语言模型的预训练权重。
 
 +--------------------+-------------------------------------+--------------+-----------------------------------------+
 | Model              | Pretrained Weight                   | Language     | Details of the model                    |
@@ -115,6 +115,11 @@ Transformer预训练模型汇总
 |                    |                                     |              | Trained on cased Chinese Simplified     |
 |                    |                                     |              | and Traditional text using              |
 |                    |                                     |              | Whole-Word-Masking with extented data.  |
+|                    +-------------------------------------+--------------+-----------------------------------------+
+|                    |``simbert-base-chinese``             | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                     |              | 12-heads, 108M parameters.              |
+|                    |                                     |              | Trained on 22 million pairs of similar  |
+|                    |                                     |              | sentences crawed from Baidu Know.       |
 +--------------------+-------------------------------------+--------------+-----------------------------------------+
 |BigBird_            |``bigbird-base-uncased``             | English      | 12-layer, 768-hidden,                   |
 |                    |                                     |              | 12-heads, _M parameters.                |
@@ -378,7 +383,7 @@ PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用�
     from paddlenlp.datasets import load_dataset
     from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
 
-    train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
+    train_ds = load_dataset("chnsenticorp", splits=["train"])
 
     model = BertForSequenceClassification.from_pretrained("bert-wwm-chinese", num_classes=len(train_ds.label_list))
 
@@ -400,7 +405,6 @@ PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用�
     for input_ids, token_type_ids, labels in train_data_loader():
         logits = model(input_ids, token_type_ids)
         loss = criterion(logits, labels)
-        probs = paddle.nn.functional.softmax(logits, axis=1)
         loss.backward()
         optimizer.step()
         optimizer.clear_grad()
@@ -428,6 +432,7 @@ Reference
   `huggingface/xlnet_chinese_large <https://huggingface.co/clue/xlnet_chinese_large>`_,
   `Knover/luge-dialogue <https://github.com/PaddlePaddle/Knover/tree/luge-dialogue/luge-dialogue>`_,
   `huawei-noah/Pretrained-Language-Model/NEZHA-PyTorch/ <https://github.com/huawei-noah/Pretrained-Language-Model/tree/master/NEZHA-PyTorch>`_
+  `ZhuiyiTechnology/simbert <https://github.com/ZhuiyiTechnology/simbert>`_
 - Lan, Zhenzhong, et al. "Albert: A lite bert for self-supervised learning of language representations." arXiv preprint arXiv:1909.11942 (2019).
 - Devlin, Jacob, et al. "Bert: Pre-training of deep bidirectional transformers for language understanding." arXiv preprint arXiv:1810.04805 (2018).
 - Zaheer, Manzil, et al. "Big bird: Transformers for longer sequences." arXiv preprint arXiv:2007.14062 (2020).
