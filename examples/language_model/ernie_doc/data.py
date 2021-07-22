@@ -425,6 +425,8 @@ class MRCIterator(ClassifierIterator):
                 end_pos = 1
 
                 actual_text = " ".join(doc_tokens[start_pos:(end_pos + 1)])
+                if orig_answer_text.islower():
+                    actual_text = actual_text.lower()
                 if actual_text.find(orig_answer_text) == -1:
                     logger.info("Could not find answer: '%s' vs. '%s'" %
                                 (actual_text, orig_answer_text))

@@ -189,7 +189,7 @@ def do_train(args):
         random_seed=args.seed)
 
     eval_ds_iter = SemanticMatchingIterator(
-        train_ds,
+        dev_ds,
         args.batch_size,
         tokenizer,
         trainer_num,
@@ -200,7 +200,7 @@ def do_train(args):
         mode="eval")
 
     test_ds_iter = SemanticMatchingIterator(
-        train_ds,
+        test_ds,
         args.batch_size,
         tokenizer,
         trainer_num,

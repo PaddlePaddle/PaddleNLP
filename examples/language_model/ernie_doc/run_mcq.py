@@ -181,7 +181,7 @@ def do_train(args):
         choice_num=num_classes)
 
     eval_ds_iter = MCQIterator(
-        train_ds,
+        eval_ds,
         args.batch_size,
         tokenizer,
         trainer_num,
@@ -193,7 +193,7 @@ def do_train(args):
         choice_num=num_classes)
 
     test_ds_iter = MCQIterator(
-        train_ds,
+        test_ds,
         args.batch_size,
         tokenizer,
         trainer_num,

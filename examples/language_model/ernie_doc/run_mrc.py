@@ -57,24 +57,16 @@ parser.add_argument("--max_answer_length", default=100, type=int, help="Max answ
 parser.add_argument("--do_lower_case", action='store_false', help="Whether to lower case the input text. Should be True for uncased models and False for cased models.")
 parser.add_argument("--verbose", action='store_true', help="Whether to output verbose log.")
 parser.add_argument("--dropout", default=0.1, type=float, help="dropout ratio of ernie_doc")
-parser.add_argument("--dataset", default="dureader_robust", type=str, choices=["dureader_robust", "cmrc2018", "drcd"], help="The avaliable Q&A dataset")
+parser.add_argument("--dataset", default="dureader_robust", type=str, choices=["dureader_robust", "cmrc2018", "drcd", "triviaqa"], help="The avaliable Q&A dataset")
 # yapf: enable
 args = parser.parse_args()
 
 # eval_dataset, test_dataset, 
 DATASET_INFO = {
-    "dureader_robust": [
-        "dev",
-        "dev",
-    ],
-    "cmrc2018": [
-        "dev",
-        "dev",
-    ],
-    "drcd": [
-        "dev",
-        "test",
-    ]
+    "dureader_robust": ["dev", "dev", ErnieDocTokenizer],
+    "cmrc2018": ["dev", "dev", ErnieDocTokenizer],
+    "drcd": ["dev", "test", ErnieDocTokenizer],
+    "triviaqa": ["dev", "dev", BPETokenizer]
 }
 
 
@@ -172,11 +164,11 @@ def evaluate(args, model, criterion, metric, data_loader, memories0, tokenizer):
 def do_train(args):
     set_seed(args)
 
-    tokenizer = ErnieDocTokenizer.from_pretrained(args.model_name_or_path)
+    DEV, TEST, TOKENIZER_CLASS = DATASET_INFO[args.dataset]
+    tokenizer = TOKENIZER_CLASS.from_pretrained(args.model_name_or_path)
 
-    dev, test = DATASET_INFO[args.dataset]
     train_ds, eval_ds, test_ds = load_dataset(
-        args.dataset, splits=['train', dev, test])
+        args.dataset, splits=['train', DEV, TEST])
 
     paddle.set_device(args.device)
     trainer_num = paddle.distributed.get_world_size()
