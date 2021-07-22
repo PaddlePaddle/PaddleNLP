@@ -76,17 +76,19 @@ class BertPooler(Layer):
     """
     """
 
-    def __init__(self, hidden_size):
+    def __init__(self, hidden_size, pool_act="tanh"):
         super(BertPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.activation = nn.Tanh()
+        self.pool_act = pool_act
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
         # to the first token.
         first_token_tensor = hidden_states[:, 0]
         pooled_output = self.dense(first_token_tensor)
-        pooled_output = self.activation(pooled_output)
+        if self.pool_act == "tanh":
+            pooled_output = self.activation(pooled_output)
         return pooled_output
 
 
@@ -254,6 +256,20 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
         },
+        "simbert-base-chinese": {
+            "vocab_size": 13685,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -280,6 +296,8 @@ class BertPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-base-chinese.pdparams",
             "macbert-large-chinese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-large-chinese.pdparams",
+            "simbert-base-chinese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/simbert-base-chinese-v1.pdparams",
         }
     }
     base_model_prefix = "bert"
@@ -354,7 +372,8 @@ class BertModel(BertPretrainedModel):
                  max_position_embeddings=512,
                  type_vocab_size=16,
                  initializer_range=0.02,
-                 pad_token_id=0):
+                 pad_token_id=0,
+                 pool_act="tanh"):
         super(BertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -370,7 +389,7 @@ class BertModel(BertPretrainedModel):
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = BertPooler(hidden_size)
+        self.pooler = BertPooler(hidden_size, pool_act)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -462,6 +481,7 @@ class BertForSequenceClassification(BertPretrainedModel):
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
         return logits
+
 
 class BertForTokenClassification(BertPretrainedModel):
     def __init__(self, bert, num_classes=2, dropout=None):
