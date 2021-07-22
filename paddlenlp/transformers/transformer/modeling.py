@@ -318,7 +318,8 @@ class TransformerDecodeCell(nn.Layer):
         self.linear = linear
         self.dropout = dropout
 
-    def forward(self, inputs, states, static_cache, trg_src_attn_bias, memory):
+    def forward(self, inputs, states, static_cache, trg_src_attn_bias, memory,
+                **kwargs):
         r"""
         Produces logits.
 
@@ -861,7 +862,7 @@ class InferTransformerModel(TransformerModel):
         self.decode = TransformerBeamSearchDecoder(
             cell, bos_id, eos_id, beam_size, var_dim_in_state=2)
 
-    def forward(self, src_word):
+    def forward(self, src_word, trg_word=None):
         r"""
         The Transformer forward method.
 
@@ -929,6 +930,13 @@ class InferTransformerModel(TransformerModel):
         static_cache, enc_output, trg_src_attn_bias = TransformerBeamSearchDecoder.tile_beam_merge_with_batch(
             (static_cache, enc_output, trg_src_attn_bias), self.beam_size)
 
+        if trg_word is not None:
+            trg_length = paddle.sum(paddle.cast(
+                trg_word != self.bos_id, dtype="int64"),
+                                    axis=-1)
+        else:
+            trg_length = None
+
         rs, _ = nn.decode.dynamic_decode(
             decoder=self.decode,
             inits=incremental_cache,
@@ -937,6 +945,8 @@ class InferTransformerModel(TransformerModel):
             trg_src_attn_bias=trg_src_attn_bias,
             static_cache=static_cache,
             is_test=True,
-            output_time_major=self.output_time_major)
+            output_time_major=self.output_time_major,
+            trg_word=trg_word,
+            trg_length=trg_length)
 
         return rs
