@@ -48,7 +48,7 @@ train_ds, dev_ds, test1_ds, test2_ds = load_dataset('duconv', splits=('train', '
 
 ### 模型训练
 
-运行如下命令即可在练集上进行finetune，并在验证集上进行验证
+运行如下命令即可在训练集上进行finetune，并在验证集上进行验证
 
 ```shell
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
@@ -202,7 +202,7 @@ python interaction.py \
 - `top_k` 表示采用"sampling"解码策略时，token的概率按从大到小排序，生成的token只从前`top_k`个中进行采样。
 - `device` 表示使用的设备。
 
-**NOTE:** 输入"[EXIT]"退出交互程序，输入"[NEXT]"开启下一轮新的对话。
+**NOTE:** 输入"[EXIT]"退出交互程序，输入"[NEXT]"开启下一轮新的对话。需要注意使用退格会导致错误。
 
 ## Reference
 
