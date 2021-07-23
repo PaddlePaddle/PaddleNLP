@@ -20,7 +20,7 @@ import paddle.nn.functional as F
 from paddle.nn import MultiHeadAttention, TransformerEncoderLayer, TransformerEncoder
 from paddle.fluid.data_feeder import convert_dtype
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import TinyBertForPretraining
+from paddlenlp.transformers import TinyBertForPretraining, TinyBertForSequenceClassification, BertForSequenceClassification
 
 __all__ = ['to_distill', 'calc_minilm_loss']
 
@@ -70,11 +70,16 @@ def to_distill(self,
     MultiHeadAttention._forward = attention_forward
     TransformerEncoderLayer._forward = transformer_encoder_layer_forward
     TransformerEncoder._forward = transformer_encoder_forward
-    TinyBertForPretraining._forward = minilm_pretraining_forward
+    BertForSequenceClassification._forward = bert_forward
+    if return_qkv:
+        TinyBertForPretraining._forward = minilm_pretraining_forward
+    else:
+        TinyBertForPretraining._forward = tinybert_forward
 
     def init_func(layer):
         if isinstance(layer, (MultiHeadAttention, TransformerEncoderLayer,
-                              TransformerEncoder, TinyBertForPretraining)):
+                              TransformerEncoder, TinyBertForPretraining,
+                              BertForSequenceClassification)):
             layer.forward = layer._forward
             if isinstance(layer, TransformerEncoder):
                 layer.return_layer_outputs = return_layer_outputs
@@ -256,3 +261,38 @@ def minilm_pretraining_forward(self,
     sequence_output, pooled_output = model(input_ids, token_type_ids,
                                            attention_mask)
     return encoder.q, encoder.k, encoder.v
+
+
+def tinybert_forward(self, input_ids, token_type_ids=None, attention_mask=None):
+    """
+    Replaces `forward` function while using multi gpus to train.
+    """
+    assert hasattr(self, self.base_model_prefix), \
+        "Student class should inherit from %s" % (self.base_model_class)
+    model = getattr(self, self.base_model_prefix)
+    encoder = model.encoder
+
+    sequence_output, pooled_output = model(input_ids, token_type_ids,
+                                           attention_mask)
+    for i in range(len(encoder.hidden_states)):
+        # While using tinybert-4l-312d, tinybert-6l-768d, tinybert-4l-312d-zh, tinybert-6l-768d-zh
+        # While using tinybert-4l-312d-v2, tinybert-6l-768d-v2
+        # encoder.hidden_states[i] = self.tinybert.fit_dense(encoder.hidden_states[i])
+        encoder.hidden_states[i] = self.tinybert.fit_denses[i](
+            encoder.hidden_states[i])
+
+    return encoder.attentions, encoder.hidden_states
+
+
+def bert_forward(self, input_ids, token_type_ids=None, attention_mask=None):
+    """
+    Replaces `forward` function while using multi gpus to train.
+    """
+    assert hasattr(self, self.base_model_prefix), \
+        "Student class should inherit from %s" % (self.base_model_class)
+    model = getattr(self, self.base_model_prefix)
+    encoder = model.encoder
+
+    sequence_output, pooled_output = model(input_ids, token_type_ids,
+                                           attention_mask)
+    return encoder.attentions, encoder.hidden_states

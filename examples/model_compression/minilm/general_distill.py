@@ -80,11 +80,6 @@ def parse_args():
         required=True,
         help="The input directory where the data will be read from.", )
     parser.add_argument(
-        "--max_predictions_per_seq",
-        default=80,
-        type=int,
-        help="The maximum total of masked tokens in input sequence")
-    parser.add_argument(
         "--output_dir",
         default=None,
         type=str,
@@ -184,11 +179,10 @@ class WorkerInitObj(object):
         random.seed(self.seed + id)
 
 
-def create_pretraining_dataset(input_file, max_pred_length, shared_list, args,
-                               worker_init, tokenizer):
+def create_pretraining_dataset(input_file, shared_list, args, worker_init,
+                               tokenizer):
     train_data = PretrainingDataset(
         input_file=input_file,
-        max_pred_length=max_pred_length,
         tokenizer=tokenizer,
         max_seq_length=args.max_seq_length)
     # files have been sharded, no need to dispatch again
@@ -213,9 +207,8 @@ def create_pretraining_dataset(input_file, max_pred_length, shared_list, args,
 
 
 class PretrainingDataset(paddle.io.Dataset):
-    def __init__(self, input_file, max_pred_length, tokenizer, max_seq_length):
+    def __init__(self, input_file, tokenizer, max_seq_length):
         self.input_file = input_file
-        self.max_pred_length = max_pred_length
         f = open(input_file, 'r')
         input_ids = []
         for i, line in enumerate(f):
@@ -305,8 +298,7 @@ def do_train(args):
         previous_file = data_file
 
         train_data_loader, _ = create_pretraining_dataset(
-            data_file, args.max_predictions_per_seq, shared_file_list, args,
-            worker_init, tokenizer)
+            data_file, shared_file_list, args, worker_init, tokenizer)
 
         # TODO(guosheng): better way to process single file
         single_file = True if f_start_id + 1 == len(files) else False
@@ -324,7 +316,6 @@ def do_train(args):
                                    paddle.distributed.get_rank()) % num_files]
             previous_file = data_file
             dataset_future = pool.submit(create_pretraining_dataset, data_file,
-                                         args.max_predictions_per_seq,
                                          shared_file_list, args, worker_init,
                                          tokenizer)
 
