@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import numpy as np
+import itertools
 from collections import namedtuple
 
 import paddle
@@ -945,6 +946,32 @@ class MCQIterator(MRCIterator):
                 start_index = index - len(records) + 1
                 gather_idx = gather_idx_candidate
         yield self._pad_batch_records(batch_records, gather_idx)
+
+    def _get_samples(self, pre_batch_list, is_last=False):
+        if is_last:
+            # pad batch
+            len_doc = [[len(doc) for doc in doc_list]
+                       for doc_list in pre_batch_list]
+            len_doc = list(itertools.chain(*len_doc))
+            max_len_idx = len_doc.index(max(len_doc))
+            doc_idx = max_len_idx % self.choice_num
+            doc_list_idx = max_len_idx // self.choice_num
+            dirty_sample = pre_batch_list[doc_list_idx][doc_idx][-1]._replace(
+                cal_loss=0)
+            for sample_list in pre_batch_list:
+                for samples in sample_list:
+                    samples.extend([dirty_sample] *
+                                   (max(len_doc) - len(samples)))
+        samples = []
+        min_len = min([len(doc) for doc in pre_batch_list])
+        for cnt in range(min_len):
+            for batch_idx in range(self.batch_size * self.trainer_num):
+                sample = pre_batch_list[batch_idx][cnt]
+                samples.append(sample)
+
+        for idx in range(len(pre_batch_list)):
+            pre_batch_list[idx] = pre_batch_list[idx][min_len:]
+        return samples
 
 
 class SemanticMatchingIterator(MRCIterator):
