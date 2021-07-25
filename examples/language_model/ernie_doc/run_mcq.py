@@ -38,7 +38,6 @@ from metrics import Acc, F1
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="pretraining model name or path")
 parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate used to train.")
@@ -53,6 +52,8 @@ parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight dec
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--dataset", default="c3", choices=["c3"], type=str, help="The training dataset")
 parser.add_argument("--layerwise_decay", default=0.8, type=float, help="layerwise decay ratio")
+parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--gradient_accumulation_steps", default=4, type=int, help="gradient_accumulation_steps")
 
 # yapf: enable
 args = parser.parse_args()
@@ -75,7 +76,7 @@ def init_memory(batch_size, memory_length, d_model, n_layers):
 
 
 @paddle.no_grad()
-def evaluate(model, metric, data_loader, memories0):
+def evaluate(model, metric, data_loader, memories0, choice_num):
     """
     Given a dataset, it evals model and computes the metric.
     Because the same sample may be splited into several samples and evaluated in 
@@ -105,16 +106,18 @@ def evaluate(model, metric, data_loader, memories0):
         logits, labels, qids = list(
             map(lambda x: paddle.gather(x, gather_idxs),
                 [logits, labels, qids]))
-        # need to collect probs for each qid, so use softmax_with_cross_entropy
+        logits = logits.reshape([-1, choice_num])
+        labels = labels.reshape([-1, choice_num, 1])[:, 0]
+        qids = qids.reshape([-1, choice_num, 1])[:, 0]
         loss, probs = nn.functional.softmax_with_cross_entropy(
             logits, labels, return_softmax=True)
         losses.append(loss.mean().numpy())
         # shape: [B, NUM_LABELS]
         np_probs = probs.numpy()
         # shape: [B, 1]
-        np_qids = qids.numpy()
+        np_qids = qids.numpy().flatten()
         np_labels = labels.numpy().flatten()
-        for i, qid in enumerate(np_qids.flatten()):
+        for i, qid in enumerate(np_qids):
             probs_dict[qid].append(np_probs[i])
             label_dict[qid] = np_labels[i]  # same qid share same label.
 
@@ -127,6 +130,7 @@ def evaluate(model, metric, data_loader, memories0):
     # collect predicted labels
     preds = []
     labels = []
+    logger.info("Total {} qustion".format(len(probs_dict)))
     for qid, probs in probs_dict.items():
         mean_prob = np.mean(np.array(probs), axis=0)
         preds.append(np.argmax(mean_prob))
@@ -164,14 +168,14 @@ def do_train(args):
         if os.path.exists(args.model_name_or_path):
             logger.info("init checkpoint from %s" % args.model_name_or_path)
     model = ErnieDocForSequenceClassification.from_pretrained(
-        args.model_name_or_path, num_classes=num_classes, cls_token_idx=0)
+        args.model_name_or_path, num_classes=1, cls_token_idx=0)
     model_config = model.ernie_doc.config
     if trainer_num > 1:
         model = paddle.DataParallel(model)
-
+    batch_size = int(args.batch_size / args.gradient_accumulation_steps)
     train_ds_iter = MCQIterator(
         train_ds,
-        args.batch_size,
+        batch_size,
         tokenizer,
         trainer_num,
         trainer_id=rank,
@@ -182,7 +186,7 @@ def do_train(args):
 
     eval_ds_iter = MCQIterator(
         eval_ds,
-        args.batch_size,
+        batch_size,
         tokenizer,
         trainer_num,
         trainer_id=rank,
@@ -194,7 +198,7 @@ def do_train(args):
 
     test_ds_iter = MCQIterator(
         test_ds,
-        args.batch_size,
+        batch_size,
         tokenizer,
         trainer_num,
         trainer_id=rank,
@@ -262,10 +266,10 @@ def do_train(args):
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
 
-    global_steps = 0
+    global_steps = 1
     best_acc = -1
-    create_memory = partial(init_memory, args.batch_size, args.memory_length,
-                            model_config["hidden_size"],
+    create_memory = partial(init_memory, batch_size * num_classes,
+                            args.memory_length, model_config["hidden_size"],
                             model_config["num_hidden_layers"])
     # copy the memory
     memories = create_memory()
@@ -275,37 +279,38 @@ def do_train(args):
         train_ds_iter.shuffle_sample()
         train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
         for step, batch in enumerate(train_dataloader, start=1):
-            global_steps += 1
             input_ids, position_ids, token_type_ids, attn_mask, labels, qids, \
                 gather_idx, need_cal_loss = batch
             logits, memories = model(input_ids, memories, token_type_ids,
                                      position_ids, attn_mask)
-
             logits, labels = list(
                 map(lambda x: paddle.gather(x, gather_idx), [logits, labels]))
+            logits = logits.reshape([-1, num_classes])
+            labels = labels.reshape([-1, num_classes, 1])[:, 0]
+
             loss = criterion(logits, labels) * need_cal_loss
-            mean_loss = loss.mean()
-            mean_loss.backward()
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.clear_grad()
+            loss.backward()
+            if step % args.gradient_accumulation_steps == 0:
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.clear_grad()
+                global_steps += 1
             # rough acc result, not a precise acc
             acc = metric.compute(logits, labels) * need_cal_loss
             metric.update(acc)
 
-            if global_steps % args.logging_steps == 0:
+            if global_steps % args.logging_steps == 0 and step % args.gradient_accumulation_steps == 0:
                 logger.info(
                     "train: global step %d, epoch: %d, loss: %f, acc:%f, lr: %f, speed: %.2f step/s"
-                    % (global_steps, epoch, mean_loss, metric.accumulate(),
+                    % (global_steps, epoch, loss, metric.accumulate(),
                        lr_scheduler.get_lr(),
                        args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
 
-            if global_steps % args.save_steps == 0:
-                # evaluate
-                logger.info("Eval:")
+            if global_steps % args.save_steps == 0 and step % args.gradient_accumulation_steps == 0:
+                logger.info("Eval, total {} qustion.".format(len(eval_ds)))
                 eval_acc = evaluate(model, eval_metric, eval_dataloader,
-                                    create_memory())
+                                    create_memory(), num_classes)
                 # save
                 if rank == 0:
                     output_dir = os.path.join(args.output_dir,
@@ -327,7 +332,8 @@ def do_train(args):
                         tokenizer.save_pretrained(output_dir)
 
     logger.info("Final test result:")
-    eval_acc = evaluate(model, eval_metric, test_dataloader, create_memory())
+    eval_acc = evaluate(model, eval_metric, test_dataloader,
+                        create_memory(), num_classes)
     if rank == 0:
         output_dir = os.path.join(args.output_dir, "model_%d" % (global_steps))
         if not os.path.exists(output_dir):

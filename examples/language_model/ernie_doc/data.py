@@ -797,8 +797,6 @@ class MCQIterator(MRCIterator):
 
             features_each = []
             for (doc_span_index, doc_span) in enumerate(doc_spans):
-                # tokens = []
-                # segments_ids = []
                 qa_features = []
                 for q_tokens, c_tokens in question_choice_pairs:
                     segment_tokens = ['[CLS]']
@@ -822,9 +820,6 @@ class MCQIterator(MRCIterator):
 
                     segment_tokens += ['[SEP]']
                     token_type_ids += [1]
-
-                    # tokens += segment_tokens
-                    # segments_ids += token_type_ids
 
                     input_ids = self.tokenizer.convert_tokens_to_ids(
                         segment_tokens)
@@ -861,7 +856,8 @@ class MCQIterator(MRCIterator):
         else:
             batch_labels = np.array([]).astype("int64").reshape([-1, 1])
         # qid
-        batch_qids = [records[0].qid for records in batch_records]
+        batch_qids = [[record.qid for record in records]
+                      for records in batch_records]
         batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
 
         if gather_idx:
@@ -945,7 +941,8 @@ class MCQIterator(MRCIterator):
                     len(record.src_ids) for record in records)
                 start_index = index - len(records) + 1
                 gather_idx = gather_idx_candidate
-        yield self._pad_batch_records(batch_records, gather_idx)
+        if len(batch_records) > 0:
+            yield self._pad_batch_records(batch_records, gather_idx)
 
     def _get_samples(self, pre_batch_list, is_last=False):
         if is_last:
