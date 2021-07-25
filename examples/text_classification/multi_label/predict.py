@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,52 +16,32 @@ import argparse
 import os
 from functools import partial
 
-import numpy as np
-import pandas as pd
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import BertForMultiLabelTextClassification, BertTokenizer
 
-from data import convert_example, create_dataloader, read_custom_data
-from metric import F1Score
+from data import convert_example, create_dataloader, read_custom_data, write_test_results
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True, help="The path to model parameters to be loaded.")
-parser.add_argument("--max_seq_length", default=200, type=int, help="The maximum total input sequence length after tokenization. "
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=64, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--data_path", type=str, default="./data", help="The path of datasets to be loaded")
 args = parser.parse_args()
 # yapf: enable
 
-def write_results(filename, results, results_dict):
-    """write_results"""
-    cols = ["id", "toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]
-    data = pd.read_csv(filename)
-    qids = [line[0] for line in data.values]
-    results_dict["id"] = qids
-    results = list(map(list, zip(*results)))
-    for key in results_dict:
-        if key != "id":
-            for result in results:
-                results_dict[key] = result
-    df = pd.DataFrame(results_dict)
-    df.to_csv("sample_test.csv", index=False)
-    print("Test results saved")
-
-def predict(model, data_loader, tokenizer, batch_size=1):
+def predict(model, data_loader, batch_size=1):
     """
     Predicts the data labels.
 
     Args:
         model (obj:`paddle.nn.Layer`): A model to classify texts.
         data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
-            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
         batch_size(obj:`int`, defaults to 1): The number of batch.
 
     Returns:
@@ -74,10 +54,8 @@ def predict(model, data_loader, tokenizer, batch_size=1):
         input_ids, token_type_ids = batch
         logits = model(input_ids, token_type_ids)
         probs = F.sigmoid(logits)
-        print(probs)
-        exit()
-        preds = probs.tolist()
-        results.extend(preds)
+        probs = probs.tolist()
+        results.extend(probs)
         if step % 100 == 0:
             print("step %d, %d samples processed" % (step, step * batch_size))
     return results
@@ -91,14 +69,14 @@ if __name__ == "__main__":
     test_ds = load_dataset(read_custom_data, filename=os.path.join(args.data_path, dataset_name), is_test=True, lazy=False)
 
     # Init the results template.
-    results_dict = {"toxic": [], "severe_toxic": [], "obscene": [], "threat": [], "insult": [], "identity_hate": []}
+    label_info = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
 
-    # If you wanna use bert/roberta/electra pretrained model,
-    model = ppnlp.transformers.BertForMultiLabelTextClassification.from_pretrained(
-        'bert-base-uncased', num_labels=len(results_dict))
+    # Init bert pretrained model
+    model = BertForMultiLabelTextClassification.from_pretrained(
+        'bert-base-uncased', num_labels=len(label_info))
 
-    # If you wanna use bert/roberta/electra pretrained model,
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-uncased')
+    # Init bert tokenizer
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     trans_func = partial(
         convert_example,
@@ -121,7 +99,8 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
 
-    results = predict(model, test_data_loader, tokenizer, args.batch_size)
+    results = predict(model, test_data_loader, args.batch_size)
     filename = os.path.join(args.data_path, dataset_name)
 
-    write_results(filename, results, results_dict)
+    # Write test result into csv file
+    write_test_results(filename, results, label_info)

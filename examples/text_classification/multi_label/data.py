@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import numpy as np
 import pandas as pd
 import paddle
@@ -49,18 +50,14 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
         token_type_ids(obj: `list[int]`): List of sequence pair mask.
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
+    encoded_inputs = tokenizer(text=example["text"], max_seq_len=max_seq_length)
+    input_ids = encoded_inputs["input_ids"]
+    token_type_ids = encoded_inputs["token_type_ids"]
 
     if not is_test:
-        encoded_inputs = tokenizer(text=example["text"], max_seq_len=max_seq_length)
-        input_ids = encoded_inputs["input_ids"]
-        token_type_ids = encoded_inputs["token_type_ids"]
         label = np.array(example["label"], dtype="float32")
         return input_ids, token_type_ids, label
-    else:
-        encoded_inputs = tokenizer(text=example, max_seq_len=max_seq_length)
-        input_ids = encoded_inputs["input_ids"]
-        token_type_ids = encoded_inputs["token_type_ids"]
-        return input_ids, token_type_ids
+    return input_ids, token_type_ids
 
 def create_dataloader(dataset,
                       mode='train',
@@ -89,6 +86,28 @@ def read_custom_data(filename, is_test=False):
     data = pd.read_csv(filename)
     for line in data.values:
         if is_test:
-            yield {"text": line[1], "label": ""}
+            text = line[1]
+            yield {"text": clean_text(text), "label": ""}
         else:
-            yield {"text": line[1], "label": line[2:]}      
+            text, label = line[1], line[2:]
+            yield {"text": clean_text(text), "label": label}     
+
+def clean_text(text):
+    text = text.replace("\r", "").replace("\n", "")
+    text = re.sub(r"\\n\n", ".", text)
+    return text
+
+def write_test_results(filename, results, label_info):
+    """write test results"""
+    data = pd.read_csv(filename)
+    qids = [line[0] for line in data.values]
+    results_dict = {k: [] for k in label_info}
+    results_dict["id"] = qids
+    results = list(map(list, zip(*results)))
+    for key in results_dict:
+        if key != "id":
+            for result in results:
+                results_dict[key] = result
+    df = pd.DataFrame(results_dict)
+    df.to_csv("sample_test.csv", index=False)
+    print("Test results saved")

@@ -513,7 +513,7 @@ class BertForMultiLabelTextClassification(BertPretrainedModel):
     """
     Model for multi label text classification task with BERT.
     Args:
-        bert (BertModel): An instance of BertModel.
+        bert (BertModel, nn.Layer): An instance of BertModel.
         num_labels (int, optional): The number of labels. Default 2
         dropout (float, optional): The dropout probability for output of BERT.
             If None, use the same value as `hidden_dropout_prob` of `BertModel`

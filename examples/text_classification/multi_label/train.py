@@ -22,13 +22,13 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import BertForMultiLabelTextClassification, BertTokenizer
 
 from data import convert_example, create_dataloader, read_custom_data
-from metric import F1Score
+from metric import MultiLabelReport
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -38,16 +38,14 @@ parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
-parser.add_argument("--warmup_proportion", default=0, type=float, help="Linear warmup proption over the training process.")
+parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
+parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument("--device", choices=["cpu", "gpu", "xpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--data_path", type=str, default="./data", help="The path of datasets to be loaded")
-parser.add_argument("--do_eval", type=bool, default=False, help="Whether to do the evaluation")
 args = parser.parse_args()
 # yapf: enable
-
 
 def set_seed(seed):
     """sets random seed"""
@@ -62,9 +60,9 @@ def evaluate(model, criterion, metric, data_loader):
 
     Args:
         model(obj:`paddle.nn.Layer`): A model to classify texts.
-        data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
         criterion(obj:`paddle.nn.Layer`): It can compute the loss.
         metric(obj:`paddle.metric.Metric`): The evaluation metric.
+        data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
     """
     model.eval()
     metric.reset()
@@ -74,13 +72,10 @@ def evaluate(model, criterion, metric, data_loader):
         logits = model(input_ids, token_type_ids)
         loss = criterion(logits, labels)
         probs = F.sigmoid(logits)
-
         losses.append(loss.numpy())
-        preds = paddle.where(probs<0.5, x=paddle.zeros_like(probs), y=paddle.ones_like(probs))
-
-        metric.update(preds, labels)
-        f1 = metric.accumulate()
-    print("eval loss: %.5f, f1 score: %.5f" % (np.mean(losses), f1))
+        metric.update(probs, labels)
+        auc, f1_score = metric.accumulate()
+    print("eval loss: %.5f, auc: %.5f, f1 score: %.5f" % (np.mean(losses), auc, f1_score))
     model.train()
     metric.reset()
 
@@ -92,16 +87,17 @@ def do_train():
 
     set_seed(args.seed)
 
-    # Load datasets.
+    # Load train dataset.
     dataset_name = 'train.csv'
-    train_ds = load_dataset(read_custom_data, filename=os.path.join(args.data_path, dataset_name), is_test=False, lazy=False)
+    train_ds = load_dataset(read_custom_data, filename=os.path.join(
+        args.data_path, dataset_name), is_test=False, lazy=False)
 
-    # If you wanna use bert/roberta/electra pretrained model,
-    model = ppnlp.transformers.BertForMultiLabelTextClassification.from_pretrained(
+    # Init bert pretrained model
+    model = BertForMultiLabelTextClassification.from_pretrained(
         'bert-base-uncased', num_labels=len(train_ds.data[0]["label"]))
 
-    # If you wanna use bert/roberta/electra pretrained model,
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-uncased')
+    # Init bert tokenizer
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     trans_func = partial(
         convert_example,
@@ -110,7 +106,7 @@ def do_train():
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Stack()  # label
+        Stack(dtype='float32')  # label
     ): [data for data in fn(samples)]
     train_data_loader = create_dataloader(
         train_ds,
@@ -118,15 +114,6 @@ def do_train():
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
-    if args.do_eval:
-        dataset_name = 'valid.csv'
-        dev_ds = load_dataset(read_custom_data, filename=os.path.join(args.data_path, dataset_name), is_test=False, lazy=False)
-        dev_data_loader = create_dataloader(
-            train_ds,
-            mode='dev',
-            batch_size=args.batch_size,
-            batchify_fn=batchify_fn,
-            trans_fn=trans_func)   
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -134,8 +121,8 @@ def do_train():
     model = paddle.DataParallel(model)
     num_training_steps = len(train_data_loader) * args.epochs
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, 
+        num_training_steps, args.warmup_proportion)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
@@ -143,13 +130,14 @@ def do_train():
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
+    
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
 
-    metric = F1Score()
+    metric = MultiLabelReport()
     criterion = paddle.nn.BCEWithLogitsLoss()
 
     global_step = 0
@@ -160,16 +148,14 @@ def do_train():
             logits = model(input_ids, token_type_ids)
             loss = criterion(logits, labels)
             probs = F.sigmoid(logits)
-
-            preds = paddle.where(probs<0.5, x=paddle.zeros_like(probs), y=paddle.ones_like(probs))
-            metric.update(preds, labels)
-            f1 = metric.accumulate()
+            metric.update(probs, labels)
+            auc, f1_score = metric.accumulate()
 
             global_step += 1
             if global_step % 10 == 0 and rank == 0:
                 print(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, f1 score: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, f1,
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, auc: %.5f, f1 score: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, step, loss, auc, f1_score,
                        10 / (time.time() - tic_train)))
                 tic_train = time.time()
             loss.backward()
@@ -180,8 +166,6 @@ def do_train():
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                if args.do_eval:
-                    evaluate(model, criterion, metric, dev_data_loader)
                 model._layers.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
 
