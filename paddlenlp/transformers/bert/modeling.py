@@ -29,7 +29,6 @@ __all__ = [
     'BertForSequenceClassification',
     'BertForTokenClassification',
     'BertForQuestionAnswering',
-    'BertForMultiLabelTextClassification',
 ]
 
 
@@ -509,41 +508,6 @@ class BertForTokenClassification(BertPretrainedModel):
         logits = self.classifier(sequence_output)
         return logits
 
-class BertForMultiLabelTextClassification(BertPretrainedModel):
-    """
-    Model for multi label text classification task with BERT.
-    Args:
-        bert (BertModel, nn.Layer): An instance of BertModel.
-        num_labels (int, optional): The number of labels. Default 2
-        dropout (float, optional): The dropout probability for output of BERT.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Default None
-    """
-
-    def __init__(self, bert, num_labels=2, dropout=None):
-        super(BertForMultiLabelTextClassification, self).__init__()
-        self.num_labels = num_labels
-        self.bert = bert  # allow bert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.bert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.bert.config["hidden_size"],
-                                    num_labels)
-        self.apply(self.init_weights)
-
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
-        _, pooled_output = self.bert(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
-
-        pooled_output = self.dropout(pooled_output)
-        logits = self.classifier(pooled_output)
-        return logits
 
 class BertLMPredictionHead(Layer):
     def __init__(self,

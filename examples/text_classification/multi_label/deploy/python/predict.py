@@ -116,7 +116,7 @@ if __name__ == "__main__":
     predictor = Predictor(args.model_file, args.params_file, args.device,
                           args.max_seq_length)
 
-    # Init bert tokenizer
+    # Load bert tokenizer
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     data = [

@@ -25,14 +25,15 @@ import paddle.nn.functional as F
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import BertForMultiLabelTextClassification, BertTokenizer
+from paddlenlp.transformers import BertTokenizer
 
 from data import convert_example, create_dataloader, read_custom_data
 from metric import MultiLabelReport
+from model import BertForMultiLabelClassifier
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
+parser.add_argument("--save_dir", default='./checkpoints', type=str, help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
@@ -88,15 +89,15 @@ def do_train():
     set_seed(args.seed)
 
     # Load train dataset.
-    file_name = 'train.csv'
+    dataset_name = 'train.csv'
     train_ds = load_dataset(read_custom_data, filename=os.path.join(
-        args.data_path, file_name), is_test=False, lazy=False)
+        args.data_path, dataset_name), is_test=False, lazy=False)
 
-    # Init bert pretrained model
-    model = BertForMultiLabelTextClassification.from_pretrained(
+    # Load bert pretrained model
+    model = BertForMultiLabelClassifier.from_pretrained(
         'bert-base-uncased', num_labels=len(train_ds.data[0]["label"]))
 
-    # Init bert tokenizer
+    # Load bert tokenizer
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     trans_func = partial(

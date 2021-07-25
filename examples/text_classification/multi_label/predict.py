@@ -23,6 +23,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import BertForMultiLabelTextClassification, BertTokenizer
 
 from data import convert_example, create_dataloader, read_custom_data, write_test_results
+from model import BertForMultiLabelClassifier
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -65,17 +66,17 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
 
     # Load train dataset.
-    file_name = 'test.csv'
-    test_ds = load_dataset(read_custom_data, filename=os.path.join(args.data_path, file_name), is_test=True, lazy=False)
+    dataset_name = 'test.csv'
+    test_ds = load_dataset(read_custom_data, filename=os.path.join(args.data_path, dataset_name), is_test=True, lazy=False)
 
-    # Init the results template.
+    # The dataset labels
     label_info = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
 
-    # Init bert pretrained model
-    model = BertForMultiLabelTextClassification.from_pretrained(
+    # Load bert pretrained model
+    model = BertForMultiLabelClassifier.from_pretrained(
         'bert-base-uncased', num_labels=len(label_info))
 
-    # Init bert tokenizer
+    # Load bert tokenizer
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     trans_func = partial(

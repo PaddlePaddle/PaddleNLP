@@ -1,19 +1,8 @@
-# 使用预训练模型Fine-tune完成多标签文本分类任务
-
-
-在2017年之前，工业界和学术界对NLP文本处理依赖于序列模型[Recurrent Neural Network (RNN)](../rnn).
-
-<p align="center">
-<img src="http://colah.github.io/posts/2015-09-NN-Types-FP/img/RNN-general.png" width="40%" height="30%"> <br />
-</p>
-
-
-[paddlenlp.seq2vec是什么? 瞧瞧它怎么完成情感分析](https://aistudio.baidu.com/aistudio/projectdetail/1283423)教程介绍了如何使用`paddlenlp.seq2vec`表征文本语义。
+# 多标签文本分类任务
 
 近年来随着深度学习的发展，模型参数的数量飞速增长。为了训练这些参数，需要更大的数据集来避免过拟合。然而，对于大部分NLP任务来说，构建大规模的标注数据集非常困难（成本过高），特别是对于句法和语义相关的任务。相比之下，大规模的未标注语料库的构建则相对容易。为了利用这些数据，我们可以先从其中学习到一个好的表示，再将这些表示应用到其他任务中。最近的研究表明，基于大规模未标注语料库的预训练模型（Pretrained Models, PTM) 在NLP任务上取得了很好的表现。
 
-近年来，大量的研究表明基于大型语料库的预训练模型（Pretrained Models, PTM）可以学习通用的语言表示，有利于下游NLP任务，同时能够避免从零开始训练模型。随着计算能力的发展，深度模型的出现（即 Transformer）和训练技巧的增强使得 PTM 不断发展，由浅变深。
-
+大量的研究表明基于大型语料库的预训练模型（Pretrained Models, PTM）可以学习通用的语言表示，有利于下游NLP任务，同时能够避免从零开始训练模型。随着计算能力的发展，深度模型的出现（即 Transformer）和训练技巧的增强使得 PTM 不断发展，由浅变深。
 
 <p align="center">
 <img src="https://ai-studio-static-online.cdn.bcebos.com/327f44ff3ed24493adca5ddc4dc24bf61eebe67c84a6492f872406f464fde91e" width="60%" height="50%"> <br />
@@ -39,6 +28,7 @@ pretrained_models/
 ├── README.md # 使用说明
 ├── data.py # 数据处理
 ├── metric.py # 指标计算
+├── model.py # 模型网络
 └── train.py # 训练评估脚本
 ```
 
@@ -49,18 +39,18 @@ pretrained_models/
 
 ```text
 data/
-├── sample_submission.csv
-├── train.csv
-├── test.csv
-└── test_labels.csv
+├── sample_submission.csv # 预测结果提交样例
+├── train.csv # 训练集
+├── test.csv # 测试集
+└── test_labels.csv # 测试数据标签，数值-1代表该条数据不参与打分
 ```
 
 ### 模型训练
 
 我们以Kaggle Toxic Comment Classification Challenge为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练
 ```shell
-$ unset CUDA_VISIBLE_DEVICES
-$ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_dir ./checkpoints
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_dir ./checkpoints
 ```
 
 可支持配置的参数：
@@ -79,14 +69,7 @@ $ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_di
 
 代码示例中使用的预训练模型是BERT，可以选择的`model`有`bert-base-uncased`，`bert-large-uncased`，`bert-base-cased`和`bert-large-cased`。
 
-```python
-# 使用bert预训练模型
-from paddlenlp.transformers import BertForMultiLabelTextClassification, BertTokenizer
-model = BertForMultiLabelTextClassification.from_pretrained('bert-base-uncased',num_labels=6))
-tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-```
-
-程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存模型在指定的`save_dir`中。
+程序运行时将会自动进行训练，评估。同时训练过程中会自动保存模型在指定的`save_dir`中。
 如：
 ```text
 checkpoints/
@@ -104,7 +87,7 @@ checkpoints/
   运行方式：
 
 ```shell
-python export_model.py --params_path=./checkpoint/model_800/model_state.pdparams --output_path=./static_graph_params
+python export_model.py --params_path=./checkpoints/model_1000/model_state.pdparams --output_path=./static_graph_params
 ```
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 
@@ -150,7 +133,7 @@ identity_hate:   0
 启动预测：
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python predict.py --device 'gpu' --params_path checkpoints/model_800/model_state.pdparams
+python predict.py --device 'gpu' --params_path checkpoints/model_1000/model_state.pdparams
 ```
 
 预测结果会以csv文件`sample_test.csv`保存在当前目录下。
