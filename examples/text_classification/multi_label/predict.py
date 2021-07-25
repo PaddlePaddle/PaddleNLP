@@ -66,8 +66,8 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
 
     # Load train dataset.
-    dataset_name = 'test.csv'
-    test_ds = load_dataset(read_custom_data, filename=os.path.join(args.data_path, dataset_name), is_test=True, lazy=False)
+    file_name = 'test.csv'
+    test_ds = load_dataset(read_custom_data, filename=os.path.join(args.data_path, file_name), is_test=True, lazy=False)
 
     # The dataset labels
     label_info = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']

@@ -89,9 +89,9 @@ def do_train():
     set_seed(args.seed)
 
     # Load train dataset.
-    dataset_name = 'train.csv'
+    file_name = 'train.csv'
     train_ds = load_dataset(read_custom_data, filename=os.path.join(
-        args.data_path, dataset_name), is_test=False, lazy=False)
+        args.data_path, file_name), is_test=False, lazy=False)
 
     # Load bert pretrained model
     model = BertForMultiLabelClassifier.from_pretrained(
