@@ -109,6 +109,8 @@ python export_model.py --params_path=./checkpoint/model_800/model_state.pdparams
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 
 导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。
+
+
 **NOTE:**
 * 可通过`threshold`参数调整最终预测结果，当预测概率值大于`threshold`时预测结果为1，否则为0；默认为0.5。
 运行方式：
