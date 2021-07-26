@@ -46,7 +46,7 @@ def get_args():
     parser.add_argument(
         '--doc_spliter',
         type=str,
-        default='\t\n',
+        default='\n',
         help="Spliter between documents. The spacial char is hard to input in shell, you can change it here."
     )
     parser.add_argument(
@@ -140,7 +140,7 @@ def main():
         doc_spliter=args.doc_spliter,
         json_key=args.json_key,
         min_doc_length=args.min_doc_length)
-    encoded_files = pool.imap(trans_json, file_paths, 25)
+    encoded_files = pool.imap(trans_json, file_paths, 1)
 
     out_paths = []
     for i, (bytes_processed, out_path) in enumerate(encoded_files, start=1):
