@@ -880,7 +880,7 @@ class InferTransformerModel(TransformerModel):
             trg_word (Tensor):
                 The ids of target sequence words. Normally, it should NOT be
                 given. If it's given, force decoding with previous output token
-                will be trigger. 
+                will be trigger. Defaults to None. 
         
         Returns:
             Tensor:
