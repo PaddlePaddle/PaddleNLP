@@ -87,14 +87,8 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     A BERT sequence has the following format:
 
     - single sequence: ``[CLS] X [SEP]``
-    - pair of sequences: ``[CLS] A [SEP] B [SEP]``
 
-    A BERT sequence pair mask has the following format:
-    ::
-        0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
-        | first sequence    | second sequence |
-
-    If only one sequence, only returns the first portion of the mask (0's).
+    It returns the first portion of the mask (0's).
 
 
     Args:
