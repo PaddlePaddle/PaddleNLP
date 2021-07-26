@@ -35,7 +35,7 @@ from paddlenlp.datasets import load_dataset
 from data import SemanticMatchingIterator
 from optimization import AdamWDL
 from metrics import Acc, F1
-from model import ErnieDocSimNet
+from model import ErnieDocForTextMatching
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -172,7 +172,7 @@ def do_train(args):
 
     ernie_doc = ErnieDocModel.from_pretrained(
         args.model_name_or_path, cls_token_idx=0)
-    model = ErnieDocSimNet(ernie_doc, num_classes, args.dropout)
+    model = ErnieDocForTextMatching(ernie_doc, num_classes, args.dropout)
 
     model_config = model.ernie_doc.config
     if trainer_num > 1:
