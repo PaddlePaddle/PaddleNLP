@@ -96,15 +96,20 @@ def dist_optimizer(args, topo):
             "use_dynamic_loss_scaling": True,
         }
     if args.use_sharding:
-        dist_strategy.sharding = True
-        dist_strategy.sharding_configs = {
-            "segment_broadcast_MB": 32,
-            "sharding_degree": args.sharding_degree,
-            "mp_degree": args.mp_degree,
-            "pp_degree": args.pp_degree,
-            "dp_degree": args.dp_degree,
-            "optimize_offload": False,
-        }
+        if args.mp_degree > 1 and args.dp_degree > 1 and \
+            args.pp_degree == 1 and args.sharding_degree == 1:
+            dist_strategy.tensor_parallel = True
+            strategy.tensor_parallel_configs = {"tensor_parallel_degree": args.mp_degree}
+        else:
+            dist_strategy.sharding = True
+            dist_strategy.sharding_configs = {
+                "segment_broadcast_MB": 32,
+                "sharding_degree": args.sharding_degree,
+                "mp_degree": args.mp_degree,
+                "pp_degree": args.pp_degree,
+                "dp_degree": args.dp_degree,
+                "optimize_offload": False,
+            }
     if args.pp_degree > 1:
         dist_strategy.pipeline_configs = {
             "schedule_mode": "1F1B",
