@@ -596,7 +596,6 @@ void topK_sampling_kernel_kernelLauncher(void* workspace,
                                          cudaStream_t stream) {
   std::minstd_rand engine;
   int seed = std::random_device()();
-
   const int batch_size = args.batch_size_;
   const int vocab_size = args.vocab_size_;
   const int candidate_num = args.candidate_num_;
@@ -605,22 +604,18 @@ void topK_sampling_kernel_kernelLauncher(void* workspace,
 
   int topk_tmp_ids_buf_size =
       args.batch_size_ * args.candidate_num_;  // type int
-
   int temp_log_probs_buf_size =
       args.batch_size_ * args.candidate_num_ * vocab_size;
-
   int topk_tmp_val_buf_size = args.batch_size_ * args.candidate_num_;  // type T
 
   temp_log_probs_buf_size = (int)(ceil(temp_log_probs_buf_size / 4.)) * 4;
-
   topk_tmp_ids_buf_size = (int)(ceil(topk_tmp_ids_buf_size / 4.)) * 4;
-
   topk_tmp_val_buf_size = (int)(ceil(topk_tmp_val_buf_size / 4.)) * 4;
 
   if (workspace == nullptr) {
-    workspace_size = sizeof(float) * temp_log_probs_buf_size +
+    workspace_size = sizeof(T) * temp_log_probs_buf_size +
                      sizeof(int) * topk_tmp_ids_buf_size +
-                     sizeof(float) * topk_tmp_val_buf_size;
+                     sizeof(T) * topk_tmp_val_buf_size;
   } else {
     T* temp_log_probs = (T*)workspace;
     int* topk_tmp_id_buf = (int*)(temp_log_probs + temp_log_probs_buf_size);
@@ -629,7 +624,7 @@ void topK_sampling_kernel_kernelLauncher(void* workspace,
     switch (candidate_num) {
       CASE_K(1);
       CASE_K(2);
-      CASE_K(4)
+      CASE_K(4);
       default:
         beam_topK_kernel_general<
             T,
