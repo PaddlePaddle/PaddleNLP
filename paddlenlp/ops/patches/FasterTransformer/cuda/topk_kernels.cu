@@ -595,7 +595,7 @@ void topK_sampling_kernel_kernelLauncher(void* workspace,
                                          DecodingSamplingArguments args,
                                          cudaStream_t stream) {
   std::minstd_rand engine;
-  int seed = 123;
+  int seed = std::random_device()();
 
   const int batch_size = args.batch_size_;
   const int vocab_size = args.vocab_size_;
@@ -620,7 +620,7 @@ void topK_sampling_kernel_kernelLauncher(void* workspace,
   if (workspace == nullptr) {
     workspace_size = sizeof(float) * temp_log_probs_buf_size +
                      sizeof(int) * topk_tmp_ids_buf_size +
-                     sizeof(int) * topk_tmp_val_buf_size;
+                     sizeof(float) * topk_tmp_val_buf_size;
   } else {
     T* temp_log_probs = (T*)workspace;
     int* topk_tmp_id_buf = (int*)(temp_log_probs + temp_log_probs_buf_size);
