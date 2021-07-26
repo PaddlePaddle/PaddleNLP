@@ -568,24 +568,23 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
             paddle.zeros([batch_size])).reshape([batch_size, beam_size])
 
         force_position = paddle.unsqueeze(trg_length > time, [1])
-        anti_force = paddle.logical_not(force_position)
+        # NOTE: When the date type of the input of paddle.tile is bool
+        # and enable static mode, its stop_gradient must be True .
+        force_position.stop_gradient = True
+        force_position = paddle.tile(force_position, [1, beam_size])
+        crt_trg_word = paddle.slice(
+            trg_word, axes=[1], starts=[time], ends=[time + 1])
+        crt_trg_word = paddle.tile(crt_trg_word, [1, beam_size])
 
-        predicted_ids = beam_search_output.predicted_ids * paddle.cast(
-            anti_force, dtype=ids_dtype) + paddle.slice(
-                trg_word, axes=[1], starts=[time],
-                ends=[time + 1]) * paddle.cast(
-                    force_position, dtype=ids_dtype)
-        scores = beam_search_output.scores * paddle.cast(
-            anti_force, dtype=scores_dtype) + scores * paddle.cast(
-                force_position, dtype=scores_dtype)
-        parent_ids = beam_search_output.parent_ids * paddle.cast(
-            anti_force, dtype=ids_dtype) + parent_ids * paddle.cast(
-                force_position, dtype=ids_dtype)
+        predicted_ids = paddle.where(force_position, crt_trg_word,
+                                     beam_search_output.predicted_ids)
+        scores = paddle.where(force_position, scores, beam_search_output.scores)
+        parent_ids = paddle.where(force_position, parent_ids,
+                                  beam_search_output.parent_ids)
 
         cell_states = beam_search_state.cell_states
-        log_probs = beam_search_state.log_probs * paddle.cast(
-            anti_force, dtype=scores_dtype) + scores * paddle.cast(
-                force_position, dtype=scores_dtype)
+        log_probs = paddle.where(force_position, scores,
+                                 beam_search_state.log_probs)
         finished = beam_search_state.finished
         lengths = beam_search_state.lengths
 
