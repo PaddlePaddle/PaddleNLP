@@ -172,8 +172,8 @@ if __name__ == '__main__':
         evaluate(model, metric, dev_loader)
         model_to_save = model._layers if isinstance(
             model, paddle.DataParallel) else model
-        paddle.save(model_to_save.state_dict(),
-                    os.path.join(args.save_dir, 'model_%d.pdparams' % step))
+        model_to_save.save_pretrained(
+            os.path.join(args.save_dir, 'model_%d' % step))
 
     if rank == 0:
         preds = predict(model, test_loader, test_ds, label_vocab)
