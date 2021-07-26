@@ -456,6 +456,7 @@ class MRCIterator(ClassifierIterator):
         self.features_all = []
         unique_id = 1000
         is_training = self.mode == "train"
+        print("total {} examples".format(len(examples)), flush=True)
         for (example_index, example) in enumerate(examples):
             query_tokens = self.tokenizer.tokenize(example.question_text)
             if len(query_tokens) > self.max_query_length:
@@ -549,6 +550,10 @@ class MRCIterator(ClassifierIterator):
                     cal_loss=1)
                 features.append(feature)
                 features_each.append(feature)
+                if example_index % 1000 == 0:
+                    print(
+                        "processing {} examples".format(example_index),
+                        flush=True)
 
                 unique_id += 1
             #repeat
@@ -1118,4 +1123,118 @@ class SemanticMatchingIterator(MRCIterator):
         return_list = self._create_pad_ids(batch_records) \
                     + self._create_pad_ids(batch_records, "pair_") \
                     + [batch_labels, batch_qids, batch_gather_idx, need_cal_loss]
+        return return_list
+
+
+class SequenceLabelingIterator(ClassifierIterator):
+    def __init__(self,
+                 dataset,
+                 batch_size,
+                 tokenizer,
+                 trainer_num,
+                 trainer_id,
+                 max_seq_length=512,
+                 memory_len=128,
+                 repeat_input=False,
+                 in_tokens=False,
+                 mode="train",
+                 random_seed=None,
+                 no_entity_id=-1):
+        super(SequenceLabelingIterator, self).__init__(
+            dataset,
+            batch_size,
+            tokenizer,
+            trainer_num,
+            trainer_id,
+            max_seq_length,
+            memory_len,
+            repeat_input,
+            in_tokens,
+            mode,
+            random_seed,
+            preprocess_text_fn=None)
+        self.no_entity_id = no_entity_id
+
+    def _convert_to_features(self, example, qid):
+        """
+        Convert example to features fed into model
+        """
+        tokens = example['tokens']
+        label = example["labels"]
+        doc_spans = []
+        _DocSpan = namedtuple("DocSpan", ["start", "length"])
+        start_offset = 0
+        max_tokens_for_doc = self.max_seq_length - 2
+        while start_offset < len(tokens):
+            length = len(tokens) - start_offset
+            if length > max_tokens_for_doc:
+                length = max_tokens_for_doc
+            doc_spans.append(_DocSpan(start=start_offset, length=length))
+            if start_offset + length == len(tokens):
+                break
+            start_offset += min(length, self.memory_len)
+
+        features = []
+        Feature = namedtuple("Feature",
+                             ["src_ids", "label_ids", "qid", "cal_loss"])
+        for (doc_span_index, doc_span) in enumerate(doc_spans):
+            curr_tokens = ["[CLS]"] + tokens[doc_span.start:doc_span.start +
+                                             doc_span.length] + ["[SEP]"]
+            token_ids = self.tokenizer.convert_tokens_to_ids(curr_tokens)
+            label = [self.no_entity_id
+                     ] + label[doc_span.start:doc_span.start +
+                               doc_span.length] + [self.no_entity_id]
+
+            features.append(
+                Feature(
+                    src_ids=token_ids, label_ids=label, qid=qid, cal_loss=1))
+
+        if self.repeat_input:
+            features_repeat = features
+            features = list(map(lambda x: x._replace(cal_loss=0), features))
+            features = features + features_repeat
+        return features
+
+    def _pad_batch_records(self, batch_records, gather_idx=[]):
+        batch_token_ids = [record.src_ids for record in batch_records]
+        batch_length = [len(record.src_ids) for record in batch_records]
+        batch_length = np.array(batch_length).astype("int64").reshape([-1, 1])
+
+        if batch_records[0].label_ids is not None:
+            batch_labels = [record.label_ids for record in batch_records]
+        else:
+            batch_labels = np.array([]).astype("int64").reshape([-1, 1])
+        # qid
+        if batch_records[-1].qid is not None:
+            batch_qids = [record.qid for record in batch_records]
+            batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
+        else:
+            batch_qids = np.array([]).astype("int64").reshape([-1, 1])
+
+        if gather_idx:
+            batch_gather_idx = np.array(gather_idx).astype("int64").reshape(
+                [-1, 1])
+            need_cal_loss = np.array([1]).astype("int64")
+        else:
+            batch_gather_idx = np.array(list(range(len(batch_records)))).astype(
+                "int64").reshape([-1, 1])
+            need_cal_loss = np.array([0]).astype("int64")
+        # padding
+        padded_token_ids, input_mask = pad_batch_data(
+            batch_token_ids, pad_idx=self.tokenizer.pad_token_id, pad_max_len=self.max_seq_length, \
+            final_cls=True, return_input_mask=True)
+        if batch_records[0].label_ids is not None:
+            padded_batch_labels = pad_batch_data(
+                batch_labels,
+                pad_idx=self.no_entity_id,
+                pad_max_len=self.max_seq_length)
+        padded_task_ids = np.zeros_like(padded_token_ids, dtype="int64")
+        padded_position_ids = get_related_pos(padded_token_ids, \
+            self.max_seq_length, self.memory_len)
+
+        return_list = [
+            padded_token_ids, padded_position_ids, padded_task_ids, input_mask,
+            padded_batch_labels, batch_length, batch_qids, batch_gather_idx,
+            need_cal_loss
+        ]
         return return_list
