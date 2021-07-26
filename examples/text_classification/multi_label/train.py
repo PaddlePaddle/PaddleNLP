@@ -29,7 +29,6 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 
 from data import convert_example, create_dataloader, read_custom_data
 from metric import MultiLabelReport
-from model import BertForMultiLabelClassifier
 from model import MultiLabelClassifier
 
 # yapf: disable
@@ -94,13 +93,11 @@ def do_train():
     train_ds = load_dataset(read_custom_data, filename=os.path.join(
         args.data_path, file_name), is_test=False, lazy=False)
 
-    # If you wanna use electra/ernie pretrained model,
-    # pretrained_model = ppnlp.transformers.ElectraModel.from_pretrained("electra-base")
+    # If you wanna use ernie pretrained model,
     # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-2.0-en")
     pretrained_model = ppnlp.transformers.BertModel.from_pretrained("bert-base-uncased")
 
-    # If you wanna use electra/ernie pretrained model,
-    # tokenizer = ppnlp.transformers.ElectraTokenizer.from_pretrained("electra-base")
+    # If you wanna use ernie pretrained model,
     # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained("ernie-2.0-en")
     tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-uncased')
 
