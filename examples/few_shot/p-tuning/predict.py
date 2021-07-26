@@ -340,7 +340,7 @@ if __name__ == "__main__":
                                         args.task_name + ".json")
 
     label_norm_dict = None
-    with open(label_normalize_json) as f:
+    with open(label_normalize_json, encoding='utf-8') as f:
         label_norm_dict = json.load(f)
 
     convert_example_fn = convert_example if args.task_name != "chid" else convert_chid_example
