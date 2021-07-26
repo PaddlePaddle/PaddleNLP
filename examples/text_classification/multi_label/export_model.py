@@ -20,20 +20,26 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 import paddlenlp as ppnlp
+from paddlenlp.transformers import BertTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
+
+from model import MultiLabelClassifier
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--params_path", type=str, required=True, default='./checkpoint/model_900/model_state.pdparams', help="The path to model parameters to be loaded.")
-parser.add_argument("--output_path", type=str, default='./output', help="The path of model parameter in static graph to be saved.")
+parser.add_argument("--params_path", type=str, required=True, default='./checkpoint/model_800/model_state.pdparams', help="The path to model parameters to be loaded.")
+parser.add_argument("--output_path", type=str, default='./static_graph_params', help="The path of model parameter in static graph to be saved.")
 args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
     # The number of labels should be in accordance with the training dataset.
-    label_map = {0: 'negative', 1: 'positive'}
-    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        "ernie-tiny", num_classes=len(label_map))
+    label_info = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
+
+    # Load pretrained model
+    pretrained_model = ppnlp.transformers.BertModel.from_pretrained("bert-base-uncased")
+
+    model = MultiLabelClassifier(pretrained_model, num_labels=len(label_info))
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
@@ -51,5 +57,4 @@ if __name__ == "__main__":
                 shape=[None, None], dtype="int64")  # segment_ids
         ])
     # Save in static graph model.
-    save_path = os.path.join(args.output_path, "inference")
-    paddle.jit.save(model, save_path)
+    paddle.jit.save(model, args.output_path)
