@@ -61,7 +61,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_dir 
 * `learning_rate`：可选，Fine-tune的最大学习率；默认为5e-5。
 * `weight_decay`：可选，控制正则项力度的参数，用于防止过拟合，默认为0.0。
 * `epochs`: 训练轮次，默认为3。
-* `warmup_proption`：可选，学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.1。
+* `warmup_proption`：可选，学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.0。
 * `init_from_ckpt`：可选，模型参数路径，热启动模型训练；默认为None。
 * `seed`：可选，随机种子，默认为1000。
 * `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
@@ -74,7 +74,6 @@ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_dir 
 ```text
 checkpoints/
 ├── model_100
-│   ├── model_config.json
 │   ├── model_state.pdparams
 │   ├── tokenizer_config.json
 │   └── vocab.txt
@@ -115,9 +114,9 @@ Thank you for understanding. I think very highly of you and would not revert wit
 Data:    Your bullshit is not welcome here.
 toxic:   1
 severe_toxic:    0
-obscene:         1
+obscene:         0
 threat:          0
-insult:          1
+insult:          0
 identity_hate:   0
 Data:    Thank you for understanding. I think very highly of you and would not revert without discussion.
 toxic:   0

@@ -19,10 +19,11 @@ from functools import partial
 import numpy as np
 import paddle
 import paddle.nn.functional as F
+import paddlenlp as ppnlp
 from paddlenlp.transformers import BertTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 
-from model import BertForMultiLabelClassifier
+from model import MultiLabelClassifier
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -35,9 +36,10 @@ if __name__ == "__main__":
     # The number of labels should be in accordance with the training dataset.
     label_info = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
 
-    # Load bert pretrained model
-    model = BertForMultiLabelClassifier.from_pretrained(
-        'bert-base-uncased', num_labels=len(label_info))
+    # Load pretrained model
+    pretrained_model = ppnlp.transformers.BertModel.from_pretrained("bert-base-uncased")
+
+    model = MultiLabelClassifier(pretrained_model, num_labels=len(label_info))
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)

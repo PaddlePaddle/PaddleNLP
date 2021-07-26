@@ -22,14 +22,15 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
+import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import BertTokenizer
 
 from data import convert_example, create_dataloader, read_custom_data
 from metric import MultiLabelReport
 from model import BertForMultiLabelClassifier
+from model import MultiLabelClassifier
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -40,7 +41,7 @@ parser.add_argument("--batch_size", default=32, type=int, help="Batch size per G
 parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
-parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
+parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument("--device", choices=["cpu", "gpu", "xpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
@@ -89,16 +90,19 @@ def do_train():
     set_seed(args.seed)
 
     # Load train dataset.
-    file_name = 'train.csv'
+    dataset_name = 'train.csv'
     train_ds = load_dataset(read_custom_data, filename=os.path.join(
-        args.data_path, file_name), is_test=False, lazy=False)
+        args.data_path, dataset_name), is_test=False, lazy=False)
 
-    # Load bert pretrained model
-    model = BertForMultiLabelClassifier.from_pretrained(
-        'bert-base-uncased', num_labels=len(train_ds.data[0]["label"]))
+    # If you wanna use electra/ernie pretrained model,
+    # pretrained_model = ppnlp.transformers.ElectraModel.from_pretrained("electra-base")
+    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-2.0-en")
+    pretrained_model = ppnlp.transformers.BertModel.from_pretrained("bert-base-uncased")
 
-    # Load bert tokenizer
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    # If you wanna use electra/ernie pretrained model,
+    # tokenizer = ppnlp.transformers.ElectraTokenizer.from_pretrained("electra-base")
+    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained("ernie-2.0-en")
+    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-uncased')
 
     trans_func = partial(
         convert_example,
@@ -115,6 +119,8 @@ def do_train():
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
+
+    model = MultiLabelClassifier(pretrained_model, num_labels=len(train_ds.data[0]["label"]))
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -167,7 +173,8 @@ def do_train():
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                model._layers.save_pretrained(save_dir)
+                save_param_path = os.path.join(save_dir, "model_state.pdparams")
+                paddle.save(model.state_dict(), save_param_path)
                 tokenizer.save_pretrained(save_dir)
 
 if __name__ == "__main__":

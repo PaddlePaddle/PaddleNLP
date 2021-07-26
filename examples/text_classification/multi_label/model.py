@@ -13,35 +13,23 @@
 # limitations under the License.
 
 import paddle.nn as nn
-from paddlenlp.transformers import BertPretrainedModel
 
-class BertForMultiLabelClassifier(BertPretrainedModel):
-    """
-    Model for multi-label text classification task with BERT.
-    Args:
-        bert (BertModel, nn.Layer): An instance of BertModel.
-        num_labels (int, optional): The number of labels. Default 2
-        dropout (float, optional): The dropout probability for output of BERT.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Default None
-    """
-
-    def __init__(self, bert, num_labels=2, dropout=None):
-        super(BertForMultiLabelClassifier, self).__init__()
+class MultiLabelClassifier(nn.Layer):
+    def __init__(self, pretrained_model, num_labels=2, dropout=None):
+        super(MultiLabelClassifier, self).__init__()
+        self.ptm = pretrained_model
         self.num_labels = num_labels
-        self.bert = bert  # allow bert to be config
         self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.bert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.bert.config["hidden_size"],
+                                  self.ptm.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.ptm.config["hidden_size"],
                                     num_labels)
-        self.apply(self.init_weights)
 
     def forward(self,
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
-        _, pooled_output = self.bert(
+        _, pooled_output = self.ptm(
             input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
