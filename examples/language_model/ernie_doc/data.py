@@ -503,16 +503,15 @@ class MRCIterator(ClassifierIterator):
                 token_to_orig_map = {}
                 token_is_max_context = {}
                 tokens.append("[CLS]")
-
                 for i in range(doc_span.length):
                     split_token_index = doc_span.start + i
-                    token_to_orig_map[len(tokens)] = tok_to_orig_index[
+                    token_to_orig_map[i + 1] = tok_to_orig_index[
                         split_token_index]
-
                     is_max_context = self._check_is_max_context(
                         doc_spans, doc_span_index, split_token_index)
-                    token_is_max_context[len(tokens)] = is_max_context
-                    tokens.append(all_doc_tokens[split_token_index])
+                    token_is_max_context[i + 1] = is_max_context
+                tokens += all_doc_tokens[doc_span.start:doc_span.start +
+                                         doc_span.length]
                 tokens.append("[SEP]")
 
                 for token in query_tokens:
@@ -552,7 +551,6 @@ class MRCIterator(ClassifierIterator):
                 features_each.append(feature)
 
                 unique_id += 1
-
             #repeat
             if self.repeat_input:
                 features_each_repeat = features_each
@@ -595,7 +593,7 @@ class MRCIterator(ClassifierIterator):
         for (span_index, doc_span) in enumerate(doc_spans):
             end = doc_span.start + doc_span.length - 1
             if position < doc_span.start:
-                continue
+                break
             if position > end:
                 continue
             num_left_context = position - doc_span.start
@@ -605,6 +603,8 @@ class MRCIterator(ClassifierIterator):
             if best_score is None or score > best_score:
                 best_score = score
                 best_span_index = span_index
+                if best_span_index > cur_span_index:
+                    return False
 
         return cur_span_index == best_span_index
 
