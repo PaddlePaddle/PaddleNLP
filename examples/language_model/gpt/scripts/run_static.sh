@@ -20,11 +20,11 @@ python3.7 -u  -m paddle.distributed.fleet.launch \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --max_seq_len 1024 \
-    --micro_batch_size 8 \
-    --global_batch_size 32 \
-    --sharding_degree 4\
-    --mp_degree 2 \
-    --dp_degree 1 \
+    --micro_batch_size 2 \
+    --global_batch_size 16 \
+    --sharding_degree 1\
+    --mp_degree 4 \
+    --dp_degree 2 \
     --pp_degree 1 \
     --use_sharding true \
     --use_amp true \
