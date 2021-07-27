@@ -17,7 +17,7 @@ import os
 import unicodedata
 
 import jieba
-from .. import (
+from ..tokenizer_utils import (
     PretrainedTokenizer,
     _is_control,
     _is_punctuation,
