@@ -41,7 +41,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="pretraining model name or path")
 parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
-parser.add_argument("--learning_rate", type=float, default=5e-5, help="Learning rate used to train.")
+parser.add_argument("--learning_rate", type=float, default=2e-5, help="Learning rate used to train.")
 parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
 parser.add_argument("--logging_steps", type=int, default=1, help="Log every X updates steps.")
 parser.add_argument("--output_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
@@ -125,6 +125,7 @@ def evaluate(model, metric, data_loader, memories0):
         metric.update(num_infer_chunks.numpy(),
                       num_label_chunks.numpy(), num_correct_chunks.numpy())
     precision, recall, f1_score = metric.accumulate()
+    logger.info("Total {} samples.".format(len(qids)))
     logger.info("eval loss: %f, precision: %f, recall: %f, f1: %f" %
                 (avg_loss, precision, recall, f1_score))
     model.train()

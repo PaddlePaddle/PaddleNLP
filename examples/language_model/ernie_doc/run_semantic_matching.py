@@ -78,17 +78,6 @@ def init_memory(batch_size, memory_length, d_model, n_layers):
 
 @paddle.no_grad()
 def evaluate(model, metric, data_loader, memories0, pair_memories0):
-    """
-    Given a dataset, it evals model and computes the metric.
-    Because the same sample may be splited into several samples and evaluated in 
-    different steps, the method to compute ERNIE-DOC classification acc has slightly
-    different. It merges the same sample results into one result. 
-
-    Args:
-        model(obj:`paddle.nn.Layer`): A model to classify texts.
-        data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
-        metric(obj:`paddle.metric.Metric`): The evaluation metric.
-    """
     model.eval()
     losses = []
     # copy the memory

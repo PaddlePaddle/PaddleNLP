@@ -1221,8 +1221,10 @@ class SequenceLabelingIterator(ClassifierIterator):
             need_cal_loss = np.array([0]).astype("int64")
         # padding
         padded_token_ids, input_mask = pad_batch_data(
-            batch_token_ids, pad_idx=self.tokenizer.pad_token_id, pad_max_len=self.max_seq_length, \
-            final_cls=True, return_input_mask=True)
+            batch_token_ids,
+            pad_idx=self.tokenizer.pad_token_id,
+            pad_max_len=self.max_seq_length,
+            return_input_mask=True)
         if batch_records[0].label_ids is not None:
             padded_batch_labels = pad_batch_data(
                 batch_labels,
