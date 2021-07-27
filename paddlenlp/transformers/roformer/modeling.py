@@ -63,7 +63,7 @@ class MultiHeadAttentionNew(MultiHeadAttention):
         # cos [batch_size, num_heads, sequence_length, embed_size_per_head//2]
 
         sin, cos = paddle.chunk(sinusoidal_pos, 2, axis=-1)
-        paddle.reshape
+
         # sin [θ0,θ1,θ2......θd/2-1] -> sin_pos [θ0,θ0,θ1,θ1,θ2,θ2......θd/2-1,θd/2-1]
         sin_pos = paddle.reshape(
             paddle.stack(

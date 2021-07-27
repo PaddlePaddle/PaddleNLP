@@ -17,7 +17,7 @@ import os
 import unicodedata
 
 import jieba
-from .. import (
+from ..tokenizer_utils import (
     PretrainedTokenizer,
     _is_control,
     _is_punctuation,
@@ -228,13 +228,13 @@ class WordpieceTokenizer(object):
 
 class RoFormerTokenizer(PretrainedTokenizer):
     """
-    Constructs a BERT tokenizer. It uses a basic tokenizer to do punctuation
-    splitting, lower casing and so on, and follows a WordPiece tokenizer to
+    Constructs a RoFormer tokenizer. It uses a basic tokenizer to do punctuation
+    splitting, lower casing, jieba pretokenizer and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
     Args:
         vocab_file (str): file path of the vocabulary
         do_lower_case (bool): Whether the text strips accents and convert to
-            lower case. If you use the BERT pretrained model, lower is set to
+            lower case. If you use the RoFormer pretrained model, lower is set to
             Flase when using the cased model, otherwise it is set to True.
             Default: True.
         unk_token (str): The special token for unkown words. Default: "[UNK]".
@@ -245,12 +245,12 @@ class RoFormerTokenizer(PretrainedTokenizer):
 
     Examples:
         .. code-block:: python
-            from paddle.hapi.text import BertTokenizer
-            tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-            # the following line get: ['he', 'was', 'a', 'puppet', '##eer']
-            tokens = tokenizer('He was a puppeteer')
-            # the following line get: 'he was a puppeteer'
-            tokenizer.convert_tokens_to_string(tokens)
+            from paddlenlp.transformers.roforme import RoFormerTokenizer
+            tokenizer = RoFormerTokenizer.from_pretrained('roformer-chinese-base')
+            # the following line get: ['今天', '的', '天气', '非常', '好', '！']
+            tokens = tokenizer.tokenize('今天的天气非常好！')
+            # the following line get: '今天 的 天气 非常 好 ！'
+            x = tokenizer.convert_tokens_to_string(tokens)
     """
 
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
