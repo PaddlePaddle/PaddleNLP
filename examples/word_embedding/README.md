@@ -11,7 +11,7 @@ PaddleNLP已预置多个公开的预训练Embedding，用户可以通过使用`p
 
 - visualdl
 
-安装命令：`python -m pip install visualdl -i https://mirror.baidu.com/pypi/simple`
+安装命令：`pip install visualdl`
 
 
 ### 启动训练
