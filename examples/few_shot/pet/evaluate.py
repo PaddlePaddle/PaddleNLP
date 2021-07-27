@@ -34,11 +34,6 @@ def do_evaluate(model, tokenizer, data_loader, label_normalize_dict):
 
     for batch in data_loader:
         src_ids, token_type_ids, masked_positions, masked_lm_labels = batch
-        # [bs * label_length, vocab_size]
-        # prediction_probs = model.predict(
-        #     input_ids=src_ids,
-        #     token_type_ids=token_type_ids,
-        #     masked_positions=masked_positions)
 
         max_len = src_ids.shape[1]
         new_masked_positions = []
@@ -113,44 +108,10 @@ def do_evaluate_cluewsc(model, tokenizer, data_loader, label_normalize_dict):
         prediction_probs = model(
             input_ids=src_ids, token_type_ids=token_type_ids)
 
-        # max_len = src_ids.shape[1]
-        # new_masked_positions = []
-
-        # for bs_index, mask_pos in enumerate(masked_positions.numpy()):
-        #     for pos in mask_pos:
-        #         new_masked_positions.append(bs_index * max_len + pos)
-        # new_masked_positions = paddle.to_tensor(np.array(new_masked_positions).astype('int32'))
-
-        # prediction_scores, _ = model(
-        #     input_ids=src_ids,
-        #     token_type_ids=token_type_ids,
-        #     masked_positions=new_masked_positions)
-        # softmax_fn = paddle.nn.Softmax()
-        # prediction_probs = softmax_fn(prediction_scores)
-
-        # batch_size = len(src_ids)
-        # vocab_size = 2
-
-        # # prediction_probs: [batch_size, label_lenght, vocab_size]
-        # prediction_probs = paddle.reshape(
-        #     prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
-
-        # # [label_num, label_length]
-        # label_ids = np.array(
-        #     [tokenizer(label)["input_ids"][1:-1] for label in normed_labels])
-
-        # y_pred = np.ones(shape=[batch_size, len(label_ids)])
-
-        # # Calculate joint distribution of candidate labels
-        # for index in range(label_length):
-        #     y_pred *= prediction_probs[:, index, label_ids[:, index]]
-
         # Get max probs label's index
         y_pred_index = paddle.argmax(prediction_probs, axis=-1).numpy()
         y_true_index = []
-        # print(y_pred_index)
-        # print(label_idx)
-        # print()
+
         for label_i in label_idx.numpy():
             y_true_index.append(label_i)
         y_true_index = np.array(y_true_index)
