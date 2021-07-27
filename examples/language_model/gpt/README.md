@@ -28,7 +28,8 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 - regex
 - sentencepiece
 - tqdm
-安装命令 `pip install regex sentencepiece tqdm`
+- visualdl
+安装命令 `pip install regex sentencepiece tqdm visualdl`
 
 ### 数据准备
 
