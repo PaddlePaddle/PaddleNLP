@@ -7,6 +7,13 @@ PaddleNLP已预置多个公开的预训练Embedding，用户可以通过使用`p
 
 ## 快速开始
 
+### 环境依赖
+
+- visualdl
+
+安装命令：`python -m pip install visualdl -i https://mirror.baidu.com/pypi/simple`
+
+
 ### 启动训练
 
 我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在验证集（dev.tsv）验证。训练时会自动下载词表dict.txt，用于对数据集进行切分，构造数据样本。
