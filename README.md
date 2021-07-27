@@ -53,7 +53,7 @@ pip install --upgrade paddlenlp
 
 ### Transformer API: 强大的预训练模型生态底座
 
-覆盖**15**个网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。也欢迎开发者进预训练模贡献！🤗 
+覆盖**15**个网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。也欢迎开发者进预训练模贡献！🤗
 
 ```python
 from paddlenlp.transformers import *
@@ -78,7 +78,7 @@ text = tokenizer('自然语言处理')
 
 # 语义表示
 model = ErnieModel.from_pretrained('ernie-1.0')
-pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
+sequence_output, pooled_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
 # 文本分类 & 句对匹配
 model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
 # 序列标注
