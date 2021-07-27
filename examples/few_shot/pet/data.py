@@ -80,18 +80,11 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
         src_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
 
-        # # Step2: gen p_token_ids
-        # p_tokens = ["[unused{}]".format(i) for i in range(p_embedding_num)]
-        # p_token_ids = tokenizer.convert_tokens_to_ids(p_tokens)
-
-        # Step3: Insert "[MASK]" to src_ids based on start_mask_position
+        # Step2: Insert "[MASK]" to src_ids based on start_mask_position
         src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
             start_mask_position:]
         token_type_ids = token_type_ids[0:start_mask_position] + [0] * len(
             mask_ids) + token_type_ids[start_mask_position:]
-
-        # Stpe4: Insert P-tokens at begin of sentence
-        # src_ids = p_token_ids + src_ids
 
         # calculate mask_positions
         mask_positions = [
@@ -143,129 +136,6 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
         return src_ids, token_type_ids, mask_positions, mask_lm_labels
 
 
-def convert_cluewsc_example(example,
-                            tokenizer,
-                            max_seq_length=512,
-                            is_test=False):
-    """
-    Args:
-        example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
-            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
-            Sequences longer than this will be truncated, sequences shorter will be padded.
-        p_embedding_num(obj:`int`) The number of p-embedding.
-    Returns:
-        input_ids(obj:`list[int]`): The list of query token ids.
-        token_type_ids(obj: `list[int]`): List of query sequence pair mask.
-        mask_positions(obj: `list[int]`): The list of mask_positions.
-        mask_lm_labels(obj: `list[int]`): The list of mask_lm_labels.
-    """
-
-    # Replace <unk> with '[MASK]'
-
-    # Step1: gen mask ids
-    if is_test:
-        label_length = example["label_length"]
-    else:
-        text_label = example["text_label"]
-        label_length = len(text_label)
-
-    mask_tokens = ["[MASK]"] * label_length
-    mask_ids = tokenizer.convert_tokens_to_ids(mask_tokens)
-
-    sentence1 = example["sentence1"]
-    if "<unk>" in sentence1:
-        start_mask_position = sentence1.index("<unk>") + 1
-        sentence1 = sentence1.replace("<unk>", "")
-        encoded_inputs = tokenizer(text=sentence1, max_seq_len=max_seq_length)
-        src_ids = encoded_inputs["input_ids"]
-        token_type_ids = encoded_inputs["token_type_ids"]
-
-        # # Step2: gen p_token_ids
-        # p_tokens = ["[unused{}]".format(i) for i in range(p_embedding_num)]
-        # p_token_ids = tokenizer.convert_tokens_to_ids(p_tokens)
-
-        # Step3: Insert "[MASK]" to src_ids based on start_mask_position
-        src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
-            start_mask_position:]
-        token_type_ids = token_type_ids[0:start_mask_position] + [0] * len(
-            mask_ids) + token_type_ids[start_mask_position:]
-
-        # Stpe4: Insert P-tokens at begin of sentence
-        # src_ids = p_token_ids + src_ids
-
-        # calculate mask_positions
-        mask_positions = [
-            index + start_mask_position for index in range(label_length)
-        ]
-    else:
-        sentence2 = example['sentence2']
-        start_mask_position = sentence2.index("<unk>") + 1
-        sentence2 = sentence2.replace("<unk>", "")
-
-        encoded_inputs = tokenizer(text=sentence2, max_seq_len=max_seq_length)
-        src_ids = encoded_inputs["input_ids"]
-        token_type_ids = encoded_inputs["token_type_ids"]
-        src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
-            start_mask_position:]
-        token_type_ids = token_type_ids[0:start_mask_position] + [0] * len(
-            mask_ids) + token_type_ids[start_mask_position:]
-
-        encoded_inputs = tokenizer(text=sentence1, max_seq_len=max_seq_length)
-        sentence1_src_ids = encoded_inputs["input_ids"][1:]
-        src_ids = sentence1_src_ids + src_ids
-        token_type_ids += [1] * len(src_ids)
-        mask_positions = [
-            index + start_mask_position + len(sentence1)
-            for index in range(label_length)
-        ]
-
-    token_type_ids = [0] * len(src_ids)
-
-    assert len(src_ids) == len(
-        token_type_ids), "length src_ids, token_type_ids must be equal"
-
-    length = len(src_ids)
-    if length > 512:
-        src_ids = src_ids[:512]
-        token_type_ids = token_type_ids[:512]
-
-    if is_test:
-        import jieba.posseg as pseg
-        judge = 0
-
-        def isname(single_word_string):
-            pair_word_list = pseg.lcut(single_word_string)
-            for eve_word, cixing in pair_word_list:
-                if cixing == "nr":
-                    return True
-            return False
-
-        text_ori = example["target"]["span1_text"]
-        text_daici = example["target"]["span2_text"]
-        if isname(text_ori) and text_daici == "它":
-            judge = 1
-        if ("妈" in text_ori or "姨" in text_ori or "婆" in text_ori or
-                "太太" in text_ori or "妻" in text_ori or "姐" in text_ori or
-                "妹" in text_ori) and ("他" in text_daici):
-            judge = 1
-        if ("爸" in text_ori or "叔" in text_ori or "公" in text_ori or
-                "夫" in text_ori or "哥" in text_ori or
-                "弟" in text_ori) and ("她" in text_daici):
-            judge = 1
-        # print(paddle.to_tensor(judge, dtype="int64"))
-        return src_ids, token_type_ids, mask_positions, judge
-    else:
-        mask_lm_labels = tokenizer(
-            text=text_label, max_seq_len=max_seq_length)["input_ids"][1:-1]
-        assert len(mask_lm_labels) == len(
-            mask_positions
-        ) == label_length, "length of mask_lm_labels:{} mask_positions:{} label_length:{} not equal".format(
-            mask_lm_labels, mask_positions, text_label)
-        return src_ids, token_type_ids, mask_positions, mask_lm_labels
-
-
 def convert_chid_example(example, tokenizer, max_seq_length=512, is_test=False):
     """
     Args:
@@ -283,17 +153,12 @@ def convert_chid_example(example, tokenizer, max_seq_length=512, is_test=False):
         mask_lm_labels(obj: `list[int]`): The list of mask_lm_labels.
     """
     # FewClue Task `Chid`' label's position must be calculated by special token: "淠"
-    # FewClue Task `Chid`' label's position must be calculated by special token: "龜" 
 
     seg_tokens = tokenizer.tokenize(example["sentence1"])
 
     # find insert position of `[MASK]`
-    # start_mask_position = seg_tokens.index("淠") + 1
-    # seg_tokens.remove("淠")
-    # start_mask_position = seg_tokens.index("龜") + 1
-    # seg_tokens.remove("龜")
-    start_mask_position = seg_tokens.index("[UNK]") + 1
-    seg_tokens.remove("[UNK]")
+    start_mask_position = seg_tokens.index("淠") + 1
+    seg_tokens.remove("淠")
 
     sentence1 = "".join(seg_tokens)
     candidates = example["candidates"]
@@ -317,18 +182,11 @@ def convert_chid_example(example, tokenizer, max_seq_length=512, is_test=False):
     mask_tokens = ["[MASK]"] * label_length
     mask_ids = tokenizer.convert_tokens_to_ids(mask_tokens)
 
-    # Step2: gen p_token_ids
-    # p_tokens = ["[unused{}]".format(i) for i in range(p_embedding_num)]
-    # p_token_ids = tokenizer.convert_tokens_to_ids(p_tokens)
-
-    # Step3: Insert "[MASK]" to src_ids based on start_mask_position
+    # Step2: Insert "[MASK]" to src_ids based on start_mask_position
     src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
         start_mask_position:]
     token_type_ids = token_type_ids[0:start_mask_position] + [0] * len(
         mask_ids) + token_type_ids[start_mask_position:]
-
-    # Stpe4: Insert P-tokens at begin of sentence
-    # src_ids = p_token_ids + src_ids
 
     # calculate mask_positions
     mask_positions = [
@@ -577,12 +435,6 @@ def transform_csldcp(example,
 
         if pattern_id == 0:
             example["sentence1"] = u'这篇关于<unk>的文章讲了' + example["content"]
-        # elif pattern_id == 1:
-        #     example["sentence1"] = example["content"] + u'这是一篇关于<unk>的文章'
-        # elif pattern_id == 2:
-        #     example["sentence1"] = example["content"] + u'这是和<unk>有关的文章'
-        # elif pattern_id == 3:
-        #     example["sentence1"] = example["content"] + u'这些与<unk>有关'
         elif pattern_id == 1:
             example["sentence1"] = example["content"] + u'和<unk>息息相关'
         elif pattern_id == 2:
@@ -599,12 +451,6 @@ def transform_csldcp(example,
         example['text_label'] = normalized_label
         if pattern_id == 0:
             example["sentence1"] = u'这篇关于<unk>的文章讲了' + example["content"]
-        # elif pattern_id == 1:
-        #     example["sentence1"] = example["content"] + u'这是一篇关于<unk>的文章'
-        # elif pattern_id == 2:
-        #     example["sentence1"] = example["content"] + u'这是和<unk>有关的文章'
-        # elif pattern_id == 3:
-        #     example["sentence1"] = example["content"] + u'这些与<unk>有关'
         elif pattern_id == 1:
             example["sentence1"] = example["content"] + u'和<unk>息息相关'
         elif pattern_id == 2:
@@ -661,9 +507,7 @@ def transform_chid(example,
 
     if is_test:
         example["label_length"] = 4
-        # example["sentence1"] = example["content"].replace("#idiom#", "淠")
-        # example["sentence1"] = example["content"].replace("#idiom#", "龜")
-        example["sentence1"] = example["content"].replace("#idiom#", "蠅")
+        example["sentence1"] = example["content"].replace("#idiom#", "淠")
         del example["content"]
 
         return example
@@ -675,11 +519,7 @@ def transform_chid(example,
         # Note: `#idom#` represent a idom which must be replaced with rarely-used Chinese characters
         # to get the label's position after the text processed by tokenizer
         #ernie
-        # example["sentence1"] = example["content"].replace("#idiom#", "淠")
-        #albert
-        # example["sentence1"] = example["content"].replace("#idiom#", "龜")
-        #macbert
-        example["sentence1"] = example["content"].replace("#idiom#", "蠅")
+        example["sentence1"] = example["content"].replace("#idiom#", "淠")
         del example["content"]
 
         return example

@@ -16,10 +16,9 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 from model import ErnieForPretraining, ErnieMLMCriterion
-from model import AlbertMLMCriterion, AlbertForPretraining
 
 from data import create_dataloader, transform_fn_dict
-from data import convert_example, convert_chid_example, convert_cluewsc_example
+from data import convert_example, convert_chid_example
 from evaluate import do_evaluate, do_evaluate_chid, do_evaluate_cluewsc
 from predict import do_predict, do_predict_chid, predict_file, write_fn, do_predict_cluewsc
 
@@ -41,21 +40,10 @@ def do_train(args):
     label_normalize_json = os.path.join("./label_normalized",
                                         args.task_name + ".json")
 
-    if 'ernie' in args.language_model:
-        # Ernie Model
-        model = ErnieForPretraining.from_pretrained(args.language_model)
-        tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
-            args.language_model)
-    elif 'albert' in args.language_model:
-        # Albert Model
-        model = AlbertForPretraining.from_pretrained(args.language_model)
-        tokenizer = ppnlp.transformers.AlbertTokenizer.from_pretrained(
-            args.language_model)
-    elif 'macbert' in args.language_model:
-        model = ppnlp.transformers.BertForPretraining.from_pretrained(
-            args.language_model)
-        tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
-            args.language_model)
+    # Ernie Model
+    model = ErnieForPretraining.from_pretrained(args.language_model)
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+        args.language_model)
 
     # map y
     label_norm_dict = None
@@ -63,10 +51,8 @@ def do_train(args):
         label_norm_dict = json.load(f)
 
     convert_example_fn = convert_example if args.task_name != "chid" else convert_chid_example
-    convert_example_fn = convert_example_fn if args.task_name != "cluewsc" else convert_cluewsc_example
 
     evaluate_fn = do_evaluate if args.task_name != "chid" else do_evaluate_chid
-    # evaluate_fn = evaluate_fn if args.task_name != "cluewsc" else do_evaluate_cluewsc
 
     predict_fn = do_predict if args.task_name != "chid" else do_predict_chid
     predict_fn = predict_fn if args.task_name != "cluewsc" else do_predict_cluewsc
@@ -333,11 +319,7 @@ if __name__ == "__main__":
         '--language_model',
         type=str,
         default='ernie-1.0',
-        choices=[
-            'ernie-1.0', 'albert-chinese-base', 'albert-chinese-xlarge',
-            'albert-chinese-xxlarge', 'macbert-large-chinese',
-            'macbert-base-chinese'
-        ],
+        choices=['ernie-1.0'],
         help="Language model")
     args = parser.parse_args()
     do_train(args)
