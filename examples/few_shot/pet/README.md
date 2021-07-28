@@ -27,21 +27,12 @@ train_ds, dev_ds, public_test_ds = load_dataset("fewclue", name="tnews", splits=
 ### 模型训练&评估
 通过如下命令，指定 GPU 0 卡,  在 FewCLUE 的 `tnews` 数据集上进行训练&评估
 ```
-#task_name="iflytek"
-task_name="tnews"
-#task_name="eprstmt"
-#task_name="bustm"
-#task_name="ocnli"
-#task_name="csl"
-#task_name="csldcp"
-#task_name="cluewsc"
-#task_name="chid"
 python -u -m paddle.distributed.launch --gpus "0" \
     pet.py \
-	--task_name ${task_name} \
+	--task_name "tnews" \
 	--device gpu \
     --pattern_id 0 \
-	--save_dir ./${task_name} \
+	--save_dir ./tnews \
 	--index 0 \
 	--batch_size 16 \
 	--learning_rate 1E-4 \
@@ -61,20 +52,11 @@ python -u -m paddle.distributed.launch --gpus "0" \
 ### 模型预测
 通过如下命令，指定 GPU 0 卡， 在 `FewCLUE` 的 `iflytek` 数据集上进行预测
 ```
-#task_name="iflytek"
-task_name="tnews"
-#task_name="eprstmt"
-#task_name="bustm"
-#task_name="ocnli"
-#task_name="csl"
-#task_name="csldcp"
-#task_name="cluewsc"
-#task_name="chid"
 python -u -m paddle.distributed.launch --gpus "0" predict.py \
-        --task_name ${task_name} \
+        --task_name "tnews" \
         --device gpu \
-        --init_from_ckpt "./${task_name}/model_120/model_state.pdparams" \
-        --output_dir "./${task_name}/output" \
+        --init_from_ckpt "./tnews/model_120/model_state.pdparams" \
+        --output_dir "./tnews/output" \
         --batch_size 32 \
         --max_seq_length 512
 ```

@@ -16,7 +16,6 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 from paddlenlp.transformers.ernie.modeling import ErniePretrainedModel, ErniePretrainingHeads, ErnieLMPredictionHead
-from paddlenlp.transformers.albert.modeling import AlbertPretrainedModel, AlbertMLMHead, AlbertForMaskedLM
 
 
 class ErnieForPretraining(ErniePretrainedModel):
