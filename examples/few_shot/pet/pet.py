@@ -55,7 +55,6 @@ def do_train(args):
     evaluate_fn = do_evaluate if args.task_name != "chid" else do_evaluate_chid
 
     predict_fn = do_predict if args.task_name != "chid" else do_predict_chid
-    predict_fn = predict_fn if args.task_name != "cluewsc" else do_predict_cluewsc
 
     # load dataset
     train_ds, public_test_ds, test_ds = load_dataset(
