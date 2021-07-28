@@ -81,7 +81,6 @@ python -m paddle.distributed.launch --gpus '0' --log_dir ./log finetune.py \
    |---------------------------------|
    | unified_transformer-12L-cn      |
    | unified_transformer-12L-cn-luge |
-   | plato-mini |
 
 - `save_dir` 表示模型的保存路径。
 - `logging_steps` 表示日志打印间隔。
@@ -143,7 +142,6 @@ python infer.py \
    |---------------------------------|
    | unified_transformer-12L-cn      |
    | unified_transformer-12L-cn-luge |
-   | plato-mini |
 
 - `output_path` 表示预测结果的保存路径。
 - `logging_steps` 表示日志打印间隔。

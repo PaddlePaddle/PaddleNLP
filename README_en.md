@@ -20,7 +20,7 @@ English | [简体中文](./README.md)
 
 ## Introduction
 
-**PaddleNLP** is a powerful NLP library with **Awesome** pre-trained Transformer models and easy-to-use interface, supporting wide-range of NLP tasks from research to industrial applications. 
+**PaddleNLP** is a powerful NLP library with **Awesome** pre-trained Transformer models and easy-to-use interface, supporting wide-range of NLP tasks from research to industrial applications.
 
 
 * **Easy-to-Use API**
@@ -76,7 +76,7 @@ text = tokenizer('natural language understanding')
 
 # Semantic Representation
 model = ErnieModel.from_pretrained('ernie-1.0')
-pooled_output, sequence_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
+sequence_output, pooled_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
 # Text Classificaiton and Matching
 model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
 # Sequence Labeling
