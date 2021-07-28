@@ -145,12 +145,6 @@ def do_evaluate_chid(model, tokenizer, data_loader, label_normalize_dict):
     for batch in data_loader:
         src_ids, token_type_ids, masked_positions, masked_lm_labels, candidate_label_ids = batch
 
-        # [bs * label_length, vocab_size]
-        # prediction_probs = model.predict(
-        #     input_ids=src_ids,
-        #     token_type_ids=token_type_ids,
-        #     masked_positions=masked_positions)
-
         max_len = src_ids.shape[1]
         new_masked_positions = []
 

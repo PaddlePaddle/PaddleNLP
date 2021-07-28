@@ -105,73 +105,6 @@ def do_predict(model, tokenizer, data_loader, label_normalize_dict):
             y_pred_labels.append(origin_labels[index])
 
     return y_pred_labels
-    # return paddle.concat(y_pred_logits, axis=0).unsqueeze(1)
-
-@paddle.no_grad()
-def do_predict_cluewsc(model, tokenizer, data_loader, label_normalize_dict):
-    model.eval()
-
-    normed_labels = [
-        normalized_lable
-        for origin_lable, normalized_lable in label_normalize_dict.items()
-    ]
-
-    origin_labels = [
-        origin_lable
-        for origin_lable, normalized_lable in label_normalize_dict.items()
-    ]
-
-    label_length = len(normed_labels[0])
-
-    y_pred_labels = []
-
-    for batch in data_loader:
-        src_ids, token_type_ids, masked_positions, judge = batch
-
-        new_masked_positions = []
-
-        for bs_index, mask_pos in enumerate(masked_positions.numpy()):
-            for pos in mask_pos:
-                new_masked_positions.append(bs_index * max_len + pos)
-        new_masked_positions = paddle.to_tensor(np.array(new_masked_positions).astype('int32'))
-        prediction_scores = model(
-            input_ids=src_ids,
-            token_type_ids=token_type_ids,
-            masked_positions=new_masked_positions)
-
-        softmax_fn = paddle.nn.Softmax()
-        prediction_probs = softmax_fn(prediction_scores)
-
-        batch_size = len(src_ids)
-        vocab_size = prediction_probs.shape[1]
-
-        # prediction_probs: [batch_size, label_lenght, vocab_size]
-        prediction_probs = paddle.reshape(
-            prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
-
-        # [label_num, label_length]
-        label_ids = np.array(
-            [tokenizer(label)["input_ids"][1:-1] for label in normed_labels])
-
-        y_pred = np.ones(shape=[batch_size, len(label_ids)])
-
-        # Calculate joint distribution of candidate labels
-        for index in range(label_length):
-            y_pred *= prediction_probs[:, index, label_ids[:, index]]
-
-        # Get max probs label's index
-        y_pred_index = np.argmax(y_pred, axis=-1)
-
-        for index in range(len(y_pred_index)):
-            if judge.numpy()[index] == 1:
-                y_pred_labels.append(origin_labels[1])
-                continue
-            y_pred_labels.append(origin_labels[y_pred_index[index]])
-
-
-    return y_pred_labels
-    # return paddle.concat(y_pred_logits, axis=0).unsqueeze(1)
-
 
 @paddle.no_grad()
 def do_predict_chid(model, tokenizer, data_loader, label_normalize_dict):
@@ -238,11 +171,11 @@ def do_predict_chid(model, tokenizer, data_loader, label_normalize_dict):
 
                 y_pred[:, label_idx] *= np.array(batch_single_token_prob)
 
-        # # Get max probs label's index
+        # Get max probs label's index
         y_pred_index = np.argmax(y_pred, axis=-1)
         y_pred_all.extend(y_pred_index)
     return y_pred_all
-    # return y_pred
+
 
 
 predict_file = {
@@ -302,7 +235,7 @@ def write_csldcp(task_name, output_file, pred_labels):
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
             test_example["label"] = pred_labels[idx]
-            # {"id": 0, "label": "力学"}
+
             str_test_example = "\"{}\": {}, \"{}\": \"{}\"".format(
                 "id", test_example['id'], "label", test_example["label"])
             f.write("{" + str_test_example + "}\n")
@@ -339,7 +272,7 @@ def write_cluewsc(task_name, output_file, pred_labels):
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
             test_example["label"] = pred_labels[idx]
-            # {"id": 0, "label": "力学"}
+
             str_test_example = "\"{}\": {}, \"{}\": \"{}\"".format(
                 "id", test_example['id'], "label", test_example["label"])
             f.write("{" + str_test_example + "}\n")

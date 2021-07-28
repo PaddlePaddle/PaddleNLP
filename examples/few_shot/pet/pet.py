@@ -19,8 +19,8 @@ from model import ErnieForPretraining, ErnieMLMCriterion
 
 from data import create_dataloader, transform_fn_dict
 from data import convert_example, convert_chid_example
-from evaluate import do_evaluate, do_evaluate_chid, do_evaluate_cluewsc
-from predict import do_predict, do_predict_chid, predict_file, write_fn, do_predict_cluewsc
+from evaluate import do_evaluate, do_evaluate_chid
+from predict import do_predict, do_predict_chid, predict_file, write_fn
 
 
 def set_seed(seed):
