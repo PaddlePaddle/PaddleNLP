@@ -261,7 +261,6 @@ def do_train(args):
 
 
 if __name__ == "__main__":
-    exit()
     ARGS = parse_args()
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
