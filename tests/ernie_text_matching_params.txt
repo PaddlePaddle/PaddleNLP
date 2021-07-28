@@ -12,7 +12,7 @@ train_model_name:null
 train_infer_img_dir:null
 null:null
 ##
-trainer:norm
+trainer:norm_train
 norm_train:../examples/text_matching/ernie_matching/train_pointwise.py
 pact_train:null
 fpgm_train:null
@@ -34,6 +34,9 @@ distill_export:null
 null:null
 null:null
 ##
+infer_model:null
+infer_export:null
+infer_quant:null
 inference:../examples/text_matching/ernie_matching/deploy/python/predict.py
 --device:cpu|gpu
 --enable_mkldnn:True|False
