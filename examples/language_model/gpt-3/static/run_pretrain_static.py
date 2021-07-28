@@ -27,7 +27,7 @@ import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
 from paddle.distributed.fleet.meta_optimizers.sharding.utils import save_persistables
-from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCriterion
+from modeling import GPTModel, GPTForPretraining, GPTPretrainingCriterion
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.ops import guard, Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger

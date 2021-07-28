@@ -21,18 +21,16 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.fluid import layers
-from paddle.fluid.framework import in_dygraph_mode
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
-from paddle.fluid.initializer import Normal, Constant, NumpyArrayInitializer
 from paddle.distributed.fleet import fleet
 
-from .. import PretrainedModel, register_base_model
+from paddlenlp.transformers import PretrainedModel, register_base_model
 import paddlenlp
 
 __all__ = [
-    'GPTTrainModel',
-    'GPTTrainForPretraining',
-    'GPTTrainPretrainingCriterion',
+    'GPTModel',
+    'GPTForPretraining',
+    'GPTPretrainingCriterion',
 ]
 
 
@@ -275,7 +273,7 @@ class TransformerDecoder(nn.Layer):
         self.num_layers = num_layers
         self.layers = decoder_layers
         self.norm = norm
-        if norm is "LayerNorm":
+        if norm == "LayerNorm":
             self.norm = nn.LayerNorm(hidden_size)
         elif norm is not None:
             raise ValueError("Only support LayerNorm")
@@ -443,7 +441,7 @@ class TransformerDecoderLayer(nn.Layer):
         return incremental_cache
 
 
-class GPTTrainEmbeddings(nn.Layer):
+class GPTEmbeddings(nn.Layer):
     """
     Include embeddings from word, position and token_type embeddings
     """
@@ -456,7 +454,7 @@ class GPTTrainEmbeddings(nn.Layer):
                  type_vocab_size=16,
                  initializer_range=0.02,
                  topo=None):
-        super(GPTTrainEmbeddings, self).__init__()
+        super(GPTEmbeddings, self).__init__()
         if topo is None or topo.mp_info.size == 1:
             self.word_embeddings = nn.Embedding(
                 vocab_size,
@@ -496,7 +494,7 @@ class GPTTrainEmbeddings(nn.Layer):
         return embeddings
 
 
-class GPTTrainPretrainedModel(PretrainedModel):
+class GPTPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained GPT models. It provides GPT related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
@@ -649,7 +647,7 @@ class GPTTrainPretrainedModel(PretrainedModel):
 
 
 @register_base_model
-class GPTTrainModel(GPTTrainPretrainedModel):
+class GPTModel(GPTPretrainedModel):
     """
     The base model of gpt.
     """
@@ -671,7 +669,7 @@ class GPTTrainModel(GPTTrainPretrainedModel):
                  bos_token_id=0,
                  eol_token_id=3,
                  topo=None):
-        super(GPTTrainModel, self).__init__()
+        super(GPTModel, self).__init__()
 
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -683,7 +681,7 @@ class GPTTrainModel(GPTTrainPretrainedModel):
         if self.pipline_mode:
             self.layer_per_stage = num_hidden_layers // self.topo.pp_info.size
 
-        self.embeddings = GPTTrainEmbeddings(
+        self.embeddings = GPTEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
             max_position_embeddings, type_vocab_size, self.initializer_range,
             topo)
@@ -759,7 +757,7 @@ class GPTTrainModel(GPTTrainPretrainedModel):
         return encoder_outputs
 
 
-class GPTTrainForPretraining(GPTTrainPretrainedModel):
+class GPTForPretraining(GPTPretrainedModel):
     """
     The pretraining model of GPT.
 
@@ -767,7 +765,7 @@ class GPTTrainForPretraining(GPTTrainPretrainedModel):
     """
 
     def __init__(self, gpt):
-        super(GPTTrainForPretraining, self).__init__()
+        super(GPTForPretraining, self).__init__()
         self.gpt = gpt
         self.apply(self.init_weights)
 
@@ -813,7 +811,7 @@ class GPTTrainForPretraining(GPTTrainPretrainedModel):
             return logits
 
 
-class GPTTrainPretrainingCriterion(paddle.nn.Layer):
+class GPTPretrainingCriterion(paddle.nn.Layer):
     """
     Criterion for GPT.
 
@@ -821,7 +819,7 @@ class GPTTrainPretrainingCriterion(paddle.nn.Layer):
     """
 
     def __init__(self, topo=None):
-        super(GPTTrainPretrainingCriterion, self).__init__()
+        super(GPTPretrainingCriterion, self).__init__()
         if topo is None or topo.mp_info.size == 1:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
         else:

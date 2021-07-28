@@ -21,7 +21,7 @@ import time
 import numpy as np
 import paddle
 from visualdl import LogWriter
-from paddlenlp.transformers import GPTTrainModel, GPTTrainForPretraining, GPTTrainPretrainingCriterion
+from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCriterion
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.utils.log import logger
 from paddlenlp.ops import Topology
@@ -31,8 +31,8 @@ from args import parse_args
 import lr
 
 MODEL_CLASSES = {
-    "gpt": (GPTTrainForPretraining, GPTTokenizer),
-    "gpt-cn": (GPTTrainForPretraining, GPTChineseTokenizer),
+    "gpt": (GPTForPretraining, GPTTokenizer),
+    "gpt-cn": (GPTForPretraining, GPTChineseTokenizer),
 }
 
 
@@ -109,15 +109,15 @@ def do_train(args):
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
         model_config[
             "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
-        model = GPTTrainForPretraining(GPTTrainModel(**model_config))
+        model = GPTForPretraining(GPTModel(**model_config))
     else:
-        model = GPTTrainForPretraining.from_pretrained(
+        model = GPTForPretraining.from_pretrained(
             args.model_name_or_path,
             hidden_dropout_prob=args.hidden_dropout_prob,
             attention_probs_dropout_prob=args.attention_probs_dropout_prob)
 
     # Create the critrion for the gpt model
-    criterion = GPTTrainPretrainingCriterion()
+    criterion = GPTPretrainingCriterion()
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
