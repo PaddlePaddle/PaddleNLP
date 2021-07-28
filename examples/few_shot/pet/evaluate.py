@@ -88,41 +88,6 @@ def do_evaluate(model, tokenizer, data_loader, label_normalize_dict):
 
 
 @paddle.no_grad()
-def do_evaluate_cluewsc(model, tokenizer, data_loader, label_normalize_dict):
-
-    model.eval()
-
-    total_num = 0
-    correct_num = 0
-
-    normed_labels = [
-        normalized_lable
-        for origin_lable, normalized_lable in label_normalize_dict.items()
-    ]
-
-    label_length = len(normed_labels[0])
-    src_ids, token_type_ids, masked_positions, masked_lm_labels
-    for batch in data_loader:
-        src_ids, token_type_ids, label_idx = batch
-        # [bs * label_length, vocab_size]
-        prediction_probs = model(
-            input_ids=src_ids, token_type_ids=token_type_ids)
-
-        # Get max probs label's index
-        y_pred_index = paddle.argmax(prediction_probs, axis=-1).numpy()
-        y_true_index = []
-
-        for label_i in label_idx.numpy():
-            y_true_index.append(label_i)
-        y_true_index = np.array(y_true_index)
-
-        total_num += len(y_true_index)
-        correct_num += (y_true_index == y_pred_index).sum()
-
-    return 100 * correct_num / total_num, total_num
-
-
-@paddle.no_grad()
 def do_evaluate_chid(model, tokenizer, data_loader, label_normalize_dict):
     """
         FewCLUE `chid` dataset is specical when evaluate: input slots have 
