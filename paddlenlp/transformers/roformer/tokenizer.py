@@ -245,28 +245,71 @@ class RoFormerTokenizer(PretrainedTokenizer):
 
     Examples:
         .. code-block:: python
-            from paddlenlp.transformers.roforme import RoFormerTokenizer
+            from paddlenlp.transformers.roformer import RoFormerTokenizer
             tokenizer = RoFormerTokenizer.from_pretrained('roformer-chinese-base')
             # the following line get: ['今天', '的', '天气', '非常', '好', '！']
             tokens = tokenizer.tokenize('今天的天气非常好！')
             # the following line get: '今天 的 天气 非常 好 ！'
-            x = tokenizer.convert_tokens_to_string(tokens)
+            tokenizer.convert_tokens_to_string(tokens)
     """
 
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
+            # chinese word level model
+            "roformer-chinese-small":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-small/vocab.txt",
             "roformer-chinese-base":
-            "https://huggingface.co/junnyu/roformer_chinese_base/resolve/main/vocab.txt",
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-base/vocab.txt",
+            # chinese char level model
+            "roformer-chinese-char-small":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-char-small/vocab.txt",
             "roformer-chinese-char-base":
-            "https://huggingface.co/junnyu/roformer_chinese_char_base/resolve/main/vocab.txt",
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-char-base/vocab.txt",
+            "roformer-chinese-sim-char-ft-small":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-ft-small/vocab.txt",
+            "roformer-chinese-sim-char-ft-base":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-ft-base/vocab.txt",
+            "roformer-chinese-sim-char-small":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-small/vocab.txt",
+            "roformer-chinese-sim-char-base":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-base/vocab.txt",
+            # english
+            "roformer-english-small-discriminator":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-english-small-discriminator/vocab.txt",
+            "roformer-english-small-generator":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-english-small-generator/vocab.txt",
         }
     }
     pretrained_init_configuration = {
+        "roformer-chinese-small": {
+            "do_lower_case": True
+        },
         "roformer-chinese-base": {
             "do_lower_case": True
         },
+        "roformer-chinese-char-small": {
+            "do_lower_case": True
+        },
         "roformer-chinese-char-base": {
+            "do_lower_case": True
+        },
+        "roformer-chinese-sim-char-ft-small": {
+            "do_lower_case": True
+        },
+        "roformer-chinese-sim-char-ft-base": {
+            "do_lower_case": True
+        },
+        "roformer-chinese-sim-char-small": {
+            "do_lower_case": True
+        },
+        "roformer-chinese-sim-char-base": {
+            "do_lower_case": True
+        },
+        "roformer-english-small-discriminator": {
+            "do_lower_case": True
+        },
+        "roformer-english-small-generator": {
             "do_lower_case": True
         },
     }

@@ -39,7 +39,28 @@ __all__ = [
 dtype_float = paddle.get_default_dtype()
 
 
-class MultiHeadAttentionNew(MultiHeadAttention):
+class MultiHeadAttentionWithRotary(MultiHeadAttention):
+    def __init__(self,
+                 embed_dim,
+                 num_heads,
+                 dropout=0.,
+                 kdim=None,
+                 vdim=None,
+                 need_weights=False,
+                 weight_attr=None,
+                 bias_attr=None,
+                 rotary_value=False):
+        super().__init__(
+            embed_dim,
+            num_heads,
+            dropout=dropout,
+            kdim=kdim,
+            vdim=vdim,
+            need_weights=need_weights,
+            weight_attr=weight_attr,
+            bias_attr=bias_attr)
+        self.rotary_value = rotary_value
+
     def positional_embedding(self, inputs):
         seq_len = inputs.shape[1]
         pos_seq = paddle.arange(0, seq_len, dtype=dtype_float)
@@ -108,7 +129,12 @@ class MultiHeadAttentionNew(MultiHeadAttention):
             q, k, v, cache = self._prepare_qkv(query, key, value, cache)
 
         sinusoidal_pos = self.positional_embedding(query)
-        q, k = self.apply_rotary_position_embeddings(sinusoidal_pos, q, k)
+        if self.rotary_value:
+            q, k, v = self.apply_rotary_position_embeddings(sinusoidal_pos, q,
+                                                            k, v)
+
+        else:
+            q, k = self.apply_rotary_position_embeddings(sinusoidal_pos, q, k)
 
         # scale dot product attention
         # TODO(guosheng): use tensor.matmul, however it doesn't support `alpha`
@@ -143,19 +169,19 @@ class MultiHeadAttentionNew(MultiHeadAttention):
         return out if len(outs) == 1 else tuple(outs)
 
 
-class TransformerEncoderLayerNew(nn.TransformerEncoderLayer):
-    def __init__(
-            self,
-            d_model,
-            nhead,
-            dim_feedforward,
-            dropout=0.1,
-            activation="relu",
-            attn_dropout=None,
-            act_dropout=None,
-            normalize_before=False,
-            weight_attr=None,
-            bias_attr=None, ):
+class TransformerEncoderLayerWithRotary(nn.TransformerEncoderLayer):
+    def __init__(self,
+                 d_model,
+                 nhead,
+                 dim_feedforward,
+                 dropout=0.1,
+                 activation="relu",
+                 attn_dropout=None,
+                 act_dropout=None,
+                 normalize_before=False,
+                 weight_attr=None,
+                 bias_attr=None,
+                 rotary_value=False):
         super().__init__(
             d_model,
             nhead,
@@ -169,12 +195,14 @@ class TransformerEncoderLayerNew(nn.TransformerEncoderLayer):
             bias_attr=bias_attr, )
         weight_attrs = _convert_param_attr_to_list(weight_attr, 2)
         bias_attrs = _convert_param_attr_to_list(bias_attr, 2)
-        self.self_attn = MultiHeadAttentionNew(
+        self.self_attn = MultiHeadAttentionWithRotary(
             d_model,
             nhead,
             dropout=attn_dropout,
             weight_attr=weight_attrs[0],
-            bias_attr=bias_attrs[0], )
+            bias_attr=bias_attrs[0],
+            rotary_value=rotary_value)
+        self._config.update({"rotary_value": rotary_value})
 
 
 class RoFormerEmbeddings(Layer):
@@ -185,13 +213,14 @@ class RoFormerEmbeddings(Layer):
     def __init__(
             self,
             vocab_size,
-            hidden_size=768,
+            embedding_size=768,
             hidden_dropout_prob=0.1,
             type_vocab_size=2, ):
         super(RoFormerEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.word_embeddings = nn.Embedding(vocab_size, embedding_size)
+        self.token_type_embeddings = nn.Embedding(type_vocab_size,
+                                                  embedding_size)
+        self.layer_norm = nn.LayerNorm(embedding_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
     def forward(self, input_ids, token_type_ids=None):
@@ -237,8 +266,25 @@ class RoFormerPretrainedModel(PretrainedModel):
 
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
+        "roformer-chinese-small": {
+            "vocab_size": 50000,
+            "embedding_size": None,
+            "hidden_size": 384,
+            "num_hidden_layers": 6,
+            "num_attention_heads": 6,
+            "intermediate_size": 1536,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+            "rotary_value": False,
+        },
         "roformer-chinese-base": {
             "vocab_size": 50000,
+            "embedding_size": None,
             "hidden_size": 768,
             "num_hidden_layers": 12,
             "num_attention_heads": 12,
@@ -250,9 +296,27 @@ class RoFormerPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "rotary_value": False,
+        },
+        "roformer-chinese-char-small": {
+            "vocab_size": 12000,
+            "embedding_size": None,
+            "hidden_size": 384,
+            "num_hidden_layers": 6,
+            "num_attention_heads": 6,
+            "intermediate_size": 1536,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+            "rotary_value": False,
         },
         "roformer-chinese-char-base": {
             "vocab_size": 12000,
+            "embedding_size": None,
             "hidden_size": 768,
             "num_hidden_layers": 12,
             "num_attention_heads": 12,
@@ -264,17 +328,132 @@ class RoFormerPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "rotary_value": False,
+        },
+        "roformer-chinese-sim-char-ft-small": {
+            "vocab_size": 12000,
+            "embedding_size": None,
+            "hidden_size": 384,
+            "num_hidden_layers": 6,
+            "num_attention_heads": 6,
+            "intermediate_size": 1536,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+            "rotary_value": False,
+        },
+        "roformer-chinese-sim-char-ft-base": {
+            "vocab_size": 12000,
+            "embedding_size": None,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+            "rotary_value": False,
+        },
+        "roformer-chinese-sim-char-small": {
+            "vocab_size": 12000,
+            "embedding_size": None,
+            "hidden_size": 384,
+            "num_hidden_layers": 6,
+            "num_attention_heads": 6,
+            "intermediate_size": 1536,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+            "rotary_value": False,
+        },
+        "roformer-chinese-sim-char-base": {
+            "vocab_size": 12000,
+            "embedding_size": None,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+            "rotary_value": False,
+        },
+        "roformer-english-small-discriminator": {
+            "vocab_size": 30522,
+            "embedding_size": 128,
+            "hidden_size": 256,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 4,
+            "intermediate_size": 1024,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 128,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+            "rotary_value": True,
+        },
+        "roformer-english-small-generator": {
+            "vocab_size": 30522,
+            "embedding_size": 128,
+            "hidden_size": 64,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 1,
+            "intermediate_size": 256,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 128,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+            "rotary_value": True,
         },
     }
+
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
+            "roformer-chinese-small":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-small/model_state.pdparams",
             "roformer-chinese-base":
-            "https://huggingface.co/junnyu/roformer_chinese_base/resolve/main/model_state.pdparams",
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-base/model_state.pdparams",
+            "roformer-chinese-char-small":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-char-small/model_state.pdparams",
             "roformer-chinese-char-base":
-            "https://huggingface.co/junnyu/roformer_chinese_char_base/resolve/main/model_state.pdparams",
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-char-base/model_state.pdparams",
+            "roformer-chinese-sim-char-ft-small":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-ft-small/model_state.pdparams",
+            "roformer-chinese-sim-char-ft-base":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-ft-base/model_state.pdparams",
+            "roformer-chinese-sim-char-small":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-small/model_state.pdparams",
+            "roformer-chinese-sim-char-base":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-base/model_state.pdparams",
+            "roformer-english-small-discriminator":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-english-small-discriminator/model_state.pdparams",
+            "roformer-english-small-generator":
+            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-english-small-generator/model_state.pdparams",
         }
     }
+
     base_model_prefix = "roformer"
 
     def init_weights(self, layer):
@@ -308,8 +487,10 @@ class RoFormerModel(RoFormerPretrainedModel):
 
     Args:
         vocab_size (`int`):
-            Vocabulary size of the XLNet model. Defines the number of different tokens that can
-            be represented by the `inputs_ids` passed when calling XLNetModel.
+            Vocabulary size of the RoFormerModel. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling RoFormerModel.
+        embedding_size (`int`, optional):
+            Dimensionality of the embedding size. Defaults to ``"hidden_size"`` if not provided.
         hidden_size (`int`, optional):
             Dimensionality of the encoder layers and the pooler layer. Defaults to ``768``.
         num_hidden_layers (`int`, optional):
@@ -333,11 +514,15 @@ class RoFormerModel(RoFormerPretrainedModel):
         initializer_range (`float`, optional):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
             Defaults to ``0.02``.
+        rotary_value (`bool`, optional):
+            whether or not apply rotay position embeddings to value.
+            Defaults to ``False``.            
     """
 
     def __init__(
             self,
             vocab_size,
+            embedding_size=None,
             hidden_size=768,
             num_hidden_layers=12,
             num_attention_heads=12,
@@ -349,23 +534,29 @@ class RoFormerModel(RoFormerPretrainedModel):
             type_vocab_size=2,
             initializer_range=0.02,
             pad_token_id=0,
-            pool_act="tanh", ):
+            pool_act="tanh",
+            rotary_value=False, ):
         super(RoFormerModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
+        if embedding_size is None:
+            embedding_size = hidden_size
+        if embedding_size != hidden_size:
+            self.embeddings_project = nn.Linear(embedding_size, hidden_size)
         self.embeddings = RoFormerEmbeddings(
             vocab_size,
-            hidden_size,
+            embedding_size,
             hidden_dropout_prob,
             type_vocab_size, )
-        encoder_layer = TransformerEncoderLayerNew(
+        encoder_layer = TransformerEncoderLayerWithRotary(
             hidden_size,
             num_attention_heads,
             intermediate_size,
             dropout=hidden_dropout_prob,
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0, )
+            act_dropout=0,
+            rotary_value=rotary_value, )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
         self.pooler = RoFormerPooler(hidden_size, pool_act)
         self.apply(self.init_weights)
@@ -374,7 +565,6 @@ class RoFormerModel(RoFormerPretrainedModel):
             self,
             input_ids,
             token_type_ids=None,
-            position_ids=None,
             attention_mask=None,
             output_hidden_states=False, ):
         if attention_mask is None:
@@ -385,10 +575,11 @@ class RoFormerModel(RoFormerPretrainedModel):
         embedding_output = self.embeddings(
             input_ids=input_ids,
             token_type_ids=token_type_ids, )
-
+        if hasattr(self, "embeddings_project"):
+            embedding_output = self.embeddings_project(embedding_output)
         if output_hidden_states:
             output = embedding_output
-            encoder_outputs = [embedding_output]
+            encoder_outputs = []
             for mod in self.encoder.layers:
                 output = mod(output, src_mask=attention_mask)
                 encoder_outputs.append(output)
@@ -415,7 +606,6 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
         sequence_output, _ = self.roformer(
             input_ids,
             token_type_ids=token_type_ids,
-            position_ids=None,
             attention_mask=None, )
 
         logits = self.classifier(sequence_output)
@@ -446,15 +636,10 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
                                     num_classes)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         _, pooled_output = self.roformer(
             input_ids,
             token_type_ids=token_type_ids,
-            position_ids=position_ids,
             attention_mask=attention_mask, )
 
         pooled_output = self.dropout(pooled_output)
@@ -473,15 +658,10 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
                                     num_classes)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         sequence_output, _ = self.roformer(
             input_ids,
             token_type_ids=token_type_ids,
-            position_ids=position_ids,
             attention_mask=attention_mask, )
 
         sequence_output = self.dropout(sequence_output)
@@ -491,16 +671,17 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
 
 class RoFormerLMPredictionHead(Layer):
     def __init__(self,
+                 embedding_size,
                  hidden_size,
                  vocab_size,
                  activation,
                  embedding_weights=None):
         super(RoFormerLMPredictionHead, self).__init__()
-        self.transform = nn.Linear(hidden_size, hidden_size)
+        self.transform = nn.Linear(hidden_size, embedding_size)
         self.activation = getattr(nn.functional, activation)
-        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.layer_norm = nn.LayerNorm(embedding_size)
         self.decoder_weight = (self.create_parameter(
-            shape=[vocab_size, hidden_size],
+            shape=[vocab_size, embedding_size],
             dtype=self.transform.weight.dtype,
             is_bias=False, ) if embedding_weights is None else
                                embedding_weights)
@@ -525,13 +706,15 @@ class RoFormerLMPredictionHead(Layer):
 
 class RoFormerPretrainingHeads(Layer):
     def __init__(self,
+                 embedding_size,
                  hidden_size,
                  vocab_size,
                  activation,
                  embedding_weights=None):
         super(RoFormerPretrainingHeads, self).__init__()
-        self.predictions = RoFormerLMPredictionHead(
-            hidden_size, vocab_size, activation, embedding_weights)
+        self.predictions = RoFormerLMPredictionHead(embedding_size, hidden_size,
+                                                    vocab_size, activation,
+                                                    embedding_weights)
         self.seq_relationship = nn.Linear(hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output, masked_positions=None):
@@ -545,6 +728,7 @@ class RoFormerForPretraining(RoFormerPretrainedModel):
         super(RoFormerForPretraining, self).__init__()
         self.roformer = roformer
         self.cls = RoFormerPretrainingHeads(
+            self.roformer.config["embedding_size"],
             self.roformer.config["hidden_size"],
             self.roformer.config["vocab_size"],
             self.roformer.config["hidden_act"],
@@ -556,14 +740,12 @@ class RoFormerForPretraining(RoFormerPretrainedModel):
             self,
             input_ids,
             token_type_ids=None,
-            position_ids=None,
             attention_mask=None,
             masked_positions=None, ):
         with paddle.static.amp.fp16_guard():
             outputs = self.roformer(
                 input_ids,
                 token_type_ids=token_type_ids,
-                position_ids=position_ids,
                 attention_mask=attention_mask, )
             sequence_output, pooled_output = outputs[:2]
             prediction_scores, seq_relationship_score = self.cls(
