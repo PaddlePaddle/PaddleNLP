@@ -94,7 +94,7 @@ model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained('ernie
 tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie')
 
 # ernie-tiny
-# model = ppnlp.transformers.ErnieForSequenceClassification.rom_pretrained('ernie-tiny',num_classes=2))
+# model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained('ernie-tiny',num_classes=2))
 # tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained('ernie-tiny')
 
 
