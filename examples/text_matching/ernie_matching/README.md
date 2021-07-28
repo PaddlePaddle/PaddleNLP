@@ -18,6 +18,10 @@
 
 ```
 ernie_matching/
+├── deply # 部署
+|   └── python
+|       └── predict.py # python 预测部署示例
+├── export_model.py # 动态图参数导出静态图参数脚本
 ├── model.py # Point-wise & Pair-wise 匹配模型组网
 ├── data.py # Point-wise & Pair-wise 训练样本的转换逻辑 、Pair-wise 生成随机负例的逻辑
 ├── train_pointwise.py # Point-wise 单塔匹配模型训练脚本
@@ -112,7 +116,7 @@ checkpoints/
 * 如需恢复模型训练，则可以设置`init_from_ckpt`， 如`init_from_ckpt=checkpoints/model_100/model_state.pdparams`。
 * 如需使用ernie-tiny模型，则需要提前先安装sentencepiece依赖，如`pip install sentencepiece`
 
-### 模型预测
+### 基于动态图模型预测
 
 我们用 LCQMC 的测试集作为预测数据,  测试数据示例如下，：
 ```text
@@ -144,6 +148,19 @@ python -u -m paddle.distributed.launch --gpus "0" \
 {'query': '现在有什么动画片好看呢？', 'title': '现在有什么好看的动画片吗？', 'pred_label': 1}
 {'query': '请问晶达电子厂现在的工资待遇怎么样要求有哪些', 'title': '三星电子厂工资待遇怎么样啊', 'pred_label': 0}
 ```
+
+### 基于静态图部署预测
+#### 模型导出
+使用动态图训练结束之后，可以使用静态图导出工具 `export_model.py` 将动态图参数导出成静态图参数。 执行如下命令：
+
+`python export_model.py --params_path ernie_ckpt/model_80.pdparams --output_path=./output`
+
+其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
+
+#### 预测部署
+导出静态图模型之后，可以基于静态图模型进行预测，`deploy/python/predict.py` 文件提供了静态图预测示例。执行如下命令：
+
+`python deploy/python/predict.py --model_dir ./output`
 
 ## Reference
 [1] Xin Liu, Qingcai Chen, Chong Deng, Huajun Zeng, Jing Chen, Dongfang Li, Buzhou Tang, LCQMC: A Large-scale Chinese Question Matching Corpus,COLING2018.

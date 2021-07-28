@@ -142,7 +142,7 @@ def do_train(args):
         for input_data in train_loader:
             #NOTE: Used for benchmark and use None as default. 
             if args.max_iter and step_idx == args.max_iter:
-                return
+                break
             train_reader_cost = time.time() - batch_start
             (src_word, trg_word, lbl_word) = input_data
 
@@ -241,6 +241,10 @@ def do_train(args):
             step_idx += 1
             scheduler.step()
             batch_start = time.time()
+
+        #NOTE: Used for benchmark and use None as default. 
+        if args.max_iter and step_idx == args.max_iter:
+            break
 
         train_epoch_cost = time.time() - epoch_start
         logger.info("train epoch: %d, epoch_cost: %.5f s" %
