@@ -36,7 +36,7 @@ from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import TinyBertForPretraining, TinyBertTokenizer
+from paddlenlp.transformers import TinyBertModel, TinyBertForPretraining, TinyBertTokenizer
 from paddlenlp.transformers.distill_utils import to_distill
 
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
@@ -156,12 +156,12 @@ def parse_args():
         help="Whether to use augmentation data to train.", )
     parser.add_argument(
         "--weight_decay",
-        default=0.0,
+        default=0.01,
         type=float,
         help="Weight decay if we apply some.")
     parser.add_argument(
         "--warmup_steps",
-        default=0,
+        default=10000,
         type=int,
         help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
     )
@@ -266,16 +266,24 @@ def do_train(args):
     args.model_type = args.model_type.lower()
 
     # For student
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-    tokenizer = tokenizer_class.from_pretrained(args.student_model_name_or_path)
-    student = model_class.from_pretrained(args.student_model_name_or_path)
+    model_class, _ = MODEL_CLASSES[args.model_type]
+    if args.student_model_name_or_path in (
+            'tinybert-4l-312d', 'tinybert-6l-768d', 'tinybert-4l-312d-v2',
+            'tinybert-6l-768d-v2', 'tinybert-4l-312d-zh', 'tinybert-6l-768d-zh'
+    ):
+        student = model_class.from_pretrained(args.student_model_name_or_path)
+    else:
+        tinybert = TinyBertModel(vocab_size=21128, num_hidden_layers=6)
+        student = model_class(tinybert)
 
     # For teacher
-    teacher_model_class, _ = MODEL_CLASSES[args.teacher_model_type]
+    teacher_model_class, tokenizer_class = MODEL_CLASSES[
+        args.teacher_model_type]
     teacher = teacher_model_class.from_pretrained(
         args.teacher_model_name_or_path)
-    pad_token_id = student.pretrained_init_configuration[
-        args.student_model_name_or_path]['pad_token_id']
+    tokenizer = tokenizer_class.from_pretrained(args.teacher_model_name_or_path)
+    pad_token_id = teacher.pretrained_init_configuration[
+        args.teacher_model_name_or_path]['pad_token_id']
     if paddle.distributed.get_world_size() > 1:
         student = paddle.DataParallel(student, find_unused_parameters=True)
         teacher = paddle.DataParallel(teacher, find_unused_parameters=True)
@@ -288,7 +296,7 @@ def do_train(args):
     optimizer = paddle.optimizer.Adam(
         learning_rate=lr_scheduler,
         beta1=0.9,
-        beta2=0.98,
+        beta2=0.999,
         epsilon=args.adam_epsilon,
         parameters=student.parameters(),
         weight_decay=args.weight_decay)
