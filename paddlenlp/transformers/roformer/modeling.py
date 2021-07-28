@@ -97,7 +97,7 @@ class MultiHeadAttentionWithRotary(MultiHeadAttention):
 
         rotate_half_query_layer = paddle.reshape(
             paddle.stack(
-                [-query_layer[:, :, :, 1::2], query_layer[:, :, :, ::2]],
+                [-query_layer[:, :, :, 1::2], query_layer[:, :, :, 0::2]],
                 axis=-1),
             query_layer.shape, )
         query_layer = query_layer * cos_pos + rotate_half_query_layer * sin_pos
@@ -105,14 +105,14 @@ class MultiHeadAttentionWithRotary(MultiHeadAttention):
 
         rotate_half_key_layer = paddle.reshape(
             paddle.stack(
-                [-key_layer[:, :, :, 1::2], key_layer[:, :, :, ::2]], axis=-1),
+                [-key_layer[:, :, :, 1::2], key_layer[:, :, :, 0::2]], axis=-1),
             key_layer.shape, )
         key_layer = key_layer * cos_pos + rotate_half_key_layer * sin_pos
         if value_layer is not None:
             # rotate_half_value_layer [-v1,v0,-v3,v2......,-vd-1,vd-2]
             rotate_half_value_layer = paddle.reshape(
                 paddle.stack(
-                    [-value_layer[:, :, :, 1::2], value_layer[:, :, :, ::2]],
+                    [-value_layer[:, :, :, 1::2], value_layer[:, :, :, 0::2]],
                     axis=-1),
                 value_layer.shape, )
             value_layer = value_layer * cos_pos + rotate_half_value_layer * sin_pos
@@ -268,7 +268,7 @@ class RoFormerPretrainedModel(PretrainedModel):
     pretrained_init_configuration = {
         "roformer-chinese-small": {
             "vocab_size": 50000,
-            "embedding_size": None,
+            "embedding_size": 384,
             "hidden_size": 384,
             "num_hidden_layers": 6,
             "num_attention_heads": 6,
@@ -284,7 +284,7 @@ class RoFormerPretrainedModel(PretrainedModel):
         },
         "roformer-chinese-base": {
             "vocab_size": 50000,
-            "embedding_size": None,
+            "embedding_size": 768,
             "hidden_size": 768,
             "num_hidden_layers": 12,
             "num_attention_heads": 12,
@@ -300,7 +300,7 @@ class RoFormerPretrainedModel(PretrainedModel):
         },
         "roformer-chinese-char-small": {
             "vocab_size": 12000,
-            "embedding_size": None,
+            "embedding_size": 384,
             "hidden_size": 384,
             "num_hidden_layers": 6,
             "num_attention_heads": 6,
@@ -316,7 +316,7 @@ class RoFormerPretrainedModel(PretrainedModel):
         },
         "roformer-chinese-char-base": {
             "vocab_size": 12000,
-            "embedding_size": None,
+            "embedding_size": 768,
             "hidden_size": 768,
             "num_hidden_layers": 12,
             "num_attention_heads": 12,
@@ -332,7 +332,7 @@ class RoFormerPretrainedModel(PretrainedModel):
         },
         "roformer-chinese-sim-char-ft-small": {
             "vocab_size": 12000,
-            "embedding_size": None,
+            "embedding_size": 384,
             "hidden_size": 384,
             "num_hidden_layers": 6,
             "num_attention_heads": 6,
@@ -348,7 +348,7 @@ class RoFormerPretrainedModel(PretrainedModel):
         },
         "roformer-chinese-sim-char-ft-base": {
             "vocab_size": 12000,
-            "embedding_size": None,
+            "embedding_size": 768,
             "hidden_size": 768,
             "num_hidden_layers": 12,
             "num_attention_heads": 12,
@@ -364,7 +364,7 @@ class RoFormerPretrainedModel(PretrainedModel):
         },
         "roformer-chinese-sim-char-small": {
             "vocab_size": 12000,
-            "embedding_size": None,
+            "embedding_size": 384,
             "hidden_size": 384,
             "num_hidden_layers": 6,
             "num_attention_heads": 6,
@@ -380,7 +380,7 @@ class RoFormerPretrainedModel(PretrainedModel):
         },
         "roformer-chinese-sim-char-base": {
             "vocab_size": 12000,
-            "embedding_size": None,
+            "embedding_size": 768,
             "hidden_size": 768,
             "num_hidden_layers": 12,
             "num_attention_heads": 12,
@@ -432,25 +432,25 @@ class RoFormerPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "roformer-chinese-small":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-small/model_state.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-small/model_state.pdparams",
             "roformer-chinese-base":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-base/model_state.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-base/model_state.pdparams",
             "roformer-chinese-char-small":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-char-small/model_state.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-char-small/model_state.pdparams",
             "roformer-chinese-char-base":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-char-base/model_state.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-char-base/model_state.pdparams",
             "roformer-chinese-sim-char-ft-small":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-ft-small/model_state.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-sim-char-ft-small/model_state.pdparams",
             "roformer-chinese-sim-char-ft-base":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-ft-base/model_state.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-sim-char-ft-base/model_state.pdparams",
             "roformer-chinese-sim-char-small":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-small/model_state.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-sim-char-small/model_state.pdparams",
             "roformer-chinese-sim-char-base":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-base/model_state.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-sim-char-base/model_state.pdparams",
             "roformer-english-small-discriminator":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-english-small-discriminator/model_state.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-english-small-discriminator/model_state.pdparams",
             "roformer-english-small-generator":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-english-small-generator/model_state.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-english-small-generator/model_state.pdparams",
         }
     }
 
@@ -490,7 +490,7 @@ class RoFormerModel(RoFormerPretrainedModel):
             Vocabulary size of the RoFormerModel. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling RoFormerModel.
         embedding_size (`int`, optional):
-            Dimensionality of the embedding size. Defaults to ``"hidden_size"`` if not provided.
+            Dimensionality of the embedding size. Defaults to ``768`` if not provided.
         hidden_size (`int`, optional):
             Dimensionality of the encoder layers and the pooler layer. Defaults to ``768``.
         num_hidden_layers (`int`, optional):
@@ -522,7 +522,7 @@ class RoFormerModel(RoFormerPretrainedModel):
     def __init__(
             self,
             vocab_size,
-            embedding_size=None,
+            embedding_size=768,
             hidden_size=768,
             num_hidden_layers=12,
             num_attention_heads=12,
@@ -539,8 +539,6 @@ class RoFormerModel(RoFormerPretrainedModel):
         super(RoFormerModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        if embedding_size is None:
-            embedding_size = hidden_size
         if embedding_size != hidden_size:
             self.embeddings_project = nn.Linear(embedding_size, hidden_size)
         self.embeddings = RoFormerEmbeddings(

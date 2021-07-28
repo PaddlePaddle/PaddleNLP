@@ -258,27 +258,27 @@ class RoFormerTokenizer(PretrainedTokenizer):
         "vocab_file": {
             # chinese word level model
             "roformer-chinese-small":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-small/vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-small/vocab.txt",
             "roformer-chinese-base":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-base/vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-base/vocab.txt",
             # chinese char level model
             "roformer-chinese-char-small":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-char-small/vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-char-small/vocab.txt",
             "roformer-chinese-char-base":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-char-base/vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-char-base/vocab.txt",
             "roformer-chinese-sim-char-ft-small":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-ft-small/vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-sim-char-ft-small/vocab.txt",
             "roformer-chinese-sim-char-ft-base":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-ft-base/vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-sim-char-ft-base/vocab.txt",
             "roformer-chinese-sim-char-small":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-small/vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-sim-char-small/vocab.txt",
             "roformer-chinese-sim-char-base":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-chinese-sim-char-base/vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-chinese-sim-char-base/vocab.txt",
             # english
             "roformer-english-small-discriminator":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-english-small-discriminator/vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-english-small-discriminator/vocab.txt",
             "roformer-english-small-generator":
-            "https://huggingface.co/junnyu/roformer_paddle/resolve/main/roformer-english-small-generator/vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roformer/roformer-english-small-generator/vocab.txt",
         }
     }
     pretrained_init_configuration = {
