@@ -393,9 +393,7 @@ def do_train(args):
         return_attentions=True,
         return_qkv=True,
         return_layer_outputs=True)
-    pad_token_id = student.pretrained_init_configuration['tinybert-6l-768d-v2'][
-        'pad_token_id']
-
+    pad_token_id = 0
     global_step = 0
     tic_train = time.time()
     best_res = 0.0

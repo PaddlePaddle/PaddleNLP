@@ -151,10 +151,6 @@ def parse_args():
         type=int,
         help="Temperature for softmax", )
     parser.add_argument(
-        "--use_aug",
-        action="store_true",
-        help="Whether to use augmentation data to train.", )
-    parser.add_argument(
         "--weight_decay",
         default=0.01,
         type=float,
@@ -167,12 +163,12 @@ def parse_args():
     )
     parser.add_argument(
         "--warmup_proportion",
-        default=0.1,
+        default=0.0,
         type=float,
         help="Linear warmup proportion over total steps.")
     parser.add_argument(
         "--adam_epsilon",
-        default=1e-6,
+        default=1e-8,
         type=float,
         help="Epsilon for Adam optimizer.")
     parser.add_argument(
