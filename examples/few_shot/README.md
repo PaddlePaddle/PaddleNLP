@@ -16,7 +16,7 @@ Few-Shot Learning 旨在研究如何从少量有监督的训练样本中学习�
 ## 策略库
 - [P-tuning](./p-tuning)
 - [EFL](./efl)
-- [PET](./pet)
+- PET
 
 ## References
 [1]X. Liu et al., “GPT Understands, Too,” arXiv:2103.10385 [cs], Mar. 2021, Accessed: Mar. 22, 2021. [Online]. Available: http://arxiv.org/abs/2103.10385
