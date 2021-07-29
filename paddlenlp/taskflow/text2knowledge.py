@@ -18,11 +18,11 @@ import json
 import math
 import os
 import copy
+import csv
 import itertools
 
 import paddle
 import paddle.nn as nn
-import pandas as pd
 from ..datasets import MapDataset, load_dataset
 from ..data import Stack, Pad, Tuple
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
@@ -207,15 +207,21 @@ class WordTagTask(Task):
 
     @staticmethod
     def _load_schema(schema_path):
-        schema_df = pd.read_csv(schema_path, sep="\t", encoding="utf8")
         schema = {}
-        for idx in range(schema_df.shape[0]):
-            if not isinstance(schema_df["type-1"][idx], float):
-                schema[schema_df["type-1"][idx]] = "root"
-            if not isinstance(schema_df["type-2"][idx], float):
-                schema[schema_df["type-2"][idx]] = schema_df["type-1"][idx]
-            if not isinstance(schema_df["type-3"][idx], float):
-                schema[schema_df["type-3"][idx]] = schema_df["type-2"][idx]
+        with open(schema_path, encoding="utf8") as f:
+            reader = csv.reader(f)
+            first_line = True
+            for line in reader:
+                if first_line:
+                    first_line = False
+                    continue
+                items = line[0].split("\t")
+                if len(items[0]):
+                    schema[items[0]] = "root"
+                if len(items[1]):
+                    schema[items[1]] = items[0]
+                if len(items[2]):
+                    schema[items[2]] = items[1]
         return schema
 
     @staticmethod
