@@ -12,7 +12,7 @@ train_model_name:null
 train_infer_img_dir:null
 null:null
 ##
-trainer:train
+trainer:norm
 norm_train:../examples/text_matching/ernie_matching/train_pointwise.py
 pact_train:null
 fpgm_train:null
