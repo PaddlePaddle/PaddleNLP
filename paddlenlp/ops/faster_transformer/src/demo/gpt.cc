@@ -84,7 +84,6 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
 
     for (int i = 0; i < tmp_result_q.length(); ++i) {
       char32_t tmp = tmp_result_q[i];
-      // std::cout << tmp << std::endl;
       if (byte_decoder.find(tmp) != byte_decoder.end()) {
         dataresultvec[bsz].result_q = dataresultvec[bsz].result_q +
                                       static_cast<wchar_t>(byte_decoder[tmp]);
@@ -125,13 +124,6 @@ std::unordered_map<char32_t, int> convert_unicode() {
       ret.insert(std::pair<char32_t, int>(key, b));
     }
   }
-
-  // std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv32;
-  // for (int i=0; i<256; ++i) {
-  //   std::cout << "=====" << std::endl;
-  //   std::cout << conv32.to_bytes(cs[i]) << std::endl;
-  //   std::cout << bs[i] << std::endl;
-  // }
 
   return ret;
 }
