@@ -604,8 +604,7 @@ void topK_sampling_kernel_kernelLauncher(void* workspace,
 
   int topk_tmp_ids_buf_size =
       args.batch_size_ * args.candidate_num_;  // type int
-  int temp_log_probs_buf_size =
-      args.batch_size_ * args.candidate_num_ * vocab_size;
+  int temp_log_probs_buf_size = args.batch_size_ * vocab_size;
   int topk_tmp_val_buf_size = args.batch_size_ * args.candidate_num_;  // type T
 
   temp_log_probs_buf_size = (int)(ceil(temp_log_probs_buf_size / 4.)) * 4;
