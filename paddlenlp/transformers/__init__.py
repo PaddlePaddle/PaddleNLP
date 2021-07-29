@@ -51,3 +51,5 @@ from .nezha.modeling import *
 from .nezha.tokenizer import *
 from .bart.modeling import *
 from .bart.tokenizer import *
+from .convbert.modeling import *
+from .convbert.tokenizer import *
