@@ -98,7 +98,7 @@ class Clue(DatasetBuilder):
         'tnews': {
             'url':
             "https://storage.googleapis.com/cluebenchmark/tasks/tnews_public.zip",
-            'md5': '587171233c8e8db00a3dc9bae5d2b47d',
+            'md5': '38186ed0a751bc33e3ae0c1b59319777',
             'splits': {
                 'train': [
                     os.path.join('tnews_public', 'train.json'),
@@ -110,6 +110,10 @@ class Clue(DatasetBuilder):
                 ],
                 'test': [
                     os.path.join('tnews_public', 'test.json'),
+                    '045a6c4f59bf1a066c4a0d7afe6cd2b4',
+                ],
+                'test1.0': [
+                    os.path.join('tnews_public', 'test1.0.json'),
                     '2d1557c7548c72d5a84c47bbbd3a4e85',
                 ],
                 'labels': [
