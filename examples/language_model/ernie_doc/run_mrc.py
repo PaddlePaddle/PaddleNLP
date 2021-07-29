@@ -27,7 +27,7 @@ import paddle.nn as nn
 from paddle.io import DataLoader
 from paddlenlp.transformers import ErnieDocModel
 from paddlenlp.transformers import ErnieDocForQuestionAnswering
-from paddlenlp.transformers import BPETokenizer, ErnieDocTokenizer
+from paddlenlp.transformers import ErnieDocTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 from paddlenlp.datasets import load_dataset
@@ -57,7 +57,7 @@ parser.add_argument("--max_answer_length", default=100, type=int, help="Max answ
 parser.add_argument("--do_lower_case", action='store_false', help="Whether to lower case the input text. Should be True for uncased models and False for cased models.")
 parser.add_argument("--verbose", action='store_true', help="Whether to output verbose log.")
 parser.add_argument("--dropout", default=0.1, type=float, help="dropout ratio of ernie_doc")
-parser.add_argument("--dataset", default="dureader_robust", type=str, choices=["dureader_robust", "cmrc2018", "drcd", "triviaqa"], help="The avaliable Q&A dataset")
+parser.add_argument("--dataset", default="dureader_robust", type=str, choices=["dureader_robust", "cmrc2018", "drcd"], help="The avaliable Q&A dataset")
 # yapf: enable
 args = parser.parse_args()
 
@@ -66,7 +66,6 @@ DATASET_INFO = {
     "dureader_robust": ["dev", "dev", ErnieDocTokenizer],
     "cmrc2018": ["dev", "dev", ErnieDocTokenizer],
     "drcd": ["dev", "test", ErnieDocTokenizer],
-    "triviaqa": ["dev", "dev", BPETokenizer]
 }
 
 

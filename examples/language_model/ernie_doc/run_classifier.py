@@ -27,7 +27,7 @@ import paddle.nn as nn
 from paddle.io import DataLoader
 from paddlenlp.transformers import ErnieDocModel
 from paddlenlp.transformers import ErnieDocForSequenceClassification
-from paddlenlp.transformers import BPETokenizer, ErnieDocTokenizer
+from paddlenlp.transformers import ErnieDocBPETokenizer, ErnieDocTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 from paddlenlp.datasets import load_dataset
@@ -62,8 +62,9 @@ args = parser.parse_args()
 # ErnieDocTokenizer for Chinese Tasks
 
 DATASET_INFO = {
-    "imdb": (BPETokenizer, "test", "test", ImdbTextPreprocessor(), Acc()),
-    "hyp": (BPETokenizer, "dev", "test", HYPTextPreprocessor(), F1()),
+    "imdb":
+    (ErnieDocBPETokenizer, "test", "test", ImdbTextPreprocessor(), Acc()),
+    "hyp": (ErnieDocBPETokenizer, "dev", "test", HYPTextPreprocessor(), F1()),
     "iflytek": (ErnieDocTokenizer, "dev", "dev", None, Acc()),
     "thucnews": (ErnieDocTokenizer, "dev", "test", None, Acc())
 }
@@ -325,26 +326,10 @@ def do_train(args):
                         if not os.path.exists(best_model_dir):
                             os.makedirs(best_model_dir)
                         model_to_save.save_pretrained(best_model_dir)
-                        tokenizer.save_pretrained(output_dir)
+                        tokenizer.save_pretrained(best_model_dir)
 
     logger.info("Final test result:")
     eval_acc = evaluate(model, eval_metric, test_dataloader, create_memory())
-    if rank == 0:
-        output_dir = os.path.join(args.output_dir, "model_%d" % (global_steps))
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        model_to_save = model._layers if isinstance(
-            model, paddle.DataParallel) else model
-        model_to_save.save_pretrained(output_dir)
-        tokenizer.save_pretrained(output_dir)
-        if eval_acc > best_acc:
-            logger.info("Save best model......")
-            best_acc = eval_acc
-            best_model_dir = os.path.join(args.output_dir, "best_model")
-            if not os.path.exists(best_model_dir):
-                os.makedirs(best_model_dir)
-            model_to_save.save_pretrained(best_model_dir)
-            tokenizer.save_pretrained(output_dir)
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ import paddle.nn as nn
 from paddle.io import DataLoader
 from paddlenlp.transformers import ErnieDocModel
 from paddlenlp.transformers import ErnieDocForSequenceClassification
-from paddlenlp.transformers import BPETokenizer, ErnieDocTokenizer
+from paddlenlp.transformers import ErnieDocTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 from paddlenlp.datasets import load_dataset
@@ -329,30 +329,11 @@ def do_train(args):
                         save_param_path = os.path.join(best_model_dir,
                                                        'model_state.pdparams')
                         paddle.save(model_to_save.state_dict(), save_param_path)
-                        tokenizer.save_pretrained(output_dir)
+                        tokenizer.save_pretrained(best_model_dir)
 
     logger.info("Final test result:")
     eval_acc = evaluate(model, eval_metric, test_dataloader,
                         create_memory(), create_memory())
-    if rank == 0:
-        output_dir = os.path.join(args.output_dir, "model_%d" % (global_steps))
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        model_to_save = model._layers if isinstance(
-            model, paddle.DataParallel) else model
-        save_param_path = os.path.join(output_dir, 'model_state.pdparams')
-        paddle.save(model_to_save.state_dict(), save_param_path)
-        tokenizer.save_pretrained(output_dir)
-        if eval_acc > best_acc:
-            logger.info("Save best model......")
-            best_acc = eval_acc
-            best_model_dir = os.path.join(args.output_dir, "best_model")
-            if not os.path.exists(best_model_dir):
-                os.makedirs(best_model_dir)
-            save_param_path = os.path.join(best_model_dir,
-                                           'model_state.pdparams')
-            paddle.save(model_to_save.state_dict(), save_param_path)
-            tokenizer.save_pretrained(output_dir)
 
 
 if __name__ == "__main__":

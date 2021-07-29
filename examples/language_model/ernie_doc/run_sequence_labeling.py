@@ -301,26 +301,10 @@ def do_train(args):
                         if not os.path.exists(best_model_dir):
                             os.makedirs(best_model_dir)
                         model_to_save.save_pretrained(best_model_dir)
-                        tokenizer.save_pretrained(output_dir)
+                        tokenizer.save_pretrained(best_model_dir)
 
     logger.info("Final test result:")
     eval_acc = evaluate(model, metric, test_dataloader, create_memory())
-    if rank == 0:
-        output_dir = os.path.join(args.output_dir, "model_%d" % (global_steps))
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        model_to_save = model._layers if isinstance(
-            model, paddle.DataParallel) else model
-        model_to_save.save_pretrained(output_dir)
-        tokenizer.save_pretrained(output_dir)
-        if f1_score > best_f1:
-            logger.info("Save best model......")
-            best_f1 = f1_score
-            best_model_dir = os.path.join(args.output_dir, "best_model")
-            if not os.path.exists(best_model_dir):
-                os.makedirs(best_model_dir)
-            model_to_save.save_pretrained(best_model_dir)
-            tokenizer.save_pretrained(output_dir)
 
 
 if __name__ == "__main__":
