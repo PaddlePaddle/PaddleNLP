@@ -12,7 +12,7 @@
 * [参考论文](#参考论文)
 
 ## 模型简介
-[ERNIE-Doc](https://arxiv.org/abs/2012.15688)是百度NLP部门提出的针对长文本的预训练模型。在循环Transformer机制之上，创新性地提出两阶段重复学习以及增强的循环机制，以此提高模型感受野，加强模型对长文本的理解能力。
+[ERNIE-Doc](https://arxiv.org/abs/2012.15688)是百度NLP提出的针对长文本的预训练模型。在循环Transformer机制之上，创新性地提出两阶段重复学习以及增强的循环机制，以此提高模型感受野，加强模型对长文本的理解能力。
 
 本项目是 ERNIE-Doc 的 PaddlePaddle 动态图实现， 包含模型训练，模型验证等内容。以下是本例的简要目录结构及说明：
 
@@ -43,20 +43,20 @@
 
 ### 通用参数释义
 
-- `model_name_or_path` 指示了finetune使用的具体预训练模型以及预训练时使用的tokenizer，目前支持的预训练模型有："ernie-doc-base-zh", "ernie-doc-base-en"。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"。
+- `model_name_or_path` 指示了Fine-tuning使用的具体预训练模型以及预训练时使用的tokenizer，目前支持的预训练模型有："ernie-doc-base-zh", "ernie-doc-base-en"。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"。
 - `dataset` 表示Fine-tuning需要加载的数据集。
 - `memory_length` 表示当前的句子被截取作为下一个样本的特征的长度。
 - `max_seq_length` 表示最大句子长度，超过该长度的部分将被切分成下一个样本。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
 - `epochs` 表示训练轮数。
-- `logging_steps` 表示日志打印间隔。
-- `save_steps` 表示模型保存及评估间隔。
+- `logging_steps` 表示日志打印间隔步数。
+- `save_steps` 表示模型保存及评估间隔步数。
 - `output_dir` 表示模型保存路径。
 - `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `seed` 表示随机数种子。
 - `weight_decay` 表示AdamW的权重衰减系数。
-- `warmup_proportion` 表示warmup系数。
+- `warmup_proportion` 表示学习率warmup系数。
 - `layerwise_decay` 表示AdamW with Layerwise decay的逐层衰减系数。
 
 由于不同任务、不同数据集所设的超参数差别较大，可查看[ERNIE-Doc](https://arxiv.org/abs/2012.15688)论文附录中具体超参设定，此处不一一列举。
@@ -64,6 +64,15 @@
 ### 分类任务
 
 分类任务支持多种数据集的评测，目前支持`imdb`, `iflytek`, `thucnews`, `hyp`四个数据集（有关数据集的描述可查看[PaddleNLP文本分类数据集](../../../docs/data_prepare/dataset_list.md)）。可通过参数`dataset`指定具体的数据集，下面以`imdb`为例子运行分类任务。
+
+#### 单卡训练
+
+```shell
+python run_classifier.py --batch_size 8 --model_name_or_path ernie-doc-base-en
+
+```
+
+#### 多卡训练
 
 ```shell
 python -m paddle.distributed.launch --gpus "0,1,2" --log_dir imdb run_classifier.py --batch_size 8 --model_name_or_path ernie-doc-base-en
@@ -88,6 +97,14 @@ python -m paddle.distributed.launch --gpus "0,1,2" --log_dir imdb run_classifier
 
 目前抽取式阅读理解支持`duredear-robust`, `drcd`,`cmrc2018`数据集。可通过参数`dataset`指定具体的数据集，下面以`dureader_robust`为例子运行抽取式阅读理解任务。
 
+#### 单卡训练
+
+```shell
+python run_mrc.py --dataset dureader_robust --batch_size 8 --learning_rate 2.75e-4
+```
+
+#### 多卡训练
+
 ```shell
 python -m paddle.distributed.launch --gpus "0,1,2" --log_dir dureader_robust run_mrc.py --dataset dureader_robust --batch_size 8 --learning_rate 2.75e-4
 ```
@@ -107,8 +124,17 @@ python -m paddle.distributed.launch --gpus "0,1,2" --log_dir dureader_robust run
 
 目前PaddleNLP提供`C3`阅读理解单项选择题数据集，可执行以下命令运行该任务。
 
+#### 单卡训练
+
 ```shell
-python -m paddle.distributed.launch --gpus "0,1,2" --log_dir mcq run_mcq.py
+python run_mcq.py --batch_size 8
+
+```
+
+#### 多卡训练
+
+```shell
+python -m paddle.distributed.launch --gpus "0,1,2" --log_dir mcq run_mcq.py --batch_size 8
 
 ```
 
@@ -124,9 +150,16 @@ python -m paddle.distributed.launch --gpus "0,1,2" --log_dir mcq run_mcq.py
 
 可执行以下命令运行该任务。
 
+#### 单卡训练
 
 ```shell
-python -m paddle.distributed.launch --gpus "0,1,2" --log_dir cail run_semantic_matching.py --learning_rate 2e-5
+python run_semantic_matching.py  --batch_size 6 --learning_rate 2e-5
+```
+
+#### 多卡训练
+
+```shell
+python -m paddle.distributed.launch --gpus "0,1,2" --log_dir cail run_semantic_matching.py --batch_size 6 --learning_rate 2e-5
 ```
 
 在`CAIL2019-SCM`数据集上Fine-tuning后，在验证集与测试集上有如下结果：
@@ -150,12 +183,19 @@ PaddleNLP集成的数据集MSRA-NER数据集对文件格式做了调整：每一
 
 可执行以下命令运行序列标注任务。
 
+#### 单卡训练
 
 ```shell
-python -m paddle.distributed.launch --gpus "0,1,2" --log_dir msra_ner run_sequence_labeling.py --learning_rate 3e-5
+python run_sequence_labeling.py --batch_size 8 --learning_rate 3e-5
 ```
 
-在`CAIL2019-SCM`数据集上Fine-tuning后，在验证集与测试集上有如下最佳结果：
+#### 多卡训练
+
+```shell
+python -m paddle.distributed.launch --gpus "0,1,2" --log_dir msra_ner run_sequence_labeling.py --batch_size 8 --learning_rate 3e-5
+```
+
+在`MSRA-NER`数据集上Fine-tuning后，在验证集与测试集上有如下最佳结果：
 
 | Dataset        | Model             |   Precision/Recall/F1   |
 |:--------------:|:-----------------:|:-----------------------:|
@@ -163,7 +203,7 @@ python -m paddle.distributed.launch --gpus "0,1,2" --log_dir msra_ner run_sequen
 
 
 ## 致谢
-* 感谢[百度NLP部门](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-doc)提供ERNIE-Doc开源代码的实现以及预训练模型。
+* 感谢[百度NLP](https://github.com/PaddlePaddle/ERNIE/tree/repro/ernie-doc)提供ERNIE-Doc开源代码的实现以及预训练模型。
 
 ## 参考论文
 
