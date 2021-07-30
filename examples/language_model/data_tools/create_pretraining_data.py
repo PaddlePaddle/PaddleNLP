@@ -63,27 +63,35 @@ def get_args():
         default='text',
         help='For JSON format. Space separate listed of keys to extract from json'
     )
+    group.add_argument(
+        '--split_sentences',
+        action='store_true',
+        help='Split documents into sentences.')
 
     group = parser.add_argument_group(title='chinese words')
     group.add_argument(
-        '--chinese_words_segment',
+        '--chinese',
         action='store_true',
         help="Is corpus need words segmentation step for chinese words.")
     group.add_argument(
-        '--chinese_splited',
+        '--cn_whole_word_segment',
         action='store_true',
-        help="Is chinese corpus is splited in to words.")
+        help="Is corpus need words segmentation step for chinese words WWM.")
     group.add_argument(
-        '--chinese_split_dimer',
-        type=str,
-        default=' ',
-        help="Split dimer between chinese words.")
-    group.add_argument(
-        '--chinese_seg_func',
+        '--cn_seg_func',
         type=str,
         default='lac',
         choices=['lac', 'seg'],
         help='Words segment function for chinese words.')
+    group.add_argument(
+        '--cn_splited',
+        action='store_true',
+        help="Is chinese corpus is splited in to words.")
+    group.add_argument(
+        '--cn_split_dimer',
+        type=str,
+        default=' ',
+        help="Split dimer between chinese words.")
 
     group = parser.add_argument_group(title='common config')
     group.add_argument(
@@ -199,6 +207,16 @@ def get_whole_word_mask_tokens(tokens, words, max_word_length=4):
     return new_tokens
 
 
+class IdentitySplitter(object):
+    def tokenize(self, *text):
+        return text
+
+
+class NewlineSplitter():
+    def tokenize(self, text):
+        return text.split("\n")
+
+
 class Converter(object):
     def __init__(self, args):
         self.args = args
@@ -207,47 +225,51 @@ class Converter(object):
         Converter.tokenizer = getattr(
             tfs, self.args.tokenizer_name).from_pretrained(self.args.model_name)
 
-        if self.args.chinese_words_segment:
-            if self.args.chinese_splited:
-                Converter.segment_func = lambda text: text.split(self.args.chinese_split_dimer)
+        # Split document to sentence.
+        if self.args.split_sentences:
+            if self.args.chinese:
+                Converter.splitter = NewlineSplitter()
             else:
-                Converter.segment_func = CHINESE_SEG_FUNC[
-                    self.args.chinese_seg_func]
-
-            def process(text):
-                words = Converter.segment_func(text)
-                tokens = Converter.tokenizer.tokenize("".join(words))
-                tokens = get_whole_word_mask_tokens(tokens, words)
-                tokens = Converter.tokenizer.convert_tokens_to_ids(tokens)
-                return tokens
-
-            Converter.process = process
-
+                if not nltk_available:
+                    print("NLTK is not available to split sentences.")
+                    exit()
+                splitter = nltk.load("tokenizers/punkt/english.pickle")
+                Converter.splitter = splitter
         else:
-            Converter.process = lambda text : Converter.tokenizer.convert_tokens_to_ids(
-                Converter.tokenizer.tokenize(text))
+            Converter.splitter = IdentitySplitter()
+
+        # Split sentence whole words mask for chinese 
+        if self.args.cn_whole_word_segment:
+            if self.args.cn_splited:
+                Converter.segment_func = lambda text: text.split(self.args.cn_split_dimer)
+            else:
+                Converter.segment_func = CHINESE_SEG_FUNC[self.args.cn_seg_func]
+            Converter.whole_word_mask = get_whole_word_mask_tokens
+        else:
+            Converter.segment_func = lambda x: x
+            Converter.whole_word_mask = lambda x, y: x
+
+        def process(text):
+            words = Converter.segment_func(text)
+            tokens = Converter.tokenizer.tokenize("".join(words))
+            tokens = Converter.whole_word_mask(tokens, words)
+            tokens = Converter.tokenizer.convert_tokens_to_ids(tokens)
+            return tokens
+
+        Converter.process = process
 
     def encode(self, json_line):
         text = json.loads(json_line)[self.args.json_key]
-        text = re.sub('[\n]+', '\n', text)
-        tokens = Converter.process(text)
-        #text = re.sub('[ ]+', ' ', text)
-        # if self.args.chinese_words_segment:
-        #     if self.args.splited:
-        #         words = text.split(self.args.split_dimer) 
-        #     else:
-        #         words = Converter.segment_func(text)
-        #     tokens = Converter.tokenizer.tokenize(text)
-        #     tokens = get_whole_word_mask_tokens(tokens, words) 
-        #     tokens = Converter.tokenizer.convert_tokens_to_ids(tokens)
-        # else:
-        #     tokens = Converter.tokenizer.convert_tokens_to_ids(
-        #         Converter.tokenizer.tokenize(text))
+        doc_ids = []
+        for sentence in Converter.splitter.tokenize(text):
+            sentence_ids = Converter.process(sentence.strip())
+            if len(sentence_ids) > 0:
+                doc_ids.append(sentence_ids)
 
-        # if self.args.append_eos:
-        #     tokens.append(Converter.tokenizer.eos_token_id)
+        if len(doc_ids) > 0 and self.args.append_eos:
+            doc_ids[-1].append(Converter.tokenizer.eos_token_id)
 
-        return tokens, len(json_line.encode("utf-8"))
+        return doc_ids, len(json_line.encode("utf-8"))
 
 
 def main():
@@ -275,7 +297,10 @@ def main():
 
     # We use BytesIO to store the ids.
     memory_stream = io.BytesIO()
+    # Lengths of sentence.
     lens = []
+    # Position of docs
+    docs = [0]
 
     for file_path in tqdm(file_paths):
         total_bytes_processed = 0
@@ -286,13 +311,19 @@ def main():
         proc_start = time.time()
         print("Time to startup:", startup_end - startup_start)
         print("Processing %s" % file_path)
-        for i, (tokens, bytes_processed) in enumerate(encoded_docs, start=1):
+        for i, (doc, bytes_processed) in enumerate(encoded_docs, start=1):
             total_bytes_processed += bytes_processed
+            if len(doc) == 0:
+                continue
 
-            lens.append(len(tokens))
-            memory_stream.write(
-                np.array(
-                    tokens, dtype=save_dtype).tobytes(order='C'))
+            for sentence in doc:
+                if len(sentence) == 0:
+                    continue
+                lens.append(len(sentence))
+                memory_stream.write(
+                    np.array(
+                        sentence, dtype=save_dtype).tobytes(order='C'))
+            docs.append(len(lens))
 
             if i % args.log_interval == 0:
                 current = time.time()
@@ -306,11 +337,21 @@ def main():
     pool.close()
     print("Saving tokens to npz file...")
     all_doc_ids = np.frombuffer(memory_stream.getbuffer(), dtype=save_dtype)
-    lens = np.array(lens, dtype=np.uint32)
-    np.savez(args.output_prefix + "_ids_lens.npz", ids=all_doc_ids, lens=lens)
-    print("Total documents num: %d" % len(lens))
+    # print(sample_tokenizer.vocab.to_tokens(all_doc_ids.tolist()))
+    # print(sample_tokenizer.convert_tokens_to_string(sample_tokenizer.vocab.to_tokens(all_doc_ids.tolist())))
+    lens = np.array(lens, dtype=np.int32)
+    docs = np.array(docs, dtype=np.int64)
+    np.savez(
+        args.output_prefix + "_ids_lens.npz",
+        ids=all_doc_ids,
+        lens=lens,
+        docs=docs)
+    print("Total sentences num: %d" % len(lens))
+    print("Total documents num: %d" % (len(docs) - 1))
     print("Total tokens num: %d" % len(all_doc_ids))
-    print("Average tokens per doc: %.2f" % (len(all_doc_ids) / len(lens)))
+    print("Average tokens per sentence: %.2f" % (len(all_doc_ids) / len(lens)))
+    print("Average tokens per document: %.2f" % (len(all_doc_ids) /
+                                                 (len(docs) - 1)))
 
 
 if __name__ == "__main__":
