@@ -25,6 +25,7 @@ option(WITH_GPU         "Compile with GPU/CPU, default use CPU."                
 option(USE_TENSORRT     "Compile with TensorRT."                                  OFF)
 option(WITH_TRANSFORMER "Compile with Transformer"                                ON)
 option(WITH_GPT         "Compile with GPT"                                        OFF)
+option(WITH_UNIFIED         "Compile with Unified Transformer"                        ON)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
@@ -36,6 +37,10 @@ endif()
 
 if(WITH_GPT)
   list(APPEND decoding_op_files fusion_gpt_op.cc fusion_gpt_op.cu)
+endif()
+
+if(WITH_UNIFIED)
+  list(APPEND decoding_op_files fusion_unified_decoding_op.cc fusion_unified_decoding_op.cu)
 endif()
 
 if(NOT WITH_TRANSFORMER AND NOT WITH_GPT)
@@ -124,15 +129,38 @@ file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/topk_kernel
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cu topk_kernels_dst)
 
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_decoder.cu open_decoder_cu_dst)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/open_decoder.h open_decoder_header_dst)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/open_decoder.h open_decoder_h_dst)
+
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/cuda_kernels.h cuda_kernels_h_dst)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/decoding_kernels.cu decoding_kernels_cu_dst)
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/transformer_decoder.cu trans_decoder_cu_src)
-file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/transformer_decoder.h trans_decoder_header_src)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/transformer_decoder.h trans_decoder_h_src)
+
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/transformer_cuda_kernels.h cuda_kernels_h_src)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/transformer_decoding_kernels.cu decoding_kernels_cu_src)
+
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/transformer_beamsearch.h beamsearch_h_src)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/transformer_sampling.h sampling_h_src)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/arguments.h arguments_h_src)
 set(trans_dst ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/)
 
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
-set(FT_PATCH_COMMAND cp ${allocator_src} ${allocator_dst} && cp ${common_src} ${common_dst} && cp ${cmakelists_src} ${cmakelists_dst} && cp ${topk_kernels_src} ${topk_kernels_dst} && cat ${trans_decoder_cu_src} >> ${open_decoder_cu_dst} && cat ${trans_decoder_header_src} >> ${open_decoder_header_dst} && ${MUTE_COMMAND})
+set(FT_PATCH_COMMAND
+  cp ${allocator_src} ${allocator_dst}
+  && cp ${common_src} ${common_dst}
+  && cp ${cmakelists_src} ${cmakelists_dst}
+  && cp ${topk_kernels_src} ${topk_kernels_dst}
+  && cp ${beamsearch_h_src} ${trans_dst}
+  && cp ${sampling_h_src} ${trans_dst}
+  && cp ${arguments_h_src} ${trans_dst}
+  && cat ${trans_decoder_cu_src} >> ${open_decoder_cu_dst}
+  && cat ${trans_decoder_h_src} >> ${open_decoder_h_dst}
+  && cat ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
+  && cat ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
+  && ${MUTE_COMMAND}
+)
 
 ######################################################################################
 # A function for automatic detection of GPUs installed  (if autodetection is enabled)
