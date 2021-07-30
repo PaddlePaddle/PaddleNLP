@@ -21,6 +21,7 @@ from paddle.nn.layer.transformer import (
     _convert_attention_mask,
     _convert_param_attr_to_list, )
 from ..electra.modeling import get_activation
+
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
