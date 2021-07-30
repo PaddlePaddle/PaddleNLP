@@ -16,12 +16,8 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import tensor
-from paddle.fluid import layers
 from paddle.nn import Layer
-from paddle.nn.layer.transformer import (
-    MultiHeadAttention,
-    _convert_attention_mask,
-    _convert_param_attr_to_list, )
+
 from ...ops.einsum import einsum
 from .. import PretrainedModel, register_base_model
 
@@ -39,7 +35,20 @@ __all__ = [
 dtype_float = paddle.get_default_dtype()
 
 
-class MultiHeadAttentionWithRotary(MultiHeadAttention):
+def _convert_attention_mask(attn_mask, dtype):
+    if attn_mask is not None and attn_mask.dtype != dtype:
+        attn_mask_dtype = attn_mask.dtype
+        if attn_mask_dtype in [
+                paddle.bool, paddle.int8, paddle.int16, paddle.int32,
+                paddle.int64
+        ]:
+            attn_mask = (paddle.cast(attn_mask, dtype) - 1.0) * 1e9
+        else:
+            attn_mask = paddle.cast(attn_mask, dtype)
+    return attn_mask
+
+
+class MultiHeadAttentionWithRotary(Layer):
     def __init__(self,
                  embed_dim,
                  num_heads,
@@ -47,19 +56,24 @@ class MultiHeadAttentionWithRotary(MultiHeadAttention):
                  kdim=None,
                  vdim=None,
                  need_weights=False,
-                 weight_attr=None,
-                 bias_attr=None,
                  rotary_value=False):
-        super().__init__(
-            embed_dim,
-            num_heads,
-            dropout=dropout,
-            kdim=kdim,
-            vdim=vdim,
-            need_weights=need_weights,
-            weight_attr=weight_attr,
-            bias_attr=bias_attr)
+        super(MultiHeadAttentionWithRotary, self).__init__()
+        self.embed_dim = embed_dim
+        self.kdim = kdim if kdim is not None else embed_dim
+        self.vdim = vdim if vdim is not None else embed_dim
+        self.num_heads = num_heads
+        self.need_weights = need_weights
         self.rotary_value = rotary_value
+
+        self.head_dim = embed_dim // num_heads
+        self.scale = self.head_dim**-0.5
+        assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
+
+        self.dropout = nn.Dropout(dropout)
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(self.kdim, embed_dim)
+        self.v_proj = nn.Linear(self.vdim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
 
     def positional_embedding(self, inputs):
         seq_len = inputs.shape[1]
@@ -71,7 +85,6 @@ class MultiHeadAttentionWithRotary(MultiHeadAttention):
             [paddle.sin(sinusoid_inp), paddle.cos(sinusoid_inp)], axis=-1)
         pos_emb = paddle.reshape(pos_emb, (1, 1, seq_len, self.head_dim))
         pos_emb.stop_gradient = True
-
         return pos_emb
 
     @staticmethod
@@ -118,36 +131,32 @@ class MultiHeadAttentionWithRotary(MultiHeadAttention):
     def forward(self, query, key=None, value=None, attn_mask=None, cache=None):
         key = query if key is None else key
         value = query if value is None else value
-        # compute q ,k ,v
-        if cache is None:
-            q, k, v = self._prepare_qkv(query, key, value, cache)
-        else:
-            q, k, v, cache = self._prepare_qkv(query, key, value, cache)
+
+        q = self.q_proj(query)
+        k = self.k_proj(key)
+        v = self.v_proj(value)
+
+        q = tensor.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
+        q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
+        k = tensor.reshape(x=k, shape=[0, 0, self.num_heads, self.head_dim])
+        k = tensor.transpose(x=k, perm=[0, 2, 1, 3])
+        v = tensor.reshape(x=v, shape=[0, 0, self.num_heads, self.head_dim])
+        v = tensor.transpose(x=v, perm=[0, 2, 1, 3])
 
         sinusoidal_pos = self.positional_embedding(query)
         if self.rotary_value:
             q, k, v = self.apply_rotary_position_embeddings(sinusoidal_pos, q,
                                                             k, v)
-
         else:
             q, k = self.apply_rotary_position_embeddings(sinusoidal_pos, q, k)
 
-        # scale dot product attention
-        # TODO(guosheng): use tensor.matmul, however it doesn't support `alpha`
-        product = layers.matmul(
-            x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
+        product = tensor.matmul(x=q, y=k, transpose_y=True) * self.scale
         if attn_mask is not None:
-            # Support bool or int mask
             attn_mask = _convert_attention_mask(attn_mask, product.dtype)
             product = product + attn_mask
-        weights = F.softmax(product)
-        if self.dropout:
-            weights = F.dropout(
-                weights,
-                self.dropout,
-                training=self.training,
-                mode="upscale_in_train")
 
+        weights = F.softmax(product)
+        weights = self.dropout(weights)
         out = tensor.matmul(weights, v)
 
         # combine heads
@@ -175,9 +184,8 @@ class TransformerEncoderLayerWithRotary(nn.TransformerEncoderLayer):
                  attn_dropout=None,
                  act_dropout=None,
                  normalize_before=False,
-                 weight_attr=None,
-                 bias_attr=None,
-                 rotary_value=False):
+                 rotary_value=False,
+                 **kwargs):
         super().__init__(
             d_model,
             nhead,
@@ -186,18 +194,9 @@ class TransformerEncoderLayerWithRotary(nn.TransformerEncoderLayer):
             activation=activation,
             attn_dropout=attn_dropout,
             act_dropout=act_dropout,
-            normalize_before=normalize_before,
-            weight_attr=weight_attr,
-            bias_attr=bias_attr, )
-        weight_attrs = _convert_param_attr_to_list(weight_attr, 2)
-        bias_attrs = _convert_param_attr_to_list(bias_attr, 2)
+            normalize_before=normalize_before)
         self.self_attn = MultiHeadAttentionWithRotary(
-            d_model,
-            nhead,
-            dropout=attn_dropout,
-            weight_attr=weight_attrs[0],
-            bias_attr=bias_attrs[0],
-            rotary_value=rotary_value)
+            d_model, nhead, dropout=attn_dropout, rotary_value=rotary_value)
         self._config.update({"rotary_value": rotary_value})
 
 

@@ -14,96 +14,31 @@
 # limitations under the License.
 
 import os
-import unicodedata
 
 import jieba
-from ..tokenizer_utils import (
-    PretrainedTokenizer,
-    _is_control,
-    _is_punctuation,
-    _is_whitespace,
-    convert_to_unicode,
-    whitespace_tokenize, )
+from ..bert.tokenizer import BasicTokenizer, WordpieceTokenizer
+from ..tokenizer_utils import PretrainedTokenizer
 
-__all__ = ["RoFormerTokenizer"]
+__all__ = ["RoFormerTokenizer", "JiebaBasicTokenizer"]
 
 
-class JiebaBasicTokenizer(object):
+class JiebaBasicTokenizer(BasicTokenizer):
     """
-    Runs basic tokenization (punctuation splitting, lower casing, etc.).
+    Runs basic tokenization with jieba (punctuation splitting, lower casing, jieba pretokenizer etc.).
     Args:
         do_lower_case (bool): Whether the text strips accents and convert to
-            lower case. If you use the BERT Pretrained model, lower is set to
+            lower case. If you use the RoFormer Pretrained model, lower is set to
             Flase when using the cased model, otherwise it is set to True.
             Default: True.
     """
 
     def __init__(self, vocab, do_lower_case=True):
-        """Constructs a BasicTokenizer."""
+        """Constructs a JiebaBasicTokenizer."""
         self.vocab = vocab
         self.do_lower_case = do_lower_case
 
-    def tokenize(self, text):
-        """
-        Tokenizes a piece of text using basic tokenizer.
-        Args:
-            text (str): A piece of text.
-        Returns:
-            list(str): A list of tokens.
-        """
-        text = convert_to_unicode(text)
-        text = self._clean_text(text)
-        text = self._tokenize_chinese_chars(text)
-
-        orig_tokens = whitespace_tokenize(text)
-        split_tokens = []
-        for token in orig_tokens:
-            if self.do_lower_case:
-                token = token.lower()
-                token = self._run_strip_accents(token)
-            split_tokens.extend(self._run_split_on_punc(token))
-
-        output_tokens = whitespace_tokenize(" ".join(split_tokens))
-        return output_tokens
-
-    def _run_strip_accents(self, text):
-        """
-        Strips accents from a piece of text.
-        """
-        text = unicodedata.normalize("NFD", text)
-        output = []
-        for char in text:
-            cat = unicodedata.category(char)
-            if cat == "Mn":
-                continue
-            output.append(char)
-        return "".join(output)
-
-    def _run_split_on_punc(self, text):
-        """
-        Splits punctuation on a piece of text.
-        """
-        chars = list(text)
-        i = 0
-        start_new_word = True
-        output = []
-        while i < len(chars):
-            char = chars[i]
-            if _is_punctuation(char):
-                output.append([char])
-                start_new_word = True
-            else:
-                if start_new_word:
-                    output.append([])
-                start_new_word = False
-                output[-1].append(char)
-            i += 1
-
-        return ["".join(x) for x in output]
-
     def _tokenize_chinese_chars(self, text):
         output = []
-
         for wholeword in jieba.cut(text, HMM=False):
             if wholeword in self.vocab:
                 output.append(" ")
@@ -120,112 +55,6 @@ class JiebaBasicTokenizer(object):
                         output.append(char)
         return "".join(output)
 
-    def _is_chinese_char(self, cp):
-        """
-        Checks whether CP is the codepoint of a CJK character.
-        """
-
-        # This defines a "chinese character" as anything in the CJK Unicode block:
-        #     https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
-        #
-        # Note that the CJK Unicode block is NOT all Japanese and Korean characters,
-        # despite its name. The modern Korean Hangul alphabet is a different block,
-        # as is Japanese Hiragana and Katakana. Those alphabets are used to write
-        # space-separated words, so they are not treated specially and handled
-        # like the all of the other languages.
-        if ((cp >= 0x4E00 and cp <= 0x9FFF) or
-            (cp >= 0x3400 and cp <= 0x4DBF)  #
-                or (cp >= 0x20000 and cp <= 0x2A6DF)  #
-                or (cp >= 0x2A700 and cp <= 0x2B73F)  #
-                or (cp >= 0x2B740 and cp <= 0x2B81F)  #
-                or (cp >= 0x2B820 and cp <= 0x2CEAF)  #
-                or (cp >= 0xF900 and cp <= 0xFAFF) or
-            (cp >= 0x2F800 and cp <= 0x2FA1F)  #
-            ):  #
-            return True
-
-        return False
-
-    def _clean_text(self, text):
-        """
-        Performs invalid character removal and whitespace cleanup on text.
-        """
-        output = []
-        for char in text:
-            cp = ord(char)
-            if cp == 0 or cp == 0xFFFD or _is_control(char):
-                continue
-            if _is_whitespace(char):
-                output.append(" ")
-            else:
-                output.append(char)
-        return "".join(output)
-
-
-class WordpieceTokenizer(object):
-    """
-    Runs WordPiece tokenization.
-    Args:
-        vocab (Vocab|dict): Vocab of the word piece tokenizer.
-        unk_token (str):  A specific token to replace all unkown tokens.
-        max_input_chars_per_word (int):  If a word's length is more than
-            max_input_chars_per_word, it will be dealt as unknown word.
-            Default: 100.
-    """
-
-    def __init__(self, vocab, unk_token, max_input_chars_per_word=100):
-        self.vocab = vocab
-        self.unk_token = unk_token
-        self.max_input_chars_per_word = max_input_chars_per_word
-
-    def tokenize(self, text):
-        """
-        Tokenizes a piece of text into its word pieces.
-        This uses a greedy longest-match-first algorithm to perform tokenization
-        using the given vocabulary.
-        Args:
-            text: A single token or whitespace separated tokens. This should have
-                already been passed through `BasicTokenizer`.
-        Returns:
-            list (str): A list of wordpiece tokens.
-        Example:
-            input = "unaffable"
-            output = ["un", "##aff", "##able"]
-        """
-
-        output_tokens = []
-        for token in whitespace_tokenize(text):
-            chars = list(token)
-            if len(chars) > self.max_input_chars_per_word:
-                output_tokens.append(self.unk_token)
-                continue
-
-            is_bad = False
-            start = 0
-            sub_tokens = []
-            while start < len(chars):
-                end = len(chars)
-                cur_substr = None
-                while start < end:
-                    substr = "".join(chars[start:end])
-                    if start > 0:
-                        substr = "##" + substr
-                    if substr in self.vocab:
-                        cur_substr = substr
-                        break
-                    end -= 1
-                if cur_substr is None:
-                    is_bad = True
-                    break
-                sub_tokens.append(cur_substr)
-                start = end
-
-            if is_bad:
-                output_tokens.append(self.unk_token)
-            else:
-                output_tokens.extend(sub_tokens)
-        return output_tokens
-
 
 class RoFormerTokenizer(PretrainedTokenizer):
     """
@@ -238,6 +67,7 @@ class RoFormerTokenizer(PretrainedTokenizer):
             lower case. If you use the RoFormer pretrained model, lower is set to
             Flase when using the cased model, otherwise it is set to True.
             Default: True.
+        use_jieba (bool): Whether or not to tokenize the text with jieba. Default: False.
         unk_token (str): The special token for unkown words. Default: "[UNK]".
         sep_token (str): The special token for separator token . Default: "[SEP]".
         pad_token (str): The special token for padding. Default: "[PAD]".
@@ -284,34 +114,44 @@ class RoFormerTokenizer(PretrainedTokenizer):
     }
     pretrained_init_configuration = {
         "roformer-chinese-small": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "use_jieba": True
         },
         "roformer-chinese-base": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "use_jieba": True
         },
         "roformer-chinese-char-small": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "use_jieba": False
         },
         "roformer-chinese-char-base": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "use_jieba": False
         },
         "roformer-chinese-sim-char-ft-small": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "use_jieba": False
         },
         "roformer-chinese-sim-char-ft-base": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "use_jieba": False
         },
         "roformer-chinese-sim-char-small": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "use_jieba": False
         },
         "roformer-chinese-sim-char-base": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "use_jieba": False
         },
         "roformer-english-small-discriminator": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "use_jieba": False
         },
         "roformer-english-small-generator": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "use_jieba": False
         },
     }
     padding_side = "right"
@@ -320,6 +160,7 @@ class RoFormerTokenizer(PretrainedTokenizer):
             self,
             vocab_file,
             do_lower_case=True,
+            use_jieba=False,
             unk_token="[UNK]",
             sep_token="[SEP]",
             pad_token="[PAD]",
@@ -330,11 +171,14 @@ class RoFormerTokenizer(PretrainedTokenizer):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
+                "`tokenizer = RoFormerTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(vocab_file))
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
-        self.basic_tokenizer = JiebaBasicTokenizer(
-            vocab=self.vocab, do_lower_case=do_lower_case)
+        if use_jieba:
+            self.basic_tokenizer = JiebaBasicTokenizer(
+                vocab=self.vocab, do_lower_case=do_lower_case)
+        else:
+            self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
         self.wordpiece_tokenizer = WordpieceTokenizer(
             vocab=self.vocab, unk_token=unk_token)
 
@@ -347,9 +191,9 @@ class RoFormerTokenizer(PretrainedTokenizer):
         """
         return len(self.vocab)
 
-    def _tokenize(self, text, use_jieba=True):
+    def _tokenize(self, text):
         """
-        End-to-end tokenization for BERT models.
+        End-to-end tokenization for RoFormer models.
         Args:
             text (str): The text to be tokenized.
 
@@ -365,7 +209,7 @@ class RoFormerTokenizer(PretrainedTokenizer):
 
     def tokenize(self, text):
         """
-        End-to-end tokenization for BERT models.
+        End-to-end tokenization for RoFormer models.
         Args:
             text (str): The text to be tokenized.
 
@@ -413,7 +257,7 @@ class RoFormerTokenizer(PretrainedTokenizer):
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens.
 
-        A BERT sequence has the following format:
+        A Roformer sequence has the following format:
         ::
             - single sequence: ``[CLS] X [SEP]``
             - pair of sequences: ``[CLS] A [SEP] B [SEP]``
@@ -439,7 +283,7 @@ class RoFormerTokenizer(PretrainedTokenizer):
         """
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
 
-        A BERT offset_mapping has the following format:
+        A RoFormer offset_mapping has the following format:
         ::
             - single sequence: ``(0,0) X (0,0)``
             - pair of sequences: `(0,0) A (0,0) B (0,0)``
@@ -465,7 +309,7 @@ class RoFormerTokenizer(PretrainedTokenizer):
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task.
 
-        A BERT sequence pair mask has the following format:
+        A RoFormer sequence pair mask has the following format:
         ::
 
             0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
