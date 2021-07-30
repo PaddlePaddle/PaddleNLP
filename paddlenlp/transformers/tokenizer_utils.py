@@ -487,10 +487,10 @@ class PretrainedTokenizer(object):
                     logger.error(err)
                     raise RuntimeError(
                         f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
-                        f"Please make sure that:\n"
-                        f"- '{pretrained_model_name_or_path}' is a correct model-identifier of built-in pretrained models\n"
-                        f"- or '{pretrained_model_name_or_path}' is a correct model-identifier of community-contributed pretrained models\n"
-                        f"- or '{pretrained_model_name_or_path}' is the correct path to a directory containing relevant tokenizer files.\n"
+                        f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                        "- a correct model-identifier of built-in pretrained models,\n"
+                        "- or a correct model-identifier of community-contributed pretrained models,\n"
+                        "- or the correct path to a directory containing relevant tokenizer files.\n"
                     )
 
         # Prepare tokenizer initialization kwargs
@@ -579,8 +579,6 @@ class PretrainedTokenizer(object):
             save_directory (str): Directory to save files into.
         """
         for name, file_name in self.resource_files_names.items():
-            if name not in self.init_config:
-                continue
             src_path = self.init_config[name]
             dst_path = os.path.join(save_directory, file_name)
             if os.path.abspath(src_path) != os.path.abspath(dst_path):

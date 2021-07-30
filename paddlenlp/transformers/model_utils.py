@@ -236,10 +236,10 @@ class PretrainedModel(Layer, GenerationMixin):
                     logger.error(err)
                     raise RuntimeError(
                         f"Can't load weights for '{pretrained_model_name_or_path}'.\n"
-                        f"Please make sure that:\n"
-                        f"- '{pretrained_model_name_or_path}' is a correct model-identifier of built-in pretrained models\n"
-                        f"- or '{pretrained_model_name_or_path}' is a correct model-identifier of community-contributed pretrained models\n"
-                        f"- or '{pretrained_model_name_or_path}' is the correct path to a directory containing relevant files(model_weights and model_config).\n"
+                        f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                        "- a correct model-identifier of built-in pretrained models,\n"
+                        "- or a correct model-identifier of community-contributed pretrained models,\n"
+                        "- or the correct path to a directory containing relevant modeling files(model_weights and model_config).\n"
                     )
 
         # Prepare model initialization kwargs
