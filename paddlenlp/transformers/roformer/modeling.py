@@ -82,9 +82,7 @@ class MultiHeadAttentionWithRotary(MultiHeadAttention):
         # https://kexue.fm/archives/8265
         # sin [batch_size, num_heads, sequence_length, embed_size_per_head//2]
         # cos [batch_size, num_heads, sequence_length, embed_size_per_head//2]
-
         sin, cos = paddle.chunk(sinusoidal_pos, 2, axis=-1)
-
         # sin [θ0,θ1,θ2......θd/2-1] -> sin_pos [θ0,θ0,θ1,θ1,θ2,θ2......θd/2-1,θd/2-1]
         sin_pos = paddle.reshape(
             paddle.stack(
@@ -94,7 +92,6 @@ class MultiHeadAttentionWithRotary(MultiHeadAttention):
             paddle.stack(
                 [cos, cos], axis=-1), sinusoidal_pos.shape)
         # rotate_half_query_layer [-q1,q0,-q3,q2......,-qd-1,qd-2]
-
         rotate_half_query_layer = paddle.reshape(
             paddle.stack(
                 [-query_layer[:, :, :, 1::2], query_layer[:, :, :, 0::2]],
@@ -102,7 +99,6 @@ class MultiHeadAttentionWithRotary(MultiHeadAttention):
             query_layer.shape, )
         query_layer = query_layer * cos_pos + rotate_half_query_layer * sin_pos
         # rotate_half_key_layer [-k1,k0,-k3,k2......,-kd-1,kd-2]
-
         rotate_half_key_layer = paddle.reshape(
             paddle.stack(
                 [-key_layer[:, :, :, 1::2], key_layer[:, :, :, 0::2]], axis=-1),

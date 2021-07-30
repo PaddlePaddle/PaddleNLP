@@ -34,6 +34,7 @@ huggingface_to_paddle = {
 
 def convert_pytorch_checkpoint_to_paddle(pytorch_checkpoint_path,
                                          paddle_dump_path):
+
     import torch
     import paddle
     pytorch_state_dict = torch.load(pytorch_checkpoint_path, map_location="cpu")

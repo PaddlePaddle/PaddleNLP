@@ -45,6 +45,7 @@ def test_mlm(text, model_name):
             pd_outputs_sentence += "".join(
                 tokenizer.convert_ids_to_tokens(
                     [id], skip_special_tokens=True))
+
     print(pd_outputs_sentence)
 
 

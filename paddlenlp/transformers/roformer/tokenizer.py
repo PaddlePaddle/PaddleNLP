@@ -103,6 +103,7 @@ class JiebaBasicTokenizer(object):
 
     def _tokenize_chinese_chars(self, text):
         output = []
+
         for wholeword in jieba.cut(text, HMM=False):
             if wholeword in self.vocab:
                 output.append(" ")
