@@ -28,7 +28,7 @@ Fine-tuning 使用GLUE数据，这部分Paddle已提供，在执行Fine-tuning �
 
 以 GLUE/SST-2 任务为例，启动 Fine-tuning 的方式如下：
 ```shell
-export CUDA_VISIBLE_DEVICES=0,1
+export CUDA_VISIBLE_DEVICES=0
 export TASK_NAME=SST-2
 
 python -u examples/language_model/convbert/run_glue.py \
@@ -45,8 +45,8 @@ python -u examples/language_model/convbert/run_glue.py \
     --device gpu
 ```
 其中参数释义如下：
-- `model_type` 指示了模型类型，当前支持BERT、ELECTRA、ERNIE,CONVBERT模型。
-- `model_name_or_path` 如果配置模型名（convbert模型当前支持convbert-small、convbert-base、convbert-large几种规格）则为本节介绍的方式。如果配置本地目录。
+- `model_type` 指示了模型类型，当前支持BERT、ELECTRA、ERNIE、CONVBERT模型。
+- `model_name_or_path` 模型名称或者路径，其中convbert模型当前仅支持convbert-small、convbert-medium-small、convbert-base几种规格。
 - `task_name` 表示 Fine-tuning 的任务，当前支持CoLA、SST-2、MRPC、STS-B、QQP、MNLI、QNLI、RTE。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
@@ -87,7 +87,7 @@ eval loss: 0.226449, acc: 0.9013761467889908, eval done total : 0.51035308837890
 | MRPC  | acc./F1                      | 87.70       |
 | STS-B | Pearson/Spearman corr        | 86.34       |
 | QQP   | acc./F1                      | 85.47       |
-| MNLI  | matched acc./mismatched acc. | no run       |
+| MNLI  | matched acc./mismatched acc. | 81.87       |
 | QNLI  | acc.                         | 87.71       |
 | RTE   | acc.                         | 66.06       |
 
