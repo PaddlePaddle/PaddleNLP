@@ -97,7 +97,7 @@ def parse_args():
         "--learning_rate",
         default=6e-4,
         type=float,
-        help="The initial learning rate for Adam.")
+        help="The initial learning rate for AdamW.")
     parser.add_argument(
         "--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
     parser.add_argument(
@@ -146,7 +146,7 @@ def parse_args():
         "--adam_epsilon",
         default=1e-8,
         type=float,
-        help="Epsilon for Adam optimizer.")
+        help="Epsilon for AdamW optimizer.")
     parser.add_argument(
         "--max_steps",
         default=400000,
@@ -257,13 +257,23 @@ def do_train(args):
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          warmup)
-    optimizer = paddle.optimizer.Adam(
+
+    clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=1.0)
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
+    decay_params = [
+        p.name for n, p in student.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
+    optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         beta1=0.9,
         beta2=0.98,
         epsilon=args.adam_epsilon,
         parameters=student.parameters(),
-        weight_decay=args.weight_decay)
+        weight_decay=args.weight_decay,
+        apply_decay_param_fun=lambda x: x in decay_params,
+        grad_clip=clip)
 
     pool = ThreadPoolExecutor(1)
 
