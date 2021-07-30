@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import paddle
 import paddle.fluid.core as core
+
+__all__ = ['to_strings_tensor', 'to_map_tensor']
 
 
 def to_strings_tensor(string_values, name):

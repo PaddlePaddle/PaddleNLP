@@ -17,3 +17,4 @@ from .faster_transformer.transformer.faster_transformer import *
 from .einsum import *
 from .distributed import *
 from . import optimizer
+from .strings import *
