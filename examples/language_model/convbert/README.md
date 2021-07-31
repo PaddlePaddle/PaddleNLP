@@ -11,6 +11,41 @@
 
 本项目是 ConvBert 在 Paddle 2.0上的开源实现。
 
+## 快速开始
+
+### 预训练模型转换
+
+预训练模型可以从 huggingface/transformers 转换而来，方法如下（适用于convbert模型，其他模型按情况调整）：
+
+1. 从huggingface.co获取convbert模型权重
+2. 设置参数运行convert.py代码
+3. 例子：
+   假设我想转换https://huggingface.co/YituTech/conv-bert-base 权重
+   - (1)首先下载 https://huggingface.co/YituTech/conv-bert-base/tree/main 中的pytorch_model.bin文件,假设我们存入了`./conv-bert-base/pytorch_model.bin`
+   - (2)运行convert.py
+        ```bash
+        python convert.py \
+            --pytorch_checkpoint_path ./conv-bert-base/pytorch_model.bin \
+            --paddle_dump_path ./convbert-base/model_state.pdparams
+        ```
+   - (3)最终我们得到了转化好的权重`./convbert-base/model_state.pdparams`
+
+
+### 模型精度对齐
+运行`python compare.py`，对比huggingface与paddle之间的精度，我们可以发现精度的平均误差在10^-7量级，最大误差在10^-6量级。
+```python
+    python compare.py
+    # huggingface YituTech/conv-bert-small vs paddle convbert-small
+    # mean difference: tensor(4.6980e-07)
+    # max difference: tensor(2.8610e-06)
+    # huggingface YituTech/conv-bert-medium-small vs paddle convbert-medium-small
+    # mean difference: tensor(3.4326e-07)
+    # max difference: tensor(2.8014e-06)
+    # huggingface YituTech/conv-bert-base vs paddle convbert-base
+    # mean difference: tensor(4.5306e-07)
+    # max difference: tensor(8.1062e-06)
+```
+
 ## **数据准备**
 
 ### Fine-tuning数据

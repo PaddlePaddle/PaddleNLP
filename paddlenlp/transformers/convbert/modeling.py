@@ -14,14 +14,9 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.fluid import layers
 from paddle import tensor
-from paddle.nn.layer.transformer import (
-    MultiHeadAttention,
-    _convert_attention_mask,
-    _convert_param_attr_to_list, )
+from paddle.nn import Layer
 from ..electra.modeling import get_activation
-
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -38,6 +33,19 @@ __all__ = [
 dtype_float = paddle.get_default_dtype()
 
 
+def _convert_attention_mask(attn_mask, dtype):
+    if attn_mask is not None and attn_mask.dtype != dtype:
+        attn_mask_dtype = attn_mask.dtype
+        if attn_mask_dtype in [
+                paddle.bool, paddle.int8, paddle.int16, paddle.int32,
+                paddle.int64
+        ]:
+            attn_mask = (paddle.cast(attn_mask, dtype) - 1.0) * 1e9
+        else:
+            attn_mask = paddle.cast(attn_mask, dtype)
+    return attn_mask
+
+
 class GroupedLinear(nn.Layer):
     def __init__(self, input_size, output_size, num_groups):
         super().__init__()
@@ -46,10 +54,10 @@ class GroupedLinear(nn.Layer):
         self.num_groups = num_groups
         self.group_in_dim = self.input_size // self.num_groups
         self.group_out_dim = self.output_size // self.num_groups
-        self.weight = layers.create_parameter(
+        self.weight = paddle.create_parameter(
             shape=[self.num_groups, self.group_in_dim, self.group_out_dim],
             dtype=dtype_float)
-        self.bias = layers.create_parameter(
+        self.bias = paddle.create_parameter(
             shape=[output_size], dtype=dtype_float, is_bias=True)
 
     def forward(self, hidden_states):
@@ -83,7 +91,7 @@ class SeparableConv1D(nn.Layer):
             kernel_size=1,
             bias_attr=False,
             data_format="NLC", )
-        self.bias = layers.create_parameter(
+        self.bias = paddle.create_parameter(
             shape=[output_filters], dtype=dtype_float, is_bias=True)
 
     def forward(self, hidden_states):
@@ -92,94 +100,68 @@ class SeparableConv1D(nn.Layer):
         return x
 
 
-class MultiHeadAttentionWithConv(MultiHeadAttention):
+class MultiHeadAttentionWithConv(Layer):
     def __init__(
             self,
             embed_dim,
             num_heads,
-            dropout=0.0,
+            dropout=0.,
             kdim=None,
             vdim=None,
             need_weights=False,
-            weight_attr=None,
-            bias_attr=None,
             conv_kernel_size=None,
             head_ratio=None, ):
-        super().__init__(
-            embed_dim,
-            num_heads,
-            dropout=dropout,
-            kdim=kdim,
-            vdim=vdim,
-            need_weights=need_weights,
-            weight_attr=weight_attr,
-            bias_attr=bias_attr, )
+        super(MultiHeadAttentionWithConv, self).__init__()
+        self.embed_dim = embed_dim
+        self.kdim = kdim if kdim is not None else embed_dim
+        self.vdim = vdim if vdim is not None else embed_dim
+        self.need_weights = need_weights
+        self.head_dim = embed_dim // num_heads
+        self.scale = self.head_dim**-0.5
+        assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
+
         self.head_ratio = head_ratio
-        self.num_heads = self.num_heads // head_ratio
+        self.num_heads = num_heads // head_ratio
         self.all_head_size = self.num_heads * self.head_dim
         self.conv_kernel_size = conv_kernel_size
+
+        self.dropout = nn.Dropout(dropout)
+        self.q_proj = nn.Linear(embed_dim, self.all_head_size)
+        self.k_proj = nn.Linear(self.kdim, self.all_head_size)
+        self.v_proj = nn.Linear(self.vdim, self.all_head_size)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
         self.key_conv_attn_layer = SeparableConv1D(
-            self.embed_dim, self.all_head_size, self.conv_kernel_size)
+            embed_dim, self.all_head_size, self.conv_kernel_size)
         self.conv_kernel_layer = nn.Linear(self.all_head_size, self.num_heads *
                                            self.conv_kernel_size)
-        self.conv_out_layer = nn.Linear(self.embed_dim, self.all_head_size)
+        self.conv_out_layer = nn.Linear(embed_dim, self.all_head_size)
         self.unfold = nn.Unfold(
             kernel_sizes=[self.conv_kernel_size, 1],
             paddings=[(self.conv_kernel_size - 1) // 2, 0], )
-        self.q_proj = nn.Linear(
-            self.embed_dim,
-            self.all_head_size,
-            weight_attr,
-            bias_attr=bias_attr)
-        self.k_proj = nn.Linear(
-            self.kdim, self.all_head_size, weight_attr, bias_attr=bias_attr)
-        self.v_proj = nn.Linear(
-            self.vdim, self.all_head_size, weight_attr, bias_attr=bias_attr)
-
-    def _prepare_qkv(self, query, key, value, cache=None):
-        q = self.q_proj(query)
-
-        mixed_key_conv_attn_layer = self.key_conv_attn_layer(query)
-        conv_attn_layer = mixed_key_conv_attn_layer * q
-
-        q = tensor.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
-
-        q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
-
-        if isinstance(cache, self.StaticCache):
-            # for encoder-decoder attention in inference and has cached
-            k, v = cache.k, cache.v
-        else:
-            k, v = self.compute_kv(key, value)
-
-        if isinstance(cache, self.Cache):
-            # for decoder self-attention in inference
-            k = tensor.concat([cache.k, k], axis=2)
-            v = tensor.concat([cache.v, v], axis=2)
-            cache = self.Cache(k, v)
-
-        return (q, k, v, conv_attn_layer) if cache is None else (
-            q, k, v, cache, conv_attn_layer)
 
     def forward(self, query, key=None, value=None, attn_mask=None, cache=None):
         key = query if key is None else key
         value = query if value is None else value
-        # compute q ,k ,v
-        if cache is None:
-            q, k, v, conv_attn_layer = self._prepare_qkv(query, key, value,
-                                                         cache)
-        else:
-            q, k, v, cache, conv_attn_layer = self._prepare_qkv(query, key,
-                                                                value, cache)
+
+        q = self.q_proj(query)
+        k = self.k_proj(key)
+        v = self.v_proj(value)
+        mixed_key_conv_attn_layer = self.key_conv_attn_layer(query)
+        conv_attn_layer = mixed_key_conv_attn_layer * q
+
+        q = tensor.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
+        q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
+        k = tensor.reshape(x=k, shape=[0, 0, self.num_heads, self.head_dim])
+        k = tensor.transpose(x=k, perm=[0, 2, 1, 3])
+        v = tensor.reshape(x=v, shape=[0, 0, self.num_heads, self.head_dim])
+        v = tensor.transpose(x=v, perm=[0, 2, 1, 3])
 
         batch_size = q.shape[0]
-
         # conv_kernel_layer
         conv_kernel_layer = self.conv_kernel_layer(conv_attn_layer)
         conv_kernel_layer = tensor.reshape(
             conv_kernel_layer, shape=[-1, self.conv_kernel_size, 1])
         conv_kernel_layer = F.softmax(conv_kernel_layer, axis=1)
-
         # conv_out
         conv_out_layer = self.conv_out_layer(query)
         conv_out_layer = tensor.reshape(
@@ -194,29 +176,18 @@ class MultiHeadAttentionWithConv(MultiHeadAttention):
             conv_out_layer,
             shape=[batch_size, -1, self.num_heads, self.head_dim])
 
-        # scale dot product attention
-        # TODO(guosheng): use tensor.matmul, however it doesn't support `alpha`
-        product = layers.matmul(
-            x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
+        product = tensor.matmul(x=q, y=k, transpose_y=True) * self.scale
         if attn_mask is not None:
-            # Support bool or int mask
             attn_mask = _convert_attention_mask(attn_mask, product.dtype)
             product = product + attn_mask
-        weights = F.softmax(product)
-        if self.dropout:
-            weights = F.dropout(
-                weights,
-                self.dropout,
-                training=self.training,
-                mode="upscale_in_train")
 
+        weights = F.softmax(product)
+        weights = self.dropout(weights)
         out = tensor.matmul(weights, v)
 
-        out = tensor.transpose(out, perm=[0, 2, 1, 3])
-
         # combine heads
+        out = tensor.transpose(out, perm=[0, 2, 1, 3])
         out = tensor.concat([out, conv_out], axis=2)
-
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
 
         # project to output
@@ -231,21 +202,19 @@ class MultiHeadAttentionWithConv(MultiHeadAttention):
 
 
 class TransformerEncoderLayerWithConv(nn.TransformerEncoderLayer):
-    def __init__(
-            self,
-            d_model,
-            nhead,
-            dim_feedforward,
-            dropout=0.1,
-            activation="relu",
-            attn_dropout=None,
-            act_dropout=None,
-            normalize_before=False,
-            weight_attr=None,
-            bias_attr=None,
-            conv_kernel_size=None,
-            head_ratio=None,
-            num_groups=None, ):
+    def __init__(self,
+                 d_model,
+                 nhead,
+                 dim_feedforward,
+                 dropout=0.1,
+                 activation="relu",
+                 attn_dropout=None,
+                 act_dropout=None,
+                 normalize_before=False,
+                 conv_kernel_size=None,
+                 head_ratio=None,
+                 num_groups=None,
+                 **kwargs):
         super().__init__(
             d_model,
             nhead,
@@ -254,17 +223,11 @@ class TransformerEncoderLayerWithConv(nn.TransformerEncoderLayer):
             activation=activation,
             attn_dropout=attn_dropout,
             act_dropout=act_dropout,
-            normalize_before=normalize_before,
-            weight_attr=weight_attr,
-            bias_attr=bias_attr, )
-        weight_attrs = _convert_param_attr_to_list(weight_attr, 2)
-        bias_attrs = _convert_param_attr_to_list(bias_attr, 2)
+            normalize_before=normalize_before)
         self.self_attn = MultiHeadAttentionWithConv(
             d_model,
             nhead,
             dropout=attn_dropout,
-            weight_attr=weight_attrs[0],
-            bias_attr=bias_attrs[0],
             conv_kernel_size=conv_kernel_size,
             head_ratio=head_ratio, )
         if num_groups > 1:
@@ -624,7 +587,7 @@ class ConvBertGenerator(ConvBertPretrainedModel):
                 self.convbert.config["embedding_size"],
                 self.convbert.config["vocab_size"])
         else:
-            self.generator_lm_head_bias = layers.create_parameter(
+            self.generator_lm_head_bias = paddle.create_parameter(
                 shape=[self.convbert.config["vocab_size"]],
                 dtype=dtype_float,
                 is_bias=True, )
