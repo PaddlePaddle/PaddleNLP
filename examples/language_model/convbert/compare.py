@@ -16,7 +16,7 @@ for model in model_list:
     pt_inputs = torch.tensor([inputs])
     pd_inputs = paddle.to_tensor([inputs])
 
-    pt_model = PTConvBertModel.from_pretrained(model[0], cache_dir="./tmp")
+    pt_model = PTConvBertModel.from_pretrained(model[0])
     pt_model.eval()
     with torch.no_grad():
         pt_outputs = pt_model(pt_inputs)[0]
