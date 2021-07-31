@@ -5,7 +5,7 @@
 [RoFormer](https://arxiv.org/pdf/2104.09864.pdf) (RoFormer: Enhanced Transformer with Rotary Position Embedding)是一个带有旋转位置嵌入(RoPE)的MLM预训练语言模型。 RoPE是一种相对位置编码方法，具有良好的理论特性。其主要思想是根据绝对位置将上下文嵌入（transformer中的 q，k）乘以旋转矩阵。可以证明上下文嵌入的内积将仅取决于相对位置。
 RoPE 是唯一可用于线性注意力的相对位置嵌入。更多详情请参考[论文](https://arxiv.org/pdf/2104.09864.pdf)或[原博客](https://kexue.fm/archives/8265)。EleutherAI还发布了一篇[博客](https://blog.eleuther.ai/rotary-embeddings/)，其中包含有关 RoPE 的直观解释和实验。
 
-本项目是RoFormer在 Paddle 2.0上的开源实现，包含了`THUCNews分类任务`的微调代码。
+本项目是RoFormer在 Paddle 2.0上的开源实现，包含了`THUCNews分类任务`和`Cail2019 Scm任务`的微调代码。
 
 ## 快速开始
 
