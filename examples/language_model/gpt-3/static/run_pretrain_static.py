@@ -27,9 +27,9 @@ import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
 from paddle.distributed.fleet.meta_optimizers.sharding.utils import save_persistables
-from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCriterion
+from modeling import GPTModel, GPTForPretraining, GPTPretrainingCriterion
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
-from paddlenlp.ops import Topology, get_rng_state_tracker
+from paddlenlp.ops import guard, Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger
 import paddlenlp.ops as ops
 from visualdl import LogWriter
@@ -190,9 +190,6 @@ def do_train(args):
     worker_num = fleet.worker_num()
     worker_index = fleet.worker_index()
 
-    assert args.pp_degree == 1, "Please use gpt-3 example to train GPT with pipline prallelism."
-    assert args.mp_degree == 1, "Please use gpt-3 example to train GPT with model prallelism."
-
     topo = Topology(
         device_rank=worker_index,
         world_size=worker_num,
@@ -258,7 +255,9 @@ def do_train(args):
                         "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
                     model_config["topo"] = topo
 
-                    model = GPTForPretraining(GPTModel(**model_config))
+                    model = guard(f'gpu:{args.pp_degree -1}')(
+                        GPTForPretraining)(guard(f'gpu:0')(GPTModel)(
+                            **model_config))
                 else:
                     model, _ = GPTForPretraining.from_pretrained(
                         args.model_name_or_path,
@@ -270,7 +269,8 @@ def do_train(args):
                 # Create the model for the gpt pretrain
                 preds = model(tokens, position_ids, attention_mask)
 
-                criterion = GPTPretrainingCriterion(topo)
+                criterion = guard(f'gpu:{args.pp_degree -1}')(
+                    GPTPretrainingCriterion)(topo)
                 loss = criterion(preds, labels, loss_mask)
 
             # Create the learning_rate sheduler and optimizer
