@@ -5,26 +5,10 @@
 [RoFormer](https://arxiv.org/pdf/2104.09864.pdf) (RoFormer: Enhanced Transformer with Rotary Position Embedding)是一个带有旋转位置嵌入(RoPE)的MLM预训练语言模型。 RoPE是一种相对位置编码方法，具有良好的理论特性。其主要思想是根据绝对位置将上下文嵌入（transformer中的 q，k）乘以旋转矩阵。可以证明上下文嵌入的内积将仅取决于相对位置。
 RoPE 是唯一可用于线性注意力的相对位置嵌入。更多详情请参考[论文](https://arxiv.org/pdf/2104.09864.pdf)或[原博客](https://kexue.fm/archives/8265)。EleutherAI还发布了一篇[博客](https://blog.eleuther.ai/rotary-embeddings/)，其中包含有关 RoPE 的直观解释和实验。
 
-本项目是RoFormer在 Paddle 2.0上的开源实现，包含了`THUCNews分类任务`和`Cail2019 Scm任务`的微调代码。
+本项目是RoFormer在 Paddle 2.x上的开源实现，包含了`THUCNews分类任务`和`Cail2019 Scm任务`的微调代码。
 
 ## 快速开始
 
-### 预训练模型转换
-
-预训练模型可以从 huggingface/transformers 转换而来，方法如下（适用于roformer模型，其他模型按情况调整）：
-
-1. 从huggingface.co获取roformer模型权重
-2. 设置参数运行convert.py代码
-3. 例子：
-   假设我想转换https://huggingface.co/junnyu/roformer_chinese_base 权重
-   - (1)首先下载 https://huggingface.co/junnyu/roformer_chinese_base/tree/main 中的pytorch_model.bin文件,假设我们存入了`./roformer_chinese_base/pytorch_model.bin`
-   - (2)运行convert.py
-        ```bash
-        python convert.py \
-            --pytorch_checkpoint_path ./roformer_chinese_base/pytorch_model.bin \
-            --paddle_dump_path ./roformer_chinese_base/model_state.pdparams
-        ```
-   - (3)最终我们得到了转化好的权重`./roformer_chinese_base/model_state.pdparams`
 
 ### 预训练MLM测试
     ```bash
@@ -63,7 +47,7 @@ python -m paddle.distributed.launch --gpus "0" examples/language_model/roformer/
 ```
 其中参数释义如下：
 - `model_type` 指示了模型类型，可以选择roformer。
-- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。注：`roformer-chinese-base`等对应使用的预训练模型转自[huggingface/transformers](https://github.com/huggingface/transformers)，具体可参考当前目录下`convert.py`中的内容。
+- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录的地址。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
@@ -108,7 +92,7 @@ python -m paddle.distributed.launch --gpus "0" examples/language_model/roformer/
 
 其中参数释义如下：
 - `model_type` 指示了模型类型，可以选择roformer_cls_pooling和roformer_mean_pooling两种类型。
-- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。注：`roformer-chinese-base`等对应使用的预训练模型转自[huggingface/transformers](https://github.com/huggingface/transformers)，具体可参考当前目录下`convert.py`中的内容。
+- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录的地址。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
 - `learning_rate` 表示学习率大小，本代码并未使用学习率衰减。

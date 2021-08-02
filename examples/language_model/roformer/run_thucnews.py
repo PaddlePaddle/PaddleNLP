@@ -178,7 +178,7 @@ def convert_example(example,
                     label_list,
                     max_seq_length=512,
                     is_test=False):
-    """convert a glue example into necessary features"""
+    """convert a thucnews example into necessary features"""
     if not is_test:
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
