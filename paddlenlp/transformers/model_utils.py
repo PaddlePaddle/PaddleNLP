@@ -108,10 +108,7 @@ class PretrainedModel(Layer, GenerationMixin):
     # TODO: more flexible resource handle, namedtuple with fields as:
     # resource_name, saved_file, handle_name_for_load(None for used as __init__
     # arguments), handle_name_for_save
-    resource_files_names = {
-        "model_state": "model_state.pdparams",
-        "model_config_file": "model_config.json"
-    }
+    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {}
     base_model_prefix = ""
 
@@ -209,6 +206,8 @@ class PretrainedModel(Layer, GenerationMixin):
                 full_file_name = os.path.join(pretrained_model_name_or_path,
                                               file_name)
                 resource_files[file_id] = full_file_name
+            resource_files["model_config_file"] = os.path.join(
+                pretrained_model_name_or_path, cls.model_config_file)
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in cls.resource_files_names.items():
@@ -216,6 +215,9 @@ class PretrainedModel(Layer, GenerationMixin):
                                               pretrained_model_name_or_path,
                                               file_name)
                 resource_files[file_id] = full_file_name
+            resource_files["model_config_file"] = os.path.join(
+                COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
+                cls.model_config_file)
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
