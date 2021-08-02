@@ -292,6 +292,7 @@ class TransformerGenerator(paddle.nn.Layer):
                  eos_id=1,
                  beam_size=4,
                  max_out_len=256,
+                 use_ft=True,
                  **kwargs):
         logger.warning(
             "TransformerGenerator is an experimental API and subject to change.")
@@ -303,25 +304,47 @@ class TransformerGenerator(paddle.nn.Layer):
         self.max_length = max_length
         self.output_time_major = kwargs.pop("output_time_major", True)
         use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
-        try:
-            load("FasterTransformer", verbose=True)
-            self.transformer = FasterTransformer(
-                src_vocab_size=src_vocab_size,
-                trg_vocab_size=trg_vocab_size,
-                max_length=max_length,
-                num_encoder_layers=num_encoder_layers,
-                num_decoder_layers=num_decoder_layers,
-                n_head=n_head,
-                d_model=d_model,
-                d_inner_hid=d_inner_hid,
-                dropout=dropout,
-                weight_sharing=weight_sharing,
-                bos_id=bos_id,
-                eos_id=eos_id,
-                beam_size=beam_size,
-                max_out_len=max_out_len,
-                use_fp16_decoding=use_fp16_decoding)
-        except Exception:
+
+        if use_ft:
+            try:
+                load("FasterTransformer", verbose=True)
+                self.transformer = FasterTransformer(
+                    src_vocab_size=src_vocab_size,
+                    trg_vocab_size=trg_vocab_size,
+                    max_length=max_length,
+                    num_encoder_layers=num_encoder_layers,
+                    num_decoder_layers=num_decoder_layers,
+                    n_head=n_head,
+                    d_model=d_model,
+                    d_inner_hid=d_inner_hid,
+                    dropout=dropout,
+                    weight_sharing=weight_sharing,
+                    bos_id=bos_id,
+                    eos_id=eos_id,
+                    beam_size=beam_size,
+                    max_out_len=max_out_len,
+                    use_fp16_decoding=use_fp16_decoding)
+            except Exception:
+                logger.warning(
+                    "Exception occurs when using Faster Transformer. " \
+                    "The original forward will be involved. ")
+                self.transformer = InferTransformerModel(
+                    src_vocab_size=src_vocab_size,
+                    trg_vocab_size=trg_vocab_size,
+                    max_length=max_length,
+                    num_encoder_layers=num_encoder_layers,
+                    num_decoder_layers=num_decoder_layers,
+                    n_head=n_head,
+                    d_model=d_model,
+                    d_inner_hid=d_inner_hid,
+                    dropout=dropout,
+                    weight_sharing=weight_sharing,
+                    bos_id=bos_id,
+                    eos_id=eos_id,
+                    beam_size=beam_size,
+                    max_out_len=max_out_len,
+                    output_time_major=self.output_time_major)
+        else:
             self.transformer = InferTransformerModel(
                 src_vocab_size=src_vocab_size,
                 trg_vocab_size=trg_vocab_size,
