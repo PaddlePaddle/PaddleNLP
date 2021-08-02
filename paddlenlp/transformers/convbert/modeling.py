@@ -120,24 +120,32 @@ class MultiHeadAttentionWithConv(Layer):
         self.scale = self.head_dim**-0.5
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
-        self.head_ratio = head_ratio
-        self.num_heads = num_heads // head_ratio
+        new_num_attention_heads = num_heads // head_ratio
+        if num_heads // head_ratio < 1:
+            self.num_heads = 1
+            self.conv_type = "noconv"
+        else:
+            self.num_heads = new_num_attention_heads
+            self.conv_type = "sdconv"
+
         self.all_head_size = self.num_heads * self.head_dim
-        self.conv_kernel_size = conv_kernel_size
 
         self.dropout = nn.Dropout(dropout)
         self.q_proj = nn.Linear(embed_dim, self.all_head_size)
         self.k_proj = nn.Linear(self.kdim, self.all_head_size)
         self.v_proj = nn.Linear(self.vdim, self.all_head_size)
         self.out_proj = nn.Linear(embed_dim, embed_dim)
-        self.key_conv_attn_layer = SeparableConv1D(
-            embed_dim, self.all_head_size, self.conv_kernel_size)
-        self.conv_kernel_layer = nn.Linear(self.all_head_size, self.num_heads *
-                                           self.conv_kernel_size)
-        self.conv_out_layer = nn.Linear(embed_dim, self.all_head_size)
-        self.unfold = nn.Unfold(
-            kernel_sizes=[self.conv_kernel_size, 1],
-            paddings=[(self.conv_kernel_size - 1) // 2, 0], )
+
+        if self.conv_type == "sdconv":
+            self.conv_kernel_size = conv_kernel_size
+            self.key_conv_attn_layer = SeparableConv1D(
+                embed_dim, self.all_head_size, self.conv_kernel_size)
+            self.conv_kernel_layer = nn.Linear(
+                self.all_head_size, self.num_heads * self.conv_kernel_size)
+            self.conv_out_layer = nn.Linear(embed_dim, self.all_head_size)
+            self.unfold = nn.Unfold(
+                kernel_sizes=[self.conv_kernel_size, 1],
+                paddings=[(self.conv_kernel_size - 1) // 2, 0], )
 
     def forward(self, query, key=None, value=None, attn_mask=None, cache=None):
         key = query if key is None else key
@@ -146,8 +154,30 @@ class MultiHeadAttentionWithConv(Layer):
         q = self.q_proj(query)
         k = self.k_proj(key)
         v = self.v_proj(value)
-        mixed_key_conv_attn_layer = self.key_conv_attn_layer(query)
-        conv_attn_layer = mixed_key_conv_attn_layer * q
+
+        if self.conv_type == "sdconv":
+            mixed_key_conv_attn_layer = self.key_conv_attn_layer(query)
+            conv_attn_layer = mixed_key_conv_attn_layer * q
+            batch_size = q.shape[0]
+            # conv_kernel_layer
+            conv_kernel_layer = self.conv_kernel_layer(conv_attn_layer)
+            conv_kernel_layer = tensor.reshape(
+                conv_kernel_layer, shape=[-1, self.conv_kernel_size, 1])
+            conv_kernel_layer = F.softmax(conv_kernel_layer, axis=1)
+            # conv_out
+            conv_out_layer = self.conv_out_layer(query)
+            conv_out_layer = tensor.reshape(
+                conv_out_layer, [batch_size, -1, self.all_head_size, 1])
+            conv_out_layer = tensor.transpose(conv_out_layer, perm=[0, 2, 1, 3])
+            conv_out_layer = self.unfold(conv_out_layer)
+            conv_out_layer = tensor.transpose(conv_out_layer, perm=[0, 2, 1])
+            conv_out_layer = tensor.reshape(
+                conv_out_layer,
+                shape=[-1, self.head_dim, self.conv_kernel_size])
+            conv_out_layer = tensor.matmul(conv_out_layer, conv_kernel_layer)
+            conv_out = tensor.reshape(
+                conv_out_layer,
+                shape=[batch_size, -1, self.num_heads, self.head_dim])
 
         q = tensor.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
         q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
@@ -155,26 +185,6 @@ class MultiHeadAttentionWithConv(Layer):
         k = tensor.transpose(x=k, perm=[0, 2, 1, 3])
         v = tensor.reshape(x=v, shape=[0, 0, self.num_heads, self.head_dim])
         v = tensor.transpose(x=v, perm=[0, 2, 1, 3])
-
-        batch_size = q.shape[0]
-        # conv_kernel_layer
-        conv_kernel_layer = self.conv_kernel_layer(conv_attn_layer)
-        conv_kernel_layer = tensor.reshape(
-            conv_kernel_layer, shape=[-1, self.conv_kernel_size, 1])
-        conv_kernel_layer = F.softmax(conv_kernel_layer, axis=1)
-        # conv_out
-        conv_out_layer = self.conv_out_layer(query)
-        conv_out_layer = tensor.reshape(
-            conv_out_layer, [batch_size, -1, self.all_head_size, 1])
-        conv_out_layer = tensor.transpose(conv_out_layer, perm=[0, 2, 1, 3])
-        conv_out_layer = self.unfold(conv_out_layer)
-        conv_out_layer = tensor.transpose(conv_out_layer, perm=[0, 2, 1])
-        conv_out_layer = tensor.reshape(
-            conv_out_layer, shape=[-1, self.head_dim, self.conv_kernel_size])
-        conv_out_layer = tensor.matmul(conv_out_layer, conv_kernel_layer)
-        conv_out = tensor.reshape(
-            conv_out_layer,
-            shape=[batch_size, -1, self.num_heads, self.head_dim])
 
         product = tensor.matmul(x=q, y=k, transpose_y=True) * self.scale
         if attn_mask is not None:
@@ -187,7 +197,8 @@ class MultiHeadAttentionWithConv(Layer):
 
         # combine heads
         out = tensor.transpose(out, perm=[0, 2, 1, 3])
-        out = tensor.concat([out, conv_out], axis=2)
+        if self.conv_type == "sdconv":
+            out = tensor.concat([out, conv_out], axis=2)
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
 
         # project to output
