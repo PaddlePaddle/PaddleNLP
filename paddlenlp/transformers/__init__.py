@@ -53,3 +53,5 @@ from .ernie_doc.modeling import *
 from .ernie_doc.tokenizer import *
 from .bart.modeling import *
 from .bart.tokenizer import *
+from .roformer.modeling import *
+from .roformer.tokenizer import *
