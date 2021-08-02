@@ -9,27 +9,9 @@
 我们为 BERT 配备了这种混合注意力设计并构建了一个ConvBERT模型。实验表明，ConvBERT 在各种下游任务中明显优于BERT及其变体，具有更低的训练成本和更少的模型参数。
 值得注意的是，ConvBERT-base 模型达到86.4GLUE分数，比ELECTRA-base高0.7，同时使用不到1/4的训练成本。
 
-本项目是 ConvBert 在 Paddle 2.0上的开源实现。
+本项目是 ConvBert 在 Paddle 2.x上的开源实现。
 
 ## 快速开始
-
-### 预训练模型转换
-
-预训练模型可以从 huggingface/transformers 转换而来，方法如下（适用于convbert模型，其他模型按情况调整）：
-
-1. 从huggingface.co获取convbert模型权重
-2. 设置参数运行convert.py代码
-3. 例子：
-   假设我想转换https://huggingface.co/YituTech/conv-bert-base 权重
-   - (1)首先下载 https://huggingface.co/YituTech/conv-bert-base/tree/main 中的pytorch_model.bin文件,假设我们存入了`./conv-bert-base/pytorch_model.bin`
-   - (2)运行convert.py
-        ```bash
-        python convert.py \
-            --pytorch_checkpoint_path ./conv-bert-base/pytorch_model.bin \
-            --paddle_dump_path ./convbert-base/model_state.pdparams
-        ```
-   - (3)最终我们得到了转化好的权重`./convbert-base/model_state.pdparams`
-
 
 ### 模型精度对齐
 运行`python compare.py`，对比huggingface与paddle之间的精度，我们可以发现精度的平均误差在10^-7量级，最大误差在10^-6量级。
