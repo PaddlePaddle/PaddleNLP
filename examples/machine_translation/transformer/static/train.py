@@ -15,7 +15,8 @@ import paddle.distributed as dist
 
 from paddlenlp.transformers import TransformerModel, CrossEntropyCriterion
 
-sys.path.append("../")
+sys.path.append(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
 import reader
 from util.record import AverageStatistical
 
@@ -45,6 +46,20 @@ def parse_args():
         default=None,
         type=int,
         help="The maximum iteration for training. ")
+    parser.add_argument(
+        "--train_file",
+        nargs='+',
+        default=None,
+        type=str,
+        help="The files for training, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. "
+    )
+    parser.add_argument(
+        "--dev_file",
+        nargs='+',
+        default=None,
+        type=str,
+        help="The files for validation, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. "
+    )
     args = parser.parse_args()
     return args
 
@@ -88,7 +103,8 @@ def do_train(args):
             src_vocab_size=args.src_vocab_size,
             trg_vocab_size=args.trg_vocab_size,
             max_length=args.max_length + 1,
-            n_layer=args.n_layer,
+            num_encoder_layers=args.n_layer,
+            num_decoder_layers=args.n_layer,
             n_head=args.n_head,
             d_model=args.d_model,
             d_inner_hid=args.d_inner_hid,
@@ -183,7 +199,7 @@ def do_train(args):
         for data in train_loader:
             # NOTE: used for benchmark and use None as default.
             if args.max_iter and step_idx == args.max_iter:
-                return
+                break
             if trainer_count == 1:
                 data = [data]
             train_reader_cost = time.time() - batch_start
@@ -261,6 +277,10 @@ def do_train(args):
             step_idx += 1
             batch_start = time.time()
 
+        # NOTE: used for benchmark and use None as default.
+        if args.max_iter and step_idx == args.max_iter:
+            break
+
     if args.save_model and dist.get_rank() == 0:
         model_path = os.path.join(args.save_model, "step_final", "transformer")
         paddle.static.save(train_program, model_path)
@@ -273,10 +293,12 @@ if __name__ == "__main__":
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
-        pprint(args)
     args.benchmark = ARGS.benchmark
     args.is_distributed = ARGS.distributed
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
+    args.train_file = ARGS.train_file
+    args.dev_file = ARGS.dev_file
+    pprint(args)
 
     do_train(args)

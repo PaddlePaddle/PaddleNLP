@@ -34,6 +34,20 @@ def parse_args():
         default=None,
         type=int,
         help="The maximum iteration for training. ")
+    parser.add_argument(
+        "--train_file",
+        nargs='+',
+        default=None,
+        type=str,
+        help="The files for training, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. "
+    )
+    parser.add_argument(
+        "--dev_file",
+        nargs='+',
+        default=None,
+        type=str,
+        help="The files for validation, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. "
+    )
     args = parser.parse_args()
     return args
 
@@ -63,7 +77,8 @@ def do_train(args):
         src_vocab_size=args.src_vocab_size,
         trg_vocab_size=args.trg_vocab_size,
         max_length=args.max_length + 1,
-        n_layer=args.n_layer,
+        num_encoder_layers=args.n_layer,
+        num_decoder_layers=args.n_layer,
         n_head=args.n_head,
         d_model=args.d_model,
         d_inner_hid=args.d_inner_hid,
@@ -127,7 +142,7 @@ def do_train(args):
         for input_data in train_loader:
             #NOTE: Used for benchmark and use None as default. 
             if args.max_iter and step_idx == args.max_iter:
-                return
+                break
             train_reader_cost = time.time() - batch_start
             (src_word, trg_word, lbl_word) = input_data
 
@@ -227,6 +242,10 @@ def do_train(args):
             scheduler.step()
             batch_start = time.time()
 
+        #NOTE: Used for benchmark and use None as default. 
+        if args.max_iter and step_idx == args.max_iter:
+            break
+
         train_epoch_cost = time.time() - epoch_start
         logger.info("train epoch: %d, epoch_cost: %.5f s" %
                     (pass_id, train_epoch_cost))
@@ -246,9 +265,11 @@ if __name__ == "__main__":
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
-        pprint(args)
     args.benchmark = ARGS.benchmark
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
+    args.train_file = ARGS.train_file
+    args.dev_file = ARGS.dev_file
+    pprint(args)
 
     do_train(args)

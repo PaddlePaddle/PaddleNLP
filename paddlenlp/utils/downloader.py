@@ -20,12 +20,16 @@ import os
 import sys
 import os.path as osp
 import shutil
+import json
 import requests
 import hashlib
 import tarfile
 import zipfile
 import time
+import uuid
+import threading
 from collections import OrderedDict
+from .env import DOWNLOAD_SERVER, SUCCESS_STATUS, FAILED_STATUS
 
 try:
     from tqdm import tqdm
@@ -55,6 +59,8 @@ except:
 from .log import logger
 
 __all__ = ['get_weights_path_from_url']
+
+COMMUNITY_MODEL_PREFIX = "https://paddlenlp.bj.bcebos.com/models/transformers/community/"
 
 WEIGHTS_HOME = osp.expanduser("~/.cache/paddle/hapi/weights")
 
@@ -236,6 +242,15 @@ def _md5check(fullname, md5sum=None):
     return True
 
 
+def _md5(text):
+    """
+    Calculate the md5 value of the input text.
+    """
+
+    md5code = hashlib.md5(text.encode())
+    return md5code.hexdigest()
+
+
 def _decompress(fname):
     """
     Decompress for zip and tar file
@@ -336,3 +351,64 @@ def _is_a_single_dir(file_list):
         if file_name != new_file_list[i].split(os.sep)[0]:
             return False
     return True
+
+
+class DownloaderCheck(threading.Thread):
+    """
+    Check the resource applicability  when downloading the models.
+    """
+
+    def __init__(self, task, command="taskflow", addition=None):
+        threading.Thread.__init__(self)
+        self.command = command
+        self.task = task
+        self.addition = addition
+        self.hash_flag = _md5(str(uuid.uuid1())[9:18]) + "-" + str(
+            int(time.time()))
+
+    def uri_path(self, server_url, api):
+        srv = server_url
+        if server_url.endswith('/'):
+            srv = server_url[:-1]
+        if api.startswith('/'):
+            srv += api
+        else:
+            api = '/' + api
+            srv += api
+        return srv
+
+    def request_check(self, task, command, addition):
+        if task is None:
+            return SUCCESS_STATUS
+        payload = {'word': self.task}
+        api_url = self.uri_path(DOWNLOAD_SERVER, 'search')
+        cache_path = os.path.join("～")
+        if os.path.exists(cache_path):
+            extra = {
+                "command": self.command,
+                "mtime": os.stat(cache_path).st_mtime,
+                "hub_name": self.hash_flag
+            }
+        else:
+            extra = {
+                "command": self.command,
+                "mtime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                "hub_name": self.hash_flag
+            }
+        if addition is not None:
+            extra.update({"addition": addition})
+        try:
+            import paddle
+            payload['hub_version'] = " "
+            payload['paddle_version'] = paddle.__version__.split('-')[0]
+            payload['extra'] = json.dumps(extra)
+            r = requests.get(api_url, payload, timeout=1).json()
+            if r.get("update_cache", 0) == 1:
+                return SUCCESS_STATUS
+            else:
+                return FAILED_STATUS
+        except Exception as err:
+            return FAILED_STATUS
+
+    def run(self):
+        self.request_check(self.task, self.command, self.addition)

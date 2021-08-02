@@ -104,3 +104,18 @@ class TimeCostAverage(object):
         if self.cnt == 0:
             return 0
         return self.total_time / self.cnt
+
+
+def get_env_device():
+    """
+    Return the device name of running enviroment.
+    """
+    if paddle.is_compiled_with_cuda():
+        return 'gpu'
+    elif paddle.is_compiled_with_npu():
+        return 'npu'
+    elif paddle.is_compiled_with_rocm():
+        return 'rocm'
+    elif paddle.is_compiled_with_xpu():
+        return 'xpu'
+    return 'cpu'

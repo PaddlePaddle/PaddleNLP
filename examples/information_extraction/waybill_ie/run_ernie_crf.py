@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import os
 from functools import partial
 
 import paddle
@@ -21,6 +23,18 @@ from paddlenlp.metrics import ChunkEvaluator
 
 from model import ErnieCrfForTokenClassification
 from data import load_dict, load_dataset, parse_decodes
+
+parser = argparse.ArgumentParser()
+
+# yapf: disable
+parser.add_argument("--save_dir", default='./ernie_crf_ckpt', type=str, help="The output directory where the model checkpoints will be written.")
+parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
+parser.add_argument("--batch_size", default=200, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
+parser.add_argument("--data_dir", default='./waybill_ie/data', type=str, help="The folder where the dataset is located.")
+
+args = parser.parse_args()
+# yapf: enable
 
 
 def convert_to_features(example, tokenizer, label_vocab):
@@ -64,13 +78,15 @@ def predict(model, data_loader, ds, label_vocab):
 
 
 if __name__ == '__main__':
-    paddle.set_device('gpu')
+    paddle.set_device(args.device)
 
     # Create dataset, tokenizer and dataloader.
-    train_ds, dev_ds, test_ds = load_dataset(datafiles=(
-        './data/train.txt', './data/dev.txt', './data/test.txt'))
+    train_ds, dev_ds, test_ds = load_dataset(
+        datafiles=(os.path.join(args.data_dir, 'train.txt'),
+                   os.path.join(args.data_dir, 'dev.txt'),
+                   os.path.join(args.data_dir, 'test.txt')))
 
-    label_vocab = load_dict('./data/tag.dic')
+    label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
     tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
     trans_func = partial(
@@ -89,17 +105,17 @@ if __name__ == '__main__':
 
     train_loader = paddle.io.DataLoader(
         dataset=train_ds,
-        batch_size=200,
+        batch_size=args.batch_size,
         return_list=True,
         collate_fn=batchify_fn)
     dev_loader = paddle.io.DataLoader(
         dataset=dev_ds,
-        batch_size=200,
+        batch_size=args.batch_size,
         return_list=True,
         collate_fn=batchify_fn)
     test_loader = paddle.io.DataLoader(
         dataset=test_ds,
-        batch_size=200,
+        batch_size=args.batch_size,
         return_list=True,
         collate_fn=batchify_fn)
 
@@ -113,7 +129,7 @@ if __name__ == '__main__':
         learning_rate=2e-5, parameters=model.parameters())
 
     step = 0
-    for epoch in range(10):
+    for epoch in range(args.epochs):
         for input_ids, token_type_ids, lengths, labels in train_loader:
             loss = model(
                 input_ids, token_type_ids, lengths=lengths, labels=labels)
@@ -127,7 +143,7 @@ if __name__ == '__main__':
         evaluate(model, metric, dev_loader)
 
         paddle.save(model.state_dict(),
-                    './ernie_crf_ckpt/model_%d.pdparams' % step)
+                    os.path.join(args.save_dir, 'model_%d' % step))
 
     preds = predict(model, test_loader, test_ds, label_vocab)
     file_path = "ernie_crf_results.txt"

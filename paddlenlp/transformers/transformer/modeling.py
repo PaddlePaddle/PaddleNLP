@@ -5,6 +5,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.fluid.framework import in_dygraph_mode
 from paddle.fluid.layers.utils import map_structure
 
 __all__ = [
@@ -317,7 +318,8 @@ class TransformerDecodeCell(nn.Layer):
         self.linear = linear
         self.dropout = dropout
 
-    def forward(self, inputs, states, static_cache, trg_src_attn_bias, memory):
+    def forward(self, inputs, states, static_cache, trg_src_attn_bias, memory,
+                **kwargs):
         r"""
         Produces logits.
 
@@ -515,10 +517,80 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
             logits=cell_outputs,
             next_cell_states=next_cell_states,
             beam_state=states)
+
+        if kwargs.get("trg_word", None) is not None:
+            if in_dygraph_mode():
+                if paddle.shape(kwargs.get("trg_word"))[1] > time:
+                    beam_search_output, beam_search_state = self.force_decoding(
+                        beam_search_output, beam_search_state,
+                        kwargs.get("trg_word"), kwargs.get("trg_length"), time)
+            else:
+
+                def condition(trg_word, time):
+                    return paddle.shape(trg_word)[1] > time
+
+                def default_fn(beam_search_output, beam_search_state):
+                    return beam_search_output, beam_search_state
+
+                from functools import partial
+                beam_search_output, beam_search_state = paddle.static.nn.case(
+                    [(condition(kwargs.get("trg_word"), time), partial(
+                        self.force_decoding,
+                        beam_search_output=beam_search_output,
+                        beam_search_state=beam_search_state,
+                        trg_word=kwargs.get("trg_word"),
+                        trg_length=kwargs.get("trg_length"),
+                        time=time))],
+                    default=partial(
+                        default_fn,
+                        beam_search_output=beam_search_output,
+                        beam_search_state=beam_search_state))
+
         next_inputs, finished = (beam_search_output.predicted_ids,
                                  beam_search_state.finished)
 
         return (beam_search_output, beam_search_state, next_inputs, finished)
+
+    def force_decoding(self, beam_search_output, beam_search_state, trg_word,
+                       trg_length, time):
+        batch_size = paddle.shape(beam_search_output.predicted_ids)[0]
+        beam_size = paddle.shape(beam_search_output.predicted_ids)[1]
+
+        ids_dtype = beam_search_output.predicted_ids.dtype
+        scores_dtype = beam_search_output.scores.dtype
+        parent_ids = paddle.zeros(shape=[batch_size, 1], dtype=ids_dtype)
+        scores = paddle.ones(
+            shape=[batch_size, beam_size], dtype=scores_dtype) * -10e9
+        scores = paddle.scatter(
+            scores.flatten(),
+            paddle.arange(
+                0, batch_size * beam_size, step=beam_size),
+            paddle.zeros([batch_size])).reshape([batch_size, beam_size])
+
+        force_position = paddle.unsqueeze(trg_length > time, [1])
+        # NOTE: When the date type of the input of paddle.tile is bool
+        # and enable static mode, its stop_gradient must be True .
+        force_position.stop_gradient = True
+        force_position = paddle.tile(force_position, [1, beam_size])
+        crt_trg_word = paddle.slice(
+            trg_word, axes=[1], starts=[time], ends=[time + 1])
+        crt_trg_word = paddle.tile(crt_trg_word, [1, beam_size])
+
+        predicted_ids = paddle.where(force_position, crt_trg_word,
+                                     beam_search_output.predicted_ids)
+        scores = paddle.where(force_position, scores, beam_search_output.scores)
+        parent_ids = paddle.where(force_position, parent_ids,
+                                  beam_search_output.parent_ids)
+
+        cell_states = beam_search_state.cell_states
+        log_probs = paddle.where(force_position, scores,
+                                 beam_search_state.log_probs)
+        finished = beam_search_state.finished
+        lengths = beam_search_state.lengths
+
+        return self.OutputWrapper(scores, predicted_ids,
+                                  parent_ids), self.StateWrapper(
+                                      cell_states, log_probs, finished, lengths)
 
 
 class TransformerModel(nn.Layer):
@@ -536,8 +608,10 @@ class TransformerModel(nn.Layer):
             The size of target vocabulary.
         max_length (int):
             The maximum length of input sequences.
-        n_layer (int):
-            The number of sub-layers to be stacked in the encoder and decoder.
+        num_encoder_layers (int):
+            The number of sub-layers to be stacked in the encoder.
+        num_decoder_layers (int):
+            The number of sub-layers to be stacked in the decoder.
         n_head (int):
             The number of head used in multi-head attention.
         d_model (int):
@@ -550,6 +624,12 @@ class TransformerModel(nn.Layer):
             Dropout rates. Used for pre-process, activation and inside attention.
         weight_sharing (bool):
             Whether to use weight sharing. 
+        attn_dropout (float):
+            The dropout probability used in MHA to drop some attention target.
+            If None, use the value of dropout. Defaults to None.
+        act_dropout (float):
+            The dropout probability used after FFN activition. If None, use
+            the value of dropout. Defaults to None.
         bos_id (int, optional):
             The start token id and also be used as padding id. Defaults to 0.
         eos_id (int, optional):
@@ -560,12 +640,15 @@ class TransformerModel(nn.Layer):
                  src_vocab_size,
                  trg_vocab_size,
                  max_length,
-                 n_layer,
+                 num_encoder_layers,
+                 num_decoder_layers,
                  n_head,
                  d_model,
                  d_inner_hid,
                  dropout,
                  weight_sharing,
+                 attn_dropout=None,
+                 act_dropout=None,
                  bos_id=0,
                  eos_id=1):
         super(TransformerModel, self).__init__()
@@ -594,10 +677,12 @@ class TransformerModel(nn.Layer):
         self.transformer = paddle.nn.Transformer(
             d_model=d_model,
             nhead=n_head,
-            num_encoder_layers=n_layer,
-            num_decoder_layers=n_layer,
+            num_encoder_layers=num_encoder_layers,
+            num_decoder_layers=num_decoder_layers,
             dim_feedforward=d_inner_hid,
             dropout=dropout,
+            attn_dropout=attn_dropout,
+            act_dropout=act_dropout,
             activation="relu",
             normalize_before=True)
 
@@ -642,7 +727,8 @@ class TransformerModel(nn.Layer):
                     src_vocab_size=30000,
                     trg_vocab_size=30000,
                     max_length=257,
-                    n_layer=6,
+                    num_encoder_layers=6,
+                    num_decoder_layers=6,
                     n_head=8,
                     d_model=512,
                     d_inner_hid=2048,
@@ -711,8 +797,10 @@ class InferTransformerModel(TransformerModel):
             The size of target vocabulary.
         max_length (int):
             The maximum length of input sequences.
-        n_layer (int):
-            The number of sub-layers to be stacked in the encoder and decoder.
+        num_encoder_layers (int):
+            The number of sub-layers to be stacked in the encoder.
+        num_decoder_layers (int):
+            The number of sub-layers to be stacked in the decoder.
         n_head (int):
             The number of head used in multi-head attention.
         d_model (int):
@@ -725,6 +813,12 @@ class InferTransformerModel(TransformerModel):
             Dropout rates. Used for pre-process, activation and inside attention.
         weight_sharing (bool):
             Whether to use weight sharing. 
+        attn_dropout (float):
+            The dropout probability used in MHA to drop some attention target.
+            If None, use the value of dropout. Defaults to None.
+        act_dropout (float):
+            The dropout probability used after FFN activition. If None, use
+            the value of dropout. Defaults to None.
         bos_id (int, optional):
             The start token id and also is used as padding id. Defaults to 0.
         eos_id (int, optional):
@@ -744,12 +838,15 @@ class InferTransformerModel(TransformerModel):
                  src_vocab_size,
                  trg_vocab_size,
                  max_length,
-                 n_layer,
+                 num_encoder_layers,
+                 num_decoder_layers,
                  n_head,
                  d_model,
                  d_inner_hid,
                  dropout,
                  weight_sharing,
+                 attn_dropout=None,
+                 act_dropout=None,
                  bos_id=0,
                  eos_id=1,
                  beam_size=4,
@@ -771,7 +868,7 @@ class InferTransformerModel(TransformerModel):
         self.decode = TransformerBeamSearchDecoder(
             cell, bos_id, eos_id, beam_size, var_dim_in_state=2)
 
-    def forward(self, src_word):
+    def forward(self, src_word, trg_word=None):
         r"""
         The Transformer forward method.
 
@@ -780,6 +877,10 @@ class InferTransformerModel(TransformerModel):
                 The ids of source sequence words. It is a tensor with shape
                 `[batch_size, source_sequence_length]` and its data type can be
                 int or int64.
+            trg_word (Tensor):
+                The ids of target sequence words. Normally, it should NOT be
+                given. If it's given, force decoding with previous output token
+                will be trigger. Defaults to None. 
         
         Returns:
             Tensor:
@@ -797,7 +898,8 @@ class InferTransformerModel(TransformerModel):
                     src_vocab_size=30000,
                     trg_vocab_size=30000,
                     max_length=256,
-                    n_layer=6,
+                    num_encoder_layers=6,
+                    num_decoder_layers=6,
                     n_head=8,
                     d_model=512,
                     d_inner_hid=2048,
@@ -838,6 +940,13 @@ class InferTransformerModel(TransformerModel):
         static_cache, enc_output, trg_src_attn_bias = TransformerBeamSearchDecoder.tile_beam_merge_with_batch(
             (static_cache, enc_output, trg_src_attn_bias), self.beam_size)
 
+        if trg_word is not None:
+            trg_length = paddle.sum(paddle.cast(
+                trg_word != self.bos_id, dtype="int64"),
+                                    axis=-1)
+        else:
+            trg_length = None
+
         rs, _ = nn.decode.dynamic_decode(
             decoder=self.decode,
             inits=incremental_cache,
@@ -846,6 +955,8 @@ class InferTransformerModel(TransformerModel):
             trg_src_attn_bias=trg_src_attn_bias,
             static_cache=static_cache,
             is_test=True,
-            output_time_major=self.output_time_major)
+            output_time_major=self.output_time_major,
+            trg_word=trg_word,
+            trg_length=trg_length)
 
         return rs

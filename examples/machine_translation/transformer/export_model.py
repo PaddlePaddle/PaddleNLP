@@ -19,6 +19,11 @@ def parse_args():
         default="./configs/transformer.big.yaml",
         type=str,
         help="Path of the config file. ")
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+    )
     args = parser.parse_args()
     return args
 
@@ -31,7 +36,8 @@ def do_export(args):
         src_vocab_size=args.src_vocab_size,
         trg_vocab_size=args.trg_vocab_size,
         max_length=args.max_length + 1,
-        n_layer=args.n_layer,
+        num_encoder_layers=args.n_layer,
+        num_decoder_layers=args.n_layer,
         n_head=args.n_head,
         d_model=args.d_model,
         d_inner_hid=args.d_inner_hid,
@@ -80,6 +86,7 @@ if __name__ == "__main__":
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
-        pprint(args)
+    args.benchmark = ARGS.benchmark
+    pprint(args)
 
     do_export(args)

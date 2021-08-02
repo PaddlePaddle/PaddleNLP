@@ -11,7 +11,7 @@
 执行以下命令，下载并解压示例数据集：
 
 ```bash
-python download.py --data_dir ./  
+python download.py --data_dir ./waybill_ie
 ```
 
 数据示例如下：
@@ -51,6 +51,17 @@ python run_bigru_crf.py
 export CUDA_VISIBLE_DEVICES=0
 python run_ernie.py
 ```
+##### 模型导出
+使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见export_model.py。静态图参数保存在output_path指定路径中。 运行方式：
+
+`python export_model.py --params_path ernie_ckpt/model_80.pdparams --output_path=./output`
+
+其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
+
+导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式：
+
+`python deploy/python/predict.py --model_dir ./output`
+
 
 #### 启动ERNIE + CRF训练
 

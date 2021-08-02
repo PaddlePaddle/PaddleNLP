@@ -106,7 +106,7 @@ def batchify_fn(batch_examples, pad_val, mode):
         attention_mask = np.expand_dims(attention_mask, axis=1)
         return attention_mask
 
-    pad_func = Pad(pad_val=pad_val, pad_right=False)
+    pad_func = Pad(pad_val=pad_val, pad_right=False, dtype='int64')
 
     input_ids = pad_func([example['input_ids'] for example in batch_examples])
     token_type_ids = pad_func(
@@ -124,8 +124,10 @@ def batchify_fn(batch_examples, pad_val, mode):
             (max_len - example['seq_len']) + i * max_len
             for i, example in enumerate(batch_examples)
         ])
-        labels = np.concatenate(
-            [np.array(example['labels']) for example in batch_examples])
+        labels = np.concatenate([
+            np.array(
+                example['labels'], dtype='int64') for example in batch_examples
+        ])
         return input_ids, token_type_ids, position_ids, attention_mask, masked_positions, labels
     else:
         return input_ids, token_type_ids, position_ids, attention_mask

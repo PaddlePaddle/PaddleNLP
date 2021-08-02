@@ -9,3 +9,7 @@
 ## Pretrained Model (PTMs)
 
 [Pretrained Models](./pretrained_models) 展示了如何使用以ERNIE为代表的模型Fine-tune完成文本分类任务。
+
+## Multi-label Text Classification
+
+[Multi-label Text Classification](./multi_label) 展示了如何使用以Bert为代表的预训练模型完成多标签文本分类任务。
