@@ -50,6 +50,7 @@ def parse_args():
         "--profile", action="store_true", help="Whether to profile. ")
     parser.add_argument(
         "--test_file",
+        nargs='+',
         default=None,
         type=str,
         help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
