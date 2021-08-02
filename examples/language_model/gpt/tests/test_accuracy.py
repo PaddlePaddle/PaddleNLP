@@ -29,10 +29,10 @@ def check_init_checkpoint():
 def get_groundtruth():
     res = {
         1: {
-            "loss": 11.043229103
+            "loss": 11.008564949
         },
         20: {
-            "loss": 10.904897690
+            "loss": 10.876321793
         },
     }
     return res
@@ -60,6 +60,11 @@ def parse_log(path=None):
     return res
 
 
+def print_test_results(name):
+    print("\n" * 5)
+    print("---- This is test reports for %s task: ----" % name)
+
+
 class GPTAccuarcy(unittest.TestCase):
     """
     Train accuarcy test for GPT
@@ -77,11 +82,13 @@ class GPTAccuarcy(unittest.TestCase):
             gt = get_groundtruth()
             res = parse_log("./output/gpt-%s/log/workerlog.0" %
                             task_name.replace("_", "-"))
+            print_test_results(task_name)
             for k in gt.keys():
                 print("%s step: %d, gt:%.9f res:%.9f " %
                       (task_name, k, gt[k]["loss"], res[k]["loss"]))
                 self.assertAlmostEqual(
                     gt[k]["loss"], res[k]["loss"], delta=1e-6)
+            print("\n" * 5)
 
     def test_acc_dp(self):
         check_dataset()
@@ -98,11 +105,13 @@ class GPTAccuarcy(unittest.TestCase):
             res2 = parse_log("./output/gpt-%s/log/workerlog.1" %
                              task_name.replace("_", "-"))
 
+            print_test_results(task_name)
             for k in gt.keys():
                 mean = (res1[k]["loss"] + res2[k]["loss"]) / 2
                 print("%s step: %d, gt:%.9f res:%.9f " %
                       (task_name, k, gt[k]["loss"], mean))
                 self.assertAlmostEqual(gt[k]["loss"], mean, delta=5e-6)
+            print("\n" * 5)
 
     @unittest.skipIf(not paddlenlp.ops.optimizer._jit_compile(),
                      "The paddle.optimizer.AdamW not compatible with Sharding")
@@ -122,11 +131,13 @@ class GPTAccuarcy(unittest.TestCase):
             res2 = parse_log("./output/gpt-%s/log/workerlog.1" %
                              task_name.replace("_", "-"))
 
+            print_test_results(task_name)
             for k in gt.keys():
                 mean = (res1[k]["loss"] + res2[k]["loss"]) / 2
                 print("%s step: %d, gt:%.9f res:%.9f " %
                       (task_name, k, gt[k]["loss"], mean))
                 self.assertAlmostEqual(gt[k]["loss"], mean, delta=5e-6)
+            print("\n" * 5)
 
     def test_acc_mp_static(self):
         check_dataset()
@@ -144,15 +155,16 @@ class GPTAccuarcy(unittest.TestCase):
             res2 = parse_log("./output/gpt-%s/log/workerlog.1" %
                              task_name.replace("_", "-"))
 
+            print_test_results(task_name)
             for k in gt.keys():
                 self.assertAlmostEqual(
                     res1[k]["loss"], res2[k]["loss"], delta=1e-7)
                 mean = (res1[k]["loss"] + res2[k]["loss"]) / 2
                 print("%s step: %d, gt:%.9f res:%.9f " %
                       (task_name, k, gt[k]["loss"], mean))
-                if k == 1:
-                    self.assertAlmostEqual(
-                        gt[k]["loss"], res1[k]["loss"], delta=1e-7)
+                self.assertAlmostEqual(
+                    gt[k]["loss"], res1[k]["loss"], delta=1e-7)
+            print("\n" * 5)
 
 
 if __name__ == "__main__":

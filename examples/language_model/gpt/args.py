@@ -14,6 +14,7 @@
 
 import argparse
 
+import paddle
 from paddlenlp.utils.log import logger
 
 
@@ -244,7 +245,12 @@ def parse_args(MODEL_CLASSES):
         default="gpu",
         choices=["cpu", "gpu", "xpu"],
         help="select cpu, gpu, xpu devices.")
-
+    parser.add_argument(
+        "--lr_decay_style",
+        type=str,
+        default="cosine",
+        choices=["cosine", "none"],
+        help="Learning rate decay style.")
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10
 
@@ -258,5 +264,9 @@ def parse_args(MODEL_CLASSES):
             logger.warning(
                 "The attention_probs_dropout_prob should set to 0 for accuracy checking."
             )
+
+    logger.info('{:20}:{}'.format("paddle commit id", paddle.version.commit))
+    for arg in vars(args):
+        logger.info('{:20}:{}'.format(arg, getattr(args, arg)))
 
     return args

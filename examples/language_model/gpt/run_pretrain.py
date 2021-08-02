@@ -125,15 +125,21 @@ def do_train(args):
     if args.decay_steps is None:
         args.decay_steps = args.max_steps
     warmup_step = args.warmup_rate * args.decay_steps
-    lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
-        max_lr=args.max_lr,
-        min_lr=args.min_lr,
-        warmup_step=warmup_step,
-        decay_step=args.decay_steps)
+
+    lr_scheduler = None
+
+    if args.lr_decay_style == "none":
+        lr_scheduler = None
+    elif args.lr_decay_style == "cosine":
+        lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
+            max_lr=args.max_lr,
+            min_lr=args.min_lr,
+            warmup_step=warmup_step,
+            decay_step=args.decay_steps)
 
     clip = None
     if args.grad_clip > 0:
-        clip = paddle.nn.ClipGradByNorm(clip_norm=args.grad_clip)
+        clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.grad_clip)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
@@ -142,7 +148,7 @@ def do_train(args):
         if not any(nd in n for nd in ["bias", "norm"])
     ]
     optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
+        learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
         beta1=args.adam_beta1,
         beta2=args.adam_beta2,
         epsilon=args.adam_epsilon,
@@ -206,7 +212,8 @@ def do_train(args):
                     tic_train = time.time()
                 loss.backward()
                 optimizer.step()
-                lr_scheduler.step()
+                if lr_scheduler is not None:
+                    lr_scheduler.step()
                 optimizer.clear_grad()
 
                 if args.check_accuracy:

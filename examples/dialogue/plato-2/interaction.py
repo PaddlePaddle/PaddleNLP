@@ -76,6 +76,7 @@ def interact(args):
                 example, is_infer=True)
             data = plato_reader._pad_batch_records([record], is_infer=True)
             inputs = gen_inputs(data, args.latent_type_size)
+            inputs['tgt_ids'] = inputs['tgt_ids'].astype('int64')
             pred = model(inputs)[0]
             bot_response = pred["response"]
             print(
