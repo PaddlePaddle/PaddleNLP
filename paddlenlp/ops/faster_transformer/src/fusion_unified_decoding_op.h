@@ -17,8 +17,8 @@ limitations under the License. */
 #include <vector>
 
 #include "fastertransformer/common.h"
-// #include "fastertransformer/decoding_beamsearch.h"
-#include "fastertransformer/transformer_decoder.h"
+#include "fastertransformer/open_decoder.h"
+#include "fastertransformer/transformer_beamsearch.h"
 #include "fastertransformer/transformer_sampling.h"
 
 #ifdef PADDLE_ON_INFERENCE
@@ -32,6 +32,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const std::vector<paddle::Tensor>& cache_k,
     const std::vector<paddle::Tensor>& cache_v,
     const paddle::Tensor& mem_seq_len,
+    const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_embedding,
     const std::vector<paddle::Tensor>& self_ln_weight,
     const std::vector<paddle::Tensor>& self_ln_bias,
@@ -75,4 +76,6 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const float& beam_search_diversity_rate,
     const int& type_id,
     const int& unk_id,
-    const int& mask_id);
+    const int& mask_id,
+    const float& temperature,
+    const float& len_penalty);

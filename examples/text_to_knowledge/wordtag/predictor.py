@@ -96,9 +96,9 @@ URLS = {
     "TermTree.V1.0":
     "https://kg-concept.bj.bcebos.com/TermTree/TermTree.V1.0.tar.gz",
     "termtree_type.csv":
-    "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree_type.csv",
-    "termtree_tags.txt":
-    "https://paddlenlp.bj.bcebos.com/paddlenlp/resource/termtree_tags.txt",
+    "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_type.csv",
+    "termtree_tags_pos.txt":
+    "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_tags_pos.txt",
 }
 
 
@@ -118,7 +118,7 @@ class WordtagPredictor(object):
         term_schema_path = self._download_termtree("termtree_type.csv")
         term_data_path = self._download_termtree("TermTree.V1.0")
         if tag_path is None:
-            tag_path = self._download_termtree("termtree_tags.txt")
+            tag_path = self._download_termtree("termtree_tags_pos.txt")
         self._tags_to_index, self._index_to_tags = self._load_labels(tag_path)
 
         self._model = ErnieCtmWordtagModel.from_pretrained(
@@ -173,7 +173,7 @@ class WordtagPredictor(object):
 
     @staticmethod
     def _load_schema(schema_path):
-        schema_df = pd.read_csv(schema_path, sep="\t", encoding="gb2312")
+        schema_df = pd.read_csv(schema_path, sep="\t", encoding="utf8")
         schema = {}
         for idx in range(schema_df.shape[0]):
             if not isinstance(schema_df["type-1"][idx], float):
@@ -274,10 +274,8 @@ class WordtagPredictor(object):
         short_input_texts = self._split_long_text2short_text_list(
             input_texts, max_predict_len)
         for text in short_input_texts:
-            tokens = ["[CLS%i]" % i
-                      for i in range(1, self.summary_num)] + list(text)
             tokenized_input = self._tokenizer(
-                tokens,
+                list(text),
                 return_length=True,
                 is_split_into_words=True,
                 max_seq_len=max_seq_len)

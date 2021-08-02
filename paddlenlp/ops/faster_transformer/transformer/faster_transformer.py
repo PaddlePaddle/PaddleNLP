@@ -35,12 +35,15 @@ class FasterTransformer(TransformerModel):
                  src_vocab_size,
                  trg_vocab_size,
                  max_length,
-                 n_layer,
+                 num_encoder_layers,
+                 num_decoder_layers,
                  n_head,
                  d_model,
                  d_inner_hid,
                  dropout,
                  weight_sharing,
+                 attn_dropout=None,
+                 act_dropout=None,
                  bos_id=0,
                  eos_id=1,
                  decoding_strategy="beam_search",
@@ -88,7 +91,7 @@ class FasterTransformer(TransformerModel):
             word_embedding=self.trg_word_embedding.word_embedding,
             positional_embedding=self.trg_pos_embedding.pos_encoder,
             linear=self.decoding_linear,
-            n_layer=n_layer,
+            num_decoder_layers=num_decoder_layers,
             n_head=n_head,
             d_model=d_model,
             bos_id=bos_id,
@@ -242,8 +245,10 @@ class TransformerGenerator(paddle.nn.Layer):
             The size of target vocabulary.
         max_length (int):
             The maximum length of input sequences.
-        n_layer (int):
-            The number of sub-layers to be stacked in the encoder and decoder.
+        num_encoder_layers (int):
+            The number of sub-layers to be stacked in the encoder.
+        num_decoder_layers (int):
+            The number of sub-layers to be stacked in the decoder.
         n_head (int):
             The number of head used in multi-head attention.
         d_model (int):
@@ -265,20 +270,22 @@ class TransformerGenerator(paddle.nn.Layer):
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
         kwargs:
-            The key word arguments can be `output_time_major` and `use_fp16_decoding`.
+            The key word arguments can be `output_time_major`, `use_fp16_decoding` and `use_ft`.
             `output_time_major(bool, optional)`: Indicate the data layout of predicted
             Tensor. If `False`, the data layout would be batch major with shape
             `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
             to `False`. `use_fp16_decoding(bool, optional)`: Whether to use fp16
-            for decoding.
+            for decoding. `use_ft(bool, optional)`: Whether to use Faster Transformer
+            for decoding. 
     """
 
     def __init__(self,
                  src_vocab_size,
                  trg_vocab_size,
                  max_length,
-                 n_layer,
+                 num_encoder_layers,
+                 num_decoder_layers,
                  n_head,
                  d_model,
                  d_inner_hid,
@@ -299,29 +306,54 @@ class TransformerGenerator(paddle.nn.Layer):
         self.max_length = max_length
         self.output_time_major = kwargs.pop("output_time_major", True)
         use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
-        try:
-            load("FasterTransformer", verbose=True)
-            self.transformer = FasterTransformer(
-                src_vocab_size=src_vocab_size,
-                trg_vocab_size=trg_vocab_size,
-                max_length=max_length,
-                n_layer=n_layer,
-                n_head=n_head,
-                d_model=d_model,
-                d_inner_hid=d_inner_hid,
-                dropout=dropout,
-                weight_sharing=weight_sharing,
-                bos_id=bos_id,
-                eos_id=eos_id,
-                beam_size=beam_size,
-                max_out_len=max_out_len,
-                use_fp16_decoding=use_fp16_decoding)
-        except Exception:
+        use_ft = kwargs.pop("use_ft", True)
+
+        if use_ft:
+            try:
+                load("FasterTransformer", verbose=True)
+                self.transformer = FasterTransformer(
+                    src_vocab_size=src_vocab_size,
+                    trg_vocab_size=trg_vocab_size,
+                    max_length=max_length,
+                    num_encoder_layers=num_encoder_layers,
+                    num_decoder_layers=num_decoder_layers,
+                    n_head=n_head,
+                    d_model=d_model,
+                    d_inner_hid=d_inner_hid,
+                    dropout=dropout,
+                    weight_sharing=weight_sharing,
+                    bos_id=bos_id,
+                    eos_id=eos_id,
+                    beam_size=beam_size,
+                    max_out_len=max_out_len,
+                    use_fp16_decoding=use_fp16_decoding)
+            except Exception:
+                logger.warning(
+                    "Exception occurs when using Faster Transformer. " \
+                    "The original forward will be involved. ")
+                self.transformer = InferTransformerModel(
+                    src_vocab_size=src_vocab_size,
+                    trg_vocab_size=trg_vocab_size,
+                    max_length=max_length,
+                    num_encoder_layers=num_encoder_layers,
+                    num_decoder_layers=num_decoder_layers,
+                    n_head=n_head,
+                    d_model=d_model,
+                    d_inner_hid=d_inner_hid,
+                    dropout=dropout,
+                    weight_sharing=weight_sharing,
+                    bos_id=bos_id,
+                    eos_id=eos_id,
+                    beam_size=beam_size,
+                    max_out_len=max_out_len,
+                    output_time_major=self.output_time_major)
+        else:
             self.transformer = InferTransformerModel(
                 src_vocab_size=src_vocab_size,
                 trg_vocab_size=trg_vocab_size,
                 max_length=max_length,
-                n_layer=n_layer,
+                num_encoder_layers=num_encoder_layers,
+                num_decoder_layers=num_decoder_layers,
                 n_head=n_head,
                 d_model=d_model,
                 d_inner_hid=d_inner_hid,
@@ -359,7 +391,8 @@ class TransformerGenerator(paddle.nn.Layer):
                     src_vocab_size=30000,
                     trg_vocab_size=30000,
                     max_length=256,
-                    n_layer=6,
+                    num_encoder_layers=6,
+                    num_decoder_layers=6,
                     n_head=8,
                     d_model=512,
                     d_inner_hid=2048,

@@ -55,6 +55,9 @@ pretrained_models/
 ├── deploy # 部署
 │   └── python
 │       └── predict.py # python预测部署示例
+│   └── serving
+│       ├── client.py # 客户端预测脚本
+│       └── export_servable_model.py # 导出Serving模型及其配置
 ├── export_model.py # 动态图参数导出静态图参数脚本
 ├── predict.py # 预测脚本
 ├── README.md # 使用说明
@@ -91,7 +94,7 @@ model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained('ernie
 tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie')
 
 # ernie-tiny
-# model = ppnlp.transformers.ErnieForSequenceClassification.rom_pretrained('ernie-tiny',num_classes=2))
+# model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained('ernie-tiny',num_classes=2))
 # tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained('ernie-tiny')
 
 
@@ -141,14 +144,14 @@ checkpoints/
   运行方式：
 
 ```shell
-python export_model.py --params_path=./checkpoint/model_900/model_state.pdparams --output_path=./static_graph_params
+python export_model.py --params_path=./checkpoint/model_900/model_state.pdparams --output_path=./output
 ```
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 
 导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式：
 
 ```shell
-python deploy/python/predict.py --model_file=static_graph_params.pdmodel --params_file=static_graph_params.pdiparams
+python deploy/python/predict.py --model_dir=./output
 ```
 
 ### 模型预测
@@ -176,3 +179,97 @@ Data: 这个宾馆比较陈旧了，特价的房间也很一般。总体来说�
 Data: 怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片      Label: negative
 Data: 作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。      Label: positive
 ```
+
+
+## 使用Paddle Serving API进行推理部署
+
+**NOTE：**
+
+使用Paddle Serving服务化部署需要将动态图保存的模型参数导出为静态图Inference模型参数文件。如何导出模型参考上述提到的**导出模型**。
+
+Inference模型参数文件：
+| 文件                          | 说明                                   |
+|-------------------------------|----------------------------------------|
+| inference.pdiparams | 模型权重文件，供推理时加载使用            |
+| inference.pdmodel   | 模型结构文件，供推理时加载使用            |
+
+
+### 依赖安装
+
+* 服务器端依赖：
+
+```shell
+pip install paddle-serving-app paddle-serving-client paddle-serving-server==0.5.0
+```
+
+如果服务器端可以使用GPU进行推理，则安装server的gpu版本，安装时要注意参考服务器当前CUDA、TensorRT的版本来安装对应的版本：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.5.0)
+
+```shell
+pip install paddle-serving-app paddle-serving-client paddle-serving-server-gpu==0.5.0
+```
+
+* 客户端依赖：
+
+```shell
+pip install paddle-serving-app paddle-serving-client
+```
+
+建议在**docker**容器中运行服务器端和客户端以避免一些系统依赖库问题，启动docker镜像的命令参考：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.5.0)
+
+### Serving的模型和配置导出
+
+使用Serving进行预测部署时，需要将静态图inference model导出为Serving可读入的模型参数和配置。运行方式如下：
+
+```shell
+python -u deploy/serving/export_servable_model.py \
+    --inference_model_dir ./ \
+    --model_file ./output/inference.pdmodel \
+    --params_file ./output/inference.pdiparams
+```
+
+可支持配置的参数：
+* `inference_model_dir`： Inference推理模型所在目录，这里假设为当前目录。
+* `model_file`： 推理需要加载的模型结构文件。
+* `params_file`： 推理需要加载的模型权重文件。
+
+执行命令后，会在当前目录下生成2个目录：serving_server 和 serving_client。serving_server目录包含服务器端所需的模型和配置，需将其拷贝到服务器端容器中；serving_client目录包含客户端所需的配置，需将其拷贝到客户端容器中。
+
+### 服务器启动server
+
+在服务器端容器中，启动server
+
+```shell
+python -m deploy/serving/paddle_serving_server_gpu.serve \
+    --model ./serving_server \
+    --port 8090
+```
+其中：
+* `model`： server加载的模型和配置所在目录。
+* `port`： 表示server开启的服务端口8090。
+
+如果服务器端可以使用GPU进行推理计算，则启动服务器时可以配置server使用的GPU id
+
+```shell
+python -m paddle_serving_server_gpu.serve \
+    --model ./serving_server \
+    --port 8090 \
+    --gpu_id 0
+```
+* `gpu_id`： server使用0号GPU。
+
+
+### 客服端发送推理请求
+
+在客户端容器中，使用前面得到的serving_client目录启动client发起RPC推理请求。和使用Paddle Inference API进行推理一样。
+
+### 从命令行读取输入数据发起推理请求
+```shell
+python deploy/serving/client.py \
+    --client_config_file ./serving_client/serving_client_conf.prototxt \
+    --server_ip_port 127.0.0.1:8090 \
+    --max_seq_length 128
+```
+其中参数释义如下：
+- `client_config_file` 表示客户端需要加载的配置文件。
+- `server_ip_port` 表示服务器端的ip地址和端口号。ip地址和端口号需要根据实际情况进行更换。
+- `max_seq_length` 表示输入的最大句子长度，超过该长度将被截断。

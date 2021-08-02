@@ -56,6 +56,9 @@ public:
   LayerNormWeight<T> layernorm;
   LayerNormWeight<T> lm_layernorm;
 
+  const T *logits_mask_T = nullptr;
+  const float *logits_mask = nullptr;
+
   int *output_ids = nullptr;
   int *parent_ids = nullptr;
   int *sequence_length = nullptr;
@@ -100,13 +103,24 @@ struct Gpt2Arguments : public DecodingSamplingArguments {
   int *vocab_mask{nullptr};
 };
 
-struct TransformerGenArguments : public DecodingSamplingArguments {
+struct TransformerSamplingArguments : public DecodingSamplingArguments {
   int **start_ids_;
+  int start_len_;
+  float temperature_{1.0};
+  float len_penalty{1.0};
+  float repeat_penalty{1.0};
+  int *vocab_mask{nullptr};
+  int type_id_{0};
+  bool normalization_before_{true};
+  int unk_id_{-1};
+  int mask_id_{-1};
+};
+
+struct TransformerBeamsearchArguments : public DecodingBeamsearchArguments {
   int start_len_;
   float temperature_{2.0};
   float len_penalty{1.0};
   float repeat_penalty{2.0};
-  int *vocab_mask{nullptr};
   int type_id_{0};
   bool normalization_before_{true};
   int unk_id_{-1};

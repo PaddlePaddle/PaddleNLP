@@ -272,7 +272,7 @@ class ErnieGramModel(ErnieGramPretrainedModel):
                 model = ErnieGramModel.from_pretrained('ernie-gram-zh')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 sequence_output, pooled_output = model(**inputs)
 
         """
@@ -376,7 +376,7 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
                 model = ErnieGramForTokenClassification.from_pretrained('ernie-gram-zh')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
         sequence_output, _ = self.ernie_gram(
@@ -460,7 +460,7 @@ class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
                 model = ErnieGramForQuestionAnswering.from_pretrained('ernie-gram-zh')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
 
@@ -554,7 +554,7 @@ class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
                 model = ErnieGramForSequenceClassification.from_pretrained('ernie-gram-zh')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
         """

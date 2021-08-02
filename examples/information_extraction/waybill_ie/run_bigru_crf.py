@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import os
 from functools import partial
 
 import paddle
@@ -25,6 +27,18 @@ from paddlenlp.embeddings import TokenEmbedding
 
 from data import load_dict, load_dataset, parse_decodes
 from model import BiGRUWithCRF
+
+parser = argparse.ArgumentParser()
+
+# yapf: disable
+parser.add_argument("--save_dir", default='./bigru_crf_ckpt', type=str, help="The output directory where the model checkpoints will be written.")
+parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
+parser.add_argument("--batch_size", default=200, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
+parser.add_argument("--data_dir", default='./waybill_ie/data', type=str, help="The folder where the dataset is located.")
+
+args = parser.parse_args()
+# yapf: enable
 
 
 def convert_tokens_to_ids(tokens, vocab, oov_token=None):
@@ -71,14 +85,16 @@ def predict(model, data_loader, ds, label_vocab):
 
 
 if __name__ == '__main__':
-    paddle.set_device('gpu')
+    paddle.set_device(args.device)
 
     # Create dataset, tokenizer and dataloader.
-    train_ds, dev_ds, test_ds = load_dataset(datafiles=(
-        './data/train.txt', './data/dev.txt', './data/test.txt'))
+    train_ds, dev_ds, test_ds = load_dataset(
+        datafiles=(os.path.join(args.data_dir, 'train.txt'),
+                   os.path.join(args.data_dir, 'dev.txt'),
+                   os.path.join(args.data_dir, 'test.txt')))
 
-    label_vocab = load_dict('./data/tag.dic')
-    word_vocab = load_dict('./data/word.dic')
+    label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
+    word_vocab = load_dict(os.path.join(args.data_dir, 'word.dic'))
 
     trans_func = partial(
         convert_to_features, word_vocab=word_vocab, label_vocab=label_vocab)
@@ -94,7 +110,7 @@ if __name__ == '__main__':
 
     train_loader = paddle.io.DataLoader(
         dataset=train_ds,
-        batch_size=200,
+        batch_size=args.batch_size,
         shuffle=True,
         drop_last=True,
         return_list=True,
@@ -102,14 +118,14 @@ if __name__ == '__main__':
 
     dev_loader = paddle.io.DataLoader(
         dataset=dev_ds,
-        batch_size=200,
+        batch_size=args.batch_size,
         drop_last=True,
         return_list=True,
         collate_fn=batchify_fn)
 
     test_loader = paddle.io.DataLoader(
         dataset=test_ds,
-        batch_size=200,
+        batch_size=args.batch_size,
         drop_last=True,
         return_list=True,
         collate_fn=batchify_fn)
@@ -122,7 +138,7 @@ if __name__ == '__main__':
     metric = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
 
     step = 0
-    for epoch in range(10):
+    for epoch in range(args.epochs):
         for token_ids, lengths, label_ids in train_loader:
             loss = model(token_ids, lengths, label_ids)
             loss = loss.mean()
@@ -132,10 +148,11 @@ if __name__ == '__main__':
             step += 1
             print("[TRAIN] Epoch:%d - Step:%d - Loss: %f" % (epoch, step, loss))
         evaluate(model, metric, dev_loader)
-        paddle.save(model.state_dict(), './ernie_ckpt/model_%d.pdparams' % step)
+        paddle.save(model.state_dict(),
+                    os.path.join(args.save_dir, 'model_%d' % step))
 
     preds = predict(model, test_loader, test_ds, label_vocab)
-    file_path = "ernie_results.txt"
+    file_path = "bigru_crf_results.txt"
     with open(file_path, "w", encoding="utf8") as fout:
         fout.write("\n".join(preds))
     # Print some examples
