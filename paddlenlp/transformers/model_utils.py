@@ -23,7 +23,7 @@ import inspect
 import paddle
 from paddle.nn import Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddlenlp.utils.downloader import get_path_from_url
+from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
@@ -105,7 +105,7 @@ class PretrainedModel(Layer, GenerationMixin):
     """
     model_config_file = "model_config.json"
     pretrained_init_configuration = {}
-    # TODO: more flexible resource handle, namedtuple with fileds as:
+    # TODO: more flexible resource handle, namedtuple with fields as:
     # resource_name, saved_file, handle_name_for_load(None for used as __init__
     # arguments), handle_name_for_save
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -115,7 +115,7 @@ class PretrainedModel(Layer, GenerationMixin):
     def _wrap_init(self, original_init, *args, **kwargs):
         """
         It would be hooked after `__init__` to add a dict including arguments of
-        `__init__` as a attribute named `config` of the prtrained model instance.
+        `__init__` as a attribute named `config` of the pretrained model instance.
         """
         init_dict = fn_args_to_dict(original_init, *((self, ) + args), **kwargs)
         self.config = init_dict
@@ -135,6 +135,7 @@ class PretrainedModel(Layer, GenerationMixin):
         list: Contains all supported built-in pretrained model names of the
             current PretrainedModel class.
         """
+        # Todo: return all model name
         return list(self.pretrained_init_configuration.keys())
 
     def get_input_embeddings(self):
@@ -150,14 +151,18 @@ class PretrainedModel(Layer, GenerationMixin):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         """
-        Creates an instance of `PretrainedModel` and load pretrained model weights
-        for it according to a specific model name (such as `bert-base-uncased`)
+        Creates an instance of `PretrainedModel`. Model weights are loaded
+        by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
 
         Args:
-            pretrained_model_name_or_path (str): Name of pretrained model
-                for built-in pretrained models loading, such as `bert-base-uncased`.
-                Or a local file directory path for local trained models loading.
+            pretrained_model_name_or_path (str): Name of pretrained model or dir path
+                to load from. The string can be:
+
+                - Name of a built-in pretrained model
+                - Name of a community-contributed pretrained model.
+                - Local directory path which contains model weights file("model_state.pdparams")
+                  and model config file ("model_config.json").
             *args (tuple): Position arguments for model `__init__`. If provided,
                 use these as position argument values for model initialization.
             **kwargs (dict): Keyword arguments for model `__init__`. If provided,
@@ -174,12 +179,20 @@ class PretrainedModel(Layer, GenerationMixin):
 
                 from paddlenlp.transformers import BertForSequenceClassification
 
+                # Name of built-in pretrained model
                 model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
+
+                # Name of community-contributed pretrained model
+                model = BertForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
+
+                # Load from local directory path
+                model = BertForSequenceClassification.from_pretrained('./my_bert/')
         """
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}
         init_configuration = {}
 
+        # From built-in pretrained models
         if pretrained_model_name_or_path in pretrained_models:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 resource_files[file_id] = map_list[
@@ -187,25 +200,26 @@ class PretrainedModel(Layer, GenerationMixin):
             init_configuration = copy.deepcopy(
                 cls.pretrained_init_configuration[
                     pretrained_model_name_or_path])
+        # From local dir path
+        elif os.path.isdir(pretrained_model_name_or_path):
+            for file_id, file_name in cls.resource_files_names.items():
+                full_file_name = os.path.join(pretrained_model_name_or_path,
+                                              file_name)
+                resource_files[file_id] = full_file_name
+            resource_files["model_config_file"] = os.path.join(
+                pretrained_model_name_or_path, cls.model_config_file)
         else:
-            if os.path.isdir(pretrained_model_name_or_path):
-                for file_id, file_name in cls.resource_files_names.items():
-                    full_file_name = os.path.join(pretrained_model_name_or_path,
-                                                  file_name)
-                    resource_files[file_id] = full_file_name
-                resource_files["model_config_file"] = os.path.join(
-                    pretrained_model_name_or_path, cls.model_config_file)
-            else:
-                raise ValueError(
-                    "Calling {}.from_pretrained() with a model identifier or the "
-                    "path to a directory instead. The supported model "
-                    "identifiers are as follows: {}, but got: {}".format(
-                        cls.__name__,
-                        cls.pretrained_init_configuration.keys(
-                        ), pretrained_model_name_or_path))
+            # Assuming from community-contributed pretrained models
+            for file_id, file_name in cls.resource_files_names.items():
+                full_file_name = os.path.join(COMMUNITY_MODEL_PREFIX,
+                                              pretrained_model_name_or_path,
+                                              file_name)
+                resource_files[file_id] = full_file_name
+            resource_files["model_config_file"] = os.path.join(
+                COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
+                cls.model_config_file)
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-
         resolved_resource_files = {}
         for file_id, file_path in resource_files.items():
             path = os.path.join(default_root, file_path.split('/')[-1])
@@ -217,8 +231,18 @@ class PretrainedModel(Layer, GenerationMixin):
             else:
                 logger.info("Downloading %s and saved to %s" %
                             (file_path, default_root))
-                resolved_resource_files[file_id] = get_path_from_url(
-                    file_path, default_root)
+                try:
+                    resolved_resource_files[file_id] = get_path_from_url(
+                        file_path, default_root)
+                except RuntimeError as err:
+                    logger.error(err)
+                    raise RuntimeError(
+                        f"Can't load weights for '{pretrained_model_name_or_path}'.\n"
+                        f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                        "- a correct model-identifier of built-in pretrained models,\n"
+                        "- or a correct model-identifier of community-contributed pretrained models,\n"
+                        "- or the correct path to a directory containing relevant modeling files(model_weights and model_config).\n"
+                    )
 
         # Prepare model initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
@@ -292,7 +316,7 @@ class PretrainedModel(Layer, GenerationMixin):
             model = cls(*derived_args, **derived_kwargs)
 
         # Maybe need more ways to load resources.
-        weight_path = list(resolved_resource_files.values())[0]
+        weight_path = resolved_resource_files["model_state"]
         assert weight_path.endswith(
             ".pdparams"), "suffix of weight must be .pdparams"
         state_dict = paddle.load(weight_path)
