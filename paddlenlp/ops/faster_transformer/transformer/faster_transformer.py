@@ -268,13 +268,14 @@ class TransformerGenerator(paddle.nn.Layer):
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
         kwargs:
-            The key word arguments can be `output_time_major` and `use_fp16_decoding`.
+            The key word arguments can be `output_time_major`, `use_fp16_decoding` and `use_ft`.
             `output_time_major(bool, optional)`: Indicate the data layout of predicted
             Tensor. If `False`, the data layout would be batch major with shape
             `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
             to `False`. `use_fp16_decoding(bool, optional)`: Whether to use fp16
-            for decoding.
+            for decoding. `use_ft(bool, optional)`: Whether to use Faster Transformer
+            for decoding. 
     """
 
     def __init__(self,
@@ -292,7 +293,6 @@ class TransformerGenerator(paddle.nn.Layer):
                  eos_id=1,
                  beam_size=4,
                  max_out_len=256,
-                 use_ft=True,
                  **kwargs):
         logger.warning(
             "TransformerGenerator is an experimental API and subject to change.")
@@ -304,6 +304,7 @@ class TransformerGenerator(paddle.nn.Layer):
         self.max_length = max_length
         self.output_time_major = kwargs.pop("output_time_major", True)
         use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
+        use_ft = kwargs.pop("use_ft", True)
 
         if use_ft:
             try:
