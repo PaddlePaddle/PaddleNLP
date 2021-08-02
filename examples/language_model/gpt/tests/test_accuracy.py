@@ -139,6 +139,8 @@ class GPTAccuarcy(unittest.TestCase):
                 self.assertAlmostEqual(gt[k]["loss"], mean, delta=5e-6)
             print("\n" * 5)
 
+    @unittest.skipIf(True,
+                     "This folder not support MP. Please use MP in GPT-3.")
     def test_acc_mp_static(self):
         check_dataset()
         check_init_checkpoint()

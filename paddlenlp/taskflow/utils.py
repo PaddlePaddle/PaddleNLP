@@ -22,6 +22,7 @@ DOC_FORMAT = r"""
     Examples:
         .. code-block:: python
                """
+DOWNLOAD_CHECK = False
 
 
 def download_file(save_dir, filename, url, md5=None, task=None):
@@ -36,7 +37,12 @@ def download_file(save_dir, filename, url, md5=None, task=None):
         url(string): The url downling the file.
         md5(string, optional): The md5 value that checking the version downloaded. 
     """
-    DownloaderCheck(task).start()
+    global DOWNLOAD_CHECK
+    if not DOWNLOAD_CHECK:
+        DOWNLOAD_CHECK = True
+        checker = DownloaderCheck(task)
+        checker.start()
+        checker.join()
     default_root = os.path.join(MODEL_HOME, save_dir)
     fullname = os.path.join(default_root, filename)
     if os.path.exists(fullname):

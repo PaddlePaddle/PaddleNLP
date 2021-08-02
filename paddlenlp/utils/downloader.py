@@ -60,6 +60,8 @@ from .log import logger
 
 __all__ = ['get_weights_path_from_url']
 
+COMMUNITY_MODEL_PREFIX = "https://paddlenlp.bj.bcebos.com/models/transformers/community/"
+
 WEIGHTS_HOME = osp.expanduser("~/.cache/paddle/hapi/weights")
 
 DOWNLOAD_RETRY_LIMIT = 3
