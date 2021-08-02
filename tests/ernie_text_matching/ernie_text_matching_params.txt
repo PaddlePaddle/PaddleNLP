@@ -1,7 +1,7 @@
 ===========================train_params=========================== 
 model_name:ernie_text_matching
-python:python3.7
-gpu_list:0|0,1
+python:/usr/local/bin/python3.7
+gpu_list:2|2,3
 Global.use_gpu:null
 Global.auto_cast:null
 --epoch:1
@@ -13,7 +13,7 @@ train_infer_img_dir:null
 null:null
 ##
 trainer:norm
-norm_train:../examples/text_matching/ernie_matching/train_pointwise.py
+norm_train:./ernie_text_matching/train_pointwise.py
 pact_train:null
 fpgm_train:null
 distill_train:null
@@ -27,14 +27,14 @@ null:null
 ===========================infer_params===========================
 --output_path:./output
 --params_path: ./output/model_100/model_state.pdparams
-norm_export:../examples/text_matching/ernie_matching/export_model.py
+norm_export:./ernie_text_matching/export_model.py
 quant_export:null
 fpgm_export:null
 distill_export:null
 null:null
 null:null
 ##
-inference:../examples/text_matching/ernie_matching/deploy/python/predict.py
+inference:./ernie_text_matching/predict.py
 --device:cpu|gpu
 --enable_mkldnn:True|False
 --cpu_threads:1|6
