@@ -54,26 +54,26 @@ python -u  -m paddle.distributed.fleet.launch \
 - `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
 - `output_dir` 指定输出文件。
-- `max_seq_len` 输入文本序列的长度 \
-- `micro_batch_size` 单卡单次的 batch size大小。即单张卡运行一次前向网络的 batch size大小 \
-- `global_batch_size` 全局的batch size大小，即一次参数更新等效的batch size。 \
+- `max_seq_len` 输入文本序列的长度。
+- `micro_batch_size` 单卡单次的 batch size大小。即单张卡运行一次前向网络的 batch size大小。
+- `global_batch_size` 全局的batch size大小，即一次参数更新等效的batch size。
 - `mp_degree` 模型并行划分的数（如 mp_degree=2 表示将计算的Tensor划分到两个设备）。
 - `sharding_degree` 切参数切分的分组大小（如 sharding_degree=4 表示参数分为4组，分别到4个设备）。
 - `pp_degree` 流水线并行参数，表示将网络划分成多少段。
 - `dp_degree` 数据并行参数。
 - `use_sharding` 开启sharding策略
-- `use_amp` 开启混合精度策略 \
-- `use_recompute` 开启重计算策略 \
-- `max_lr` 训练学习率 \
-- `min_lr` 学习率衰减的最小值 \
-- `max_steps` 最大训练步数
-- `save_steps` 保存模型间隔
+- `use_amp` 开启混合精度策略。
+- `use_recompute` 开启重计算策略。
+- `max_lr` 训练学习率。
+- `min_lr` 学习率衰减的最小值。
+- `max_steps` 最大训练步数。
+- `save_steps` 保存模型间隔。
 - `weight_decay` 权重衰减参数。
-- `warmup_rate` 学习率warmup参数
+- `warmup_rate` 学习率warmup参数。
 - `grad_clip` 梯度裁剪范围。
-- `logging_freq` 日志输出间隔\
-- `eval_freq 模型评估间隔\
-- `device` 训练设备
+- `logging_freq` 日志输出间隔。
+- `eval_freq 模型评估间隔。
+- `device` 训练设备。
 
 注
 - 一般而言，需要设置 `mp_degree * sharding_degree * pp_degree * dp_degree` = 训练机器的总卡数。
@@ -88,4 +88,8 @@ python -u  -m paddle.distributed.fleet.launch \
 - 流水线并行(Pipeline Parallelism)
 - 纯数据并行(Data Parallelism)
 
+具体内容可以参考稿件:[飞桨分布式训练又推新品，4D混合并行可训千亿级AI模型](https://baijiahao.baidu.com/s?id=1697085717806202673)。
+
+### 参考文献
+- [Language Models are Few-Shot Learners](https://arxiv.org/pdf/2005.14165.pdf)
 除了上述混合并行策略外，飞桨还支持重计算、offload、混合精度等策略，来减少显存占用、加速训练。
