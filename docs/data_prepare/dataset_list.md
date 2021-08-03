@@ -11,6 +11,9 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 |  [DuReader-robust](https://aistudio.baidu.com/aistudio/competition/detail/49) | 千言数据集：阅读理解，答案原文抽取|`paddlenlp.datasets.load_dataset('dureader_robust')` |
 |  [CMRC2018](http://hfl-rc.com/cmrc2018/) | 第二届“讯飞杯”中文机器阅读理解评测数据集|`paddlenlp.datasets.load_dataset('cmrc2018')` |
 |  [DRCD](https://github.com/DRCKnowledgeTeam/DRCD) | 台達閱讀理解資料集|`paddlenlp.datasets.load_dataset('drcd')` |
+|  [TriviaQA](http://nlp.cs.washington.edu/triviaqa/) | Washington大学问答数据集|`paddlenlp.datasets.load_dataset('triviaqa')` |
+|  [C3](https://dataset.org/c3/) | 阅读理解单选题 |`paddlenlp.datasets.load_dataset('c3')` |
+
 
 ## 文本分类
 
@@ -47,6 +50,9 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 |  [CLUEWSCF](https://github.com/CLUEbenchmark/FewCLUE/tree/main/datasets)  | FewCLUE 评测中的 WSC Winograd 模式挑战中文版，代词消歧任务，二分类任务 | `paddlenlp.datasets.load_dataset('fewclue', 'cluewsc')`|
 | [THUCNews](https://github.com/gaussic/text-classification-cnn-rnn#%E6%95%B0%E6%8D%AE%E9%9B%86) |  THUCNews中文新闻类别分类 | `paddlenlp.datasets.load_dataset('thucnews')` |
 | [HYP](https://pan.webis.de/semeval19/semeval19-web/) | 英文政治新闻情感分类语料  | `paddlenlp.datasets.load_dataset('hyp')` |
+
+## 文本匹配
+| [CAIL2019-SCM](https://github.com/china-ai-law-challenge/CAIL2019/tree/master/scm) | 相似法律案例匹配  | `paddlenlp.datasets.load_dataset('cail2019_scm')` |
 
 ## 序列标注
 

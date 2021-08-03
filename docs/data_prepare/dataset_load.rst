@@ -65,3 +65,5 @@
 
         >>> from paddlenlp.datasets import load_dataset
         >>> train_ds, test_ds = load_dataset("glue", "cola", splits=["train", "test"], data_files=["my_train_file.csv", "my_test_file.csv"])
+
+    **另外需要注意数据集的是没有默认加载选项的，**:attr:`splits` **和**:attr:`data_files` **必须至少指定一个。**

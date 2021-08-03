@@ -117,7 +117,7 @@ def convert_static_to_dygraph_params(dygraph_params_save_path,
 
     for name in state_dict.keys():
         if name in params:
-            assert ((state_dict[name] == params[name]).all() == True)
+            assert ((state_dict[name] == params[name].numpy()).all() == True)
         else:
             print(name, 'not in params')
 
