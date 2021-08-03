@@ -483,20 +483,27 @@ class FasterGPT(nn.Layer):
 class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
     def __init__(self,
                  model,
+                 decoding_strategy="topk_sampling",
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  decoding_type_id=1):
         super(FasterUnifiedTransformer, self).__init__()
         self._model = model
+        self._decoding_strategy = decoding_strategy
         self.bos_token_id = model.bos_token_id
         self.pad_token_id = model.pad_token_id
         self.eos_token_id = model.eos_token_id
+        self.unk_token_id = model.unk_token_id
+        self.vocab_size = model.lm_head.decoder_bias.shape[0]
+        self.logits_mask = self.generate_logits_mask()
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
+            decoding_strategy=self._decoding_strategy,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding,
-            decoding_type_id=decoding_type_id)
+            decoding_type_id=decoding_type_id,
+            logits_mask=self.logits_mask)
 
     def prepare_inputs_for_generation(self,
                                       input_ids,
@@ -522,6 +529,15 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             "seq_len": seq_len
         }
 
+    def generate_logits_mask(self):
+        # pre-process distribution
+        logits_mask = paddle.zeros(
+            shape=[self.vocab_size], dtype=paddle.get_default_dtype())
+        logits_mask[self.unk_token_id] = -1e9
+        logits_mask[self.bos_token_id] = -1e9
+        logits_mask[self.pad_token_id] = -1e9
+        return logits_mask
+
     def sample(self,
                input_ids,
                logits_processors,
@@ -536,7 +552,42 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         max_length -= input_ids.shape[-1]
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
+
+        if self._decoding_strategy == "topk_sampling":
+            top_p = 0.0
+        elif self._decoding_strategy == "topp_sampling":
+            top_k = 0
+
+        return self.forward(
+            model_inputs=model_inputs,
+            max_length=max_length,
+            top_k=top_k,
+            top_p=top_p,
+            temperature=temperature)
+
+    def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
+                    pad_token_id, eos_token_id, **model_kwargs):
+        max_length -= input_ids.shape[-1]
+        model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                          **model_kwargs)
+        temperature = model_kwargs.pop('temperature', 1.0)
+
+        return self.forward(
+            model_inputs=model_inputs,
+            max_length=max_length,
+            num_beams=beam_scorer.num_beams,
+            temperature=temperature)
+
+    def forward(self,
+                max_length,
+                decoding_strategy="topk_sampling",
+                top_k=4,
+                top_p=0.0,
+                num_beams=4,
+                temperature=1.0,
+                model_inputs=None):
         seq_len = model_inputs.pop('seq_len', None)
+
         outputs = self._model(**model_inputs)
         if isinstance(outputs, tuple):
             caches = outputs[1]
@@ -544,27 +595,16 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             raise RuntimeError('Not support.')
         cache_k = [c.k for c in caches]
         cache_v = [c.v for c in caches]
+        print(paddle.mean(cache_k[0]))
 
         return self.decoding(
             cache_k=cache_k,
             cache_v=cache_v,
             memory_seq_lens=seq_len,
+            beam_size=num_beams,
             topk=top_k,
             topp=top_p,
             max_out_len=max_length,
             bos_id=self.bos_token_id,
             eos_id=self.eos_token_id,
             temperature=temperature)
-
-    def forward(self,
-                input_ids,
-                logits_processors,
-                max_length,
-                pad_token_id,
-                eos_token_id,
-                top_k=4,
-                top_p=0.0,
-                temperature=1.0,
-                min_tokens_to_keep=1,
-                **model_kwargs):
-        raise RuntimeError('Not implement. Please use generate API. ')

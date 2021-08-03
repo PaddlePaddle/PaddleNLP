@@ -400,6 +400,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           len_penalty,
           cublas_handle_,
           stream);
+      break;
     }
     case paddle::DataType::FLOAT32: {
       ret = unified_decoding_kernel<paddle::DataType::FLOAT32>(
@@ -455,11 +456,13 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           len_penalty,
           cublas_handle_,
           stream);
+      break;
     }
     default: {
       PD_THROW(
           "NOT supported data type. "
           "Only float16 and float32 are supported. ");
+      break;
     }
   }
 

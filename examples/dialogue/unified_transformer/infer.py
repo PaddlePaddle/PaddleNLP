@@ -80,12 +80,14 @@ def infer(args):
         args.model_name_or_path)
 
     test_ds = load_dataset('duconv', splits='test_1')
+    args.batch_size = 1
     test_ds, test_data_loader = create_data_loader(test_ds, tokenizer, args,
                                                    'test')
 
     if args.faster:
         model = FasterUnifiedTransformer(
             model,
+            decoding_strategy="topk_sampling",
             decoding_lib=args.decoding_lib,
             use_fp16_decoding=args.use_fp16_decoding,
             decoding_type_id=args.decoding_type_id)
@@ -98,26 +100,28 @@ def infer(args):
         input_ids, token_type_ids, position_ids, attention_mask, seq_len = inputs
         output = model.generate(
             input_ids=input_ids,
-            token_type_ids=token_type_ids,  # won't work when args.faster is True.
-            position_ids=position_ids,  # won't work when args.faster is True.
-            attention_mask=attention_mask,  # won't work when args.faster is True.
-            seq_len=seq_len,  # only works when args.faster is True.
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            seq_len=seq_len,
             max_length=args.max_dec_len,
-            min_length=args.min_dec_len,
+            # min_length=args.min_dec_len,
             decode_strategy=args.decode_strategy,
-            temperature=args.temperature,
+            # temperature=args.temperature,
             top_k=args.top_k,
             top_p=args.top_p,
-            num_beams=args.num_beams,
-            length_penalty=args.length_penalty,
-            early_stopping=args.early_stopping,
-            num_return_sequences=args.num_return_sequences)
+            num_beams=1,  #args.num_beams,
+            # length_penalty=args.length_penalty,
+            # early_stopping=args.early_stopping,
+            num_return_sequences=1)  #args.num_return_sequences)
 
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
             print('step %d - %.3fs/step' %
                   (step, total_time / args.logging_steps))
             total_time = 0.0
+        print(output)
+        exit()
 
         if args.faster:
             ids = output
