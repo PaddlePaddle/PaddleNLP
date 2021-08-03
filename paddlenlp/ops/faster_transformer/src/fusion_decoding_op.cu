@@ -112,8 +112,14 @@ std::vector<paddle::Tensor> decoding_kernel(
   decoding_params.stream = stream;
   fastertransformer::Allocator<AllocatorType::PD> allocator_(stream);
 
+  paddle::Tensor input_D = paddle::Tensor(paddle::PlaceType::kGPU);
+  if (input.type() != D) {
+    input_D = input.cast(D);
+  } else {
+    input_D = input;
+  }
   decoding_params.memory_tensor =
-      reinterpret_cast<const DataType_*>(input.data<data_t_>());
+      reinterpret_cast<const DataType_*>(input_D.data<data_t_>());
   decoding_params.memory_sequence_length = memory_sequence_length.data<int>();
 
   DecoderInitParam<DataType_>* params =

@@ -120,9 +120,6 @@ class FasterTransformer(TransformerModel):
             training=False) if self.dropout else src_emb
         enc_output = self.transformer.encoder(enc_input, src_slf_attn_bias)
 
-        if self.use_fp16_decoding:
-            enc_output = paddle.cast(enc_output, dtype="float16")
-
         mem_seq_lens = paddle.sum(paddle.cast(
             src_word != self.bos_id, dtype="int32"),
                                   axis=1)
