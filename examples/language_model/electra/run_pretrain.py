@@ -593,7 +593,7 @@ def do_train(args):
                                  (time.time() - tic_train) / args.logging_steps)
                         print(log_str)
                         log_list.append(log_str)
-                        loss_list = []
+                    loss_list = []
                 else:
                     log_str = (
                         "global step {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, "
