@@ -16,6 +16,17 @@ def parse_args():
         default="./configs/transformer.base.yaml",
         type=str,
         help="Path of the config file. ")
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+    )
+    parser.add_argument(
+        "--test_file",
+        default=None,
+        type=str,
+        help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
+    )
     args = parser.parse_args()
     return args
 
@@ -111,6 +122,8 @@ if __name__ == "__main__":
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
+    args.benchmark = ARGS.benchmark
+    args.test_file = ARGS.test_file
     pprint(args)
 
     do_predict(args)
