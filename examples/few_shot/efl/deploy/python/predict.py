@@ -24,6 +24,9 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
 
+from data import convert_example, processor_dict
+from task_label_description import TASK_LABELS_DESC
+
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True,
@@ -32,7 +35,7 @@ parser.add_argument("--model_dir", type=str, required=True,
 parser.add_argument("--max_seq_length", default=128, type=int,
     help="The maximum total input sequence length after tokenization. Sequences "
     "longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=32, type=int,
+parser.add_argument("--batch_size", default=15, type=int,
     help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu",
     help="Select which device to train model, defaults to gpu.")
@@ -54,22 +57,7 @@ parser.add_argument("--save_log_path", type=str, default="./log_output/",
 args = parser.parse_args()
 # yapf: enable
 
-
-def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
-
-    query, title = example["query"], example["title"]
-
-    encoded_inputs = tokenizer(
-        text=query, text_pair=title, max_seq_len=max_seq_length)
-
-    input_ids = encoded_inputs["input_ids"]
-    token_type_ids = encoded_inputs["token_type_ids"]
-
-    if not is_test:
-        label = np.array([example["label"]], dtype="int64")
-        return input_ids, token_type_ids, label
-    else:
-        return input_ids, token_type_ids
+from data import convert_example
 
 
 class Predictor(object):
@@ -135,7 +123,7 @@ class Predictor(object):
             import auto_log
             pid = os.getpid()
             self.autolog = auto_log.AutoLogger(
-                model_name="ernie-tiny",
+                model_name="ernie-1.0",
                 model_precision=precision,
                 batch_size=self.batch_size,
                 data_shape="dynamic",
@@ -169,10 +157,7 @@ class Predictor(object):
         examples = []
         for text in data:
             input_ids, segment_ids = convert_example(
-                text,
-                tokenizer,
-                max_seq_length=self.max_seq_length,
-                is_test=True)
+                text, tokenizer, is_test=True)
             examples.append((input_ids, segment_ids))
 
         batchify_fn = lambda samples, fn=Tuple(
@@ -184,14 +169,20 @@ class Predictor(object):
             self.autolog.times.stamp()
 
         input_ids, segment_ids = batchify_fn(examples)
+        import types
+        print(type(input_ids))
+        print(type(input_ids[0]))
+        print(type(input_ids[0][0]))
+        print("input_ids:{}".format(input_ids))
+        print("segment_ids:{}".format(segment_ids))
         self.input_handles[0].copy_from_cpu(input_ids)
         self.input_handles[1].copy_from_cpu(segment_ids)
         self.predictor.run()
-        probs = self.output_handle.copy_to_cpu()
+        logits = self.output_handle.copy_to_cpu()
         if args.benchmark:
             self.autolog.times.stamp()
 
-        #probs = softmax(logits, axis=1)
+        probs = softmax(logits, axis=1)
         idx = np.argmax(probs, axis=1)
         idx = idx.tolist()
         labels = [label_map[i] for i in idx]
@@ -199,7 +190,7 @@ class Predictor(object):
         if args.benchmark:
             self.autolog.times.end(stamp=True)
 
-        return labels
+        return probs
 
 
 if __name__ == "__main__":
@@ -208,23 +199,23 @@ if __name__ == "__main__":
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.cpu_threads, args.enable_mkldnn)
 
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
-
-    test_ds = load_dataset("lcqmc", splits=["test"])
-
-    data = [{'query': d['query'], 'title': d['title']} for d in test_ds]
+    # ErnieTinyTokenizer is special for ernie-tiny pretained model.
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    test_ds = load_dataset("fewclue", name="tnews", splits=["test"])
+    processor = processor_dict["tnews"](9)
+    test_ds = processor.get_test_datasets(test_ds, TASK_LABELS_DESC["tnews"])
 
     batches = [
-        data[idx:idx + args.batch_size]
-        for idx in range(0, len(data), args.batch_size)
+        test_ds[idx:idx + args.batch_size]
+        for idx in range(0, len(test_ds), args.batch_size)
     ]
-    label_map = {0: 'dissimilar', 1: 'similar'}
+
+    label_map = {0: 'false', 1: 'true'}
 
     results = []
     for batch_data in batches:
         results.extend(predictor.predict(batch_data, tokenizer, label_map))
-    for idx, text in enumerate(data):
+    for idx, text in enumerate(test_ds):
         print('Data: {} \t Label: {}'.format(text, results[idx]))
     if args.benchmark:
         predictor.autolog.report()

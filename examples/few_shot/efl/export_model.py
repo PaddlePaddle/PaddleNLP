@@ -22,8 +22,6 @@ import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 
-from model import PointwiseMatching
-
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True, default='./checkpoint/model_900/model_state.pdparams', help="The path to model parameters to be loaded.")
@@ -32,21 +30,15 @@ args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-    # If you want to use ernie1.0 model, plesace uncomment the following code
-    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
-
-    pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-        'ernie-gram-zh')
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
-    model = PointwiseMatching(pretrained_model)
+    # The number of labels should be in accordance with the training dataset.
+    label_map = {0: 'negative', 1: 'positive'}
+    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
+        "ernie-1.0", num_classes=len(label_map))
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
-
     model.eval()
 
     # Convert to static graph with specific input description
