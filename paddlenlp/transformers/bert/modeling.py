@@ -538,7 +538,7 @@ class BertForSequenceClassification(BertPretrainedModel):
         bert (:class:`BertModel`):
             An instance of BertModel.
         num_classes (int, optional):
-            The number of classes. Default 2.
+            The number of classes. Default ``2``.
         dropout (float, optional):
             The dropout probability for output of BERT.
             If None, use the same value as `hidden_dropout_prob` of `BertModel`
