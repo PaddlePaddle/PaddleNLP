@@ -1,4 +1,5 @@
-# Few-Shot Learning(FSL)
+# Few-Shot Learning (FSL)
+
 Few-Shot Learning 旨在研究如何从少量有监督的训练样本中学习出具有良好泛化性的模型，对训练数据很少或监督数据获取成本极高的应用场景有很大价值。
 
 随着大规模预训练模型的不断涌现，FSL 结合预训练模型的先验知识和强大的泛化能力在下游任务效果上取得了显著提升，为大规模预训练模型结合 FSL 的工业落地应用带来了无限可能性。
@@ -13,12 +14,16 @@ Few-Shot Learning 旨在研究如何从少量有监督的训练样本中学习�
 | P-tuning  | ERNIE1.0  | 55.70 | 83.28  | 63.43  | 35.36  | 60.54  | 50.02  | 54.51  | 50.14 | 54.93 | 41.16 |
 | EFL       | ERNIE1.0  | 54.47 | 84.10  | 60.10  | 35.12  | 56.61  | 56.57  | 53.59  | 46.37 | 61.21 | 36.56 |
 | PET       | ERNIE1.0  | 56.63 | 86.88  | 61.90  | 36.90  | 61.10  | 56.51  | 55.02  | 50.31 | 59.72 | 41.35 |
-## 策略库
+
+## Models
 - [P-tuning](./p-tuning)
 - [EFL](./efl)
-- PET
+- [PET](./pet)
 
 ## References
-[1]X. Liu et al., “GPT Understands, Too,” arXiv:2103.10385 [cs], Mar. 2021, Accessed: Mar. 22, 2021. [Online]. Available: http://arxiv.org/abs/2103.10385
-[2] Wang, Sinong, Han Fang, Madian Khabsa, Hanzi Mao, and Hao Ma. “Entailment as Few-Shot Learner.” ArXiv:2104.14690 [Cs], April 29, 2021. http://arxiv.org/abs/2104.14690.
-[3] Wang, S., Fang, H., Khabsa, M., Mao, H., and Ma, H., “Entailment as Few-Shot Learner”, ArXiv:2001.07676 [Cs], 2021. https://arxiv.org/abs/2001.07676
+
+- [1] X. Liu et al., “GPT Understands, Too,” arXiv:2103.10385 [cs], Mar. 2021, Accessed: Mar. 22, 2021. [Online]. Available: http://arxiv.org/abs/2103.10385
+
+- [2] Wang, Sinong, Han Fang, Madian Khabsa, Hanzi Mao, and Hao Ma. “Entailment as Few-Shot Learner.” ArXiv:2104.14690 [Cs], April 29, 2021. http://arxiv.org/abs/2104.14690.
+
+- [3] Wang, S., Fang, H., Khabsa, M., Mao, H., and Ma, H., “Entailment as Few-Shot Learner”, ArXiv:2001.07676 [Cs], 2021. https://arxiv.org/abs/2001.07676
