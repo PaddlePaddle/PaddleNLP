@@ -112,7 +112,7 @@ class Text2SQLEncoderV2(nn.Layer):
         """
         seq_hidden, cls_hidden = self.base_encoder(inputs['src_ids'],
                                                    inputs['sent_ids'])
-        if self.pretrain_model_type != 'ERNIE':
+        if self.pretrain_model_type != 'ERNIE' and self.pretrain_model_type != 'BERT':
             cls_hidden, seq_hidden = seq_hidden, cls_hidden
 
         question_tokens_index = inputs["question_tokens_index"]
