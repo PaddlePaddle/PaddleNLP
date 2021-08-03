@@ -1,7 +1,7 @@
 ===========================train_params=========================== 
 model_name:ernie_text_matching
 python:/usr/local/bin/python3.7
-gpu_list:2|2,3
+gpu_list:0|0,1
 Global.use_gpu:null
 Global.auto_cast:null
 --epoch:1
