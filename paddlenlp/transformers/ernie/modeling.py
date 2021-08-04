@@ -688,7 +688,7 @@ class ErniePretrainingHeads(nn.Layer):
 
 class ErnieForPretraining(ErniePretrainedModel):
     r"""
-    Bert Model with two heads on top as done during the pretraining: 
+    Ernie Model with two heads on top as done during the pretraining:
     a `masked language modeling` head and a `next sentence prediction (classification)` head.
 
     """
@@ -711,6 +711,7 @@ class ErnieForPretraining(ErniePretrainedModel):
                 attention_mask=None,
                 masked_positions=None):
         r"""
+
         Args:
             input_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary. They are
@@ -750,19 +751,6 @@ class ErnieForPretraining(ErniePretrainedModel):
             - `prediction_scores`(Tensor): The scores of prediction on masked token.
             - `seq_relationship_score`(Tensor): The scores of next sentence prediction.
 
-        Example:
-            .. code-block::
-
-                import paddle
-                from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
-
-                tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
-                model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
-
-                inputs = tokenizer("Hey, paddle-paddle is awesome !")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                logits = model(**inputs)
-
         """
         with paddle.static.amp.fp16_guard():
             outputs = self.ernie(
@@ -785,11 +773,6 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
     Args:
         vocab_size (`int`):
             See :class:`ErnieModel`.
-    """
-    """
-    The loss output of Bert Model during the pretraining: 
-    a `masked language modeling` head and a `next sentence prediction (classification)` head.
-
     """
 
     def __init__(self, vocab_size):

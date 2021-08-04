@@ -511,6 +511,17 @@ class BertModel(BertPretrainedModel):
 
 
 class BertForQuestionAnswering(BertPretrainedModel):
+    """
+    Model for question answering task with BERT.
+
+    Args:
+        bert (:class:`BertModel`):
+            An instance of BertModel.
+        dropout (float, optional):
+            The dropout probability for output of BERT.
+            If None, use the same value as `hidden_dropout_prob` of `BertModel`
+            instance `bert`. Default None.
+        """
     def __init__(self, bert, dropout=None):
         super(BertForQuestionAnswering, self).__init__()
         self.bert = bert  # allow bert to be config
@@ -518,6 +529,22 @@ class BertForQuestionAnswering(BertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None):
+        r"""
+        The BertForQuestionAnswering forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (`Tensor`):
+                See :class:`BertModel`.
+            token_type_ids (`Tensor`, optional):
+                See :class:`BertModel`.
+
+        Returns:
+            logits (Tensor):
+                A Tensor of the input text classification logits.
+                Shape as `(batch_size, num_classes)` and dtype as `float`.
+
+        """
+
         sequence_output, _ = self.bert(
             input_ids,
             token_type_ids=token_type_ids,
@@ -609,6 +636,20 @@ class BertForSequenceClassification(BertPretrainedModel):
 
 
 class BertForTokenClassification(BertPretrainedModel):
+    """
+    Model for token classification task with BERT.
+
+    Args:
+        bert (:class:`BertModel`):
+            An instance of BertModel.
+        num_classes (int, optional):
+            The number of classes. Default ``2``.
+        dropout (float, optional):
+            The dropout probability for output of BERT.
+            If None, use the same value as `hidden_dropout_prob` of `BertModel`
+            instance `bert`. Default None.
+    """
+
     def __init__(self, bert, num_classes=2, dropout=None):
         super(BertForTokenClassification, self).__init__()
         self.num_classes = num_classes
@@ -624,6 +665,25 @@ class BertForTokenClassification(BertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r"""
+        The BertForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (`Tensor`):
+                See :class:`BertModel`.
+            token_type_ids (`Tensor`, optional):
+                See :class:`BertModel`.
+            position_ids(,optional):
+                See :class:`BertModel`.
+            attention_mask_list (`list`, optional):
+                See :class:`BertModel`.
+
+        Returns:
+            logits (Tensor):
+                A Tensor of the input token classification logits.
+                Shape as `(batch_size, num_classes)` and dtype as `float`.
+
+        """
         sequence_output, _ = self.bert(
             input_ids,
             token_type_ids=token_type_ids,
@@ -712,6 +772,48 @@ class BertForPretraining(BertPretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 masked_positions=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate first and second portions of the inputs.
+                Indices can be either 0 or 1:
+
+                - 0 corresponds to a **sentence A** token,
+                - 1 corresponds to a **sentence B** token.
+
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                Defaults to None, which means no segment embeddings is added to token embeddings.
+            position_ids (Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                config.max_position_embeddings - 1]``.
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attention_mask (Tensor, optional):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set
+                to **-infinity** for any positions in the mask that are **0**, and will be
+                **unchanged** for positions that are **1**.
+
+                - **1** for tokens that are **not masked**,
+                - **0** for tokens that are **masked**.
+
+                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+                Defaults to `None`.
+
+
+        Returns:
+            A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
+
+            With the fields:
+
+            - `prediction_scores`(Tensor): The scores of prediction on masked token.
+            - `seq_relationship_score`(Tensor): The scores of next sentence prediction.
+
+        """
         with paddle.static.amp.fp16_guard():
             outputs = self.bert(
                 input_ids,

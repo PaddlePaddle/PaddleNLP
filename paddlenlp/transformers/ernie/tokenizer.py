@@ -135,7 +135,7 @@ class ErnieTokenizer(PretrainedTokenizer):
     @property
     def vocab_size(self):
         r"""
-        return the size of vocabulary.
+        Return the size of vocabulary.
 
         Returns:
             int: the size of vocabulary.
@@ -298,29 +298,26 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
     use the `sentencepiece` tools to cut the words to sub-words.
 
     Args:
-        vocab_file (str): 
-            The file path of the vocabulary.
-        sentencepiece_model_file (str):
-            The file path of sentencepice model.
-        word_dict(str):
-            The file path of word vocabulary, 
-            which is used to do chinese word segmentation.
-        do_lower_case (str, optional): 
-            Whether the text strips accents and convert to lower case. 
+
+        vocab_file (str):
+            file path of the vocabulary.
+        do_lower_case (str, optional):
+            Whether the text strips accents and convert to lower case.
             Defaults to `True`.
-        unk_token (str, optional): 
-            The special token for unknown words. 
+        unk_token (str, optional):
+            The special token for unknown words.
             Defaults to "[UNK]".
-        sep_token (str, optional): 
-            The special token for separator token. 
+        sep_token (str, optional):
+            The special token for separator token.
             Defaults to "[SEP]".
-        pad_token (str, optional): 
-            The special token for padding. 
+        pad_token (str, optional):
+            The special token for padding.
             Defaults to "[PAD]".
-        cls_token (str, optional): 
-            The special token for cls. 
-            Defaults to "[CLS]".
-        mask_token (str, optional): 
+        cls_token (str, optional):
+            The special token for sequence classification.
+            It is the last token of the sequence when built with special tokens.
+            Default: "[CLS]".
+        mask_token (str, optional):
             The special token for mask.
             Defaults to "[MASK]".
 
