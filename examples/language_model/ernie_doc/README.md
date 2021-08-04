@@ -75,7 +75,7 @@ python run_classifier.py --batch_size 8 --model_name_or_path ernie-doc-base-en
 #### 多卡训练
 
 ```shell
-python -m paddle.distributed.launch --gpus "0,1,2" --log_dir imdb run_classifier.py --batch_size 8 --model_name_or_path ernie-doc-base-en
+python -m paddle.distributed.launch --gpus "0,1" --log_dir imdb run_classifier.py --batch_size 8 --model_name_or_path ernie-doc-base-en
 
 ```
 
@@ -106,7 +106,7 @@ python run_mrc.py --dataset dureader_robust --batch_size 8 --learning_rate 2.75e
 #### 多卡训练
 
 ```shell
-python -m paddle.distributed.launch --gpus "0,1,2" --log_dir dureader_robust run_mrc.py --dataset dureader_robust --batch_size 8 --learning_rate 2.75e-4
+python -m paddle.distributed.launch --gpus "0,1" --log_dir dureader_robust run_mrc.py --dataset dureader_robust --batch_size 8 --learning_rate 2.75e-4
 ```
 
 在`duredear-robust`, `drcd`, `cmrc2018`各数据集上Fine-tuning后，在验证集上有如下结果：
@@ -134,7 +134,7 @@ python run_mcq.py --batch_size 8
 #### 多卡训练
 
 ```shell
-python -m paddle.distributed.launch --gpus "0,1,2" --log_dir mcq run_mcq.py --batch_size 8
+python -m paddle.distributed.launch --gpus "0,1" --log_dir mcq run_mcq.py --batch_size 8
 
 ```
 
@@ -159,7 +159,7 @@ python run_semantic_matching.py  --batch_size 6 --learning_rate 2e-5
 #### 多卡训练
 
 ```shell
-python -m paddle.distributed.launch --gpus "0,1,2" --log_dir cail run_semantic_matching.py --batch_size 6 --learning_rate 2e-5
+python -m paddle.distributed.launch --gpus "0,1" --log_dir cail run_semantic_matching.py --batch_size 6 --learning_rate 2e-5
 ```
 
 在`CAIL2019-SCM`数据集上Fine-tuning后，在验证集与测试集上有如下结果：
@@ -192,7 +192,7 @@ python run_sequence_labeling.py --batch_size 8 --learning_rate 3e-5
 #### 多卡训练
 
 ```shell
-python -m paddle.distributed.launch --gpus "0,1,2" --log_dir msra_ner run_sequence_labeling.py --batch_size 8 --learning_rate 3e-5
+python -m paddle.distributed.launch --gpus "0,1" --log_dir msra_ner run_sequence_labeling.py --batch_size 8 --learning_rate 3e-5
 ```
 
 在`MSRA-NER`数据集上Fine-tuning后，在验证集与测试集上有如下最佳结果：

@@ -20,6 +20,10 @@ from paddle.optimizer import AdamW
 class AdamWDL(AdamW):
     """
     AdamW with dynamic lr setting
+    “Layer-wise decay” means exponentially decaying the learning rates of individual 
+    layers in a top-down manner. For example, suppose the 24-th layer uses a learning
+    rate l, and the Layer-wise decay rate is α, then the learning rate of layer m 
+    is lα^(24-m). See more details on: https://arxiv.org/abs/1906.08237
     """
 
     def __init__(self,
@@ -52,7 +56,7 @@ class AdamWDL(AdamW):
             grad_clip=grad_clip,
             name=name,
             apply_decay_param_fun=apply_decay_param_fun,
-            weight_decay=0.01,
+            weight_decay=weight_decay,
             lazy_mode=lazy_mode,
             multi_precision=multi_precision)
 
