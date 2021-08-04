@@ -116,11 +116,16 @@ class MultiHeadAttention(nn.Layer):
         return paddle.transpose(x=x, perm=[0, 2, 1, 3])
 
     def __rel_shift(self, x, klen=-1):
-        # shape: [B, N, T, 2 * T + M]
+        """
+        To perform relative attention, it should relatively shift the attention score matrix
+        See more details on: https://github.com/kimiyoung/transformer-xl/issues/8#issuecomment-454458852        
+        """
+        # input shape: [B, N, T, 2 * T + M]
         x_shape = x.shape
         x = x.reshape([x_shape[0], x_shape[1], x_shape[3], x_shape[2]])
         x = x[:, :, 1:, :]
         x = x.reshape([x_shape[0], x_shape[1], x_shape[2], x_shape[3] - 1])
+        # output shape: [B, N, T, T + M]
         return x[:, :, :, :klen]
 
     def __scaled_dot_product_attention(self, q, k, v, r, t, attn_mask):
