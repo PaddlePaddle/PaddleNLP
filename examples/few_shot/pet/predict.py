@@ -134,7 +134,7 @@ def do_predict_chid(model, tokenizer, data_loader, label_normalize_dict):
             for pos in mask_pos:
                 new_masked_positions.append(bs_index * max_len + pos)
         new_masked_positions = paddle.to_tensor(np.array(new_masked_positions).astype('int32'))
-        prediction_scores, _ = model(
+        prediction_scores = model(
             input_ids=src_ids,
             token_type_ids=token_type_ids,
             masked_positions=new_masked_positions)
@@ -360,7 +360,7 @@ if __name__ == "__main__":
                                         args.task_name + ".json")
 
     label_norm_dict = None
-    with open(label_normalize_json) as f:
+    with open(label_normalize_json, 'r', encoding="utf-8") as f:
         label_norm_dict = json.load(f)
 
     convert_example_fn = convert_example if args.task_name != "chid" else convert_chid_example
