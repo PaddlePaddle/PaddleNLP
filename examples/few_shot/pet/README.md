@@ -50,7 +50,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
 模型每训练 1 个 epoch,  会在验证集上进行评估
 
 ### 模型预测
-通过如下命令，指定 GPU 0 卡， 在 `FewCLUE` 的 `iflytek` 数据集上进行预测
+通过如下命令，指定 GPU 0 卡， 在 `FewCLUE` 的 `tnews` 数据集上进行预测
 ```
 python -u -m paddle.distributed.launch --gpus "0" predict.py \
         --task_name "tnews" \
