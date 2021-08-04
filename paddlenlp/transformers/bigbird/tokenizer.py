@@ -179,6 +179,15 @@ class BigBirdTokenizer(PretrainedTokenizer):
             masked_lm_prob (:obj:`int`, 'optional`):
                 The probability a training data will be masked. Defaults to `0.15`.
 
+        returns:
+
+        Args:
+            span_ids()
+            masked_lm_positions
+            masked_lm_ids
+            masked_lm_weights
+
+
 
 
         """
