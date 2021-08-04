@@ -10,7 +10,11 @@ from pprint import pprint
 import paddle
 from paddle import inference
 
-sys.path.append("../../")
+from paddlenlp.utils.log import logger
+
+sys.path.append(
+    os.path.abspath(
+        os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)))
 import reader
 
 
@@ -44,6 +48,17 @@ def parse_args():
     )
     parser.add_argument(
         "--profile", action="store_true", help="Whether to profile. ")
+    parser.add_argument(
+        "--test_file",
+        default=None,
+        type=str,
+        help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
+    )
+    parser.add_argument(
+        "--save_log_path",
+        default="./output/",
+        type=str,
+        help="The path to save logs when profile is enabled. ")
     args = parser.parse_args()
     return args
 
@@ -65,11 +80,11 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 
 
 class Predictor(object):
-    def __init__(self, predictor, input_handles, output_handles, recorder=None):
+    def __init__(self, predictor, input_handles, output_handles, autolog=None):
         self.predictor = predictor
         self.input_handles = input_handles
         self.output_handles = output_handles
-        self.recorder = recorder
+        self.autolog = autolog
 
     @classmethod
     def create_predictor(cls, args, config=None, profile=False,
@@ -92,9 +107,24 @@ class Predictor(object):
             config.switch_use_feed_fetch_ops(False)
 
         if profile:
-            recorder = Recorder(config, args.infer_batch_size, model_name)
+            pid = os.getpid()
+            autolog = auto_log.AutoLogger(
+                model_name=args.model_name,
+                model_precision="fp32",
+                batch_size=args.infer_batch_size,
+                save_path=args.save_log_path,
+                inference_config=config,
+                data_shape="dynamic",
+                pids=pid,
+                process_name=None,
+                gpu_ids=0,
+                time_keys=[
+                    'preprocess_time', 'inference_time', 'postprocess_time'
+                ],
+                warmup=0,
+                logger=logger)
         else:
-            recorder = None
+            autolog = None
 
         predictor = inference.create_predictor(config)
         input_handles = [
@@ -105,7 +135,7 @@ class Predictor(object):
             predictor.get_output_handle(name)
             for name in predictor.get_output_names()
         ]
-        return cls(predictor, input_handles, output_handles, recorder)
+        return cls(predictor, input_handles, output_handles, autolog)
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
@@ -120,21 +150,19 @@ class Predictor(object):
     def predict(self, test_loader, to_tokens, n_best, bos_idx, eos_idx):
         outputs = []
         samples = 0
-        if self.recorder is not None:
-            cpu_rss_mb, gpu_rss_mb = 0, 0
-            gpu_id = 0
-            gpu_util = 0
-            self.recorder.tic()
+        if self.autolog is not None:
+            self.autolog.times.start()
 
         for data in test_loader:
             samples += len(data[0])
+
+            if self.autolog is not None:
+                self.autolog.times.stamp()
+
             output = self.predict_batch(data)
 
-            if self.recorder is not None:
-                cm, gm = Recorder.get_current_memory_mb(gpu_id)
-                cpu_rss_mb += cm
-                gpu_rss_mb += gm
-                gpu_util += Recorder.get_current_gputil(gpu_id)
+            if self.autolog is not None:
+                self.autolog.times.stamp()
 
             finished_sequence = output[0].transpose([0, 2, 1])
             for ins in finished_sequence:
@@ -148,13 +176,8 @@ class Predictor(object):
                     n_best_seq.append(sequence)
                 outputs.append(n_best_seq)
 
-        if self.recorder is not None:
-            self.recorder.toc(samples)
-            self.recorder.get_device_info(
-                cpu_rss_mb=cpu_rss_mb / len(test_loader),
-                gpu_rss_mb=gpu_rss_mb / len(test_loader),
-                gpu_util=gpu_util / len(test_loader))
-            self.recorder.report()
+        if self.autolog is not None:
+            self.autolog.times.end(stamp=True)
         return outputs
 
 
@@ -173,13 +196,15 @@ def do_inference(args):
             f.write(sequence + "\n")
     f.close()
 
+    if args.profile:
+        predictor.autolog.report()
+
 
 if __name__ == "__main__":
     ARGS = parse_args()
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
-        pprint(args)
     args.benchmark = ARGS.benchmark
     args.device = ARGS.device
     args.use_mkl = ARGS.use_mkl
@@ -190,8 +215,11 @@ if __name__ == "__main__":
     args.model_name = "transformer_base" if "base" in ARGS.config else "transformer_big"
     if ARGS.model_dir != "":
         args.inference_model_dir = ARGS.model_dir
+    args.test_file = ARGS.test_file
+    args.save_log_path = ARGS.save_log_path
+    pprint(args)
 
     if args.profile:
-        from utils.recorder import Recorder
+        import auto_log
 
     do_inference(args)
