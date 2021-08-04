@@ -25,6 +25,8 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.io import DataLoader
+from paddle.metric import Accuracy
+
 from paddlenlp.transformers import ErnieDocModel
 from paddlenlp.transformers import ErnieDocForSequenceClassification
 from paddlenlp.transformers import ErnieDocTokenizer
@@ -34,7 +36,6 @@ from paddlenlp.datasets import load_dataset
 
 from data import SemanticMatchingIterator
 from optimization import AdamWDL
-from metrics import Acc, F1
 from model import ErnieDocForTextMatching
 
 # yapf: disable
@@ -59,7 +60,9 @@ parser.add_argument("--layerwise_decay", default=1.0, type=float, help="layerwis
 # yapf: enable
 args = parser.parse_args()
 
-DATASET_INFO = {"cail2019_scm": (ErnieDocTokenizer, "dev", "test", Acc()), }
+DATASET_INFO = {
+    "cail2019_scm": (ErnieDocTokenizer, "dev", "test", Accuracy()),
+}
 
 
 def set_seed(args):
@@ -124,13 +127,14 @@ def evaluate(model, metric, data_loader, memories0, pair_memories0):
     labels = []
     for qid, probs in probs_dict.items():
         mean_prob = np.mean(np.array(probs), axis=0)
-        preds.append(np.argmax(mean_prob))
+        preds.append(mean_prob)
         labels.append(label_dict[qid])
 
-    preds = np.array(preds, dtype='int64')
-    labels = np.array(labels, dtype='int64')
+    preds = paddle.to_tensor(np.array(preds, dtype='int64'))
+    labels = paddle.to_tensor(np.array(labels, dtype='int64'))
 
-    acc_or_f1 = metric(preds, labels)
+    metric.update(metric.compute(preds, labels))
+    acc_or_f1 = metric.accumulate()
     logger.info("Eval loss: %.5f, %s: %.5f" %
                 (np.mean(losses), metric.__class__.__name__, acc_or_f1))
     model.train()

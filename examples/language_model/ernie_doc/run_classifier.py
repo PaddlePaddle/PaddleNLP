@@ -25,6 +25,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.io import DataLoader
+from paddle.metric import Accuracy
 from paddlenlp.transformers import ErnieDocModel
 from paddlenlp.transformers import ErnieDocForSequenceClassification
 from paddlenlp.transformers import ErnieDocBPETokenizer, ErnieDocTokenizer
@@ -34,7 +35,7 @@ from paddlenlp.datasets import load_dataset
 
 from data import ClassifierIterator, ImdbTextPreprocessor, HYPTextPreprocessor
 from optimization import AdamWDL
-from metrics import Acc, F1
+from metrics import F1
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -63,10 +64,10 @@ args = parser.parse_args()
 
 DATASET_INFO = {
     "imdb":
-    (ErnieDocBPETokenizer, "test", "test", ImdbTextPreprocessor(), Acc()),
+    (ErnieDocBPETokenizer, "test", "test", ImdbTextPreprocessor(), Accuracy()),
     "hyp": (ErnieDocBPETokenizer, "dev", "test", HYPTextPreprocessor(), F1()),
-    "iflytek": (ErnieDocTokenizer, "dev", "dev", None, Acc()),
-    "thucnews": (ErnieDocTokenizer, "dev", "test", None, Acc())
+    "iflytek": (ErnieDocTokenizer, "dev", "dev", None, Accuracy()),
+    "thucnews": (ErnieDocTokenizer, "dev", "test", None, Accuracy())
 }
 
 
@@ -132,13 +133,14 @@ def evaluate(model, metric, data_loader, memories0):
     labels = []
     for qid, probs in probs_dict.items():
         mean_prob = np.mean(np.array(probs), axis=0)
-        preds.append(np.argmax(mean_prob))
+        preds.append(mean_prob)
         labels.append(label_dict[qid])
 
-    preds = np.array(preds, dtype='int64')
-    labels = np.array(labels, dtype='int64')
+    preds = paddle.to_tensor(np.array(preds, dtype='float32'))
+    labels = paddle.to_tensor(np.array(labels, dtype='int64'))
 
-    acc_or_f1 = metric(preds, labels)
+    metric.update(metric.compute(preds, labels))
+    acc_or_f1 = metric.accumulate()
     logger.info("Eval loss: %.5f, %s: %.5f" %
                 (np.mean(losses), metric.__class__.__name__, acc_or_f1))
     model.train()
@@ -151,7 +153,7 @@ def do_train(args):
         args.dataset]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    # get dataset
+    # Get dataset
     if args.dataset == "iflytek":
         train_ds, eval_ds, test_ds = load_dataset(
             "clue", name=args.dataset, splits=["train", eval_name, test_name])
@@ -161,7 +163,7 @@ def do_train(args):
 
     num_classes = len(train_ds.label_list)
 
-    # initialize model 
+    # Initialize model 
     paddle.set_device(args.device)
     trainer_num = paddle.distributed.get_world_size()
     if trainer_num > 1:
@@ -239,7 +241,7 @@ def do_train(args):
     for n, p in model.named_parameters():
         name_dict[p.name] = n
 
-    # layerwise decay
+    # Layerwise decay
     def set_param_lr(param):
         ratio = 1.0
         decay_rate = args.layerwise_decay
@@ -270,7 +272,7 @@ def do_train(args):
     create_memory = partial(init_memory, args.batch_size, args.memory_length,
                             model_config["hidden_size"],
                             model_config["num_hidden_layers"])
-    # copy the memory
+    # Copy the memory
     memories = create_memory()
     tic_train = time.time()
     for epoch in range(args.epochs):

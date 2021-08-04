@@ -24,6 +24,7 @@ import time
 import numpy as np
 import paddle
 import paddle.nn as nn
+from paddle.metric import Accuracy
 from paddle.io import DataLoader
 from paddlenlp.transformers import ErnieDocModel
 from paddlenlp.transformers import ErnieDocForSequenceClassification
@@ -34,7 +35,6 @@ from paddlenlp.datasets import load_dataset
 
 from data import MCQIterator
 from optimization import AdamWDL
-from metrics import Acc, F1
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -58,7 +58,7 @@ parser.add_argument("--gradient_accumulation_steps", default=4, type=int, help="
 # yapf: enable
 args = parser.parse_args()
 
-DATASET_INFO = {"c3": (ErnieDocTokenizer, "dev", "test", Acc()), }
+DATASET_INFO = {"c3": (ErnieDocTokenizer, "dev", "test", Accuracy()), }
 
 
 def set_seed(args):
@@ -116,19 +116,20 @@ def evaluate(model, metric, data_loader, memories0, choice_num):
                          eval_logging_step / (time.time() - tic_train)))
             tic_train = time.time()
 
-    # collect predicted labels
+    # Collect predicted labels
     preds = []
     labels = []
     logger.info("Total {} qustion".format(len(probs_dict)))
     for qid, probs in probs_dict.items():
         mean_prob = np.mean(np.array(probs), axis=0)
-        preds.append(np.argmax(mean_prob))
+        preds.append(mean_prob)
         labels.append(label_dict[qid])
 
-    preds = np.array(preds, dtype='int64')
-    labels = np.array(labels, dtype='int64')
+    preds = paddle.to_tensor(np.array(preds, dtype='float32'))
+    labels = paddle.to_tensor(np.array(labels, dtype='int64'))
 
-    acc_or_f1 = metric(preds, labels)
+    metric.update(metric.compute(preds, labels))
+    acc_or_f1 = metric.accumulate()
     logger.info("Eval loss: %.5f, %s: %.5f" %
                 (np.mean(losses), metric.__class__.__name__, acc_or_f1))
     model.train()
@@ -141,13 +142,13 @@ def do_train(args):
         args.dataset]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    # get dataset
+    # Get dataset
     train_ds, eval_ds, test_ds = load_dataset(
         args.dataset, splits=["train", eval_name, test_name])
 
     num_classes = len(train_ds.label_list)
 
-    # initialize model 
+    # Initialize model 
     paddle.set_device(args.device)
     trainer_num = paddle.distributed.get_world_size()
     if trainer_num > 1:
@@ -224,12 +225,12 @@ def do_train(args):
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
-    # construct dict
+    # Construct dict
     name_dict = dict()
     for n, p in model.named_parameters():
         name_dict[p.name] = n
 
-    # layerwise decay
+    # Layerwise decay
     def set_param_lr(param):
         ratio = 1.0
         decay_rate = args.layerwise_decay
@@ -260,7 +261,7 @@ def do_train(args):
     create_memory = partial(init_memory, batch_size * num_classes,
                             args.memory_length, model_config["hidden_size"],
                             model_config["num_hidden_layers"])
-    # copy the memory
+    # Copy the memory
     memories = create_memory()
     tic_train = time.time()
 
@@ -284,7 +285,7 @@ def do_train(args):
                 lr_scheduler.step()
                 optimizer.clear_grad()
                 global_steps += 1
-            # rough acc result, not a precise acc
+            # Rough acc result, not a precise acc
             acc = metric.compute(logits, labels) * need_cal_loss
             metric.update(acc)
 
@@ -300,7 +301,7 @@ def do_train(args):
                 logger.info("Eval, total {} qustion.".format(len(eval_ds)))
                 eval_acc = evaluate(model, eval_metric, eval_dataloader,
                                     create_memory(), num_classes)
-                # save
+                # Save model
                 if rank == 0:
                     output_dir = os.path.join(args.output_dir,
                                               "model_%d" % (global_steps))

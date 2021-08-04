@@ -15,35 +15,45 @@
 import numpy as np
 import collections
 import sys
+import paddle
 from paddle.utils import try_import
+from paddle.metric import Metric
 from paddlenlp.metrics.dureader import get_final_text, _compute_softmax, _get_best_indexes
 
-
-# Metric for ERNIE-DOC
-class Acc(object):
-    def __call__(self, preds, labels):
-        if isinstance(preds, list):
-            preds = np.array(preds, dtype='int64')
-        if isinstance(labels, list):
-            labels = np.array(labels, dtype='int64')
-        acc = (preds == labels).sum() * 1.0 / labels.size
-        return acc
+# Metric for ERNIE-DOCs
 
 
 class F1(object):
     def __init__(self, positive_label=1):
         self.positive_label = positive_label
+        self.tp = 0
+        self.fp = 0
+        self.fn = 0
 
-    def __call__(self, preds, labels):
-        if isinstance(preds, list):
-            preds = np.array(preds, dtype='int64')
+    def compute(self, preds, labels):
+        if isinstance(preds, paddle.Tensor):
+            preds = preds.numpy()
+        elif isinstance(preds, list):
+            preds = np.array(preds, dtype='float32')
         if isinstance(labels, list):
             labels = np.array(labels, dtype='int64')
+        elif isinstance(labels, paddle.Tensor):
+            labels = labels.numpy()
+        preds = np.argmax(preds, axis=1)
         tp = ((preds == labels) & (labels == self.positive_label)).sum()
         fn = ((preds != labels) & (labels == self.positive_label)).sum()
         fp = ((preds != labels) & (preds == self.positive_label)).sum()
-        recall = tp / (tp + fn)
-        precision = tp / (tp + fp)
+        return tp, fp, fn
+
+    def update(self, statistic):
+        tp, fp, fn = statistic
+        self.tp += tp
+        self.fp += fp
+        self.fn += fn
+
+    def accumulate(self):
+        recall = self.tp / (self.tp + self.fn)
+        precision = self.tp / (self.tp + self.fp)
         f1 = 2 * recall * precision / (recall + precision)
         return f1
 
