@@ -17,7 +17,7 @@
 当我们加载一个保存好的模型时，我们都需要将参数权重加载并重新赋值给相应的模型。
 
 PyTorch和Paddle都是通过序列化和反序列化模型的 ``state dict`` （状态字典）来进行参数权重的存储和加载的。
- ``state dict`` 从数据结构上来看就是一个字典（比如Python中的dict），
+``state dict`` 从数据结构上来看就是一个字典（比如Python中的dict），
 其中key是模型参数的名称（数据类型为string），而value则为key所对应的值（数据类型为Tensor）。
 参数存储时，先获取目标对象的 ``state dict`` ，然后将 ``state dict`` 存储至磁盘；
 参数载入时，先从磁盘载入保存的 ``state dict`` ，然后通过 ``set_state_dict()`` 方法配置到目标对象中。
@@ -59,8 +59,8 @@ Paddle集成了 ``LeNet`` 这个简单的模型，我们可以一键进行模型
 
 我们可以通过 ``model.state_dict().keys()`` 来获取模型的所有参数名称。
 可以看到 ``LeNet`` 一共有10组参数，分别为： `'features.0.weight'` 、 `'features.0.bias'` 、
- `'features.3.weight'` 、 `'features.3.bias'` 、 `'fc.0.weight'` 、 `'fc.0.bias'` 、
- `'fc.1.weight'` 、 `'fc.1.bias'` 、 `'fc.2.weight'` 和 `'fc.2.bias'` 。
+`'features.3.weight'` 、 `'features.3.bias'` 、 `'fc.0.weight'` 、 `'fc.0.bias'` 、
+`'fc.1.weight'` 、 `'fc.1.bias'` 、 `'fc.2.weight'` 和 `'fc.2.bias'` 。
 
 通过查询 ``model.state_dict()['features.0.weight']`` 可以查看 `'features.0.weight'` 这个参数的具体权重数值。
 上述输出显示该权重是一个dtype=float32，shape=[6, 1, 3, 3]的Tensor。
@@ -80,7 +80,6 @@ PaddleNLP（Paddle框架）和HuggingFace的transformers（PyTorch框架）里�
 两者参数量和具体参数数值都是完全一致的。我们可以来加载对比这两个模型的 ``state dict`` 来了解转换的细节。
 
 我们分别加载这两个模型来进行深入分析。
-
 
 3.1 PyTorch下的 ``state dict``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -286,17 +285,17 @@ Paddle模型的 ``state dict`` 是通过一个dict来进行存储，可以看到
 首先我们需要对keys进行一一对应:
 
 我们从参数名称上能看出基本的一个对应关系，比如：
-* ``bert.embeddings.LayerNorm.gamma`` 对应 ``bert.embeddings.layer_norm.weight`` ；
-* ``bert.embeddings.LayerNorm.beta`` 对应 ``bert.embeddings.layer_norm.bias`` ；
-* ``bert.encoder.layer.0.attention.self.query.weight`` 对应 ``bert.encoder.layers.0.self_attn.q_proj.weight`` ；
-* ``bert.encoder.layer.0.attention.self.query.bias`` 对应 ``bert.encoder.layers.0.self_attn.q_proj.bias`` 等。
+  * ``bert.embeddings.LayerNorm.gamma`` 对应 ``bert.embeddings.layer_norm.weight`` ；
+  * ``bert.embeddings.LayerNorm.beta`` 对应 ``bert.embeddings.layer_norm.bias`` ；
+  * ``bert.encoder.layer.0.attention.self.query.weight`` 对应 ``bert.encoder.layers.0.self_attn.q_proj.weight`` ；
+  * ``bert.encoder.layer.0.attention.self.query.bias`` 对应 ``bert.encoder.layers.0.self_attn.q_proj.bias`` 等。
 
 两者的顺序是基本一致的，但也有一些例外，比如：
-* ``bert.encoder.layers.0.norm1.weight`` 对应 ``bert.encoder.layer.0.attention.output.LayerNorm.gamma`` ；
-* ``bert.encoder.layers.0.norm1.bias`` 对应 ``bert.encoder.layer.0.attention.output.LayerNorm.beta`` ；
-* ``bert.encoder.layer.0.intermediate.dense.weight`` 对应 ``bert.encoder.layers.0.linear1.weight`` ；
-* ``bert.encoder.layer.0.output.dense.weight`` 对应 ``bert.encoder.layers.0.linear2.weight`` ；
-* ``bert.encoder.layer.0.output.LayerNorm.gamma`` 对应 ``bert.encoder.layers.0.norm2.weight`` 等。
+  * ``bert.encoder.layers.0.norm1.weight`` 对应 ``bert.encoder.layer.0.attention.output.LayerNorm.gamma`` ；
+  * ``bert.encoder.layers.0.norm1.bias`` 对应 ``bert.encoder.layer.0.attention.output.LayerNorm.beta`` ；
+  * ``bert.encoder.layer.0.intermediate.dense.weight`` 对应 ``bert.encoder.layers.0.linear1.weight`` ；
+  * ``bert.encoder.layer.0.output.dense.weight`` 对应 ``bert.encoder.layers.0.linear2.weight`` ；
+  * ``bert.encoder.layer.0.output.LayerNorm.gamma`` 对应 ``bert.encoder.layers.0.norm2.weight`` 等。
 
 具体的keys对应关系需要我们对比具体的代码实现来进行准确的对应。在上面的表格中我们已经将两者的keys准确地一一对应了。
 建立好了keys的对应关系之后，我们还需要进行values的对应关系。
@@ -424,7 +423,7 @@ Paddle模型的 ``state dict`` 是通过一个dict来进行存储，可以看到
 
 .. code:: python
 
-    text = "paddle paddle is the best, and the very best is paddlenlp!"
+    text = "Welcome to use paddle paddle and paddlenlp!"
     torch_model_name = "bert-base-uncased"
     paddle_model_name = "bert-base-uncased"
 
