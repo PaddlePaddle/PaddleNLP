@@ -1,0 +1,51 @@
+===========================train_params===========================
+model_name:transformer_base
+python:python3.7
+gpu_list:0|0,1
+null:null
+null:null
+--max_iter:lite_train_infer=501
+null:null
+null:null
+null:null
+null:null
+null:null
+null:null
+##
+trainer:norm_train
+norm_train:../examples/machine_translation/transformer/train.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --benchmark
+pact_train:null
+fpgm_train:null
+distill_train:null
+null:null
+null:null
+##
+===========================eval_params=========================== 
+eval:../examples/machine_translation/transformer/predict.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --benchmark
+null:null
+##
+===========================infer_params===========================
+null:null
+null:null
+norm_export:../examples/machine_translation/transformer/export_model.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --benchmark
+quant_export:null
+fpgm_export:null
+distill_export:null
+export1:null
+export2:null
+##
+infer_model:null
+infer_export:null
+infer_quant:null
+inference:../examples/machine_translation/transformer/deploy/python/inference.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --benchmark --profile
+--device:gpu
+--use_mkl:True
+--threads:6
+--batch_size:4
+null:null
+null:null
+null:null
+null:null
+null:null
+null:null
+null:null
