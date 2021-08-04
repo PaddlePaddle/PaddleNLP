@@ -73,7 +73,6 @@ python export_model.py --params_path=./checkpoint/model_100/model_state.pdparams
 
 导出静态图模型之后，可以用于部署，`deploy/python/predict.py` 脚本提供了 python 部署预测示例。运行方式：
 ```
-export PYTHONPATH="./:${PYTHONPATH}"
 python deploy/python/predict.py --model_dir=./output
 
 ```

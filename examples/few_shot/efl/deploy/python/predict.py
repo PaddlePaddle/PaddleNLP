@@ -14,6 +14,7 @@
 
 import argparse
 import os
+import sys
 
 import numpy as np
 import paddle
@@ -24,6 +25,8 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
 
+sys.path.append('./')
+
 from data import convert_example, processor_dict
 from task_label_description import TASK_LABELS_DESC
 
@@ -32,7 +35,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True,
     help="The directory to static model.")
 parser.add_argument("--task_name", type=str, required=True,
-    help="The FewCLUE task_name.")
+    help="FewCLUE task name.")
 
 parser.add_argument("--max_seq_length", default=128, type=int,
     help="The maximum total input sequence length after tokenization. Sequences "
@@ -58,8 +61,6 @@ parser.add_argument("--save_log_path", type=str, default="./log_output/",
     help="The file path to save log.")
 args = parser.parse_args()
 # yapf: enable
-
-from data import convert_example
 
 
 class Predictor(object):
@@ -150,7 +151,7 @@ class Predictor(object):
                 which contains most of the methods. Users should refer to the superclass for more information regarding methods.
 
         Returns:
-            results(obj:`dict`): All the predictions probs.
+            results(obj:`dict`): All the predictions labels.
         """
         if args.benchmark:
             self.autolog.times.start()
@@ -195,23 +196,19 @@ if __name__ == "__main__":
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    test_ds = load_dataset("fewclue", name=args.task_name, splits=["test"])
-    
-    # Note: neg_num has no effect when infer, here just is a place_holder
-    neg_num = 0
-    processor = processor_dict[args.task_name](neg_num)
-    test_ds = processor.get_test_datasets(test_ds, TASK_LABELS_DESC[args.task_name])
+    test_ds = load_dataset("fewclue", name="tnews", splits=["test"])
+    processor = processor_dict["tnews"](9)
+    test_ds = processor.get_test_datasets(test_ds, TASK_LABELS_DESC["tnews"])
 
     batches = [
         test_ds[idx:idx + args.batch_size]
         for idx in range(0, len(test_ds), args.batch_size)
     ]
 
-
     results = []
     for batch_data in batches:
         results.extend(predictor.predict(batch_data, tokenizer))
     for idx, text in enumerate(test_ds):
-        print('Data: {} \t Probs: {}'.format(text, results[idx]))
+        print('Data: {} \t Label: {}'.format(text, results[idx]))
     if args.benchmark:
         predictor.autolog.report()
