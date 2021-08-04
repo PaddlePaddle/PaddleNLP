@@ -4,7 +4,7 @@
 GPT-[3](https://arxiv.org/pdf/2005.14165.pdf) 是以[Transformer](https://arxiv.org/abs/1706.03762) 为基础的语言生成模型。GPT-3模型的最大参数量可以达到170B，如此大规模参数的模型对于训练使用的深度学习框架是一个巨大的挑战。
 
 本示例主要提供了GPT-3的训练过程，数据准备、预测部署等内容请参见[GPT](../gpt) 目录。
-本示例包含了GPT-3的[静态图](./static)和[动态图](./dygraph)的多级并行训练流程。
+本示例包含了GPT-3的[静态图](./static)和动态图的多级并行训练流程。
 用户可以根据自己的需求，训练GPT-3模型，或者参考本示例，使用模型并行、流水线并行等策略，开发训练其他大模型。
 
 
@@ -72,12 +72,12 @@ python -u  -m paddle.distributed.fleet.launch \
 - `warmup_rate` 学习率warmup参数。
 - `grad_clip` 梯度裁剪范围。
 - `logging_freq` 日志输出间隔。
-- `eval_freq 模型评估间隔。
+- `eval_freq` 模型评估间隔。
 - `device` 训练设备。
 
-注
+注：
 - 一般而言，需要设置 `mp_degree * sharding_degree * pp_degree * dp_degree` = 训练机器的总卡数。
-- 一般而言， `global_batch_size = micro_batch_size * sharding_degree * dp_degree`。用户也可以使用梯度累积的方式增大global_batch_size。
+- 一般而言， `global_batch_size = micro_batch_size * sharding_degree * dp_degree`。用户也可以使用梯度累积的方式增大`global_batch_size`。
 
 ### 飞桨 4D 并行简介
 
@@ -88,8 +88,7 @@ python -u  -m paddle.distributed.fleet.launch \
 - 流水线并行(Pipeline Parallelism)
 - 纯数据并行(Data Parallelism)
 
-具体内容可以参考稿件:[飞桨分布式训练又推新品，4D混合并行可训千亿级AI模型](https://baijiahao.baidu.com/s?id=1697085717806202673)。
+除了上述混合并行策略外，飞桨还支持重计算、offload、混合精度等策略，来减少显存占用、加速训练。更多具体内容可以参考稿件:[飞桨分布式训练又推新品，4D混合并行可训千亿级AI模型](https://baijiahao.baidu.com/s?id=1697085717806202673)。
 
 ### 参考文献
 - [Language Models are Few-Shot Learners](https://arxiv.org/pdf/2005.14165.pdf)
-除了上述混合并行策略外，飞桨还支持重计算、offload、混合精度等策略，来减少显存占用、加速训练。
