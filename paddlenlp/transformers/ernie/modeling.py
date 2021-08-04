@@ -435,7 +435,7 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("Hey, paddle-paddle is awesome !")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
@@ -521,7 +521,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("Hey, paddle-paddle is awesome !")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
@@ -617,7 +617,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("Hey, paddle-paddle is awesome !")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
@@ -759,7 +759,7 @@ class ErnieForPretraining(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("Hey, paddle-paddle is awesome !")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
