@@ -320,12 +320,13 @@ class ErnieModel(ErniePretrainedModel):
             A tuple of shape (``sequence_output``, ``pooled_output``).
 
             With the fields:
+
             - sequence_output (Tensor):
                 Sequence of hidden-states at the last layer of the model.
                 It's data type should be `float` and has a shape of `(batch_size, seq_lens, hidden_size)`.
                 ``seq_lens`` corresponds to the length of input sequence.
             - pooled_output (Tensor):
-                A Tensor of the first token representation.
+                A Tensor of the first token representation（[`CLS`]）.
                 It's data type should be `float` and has a shape of `(batch_size, hidden_size]`.
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
 
@@ -507,8 +508,9 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
             A tuple of shape (``start_logits``, ``end_logits``).
 
             With the fields:
-            - start_logits(Tensor): The logits of start position of prediction answer.
-            - end_logits(Tensor): The logits of end position of prediction answer.
+
+            - start_logits(`Tensor`): The logits of start position of prediction answer.
+            - end_logits(`Tensor`): The logits of end position of prediction answer.
 
         Example:
             .. code-block::
@@ -744,8 +746,9 @@ class ErnieForPretraining(ErniePretrainedModel):
             A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
 
             With the fields:
-            - prediction_scores(Tensor): The scores of prediction on masked token.
-            - seq_relationship_score(Tensor): The scores of next sentence prediction.
+
+            - `prediction_scores`(Tensor): The scores of prediction on masked token.
+            - `seq_relationship_score`(Tensor): The scores of next sentence prediction.
 
         Example:
             .. code-block::
@@ -774,7 +777,16 @@ class ErnieForPretraining(ErniePretrainedModel):
 
 
 class ErniePretrainingCriterion(paddle.nn.Layer):
-    r"""
+    """
+    Ernie Criterion for a pretraiing task on top.
+    The loss output of Ernie Model during the pretraining:
+    a `masked language modeling` head and a `next sentence prediction (classification)` head.
+
+    Args:
+        vocab_size (`int`):
+            See :class:`ErnieModel`.
+    """
+    """
     The loss output of Bert Model during the pretraining: 
     a `masked language modeling` head and a `next sentence prediction (classification)` head.
 
@@ -787,6 +799,7 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
 
     def forward(self, prediction_scores, seq_relationship_score,
                 masked_lm_labels, next_sentence_labels, masked_lm_scale):
+
         with paddle.static.amp.fp16_guard():
             masked_lm_loss = F.cross_entropy(
                 prediction_scores,

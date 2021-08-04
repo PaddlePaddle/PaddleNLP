@@ -55,7 +55,8 @@ class ErnieTokenizer(PretrainedTokenizer):
             Defaults to "[MASK]".
     
     Examples:
-        .. code-block:: python
+        .. code-block:: 
+
             from paddlenlp.transformers import ErnieTokenizer
             tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
             encoded_inputs = tokenizer('这是一个测试样例')

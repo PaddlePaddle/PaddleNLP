@@ -652,7 +652,7 @@ class BigBirdPretrainingHeads(Layer):
 
 class BigBirdForPretraining(BigBirdPretrainedModel):
     """
-    BigBird Model for a pretraiing task on top.
+    BigBird Model for a pretraining task on top.
 
     Args:
         bigbird (:class:`BigBirdModel`):
@@ -804,6 +804,7 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
 
         Example:
             .. code-block::
+
                 import numpy as np
                 import paddle
                 from paddlenlp.transformers import BigBirdForPretraining, BigBirdTokenizer, BigBirdPretrainingCriterion

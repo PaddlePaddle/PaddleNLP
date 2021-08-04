@@ -334,7 +334,7 @@ class BertModel(BertPretrainedModel):
     Args:
         vocab_size (`int`):
             Vocabulary size of `inputs_ids` in `BertModel`.Defines the number of different tokens that can
-            be represented by the `inputs_ids` passed when calling `XLNetModel`.
+            be represented by the `inputs_ids` passed when calling `BertModel`.
         hidden_size (`int`, optional):
             Dimensionality of the encoder layers and the pooler layer. Defaults to ``768``.
         num_hidden_layers (`int`, optional):
@@ -377,7 +377,7 @@ class BertModel(BertPretrainedModel):
                 See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `BertModel`.
 
         pad_token_id ('int', optional):
-            The pad token index in the token vocabulary.
+            The index of padding token in the token vocabulary.
             Defaults to ``0``.
 
         pooled_act (`str`, optional):
@@ -441,7 +441,10 @@ class BertModel(BertPretrainedModel):
 
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to ``None``, which means we don't add segment embeddings.
-            position_ids():
+            position_ids(`Tensor`, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                config.max_position_embeddings - 1]``.
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
             attention_mask (`Tensor`, optional):
                 Mask to indicate whether to perform attention on each input token or not.
                 The values should be either 0 or 1. The attention scores will be set to **-infinity**
@@ -453,18 +456,18 @@ class BertModel(BertPretrainedModel):
 
                 It's data type should be 'float32' and has a shape of [batch_size, sequence_length].
                 Defaults to 'None'.
-            output_hidden_states (`bool`, optional):
+            output_hidden_states (bool, optional):
                 Whether to return the output of each layer in the hidden layers.
                 Defaults to be `False`.
 
         Returns:
-            `Tuple`: (``sequence_output``, ``pooled_output``) or (``encoder_output``, ``pooled_output``).
+            `Tuple`: A tuple of shape (``sequence_output``, ``pooled_output``) or (``encoder_output``, ``pooled_output``).
 
             With the fields:
 
             - sequence_output (`Tensor`):
                 Sequence of hidden-states at the last layer of the model.
-                It's data type should be float32 and has a shape of (batch_size, seq_lens, hidden_size].
+                It's data type should be float32 and has a shape of (`batch_size, seq_lens, hidden_size`].
                 ``seq_lens`` corresponds to the length of input sequence.
 
             - pooled_output (`Tensor`):
@@ -476,9 +479,6 @@ class BertModel(BertPretrainedModel):
             - encoder_output (`Tensor`):
                 Sequence of output at hidden layers of the model. Its data type should be float32 and
                 has a shape of [batch_size, sequence_length, hidden_size].
-
-
-
 
 
         '''
@@ -529,6 +529,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
         return start_logits, end_logits
+
 
 class BertForSequenceClassification(BertPretrainedModel):
     """
@@ -685,6 +686,15 @@ class BertPretrainingHeads(Layer):
 
 
 class BertForPretraining(BertPretrainedModel):
+    """
+    Bert Model for a pretraining task on top.
+
+    Args:
+        bert (:class:`BertModel`):
+            An instance of :class:`BertModel`.
+
+    """
+
     def __init__(self, bert):
         super(BertForPretraining, self).__init__()
         self.bert = bert
