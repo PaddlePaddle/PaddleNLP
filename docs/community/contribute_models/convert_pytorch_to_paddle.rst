@@ -4,10 +4,10 @@
 
 0. 前言
 ------------------------------------------
-本文将介绍如何进行不同框架下的模型格式转换（以从PyTorch框架到Paddle框架的转换为例）。
+本文将介绍如何进行不同框架下的模型权重转换（以模型权重从PyTorch框架到Paddle框架的格式转换为例）。
 
-模型格式转换的过程需要用户对模型结构有一个详细的了解，同时也需要用户能熟练使用相应的两种深度学习框架。
-同理，成功完成模型的格式转换有助于用户更加深入地理解该模型结构，以及增加对框架的使用熟练度。
+模型格式转换的过程需要用户对模型结构有一个较详细的了解，
+成功完成模型格式转换反过来会有助于加深用户对该模型结构的理解。
 
 让我们开始这个有趣的过程吧！
 
@@ -16,19 +16,24 @@
 不管在什么框架下，当我们保存训练好的模型时，我们都需要将模型的参数权重持久化保存下来；
 当我们加载一个保存好的模型时，我们都需要将参数权重加载并重新赋值给相应的模型。
 
-PyTorch和Paddle都是通过序列化和反序列化模型的 ``state dict`` （状态字典）来进行参数权重的存储和加载的。 ``state dict`` 从数据结构上来看就是一个字典（比如Python中的dict），其中key是模型参数的名称（数据类型为string），
-而value则为key所对应的值（数据类型为Tensor）。
+PyTorch和Paddle都是通过序列化和反序列化模型的 ``state dict`` （状态字典）来进行参数权重的存储和加载的。
+ ``state dict`` 从数据结构上来看就是一个字典（比如Python中的dict），
+其中key是模型参数的名称（数据类型为string），而value则为key所对应的值（数据类型为Tensor）。
 参数存储时，先获取目标对象的 ``state dict`` ，然后将 ``state dict`` 存储至磁盘；
 参数载入时，先从磁盘载入保存的 ``state dict`` ，然后通过 ``set_state_dict()`` 方法配置到目标对象中。
 
-按照约定俗成的命名规则，Paddle框架保存的模型文件名一般后缀为 `'.pdparams'` ，PyTorch框架保存的模型文件名一般后缀为 `'.pt'` 、 `'.pth'` 或者 `'.bin'` 。虽然后缀并不影响模型的保存和加载，但我们一般都会遵循这个命名规范。
+按照约定俗成的命名规则，Paddle框架保存的模型文件名一般后缀为 `'.pdparams'` ，
+PyTorch框架保存的模型文件名一般后缀为 `'.pt'` 、 `'.pth'` 或者 `'.bin'` 。
+虽然后缀并不影响模型的保存和加载，但我们一般都会遵循这个命名规范。
 
 2. ``state dict`` 概述
 ------------------------------------------
-刚刚我们简单介绍了一下模型文件和其中存储的 ``state dict`` ，下面让我们来看一个具体的例子来对 ``state dict`` 有更进一步的了解。
+刚刚我们简单介绍了一下模型文件和其中存储的 ``state dict`` ，
+下面让我们来看一个具体的例子来对 ``state dict`` 有更进一步的了解。
 
 ``LeNet`` 是由Yann LeCun等人在1998年提出的一个CNN网络模型，并且成功应用于手写数字识别系统。
-Paddle集成了 ``LeNet`` 这个简单的模型，我们可以一键进行模型加载，下面的代码实现了该模型的加载和对应 ``state dict`` 的输出：
+Paddle集成了 ``LeNet`` 这个简单的模型，我们可以一键进行模型加载，
+下面的代码实现了该模型的加载和对应 ``state dict`` 的输出：
 
 .. code:: python
 
@@ -52,9 +57,13 @@ Paddle集成了 ``LeNet`` 这个简单的模型，我们可以一键进行模型
               [-0.09760553, -0.02011104, -0.50577533]]]])
 
 
-我们可以通过 ``model.state_dict().keys()`` 来获取模型的所有参数名称。可以看到 ``LeNet`` 一共有10组参数，分别为： `'features.0.weight'` 、 `'features.0.bias'` 、 `'features.3.weight'` 、 `'features.3.bias'` 、 `'fc.0.weight'` 、 `'fc.0.bias'` 、 `'fc.1.weight'` 、 `'fc.1.bias'` 、 `'fc.2.weight'` 和 `'fc.2.bias'` 。
+我们可以通过 ``model.state_dict().keys()`` 来获取模型的所有参数名称。
+可以看到 ``LeNet`` 一共有10组参数，分别为： `'features.0.weight'` 、 `'features.0.bias'` 、
+ `'features.3.weight'` 、 `'features.3.bias'` 、 `'fc.0.weight'` 、 `'fc.0.bias'` 、
+ `'fc.1.weight'` 、 `'fc.1.bias'` 、 `'fc.2.weight'` 和 `'fc.2.bias'` 。
 
-通过查询 ``model.state_dict()['features.0.weight']`` 可以查看 `'features.0.weight'` 这个参数的具体权重数值。上述输出显示该权重是一个dtype=float32，shape=[6, 1, 3, 3]的Tensor。
+通过查询 ``model.state_dict()['features.0.weight']`` 可以查看 `'features.0.weight'` 这个参数的具体权重数值。
+上述输出显示该权重是一个dtype=float32，shape=[6, 1, 3, 3]的Tensor。
 
 3. 利用 ``state dict`` 进行模型转换
 ------------------------------------------
@@ -73,7 +82,7 @@ PaddleNLP（Paddle框架）和HuggingFace的transformers（PyTorch框架）里�
 我们分别加载这两个模型来进行深入分析。
 
 
-3.1 PyTroch下的 ``state dict``
+3.1 PyTorch下的 ``state dict``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 首先加载transformers下的 ``'bert-base-uncased'`` 模型，
 
@@ -81,7 +90,8 @@ PaddleNLP（Paddle框架）和HuggingFace的transformers（PyTorch框架）里�
 
     >>> import torch
     >>> model_name = "bert-base-uncased"
-    >>> model_file = "bert-base-uncased"
+    >>> # 模型下载地址： https://huggingface.co/bert-base-uncased/blob/main/pytorch_model.bin
+    >>> model_file = "pytorch_model.bin"
     >>> pytorch_state_dict = torch.load(model_file)
     >>> pytorch_state_dict.keys()
     odict_keys(['bert.embeddings.word_embeddings.weight', 'bert.embeddings.position_embeddings.weight', 'bert.embeddings.token_type_embeddings.weight',
@@ -115,22 +125,26 @@ PaddleNLP（Paddle框架）和HuggingFace的transformers（PyTorch框架）里�
                 'cls.predictions.transform.LayerNorm.beta', 'cls.predictions.decoder.weight',
                 'cls.seq_relationship.weight', 'cls.seq_relationship.bias'])
 
-odict_keys（ordered_dict keys）所显示的是PyTorch模型文件所对应的 ``state dict`` 的keys:
-我们仔细观察一下可以发现参数可以分成几大模块：**embeddings** 模块，**encoder_layers** 模块, **pooler** 模块, **cls** 模块。
+``odict_keys``（ordered_dict keys）所显示的是PyTorch模型文件所对应的 ``state dict`` 的keys:
+我们仔细观察一下可以发现参数可以分成几大模块：**embeddings** 模块，
+**encoder_layers** 模块, **pooler** 模块, **cls** 模块。
 
 我们可以结合bert的具体结构来解读一下各个模块：
 
 - **embeddings** 模块
 
-  'bert.embeddings'开头的各个参数是bert模型的embeddings模块的参数，包括word_embeddings矩阵，position_embeddings矩阵，token_type_embeddings矩阵以及embeddings模块的LayerNorm层参数等。
+  'bert.embeddings'开头的各个参数是bert模型的embeddings模块的参数，
+  包括word_embeddings矩阵，position_embeddings矩阵，token_type_embeddings矩阵以及embeddings模块的LayerNorm层参数等。
 
 - **encoder_layers** 模块
 
-  'bert.encoder.layer'开头的各个参数是bert模型的encoder层的参数，可以看到一共这个模型一共有12层（编号0-11）encoder，每一层encoder的结构都是一模一样的。一层encoder主要由一个self-attention模块和一个feed-forward模块构成。
+  'bert.encoder.layer'开头的各个参数是bert模型的encoder层的参数，
+  可以看到一共这个模型一共有12层（编号0-11）encoder，每一层encoder的结构都是一模一样的。
+  一层encoder主要由一个self-attention模块和一个feed-forward模块构成。
 
   我们具体来看一下第1层encoder的参数（'bert.encoder.layer.0'开头的参数）：
-  'attention.self.query'，'attention.self.key'和'attention.self.value'分别代表self-attention结构里面
-  的query矩阵，key矩阵和value矩阵。
+  'attention.self.query'，'attention.self.key'和'attention.self.value'
+  分别代表self-attention结构里面的query矩阵，key矩阵和value矩阵。
   'attention.output.dense'是self-attention结构的线性层。
   'attention.output.LayerNorm'则是self-attention结构后的LayerNorm层。
 
@@ -157,7 +171,8 @@ odict_keys（ordered_dict keys）所显示的是PyTorch模型文件所对应的 
 
     >>> import paddle
     >>> model_name = "bert-base-uncased"
-    >>> model_file = "bert-base-uncased"
+    >>> # 模型下载地址： https://paddlenlp.bj.bcebos.com/models/transformers/bert-base-uncased.pdparams
+    >>> model_file = "bert-base-uncased.pdparams"
     >>> paddle_state_dict = torch.load(model_file)
     >>> paddle_state_dict.keys()
     dict_keys(['bert.embeddings.word_embeddings.weight', 'bert.embeddings.position_embeddings.weight', 'bert.embeddings.token_type_embeddings.weight',
@@ -271,26 +286,32 @@ Paddle模型的 ``state dict`` 是通过一个dict来进行存储，可以看到
 首先我们需要对keys进行一一对应:
 
 我们从参数名称上能看出基本的一个对应关系，比如：
-``bert.embeddings.LayerNorm.gamma`` 对应 ``bert.embeddings.layer_norm.weight`` ；
-``bert.embeddings.LayerNorm.beta`` 对应 ``bert.embeddings.layer_norm.bias`` ；
-``bert.encoder.layer.0.attention.self.query.weight`` 对应 ``bert.encoder.layers.0.self_attn.q_proj.weight`` ；
-``bert.encoder.layer.0.attention.self.query.bias`` 对应 ``bert.encoder.layers.0.self_attn.q_proj.bias`` 等。
+* ``bert.embeddings.LayerNorm.gamma`` 对应 ``bert.embeddings.layer_norm.weight`` ；
+* ``bert.embeddings.LayerNorm.beta`` 对应 ``bert.embeddings.layer_norm.bias`` ；
+* ``bert.encoder.layer.0.attention.self.query.weight`` 对应 ``bert.encoder.layers.0.self_attn.q_proj.weight`` ；
+* ``bert.encoder.layer.0.attention.self.query.bias`` 对应 ``bert.encoder.layers.0.self_attn.q_proj.bias`` 等。
 
 两者的顺序是基本一致的，但也有一些例外，比如：
-``bert.encoder.layers.0.norm1.weight`` 对应 ``bert.encoder.layer.0.attention.output.LayerNorm.gamma`` ；
-``bert.encoder.layers.0.norm1.bias`` 对应 ``bert.encoder.layer.0.attention.output.LayerNorm.beta`` ；
-``bert.encoder.layer.0.intermediate.dense.weight`` 对应 ``bert.encoder.layers.0.linear1.weight`` ；
-``bert.encoder.layer.0.output.dense.weight`` 对应 ``bert.encoder.layers.0.linear2.weight`` ；
-``bert.encoder.layer.0.output.LayerNorm.gamma`` 对应 ``bert.encoder.layers.0.norm2.weight`` 等。
+* ``bert.encoder.layers.0.norm1.weight`` 对应 ``bert.encoder.layer.0.attention.output.LayerNorm.gamma`` ；
+* ``bert.encoder.layers.0.norm1.bias`` 对应 ``bert.encoder.layer.0.attention.output.LayerNorm.beta`` ；
+* ``bert.encoder.layer.0.intermediate.dense.weight`` 对应 ``bert.encoder.layers.0.linear1.weight`` ；
+* ``bert.encoder.layer.0.output.dense.weight`` 对应 ``bert.encoder.layers.0.linear2.weight`` ；
+* ``bert.encoder.layer.0.output.LayerNorm.gamma`` 对应 ``bert.encoder.layers.0.norm2.weight`` 等。
 
 具体的keys对应关系需要我们对比具体的代码实现来进行准确的对应。在上面的表格中我们已经将两者的keys准确地一一对应了。
 建立好了keys的对应关系之后，我们还需要进行values的对应关系。
 如果你仔细观察表格，会发现有些参数对应的values形状存在差异。
 
 比如 ``bert.encoder.layer.0.intermediate.dense.weight`` 和 ``bert.encoder.layers.0.linear1.weight``
-这两个keys是相对应的参数名，但是他们的values形状却不相同，前者是 ``[3072, 768]`` ，后者是 ``[768, 3072]`` ，两者刚好是一个转置的关系。这是因为PyTorch对于nn.Linear模块的保存是将权重的shape进行转置后保存的。所以在我们进行 ``state dict`` 转换的时候，需要注意做好shape的转换（比如需要将PyTorch模型里nn.Linear层对应的参数权重转置处理后生成Paddle的参数权重）。
+这两个keys是相对应的参数名，但是他们的values形状却不相同，前者是 ``[3072, 768]`` ，后者是 ``[768, 3072]`` ，两者刚好是一个转置的关系。
+这是因为PyTorch对于nn.Linear模块的保存是将权重的shape进行转置后保存的。
+所以在我们进行 ``state dict`` 转换的时候，
+需要注意做好shape的转换（比如需要将PyTorch模型里nn.Linear层对应的参数权重转置处理后生成Paddle的参数权重）。
 
-另外还需要注意其他一些细节，这里列出来几个可能会遇到的情景：有些模型结构可能在实现时对参数的处理有差异导致存在参数的拆分或者合并等操作，此时我们需要进行参数多对一或者一对多的映射，同时将对应的values拆分或者合并；还有存在batch norm层时，我们需要注意todo。
+另外还需要注意其他一些细节，这里列出来几个可能会遇到的情景：
+有些模型结构可能在实现时对参数的处理有差异导致存在参数的拆分或者合并等操作，
+此时我们需要进行参数多对一或者一对多的映射，同时将对应的values拆分或者合并；
+还有存在batch norm层时，我们需要注意todo。
 
 
 3.4 bert模型转换代码
@@ -457,12 +478,13 @@ Paddle模型的 ``state dict`` 是通过一个dict来进行存储，可以看到
 
 4.2 运行fine-tuning代码进行验证
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-当我们对齐前向精度时，一般来说我们的模型转换就已经成功了。我们还可以运行下游任务的fine-tuning来进行double check。
-同样的，我们需要设置相同的训练数据，相同的训练参数，相同的训练环境进行下游任务的fine-tuning来对比两者的收敛性以及
-收敛指标。
+当我们对齐前向精度时，一般来说我们的模型转换就已经成功了。
+我们还可以运行下游任务的fine-tuning来进行double check。
+同样的，我们需要设置相同的训练数据，相同的训练参数，
+相同的训练环境进行下游任务的fine-tuning来对比两者的收敛性以及收敛指标。
 
 5. 写在最后
 ------------------------------------------
 到这里你就已经成功完成了PyTorch模型到Paddle模型的转换工作，恭喜你！
-相信在这个过程中你对转换的模型有了更加深入的理解，你对PyTorch和Paddle框架也能更加熟练使用了。
+相信在这个过程中你对转换的模型有了更加深入的理解，对PyTorch和Paddle框架也能更加熟练使用了。
 欢迎提PR共享你的模型，这样每一个使用PaddleNLP的用户都能使用你共享的模型哦～
