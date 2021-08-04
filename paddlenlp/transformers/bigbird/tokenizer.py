@@ -176,6 +176,11 @@ class BigBirdTokenizer(PretrainedTokenizer):
             max_pred_len (:obj:`int`, `optional`, defaults to `None`):
                 If set to a number, will limit the mask sequence returned so that it has a maximum prediction length.
                 If set to None, will not limit the mask sequence.
+            masked_lm_prob (:obj:`int`, 'optional`):
+                The probability a training data will be masked. Defaults to `0.15`.
+
+
+
         """
 
         def get_input_ids(text):

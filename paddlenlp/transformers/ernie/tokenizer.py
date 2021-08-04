@@ -33,6 +33,7 @@ class ErnieTokenizer(PretrainedTokenizer):
     tokenize as subwords.
 
     Args:
+
         vocab_file (str): 
             file path of the vocabulary.
         do_lower_case (str, optional): 
@@ -44,28 +45,23 @@ class ErnieTokenizer(PretrainedTokenizer):
         sep_token (str, optional): 
             The special token for separator token. 
             Defaults to "[SEP]".
-        pad_token (str, optional): 
-            The special token for padding. 
+        pad_token (str, optional):
+            The special token for padding.
             Defaults to "[PAD]".
-        cls_token (str, optional): 
-            The special token for cls. 
-            Defaults to "[CLS]".
+        cls_token (str, optional):
+            The special token for sequence classification.
+            It is the last token of the sequence when built with special tokens.
+            Default: "[CLS]".
         mask_token (str, optional): 
             The special token for mask.
             Defaults to "[MASK]".
     
     Examples:
-        .. code-block:: 
+        .. code-block::
 
             from paddlenlp.transformers import ErnieTokenizer
             tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
-            encoded_inputs = tokenizer('这是一个测试样例')
-            # encoded_inputs: 
-            # { 
-            #   'input_ids': [1, 47, 10, 7, 27, 558, 525, 314, 656, 2], 
-            #   'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            # }
-
+            encoded_inputs = tokenizer('Hey, Paddle-paddle is awesome !')
 
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained

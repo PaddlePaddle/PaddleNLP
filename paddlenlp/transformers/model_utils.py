@@ -103,6 +103,7 @@ class PretrainedModel(Layer, GenerationMixin):
     Besides, metaclass `InitTrackerMeta` is used to create `PretrainedModel`,
     by which subclasses can track arguments for initialization automatically.
     """
+
     model_config_file = "model_config.json"
     pretrained_init_configuration = {}
     # TODO: more flexible resource handle, namedtuple with fileds as:

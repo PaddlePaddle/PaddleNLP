@@ -317,7 +317,7 @@ class ErnieModel(ErniePretrainedModel):
                 Defaults to `None`.
 
         Returns:
-            A tuple of shape (``sequence_output``, ``pooled_output``).
+            Tuple：A tuple of shape (``sequence_output``, ``pooled_output``).
 
             With the fields:
 
@@ -339,7 +339,7 @@ class ErnieModel(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieModel.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("Hey, paddle-paddle is awesome !")
                 inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
                 sequence_output, pooled_output = model(**inputs)
 
