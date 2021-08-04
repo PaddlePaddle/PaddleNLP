@@ -11,10 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from functools import partial
+
 import paddle
 import paddle.fluid as fluid
 from paddle.fluid import core
 from paddle.optimizer import AdamW
+
+__all__ = ['AdamWDL', ]
+
+
+# Layerwise decay
+def set_param_lr(decay_rate, name_dict, n_layers, param):
+    """
+        decay_rate: Layer-wise decay ratio.
+        name_dict: static name of model, get from model.named_parameters().
+        n_layers: total number of layers in the transformer encoder.
+    """
+    ratio = 1.0
+    static_name = name_dict[param.name]
+    if "encoder.layers" in static_name:
+        idx = static_name.find("encoder.layers.")
+        layer = int(static_name[idx:].split(".")[2])
+        ratio = decay_rate**(n_layers - layer)
+    elif "embedding" in static_name:
+        ratio = decay_rate**(n_layers + 1)
+    param.optimize_attr["learning_rate"] *= ratio
 
 
 class AdamWDL(AdamW):
@@ -39,14 +61,16 @@ class AdamWDL(AdamW):
                  multi_precision=False,
                  layerwise_decay=0,
                  n_layers=12,
-                 set_param_lr_fun=None,
+                 set_param_lr_fun=set_param_lr,
+                 name_dict=None,
                  name=None):
         if not isinstance(layerwise_decay, float) and \
                 not isinstance(layerwise_decay, fluid.framework.Variable):
             raise TypeError("coeff should be float or Tensor.")
         self.layerwise_decay = layerwise_decay
         self.n_layers = n_layers
-        self.set_param_lr_fun = set_param_lr_fun
+        self.set_param_lr_fun = partial(set_param_lr_fun, layerwise_decay,
+                                        name_dict, n_layers)
         super(AdamWDL, self).__init__(
             learning_rate=learning_rate,
             parameters=parameters,

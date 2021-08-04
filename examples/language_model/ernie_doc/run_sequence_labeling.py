@@ -32,9 +32,9 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import ChunkEvaluator
+from paddlenlp.ops.optimizer import AdamWDL
 
 from data import SequenceLabelingIterator
-from optimization import AdamWDL
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -218,20 +218,6 @@ def do_train(args):
     for n, p in model.named_parameters():
         name_dict[p.name] = n
 
-    # layerwise decay
-    def set_param_lr(param):
-        ratio = 1.0
-        decay_rate = args.layerwise_decay
-        static_name = name_dict[param.name]
-        n_layers = model_config["num_hidden_layers"]
-        if "encoder.layers" in static_name:
-            idx = static_name.find("encoder.layers.")
-            layer = int(static_name[idx:].split(".")[2])
-            ratio = decay_rate**(n_layers - layer)
-        elif "embedding" in static_name:
-            ratio = decay_rate**(n_layers + 1)
-        param.optimize_attr["learning_rate"] *= ratio
-
     optimizer = AdamWDL(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
@@ -239,7 +225,7 @@ def do_train(args):
         apply_decay_param_fun=lambda x: x in decay_params,
         n_layers=model_config["num_hidden_layers"],
         layerwise_decay=args.layerwise_decay,
-        set_param_lr_fun=set_param_lr)
+        name_dict=name_dict)
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = ChunkEvaluator(label_list=train_ds.label_list)
