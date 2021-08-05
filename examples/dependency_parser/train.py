@@ -13,90 +13,56 @@
 # limitations under the License.
 
 import logging
-from functools import partial
 import argparse
 import os
 import time
-import random
 
-import dill
 import numpy as np
 import paddle
-from paddle.fluid import layers
-import paddle.nn.functional as F
-import paddlenlp as ppnlp
-from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers.optimization import LinearDecayWithWarmup
 
-import utils
-from data import batchify, TextDataset
-from model import DDParserModel
-from module import masked_select, index_sample
-from metric import ParserEvaluator
+from env import Environment
+from data import batchify, TextDataset, Corpus
+from model.model import DDParserModel
+from model.metric import ParserEvaluator
+from model.model_utils import ParserCriterion, decode
 
 # yapf: disable
-parser = argparse.ArgumentParser(__doc__)
-# train
+parser = argparse.ArgumentParser()
+# Train
+parser.add_argument("--epochs", type=int, default=100, help="Number of epoches for training.")
 parser.add_argument("--device", choices=["cpu", "gpu", "xpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint.")
 parser.add_argument("--data_path", type=str, default='./data', help="The path of datasets to be loaded.")
-parser.add_argument("--batch_size", type=int, default=1000, help="Total examples' number of a batch for training.")
+parser.add_argument("--max_batch_size", type=int, default=5000, help="Maximum examples of a batch for training.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
-parser.add_argument("--encoding_model", choices=["lstm", "ernie-1.0", "ernie-tiny", "ernie-lstm", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
+parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
 parser.add_argument("--clip", type=float, default=1.0, help="The threshold of gradient clip.")
 parser.add_argument("--lstm_lr", type=float, default=0.002, help="The Learning rate of lstm encoding model.")
 parser.add_argument("--ernie_lr", type=float, default=5e-05, help="The Learning rate of ernie encoding model.")
 parser.add_argument("--seed", type=int, default=1, help="Random seed for initialization.")
-# preprocess
+# Preprocess
 parser.add_argument("--min_freq", type=int, default=2, help="The minimum frequency of word when construct the vocabulary.")
 parser.add_argument("--preprocess", type=bool, default=True, help="Whether to preprocess the dataset.")
 parser.add_argument("--fix_len", type=int, default=20)
 parser.add_argument("--n_buckets", type=int, default=15, help="Number of buckets to devide the dataset.")
-# decode
+# Decode
 parser.add_argument("--tree", type=bool, default=True, help="Ensure the output conforms to the tree structure.")
-# lstm
+# Lstm
 parser.add_argument("--beta1", type=float, default=0.9, help="The coefficient of adam optimizer for computing running average of gradient.")
 parser.add_argument("--beta2", type=float, default=0.9, help="The coefficient of adam optimizer for computing running average of squared-gradient.")
 parser.add_argument("--epsilon", type=float, default=1e-12, help="A small float value for numerical stability.")
 parser.add_argument("--decay_rate", type=float, default=0.75, help="The decay rate of learning rate.")
 parser.add_argument("--feat", choices=["char", "pos"], type=str, default=None, help="The feature representation to use.")
-# ernie
+# Ernie
 parser.add_argument("--warmup_proportion", type=float, default=0.0, help="Linear warmup proportion over total steps.")
 parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay if we apply some.")
+parser.add_argument("--mode", type=str, default="train")
 args = parser.parse_args()
 # yapf: enable
 
-def loss_function(s_arc, s_rel, arcs, rels, mask):
-    """Loss function"""
-    arcs = masked_select(arcs, mask)
-    rels = masked_select(rels, mask)
-    s_arc = masked_select(s_arc, mask)
-    s_rel = masked_select(s_rel, mask)
-    s_rel = index_sample(s_rel, paddle.unsqueeze(arcs, axis=1))
-    arc_loss = layers.cross_entropy(F.softmax(s_arc), arcs)
-    rel_loss = layers.cross_entropy(F.softmax(s_rel), rels)
-
-    loss = paddle.mean(arc_loss + rel_loss)
-
-    return loss
-
-def decode(args, s_arc, s_rel, mask):
-    """Decode function"""
-    mask = mask.numpy()
-    lens = np.sum(mask, -1)
-    # prevent self-loops
-    arc_preds = paddle.argmax(s_arc, axis=-1).numpy()
-    bad = [not utils.istree(seq[:i + 1]) for i, seq in zip(lens, arc_preds)]
-    if args.tree and any(bad):
-        arc_preds[bad] = utils.eisner(s_arc.numpy()[bad], mask[bad])
-    arc_preds = paddle.to_tensor(arc_preds)
-    rel_preds = paddle.argmax(s_rel, axis=-1)
-    rel_preds = index_sample(rel_preds, paddle.unsqueeze(arc_preds, axis=-1))
-    rel_preds = paddle.squeeze(rel_preds, axis=-1)
-    return arc_preds, rel_preds
-
 @paddle.no_grad()
-def evaluate(args, model, metric, data_loader):
+def evaluate(args, model, metric, criterion, data_loader):
     """
     Given a dataset, it evals model and computes the metric.
     Args:
@@ -109,7 +75,7 @@ def evaluate(args, model, metric, data_loader):
     metric.reset()
     losses = []
     for batch in data_loader():
-        if args.encoding_model.startswith("ernie"):
+        if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
             words, arcs, rels = batch
             s_arc, s_rel, words = model(words)
         else:
@@ -121,7 +87,7 @@ def evaluate(args, model, metric, data_loader):
                 words != args.eos_index,
         )
 
-        loss = loss_function(s_arc, s_rel, arcs, rels, mask)
+        loss = criterion(s_arc, s_rel, arcs, rels, mask)
 
         losses.append(loss.numpy().item())
 
@@ -135,34 +101,26 @@ def evaluate(args, model, metric, data_loader):
     metric.reset()
 
 def do_train():
-    paddle.set_device(args.device)
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    env = utils.Environment(args)
+    env = Environment(args)
 
     train = Corpus.load("./data/train.txt", env.fields)
     dev = Corpus.load("./data/test.txt", env.fields)
-    test = Corpus.load("./data/test_small.txt", env.fields)
 
     train_ds = TextDataset(train, env.fields, args.n_buckets)
     dev_ds = TextDataset(dev, env.fields, args.n_buckets)
-    test_ds = TextDataset(test, env.fields, args.n_buckets)
 
-    train_data_loader = batchify(train_ds, args.batch_size, True, True)
-    dev_data_loader = batchify(dev_ds, args.batch_size)
-    test_data_loader = batchify(test_ds, args.batch_size)
+    train_data_loader = batchify(train_ds, args.max_batch_size, shuffle=True, use_multiprocess=True)
+    dev_data_loader = batchify(dev_ds, args.max_batch_size)
     
-    if args.encoding_model.startswith(
-            "ernie") and args.encoding_model != "ernie-lstm" or args.encoding_model == 'transformer':
+    if args.encoding_model.startswith("ernie"):
         lr = args.ernie_lr
-    else:
-        lr = args.lstm_lr
-
-    if args.encoding_model.startswith("ernie") and args.encoding_model != "ernie-lstm":
         model = DDParserModel(args=args, pretrained_model=env.pretrained_model)
     else:
+        lr = args.lstm_lr
         model = DDParserModel(args=args)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
@@ -171,17 +129,10 @@ def do_train():
     model = paddle.DataParallel(model)
     num_training_steps = len(train_data_loader) * args.epochs
 
-    #if args.encoding_model.startswith("ernie") and args.encoding_model != "ernie-lstm":
-    #    lr_scheduler = LinearDecayWithWarmup(lr, num_training_steps, args.warmup_proportion)
-    #else:
-    #    lr_scheduler = paddle.optimizer.lr.ExponentialDecay(learning_rate=lr, gamma=args.decay_rate)
-
     lr_scheduler = LinearDecayWithWarmup(lr, num_training_steps, args.warmup_proportion)
-    #from paddle.fluid import dygraph
-    #lr_scheduler = dygraph.ExponentialDecay(learning_rate=lr, decay_steps=5000, decay_rate=0.75)
     grad_clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.clip)
 
-    if args.encoding_model.startswith("ernie") and args.encoding_model != "ernie-lstm":
+    if args.encoding_model.startswith("ernie"):
         optimizer = paddle.optimizer.AdamW(
             learning_rate=lr_scheduler,
             parameters=model.parameters(),
@@ -189,7 +140,6 @@ def do_train():
             grad_clip=grad_clip,
         )
     else:
-        '''
         optimizer = paddle.optimizer.Adam(
             learning_rate=lr_scheduler,
             beta1=args.beta1,
@@ -198,26 +148,17 @@ def do_train():
             parameters=model.parameters(),
             grad_clip=grad_clip,
         )
-        '''
-        optimizer = paddle.fluid.optimizer.AdamOptimizer(
-            learning_rate=lr_scheduler,
-            beta1=0.9,
-            beta2=0.9,
-            epsilon=args.epsilon,
-            parameter_list=model.parameters(),
-            grad_clip=grad_clip,
-        )
 
     # train
     metric = ParserEvaluator()
+    criterion = ParserCriterion()
 
     global_step = 0
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         total_loss = 0
         for step, inputs in enumerate(train_data_loader(), start=1):
-            #model.clear_gradients()
-            if args.encoding_model.startswith("ernie"):
+            if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
                 words, arcs, rels = inputs
                 s_arc, s_rel, words = model(words)
             else:
@@ -229,10 +170,9 @@ def do_train():
                 words != args.eos_index,
             )
 
-            loss = loss_function(s_arc, s_rel, arcs, rels, mask)
+            loss = criterion(s_arc, s_rel, arcs, rels, mask)
             loss.backward()
             optimizer.step()
-            #optimizer.minimize(loss)
             lr_scheduler.step()
             optimizer.clear_grad()
 
@@ -245,13 +185,13 @@ def do_train():
 
             total_loss += loss.numpy().item()
         if rank == 0:
-            save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
+            save_dir = os.path.join(args.save_dir, "model_epoch_%d" % epoch)
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
-            evaluate(args, model, metric, dev_data_loader)
+            evaluate(args, model, metric, criterion, dev_data_loader)
             save_param_path = os.path.join(save_dir, "model_state.pdparams")
             paddle.save(model.state_dict(), save_param_path)
-            if args.encoding_model.startswith("ernie"):
+            if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
                 env.tokenizer.save_pretrained(save_dir)                           
         total_loss /= len(train_data_loader)
     

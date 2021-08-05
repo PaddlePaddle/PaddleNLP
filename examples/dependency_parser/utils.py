@@ -12,120 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-import os
 import unicodedata
 import random
-import dill
+import copy
 
 import numpy as np
-import paddle
-import paddlenlp as ppnlp
 
 from model.model_utils import fill_diagonal, stripe, backtrack, pad_sequence
-from data import CoNLL, Field, SubwordField, ErnieField, Corpus
-
-class Environment(object):
-    """initialize the enviroment"""
-    def __init__(self, args):
-        self.args = args
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-        paddle.seed(args.seed)
-        os.environ["FLAGS_paddle_num_threads"] = str("16")
-
-        if args.preprocess:
-            if args.encoding_model.startswith("ernie"):
-                if args.encoding_model in ["ernie-1.0", "ernie-tiny"]:
-                    self.pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(args.encoding_model)
-                    self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(args.encoding_model)
-                elif args.encoding_model == "ernie-gram-zh":
-                    self.pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(args.encoding_model)
-                    self.tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(args.encoding_model)
-                else:
-                    self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(args.encoding_model)
-                
-                args.vocab_size = len(self.tokenizer.vocab)
-                self.WORD = ErnieField(
-                    "word",
-                    pad='[PAD]',
-                    unk='[UNK]',
-                    bos='[CLS]',
-                    eos='[SEP]',
-                    fix_len=args.fix_len,
-                    tokenizer=self.tokenizer,
-                )
-                self.WORD.vocab = self.tokenizer.vocab
-                args.feat = None
-            else:
-                self.WORD = Field(
-                    "word",
-                    pad='[PAD]',
-                    unk='[UNK]',
-                    bos='[BOS]',
-                    eos='[EOS]',
-                    lower=True,
-                )
-            if args.feat == "char":
-                self.FEAT = SubwordField(
-                    "chars",
-                    pad='[PAD]',
-                    unk='[UNK]',
-                    bos='[BOS]',
-                    eos='[EOS]',
-                    fix_len=args.fix_len,
-                    tokenize=list,
-                )
-            elif args.feat == "pos":
-                self.FEAT = Field("postag", bos='[BOS]', eos='[EOS]')
-            else:
-                self.FEAT = None
-            self.ARC = Field(
-                "head",
-                bos='[BOS]',
-                eos='[EOS]',
-                use_vocab=False,
-                fn=numericalize,
-            )
-            self.REL = Field("deprel", bos='[BOS]', eos='[EOS]')
-            if args.feat == "char":
-                self.fields = CoNLL(FORM=(self.WORD, self.FEAT), HEAD=self.ARC, DEPREL=self.REL)
-            else:
-                self.fields = CoNLL(FORM=self.WORD, CPOS=self.FEAT, HEAD=self.ARC, DEPREL=self.REL)
-
-            train = Corpus.load("./data/train.txt", self.fields)
-
-            if not args.encoding_model.startswith("ernie"):
-                self.WORD.build(train, args.min_freq)
-                self.FEAT.build(train)
-
-            self.REL.build(train)
-            with open("fields", "wb") as f:
-                dill.dump(self.fields, f)
-        else:
-            with open("fields", "rb") as f:
-                self.fields = dill.load(f)
-
-            if isinstance(self.fields.FORM, tuple):
-                self.WORD, self.FEAT = self.fields.FORM
-            else:
-                self.WORD, self.FEAT = self.fields.FORM, self.fields.CPOS
-            self.ARC, self.REL = self.fields.HEAD, self.fields.DEPREL
-
-        if args.encoding_model.startswith("ernie"):
-            vocab_items = list(self.WORD.vocab.token_to_idx.items())
-        else:
-            vocab_items = self.WORD.vocab.stoi.items()
-        self.puncts = np.array([i for s, i in vocab_items if ispunct(s)], dtype=np.int64)
-
-        self.args.n_words = len(self.WORD.vocab)
-        self.args.n_feats = self.FEAT and len(self.FEAT.vocab)
-        self.args.n_rels = len(self.REL.vocab)
-        self.args.pad_index = self.WORD.pad_index
-        self.args.unk_index = self.WORD.unk_index
-        self.args.bos_index = self.WORD.bos_index
-        self.args.eos_index = self.WORD.eos_index
-        self.args.feat_pad_index = self.FEAT and self.FEAT.pad_index
 
 def kmeans(x, k):
     """kmeans algorithm, put sentence id into k buckets according to sentence length

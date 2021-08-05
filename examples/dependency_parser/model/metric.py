@@ -59,4 +59,3 @@ class ParserEvaluator(Metric):
         Returns metric name
         """
         return self._name
-    

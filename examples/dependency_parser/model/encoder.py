@@ -18,11 +18,11 @@ import paddle.nn as nn
 from model.model_utils import reduce_sum, masked_select, pad_sequence_paddle, mask_fill, index_sample
 from model.dropouts import SharedDropout, IndependentDropout
 
-class ErnieEmbed(nn.Layer):
+class ErnieEncoder(nn.Layer):
     def __init__(self, 
                  args, 
                  pretrained_model):
-        super(ErnieEmbed, self).__init__()
+        super(ErnieEncoder, self).__init__()
         self.ptm = pretrained_model
         self.args = args
         self.mlp_input_size = self.ptm.config["hidden_size"]
@@ -49,14 +49,15 @@ class ErnieEmbed(nn.Layer):
         words = index_sample(words, position)
         return words, x
 
-class LSTMByWPEmbed(nn.Layer):
+class LSTMByWPEncoder(nn.Layer):
     def __init__(self,
                  args,
                  lstm_by_wp_embed_size=200,
                  n_embed=300,
                  n_lstm_hidden=300,
+                 n_lstm_layers=3,
                  lstm_dropout=0.33):
-        super(LSTMByWPEmbed, self).__init__()
+        super(LSTMByWPEncoder, self).__init__()
         self.args = args
 
         self.word_embed = nn.Embedding(self.args.vocab_size, lstm_by_wp_embed_size)
@@ -88,8 +89,8 @@ class LSTMByWPEmbed(nn.Layer):
         word_embed = self.word_embed(words)
         embed = word_embed
         mask = words != self.args.pad_index
-        seq_lens = reduce_sum(seq_mask, -1)
-        x = self.lstm(embed, seq_lens)
+        seq_lens = reduce_sum(mask, -1)
+        x, _ = self.lstm(embed, sequence_length=seq_lens)
         x = paddle.reshape(
             index_sample(x, position),
             shape=position.shape[:2] + [x.shape[2]],
@@ -98,7 +99,7 @@ class LSTMByWPEmbed(nn.Layer):
         x = self.lstm_dropout(x)
         return words, x
 
-class LSTMEmbed(nn.Layer):
+class LSTMEncoder(nn.Layer):
     def __init__(self, 
                  args,
                  n_char_embed=50,
@@ -109,11 +110,11 @@ class LSTMEmbed(nn.Layer):
                  n_lstm_hidden=300,
                  n_lstm_layers=3,
                  lstm_dropout=0.33):
-        super(LSTMEmbed, self).__init__()
+        super(LSTMEncoder, self).__init__()
         self.args = args
 
         if self.args.feat == "char":
-            self.feat_embed = CharLSTMEmbed(
+            self.feat_embed = CharLSTMEncoder(
                 n_chars=self.args.n_feats,
                 n_embed=n_char_embed,
                 n_out=n_lstm_char_embed,
@@ -152,14 +153,13 @@ class LSTMEmbed(nn.Layer):
         x = self.lstm_dropout(x)
         return words, x
 
-class CharLSTMEmbed(nn.Layer):
-    """CharLSTMEmbed"""
+class CharLSTMEncoder(nn.Layer):
     def __init__(self, 
                  n_chars, 
                  n_embed, 
                  n_out, 
                  pad_index=0):
-        super(CharLSTMEmbed, self).__init__()
+        super(CharLSTMEncoder, self).__init__()
         self.n_chars = n_chars
         self.n_embed = n_embed
         self.n_out = n_out
