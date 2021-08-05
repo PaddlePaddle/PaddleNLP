@@ -26,6 +26,7 @@ option(USE_TENSORRT     "Compile with TensorRT."                                
 option(WITH_TRANSFORMER "Compile with Transformer"                                ON)
 option(WITH_GPT         "Compile with GPT"                                        OFF)
 option(WITH_UNIFIED         "Compile with Unified Transformer"                        ON)
+option(WITH_ENCODER     "Compile with Transformer Decoder"                        ON)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
@@ -41,6 +42,10 @@ endif()
 
 if(WITH_UNIFIED)
   list(APPEND decoding_op_files fusion_unified_decoding_op.cc fusion_unified_decoding_op.cu)
+endif()
+
+if(WITH_ENCODER)
+  list(APPEND encoder_op_files fusion_encoder_op.cc fusion_encoder_op.cu)
 endif()
 
 if(NOT WITH_TRANSFORMER AND NOT WITH_GPT)

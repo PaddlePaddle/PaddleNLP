@@ -146,6 +146,7 @@ if(ON_INFER)
   endif(NOT WIN32)
 
   cuda_add_library(pd_infer_custom_op ${decoding_op_files} SHARED)
+  cuda_add_library(pd_infer_custom_op ${encoder_op_files} SHARED)
   add_dependencies(pd_infer_custom_op extern_${THIRD_PARTY_NAME})
   string(REPLACE "/" ";" DEMO_PATH ${DEMO})
 
@@ -269,4 +270,8 @@ else(ON_INFER)
   add_library(decoding_op SHARED ${decoding_op_files})
   add_dependencies(decoding_op extern_${THIRD_PARTY_NAME} boost)
   target_link_libraries(decoding_op PRIVATE -lcublas -lcudart ${lib_link} ${ft_lib_link})
+
+  add_library(encoder_op SHARED ${encoder_op_files})
+  add_dependencies(encoder_op extern_${THIRD_PARTY_NAME} boost)
+  target_link_libraries(encoder_op PRIVATE -lcublas -lcudart ${lib_link} ${ft_lib_link})
 endif()
