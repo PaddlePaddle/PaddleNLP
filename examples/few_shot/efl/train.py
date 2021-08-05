@@ -260,6 +260,9 @@ def do_train():
             test_data_loader,
             task_label_description=TASK_LABELS_DESC[args.task_name])
 
+        if not os.path.exists(args.output_dir):
+            os.makedirs(args.output_dir)
+
         output_file = os.path.join(args.output_dir,
                                    str(epoch) + predict_file[args.task_name])
 
