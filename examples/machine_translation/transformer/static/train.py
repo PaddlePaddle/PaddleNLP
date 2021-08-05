@@ -15,7 +15,8 @@ import paddle.distributed as dist
 
 from paddlenlp.transformers import TransformerModel, CrossEntropyCriterion
 
-sys.path.append("../")
+sys.path.append(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
 import reader
 from util.record import AverageStatistical
 
@@ -198,7 +199,7 @@ def do_train(args):
         for data in train_loader:
             # NOTE: used for benchmark and use None as default.
             if args.max_iter and step_idx == args.max_iter:
-                return
+                break
             if trainer_count == 1:
                 data = [data]
             train_reader_cost = time.time() - batch_start
@@ -275,6 +276,10 @@ def do_train(args):
             batch_id += 1
             step_idx += 1
             batch_start = time.time()
+
+        # NOTE: used for benchmark and use None as default.
+        if args.max_iter and step_idx == args.max_iter:
+            break
 
     if args.save_model and dist.get_rank() == 0:
         model_path = os.path.join(args.save_model, "step_final", "transformer")

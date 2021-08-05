@@ -27,12 +27,12 @@ def parse_args():
     parser.add_argument(
         "--model_file",
         type=str,
-        default='./static_graph_params.pdmodel',
+        default='./output/inference.pdmodel',
         help="The inference model file name.")
     parser.add_argument(
         "--params_file",
         type=str,
-        default='./static_graph_params.pdiparams',
+        default='./output/inference.pdiparams',
         help="The input inference parameters file name.")
     return parser.parse_args()
 

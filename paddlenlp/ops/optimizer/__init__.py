@@ -32,7 +32,7 @@ def _jit_compile():
         return True
     except RuntimeError as e:
         import sys
-        sys.stderr.write(str(e) + "\n")
+        sys.stderr.write(str(e) + "\n\n")
         sys.stderr.write(
             '''Warning with compile custom ops: compile custom adamw op failed. \nIf you do not use custom ops, please ignore this warning! \n\n'''
         )

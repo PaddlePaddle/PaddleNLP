@@ -9,7 +9,7 @@ rm -rf core.*
 rm -rf start_sharding*
 rm -rf main_sharding*
 
-task_name="gpt-mp-sharding"
+task_name="gpt-dp-sharding"
 rm -rf output/$task_name/log
 
 python -u  -m paddle.distributed.fleet.launch \
@@ -21,11 +21,9 @@ python -u  -m paddle.distributed.fleet.launch \
     --output_dir "output/$task_name" \
     --max_seq_len 1024 \
     --micro_batch_size 8 \
-    --global_batch_size 32 \
-    --sharding_degree 4\
-    --mp_degree 2 \
+    --global_batch_size 64 \
+    --sharding_degree 8\
     --dp_degree 1 \
-    --pp_degree 1 \
     --use_sharding true \
     --use_amp true \
     --use_recompute true \
