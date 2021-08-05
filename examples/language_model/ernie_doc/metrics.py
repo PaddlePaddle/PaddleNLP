@@ -86,14 +86,14 @@ class EM_AND_F1(object):
             else:
                 temp_str += char
 
-        #handling last part
+        #Handling last part
         if temp_str != "":
             ss = self.nltk.word_tokenize(temp_str)
             segs_out.extend(ss)
 
         return segs_out
 
-    # remove punctuation
+    # Remove punctuation
     def _remove_punctuation(self, in_str):
         """remove_punctuation"""
         in_str = in_str.lower().strip()
@@ -110,7 +110,7 @@ class EM_AND_F1(object):
                 out_segs.append(char)
         return ''.join(out_segs)
 
-    # find longest common string
+    # Find longest common string
     def _find_lcs(self, s1, s2):
         m = [[0 for i in range(len(s2) + 1)] for j in range(len(s1) + 1)]
         mmax = 0
@@ -200,7 +200,7 @@ def compute_qa_predictions(all_examples, all_features, all_results, n_best_size,
         features = example_index_to_features[example_index]
 
         prelim_predictions = []
-        # keep track of the minimum score of null start+end of position 0
+        # Keep track of the minimum score of null start+end of position 0
         for (feature_index, feature) in enumerate(features):
             result = unique_id_to_result[feature.qid]
             start_indexes = _get_best_indexes(result.start_logits, n_best_size)

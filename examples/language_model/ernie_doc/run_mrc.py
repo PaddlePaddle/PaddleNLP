@@ -39,7 +39,7 @@ from metrics import compute_qa_predictions, EM_AND_F1
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="pretraining model name or path")
+parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="Pretraining model name or path")
 parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--learning_rate", type=float, default=2.75e-4, help="Learning rate used to train.")
 parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
@@ -48,15 +48,15 @@ parser.add_argument("--output_dir", type=str, default='checkpoints/', help="Dire
 parser.add_argument("--epochs", type=int, default=5, help="Number of epoches for training.")
 parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
 parser.add_argument("--seed", type=int, default=1, help="Random seed for initialization.")
-parser.add_argument("--memory_length", type=int, default=128, help="Random seed for initialization.")
+parser.add_argument("--memory_length", type=int, default=128, help="Length of the retained previous heads.")
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
-parser.add_argument("--layerwise_decay", default=0.8, type=float, help="layerwise decay ratio")
+parser.add_argument("--layerwise_decay", default=0.8, type=float, help="Layerwise decay ratio")
 parser.add_argument("--n_best_size", default=20, type=int, help="The total number of n-best predictions to generate in the nbest_predictions.json output file.")
 parser.add_argument("--max_answer_length", default=100, type=int, help="Max answer length.")
 parser.add_argument("--do_lower_case", action='store_false', help="Whether to lower case the input text. Should be True for uncased models and False for cased models.")
 parser.add_argument("--verbose", action='store_true', help="Whether to output verbose log.")
-parser.add_argument("--dropout", default=0.1, type=float, help="dropout ratio of ernie_doc")
+parser.add_argument("--dropout", default=0.1, type=float, help="Dropout ratio of ernie_doc")
 parser.add_argument("--dataset", default="dureader_robust", type=str, choices=["dureader_robust", "cmrc2018", "drcd"], help="The avaliable Q&A dataset")
 # yapf: enable
 args = parser.parse_args()
@@ -109,7 +109,7 @@ def evaluate(args, model, criterion, metric, data_loader, memories0, tokenizer):
     tic_eval = time.time()
     memories = list(memories0)
 
-    # collect result
+    # Collect result
     logger.info("The example number of eval_dataloader: {}".format(
         len(data_loader._batch_reader.features)))
     for step, batch in enumerate(data_loader, start=1):
@@ -145,7 +145,7 @@ def evaluate(args, model, criterion, metric, data_loader, memories0, tokenizer):
                         start_logits=start_logits_each,
                         end_logits=end_logits_each))
 
-    # compute_predictions
+    # Compute_predictions
     all_predictions_eval, all_nbest_eval = compute_qa_predictions(
         data_loader._batch_reader.examples, data_loader._batch_reader.features,
         all_results, args.n_best_size, args.max_answer_length,
@@ -245,7 +245,7 @@ def do_train(args):
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
-    # construct dict
+    # Construct dict
     name_dict = dict()
     for n, p in model.named_parameters():
         name_dict[p.name] = n
@@ -300,7 +300,7 @@ def do_train(args):
                 tic_train = time.time()
 
             if global_steps % args.save_steps == 0:
-                # evaluate
+                # Evaluate
                 logger.info("Eval:")
                 EM, F1, AVG = evaluate(args, model, criterion,
                                        EM_AND_F1(), eval_dataloader,

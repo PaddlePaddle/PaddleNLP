@@ -41,7 +41,7 @@ from model import ErnieDocForTextMatching
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=6, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="pretraining model name or path")
+parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="Pretraining model name or path")
 parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--learning_rate", type=float, default=5e-5, help="Learning rate used to train.")
 parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
@@ -50,12 +50,12 @@ parser.add_argument("--output_dir", type=str, default='checkpoints/', help="Dire
 parser.add_argument("--epochs", type=int, default=15, help="Number of epoches for training.")
 parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
 parser.add_argument("--seed", type=int, default=1, help="Random seed for initialization.")
-parser.add_argument("--memory_length", type=int, default=128, help="Random seed for initialization.")
+parser.add_argument("--memory_length", type=int, default=128, help="Length of the retained previous heads.")
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--dataset", default="cail2019_scm", choices=["cail2019_scm"], type=str, help="The training dataset")
-parser.add_argument("--dropout", default=0.1, type=float, help="dropout ratio of ernie_doc")
-parser.add_argument("--layerwise_decay", default=1.0, type=float, help="layerwise decay ratio")
+parser.add_argument("--dropout", default=0.1, type=float, help="Dropout ratio of ernie_doc")
+parser.add_argument("--layerwise_decay", default=1.0, type=float, help="Layerwise decay ratio")
 
 # yapf: enable
 args = parser.parse_args()
@@ -103,18 +103,18 @@ def evaluate(model, metric, data_loader, memories0, pair_memories0):
             pair_attn_mask)
         logits, labels, qids = list(
             map(lambda x: paddle.gather(x, gather_idx), [logits, labels, qids]))
-        # need to collect probs for each qid, so use softmax_with_cross_entropy
+        # Need to collect probs for each qid, so use softmax_with_cross_entropy
         loss, probs = nn.functional.softmax_with_cross_entropy(
             logits, labels, return_softmax=True)
         losses.append(loss.mean().numpy())
-        # shape: [B, NUM_LABELS]
+        # Shape: [B, NUM_LABELS]
         np_probs = probs.numpy()
-        # shape: [B, 1]
+        # Shape: [B, 1]
         np_qids = qids.numpy()
         np_labels = labels.numpy().flatten()
         for i, qid in enumerate(np_qids.flatten()):
             probs_dict[qid].append(np_probs[i])
-            label_dict[qid] = np_labels[i]  # same qid share same label.
+            label_dict[qid] = np_labels[i]  # Same qid share same label.
 
         if step % eval_logging_step == 0:
             logger.info("Step %d: loss:  %.5f, speed: %.5f steps/s" %
@@ -122,7 +122,7 @@ def evaluate(model, metric, data_loader, memories0, pair_memories0):
                          eval_logging_step / (time.time() - tic_train)))
             tic_train = time.time()
 
-    # collect predicted labels
+    # Collect predicted labels
     preds = []
     labels = []
     for qid, probs in probs_dict.items():
@@ -147,13 +147,13 @@ def do_train(args):
         args.dataset]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    # get dataset
+    # Get dataset
     train_ds, eval_ds, test_ds = load_dataset(
         args.dataset, splits=["train", eval_name, test_name])
 
     num_classes = len(train_ds.label_list)
 
-    # initialize model 
+    # Initialize model 
     paddle.set_device(args.device)
     trainer_num = paddle.distributed.get_world_size()
     if trainer_num > 1:
@@ -230,7 +230,7 @@ def do_train(args):
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
-    # construct dict
+    # Construct dict
     name_dict = dict()
     for n, p in model.named_parameters():
         name_dict[p.name] = n
@@ -252,7 +252,7 @@ def do_train(args):
     create_memory = partial(init_memory, args.batch_size, args.memory_length,
                             model_config["hidden_size"],
                             model_config["num_hidden_layers"])
-    # copy the memory
+    # Copy the memory
     memories = create_memory()
     pair_memories = create_memory()
     tic_train = time.time()
@@ -279,7 +279,7 @@ def do_train(args):
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
-            # rough acc result, not a precise acc
+            # Rough acc result, not a precise acc
             acc = metric.compute(logits, labels) * need_cal_loss
             metric.update(acc)
 
@@ -292,11 +292,11 @@ def do_train(args):
                 tic_train = time.time()
 
             if global_steps % args.save_steps == 0:
-                # evaluate
+                # Evaluate
                 logger.info("Eval:")
                 eval_acc = evaluate(model, eval_metric, eval_dataloader,
                                     create_memory(), create_memory())
-                # save
+                # Save
                 if rank == 0:
                     output_dir = os.path.join(args.output_dir,
                                               "model_%d" % (global_steps))

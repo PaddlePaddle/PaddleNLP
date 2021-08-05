@@ -38,7 +38,7 @@ from data import MCQIterator
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="pretraining model name or path")
+parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="Pretraining model name or path")
 parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate used to train.")
 parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
@@ -47,13 +47,13 @@ parser.add_argument("--output_dir", type=str, default='checkpoints/', help="Dire
 parser.add_argument("--epochs", type=int, default=8, help="Number of epoches for training.")
 parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
 parser.add_argument("--seed", type=int, default=1, help="Random seed for initialization.")
-parser.add_argument("--memory_length", type=int, default=128, help="Random seed for initialization.")
+parser.add_argument("--memory_length", type=int, default=128, help="Length of the retained previous heads.")
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--dataset", default="c3", choices=["c3"], type=str, help="The training dataset")
-parser.add_argument("--layerwise_decay", default=0.8, type=float, help="layerwise decay ratio")
+parser.add_argument("--layerwise_decay", default=0.8, type=float, help="Layerwise decay ratio")
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--gradient_accumulation_steps", default=4, type=int, help="gradient_accumulation_steps")
+parser.add_argument("--gradient_accumulation_steps", default=4, type=int, help="Number of updates steps to accumualte before performing a backward/update pass.")
 
 # yapf: enable
 args = parser.parse_args()
@@ -79,7 +79,7 @@ def init_memory(batch_size, memory_length, d_model, n_layers):
 def evaluate(model, metric, data_loader, memories0, choice_num):
     model.eval()
     losses = []
-    # copy the memory
+    # Copy the memory
     memories = list(memories0)
     tic_train = time.time()
     eval_logging_step = 500
@@ -101,14 +101,14 @@ def evaluate(model, metric, data_loader, memories0, choice_num):
         loss, probs = nn.functional.softmax_with_cross_entropy(
             logits, labels, return_softmax=True)
         losses.append(loss.mean().numpy())
-        # shape: [B, NUM_LABELS]
+        # Shape: [B, NUM_LABELS]
         np_probs = probs.numpy()
-        # shape: [B, 1]
+        # Shape: [B, 1]
         np_qids = qids.numpy().flatten()
         np_labels = labels.numpy().flatten()
         for i, qid in enumerate(np_qids):
             probs_dict[qid].append(np_probs[i])
-            label_dict[qid] = np_labels[i]  # same qid share same label.
+            label_dict[qid] = np_labels[i]  # Same qid share same label.
 
         if step % eval_logging_step == 0:
             logger.info("Step %d: loss:  %.5f, speed: %.5f steps/s" %

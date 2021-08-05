@@ -59,7 +59,7 @@ def pad_batch_data(insts,
     # Any token included in dict can be used to pad, since the paddings' loss
     # will be masked out by weights and make no effect on parameter gradients.
 
-    # id
+    # Input id
     if final_cls:
         inst_data = np.array([
             inst[:-1] + list([pad_idx] * (max_len - len(inst))) + [inst[-1]]
@@ -70,7 +70,7 @@ def pad_batch_data(insts,
             [inst + list([pad_idx] * (max_len - len(inst))) for inst in insts])
     return_list += [inst_data.astype(insts_data_type).reshape([-1, max_len, 1])]
 
-    # position data
+    # Position id
     if return_pos:
         inst_pos = np.array([
             list(range(0, len(inst))) + [pad_idx] * (max_len - len(inst))
@@ -168,7 +168,7 @@ class ClassifierIterator(object):
             self.global_rng.shuffle(self.dataset)
 
     def _cnt_list(self, inp):
-        """cnt_list"""
+        """Cnt_list"""
         cnt = 0
         for lit in inp:
             if lit:
@@ -220,7 +220,7 @@ class ClassifierIterator(object):
 
     def _get_samples(self, pre_batch_list, is_last=False):
         if is_last:
-            # pad batch
+            # Pad batch
             len_doc = [len(doc) for doc in pre_batch_list]
             max_len_idx = len_doc.index(max(len_doc))
             dirty_sample = pre_batch_list[max_len_idx][-1]._replace(cal_loss=0)
@@ -247,7 +247,7 @@ class ClassifierIterator(object):
                 [-1, 1])
         else:
             batch_labels = np.array([]).astype("int64").reshape([-1, 1])
-        # qid
+        # Qid
         if batch_records[-1].qid is not None:
             batch_qids = [record.qid for record in batch_records]
             batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
@@ -263,7 +263,7 @@ class ClassifierIterator(object):
                 "int64").reshape([-1, 1])
             need_cal_loss = np.array([0]).astype("int64")
 
-        # padding
+        # Padding
         padded_token_ids, input_mask = pad_batch_data(
             batch_token_ids, pad_idx=self.tokenizer.pad_token_id, pad_max_len=self.max_seq_length, \
             final_cls=True, return_input_mask=True)
@@ -556,7 +556,7 @@ class MRCIterator(ClassifierIterator):
                         flush=True)
 
                 unique_id += 1
-            #repeat
+            # Repeat
             if self.repeat_input:
                 features_each_repeat = features_each
                 features_each = list(
@@ -568,9 +568,9 @@ class MRCIterator(ClassifierIterator):
         return features
 
     def _preprocess_data(self):
-        # construct examples
+        # Construct examples
         self.examples = self._convert_qa_to_examples()
-        # construct features
+        # Construct features
         self.features = self._convert_example_to_feature(self.examples)
 
     def get_num_examples(self):
@@ -580,7 +580,7 @@ class MRCIterator(ClassifierIterator):
 
     def _improve_answer_span(self, doc_tokens, input_start, input_end,
                              orig_answer_text):
-        """improve answer span"""
+        """Improve answer span"""
         tok_answer_text = " ".join(self.tokenizer.tokenize(orig_answer_text))
 
         for new_start in range(input_start, input_end + 1):
@@ -592,7 +592,7 @@ class MRCIterator(ClassifierIterator):
         return (input_start, input_end)
 
     def _check_is_max_context(self, doc_spans, cur_span_index, position):
-        """chech is max context"""
+        """Check is max context"""
         best_score = None
         best_span_index = None
         for (span_index, doc_span) in enumerate(doc_spans):
@@ -614,7 +614,7 @@ class MRCIterator(ClassifierIterator):
         return cur_span_index == best_span_index
 
     def _pad_batch_records(self, batch_records, gather_idx=[]):
-        """pad batch data"""
+        """Pad batch data"""
         batch_token_ids = [record.src_ids for record in batch_records]
 
         if self.mode == "train":
@@ -665,7 +665,7 @@ class MRCIterator(ClassifierIterator):
         return return_list
 
     def _create_instances(self):
-        """generate batch records"""
+        """Generate batch records"""
         pre_batch_list = []
         insert_idx = []
         for qid, features in enumerate(self.features_all):
@@ -839,7 +839,7 @@ class MCQIterator(MRCIterator):
                 features.append(qa_features)
                 features_each.append(qa_features)
 
-            #repeat
+            # Repeat
             if self.repeat_input:
                 features_each_repeat = features_each
                 features_each = list(
@@ -860,7 +860,7 @@ class MCQIterator(MRCIterator):
                 [-1, 1])
         else:
             batch_labels = np.array([]).astype("int64").reshape([-1, 1])
-        # qid
+        # Qid
         batch_qids = [[record.qid for record in records]
                       for records in batch_records]
         batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
@@ -877,7 +877,7 @@ class MCQIterator(MRCIterator):
         batch_task_ids = [[record.segment_ids for record in records]
                           for records in batch_records]
 
-        # padding
+        # Padding
         batch_padded_token_ids = []
         batch_input_mask = []
         batch_padded_task_ids = []
@@ -951,7 +951,7 @@ class MCQIterator(MRCIterator):
 
     def _get_samples(self, pre_batch_list, is_last=False):
         if is_last:
-            # pad batch
+            # Pad batch
             len_doc = [[len(doc) for doc in doc_list]
                        for doc_list in pre_batch_list]
             len_doc = list(itertools.chain(*len_doc))
@@ -1019,7 +1019,7 @@ class SemanticMatchingIterator(MRCIterator):
                 map(lambda x: len(x),
                     [text_a_tokens, text_b_tokens, text_c_tokens]))
 
-            # align 3 text
+            # Align 3 text
             min_text_len = min([a_len, b_len, c_len])
             text_a_tokens = text_a_tokens[:min_text_len]
             text_b_tokens = text_b_tokens[:min_text_len]
@@ -1063,7 +1063,7 @@ class SemanticMatchingIterator(MRCIterator):
                 features.append(feature)
                 features_each.append(feature)
 
-            #repeat
+            # Repeat
             if self.repeat_input:
                 features_each_repeat = features_each
                 features_each = list(
@@ -1082,7 +1082,7 @@ class SemanticMatchingIterator(MRCIterator):
             getattr(record, segment_ids) for record in batch_records
         ]
 
-        # padding
+        # Padding
         padded_token_ids, input_mask = pad_batch_data(
             batch_token_ids,
             pad_idx=self.tokenizer.pad_token_id,
@@ -1107,7 +1107,7 @@ class SemanticMatchingIterator(MRCIterator):
                 [-1, 1])
         else:
             batch_labels = np.array([]).astype("int64").reshape([-1, 1])
-        # qid
+        # Qid
         batch_qids = [record.qid for record in batch_records]
         batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
 
@@ -1204,7 +1204,7 @@ class SequenceLabelingIterator(ClassifierIterator):
             batch_labels = [record.label_ids for record in batch_records]
         else:
             batch_labels = np.array([]).astype("int64").reshape([-1, 1])
-        # qid
+        # Qid
         if batch_records[-1].qid is not None:
             batch_qids = [record.qid for record in batch_records]
             batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
@@ -1219,7 +1219,7 @@ class SequenceLabelingIterator(ClassifierIterator):
             batch_gather_idx = np.array(list(range(len(batch_records)))).astype(
                 "int64").reshape([-1, 1])
             need_cal_loss = np.array([0]).astype("int64")
-        # padding
+        # Padding
         padded_token_ids, input_mask = pad_batch_data(
             batch_token_ids,
             pad_idx=self.tokenizer.pad_token_id,

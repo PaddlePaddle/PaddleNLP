@@ -39,7 +39,7 @@ from data import SequenceLabelingIterator
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="pretraining model name or path")
+parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-zh", help="Pretraining model name or path")
 parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--learning_rate", type=float, default=3e-5, help="Learning rate used to train.")
 parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
@@ -48,11 +48,11 @@ parser.add_argument("--output_dir", type=str, default='checkpoints/', help="Dire
 parser.add_argument("--epochs", type=int, default=3, help="Number of epoches for training.")
 parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
 parser.add_argument("--seed", type=int, default=1, help="Random seed for initialization.")
-parser.add_argument("--memory_length", type=int, default=128, help="Random seed for initialization.")
+parser.add_argument("--memory_length", type=int, default=128, help="Length of the retained previous heads.")
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--dataset", default="msra_ner", choices=["msra_ner"], type=str, help="The training dataset")
-parser.add_argument("--layerwise_decay", default=1.0, type=float, help="layerwise decay ratio")
+parser.add_argument("--layerwise_decay", default=1.0, type=float, help="Layerwise decay ratio")
 # yapf: enable
 args = parser.parse_args()
 
@@ -80,7 +80,7 @@ def evaluate(model, metric, data_loader, memories0):
     avg_loss, precision, recall, f1_score = 0, 0, 0, 0
     loss_fct = paddle.nn.loss.CrossEntropyLoss()
     losses = []
-    # copy the memory
+    # Copy the memory
     memories = list(memories0)
     tic_train = time.time()
     eval_logging_step = 500
@@ -213,7 +213,7 @@ def do_train(args):
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
-    # construct dict
+    # Construct dict
     name_dict = dict()
     for n, p in model.named_parameters():
         name_dict[p.name] = n
@@ -235,7 +235,7 @@ def do_train(args):
     create_memory = partial(init_memory, args.batch_size, args.memory_length,
                             model_config["hidden_size"],
                             model_config["num_hidden_layers"])
-    # copy the memory
+    # Copy the memory
     memories = create_memory()
     tic_train = time.time()
     best_f1 = 0
@@ -264,12 +264,12 @@ def do_train(args):
                        args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
             if global_steps % args.save_steps == 0:
-                # evaluate
+                # Evaluate
                 logger.info("Eval:")
                 precision, recall, f1_score = evaluate(model, metric,
                                                        eval_dataloader,
                                                        create_memory())
-                # save
+                # Save
                 if rank == 0:
                     output_dir = os.path.join(args.output_dir,
                                               "model_%d" % (global_steps))
