@@ -1,7 +1,6 @@
 set -x
 export PADDLE_WITH_GLOO=0
 export FLAGS_call_stack_level=2
-export FLAGS_allocator_strategy=naive_best_fit
 unset CUDA_VISIBLE_DEVICES
 
 rm -rf *.prototxt
@@ -9,27 +8,27 @@ rm -rf core.*
 rm -rf start_sharding*
 rm -rf main_sharding*
 
-task_name="gpt-mp-sharding"
+task_name="ernie-1.0-dp-sharding"
 rm -rf output/$task_name/log
 
-python -u  -m paddle.distributed.fleet.launch \
-    --gpus "0,1,2,3,4,5,6,7" \
+PYTHONPATH=../../../ python -u  -m paddle.distributed.fleet.launch \
+    --gpus "0" \
     --log_dir "output/$task_name/log" run_pretrain_static.py \
-    --model_type "gpt" \
-    --model_name_or_path "gpt3-1.3B-en" \
+    --model_type "ernie" \
+    --model_name_or_path "ernie-1.0" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
-    --max_seq_len 1024 \
-    --micro_batch_size 8 \
-    --global_batch_size 32 \
-    --sharding_degree 4\
-    --mp_degree 2 \
+    --max_seq_len 128 \
+    --micro_batch_size 64 \
+    --global_batch_size 64 \
+    --sharding_degree 1\
+    --mp_degree 1 \
     --dp_degree 1 \
     --pp_degree 1 \
-    --use_sharding true \
+    --use_sharding false \
     --use_amp true \
-    --use_recompute true \
-    --max_lr 0.00015 \
+    --use_recompute false \
+    --max_lr 0.0001 \
     --min_lr 0.00001 \
     --max_steps 500000 \
     --save_steps 100000 \
@@ -37,7 +36,7 @@ python -u  -m paddle.distributed.fleet.launch \
     --weight_decay 0.01\
     --warmup_rate 0.01 \
     --grad_clip 1.0 \
-    --logging_freq 1\
+    --logging_freq 20\
     --eval_freq 1000 \
     --device "gpu"
 
