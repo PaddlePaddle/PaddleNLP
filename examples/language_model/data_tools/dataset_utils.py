@@ -33,8 +33,9 @@ print_rank_0 = print
 
 DSET_TYPE_BERT = 'standard_bert'
 DSET_TYPE_T5 = 't5'
+DSET_TYPE_ERNIE = 'ernie'
 
-DSET_TYPES = [DSET_TYPE_BERT, DSET_TYPE_T5]
+DSET_TYPES = [DSET_TYPE_BERT, DSET_TYPE_T5, DSET_TYPE_ERNIE]
 
 
 class MMapIndexedDataset(paddle.io.Dataset):
@@ -42,12 +43,9 @@ class MMapIndexedDataset(paddle.io.Dataset):
         super().__init__()
 
         self._path = path
-
-        process_datas = np.load(path, mmap_mode="r+", allow_pickle=True)
+        process_datas = np.load(path, mmap_mode="r", allow_pickle=True)
         # All documment ids, extend as 1-D array.
         self._token_ids = process_datas["ids"]
-        # The len(sample_lens) num of docs
-        # The sum(sample_lens) should equal len(sample_ids)
         self._sizes = process_datas["lens"]
         self._pointers = np.insert(np.cumsum(self._sizes), 0, 0)
         self._doc_idx = process_datas["docs"]
@@ -234,6 +232,7 @@ def create_masked_lm_predictions(tokens,
                                  do_permutation=False,
                                  geometric_dist=False,
                                  to_chinese_char=False,
+                                 inplace_random_mask=False,
                                  masking_style="bert"):
     """Creates the predictions for the masked LM objective.
     Note: Tokens here are vocab ids and not text tokens."""
@@ -310,6 +309,7 @@ def create_masked_lm_predictions(tokens,
 
     (masked_lms, masked_spans) = ([], [])
     covered_indexes = set()
+    backup_output_tokens = list(output_tokens)
     for cand_index_set in ngram_indexes:
         if len(masked_lms) >= num_to_predict:
             break
@@ -364,11 +364,15 @@ def create_masked_lm_predictions(tokens,
                 else:
                     # 10% of the time, keep original
                     if np_rng.random() < 0.5:
-                        masked_token = tokens[index]
+                        masked_token = output_tokens[index]
                     # 10% of the time, replace with random word
                     else:
-                        masked_token = vocab_id_list[np_rng.randint(
-                            0, len(vocab_id_list))]
+                        if inplace_random_mask:
+                            masked_token = backup_output_tokens[np_rng.randint(
+                                0, len(output_tokens))]
+                        else:
+                            masked_token = vocab_id_list[np_rng.randint(
+                                0, len(vocab_id_list))]
             elif masking_style == "t5":
                 masked_token = mask_id
             else:
@@ -484,6 +488,7 @@ def pad_and_convert_to_numpy(tokens, tokentypes, masked_positions,
 
 def build_train_valid_test_datasets(data_prefix,
                                     data_impl,
+                                    tokenizer,
                                     splits_string,
                                     train_valid_test_num_samples,
                                     max_seq_length,
@@ -499,6 +504,7 @@ def build_train_valid_test_datasets(data_prefix,
         return _build_train_valid_test_datasets(
             data_prefix[0],
             data_impl,
+            tokenizer,
             splits_string,
             train_valid_test_num_samples,
             max_seq_length,
@@ -513,6 +519,7 @@ def build_train_valid_test_datasets(data_prefix,
 
 def _build_train_valid_test_datasets(data_prefix,
                                      data_impl,
+                                     tokenizer,
                                      splits_string,
                                      train_valid_test_num_samples,
                                      max_seq_length,
@@ -555,9 +562,9 @@ def _build_train_valid_test_datasets(data_prefix,
     print_split_stats('test', 2)
 
     def build_dataset(index, name):
-        from megatron.data.bert_dataset import BertDataset
-        from megatron.data.ict_dataset import ICTDataset
-        from megatron.data.t5_dataset import T5Dataset
+        # from megatron.data.bert_dataset import BertDataset
+        # from megatron.data.t5_dataset import T5Dataset
+        from .ernie_dataset import ErnieDataset
         dataset = None
         if splits[index + 1] > splits[index]:
             # Get the pointer to the original doc-idx so we can set it later.
@@ -579,6 +586,7 @@ def _build_train_valid_test_datasets(data_prefix,
             if dataset_type == DSET_TYPE_T5:
                 dataset = T5Dataset(
                     indexed_dataset=indexed_dataset,
+                    tokenizer=tokenizer,
                     masked_lm_prob=masked_lm_prob,
                     max_seq_length_dec=max_seq_length_dec,
                     short_seq_prob=short_seq_prob,
@@ -586,6 +594,15 @@ def _build_train_valid_test_datasets(data_prefix,
             elif dataset_type == DSET_TYPE_BERT:
                 dataset = BertDataset(
                     indexed_dataset=indexed_dataset,
+                    tokenizer=tokenizer,
+                    masked_lm_prob=masked_lm_prob,
+                    short_seq_prob=short_seq_prob,
+                    binary_head=binary_head,
+                    **kwargs)
+            elif dataset_type == DSET_TYPE_ERNIE:
+                dataset = ErnieDataset(
+                    indexed_dataset=indexed_dataset,
+                    tokenizer=tokenizer,  #ErnieTokenizer.from_pretrained("ernie-1.0"),
                     masked_lm_prob=masked_lm_prob,
                     short_seq_prob=short_seq_prob,
                     binary_head=binary_head,
@@ -697,7 +714,7 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
         print_rank_0(' > building sapmles index mapping for {} ...'.format(
             name))
         # First compile and then import.
-        import helpers
+        import data_tools.helpers as helpers
         samples_mapping = helpers.build_mapping(
             indexed_dataset.doc_idx, indexed_dataset.sizes, num_epochs,
             max_num_samples, max_seq_length, short_seq_prob, seed, verbose, 2

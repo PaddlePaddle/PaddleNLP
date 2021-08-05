@@ -331,7 +331,7 @@ def main():
                 mbs = total_bytes_processed / elapsed / 1024 / 1024
                 print(
                     f"Processed {i} documents",
-                    f"({i/elapsed} docs/s, {mbs} MB/s).",
+                    f"({i/elapsed:.2f} docs/s, {mbs:.4f} MB/s).",
                     file=sys.stderr)
 
     pool.close()

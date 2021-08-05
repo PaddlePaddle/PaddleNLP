@@ -780,20 +780,18 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
 
     """
 
-    def __init__(self, vocab_size):
+    def __init__(self):
         super(ErniePretrainingCriterion, self).__init__()
         self.loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=-1)
-        self.vocab_size = vocab_size
 
     def forward(self, prediction_scores, seq_relationship_score,
-                masked_lm_labels, next_sentence_labels, masked_lm_scale):
+                masked_lm_labels, next_sentence_labels):
         with paddle.static.amp.fp16_guard():
             masked_lm_loss = F.cross_entropy(
                 prediction_scores,
                 masked_lm_labels,
                 ignore_index=-1,
                 reduction='none')
-            masked_lm_loss = masked_lm_loss / masked_lm_scale
             next_sentence_loss = F.cross_entropy(
                 seq_relationship_score, next_sentence_labels, reduction='none')
-            return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)
+            return paddle.mean(masked_lm_loss), paddle.mean(next_sentence_loss)

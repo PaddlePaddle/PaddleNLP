@@ -18,7 +18,7 @@ import numpy as np
 import paddle
 import re
 
-from dataset_utils import (
+from .dataset_utils import (
     get_samples_mapping,
     get_a_and_b_segments,
     truncate_segments,
@@ -122,7 +122,7 @@ def build_training_sample(sample, target_seq_length, max_seq_length,
 
     if binary_head:
         # We assume that we have at least two sentences in the sample
-        assert len(sample) > 1
+        assert len(sample) > 1, "The sentence num should be large than 1."
     assert target_seq_length <= max_seq_length
 
     # Divide sample into two segments (A and B).
@@ -160,23 +160,16 @@ def build_training_sample(sample, target_seq_length, max_seq_length,
          max_predictions_per_seq,
          np_rng,
          vocab_token_to_id_dict=vocab_token_to_id_dict,
-         to_chinese_char=True)
+         to_chinese_char=True,
+         inplace_random_mask=True, )
 
     # Padding.
     tokens_np, tokentypes_np, labels_np, padding_mask_np, loss_mask_np \
         = pad_and_convert_to_numpy(tokens, tokentypes, masked_positions,
                                    masked_labels, pad_id, max_seq_length)
 
-    train_sample = {
-        'text': tokens_np,
-        'types': tokentypes_np,
-        'labels': labels_np,
-        'is_random': int(is_next_random),
-        'loss_mask': loss_mask_np,
-        'padding_mask': padding_mask_np,
-        'truncated': int(truncated)
-    }
-    return train_sample
+    return tokens_np, tokentypes_np, padding_mask_np, masked_positions, masked_labels, int(
+        is_next_random)
 
 
 def pad_and_convert_to_numpy(tokens, tokentypes, masked_positions,
@@ -197,8 +190,8 @@ def pad_and_convert_to_numpy(tokens, tokentypes, masked_positions,
 
     # Padding mask.
     padding_mask_np = np.array(
-        [1] * num_tokens + [0] * padding_length, dtype=np.int64)
-
+        [1] * num_tokens + [0] * padding_length, dtype=np.float32)
+    padding_mask_np = padding_mask_np.reshape([1, 1, -1])
     # Lables and loss mask.
     labels = [-1] * max_seq_length
     loss_mask = [0] * max_seq_length
@@ -210,25 +203,3 @@ def pad_and_convert_to_numpy(tokens, tokentypes, masked_positions,
     loss_mask_np = np.array(loss_mask, dtype=np.int64)
 
     return tokens_np, tokentypes_np, labels_np, padding_mask_np, loss_mask_np
-
-
-if __name__ == "__main__":
-    ernie_tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
-    indexed_dataset = get_indexed_dataset_("xxxsg_ids_lens.npz", None, False)
-    ds = ErnieDataset(
-        name="ernie-test",
-        tokenizer=ernie_tokenizer,
-        indexed_dataset=indexed_dataset,
-        data_prefix="test",
-        num_epochs=None,
-        max_num_samples=20000,
-        masked_lm_prob=0.15,
-        max_seq_length=512,
-        short_seq_prob=0.1,
-        seed=1234,
-        binary_head=True)
-
-    print(ds[3])
-    print(
-        ernie_tokenizer.convert_tokens_to_string(
-            ernie_tokenizer.vocab.to_tokens(ds[3]["text"].tolist())))

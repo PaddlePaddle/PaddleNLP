@@ -46,7 +46,7 @@ def get_args():
     parser.add_argument(
         '--doc_spliter',
         type=str,
-        default='\n',
+        default='',
         help="Spliter between documents. The spacial char is hard to input in shell, you can change it here."
     )
     parser.add_argument(
@@ -66,12 +66,13 @@ def get_args():
         help='Interval between progress updates.')
     parser.add_argument(
         '--no-merge', action='store_true', help='Don\'t merge the file.')
+    parser.add_argument(
+        '--no-shuffle', action='store_true', help='Don\'t shuffle the file.')
     args = parser.parse_args()
     return args
 
 
-def raw_text_to_json(path, doc_spliter="\n", json_key="text",
-                     min_doc_length=10):
+def raw_text_to_json(path, doc_spliter="", json_key="text", min_doc_length=10):
     path = os.path.abspath(path)
     if not os.path.exists(path):
         print("No found file %s" % path)
@@ -85,7 +86,7 @@ def raw_text_to_json(path, doc_spliter="\n", json_key="text",
         line = f.readline()
         while line:
             len_files += len(line)
-            if line == doc_spliter:
+            if line.strip() == doc_spliter:
                 if len(doc) > min_doc_length:
                     fout.write(
                         json.dumps(
@@ -107,6 +108,7 @@ def raw_text_to_json(path, doc_spliter="\n", json_key="text",
 def merge_file(file_paths, output_path):
     if not output_path.endswith(".jsonl"):
         output_path = output_path + ".jsonl"
+    print("Merging files into %s" % output_path)
     with open(output_path, 'wb') as wfd:
         for f in file_paths:
             if f is not None and os.path.exists(f):
@@ -114,6 +116,16 @@ def merge_file(file_paths, output_path):
                     shutil.copyfileobj(fd, wfd)
                 os.remove(f)
     print("File save in %s" % output_path)
+    return output_path
+
+
+def shuffle_file(output_path):
+    print("Shuffling the jsonl file...")
+    if os.path.exists(output_path):
+        os.system("shuf %s -o %s" % (output_path, output_path))
+        print("File shuffled!!!")
+    else:
+        raise ValueError("File not found: %s" % output_path)
 
 
 def main():
@@ -158,7 +170,9 @@ def main():
                 file=sys.stderr)
 
     if not args.no_merge:
-        merge_file(out_paths, args.output_path)
+        output_path = merge_file(out_paths, args.output_path)
+        if not args.no_shuffle:
+            shuffle_file(output_path)
 
 
 if __name__ == "__main__":
