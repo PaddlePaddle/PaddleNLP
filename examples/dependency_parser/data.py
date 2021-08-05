@@ -13,11 +13,7 @@
 # limitations under the License.
 
 from collections import defaultdict, namedtuple, Counter
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
-    from io import open
+from collections.abc import Iterable
 import math
 import six
 import numpy as np
@@ -272,12 +268,12 @@ class ErnieField(Field):
         if self.fix_len <= 0:
             self.fix_len = max(len(token) for seq in sequences for token in seq)
         if self.bos:
-            sequences = [[[self.bos]] + seq for seq in sequences]
+            sequences = [[[self.bos_index]] + seq for seq in sequences]
         if self.eos:
-            sequences = [seq + [[self.eos]] for seq in sequences]
+            sequences = [seq + [[self.eos_index]] for seq in sequences]
 
         sequences = [
-            pad_sequence([np.array(ids[:self.fix_len], dtype=np.int64) for ids in seq], self.pad, self.fix_len)
+            pad_sequence([np.array(ids[:self.fix_len], dtype=np.int64) for ids in seq], self.pad_index, self.fix_len)
             for seq in sequences
         ]
         return sequences

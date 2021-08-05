@@ -17,7 +17,7 @@ import paddle.nn as nn
 from paddle.fluid import layers
 
 from model.dropouts import SharedDropout
-from model.embedding import LSTMEmbed, LSTMByWPEmbed, ErnieEmbed
+from model.encoder import LSTMEncoder, LSTMByWPEncoder, ErnieEncoder
 
 class DDParserModel(nn.Layer):
     """DDParser"""
@@ -32,11 +32,11 @@ class DDParserModel(nn.Layer):
         self.pretrained_model = pretrained_model
 
         if args.encoding_model == "lstm":
-            self.embed = LSTMEmbed(self.args)
-        elif args.encoding_model == "ernie-lstm":
-            self.embed = LSTMByWPEmbed(self.args)
+            self.embed = LSTMEncoder(self.args)
+        elif args.encoding_model == "lstm-pe":
+            self.embed = LSTMByWPEncoder(self.args)
         else:
-            self.embed = ErnieEmbed(self.args, self.pretrained_model)
+            self.embed = ErnieEncoder(self.args, self.pretrained_model)
 
         # mlp layer
         self.mlp_arc_h = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_arc, dropout=mlp_dropout)
