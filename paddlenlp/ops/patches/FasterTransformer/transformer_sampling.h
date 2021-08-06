@@ -518,6 +518,8 @@ public:
         // TODO(): repeat penalty vertification.
         apply_penalties_Launcher(step,
                                  logits_buf_,
+                                 decoding_params.embedding_bias_T,
+                                 finished_buf_,
                                  nullptr, /*current_ids*/
                                  nullptr, /*previous_ids*/
                                  nullptr, /*parent_ids*/
@@ -534,14 +536,6 @@ public:
 
       if (args_.candidate_num_ != 0) {
         // top k sampling
-        update_logits_without_softmax(logits_buf_,
-                                      decoding_params.embedding_bias_T,
-                                      args_.end_id_,
-                                      finished_buf_,
-                                      m,
-                                      n,
-                                      decoding_params.stream);
-
         topK_sampling_kernel_kernelLauncher(
             topk_workspace_,
             topk_workspace_size_,
@@ -555,9 +549,9 @@ public:
       } else if (args_.probability_threshold_ != 0.0) {
         // top p sampling
         softmax_kernelLauncher(logits_buf_,
-                               decoding_params.embedding_bias_T,
+                               (DataType_ *)nullptr,
                                args_.end_id_,
-                               finished_buf_,
+                               nullptr,
                                m,
                                n,
                                decoding_params.stream);

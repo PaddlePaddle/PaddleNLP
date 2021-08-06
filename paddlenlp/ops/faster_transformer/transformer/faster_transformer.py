@@ -483,7 +483,7 @@ class FasterGPT(nn.Layer):
 class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
     def __init__(self,
                  model,
-                 decoding_strategy="topk_sampling",
+                 decoding_strategy="sampling",
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  decoding_type_id=1):
@@ -495,7 +495,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         self.eos_token_id = model.eos_token_id
         self.unk_token_id = model.unk_token_id
         self.vocab_size = model.lm_head.decoder_bias.shape[0]
-        self.logits_mask = self.generate_logits_mask()
+        self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
@@ -529,10 +529,10 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             "seq_len": seq_len
         }
 
-    def generate_logits_mask(self):
+    def generate_logits_mask(self, use_fp16_decoding):
         # pre-process distribution
-        logits_mask = paddle.zeros(
-            shape=[self.vocab_size], dtype=paddle.get_default_dtype())
+        d_type = "float16" if use_fp16_decoding and self._decoding_strategy == "sampling" else "float32"
+        logits_mask = paddle.zeros(shape=[self.vocab_size], dtype=d_type)
         logits_mask[self.unk_token_id] = -1e9
         logits_mask[self.bos_token_id] = -1e9
         logits_mask[self.pad_token_id] = -1e9
@@ -553,10 +553,14 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
 
-        if self._decoding_strategy == "topk_sampling":
-            top_p = 0.0
-        elif self._decoding_strategy == "topp_sampling":
-            top_k = 0
+        # if self._decoding_strategy == "sampling" and (top_p == 1.0 and top_k > 0):
+        #     top_p = 0.0
+        # elif self._decoding_strategy == "sampling" and (top_p != 1.0 and top_k == 0):
+        #     top_k = 0
+        # else:
+        #     raise ValueError(
+        #         "Only topk sampling or topp sampling are supported. " \
+        #         "Topk sampling and topp sampling cannot be both applied. ")
 
         return self.forward(
             model_inputs=model_inputs,
@@ -595,7 +599,6 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             raise RuntimeError('Not support.')
         cache_k = [c.k for c in caches]
         cache_v = [c.v for c in caches]
-        print(paddle.mean(cache_k[0]))
 
         return self.decoding(
             cache_k=cache_k,

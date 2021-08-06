@@ -36,10 +36,10 @@ __global__ void embeddings_kernels(T* from_tensor,
     const int row_index = index / hidden_units;
     const int col_index = index % hidden_units;
     from_tensor[index] =
-        embedding_table[word_ids[row_index] * hidden_units + col_index]  //
-        + position_encoding[(step - 1 + memory_sequence_length[row_index]) *
-                                hidden_units +
-                            col_index] +
+        embedding_table[word_ids[row_index] * hidden_units + col_index] +
+        position_encoding[(step - 1 + memory_sequence_length[row_index]) *
+                              hidden_units +
+                          col_index] +
         type_table[type_id * hidden_units + col_index];
   }
 }
@@ -166,6 +166,8 @@ __global__ void apply_penalties_kernel(int step,
                                        int vocab_size,
                                        int beam_width,
                                        T* log_probs,
+                                       const T* bias,
+                                       const bool* finished,
                                        int* current_ids,
                                        int* previous_ids,
                                        int* parent_ids,
@@ -176,73 +178,92 @@ __global__ void apply_penalties_kernel(int step,
                                        const T* logits_mask = nullptr) {
   int tid = threadIdx.x;
   int bid = blockIdx.x;
-  int bbid = blockIdx.y;   // batch_size * beam_size
+  int bbid = blockIdx.y;   // batch_size * beam_size: index
   int bbsize = gridDim.y;  // batch_size * beam_size
   int batchid = bbid / beam_width;
   // int beamid = bbid % beam_width;
 
-  // temperature
+  bool finish = (finished != nullptr) ? finished[bbid] : false;
+
+  const bool IS_FP16 = std::is_same<T, half>::value;
+  const T MAX_T_VAL = (IS_FP16) ? HALF_FLT_MAX : FLT_MAX;
   for (int i = tid + bid * blockDim.x; i < vocab_size;
        i += blockDim.x * gridDim.x) {
-    log_probs[i + bbid * vocab_size] *= inv_temp;
-  }
-
-  if (tid == 0 && bid == 0) {
-    // apply repetition penalty (this can apply the penalty multiple times to a
-    // repeated word).
-    if (repeat_penalty != 1.0) {
-      int prev_id = current_ids[bbid];
-      if (log_probs[prev_id + bbid * vocab_size] > T(0)) {
-        log_probs[prev_id + bbid * vocab_size] =
-            float(log_probs[prev_id + bbid * vocab_size]) / repeat_penalty;
-      } else {
-        log_probs[prev_id + bbid * vocab_size] =
-            float(log_probs[prev_id + bbid * vocab_size]) * repeat_penalty;
-      }
-
-      if (step > 1) {
-        int parent_beamid = parent_ids[bbsize * (step - 2) + bbid];
-        for (int i = step - 2; i > 0; --i) {
-          prev_id =
-              previous_ids[i * bbsize + batchid * beam_width + parent_beamid];
-          if (log_probs[prev_id + bbid * vocab_size] > T(0)) {
-            log_probs[prev_id + bbid * vocab_size] =
-                float(log_probs[prev_id + bbid * vocab_size]) / repeat_penalty;
-          } else {
-            log_probs[prev_id + bbid * vocab_size] =
-                float(log_probs[prev_id + bbid * vocab_size]) * repeat_penalty;
-          }
-          // if (i > 0) parent_beamid = parent_ids[bbsize*(i-1)+parent_beamid];
-          parent_beamid = parent_ids[bbsize * (i - 1) + parent_beamid];
-        }
-      }
-      prev_id = previous_ids[batchid * beam_width];
-      if (log_probs[prev_id + bbid * vocab_size] > T(0)) {
-        log_probs[prev_id + bbid * vocab_size] =
-            float(log_probs[prev_id + bbid * vocab_size]) / repeat_penalty;
-      } else {
-        log_probs[prev_id + bbid * vocab_size] =
-            float(log_probs[prev_id + bbid * vocab_size]) * repeat_penalty;
-      }
-    }
-
-    // apply length penalty
-    // NOTE: The length penalty has different implementation. May be update.
-    if (len_penalty != 1.0) {
-      if (log_probs[end_id + bbid * vocab_size] > T(0)) {
-        log_probs[end_id + bbid * vocab_size] =
-            float(log_probs[end_id + bbid * vocab_size]) / len_penalty;
-      } else {
-        log_probs[end_id + bbid * vocab_size] =
-            float(log_probs[end_id + bbid * vocab_size]) * len_penalty;
-      }
+    if (finish) {
+      log_probs[i + bbid * vocab_size] = (i == end_id) ? MAX_T_VAL : -MAX_T_VAL;
+    } else {
+      log_probs[i + bbid * vocab_size] += bias[i];
     }
   }
 
-  if (logits_mask) {
+  if (!finish) {
+    // temperature
     for (int i = tid + bid * blockDim.x; i < vocab_size;
          i += blockDim.x * gridDim.x) {
-      log_probs[i + bbid * vocab_size] += logits_mask[i];
+      log_probs[i + bbid * vocab_size] *= inv_temp;
+    }
+
+    if (tid == 0 && bid == 0) {
+      // apply repetition penalty (this can apply the penalty multiple times to
+      // a
+      // repeated word).
+      if (repeat_penalty != 1.0) {
+        int prev_id = current_ids[bbid];
+        if (log_probs[prev_id + bbid * vocab_size] > T(0)) {
+          log_probs[prev_id + bbid * vocab_size] =
+              float(log_probs[prev_id + bbid * vocab_size]) / repeat_penalty;
+        } else {
+          log_probs[prev_id + bbid * vocab_size] =
+              float(log_probs[prev_id + bbid * vocab_size]) * repeat_penalty;
+        }
+
+        if (step > 1) {
+          int parent_beamid = parent_ids[bbsize * (step - 2) + bbid];
+          for (int i = step - 2; i > 0; --i) {
+            prev_id =
+                previous_ids[i * bbsize + batchid * beam_width + parent_beamid];
+            if (log_probs[prev_id + bbid * vocab_size] > T(0)) {
+              log_probs[prev_id + bbid * vocab_size] =
+                  float(log_probs[prev_id + bbid * vocab_size]) /
+                  repeat_penalty;
+            } else {
+              log_probs[prev_id + bbid * vocab_size] =
+                  float(log_probs[prev_id + bbid * vocab_size]) *
+                  repeat_penalty;
+            }
+            // if (i > 0) parent_beamid =
+            // parent_ids[bbsize*(i-1)+parent_beamid];
+            parent_beamid = parent_ids[bbsize * (i - 1) + parent_beamid];
+          }
+        }
+        prev_id = previous_ids[batchid * beam_width];
+        if (log_probs[prev_id + bbid * vocab_size] > T(0)) {
+          log_probs[prev_id + bbid * vocab_size] =
+              float(log_probs[prev_id + bbid * vocab_size]) / repeat_penalty;
+        } else {
+          log_probs[prev_id + bbid * vocab_size] =
+              float(log_probs[prev_id + bbid * vocab_size]) * repeat_penalty;
+        }
+      }
+
+      // apply length penalty
+      // NOTE: The length penalty has different implementation. May be update.
+      if (len_penalty != 1.0) {
+        if (log_probs[end_id + bbid * vocab_size] > T(0)) {
+          log_probs[end_id + bbid * vocab_size] =
+              float(log_probs[end_id + bbid * vocab_size]) / len_penalty;
+        } else {
+          log_probs[end_id + bbid * vocab_size] =
+              float(log_probs[end_id + bbid * vocab_size]) * len_penalty;
+        }
+      }
+    }
+
+    if (logits_mask) {
+      for (int i = tid + bid * blockDim.x; i < vocab_size;
+           i += blockDim.x * gridDim.x) {
+        log_probs[i + bbid * vocab_size] += logits_mask[i];
+      }
     }
   }
 }
@@ -250,6 +271,8 @@ __global__ void apply_penalties_kernel(int step,
 template <typename T>
 void apply_penalties_Launcher(int step,
                               T* log_probs,
+                              const T* bias,
+                              const bool* finished,
                               int* current_ids,
                               int* previous_ids,
                               int* parent_ids,
@@ -269,6 +292,8 @@ void apply_penalties_Launcher(int step,
                                                         vocab_size,
                                                         beam_width,
                                                         log_probs,
+                                                        bias,
+                                                        finished,
                                                         current_ids,
                                                         previous_ids,
                                                         parent_ids,
@@ -343,6 +368,8 @@ template void init_logits_mask_Launcher(half* logits_mask,
 
 template void apply_penalties_Launcher(int step,
                                        float* log_probs,
+                                       const float* bias,
+                                       const bool* finished,
                                        int* current_ids,
                                        int* previous_ids,
                                        int* parent_ids,
@@ -358,6 +385,8 @@ template void apply_penalties_Launcher(int step,
 
 template void apply_penalties_Launcher(int step,
                                        half* log_probs,
+                                       const half* bias,
+                                       const bool* finished,
                                        int* current_ids,
                                        int* previous_ids,
                                        int* parent_ids,

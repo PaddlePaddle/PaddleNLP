@@ -505,6 +505,8 @@ public:
         // TODO(): repeat penalty vertification.
         apply_penalties_Launcher<float>(step,
                                         logits_buf_,
+                                        decoding_params.embedding_bias,
+                                        finished_buf_,
                                         nullptr, /*current_ids*/
                                         nullptr, /*previous_ids*/
                                         nullptr, /*parent_ids*/
@@ -524,7 +526,7 @@ public:
       if (is_fuse_topk_softMax_ &&
           (k == 1 || k == 2 || k == 3 || k == 4 || k == 8 || k == 16)) {
         topK_softMax(logits_buf_,
-                     decoding_params.embedding_bias,
+                     nullptr,
                      finished_buf_,
                      cum_log_buf_,
                      word_ids_buf_,
@@ -549,13 +551,8 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
       } else {
-        update_logits(logits_buf_,
-                      decoding_params.embedding_bias,
-                      args_.end_id_,
-                      finished_buf_,
-                      m,
-                      n,
-                      decoding_params.stream);
+        update_logits_without_bias(
+            logits_buf_, args_.end_id_, m, n, decoding_params.stream);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -611,7 +608,7 @@ public:
           args_.batch_size_,
           args_.beam_width_,
           args_.hidden_units_,
-          step,
+          step + args_.start_len_,
           cache_size,
           args_.decoder_layers_,
           decoding_params.stream);

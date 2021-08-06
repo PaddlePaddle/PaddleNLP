@@ -78,7 +78,8 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     output_dims = {max_len, batch_size, beam_size};
     parent_ids_dims = output_dims;
   } else if (decoding_strategy == "topk_sampling" ||
-             decoding_strategy == "topp_sampling") {
+             decoding_strategy == "topp_sampling" ||
+             decoding_strategy == "sampling") {
     output_dims = {max_len, batch_size};
     parent_ids_dims = {1};
   } else {
@@ -90,17 +91,17 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
       paddle::Tensor(cache_k[0].place(), sequence_length_dims);
 
   if (cache_k[0].place() == paddle::PlaceType::kGPU) {
-    auto sequence_length = paddle::Tensor(paddle::PlaceType::kGPU);
+    auto mem_seq_length = paddle::Tensor(paddle::PlaceType::kGPU);
 
     if (mem_seq_len.place() != paddle::PlaceType::kGPU) {
-      sequence_length = mem_seq_len.copy_to<int>(paddle::PlaceType::kGPU);
+      mem_seq_length = mem_seq_len.copy_to<int>(paddle::PlaceType::kGPU);
     } else {
-      sequence_length = mem_seq_len;
+      mem_seq_length = mem_seq_len;
     }
 
     return UnifiedDecodingCUDAForward(cache_k,
                                       cache_v,
-                                      sequence_length,
+                                      mem_seq_length,
                                       logits_mask,
                                       word_embedding,
                                       self_ln_weight,
@@ -212,7 +213,8 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     output_dims = {max_len, batch_size, beam_size};
     return {output_dims, output_dims, sequence_length_dims};
   } else if (decoding_strategy == "topk_sampling" ||
-             decoding_strategy == "topp_sampling") {
+             decoding_strategy == "topp_sampling" ||
+             decoding_strategy == "sampling") {
     output_dims = {max_len, batch_size};
     return {output_dims, {1}, sequence_length_dims};
   } else {

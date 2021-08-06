@@ -53,6 +53,8 @@ void init_logits_mask_Launcher(T* logits_mask,
 template <typename T>
 void apply_penalties_Launcher(int step,
                               T* log_probs,
+                              const T* bias,
+                              const bool* finished,
                               int* current_ids,
                               int* previous_ids,
                               int* parent_ids,
@@ -65,4 +67,20 @@ void apply_penalties_Launcher(int step,
                               float repeat_penalty,
                               cudaStream_t stream,
                               const T* logits_mask);
+
+template <typename T>
+void softmax_kernelLauncher(T* logits,
+                            const T* bias,
+                            const int end_ids,
+                            const bool* finished,
+                            const int m,
+                            const int n,
+                            cudaStream_t stream,
+                            const T* logits_mask);
+
+void update_logits_without_bias(float* logits,
+                                const int end_ids,
+                                const int m,
+                                const int n,
+                                cudaStream_t stream);
 }
