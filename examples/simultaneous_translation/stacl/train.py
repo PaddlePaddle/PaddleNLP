@@ -141,7 +141,7 @@ def do_train(args):
                 optimizer.step()
                 optimizer.clear_grad()
 
-            if args.max_iter and step_idx == args.max_iter:
+            if args.max_iter and step_idx + 1 == args.max_iter:
                 return
 
             tokens_per_cards = token_num.numpy()
