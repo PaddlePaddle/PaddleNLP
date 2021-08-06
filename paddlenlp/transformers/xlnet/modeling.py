@@ -683,6 +683,7 @@ class XLNetModel(XLNetPretrainedModel):
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
                 See :meth:`XLNetPretrainedModel._init_weights()` for how weights are initialized in `XLNetModel`.
+
     """
 
     def __init__(
@@ -871,6 +872,7 @@ class XLNetModel(XLNetPretrainedModel):
 
                 .. note::
                     `use_mems` has to be set to `True` in order to make use of `mems`.
+
             perm_mask (Tensor, optional):
                 Mask to indicate the permutation pattern of the input sequence with values being either 0 or 1.
 

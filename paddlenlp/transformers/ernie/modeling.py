@@ -634,7 +634,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
 
 class ErnieLMPredictionHead(nn.Layer):
     r"""
-    Bert Model with a `language modeling` head on top.
+    Ernie Model with a `language modeling` head on top.
     """
 
     def __init__(self,

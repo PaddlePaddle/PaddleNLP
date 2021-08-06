@@ -34,12 +34,15 @@ class BigBirdTokenizer(PretrainedTokenizer):
         sentencepiece_model_file (`str`): File path of the vocabulary
         do_lower_case (`bool`): Whether the text strips accents and convert to
             lower case. If you use the BigBird pretrained model, lower is set to
-            False when using the cased model, otherwise it is set to True.
+            False when using the cased model, otherwise it is set to `True`.
             Defaults to True.
         unk_token (`str`): The special token for unkown words. Defaults to `[UNK]`.
         sep_token (`str`): The special token for separator token . Defaults to `[SEP]`.
         pad_token (`str`): The special token for padding. Defaults to `[PAD]`.
-        cls_token (`str`): The special token for cls. Defaults to `[CLS]`.
+        cls_token (`str`):
+            The special token for sequence classification.
+            It is the last token of the sequence when built with special tokens.
+            Default: "[CLS]".
         mask_token (`str`): The special token for mask. Defaults to `[MASK]`.
     
     Raises:
@@ -138,6 +141,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
         Args:
             text (str): The text to be tokenized.
             pair_text(str):  The pair text to be tokenized.
+
         Returns:
             `List`: A list of string representing converted tokens.
         """
@@ -151,6 +155,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
 
         Args:
             tokens (list): A list of string representing tokens to be converted.
+
         Returns:
             `Str`: Converted string from tokens.
         """
@@ -179,16 +184,14 @@ class BigBirdTokenizer(PretrainedTokenizer):
             masked_lm_prob (:obj:`int`, 'optional`):
                 The probability a training data will be masked. Defaults to `0.15`.
 
-        returns:
+        Returns:
+            span_ids()：
 
-        Args:
-            span_ids()
-            masked_lm_positions
-            masked_lm_ids
-            masked_lm_weights
+            masked_lm_positions():
 
+            masked_lm_ids():
 
-
+            masked_lm_weights():
 
         """
 

@@ -333,7 +333,7 @@ class BertModel(BertPretrainedModel):
 
     Args:
         vocab_size (`int`):
-            Vocabulary size of `inputs_ids` in `BertModel`.Defines the number of different tokens that can
+            Vocabulary size of `inputs_ids` in `BertModel`. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling `BertModel`.
         hidden_size (`int`, optional):
             Dimensionality of the encoder layers and the pooler layer. Defaults to ``768``.
@@ -696,6 +696,9 @@ class BertForTokenClassification(BertPretrainedModel):
 
 
 class BertLMPredictionHead(Layer):
+    """
+    Bert Model with a `language modeling` head on top for CLM fine-tuning.
+    """
     def __init__(self,
                  hidden_size,
                  vocab_size,
@@ -729,6 +732,20 @@ class BertLMPredictionHead(Layer):
 
 
 class BertPretrainingHeads(Layer):
+    """
+    Perform language modeling task and next sentence classification task.
+
+    Args：
+        hidden_size(`int`):
+            See :class:`BertModel`.
+        vocab_size(`int`):
+            See :class:`BertModel`.
+        activation(`str`):
+            Activation function used in the language modeling task.
+        embedding_weights(`Tensor`, optional):
+            Embedding weights of the pretrained model. Defaults to `None`.
+
+    """
     def __init__(self,
                  hidden_size,
                  vocab_size,
@@ -740,6 +757,30 @@ class BertPretrainingHeads(Layer):
         self.seq_relationship = nn.Linear(hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output, masked_positions=None):
+        """
+        Args:
+            sequence_output(`Tensor`):
+                Sequence of hidden-states at the last layer of the model.
+                It's data type should be float32 and has a shape of (`batch_size, seq_lens, hidden_size`].
+                ``seq_lens`` corresponds to the length of input sequence.
+            pooled_output(`Tensor`):
+                The output of first token (`[CLS]`) in sequence.
+                We "pool" the model by simply taking the hidden state corresponding to the first token.
+                Its data type should be float32 and
+                has a shape of [batch_size, hidden_size].
+            masked_positions(`Tensor`, optional):
+                The masked positions embeddings. Defaults to `None`.
+
+        Returns:
+            A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
+
+            With the fields:
+
+            - `prediction_scores`(Tensor): The scores of prediction on masked token.
+            - `seq_relationship_score`(Tensor): The scores of next sentence prediction.
+
+
+        """
         prediction_scores = self.predictions(sequence_output, masked_positions)
         seq_relationship_score = self.seq_relationship(pooled_output)
         return prediction_scores, seq_relationship_score
@@ -747,7 +788,7 @@ class BertPretrainingHeads(Layer):
 
 class BertForPretraining(BertPretrainedModel):
     """
-    Bert Model for a pretraining task on top.
+    Bert Model for pretraining tasks on top.
 
     Args:
         bert (:class:`BertModel`):
@@ -827,6 +868,14 @@ class BertForPretraining(BertPretrainedModel):
 
 
 class BertPretrainingCriterion(paddle.nn.Layer):
+    """
+
+    Args:
+        vocab_size(`int`):
+            Vocabulary size of `inputs_ids` in `BertModel`. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling `BertModel`.
+
+    """
     def __init__(self, vocab_size):
         super(BertPretrainingCriterion, self).__init__()
         # CrossEntropyLoss is expensive since the inner reshape (copy)
@@ -835,6 +884,23 @@ class BertPretrainingCriterion(paddle.nn.Layer):
 
     def forward(self, prediction_scores, seq_relationship_score,
                 masked_lm_labels, next_sentence_labels, masked_lm_scale):
+        """
+        Args:
+            prediction_scores(`Tensor·):
+                The scores of prediction on masked token.
+            seq_relationship_score(`Tensor`):
+                The scores of next sentence prediction.
+            masked_lm_labels():
+
+            next_sentence_labels():
+
+            masked_lm_scale():
+
+
+        Returns:
+
+
+        """
         with paddle.static.amp.fp16_guard():
             masked_lm_loss = F.cross_entropy(
                 prediction_scores,
