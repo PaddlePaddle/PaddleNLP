@@ -119,8 +119,6 @@ def infer(args):
             print('step %d - %.3fs/step' %
                   (step, total_time / args.logging_steps))
             total_time = 0.0
-        print(output)
-        exit()
 
         if args.faster:
             ids = output
