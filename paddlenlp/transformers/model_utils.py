@@ -222,10 +222,11 @@ class PretrainedModel(Layer, GenerationMixin):
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
         for file_id, file_path in resource_files.items():
-            path = os.path.join(default_root, file_path.split('/')[-1])
             if file_path is None or os.path.isfile(file_path):
                 resolved_resource_files[file_id] = file_path
-            elif os.path.exists(path):
+                continue
+            path = os.path.join(default_root, file_path.split('/')[-1])
+            if os.path.exists(path):
                 logger.info("Already cached %s" % path)
                 resolved_resource_files[file_id] = path
             else:

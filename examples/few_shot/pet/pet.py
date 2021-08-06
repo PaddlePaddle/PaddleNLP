@@ -232,7 +232,7 @@ def do_train(args):
 
         test_accuracy, total_num = evaluate_fn(
             model, tokenizer, public_test_data_loader, label_norm_dict)
-        print("epoch:{}\ttest_accuracy:{:.3f}\ttotal_num:{}".format(
+        print("epoch:{}, test_accuracy:{:.3f}, total_num:{}".format(
             epoch, test_accuracy, total_num))
 
 
