@@ -17,9 +17,13 @@ import paddle
 import torch
 import numpy as np
 
+paddle.set_device("cpu")
+
 model = torch.load(sys.argv[1], map_location='cpu')
 
-[print(x) for x in sorted(list(model.keys()))]
+print("The origin model keys:")
+for x in sorted(list(model.keys())):
+    print(x)
 
 state = {}
 for sub_name, sub_param in model.items():
@@ -30,8 +34,6 @@ for sub_name, sub_param in model.items():
     else:
         final_name = sub_name
     state[final_name] = sub_param.numpy()
-
-paddle.set_device("cpu")
 
 
 def trans_name(key):
