@@ -28,6 +28,12 @@ if [ ${MODE} = "lite_train_infer" ]; then
     if [ -f test.de ]; then
         rm -f test.de
     fi
+    mkdir -p ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/
+    rm -f ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33712
+    rm -f ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708
+    # Vocab
+    cp -f WMT14.en-de.partial/wmt14_ende_data_bpe/vocab_all.bpe.33712 ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33712
+    cp -f WMT14.en-de.partial/wmt14_ende_data_bpe/vocab_all.bpe.33708 ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708
     # Train
     ln -s WMT14.en-de.partial/wmt14_ende_data_bpe/train.tok.clean.bpe.en train.en
     ln -s WMT14.en-de.partial/wmt14_ende_data_bpe/train.tok.clean.bpe.de train.de
@@ -44,9 +50,9 @@ elif [ ${MODE} = "whole_infer" ]; then
     # For infer. 
     if [ ! -f tranformer-base-wmt_ende_bpe.tar.gz ]; then
         wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz
+        tar -zxf tranformer-base-wmt_ende_bpe.tar.gz
+        mv base_trained_models/ trained_models/
     fi
-    tar -zxf tranformer-base-wmt_ende_bpe.tar.gz
-    mv base_trained_models/ trained_models/
     # For train. 
     if [ ! -f WMT14.en-de.partial.tar.gz ]; then
         wget https://paddlenlp.bj.bcebos.com/datasets/WMT14.en-de.partial.tar.gz
@@ -76,6 +82,12 @@ elif [ ${MODE} = "whole_infer" ]; then
     if [ -f test.de ]; then
         rm -f test.de
     fi
+    mkdir -p ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/
+    rm -f ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33712
+    rm -f ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708
+    # Vocab
+    cp -f WMT14.en-de.partial/wmt14_ende_data_bpe/vocab_all.bpe.33712 ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33712
+    cp -f WMT14.en-de.partial/wmt14_ende_data_bpe/vocab_all.bpe.33708 ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708
     # Train with partial data. 
     ln -s WMT14.en-de.partial/wmt14_ende_data_bpe/train.tok.clean.bpe.en train.en
     ln -s WMT14.en-de.partial/wmt14_ende_data_bpe/train.tok.clean.bpe.de train.de
@@ -112,6 +124,12 @@ elif [ ${MODE} = "whole_train_infer" ]; then
     if [ -f test.de ]; then
         rm -f test.de
     fi
+    mkdir -p ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/
+    rm -f ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33712
+    rm -f ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708
+    # Vocab
+    cp -f WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33712 ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33712
+    cp -f WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708
     # Train with whole data. 
     ln -s WMT14.en-de/wmt14_ende_data_bpe/train.tok.clean.bpe.33708.en train.en
     ln -s WMT14.en-de/wmt14_ende_data_bpe/train.tok.clean.bpe.33708.de train.de
@@ -127,9 +145,9 @@ else # infer
     # Trained transformer base model checkpoint. 
     if [ ! -f tranformer-base-wmt_ende_bpe.tar.gz ]; then
         wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz
+        tar -zxf tranformer-base-wmt_ende_bpe.tar.gz
+        mv base_trained_models/ trained_models/
     fi
-    tar -zxf tranformer-base-wmt_ende_bpe.tar.gz
-    mv base_trained_models/ trained_models/
     # Set soft link.
     if [ -f test.en ]; then
         rm -f test.en
@@ -137,6 +155,12 @@ else # infer
     if [ -f test.de ]; then
         rm -f test.de
     fi
+    mkdir -p ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/
+    rm -f ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33712
+    rm -f ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708
+    # Vocab
+    cp -f WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33712 ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33712
+    cp -f WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708
     # Test with whole data. 
     ln -s WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en test.en
     ln -s WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.de test.de
