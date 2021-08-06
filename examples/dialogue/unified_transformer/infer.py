@@ -80,7 +80,6 @@ def infer(args):
         args.model_name_or_path)
 
     test_ds = load_dataset('duconv', splits='test_1')
-    args.batch_size = 1
     test_ds, test_data_loader = create_data_loader(test_ds, tokenizer, args,
                                                    'test')
 
