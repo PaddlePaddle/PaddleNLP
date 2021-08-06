@@ -384,6 +384,19 @@ class BertModel(BertPretrainedModel):
             The non-linear activation function in the pooling layer.
             Defaults to ``"tanh"``.
 
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import BertModel, BertTokenizer
+
+                tokenizer = BertTokenizer.from_pretrained('bert-wwm-chinese')
+                model = BertModel.from_pretrained('bert-wwm-chinese')
+
+                inputs = tokenizer("这是一个测试样例!")
+                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                output = model(**inputs)
+
     """
 
     def __init__(self,
@@ -673,7 +686,7 @@ class BertForTokenClassification(BertPretrainedModel):
                 See :class:`BertModel`.
             token_type_ids (`Tensor`, optional):
                 See :class:`BertModel`.
-            position_ids(,optional):
+            position_ids(`Tensor`, optional):
                 See :class:`BertModel`.
             attention_mask_list (`list`, optional):
                 See :class:`BertModel`.
@@ -732,7 +745,7 @@ class BertLMPredictionHead(Layer):
 
 
 class BertPretrainingHeads(Layer):
-    """
+    r"""
     Perform language modeling task and next sentence classification task.
 
     Args：

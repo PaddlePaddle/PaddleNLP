@@ -440,7 +440,7 @@ class NeZhaPretrainedModel(PretrainedModel):
 @register_base_model
 class NeZhaModel(NeZhaPretrainedModel):
     """
-    The bare BERT Model transformer outputting raw hidden-states without any specific head on top.
+    The bare NeZha Model transformer outputting raw hidden-states without any specific head on top.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Check the superclass documentation for the generic methods and the library implements for all its model.
@@ -501,7 +501,7 @@ class NeZhaModel(NeZhaPretrainedModel):
             The `epsilon` parameter used in :class:`paddle.nn.LayerNorm` for initializing layer normalization layers.
             A small value to the variance added to the normalization layer to prevent division by zero.
             Defaults to '1e-12'.
-        use_relative_position(bool, optional):
+        use_relative_position(`bool`, optional):
             Whether to use relative position in position embedding. Defaults to `False`.
 
     """
