@@ -1391,6 +1391,35 @@ class PretrainedTokenizer(object):
 
 
 class BPETokenizer(PretrainedTokenizer):
+    """
+    The base class for all bpe tokenizers. It mainly provides common tokenize
+    methods for bpe type tokenizer. 
+    
+    Args:
+        vocab_file (str): 
+            file path of the vocabulary.
+        encoder_json_path (str, optional):
+            file path of the id to vocab.
+        vocab_bpe_path (str, optional):
+            file path of word merge text.
+        unk_token (str, optional): 
+            The special token for unknown words. 
+            Defaults to "[UNK]".
+        sep_token (str, optional): 
+            The special token for separator token. 
+            Defaults to "[SEP]".
+        pad_token (str, optional): 
+            The special token for padding. 
+            Defaults to "[PAD]".
+        cls_token (str, optional): 
+            The special token for cls. 
+            Defaults to "[CLS]".
+        mask_token (str, optional): 
+            The special token for mask.
+            Defaults to "[MASK]".
+
+    """
+
     class Encoder(object):
         def __init__(self,
                      encoder,
@@ -1590,8 +1619,7 @@ class BPETokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 params=None):
+                 mask_token="[MASK]"):
         self.vocab = self.load_vocabulary(
             vocab_file,
             unk_token=unk_token,
@@ -1602,7 +1630,7 @@ class BPETokenizer(PretrainedTokenizer):
         self.vocab_bpe_path = vocab_bpe_path
         self.encoder = self._get_encoder(encoder_json_path, vocab_bpe_path)
 
-    def tokenize(self, text, is_sentencepiece=True):
+    def _tokenize(self, text, is_sentencepiece=True):
         text = convert_to_unicode(text)
         text = " ".join(text.split())  # remove duplicate whitespace
         nltk = try_import('nltk')
@@ -1613,6 +1641,9 @@ class BPETokenizer(PretrainedTokenizer):
             bpe_ids = self.encoder.encode(text)
         tokens = [str(bpe_id) for bpe_id in bpe_ids]
         return tokens
+
+    def tokenize(self, text, is_sentencepiece=True):
+        return self._tokenize(text, is_sentencepiece)
 
     def _get_encoder(self, encoder_json_path, vocab_bpe_path):
         with open(encoder_json_path, 'r') as f:

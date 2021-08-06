@@ -54,7 +54,7 @@ class ErnieDocTokenizer(ErnieTokenizer):
     Examples:
         .. code-block:: python
             from paddlenlp.transformers import ErnieDocTokenizer
-            tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-zh')
+            tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
             encoded_inputs = tokenizer('这是一个测试样例')
             # encoded_inputs: 
             # { 
@@ -96,7 +96,46 @@ class ErnieDocTokenizer(ErnieTokenizer):
 
 
 class ErnieDocBPETokenizer(BPETokenizer):
-    """ Runs bpe tokenize """
+    r"""
+    Constructs an ERNIE-Doc BPE tokenizer. It uses a bpe tokenizer to do punctuation
+    splitting, lower casing and so on, then tokenize words as subwords.
+
+    Args:
+        vocab_file (str): 
+            file path of the vocabulary.
+        encoder_json_path (str, optional):
+            file path of the id to vocab.
+        vocab_bpe_path (str, optional):
+            file path of word merge text.
+        unk_token (str, optional): 
+            The special token for unknown words. 
+            Defaults to "[UNK]".
+        sep_token (str, optional): 
+            The special token for separator token. 
+            Defaults to "[SEP]".
+        pad_token (str, optional): 
+            The special token for padding. 
+            Defaults to "[PAD]".
+        cls_token (str, optional): 
+            The special token for cls. 
+            Defaults to "[CLS]".
+        mask_token (str, optional): 
+            The special token for mask.
+            Defaults to "[MASK]".
+    
+    Examples:
+        .. code-block:: python
+            from paddlenlp.transformers import ErnieDocBPETokenizer
+            tokenizer = ErnieDocBPETokenizer.from_pretrained('ernie-doc-base-en')
+            encoded_inputs = tokenizer('This is an example')
+            # encoded_inputs: 
+            # { 
+            #   'input_ids': [713, 16, 41, 1246], 
+            #   'token_type_ids': [0, 0, 0, 0]
+            # }
+
+
+    """
     resource_files_names = {
         "vocab_file": "vocab.txt",
         "encoder_json_path": "encoder.json",
@@ -130,8 +169,7 @@ class ErnieDocBPETokenizer(BPETokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 params=None):
+                 mask_token="[MASK]"):
         super(ErnieDocBPETokenizer, self).__init__(
             vocab_file,
             encoder_json_path=encoder_json_path,
@@ -140,5 +178,4 @@ class ErnieDocBPETokenizer(BPETokenizer):
             sep_token=sep_token,
             pad_token=pad_token,
             cls_token=cls_token,
-            mask_token=mask_token,
-            params=params)
+            mask_token=mask_token)
