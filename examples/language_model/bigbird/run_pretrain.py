@@ -48,7 +48,7 @@ class PretrainingDataset(Dataset):
         self.tokenizer = tokenizer
         self.max_encoder_length = max_encoder_length
         self.max_pred_length = max_pred_length
-        input_file = open(input_file, "r")
+        input_file = open(input_file, "r", encoding="utf-8")
         self.lines = input_file.readlines()
 
         self.vocab_size = tokenizer.vocab_size

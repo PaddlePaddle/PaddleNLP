@@ -74,7 +74,7 @@ def create_dataloader(batch_size,
         input_ids = np.array(input_ids).astype('int64')
         return input_ids
 
-    def _collate_data(data, stack_fn=Stack()):
+    def _collate_data(data, stack_fn=Stack(dtype='int64')):
         num_fields = len(data[0])
         out = [None] * num_fields
         out[0] = stack_fn(
