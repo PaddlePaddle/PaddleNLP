@@ -33,7 +33,11 @@ def parse_args():
         choices=["gpu", "xpu", "cpu"],
         help="Device to use during inference. ")
     parser.add_argument(
-        "--use_mkl", action="store_true", help="Whether to use mkl. ")
+        "--use_mkl",
+        default=False,
+        type=eval,
+        choices=[True, False],
+        help="Whether to use mkl. ")
     parser.add_argument(
         "--threads",
         default=1,
