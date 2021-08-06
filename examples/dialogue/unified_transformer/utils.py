@@ -236,6 +236,8 @@ def select_response(ids,
 
 
 def select_response_without_scores(ids, tokenizer, keep_space=True):
+    if len(ids.shape) > 2:
+        ids = ids[:, :, 0].squeeze()
     ids = ids.numpy().transpose()
 
     results = []
