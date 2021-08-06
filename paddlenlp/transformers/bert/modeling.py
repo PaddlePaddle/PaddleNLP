@@ -899,19 +899,21 @@ class BertPretrainingCriterion(paddle.nn.Layer):
                 masked_lm_labels, next_sentence_labels, masked_lm_scale):
         """
         Args:
-            prediction_scores(`Tensor·):
+            prediction_scores(`Tensor`):
                 The scores of prediction on masked token.
             seq_relationship_score(`Tensor`):
                 The scores of next sentence prediction.
-            masked_lm_labels():
-
-            next_sentence_labels():
-
-            masked_lm_scale():
-
+            masked_lm_labels(`Tensor`):
+                The labels of the masked language modeling, the dimensionality of `masked_lm_labels`
+                is equal to `prediction_scores`.
+            next_sentence_labels(`Tensor`):
+                The labels of the next sentence prediction, the dimensionality of `next_sentence_labels`
+                is equal to `seq_relation_lables`.
+            masked_lm_scale(`float`):
+                Used for the normalization of masked language modeling loss.
 
         Returns:
-
+            Tensor: The loss of the model, equals to the sum of `masked_lm_loss` plus the mean of 'next_sentence_loss`.
 
         """
         with paddle.static.amp.fp16_guard():
