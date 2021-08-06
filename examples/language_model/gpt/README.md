@@ -222,7 +222,7 @@ python deploy/python/inference.py --model_type gpt \
 
 ## 其他
 
-本项目提供了Huggingface的权重转化示例`converter.py`，用户可以参考转化脚本，转换自己需要的模型权重。
+本项目提供了Huggingface的权重转化示例`converter.py`，`python xxx-gpt.bin`即可完成转换。用户可以参考转化脚本，转换自己需要的模型权重。
 
 ## 参考文献
 - [Language Models are Unsupervised Multitask Learners](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
