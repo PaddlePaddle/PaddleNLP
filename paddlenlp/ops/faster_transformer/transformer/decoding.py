@@ -663,6 +663,7 @@ class InferUnifiedDecoding(nn.Layer):
                 "The args decoding_lib must be set to use Faster Transformer. ")
         elif not os.path.exists(decoding_lib):
             raise ValueError("The path to decoding lib is not exist.")
+        # TODO(): Using jit. 
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(

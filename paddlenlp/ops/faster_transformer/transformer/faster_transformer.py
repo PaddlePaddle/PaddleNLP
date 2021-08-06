@@ -586,7 +586,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
     def forward(self,
                 max_length,
-                decoding_strategy="topk_sampling",
+                decoding_strategy="sampling",
                 top_k=4,
                 top_p=0.0,
                 num_beams=4,
