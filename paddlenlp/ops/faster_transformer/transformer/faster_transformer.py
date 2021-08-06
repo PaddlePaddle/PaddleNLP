@@ -553,14 +553,16 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
 
-        # if self._decoding_strategy == "sampling" and (top_p == 1.0 and top_k > 0):
-        #     top_p = 0.0
-        # elif self._decoding_strategy == "sampling" and (top_p != 1.0 and top_k == 0):
-        #     top_k = 0
-        # else:
-        #     raise ValueError(
-        #         "Only topk sampling or topp sampling are supported. " \
-        #         "Topk sampling and topp sampling cannot be both applied. ")
+        if self._decoding_strategy == "sampling" and (top_p == 1.0 and
+                                                      top_k > 0):
+            top_p = 0.0
+        elif self._decoding_strategy == "sampling" and (top_p != 1.0 and
+                                                        top_k == 0):
+            top_k = 0
+        else:
+            raise ValueError(
+                "Only topk sampling or topp sampling are supported. " \
+                "Topk sampling and topp sampling cannot be both applied. ")
 
         return self.forward(
             model_inputs=model_inputs,
