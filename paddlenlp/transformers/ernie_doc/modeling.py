@@ -300,10 +300,17 @@ class ErnieDocEncoder(nn.Layer):
 
 
 class ErnieDocPretrainedModel(PretrainedModel):
+    """
+    An abstract class for pretrained ErnieDoc models. It provides ErnieDoc related `model_config_file`,
+    `resource_files_names`, `pretrained_resource_files_map`, `pretrained_init_configuration` and
+    `base_model_prefix` for downloading and loading pretrained models.
+
+    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+    """
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "ernie-doc-base-en": {
-            "attention_probs_dropout_prob": 0.0,
+            "attention_dropout_prob": 0.0,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.0,
             "relu_dropout": 0.0,
@@ -319,7 +326,7 @@ class ErnieDocPretrainedModel(PretrainedModel):
             "pad_token_id": 1
         },
         "ernie-doc-base-zh": {
-            "attention_probs_dropout_prob": 0.1,
+            "attention_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
             "relu_dropout": 0.0,
@@ -425,12 +432,67 @@ class ErnieDocPooler(nn.Layer):
 
 @register_base_model
 class ErnieDocModel(ErnieDocPretrainedModel):
+    """
+    The bare ERNIE-Doc Model outputting raw hidden-states without any specific head on top.
+    
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+    
+    This model is also a `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        num_hidden_layers (int):
+            The number of hidden layers in the encoder.
+        num_attention_heads (int):
+            Number of attention heads in each attention layer.
+        hidden_size (int):
+            Dimensionality of the embedding layers, encoder layers and pooler layer.
+        hidden_dropout_prob (int):
+            The dropout probability of encoder layer.
+        attention_dropout_prob (int):
+            The dropout probability of attention output.
+        relu_dropout (int):
+            The dropout probability of FFN.
+        hidden_act (str):
+            The activation function of FFN.
+        memory_len (int):
+            The number of tokens to cache. If not 0, the last `memory_len` hidden states
+            in each layer will be cached into memory.
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in `ErnieDocModel`.
+            Also is the vocab size of token embedding matrix.
+        max_position_embeddings (int):
+            The maximum of positions embedding. 
+        task_type_vocab_size (int, optional):
+            The size of segment embedding. Defaults to 3.
+        normalize_before (bool, optional):
+            Indicate whether to put layer normalization into preprocessing of MHA and FFN sub-layers. 
+            If True, pre-process is layer normalization and post-precess includes dropout, 
+            residual connection. Otherwise, no pre-process and post-precess includes dropout, 
+            residual connection, layer normalization. Defaults to False.
+        epsilon (float, optional):
+            The `epsilon` parameter used in :class:`paddle.nn.LayerNorm` for
+            initializing layer normalization layers. Defaults to 1e-5.
+        rel_pos_params_sharing (bool, optional):
+            Defaults to False.
+        initializer_range (float, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Defaults to 0.02.
+        pad_token_id (int, optional):
+            The token id of [PAD] token whose parameters won't be updated when training.
+            Defaults to 0.
+        cls_token_idx (int, optional):
+            The token id of [CLS] token. Defaults to -1.
+    """
+
     def __init__(self,
                  num_hidden_layers,
                  num_attention_heads,
                  hidden_size,
                  hidden_dropout_prob,
-                 attention_probs_dropout_prob,
+                 attention_dropout_prob,
                  relu_dropout,
                  hidden_act,
                  memory_len,
@@ -461,7 +523,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
             hidden_size,
             d_inner_hid,
             hidden_dropout_prob,
-            attention_probs_dropout_prob,
+            attention_dropout_prob,
             relu_dropout,
             hidden_act,
             normalize_before=normalize_before,
@@ -502,6 +564,85 @@ class ErnieDocModel(ErnieDocPretrainedModel):
 
     def forward(self, input_ids, memories, token_type_ids, position_ids,
                 attn_mask):
+        r"""
+        The ErnieDocModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
+            memories (List[Tensor]):
+                A list of length `n_layers` with each Tensor being a pre-computed hidden-state for each layer.
+                Each Tensor has a dtype `float32` and a shape of [batch_size, sequence_length, hidden_size].
+            token_type_ids (Tensor):
+                Segment token indices to indicate first and second portions of the inputs.
+                Indices can be either 0 or 1:
+
+                - 0 corresponds to a **sentence A** token,
+                - 1 corresponds to a **sentence B** token.
+
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
+                Defaults to None, which means no segment embeddings is added to token embeddings.
+            position_ids (Tensor):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                config.max_position_embeddings - 1]``. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attn_mask (Tensor):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set
+                to **-infinity** for any positions in the mask that are **0**, and will be
+                **unchanged** for positions that are **1**.
+
+                - **1** for tokens that are **not masked**,
+                - **0** for tokens that are **masked**.
+
+                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+        Returns:
+            Tuple : Returns tuple with 3 field:
+            - `encoder_output` (Tensor):
+                A tensor containing hidden-states of the model at the output of last layer.
+                Each Tensor has a data type of `float32` and has a shape of
+                [batch_size, sequence_length, hidden_size]. 
+            - `pooled_output` (Tensor):
+                A tensor containing the [CLS] of hidden-states of the model at the output of last layer.
+                Each Tensor has a data type of `float32` and has a shape of [batch_size, hidden_size]. 
+            - `new_mem` (List[Tensor]):
+                A list of pre-computed hidden-states. The length of the list is `n_layers`.
+                Each element in the list is a Tensor with dtype `float32` and has a shape of
+                [batch_size, memory_length, hidden_size].
+
+        Example:
+            .. code-block::
+                import numpy as np
+                import paddle
+                from paddlenlp.transformers import ErnieDocModel
+                from paddlenlp.transformers import ErnieDocTokenizer
+                
+                def get_related_pos(insts, seq_len, memory_len=128):
+                    beg = seq_len + seq_len + memory_len
+                    r_position = [list(range(beg - 1, seq_len - 1, -1)) + \
+                                list(range(0, seq_len)) for i in range(len(insts))]
+                    return np.array(r_position).astype('int64').reshape([len(insts), beg, 1])
+                    
+                tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
+                model = ErnieDocModel.from_pretrained('ernie-doc-base-zh')
+
+                inputs = tokenizer("这是一个示例")
+                inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
+                
+                memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
+                position_ids = paddle.to_tensor(get_related_pos(inputs['input_ids'], 128, 128))
+                attn_mask = paddle.ones([1, 128, 1])
+
+                inputs['memories'] = memories
+                inputs['position_ids'] = position_ids
+                inputs['attn_mask'] = attn_mask
+
+                outputs = model(**inputs)
+
+                last_hidden_states = outputs[0]
+
+        """
         input_embeddings, position_embeddings, token_embeddings = \
             self.embeddings(input_ids, token_type_ids, position_ids)
 
@@ -521,6 +662,19 @@ class ErnieDocModel(ErnieDocPretrainedModel):
 
 
 class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
+    """
+    ErnieDoc Model with a sequence classification/regression head on top
+    (a linear layer on top of the pooled output) e.g. for GLUE tasks.
+
+    Args:
+        ernie_doc (:class:`ErnieDocModel`):
+            An instance of :class:`ErnieDocModel`.
+        num_classes (int):
+            The number of classes.
+        dropout (float, optional)
+            The dropout ratio of last output. Default to 0.1.
+    """
+
     def __init__(self, ernie_doc, num_classes, dropout=0.1):
         super(ErnieDocForSequenceClassification, self).__init__()
         self.ernie_doc = ernie_doc
@@ -531,6 +685,80 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
 
     def forward(self, input_ids, memories, token_type_ids, position_ids,
                 attn_mask):
+        r"""
+        The ErnieDocForSequenceClassification forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
+            memories (List[Tensor]):
+                A list of length `n_layers` with each Tensor being a pre-computed hidden-state for each layer.
+                Each Tensor has a dtype `float32` and a shape of [batch_size, sequence_length, hidden_size].
+            token_type_ids (Tensor):
+                Segment token indices to indicate first and second portions of the inputs.
+                Indices can be either 0 or 1:
+
+                - 0 corresponds to a **sentence A** token,
+                - 1 corresponds to a **sentence B** token.
+
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
+                Defaults to None, which means no segment embeddings is added to token embeddings.
+            position_ids (Tensor):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                config.max_position_embeddings - 1]``. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attn_mask (Tensor):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set
+                to **-infinity** for any positions in the mask that are **0**, and will be
+                **unchanged** for positions that are **1**.
+
+                - **1** for tokens that are **not masked**,
+                - **0** for tokens that are **masked**.
+
+                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+        Returns:
+            Tuple : Returns tuple with 3 field:
+            - `logits` (Tensor):
+                A tensor containing the [CLS] of hidden-states of the model at the output of last layer.
+                Each Tensor has a data type of `float32` and has a shape of [batch_size, num_classes]. 
+            - `mem` (List[Tensor]):
+                A list of pre-computed hidden-states. The length of the list is `n_layers`.
+                Each element in the list is a Tensor with dtype `float32` and has a shape of
+                [batch_size, memory_length, hidden_size].
+        
+        Example:
+            .. code-block::
+                import numpy as np
+                import paddle
+                from paddlenlp.transformers import ErnieDocForSequenceClassification
+                from paddlenlp.transformers import ErnieDocTokenizer
+                
+                def get_related_pos(insts, seq_len, memory_len=128):
+                    beg = seq_len + seq_len + memory_len
+                    r_position = [list(range(beg - 1, seq_len - 1, -1)) + \
+                                list(range(0, seq_len)) for i in range(len(insts))]
+                    return np.array(r_position).astype('int64').reshape([len(insts), beg, 1])
+                    
+                tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
+                model = ErnieDocForSequenceClassification.from_pretrained('ernie-doc-base-zh', num_classes=2)
+
+                inputs = tokenizer("这是一个示例")
+                inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
+                
+                memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
+                position_ids = paddle.to_tensor(get_related_pos(inputs['input_ids'], 128, 128))
+                attn_mask = paddle.ones([1, 128, 1])
+
+                inputs['memories'] = memories
+                inputs['position_ids'] = position_ids
+                inputs['attn_mask'] = attn_mask
+
+                outputs = model(**inputs)
+
+                last_hidden_states = outputs[0]
+        """
         _, pooled_output, mem = self.ernie_doc(
             input_ids, memories, token_type_ids, position_ids, attn_mask)
         pooled_output = self.dropout(pooled_output)
@@ -539,6 +767,19 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
 
 
 class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
+    """
+    ErnieDoc Model with a token classification/regression head on top
+    (a linear layer on top of the pooled output) e.g. for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        ernie_doc (:class:`ErnieDocModel`):
+            An instance of :class:`ErnieDocModel`.
+        num_classes (int):
+            The number of classes.
+        dropout (float, optional)
+            The dropout ratio of last output. Default to 0.1.
+    """
+
     def __init__(self, ernie_doc, num_classes, dropout=0.1):
         super(ErnieDocForTokenClassification, self).__init__()
         self.num_classes = num_classes
@@ -550,6 +791,80 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
 
     def forward(self, input_ids, memories, token_type_ids, position_ids,
                 attn_mask):
+        r"""
+        The ErnieDocForTokenClassification forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
+            memories (List[Tensor]):
+                A list of length `n_layers` with each Tensor being a pre-computed hidden-state for each layer.
+                Each Tensor has a dtype `float32` and a shape of [batch_size, sequence_length, hidden_size].
+            token_type_ids (Tensor):
+                Segment token indices to indicate first and second portions of the inputs.
+                Indices can be either 0 or 1:
+
+                - 0 corresponds to a **sentence A** token,
+                - 1 corresponds to a **sentence B** token.
+
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
+                Defaults to None, which means no segment embeddings is added to token embeddings.
+            position_ids (Tensor):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                config.max_position_embeddings - 1]``. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attn_mask (Tensor):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set
+                to **-infinity** for any positions in the mask that are **0**, and will be
+                **unchanged** for positions that are **1**.
+
+                - **1** for tokens that are **not masked**,
+                - **0** for tokens that are **masked**.
+
+                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+        Returns:
+            Tuple : Returns tuple with 3 field:
+            - `logits` (Tensor):
+                A tensor containing the hidden-states of the model at the output of last layer.
+                Each Tensor has a data type of `float32` and has a shape of [batch_size, sequence_length, num_classes]. 
+            - `mem` (List[Tensor]):
+                A list of pre-computed hidden-states. The length of the list is `n_layers`.
+                Each element in the list is a Tensor with dtype `float32` and has a shape of
+                [batch_size, memory_length, hidden_size].
+
+        Example:
+            .. code-block::
+                import numpy as np
+                import paddle
+                from paddlenlp.transformers import ErnieDocForTokenClassification
+                from paddlenlp.transformers import ErnieDocTokenizer
+                
+                def get_related_pos(insts, seq_len, memory_len=128):
+                    beg = seq_len + seq_len + memory_len
+                    r_position = [list(range(beg - 1, seq_len - 1, -1)) + \
+                                list(range(0, seq_len)) for i in range(len(insts))]
+                    return np.array(r_position).astype('int64').reshape([len(insts), beg, 1])
+                    
+                tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
+                model = ErnieDocForTokenClassification.from_pretrained('ernie-doc-base-zh', num_classes=2)
+
+                inputs = tokenizer("这是一个示例")
+                inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
+                
+                memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
+                position_ids = paddle.to_tensor(get_related_pos(inputs['input_ids'], 128, 128))
+                attn_mask = paddle.ones([1, 128, 1])
+
+                inputs['memories'] = memories
+                inputs['position_ids'] = position_ids
+                inputs['attn_mask'] = attn_mask
+
+                outputs = model(**inputs)
+
+                last_hidden_states = outputs[0]
+        """
         sequence_output, _, mem = self.ernie_doc(
             input_ids, memories, token_type_ids, position_ids, attn_mask)
         sequence_output = self.dropout(sequence_output)
@@ -558,6 +873,17 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
 
 
 class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
+    """
+    ErnieDoc Model with a qusestion head on top
+    (a linear layer on top of the pooled output) e.g. for Dureader.
+    
+    Args:
+        ernie_doc (:class:`ErnieDocModel`):
+            An instance of :class:`ErnieDocModel`.
+        dropout (float, optional)
+            The dropout ratio of last output. Default to 0.1.
+    """
+
     def __init__(self, ernie_doc, dropout=0.1):
         super(ErnieDocForQuestionAnswering, self).__init__()
         self.ernie_doc = ernie_doc  # allow ernie_doc to be config
@@ -567,6 +893,82 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
 
     def forward(self, input_ids, memories, token_type_ids, position_ids,
                 attn_mask):
+        r"""
+        The ErnieDocForQuestionAnswering forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
+            memories (List[Tensor]):
+                A list of length `n_layers` with each Tensor being a pre-computed hidden-state for each layer.
+                Each Tensor has a dtype `float32` and a shape of [batch_size, sequence_length, hidden_size].
+            token_type_ids (Tensor):
+                Segment token indices to indicate first and second portions of the inputs.
+                Indices can be either 0 or 1:
+
+                - 0 corresponds to a **sentence A** token,
+                - 1 corresponds to a **sentence B** token.
+
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
+                Defaults to None, which means no segment embeddings is added to token embeddings.
+            position_ids (Tensor):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                config.max_position_embeddings - 1]``. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attn_mask (Tensor):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set
+                to **-infinity** for any positions in the mask that are **0**, and will be
+                **unchanged** for positions that are **1**.
+
+                - **1** for tokens that are **not masked**,
+                - **0** for tokens that are **masked**.
+
+                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+        Returns:
+            Tuple : Returns tuple with 3 field:
+            - `start_logits` (Tensor):
+                A tensor containing the [CLS] of hidden-states of the model at the output of last layer.
+                Each Tensor has a data type of `float32` and has a shape of [batch_size, sequence_length]. 
+            - `end_logits` (Tensor):
+                A tensor containing the [CLS] of hidden-states of the model at the output of last layer.
+                Each Tensor has a data type of `float32` and has a shape of [batch_size, sequence_length]. 
+            - `mem` (List[Tensor]):
+                A list of pre-computed hidden-states. The length of the list is `n_layers`.
+                Each element in the list is a Tensor with dtype `float32` and has a shape of
+                [batch_size, memory_length, hidden_size].
+        Example:
+            .. code-block::
+                import numpy as np
+                import paddle
+                from paddlenlp.transformers import ErnieDocForQuestionAnswering
+                from paddlenlp.transformers import ErnieDocTokenizer
+                
+                def get_related_pos(insts, seq_len, memory_len=128):
+                    beg = seq_len + seq_len + memory_len
+                    r_position = [list(range(beg - 1, seq_len - 1, -1)) + \
+                                list(range(0, seq_len)) for i in range(len(insts))]
+                    return np.array(r_position).astype('int64').reshape([len(insts), beg, 1])
+                    
+                tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
+                model = ErnieDocForQuestionAnswering.from_pretrained('ernie-doc-base-zh')
+
+                inputs = tokenizer("这是一个示例")
+                inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
+                
+                memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
+                position_ids = paddle.to_tensor(get_related_pos(inputs['input_ids'], 128, 128))
+                attn_mask = paddle.ones([1, 128, 1])
+
+                inputs['memories'] = memories
+                inputs['position_ids'] = position_ids
+                inputs['attn_mask'] = attn_mask
+
+                outputs = model(**inputs)
+
+                last_hidden_states = outputs[0]
+        """
         sequence_output, _, mem = self.ernie_doc(
             input_ids, memories, token_type_ids, position_ids, attn_mask)
         sequence_output = self.dropout(sequence_output)
