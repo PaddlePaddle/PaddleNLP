@@ -48,6 +48,9 @@ if [ ${MODE} = "lite_train_infer" ]; then
     cd -
 elif [ ${MODE} = "whole_infer" ]; then
     cd ../examples/machine_translation/transformer/
+    sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
+    sed -i "s/^max_out_len.*/max_out_len: 1024/g" configs/transformer.big.yaml
+
     # Trained transformer base model checkpoint. 
     # For infer. 
     if [ ! -f tranformer-base-wmt_ende_bpe.tar.gz ]; then
@@ -102,6 +105,9 @@ elif [ ${MODE} = "whole_infer" ]; then
     cd -
 elif [ ${MODE} = "whole_train_infer" ]; then
     cd ../examples/machine_translation/transformer/
+    sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
+    sed -i "s/^max_out_len.*/max_out_len: 1024/g" configs/transformer.big.yaml
+
     # Whole data set prepared. 
     if [ ! -f WMT14.en-de.tar.gz ]; then
         wget https://paddlenlp.bj.bcebos.com/datasets/WMT14.en-de.tar.gz
@@ -144,6 +150,9 @@ elif [ ${MODE} = "whole_train_infer" ]; then
     cd -
 else # infer
     cd ../examples/machine_translation/transformer/
+    sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
+    sed -i "s/^max_out_len.*/max_out_len: 1024/g" configs/transformer.big.yaml
+
     # Trained transformer base model checkpoint. 
     if [ ! -f tranformer-base-wmt_ende_bpe.tar.gz ]; then
         wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz
