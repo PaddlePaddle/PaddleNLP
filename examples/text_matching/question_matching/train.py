@@ -34,7 +34,6 @@ from model import QuestionMatching
 parser = argparse.ArgumentParser()
 parser.add_argument("--train_set", type=str, required=True, help="The full path of train_set_file")
 parser.add_argument("--dev_set", type=str, required=True, help="The full path of dev_set_file")
-parser.add_argument("--test_set", type=str, required=True, help="The full path of test_set_file")
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--max_seq_length", default=256, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")

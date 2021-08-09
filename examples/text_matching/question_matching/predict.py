@@ -32,6 +32,7 @@ from model import QuestionMatching
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--input_file", type=str, required=True, help="The full path of input file")
+parser.add_argument("--result_file", type=str, required=True, help="The result file name")
 parser.add_argument("--params_path", type=str, required=True, help="The path to model parameters to be loaded.")
 parser.add_argument("--max_seq_length", default=256, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
@@ -117,6 +118,7 @@ if __name__ == "__main__":
 
     y_probs = predict(model, test_data_loader)
     y_preds = np.argmax(y_probs, axis=1)
-
-    for y_pred in y_preds:
-        print(y_pred)
+    
+    with open(args.result_file, 'w', encoding="utf-8") as f:
+        for y_pred in y_preds:
+            f.write(str(y_pred) + "\n")
