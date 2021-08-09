@@ -332,70 +332,57 @@ class BertModel(BertPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (`int`):
+        vocab_size (int):
             Vocabulary size of `inputs_ids` in `BertModel`. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling `BertModel`.
-        hidden_size (`int`, optional):
-            Dimensionality of the encoder layers and the pooler layer. Defaults to ``768``.
-        num_hidden_layers (`int`, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to ``12``.
-        num_attention_heads (`int`, optional):
+        hidden_size (int, optional):
+            Dimensionality of the encoder layers and the pooler layer. Defaults to `768`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in the Transformer encoder. Defaults to `12`.
+        num_attention_heads (int, optional):
             Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to ``12``.
-        intermediate_size (`int`, optional):
+            Defaults to `12`.
+        intermediate_size (int, optional):
             Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
-            Defaults to ``3072``.
-        hidden_act (`str`, optional):
+            Defaults to `3072`.
+        hidden_act (str, optional):
             The non-linear activation function in the feed-forward layer.
             ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to ``"gelu"``.
-        hidden_dropout_prob (`float`, optional):
+            are supported. Defaults to `"gelu"`.
+        hidden_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to ``0.1``.
-        attention_probs_dropout_prob (`float`, optional):
+            Defaults to `0.1`.
+        attention_probs_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the pooler.
-            Defaults to ``0.1``.
-        max_position_embeddings (`int`, optional):
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
             The maximum value of the dimensionality of position encoding. The dimensionality of position encoding
             is the dimensionality of the sequence in `BertModel`.
-            Defaults to ``512``.
-        type_vocab_size (`int`, optional):
+            Defaults to `512`.
+        type_vocab_size (int, optional):
             The vocabulary size of `token_type_ids` passed when calling `~ transformers.BertModel`.
-            Defaults to ``12``.
+            Defaults to `12`.
             `token_type_ids` are segment token indices to indicate first
              and second portions of the inputs. Indices can either be 0 or 1:
 
                 - 0 corresponds to a *sentence A* token,
                 - 1 corresponds to a *sentence B* token.
 
-        initializer_range (`float`, optional):
+        initializer_range (float, optional):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-            Defaults to ``0.02``.
+            Defaults to `0.02`.
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
                 See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `BertModel`.
 
-        pad_token_id ('int', optional):
+        pad_token_id (int, optional):
             The index of padding token in the token vocabulary.
-            Defaults to ``0``.
+            Defaults to `0`.
 
         pooled_act (`str`, optional):
             The non-linear activation function in the pooling layer.
-            Defaults to ``"tanh"``.
-
-        Example:
-            .. code-block::
-
-                import paddle
-                from paddlenlp.transformers import BertModel, BertTokenizer
-
-                tokenizer = BertTokenizer.from_pretrained('bert-wwm-chinese')
-                model = BertModel.from_pretrained('bert-wwm-chinese')
-
-                inputs = tokenizer("这是一个测试样例!")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
-                output = model(**inputs)
+            Defaults to `"tanh"`.
 
     """
 
@@ -441,11 +428,11 @@ class BertModel(BertPretrainedModel):
         The BertModel forward method, overrides the `__call__()` special method.
 
         Args:
-            input_ids (`Tensor`):
+            input_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 Segment token indices to indicate first and second portions of the inputs.
                 Indices can either be 0 or 1:
 
@@ -453,12 +440,12 @@ class BertModel(BertPretrainedModel):
                 - 1 corresponds to a *sentence B* token.
 
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-                Defaults to ``None``, which means we don't add segment embeddings.
-            position_ids(`Tensor`, optional):
+                Defaults to `None`, which means we don't add segment embeddings.
+            position_ids(Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
                 config.max_position_embeddings - 1]``.
                 Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
-            attention_mask (`Tensor`, optional):
+            attention_mask (Tensor, optional):
                 Mask to indicate whether to perform attention on each input token or not.
                 The values should be either 0 or 1. The attention scores will be set to **-infinity**
                 for any positions in mask that are **0**, and will be **unchanged** for positions that
@@ -474,26 +461,37 @@ class BertModel(BertPretrainedModel):
                 Defaults to be `False`.
 
         Returns:
-            `Tuple`: A tuple of shape (``sequence_output``, ``pooled_output``) or (``encoder_output``, ``pooled_output``).
+            Tuple: A tuple of shape (`sequence_output`, `pooled_output`) or (`encoder_output`, `pooled_output`).
 
             With the fields:
 
-            - sequence_output (`Tensor`):
+            - `sequence_output` (Tensor):
                 Sequence of hidden-states at the last layer of the model.
                 It's data type should be float32 and has a shape of (`batch_size, seq_lens, hidden_size`].
-                ``seq_lens`` corresponds to the length of input sequence.
+                `seq_lens` corresponds to the length of input sequence.
 
-            - pooled_output (`Tensor`):
+            - `pooled_output` (Tensor):
                 The output of first token (`[CLS]`) in sequence.
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
                 Its data type should be float32 and
                 has a shape of [batch_size, hidden_size].
 
-            - encoder_output (`Tensor`):
+            - `encoder_output` (Tensor):
                 Sequence of output at hidden layers of the model. Its data type should be float32 and
                 has a shape of [batch_size, sequence_length, hidden_size].
 
+        Example:
+            .. code-block::
 
+                import paddle
+                from paddlenlp.transformers import BertModel, BertTokenizer
+
+                tokenizer = BertTokenizer.from_pretrained('bert-wwm-chinese')
+                model = BertModel.from_pretrained('bert-wwm-chinese')
+
+                inputs = tokenizer("这是一个测试样例!")
+                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                output = model(**inputs)
         '''
 
         if attention_mask is None:
@@ -546,9 +544,9 @@ class BertForQuestionAnswering(BertPretrainedModel):
         The BertForQuestionAnswering forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (`Tensor`):
+            input_ids (Tensor):
                 See :class:`BertModel`.
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 See :class:`BertModel`.
 
         Returns:
@@ -579,7 +577,7 @@ class BertForSequenceClassification(BertPretrainedModel):
         bert (:class:`BertModel`):
             An instance of BertModel.
         num_classes (int, optional):
-            The number of classes. Default ``2``.
+            The number of classes. Default `2`.
         dropout (float, optional):
             The dropout probability for output of BERT.
             If None, use the same value as `hidden_dropout_prob` of `BertModel`
@@ -606,13 +604,13 @@ class BertForSequenceClassification(BertPretrainedModel):
         The BertForSequenceClassification forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (`Tensor`):
+            input_ids (Tensor):
                 See :class:`BertModel`.
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 See :class:`BertModel`.
-            position_ids(,optional):
+            position_ids(Tensor, optional):
                 See :class:`BertModel`.
-            attention_mask_list (`list`, optional):
+            attention_mask_list (list, optional):
                 See :class:`BertModel`.
 
         Returns:
@@ -682,13 +680,13 @@ class BertForTokenClassification(BertPretrainedModel):
         The BertForSequenceClassification forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (`Tensor`):
+            input_ids (Tensor):
                 See :class:`BertModel`.
             token_type_ids (`Tensor`, optional):
                 See :class:`BertModel`.
-            position_ids(`Tensor`, optional):
+            position_ids(Tensor, optional):
                 See :class:`BertModel`.
-            attention_mask_list (`list`, optional):
+            attention_mask_list (list, optional):
                 See :class:`BertModel`.
 
         Returns:
@@ -745,17 +743,17 @@ class BertLMPredictionHead(Layer):
 
 
 class BertPretrainingHeads(Layer):
-    r"""
+    """
     Perform language modeling task and next sentence classification task.
 
     Args：
-        hidden_size(`int`):
+        hidden_size(int):
             See :class:`BertModel`.
-        vocab_size(`int`):
+        vocab_size(int):
             See :class:`BertModel`.
-        activation(`str`):
+        activation(str):
             Activation function used in the language modeling task.
-        embedding_weights(`Tensor`, optional):
+        embedding_weights(Tensor, optional):
             Embedding weights of the pretrained model. Defaults to `None`.
 
     """
@@ -772,16 +770,16 @@ class BertPretrainingHeads(Layer):
     def forward(self, sequence_output, pooled_output, masked_positions=None):
         """
         Args:
-            sequence_output(`Tensor`):
+            sequence_output(Tensor):
                 Sequence of hidden-states at the last layer of the model.
                 It's data type should be float32 and has a shape of (`batch_size, seq_lens, hidden_size`].
                 ``seq_lens`` corresponds to the length of input sequence.
-            pooled_output(`Tensor`):
+            pooled_output(Tensor):
                 The output of first token (`[CLS]`) in sequence.
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
                 Its data type should be float32 and
                 has a shape of [batch_size, hidden_size].
-            masked_positions(`Tensor`, optional):
+            masked_positions(Tensor, optional):
                 The masked positions embeddings. Defaults to `None`.
 
         Returns:
@@ -789,8 +787,8 @@ class BertPretrainingHeads(Layer):
 
             With the fields:
 
-            - `prediction_scores`(Tensor): The scores of prediction on masked token.
-            - `seq_relationship_score`(Tensor): The scores of next sentence prediction.
+            - `prediction_scores` (Tensor): The scores of prediction on masked token.
+            - `seq_relationship_score` (Tensor): The scores of next sentence prediction.
 
 
         """
@@ -833,7 +831,7 @@ class BertForPretraining(BertPretrainedModel):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-            token_type_ids (Tensor, optional):
+            token_tycpe_ids (Tensor, optional):
                 Segment token indices to indicate first and second portions of the inputs.
                 Indices can be either 0 or 1:
 
@@ -860,12 +858,12 @@ class BertForPretraining(BertPretrainedModel):
 
 
         Returns:
-            A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
+            Tuple: A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
 
             With the fields:
 
-            - `prediction_scores`(Tensor): The scores of prediction on masked token.
-            - `seq_relationship_score`(Tensor): The scores of next sentence prediction.
+            - `prediction_scores` (Tensor): The scores of prediction on masked token.
+            - `seq_relationship_score` (Tensor): The scores of next sentence prediction.
 
         """
         with paddle.static.amp.fp16_guard():
@@ -884,7 +882,7 @@ class BertPretrainingCriterion(paddle.nn.Layer):
     """
 
     Args:
-        vocab_size(`int`):
+        vocab_size(int):
             Vocabulary size of `inputs_ids` in `BertModel`. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling `BertModel`.
 
@@ -899,21 +897,21 @@ class BertPretrainingCriterion(paddle.nn.Layer):
                 masked_lm_labels, next_sentence_labels, masked_lm_scale):
         """
         Args:
-            prediction_scores(`Tensor`):
+            prediction_scores(Tensor):
                 The scores of prediction on masked token.
-            seq_relationship_score(`Tensor`):
+            seq_relationship_score(Tensor):
                 The scores of next sentence prediction.
-            masked_lm_labels(`Tensor`):
+            masked_lm_labels(Tensor):
                 The labels of the masked language modeling, the dimensionality of `masked_lm_labels`
                 is equal to `prediction_scores`.
-            next_sentence_labels(`Tensor`):
+            next_sentence_labels(Tensor):
                 The labels of the next sentence prediction, the dimensionality of `next_sentence_labels`
                 is equal to `seq_relation_lables`.
-            masked_lm_scale(`float`):
+            masked_lm_scale(float):
                 Used for the normalization of masked language modeling loss.
 
         Returns:
-            Tensor: The loss of the model, equals to the sum of `masked_lm_loss` plus the mean of 'next_sentence_loss`.
+            Tensor: The loss of the model, equals to the sum of `masked_lm_loss` plus the mean of `next_sentence_loss`.
 
         """
         with paddle.static.amp.fp16_guard():
