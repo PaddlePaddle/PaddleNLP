@@ -450,26 +450,26 @@ class NeZhaModel(NeZhaPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (`int`):
+        vocab_size (int):
             Vocabulary size of `inputs_ids` in `NeZhaModel`.Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling `NeZhaModel`.
-        hidden_size (`int`, optional):
-            Dimensionality of the encoder layers and the pooler layer. Defaults to ``768``.
-        num_hidden_layers (`int`, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to ``12``.
+        hidden_size (int, optional):
+            Dimensionality of the encoder layers and the pooler layer. Defaults to `768`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in the Transformer encoder. Defaults to `12`.
         num_attention_heads (`int`, optional):
             Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to ``12``.
+            Defaults to `12`.
         intermediate_size (`int`, optional):
             Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
-            Defaults to ``3072``.
-        hidden_act (`str`, optional):
+            Defaults to `3072`.
+        hidden_act (str, optional):
             The non-linear activation function in the feed-forward layer.
             ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to ``"gelu"``.
-        hidden_dropout_prob (`float`, optional):
+            are supported. Defaults to `"gelu"`.
+        hidden_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to ``0.1``.
+            Defaults to ``0.1`.
         attention_probs_dropout_prob (`float`, optional):
             The dropout probability for all fully connected layers in the pooler.
             Defaults to ``0.1``.

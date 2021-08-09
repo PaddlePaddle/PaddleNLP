@@ -490,7 +490,7 @@ class BertModel(BertPretrainedModel):
                 model = BertModel.from_pretrained('bert-wwm-chinese')
 
                 inputs = tokenizer("这是一个测试样例!")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
 
@@ -554,6 +554,21 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 A Tensor of the input text classification logits.
                 Shape as `(batch_size, num_classes)` and dtype as `float`.
 
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.bert.modeling import BertForQuestionAnswering
+                from paddlenlp.transformers.bert.tokenizer import BertTokenizer
+
+                tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+                model = BertForQuestionAnswering.from_pretrained('bert-base-cased')
+
+                inputs = tokenizer("这是一个测试样例!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
         """
 
         sequence_output, _ = self.bert(
@@ -694,6 +709,21 @@ class BertForTokenClassification(BertPretrainedModel):
                 A Tensor of the input token classification logits.
                 Shape as `(batch_size, num_classes)` and dtype as `float`.
 
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.bert.modeling import BertForTokenClassification
+                from paddlenlp.transformers.bert.tokenizer import BertTokenizer
+
+                tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+                model = BertForTokenClassification.from_pretrained('bert-base-cased')
+
+                inputs = tokenizer("这是一个测试样例!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
         """
         sequence_output, _ = self.bert(
             input_ids,
