@@ -289,7 +289,7 @@ class WordtagPredictor(object):
                     raise Exception("The len of text must same as raw text.")
         return concat_results
 
-    def _pre_process_text(self, input_texts, max_seq_len=128, batch_size=1):
+    def _pre_process_text(self, input_texts, max_seq_len=512, batch_size=1):
         infer_data = []
         max_predict_len = max_seq_len - self.summary_num - 1
         short_input_texts = self._split_long_text2short_text_list(
@@ -362,7 +362,7 @@ class WordtagPredictor(object):
     @paddle.no_grad()
     def run(self,
             input_texts,
-            max_seq_len=128,
+            max_seq_len=512,
             batch_size=1,
             return_hidden_states=None):
         """Predict a input text by wordtag.
