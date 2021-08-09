@@ -234,9 +234,6 @@ public:
       fclose(fd);
     }
     if (err != 1) {
-      printf(
-          "[WARNING] decoding loading GEMM algorithms error, using default "
-          "GEMM algorithms!\n");
       if (Traits_::OpType == OperationType::FP32) {
         cublasAlgo_[0] = CUBLAS_GEMM_DEFAULT;
       } else {
