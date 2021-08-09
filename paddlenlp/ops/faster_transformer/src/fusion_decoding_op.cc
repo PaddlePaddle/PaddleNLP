@@ -66,7 +66,7 @@ std::vector<paddle::Tensor> DecodingForward(
     const float& beam_search_diversity_rate,
     const bool& rel_len) {
   int batch_size = input.shape()[0];
-  int max_out_len = rel_len ? max_len + input_dims[1] : max_len;
+  int max_out_len = rel_len ? max_len + input.shape()[1] : max_len;
 
   std::vector<int64_t> output_dims;
   std::vector<int64_t> parent_ids_dims;
