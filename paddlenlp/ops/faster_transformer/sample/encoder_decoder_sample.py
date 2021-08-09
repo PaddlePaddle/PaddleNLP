@@ -265,8 +265,8 @@ def do_predict(args):
         use_fp16_decoder=args.use_fp16_decoder)
 
     # Load checkpoint.
-    transformer.load(args.init_from_params)
-
+    transformer.load(
+        os.path.join(args.init_from_params, "transformer.pdparams"))
     # Set evaluate mode
     transformer.eval()
 
