@@ -747,16 +747,17 @@ class BertPretrainingHeads(Layer):
     Perform language modeling task and next sentence classification task.
 
     Args：
-        hidden_size(int):
+        hidden_size (int):
             See :class:`BertModel`.
-        vocab_size(int):
+        vocab_size (int):
             See :class:`BertModel`.
-        activation(str):
+        activation (str):
             Activation function used in the language modeling task.
-        embedding_weights(Tensor, optional):
+        embedding_weights (Tensor, optional):
             Embedding weights of the pretrained model. Defaults to `None`.
 
     """
+
     def __init__(self,
                  hidden_size,
                  vocab_size,
