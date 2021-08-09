@@ -130,7 +130,7 @@ def evaluate(model, metric, data_loader, memories0, pair_memories0):
         preds.append(mean_prob)
         labels.append(label_dict[qid])
 
-    preds = paddle.to_tensor(np.array(preds, dtype='int64'))
+    preds = paddle.to_tensor(np.array(preds, dtype='float32'))
     labels = paddle.to_tensor(np.array(labels, dtype='int64'))
 
     metric.update(metric.compute(preds, labels))
