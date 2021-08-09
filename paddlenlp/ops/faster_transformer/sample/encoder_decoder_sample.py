@@ -162,7 +162,7 @@ class FasterDecoder(nn.Layer):
             if args.use_fp16_decoder:
                 dec_input = paddle.cast(dec_input, "float16")
 
-            dec_output, _, _ = self.decoder(
+            dec_output, self_cache, mem_cache = self.decoder(
                 from_tensor=dec_input,
                 memory_tensor=enc_output,
                 mem_seq_len=mem_seq_lens,

@@ -183,6 +183,8 @@ class InferTransformerDecoder(nn.Layer):
     def forward(self, from_tensor, memory_tensor, mem_seq_len, self_cache,
                 mem_cache):
         decoder_output = from_tensor
+        self_caches = []
+        mem_caches = []
         self_cache = paddle.concat(
             [
                 self_cache, paddle.zeros(
@@ -229,5 +231,9 @@ class InferTransformerDecoder(nn.Layer):
                 old_mem_cache=mem_cache[idx],
                 n_head=self.n_head,
                 size_per_head=self.size_per_head)
+            self_caches.append(new_self_cache)
+            mem_caches.append(new_mem_cache)
 
+        self_cache = paddle.stack(self_caches, axis=0)
+        mem_cache = paddle.stack(mem_caches, axis=0)
         return decoder_output, self_cache, mem_cache
