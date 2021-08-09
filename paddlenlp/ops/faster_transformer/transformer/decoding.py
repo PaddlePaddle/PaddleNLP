@@ -35,7 +35,8 @@ def infer_transformer_decoding(
         ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
         decoder_ln_bias, linear_weight, linear_bias, pos_emb,
         _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
-        _n_layer, _bos_id, _eos_id, _max_out_len, _beam_search_diversity_rate):
+        _n_layer, _bos_id, _eos_id, _max_out_len, _beam_search_diversity_rate,
+        _rel_len):
     helper = LayerHelper('fusion_decoding', **locals())
 
     inputs = {
@@ -86,7 +87,8 @@ def infer_transformer_decoding(
         'bos_id': _bos_id,
         'eos_id': _eos_id,
         'max_len': _max_out_len,
-        'beam_search_diversity_rate': _beam_search_diversity_rate
+        'beam_search_diversity_rate': _beam_search_diversity_rate,
+        "rel_len": _rel_len
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -171,9 +173,9 @@ def finalize(beam_size,
     if max_seq_len is None:
         max_seq_len = paddle.max(out_seq_lens)
     ids = paddle.slice(output_ids, [0], [0], [max_seq_len])
-    if "beam_search" == decoding_strategy:
-        parent_ids = paddle.slice(parent_ids, [0], [0],
-                                  [max_seq_len]) % beam_size
+    if decoding_strategy.startswith("beam_search"):
+        parent_ids = paddle.slice(parent_ids, [0], [0], [max_seq_len]) % (
+            beam_size * 2 if decoding_strategy.endswith("_v2") else beam_size)
         ids = paddle.nn.functional.gather_tree(ids, parent_ids)
     return ids
 
@@ -208,7 +210,8 @@ class InferTransformerDecoding(nn.Layer):
                  max_out_len=256,
                  beam_search_diversity_rate=0.0,
                  decoding_lib=None,
-                 use_fp16_decoding=False):
+                 use_fp16_decoding=False,
+                 rel_len=False):
         # if decoding_lib is None:
         #     raise ValueError(
         #         "The args decoding_lib must be set to use Faster Transformer. ")
@@ -280,7 +283,7 @@ class InferTransformerDecoding(nn.Layer):
             decoder.norm.bias = transfer_param(decoder.norm.bias, is_bias=True)
 
             linear.weight = transfer_param(linear.weight)
-            if "beam_search" != decoding_strategy:
+            if not decoding_strategy.startswith("beam_search"):
                 linear.bias = transfer_param(linear.bias)
 
             positional_embedding.weight = transfer_param(
@@ -356,7 +359,7 @@ class InferTransformerDecoding(nn.Layer):
         self.linear_bias = [linear.bias]
 
     def forward(self, enc_output, memory_seq_lens):
-        if "beam_search" == self._decoding_strategy:
+        if self._decoding_strategy.startswith("beam_search"):
             enc_output = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
                 enc_output, self._beam_size)
             memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
@@ -376,8 +379,9 @@ class InferTransformerDecoding(nn.Layer):
             self.linear_weight, self.linear_bias, self.pos_emb,
             self._decoding_strategy, self._beam_size, self._topk, self._topp,
             self._n_head,
-            int(self._d_model / self._n_head), self._num_decoder_layers, self._bos_id,
-            self._eos_id, self._max_out_len, self._beam_search_diversity_rate)
+            int(self._d_model / self._n_head), self._num_decoder_layers,
+            self._bos_id, self._eos_id, self._max_out_len,
+            self._beam_search_diversity_rate, self._rel_len)
 
         ids = finalize(
             self._beam_size,

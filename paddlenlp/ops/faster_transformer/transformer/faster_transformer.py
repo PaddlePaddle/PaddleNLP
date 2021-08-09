@@ -50,7 +50,8 @@ class FasterTransformer(TransformerModel):
                  topp=0.0,
                  max_out_len=256,
                  decoding_lib=None,
-                 use_fp16_decoding=False):
+                 use_fp16_decoding=False,
+                 rel_len=False):
         # if decoding_lib is None:
         #     raise ValueError(
         #         "The args decoding_lib must be set to use Faster Transformer. ")
@@ -67,6 +68,7 @@ class FasterTransformer(TransformerModel):
         self.max_out_len = args.pop("max_out_len")
         self.decoding_lib = args.pop("decoding_lib")
         self.use_fp16_decoding = args.pop("use_fp16_decoding")
+        self.rel_len = args.pop("rel_len")
         self.dropout = dropout
         self.weight_sharing = weight_sharing
         self.trg_vocab_size = trg_vocab_size
@@ -100,7 +102,8 @@ class FasterTransformer(TransformerModel):
             topp=topp,
             max_out_len=max_out_len,
             decoding_lib=self.decoding_lib,
-            use_fp16_decoding=self.use_fp16_decoding)
+            use_fp16_decoding=self.use_fp16_decoding,
+            rel_len=self.rel_len)
 
     def forward(self, src_word):
         src_max_len = paddle.shape(src_word)[-1]
@@ -150,8 +153,11 @@ class FasterTransformer(TransformerModel):
         # NOTE: the data type of the embedding bias for logits is different
         # between decoding with beam search and top-k/top-p sampling in
         # Faster Transformer when using float16.
+        # NOTE: This changes since FasterTransformer V4.0 and update accordingly
+        # after update to FT-4.0.
         bias_dtype = "float32"
-        if self.use_fp16_decoding and "beam_search" != self.decoding_strategy:
+        if self.use_fp16_decoding and not self.decoding_strategy.startswith(
+                "beam_search"):
             bias_dtype = "float16"
         model_dict["decoding_linear.bias"] = np.zeros(
             [self.trg_vocab_size], dtype=bias_dtype)
@@ -196,8 +202,11 @@ class FasterTransformer(TransformerModel):
         # NOTE: the data type of the embedding bias for logits is different
         # between decoding with beam search and top-k/top-p sampling in
         # Faster Transformer when using float16.
+        # NOTE: This changes since FasterTransformer V4.0 and update accordingly
+        # after update to FT-4.0.
         bias_dtype = "float32"
-        if self.use_fp16_decoding and "beam_search" != self.decoding_strategy:
+        if self.use_fp16_decoding and not self.decoding_strategy.startswith(
+                "beam_search"):
             bias_dtype = "float16"
         model_dict["decoding_linear.bias"] = np.zeros(
             [self.trg_vocab_size], dtype=bias_dtype)

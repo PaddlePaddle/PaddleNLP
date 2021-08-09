@@ -78,7 +78,10 @@ std::vector<paddle::Tensor> decoding_kernel(
     float beam_search_diversity_rate_,
     cublasHandle_t cublas_handle_,
     cudaStream_t stream) {
-  int beam_width_ = (decoding_strategy == "beam_search") ? beam_size : 1;
+  int beam_width_ = (decoding_strategy == "beam_search" ||
+                     decoding_strategy == "beam_search_v2")
+                        ? beam_size
+                        : 1;
   int candidate_num_ = (decoding_strategy == "topk_sampling" ||
                         decoding_strategy == "topp_sampling")
                            ? topk
@@ -89,7 +92,8 @@ std::vector<paddle::Tensor> decoding_kernel(
                                      : 0.0;
 
   auto input_dims = input.shape();
-  int batch_size_ = (decoding_strategy == "beam_search")
+  int batch_size_ = (decoding_strategy == "beam_search" ||
+                     decoding_strategy == "beam_search_v2")
                         ? input_dims[0] / beam_width_
                         : input_dims[0];
   const int memory_max_seq_len = input_dims[1];
@@ -223,7 +227,8 @@ std::vector<paddle::Tensor> decoding_kernel(
   // NOTE: the data type of the embedding bias for logits is different
   // between decoding with beam search and top-k/top-p sampling in
   // Faster Transformer when using float16.
-  if ("beam_search" == decoding_strategy) {
+  if ("beam_search" == decoding_strategy ||
+      "beam_search_v2" == decoding_strategy) {
     // for matmul bias
     decoding_params.embedding_bias =
         reinterpret_cast<const float*>(embedding_bias.data<float>());
@@ -251,6 +256,28 @@ std::vector<paddle::Tensor> decoding_kernel(
         start_id_,
         end_id_,
         beam_search_diversity_rate_);
+
+    decoding_beamsearch_->forward(params, decoding_params);
+
+    delete decoding_beamsearch_;
+  } else if ("beam_search_v2" == decoding_strategy) {
+    DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beamsearch_;
+    decoding_beamsearch_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
+        allocator_,
+        batch_size_,
+        beam_width_,
+        max_seq_len_,
+        head_num_,
+        size_per_head_,
+        vocab_size,
+        num_layer_,
+        memory_hidden_dim,
+        memory_max_seq_len,
+        start_id_,
+        end_id_,
+        beam_search_diversity_rate_,
+        true,   // is_fuse_topk_softMax_
+        true);  // keep_alive_beam_
 
     decoding_beamsearch_->forward(params, decoding_params);
 
