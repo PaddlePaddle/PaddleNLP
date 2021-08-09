@@ -2,8 +2,10 @@ MODE=$1
 
 if [ ${MODE} = "lite_train_infer" ]; then
     cd ../examples/machine_translation/transformer/
-    sed -i "s/^max_out_len.*/max_out_len: 32/g" configs/transformer.base.yaml
-    sed -i "s/^max_out_len.*/max_out_len: 32/g" configs/transformer.big.yaml
+    # The whole procedure of lite_train_infer should be less than 15min.
+    # Hence, set maximum output length is 16. 
+    sed -i "s/^max_out_len.*/max_out_len: 16/g" configs/transformer.base.yaml
+    sed -i "s/^max_out_len.*/max_out_len: 16/g" configs/transformer.big.yaml
     # Data set prepared. 
     if [ ! -f WMT14.en-de.partial.tar.gz ]; then
         wget https://paddlenlp.bj.bcebos.com/datasets/WMT14.en-de.partial.tar.gz

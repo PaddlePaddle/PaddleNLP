@@ -41,7 +41,7 @@ inference:../examples/machine_translation/transformer/deploy/python/inference.py
 --device:gpu|cpu
 --use_mkl:True|False
 --threads:1|6
---batch_size:1|32
+--batch_size:32
 null:null
 null:null
 null:null
