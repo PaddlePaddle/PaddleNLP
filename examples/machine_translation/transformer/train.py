@@ -258,6 +258,8 @@ def do_train(args):
                     os.path.join(model_dir, "transformer.pdparams"))
         paddle.save(optimizer.state_dict(),
                     os.path.join(model_dir, "transformer.pdopt"))
+    # NOTE: Try to avoid "process abort signal" exception using multi-cards. 
+    dist.barrier()
 
 
 if __name__ == "__main__":
