@@ -552,11 +552,11 @@ class NeZhaModel(NeZhaPretrainedModel):
         The NeZhaModel forward method, overrides the `__call__()` special method.
 
         Args:
-            input_ids (`Tensor`):
+            input_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 Segment token indices to indicate first and second portions of the inputs.
                 Indices can either be 0 or 1:
 
@@ -565,7 +565,7 @@ class NeZhaModel(NeZhaPretrainedModel):
 
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to ``None``, which means we don't add segment embeddings.
-            attention_mask (`Tensor`, optional):
+            attention_mask (Tensor, optional):
                 Mask to indicate whether to perform attention on each input token or not.
                 The values should be either 0 or 1. The attention scores will be set to **-infinity**
                 for any positions in mask that are **0**, and will be **unchanged** for positions that
@@ -597,13 +597,13 @@ class NeZhaModel(NeZhaPretrainedModel):
             .. code-block::
 
                 import paddle
-                from paddlenlp.transformers import NeZhaModel, NezhaTokenizer
+                from paddlenlp.transformers import NeZhaModel, NeZhaTokenizer
 
                 tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
-                model = ErnieModel.from_pretrained('nezha-base-chinese')
+                model = NeZhaModel.from_pretrained('nezha-base-chinese')
 
                 inputs = tokenizer("这是一个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 sequence_output, pooled_output = model(**inputs)
 
         '''
@@ -660,6 +660,21 @@ class NeZhaLMPredictionHead(nn.Layer):
 
 
 class NeZhaPretrainingHeads(nn.Layer):
+    """
+    Perform language modeling task and next sentence classification task.
+
+    Args:
+        hidden_size (int):
+            See :class:`NeZhaModel`.
+        vocab_size (int):
+            See :class:`NezhaModel`.
+        hidden_act (str):
+            Activation function used in hidden layers.
+        embedding_weights (Tensor, optional):
+            Embedding weights of the pretrained model. Defaults to `None`.
+
+    """
+
     def __init__(self,
                  hidden_size,
                  vocab_size,
@@ -675,12 +690,43 @@ class NeZhaPretrainingHeads(nn.Layer):
         self.seq_relationship = nn.Linear(hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output):
+        """
+        Args:
+            sequence_output(Tensor):
+                Sequence of hidden-states at the last layer of the model.
+                It's data type should be float32 and has a shape of (`batch_size, seq_lens, hidden_size`].
+                ``seq_lens`` corresponds to the length of input sequence.
+            pooled_output(Tensor):
+                The output of first token (`[CLS]`) in sequence.
+                We "pool" the model by simply taking the hidden state corresponding to the first token.
+                Its data type should be float32 and
+                has a shape of [batch_size, hidden_size].
+
+        Returns:
+            A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
+
+            With the fields:
+
+            - `prediction_scores` (Tensor): The scores of prediction on masked token.
+            - `seq_relationship_score` (Tensor): The scores of next sentence prediction.
+
+
+        """
         prediction_scores = self.predictions(sequence_output)
         seq_relationship_score = self.seq_relationship(pooled_output)
         return prediction_scores, seq_relationship_score
 
 
 class NeZhaForPretraining(NeZhaPretrainedModel):
+    """
+    NeZha Model for pretraining tasks on top.
+
+    Args:
+        nezha (:class:`NeZhaModel`):
+            An instance of :class:`NeZhaModel`.
+
+    """
+
     def __init__(self, nezha):
         super(NeZhaForPretraining, self).__init__()
         self.nezha = nezha
@@ -695,6 +741,32 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None,
                 masked_lm_labels=None, next_sentence_label=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`NeZhaModel`.
+            token_tycpe_ids (Tensor, optional):
+                See :class:`NeZhaModel`.
+            attention_mask (Tensor, optional):
+                See :class:`NeZhaModel`.
+            masked_lm_labels(Tensor):
+                The labels of the masked language modeling, the dimensionality of `masked_lm_labels`
+                is equal to `prediction_scores`. Defaults to `None`.
+            next_sentence_labels(Tensor):
+                The labels of the next sentence prediction, the dimensionality of `next_sentence_labels`
+                is equal to `seq_relation_lables`. Defaults to `None`.
+
+        Returns:
+            Tuple: A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
+
+            With the fields:
+
+            - `prediction_scores` (Tensor): The scores of prediction on masked token.
+            - `seq_relationship_score` (Tensor): The scores of next sentence prediction.
+
+        """
+
         sequence_output, pooled_output = self.nezha(input_ids, token_type_ids, attention_mask)
         prediction_scores, seq_relationship_score = self.cls(sequence_output, pooled_output)
 
@@ -735,6 +807,19 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
 
 
 class NeZhaForSequenceClassification(NeZhaPretrainedModel):
+    """
+    Model for sentence (pair) classification task with NeZha.
+
+    Args:
+        nezha (:class:`NeZhaModel`):
+            An instance of NeZhaModel.
+        num_classes (int, optional):
+            The number of classes. Default `2`.
+        dropout (float, optional):
+            The dropout probability for output of BERT.
+            If None, use the same value as `hidden_dropout_prob` of `NeZhaModel`
+            instance `nezha`. Default None.
+    """
     def __init__(self, nezha, num_classes=2, dropout=None):
         super(NeZhaForSequenceClassification, self).__init__()
         self.num_classes = num_classes
@@ -744,7 +829,43 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        """
+        The NeZhaForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`NeZhaModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`NeZhaModel`.
+            position_ids(Tensor, optional):
+                See :class:`NeZhaModel`.
+            attention_mask_list (list, optional):
+                See :class:`NeZhaModel`.
+
+        Returns:
+            logits (Tensor):
+                A Tensor of the input text classification logits.
+                Shape as `(batch_size, num_classes)` and dtype as `float`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.nezha.modeling import NeZhaForSequenceClassification
+                from paddlenlp.transformers.nezha.tokenizer import NeZhaTokenizer
+
+                tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
+                model = NeZhaForSequenceClassification.from_pretrained('nezha-base-chinese')
+
+                inputs = tokenizer("这是一个测试样例")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
+
         _, pooled_output = self.nezha(input_ids, token_type_ids, attention_mask)
+
         pooled_output = self.dropout(pooled_output)
 
         logits = self.classifier(pooled_output)
@@ -753,6 +874,20 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
 
 
 class NeZhaForTokenClassification(NeZhaPretrainedModel):
+    """
+    Model for token classification task with NeZha.
+
+    Args:
+        nezha (:class:`NeZhaModel`):
+            An instance of NeZhaModel.
+        num_classes (int, optional):
+            The number of classes. Default `2`.
+        dropout (float, optional):
+            The dropout probability for output of NeZha.
+            If None, use the same value as `hidden_dropout_prob` of `NeZhaModel`
+            instance `nezha`. Default None.
+    """
+
     def __init__(self, nezha, num_classes=2, dropout=None):
         super(NeZhaForTokenClassification, self).__init__()
         self.num_classes = num_classes
@@ -762,6 +897,41 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        r"""
+        The NeZhaForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`NeZhaModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`NeZhaModel`.
+            position_ids(Tensor, optional):
+                See :class:`NeZhaModel`.
+            attention_mask_list (list, optional):
+                See :class:`NeZhaModel`.
+
+        Returns:
+            logits (Tensor):
+                A Tensor of the input token classification logits.
+                Shape as `(batch_size, num_classes)` and dtype as `float`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.nezha.modeling import NeZhaForTokenClassification
+                from paddlenlp.transformers.nezha.tokenizer import NeZhaTokenizer
+
+                tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
+                model = NeZhaForTokenClassification.from_pretrained('nezha-base-chinese')
+
+                inputs = tokenizer("这是一个测试样例!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
+
         sequence_output, _ = self.nezha(input_ids, token_type_ids, attention_mask)
         sequence_output = self.dropout(sequence_output)
 
@@ -771,6 +941,19 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
 
 
 class NeZhaForMultipleChoice(NeZhaPretrainedModel):
+    """
+    Model for multiple choice task with NeZha.
+
+    Args:
+        nezha (:class:`NeZhaModel`):
+            An instance of NeZhaModel.
+        num_classes (int, optional):
+            The number of classes. Default `2`.
+        dropout (float, optional):
+            The dropout probability for output of NeZha.
+            If None, use the same value as `hidden_dropout_prob` of `NeZhaModel`
+            instance `nezha`. Default None.
+    """
     def __init__(self, nezha, num_choices=2, dropout=None):
         super(NeZhaForMultipleChoice, self).__init__()
         self.num_choices = num_choices
@@ -780,6 +963,22 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        r"""
+        The NeZhaForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`NeZhaModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`NeZhaModel`.
+            attention_mask(Tensor, optional):
+                See :class:`NeZhaModel`.
+
+        Returns:
+            logits (Tensor):
+                A Tensor of the input token classification logits.
+                Shape as `(batch_size, num_classes)` and dtype as `float`.
+        """
         # input_ids: [bs, num_choice, seq_l]
         input_ids = input_ids.reshape((-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
         
