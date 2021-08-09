@@ -457,51 +457,51 @@ class NeZhaModel(NeZhaPretrainedModel):
             Dimensionality of the encoder layers and the pooler layer. Defaults to `768`.
         num_hidden_layers (int, optional):
             Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        num_attention_heads (`int`, optional):
+        num_attention_heads (int, optional):
             Number of attention heads for each attention layer in the Transformer encoder.
             Defaults to `12`.
-        intermediate_size (`int`, optional):
+        intermediate_size (int, optional):
             Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
             Defaults to `3072`.
         hidden_act (str, optional):
             The non-linear activation function in the feed-forward layer.
             ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
+            are supported. Defaults to "gelu".
         hidden_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to ``0.1`.
-        attention_probs_dropout_prob (`float`, optional):
+            Defaults to `0.1`.
+        attention_probs_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the pooler.
-            Defaults to ``0.1``.
-        max_position_embeddings (`int`, optional):
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
             The maximum value of the dimensionality of position encoding. The dimensionality of position encoding
             is the dimensionality of the sequence in `NeZhaModel`.
-            Defaults to ``512``.
-        type_vocab_size (`int`, optional):
+            Defaults to `512`.
+        type_vocab_size (int, optional):
             The vocabulary size of `token_type_ids` passed when calling `~ transformers.NeZhaModel`.
-            Defaults to ``12``.
+            Defaults to `12`.
             `token_type_ids` are segment token indices to indicate first
              and second portions of the inputs. Indices can either be 0 or 1:
 
                 - 0 corresponds to a *sentence A* token,
                 - 1 corresponds to a *sentence B* token.
 
-        initializer_range (`float`, optional):
+        initializer_range (float, optional):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-            Defaults to ``0.02``.
+            Defaults to `0.02`.
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
                 See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `BertModel`.
 
-        max_relative_positions(`int`, optional):
+        max_relative_positions(int, optional):
             The maximum value of relative position.
             Defaults to `64`.
-        layer_norm_eps('float', optional):
+        layer_norm_eps(float, optional):
             The `epsilon` parameter used in :class:`paddle.nn.LayerNorm` for initializing layer normalization layers.
             A small value to the variance added to the normalization layer to prevent division by zero.
-            Defaults to '1e-12'.
-        use_relative_position(`bool`, optional):
+            Defaults to `1e-12`.
+        use_relative_position(bool, optional):
             Whether to use relative position in position embedding. Defaults to `False`.
 
     """

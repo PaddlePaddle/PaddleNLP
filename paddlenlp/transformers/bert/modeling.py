@@ -776,7 +776,7 @@ class BertPretrainingHeads(Layer):
     """
     Perform language modeling task and next sentence classification task.
 
-    Args：
+    Args:
         hidden_size (int):
             See :class:`BertModel`.
         vocab_size (int):
