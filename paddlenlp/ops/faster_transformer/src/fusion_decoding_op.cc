@@ -151,9 +151,8 @@ std::vector<paddle::Tensor> DecodingForward(
                                num_layer,
                                bos_id,
                                eos_id,
-                               max_len,
-                               beam_search_diversity_rate,
-                               rel_len);
+                               max_out_len,
+                               beam_search_diversity_rate);
   } else {
     PD_THROW("Not implemented place. Only GPU is supported. ");
   }
