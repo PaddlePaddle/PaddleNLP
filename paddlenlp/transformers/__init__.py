@@ -53,3 +53,7 @@ from .bart.modeling import *
 from .bart.tokenizer import *
 from .roformer.modeling import *
 from .roformer.tokenizer import *
+from .blenderbot.modeling import *
+from .blenderbot.tokenizer import *
+from .blenderbot_small.modeling import *
+from .blenderbot_small.tokenizer import *
