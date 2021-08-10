@@ -60,7 +60,7 @@ class LSTMByWPEncoder(nn.Layer):
         super(LSTMByWPEncoder, self).__init__()
         self.args = args
 
-        self.word_embed = nn.Embedding(self.args.vocab_size, lstm_by_wp_embed_size)
+        self.word_embed = nn.Embedding(self.args.n_words, lstm_by_wp_embed_size)
 
         self.lstm = nn.LSTM(
             input_size=lstm_by_wp_embed_size,
@@ -182,3 +182,4 @@ class CharLSTMEncoder(nn.Layer):
         h = paddle.concat(paddle.unstack(h), axis=-1)
         feat_embed = pad_sequence_paddle(paddle.split(h, lens.numpy().tolist(), axis=0), self.pad_index)
         return feat_embed
+        

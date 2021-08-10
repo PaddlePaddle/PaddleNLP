@@ -267,3 +267,4 @@ def reduce_sum(input, dim):
         input = layers.cast(input, 'int32')
     output = layers.reduce_sum(input, dim=dim)
     return output
+    
