@@ -87,6 +87,10 @@ skep/
 句子级情感分类数据集，本示例采用常用开源数据集ChnSenticorp中文数据集、GLUE-SST2英文数据集。这两个数据集PaddleNLP已经内置。
 通过以下方式即可实现加载。
 
+```python
+train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
+train_ds, dev_ds = load_dataset("glue", "sst-2", splits=["train", "dev"])
+```
 
 ### 模型训练
 

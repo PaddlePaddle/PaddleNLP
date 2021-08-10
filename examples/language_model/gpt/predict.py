@@ -59,7 +59,7 @@ class Demo:
 
     def ask_question_en(self, question):
         self.predict(
-            "Question: Where is the capital of China? Answer: Beijing. \nQuestion: %s  "
+            "Question: Where is the capital of China? Answer: Beijing. \n Question:%s Answer:"
             % question)
 
     # dictation poetry
