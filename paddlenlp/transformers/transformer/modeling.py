@@ -1026,6 +1026,21 @@ class TransformerModel(nn.Layer):
                             finished_flags).numpy():
                 break
 
+        # Accounting for corner case: It's possible that no sequence in alive for a
+        # particular batch item ever reached EOS. In that case, we should just copy
+        # the contents of alive for that batch item. tf.reduce_any(finished_flags, 1)
+        # if 0, means that no sequence for that batch index had reached EOS. We need
+        # to do the same for the scores as well.
+        finished_flags = paddle.any(paddle.cast(
+            finished_flags, dtype='bool'),
+                                    axis=1,
+                                    keepdim=True).tile([1, beam_size])
+        finished_seq = paddle.where(
+            finished_flags.unsqueeze(-1).tile([1, 1, alive_seq.shape[-1]]),
+            finished_seq, alive_seq)
+        finished_scores = paddle.where(finished_flags, finished_scores,
+                                       alive_log_probs)
+
         return finished_seq, finished_scores
 
 
