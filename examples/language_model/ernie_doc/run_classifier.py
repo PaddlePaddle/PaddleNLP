@@ -39,7 +39,7 @@ from metrics import F1
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--model_name_or_path", type=str, default="ernie-doc-base-en", help="Pretraining model name or path")
 parser.add_argument("--max_seq_length", type=int, default=512, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--learning_rate", type=float, default=7e-5, help="Learning rate used to train.")

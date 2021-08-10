@@ -22,11 +22,17 @@ __all__ = ['AdamWDL', ]
 
 
 # Layerwise decay
-def set_param_lr(decay_rate, name_dict, n_layers, param):
+def layerwise_lr_decay(decay_rate, name_dict, n_layers, param):
     """
-        decay_rate: Layer-wise decay ratio.
-        name_dict: static name of model, get from model.named_parameters().
-        n_layers: total number of layers in the transformer encoder.
+    Args:
+        decay_rate (float): 
+            Layer-wise decay ratio.
+        name_dict (dict): 
+            The keys of name_dict is dynamic name of model while the value
+            of name_dict is static name.
+            Use model.named_parameters() to get name_dict.
+        n_layers (int):
+            Total number of layers in the transformer encoder.
     """
     ratio = 1.0
     static_name = name_dict[param.name]
@@ -41,7 +47,9 @@ def set_param_lr(decay_rate, name_dict, n_layers, param):
 
 class AdamWDL(AdamW):
     """
-    AdamW with dynamic lr setting
+    The AdamWDL optimizer is implemented based on the AdamW Optimization with dynamic lr setting.
+
+    We use "Layer-wise lr decay" as default dynamic lr setting method of AdamWDL.
     “Layer-wise decay” means exponentially decaying the learning rates of individual 
     layers in a top-down manner. For example, suppose the 24-th layer uses a learning
     rate l, and the Layer-wise decay rate is α, then the learning rate of layer m 
@@ -61,7 +69,7 @@ class AdamWDL(AdamW):
                  multi_precision=False,
                  layerwise_decay=0,
                  n_layers=12,
-                 set_param_lr_fun=set_param_lr,
+                 set_param_lr_fun=layerwise_lr_decay,
                  name_dict=None,
                  name=None):
         if not isinstance(layerwise_decay, float) and \

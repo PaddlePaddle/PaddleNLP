@@ -86,7 +86,7 @@ python -m paddle.distributed.launch --gpus "0,1" --log_dir imdb run_classifier.p
 | IMDB      | ernie-doc-base-en |      0.9506      |
 | THUCNews  | ernie-doc-base-zh |      0.9854      |
 | HYP       | ernie-doc-base-en |      0.7412      |
-| IFLYTEK   | ernie-doc-base-zh |      0.6224      |
+| IFLYTEK   | ernie-doc-base-zh |      0.6179      |
 
 
 ### 阅读理解任务
