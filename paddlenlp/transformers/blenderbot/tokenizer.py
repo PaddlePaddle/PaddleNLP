@@ -17,9 +17,6 @@ __all__ = ['BlenderbotTokenizer']
 
 
 class BlenderbotTokenizer(GPTTokenizer):
-    r"""
-    Construct a BART tokenizer.
-    """
     # merges and vocab same as GPT2
     resource_files_names = {
         "vocab_file": "vocab.json",
@@ -37,7 +34,7 @@ class BlenderbotTokenizer(GPTTokenizer):
                 "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-3B-distill-vocab.json",
         },
         "merges_file": {
-            "blenderbot - 90M":
+            "blenderbot-90M":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-90M-merges.txt",
             "blenderbot-400M-distill":
                 "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-400M-distill-merges.txt",
@@ -47,6 +44,7 @@ class BlenderbotTokenizer(GPTTokenizer):
                 "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-3B-distill-merges.txt",
         }
     }
+
     # pretrained_init_configuration = {"bart-base": {}, "bart-large": {}}
 
     def __init__(
@@ -64,8 +62,8 @@ class BlenderbotTokenizer(GPTTokenizer):
             eol_token='\u010a',  # The token of newline.
     ):
         super(BlenderbotTokenizer, self).__init__(vocab_file, merges_file, errors,
-                                            max_len, special_tokens, pad_token,
-                                            eos_token, eol_token)
+                                                  max_len, special_tokens, pad_token,
+                                                  eos_token, eol_token)
 
     def __call__(self,
                  text,
@@ -93,6 +91,3 @@ class BlenderbotTokenizer(GPTTokenizer):
         if token_ids_1 is None:
             return _cls + token_ids_0 + _sep
         return _cls + token_ids_0 + _sep + token_ids_1 + _sep
-
-
-from transformers.models.blenderbot import BlenderbotPreTrainedModel
