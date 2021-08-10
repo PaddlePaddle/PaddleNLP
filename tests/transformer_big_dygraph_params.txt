@@ -27,7 +27,7 @@ null:null
 ===========================infer_params===========================
 null:null
 null:null
-norm_export:../examples/machine_translation/transformer/export_model.py --config ../examples/machine_translation/transformer/configs/transformer.big.yaml --benchmark
+norm_export:../examples/machine_translation/transformer/export_model.py --config ../examples/machine_translation/transformer/configs/transformer.big.yaml
 quant_export:null
 fpgm_export:null
 distill_export:null
