@@ -4,7 +4,7 @@ python:python3.7
 gpu_list:0|0,1
 null:null
 null:null
---max_iter:501
+--max_iter:lite_train_infer=500
 null:null
 null:null
 null:null
@@ -44,7 +44,7 @@ inference:../examples/machine_translation/transformer/deploy/python/inference.py
 --batch_size:32
 null:null
 null:null
---model_dir:../examples/machine_translation/transformer/infer_model/
+null:null
 null:null
 null:null
 null:null
