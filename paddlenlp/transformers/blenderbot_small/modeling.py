@@ -65,24 +65,26 @@ class BlenderbotSmallPretrainedModel(PretrainedModel):
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "blenderbot_small-90M": {
-            "attention_dropout": 0.0,
+            "vocab_size": 54944,
             "bos_token_id": 1,
+            "pad_token_id": 0,
+            "eos_token_id": 2,
+            "decoder_start_token_id": 1,
             "d_model": 512,
+            "num_encoder_layers": 8,
+            "num_decoder_layers": 8,
+            "encoder_attention_heads": 16,
             "decoder_attention_heads": 16,
             "decoder_ffn_dim": 2048,
-            "num_decoder_layers": 8,
-            "decoder_start_token_id": 1,
-            "dropout": 0.1,
-            "encoder_attention_heads": 16,
             "encoder_ffn_dim": 2048,
-            "num_encoder_layers": 8,
-            "eos_token_id": 2,
+            "dropout": 0.1,
+            "activation_function": "gelu",
             "init_std": 0.02,
             "max_position_embeddings": 512,
-            "normalize_before":False,
-            "pad_token_id": 0,
+            "attention_dropout": 0.0,
+            "activation_dropout": 0.0,
             "scale_embedding": True,
-            "vocab_size": 54944
+            "normalize_before": False,
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
