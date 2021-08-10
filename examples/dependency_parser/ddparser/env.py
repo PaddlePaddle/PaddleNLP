@@ -32,7 +32,6 @@ class Environment(object):
             random.seed(args.seed)
             np.random.seed(args.seed)
             paddle.seed(args.seed)
-        #os.environ["FLAGS_paddle_num_threads"] = str("16")
 
         if args.preprocess and args.mode == "train":
             if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
