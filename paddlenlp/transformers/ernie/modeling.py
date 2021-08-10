@@ -367,11 +367,9 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
         ernie (ErnieModel): 
             An instance of `paddlenlp.transformers.ErnieModel`.
         num_classes (int, optional): 
-            The number of classes. Default to `2`.
+            See :class:`ErnieModel`.
         dropout (float, optional): 
-            The dropout probability for output of ERNIE. 
-            If None, use the same value as `hidden_dropout_prob` 
-            of `paddlenlp.transformers.ErnieModel` instance. Defaults to `None`.
+            See :class:`ErnieModel`.
     """
 
     def __init__(self, ernie, num_classes=2, dropout=None):
@@ -392,35 +390,13 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                See :class:`ErnieModel`.
             token_type_ids (Tensor, optional):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
-
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
-
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-                Defaults to None, which means no segment embeddings is added to token embeddings.
+                See :class:`ErnieModel`.
             position_ids (Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
-                Defaults to `None`.
-
-
+                See :class:`ErnieModel`.
         Returns:
             logits (Tensor):
                 A Tensor of the input text classification logits.
@@ -475,42 +451,21 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                See :class:`ErnieModel`.
             token_type_ids (Tensor, optional):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
-
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
-
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-                Defaults to None, which means no segment embeddings is added to token embeddings.
+                See :class:`ErnieModel`.
             position_ids (Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
-                Defaults to `None`.
-
+                See :class:`ErnieModel`.
 
         Returns:
-            A tuple of shape (``start_logits``, ``end_logits``).
+            A tuple of shape (`start_logits`, `end_logits`).
 
             With the fields:
 
-            - start_logits(`Tensor`): The logits of start position of prediction answer.
-            - end_logits(`Tensor`): The logits of end position of prediction answer.
+            - start_logits(Tensor): The logits of start position of prediction answer.
+            - end_logits(Tensor): The logits of end position of prediction answer.
 
         Example:
             .. code-block::
@@ -605,7 +560,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
 
         Returns:
             logits (Tensor):
-                A Tensor of the input text classification logits, shape as (batch_size, seq_lens, `num_classes`).
+                A Tensor of the input text classification logits, shape as (batch_size, seq_lens, num_classes).
                 seq_lens mean the number of tokens of the input sequence.
 
         Example:
