@@ -143,6 +143,7 @@ def evaluate(model, metric, data_loader, memories0):
     acc_or_f1 = metric.accumulate()
     logger.info("Eval loss: %.5f, %s: %.5f" %
                 (np.mean(losses), metric.__class__.__name__, acc_or_f1))
+    metric.reset()
     model.train()
     return acc_or_f1
 

@@ -26,9 +26,7 @@ from paddlenlp.metrics.dureader import get_final_text, _compute_softmax, _get_be
 class F1(object):
     def __init__(self, positive_label=1):
         self.positive_label = positive_label
-        self.tp = 0
-        self.fp = 0
-        self.fn = 0
+        self.reset()
 
     def compute(self, preds, labels):
         if isinstance(preds, paddle.Tensor):
@@ -56,6 +54,11 @@ class F1(object):
         precision = self.tp / (self.tp + self.fp)
         f1 = 2 * recall * precision / (recall + precision)
         return f1
+
+    def reset(self):
+        self.tp = 0
+        self.fp = 0
+        self.fn = 0
 
 
 class EM_AND_F1(object):

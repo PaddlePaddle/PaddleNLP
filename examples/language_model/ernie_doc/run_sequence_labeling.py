@@ -125,6 +125,7 @@ def evaluate(model, metric, data_loader, memories0):
         metric.update(num_infer_chunks.numpy(),
                       num_label_chunks.numpy(), num_correct_chunks.numpy())
     precision, recall, f1_score = metric.accumulate()
+    metric.reset()
     logger.info("Total {} samples.".format(len(qids)))
     logger.info("eval loss: %f, precision: %f, recall: %f, f1: %f" %
                 (avg_loss, precision, recall, f1_score))
