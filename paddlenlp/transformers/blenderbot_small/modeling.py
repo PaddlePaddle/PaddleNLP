@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import numpy as np
 import math
 import paddle
@@ -28,7 +29,6 @@ __all__ = [
 
 
 # Copied from paddlenlp.transformers.bart.modeling.shift_tokens_right
-# with Blenderbot -> BlenderbotSmall
 def shift_tokens_right(input_ids: tensor, decoder_start_token_id: int):
     """
     Shift input ids one token to the right.
@@ -39,8 +39,7 @@ def shift_tokens_right(input_ids: tensor, decoder_start_token_id: int):
     return shifted_input_ids
 
 
-# Copied from paddlenlp.transformers.blenderbot.modeling.BlenderbotLearnedPositionalEmbedding
-# with Blenderbot -> BlenderbotSmall
+
 class BlenderbotSmallLearnedPositionalEmbedding(Embedding):
     def __init__(self, num_embeddings, embedding_dim, padding_idx=None):
         super().__init__(
@@ -82,7 +81,7 @@ class BlenderbotSmallPretrainedModel(PretrainedModel):
             "max_position_embeddings": 512,
             "normalize_before":False,
             "pad_token_id": 0,
-            "scale_embedding": True,  # BlenderSmall do embedding scale
+            "scale_embedding": True,
             "vocab_size": 54944
         },
     }
@@ -234,7 +233,7 @@ class BlenderbotSmallDecoder(BlenderbotSmallPretrainedModel):
         decoder_inputs_embeds = self.embed_tokens(decoder_input_ids) * self.embed_scale
         decoder_inputs_embed_pos = self.decoder_embed_positions(decoder_input_ids.shape)
 
-        # Different from BLenderbot, BlenderbotSmall Apply layer norm on hidden_states
+        # Different from BLenderbot, BlenderbotSmall Apply layer norm on decoder_inputs_embeds
         decoder_inputs_embeds = self.decoder_layernorm_embedding(decoder_inputs_embeds)
 
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos

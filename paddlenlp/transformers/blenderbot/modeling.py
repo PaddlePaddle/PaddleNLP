@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import numpy as np
 import math
 import paddle
@@ -29,7 +30,6 @@ __all__ = [
 
 
 # Copied from .paddlenlp.transformers.bart.modeling.shift_tokens_right
-# with Blenderbot -> BlenderbotSmall
 def shift_tokens_right(input_ids: tensor, decoder_start_token_id: int):
     """
     Shift input ids one token to the right.
@@ -199,7 +199,6 @@ class BlenderbotEncoder(BlenderbotPretrainedModel):
         inputs_embed_pos = self.encoder_embed_positions(input_ids.shape)
 
         hidden_states = inputs_embeds + inputs_embed_pos
-
         encoder_input = self.encoder_dropout(hidden_states)
 
         if attention_mask is None:
@@ -269,11 +268,9 @@ class BlenderbotDecoder(BlenderbotPretrainedModel):
                     dtype=paddle.get_default_dtype())),
                 1)
         decoder_inputs_embeds = self.embed_tokens(decoder_input_ids) * self.embed_scale
-        decoder_inputs_embed_pos = self.decoder_embed_positions(
-            decoder_input_ids.shape)
+        decoder_inputs_embed_pos = self.decoder_embed_positions(decoder_input_ids.shape)
 
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
-
         decoder_input = self.decoder_dropout(hidden_states)
 
         decoder_output = self.decoder(
@@ -353,6 +350,8 @@ class BlenderbotModel(BlenderbotPretrainedModel):
         return decoder_output
 
 
+# Copied from .paddlenlp.transformers.bart.modeling.BartForConditionalGeneration
+# with Bart -> Blenderbot
 class BlenderbotForConditionalGeneration(BlenderbotPretrainedModel):
     def __init__(self, blenderbot):
         super().__init__()
