@@ -597,6 +597,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
                 - **0** for tokens that are **masked**.
 
                 It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+
         Returns:
             Tuple : Returns tuple with 3 field:
             - `encoder_output` (Tensor):
@@ -613,6 +614,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
 
         Example:
             .. code-block::
+
                 import numpy as np
                 import paddle
                 from paddlenlp.transformers import ErnieDocModel
@@ -718,6 +720,7 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                 - **0** for tokens that are **masked**.
 
                 It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+
         Returns:
             Tuple : Returns tuple with 3 field:
             - `logits` (Tensor):
@@ -727,9 +730,10 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                 A list of pre-computed hidden-states. The length of the list is `n_layers`.
                 Each element in the list is a Tensor with dtype `float32` and has a shape of
                 [batch_size, memory_length, hidden_size].
-        
+
         Example:
             .. code-block::
+
                 import numpy as np
                 import paddle
                 from paddlenlp.transformers import ErnieDocForSequenceClassification
@@ -758,6 +762,7 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                 outputs = model(**inputs)
 
                 last_hidden_states = outputs[0]
+
         """
         _, pooled_output, mem = self.ernie_doc(
             input_ids, memories, token_type_ids, position_ids, attn_mask)
@@ -824,6 +829,7 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
                 - **0** for tokens that are **masked**.
 
                 It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+
         Returns:
             Tuple : Returns tuple with 3 field:
             - `logits` (Tensor):
@@ -836,6 +842,7 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
 
         Example:
             .. code-block::
+
                 import numpy as np
                 import paddle
                 from paddlenlp.transformers import ErnieDocForTokenClassification
@@ -864,6 +871,7 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
                 outputs = model(**inputs)
 
                 last_hidden_states = outputs[0]
+
         """
         sequence_output, _, mem = self.ernie_doc(
             input_ids, memories, token_type_ids, position_ids, attn_mask)
@@ -926,6 +934,7 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
                 - **0** for tokens that are **masked**.
 
                 It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+
         Returns:
             Tuple : Returns tuple with 3 field:
             - `start_logits` (Tensor):
@@ -938,8 +947,10 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
                 A list of pre-computed hidden-states. The length of the list is `n_layers`.
                 Each element in the list is a Tensor with dtype `float32` and has a shape of
                 [batch_size, memory_length, hidden_size].
+
         Example:
             .. code-block::
+
                 import numpy as np
                 import paddle
                 from paddlenlp.transformers import ErnieDocForQuestionAnswering
@@ -968,6 +979,7 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
                 outputs = model(**inputs)
 
                 last_hidden_states = outputs[0]
+
         """
         sequence_output, _, mem = self.ernie_doc(
             input_ids, memories, token_type_ids, position_ids, attn_mask)
