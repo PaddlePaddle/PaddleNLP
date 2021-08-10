@@ -195,39 +195,44 @@ class SkepModel(SkepPretrainedModel):
 
     Args:
 
-        vocab_size (`int`):
+        vocab_size (int):
             Vocabulary size of the SKEP model. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling SKEP.
-        hidden_size (`int`, optional):
-            Dimension of the encoder layers and the pooler layer. Defaults to ``768``.
-        num_hidden_layers (`int`, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to ``12``.
-        num_attention_heads (`int`, optional):
+        hidden_size (int, optional):
+            Dimension of the encoder layers and the pooler layer. Defaults to `768`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in the Transformer encoder. Defaults to `12`.
+        num_attention_heads (int, optional):
             Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to ``12``.
-        intermediate_size (`int`, optional):
+            Defaults to `12`.
+        intermediate_size (int, optional):
             Dimension of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
-            Defaults to ``3072``.
-        hidden_act (`str`, optional):
+            Defaults to `3072`.
+        hidden_act (str, optional):
             The non-linear activation function in the feed-forward layer.
             ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to ``"gelu"``.
-        hidden_dropout_prob (`float`, optional):
+            are supported. Defaults to `"gelu"`.
+        hidden_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to ``0.1``.
-        attention_probs_dropout_prob (`float`, optional):
+            Defaults to `0.1`.
+        attention_probs_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the pooler.
-            Defaults to ``0.1``.
-        max_position_embeddings (`int`, optional):
-            The max position index of an input sequence. Defaults to ``512``.
-        type_vocab_size (`int`, optional):
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
+            The max position index of an input sequence. Defaults to `512`.
+        type_vocab_size (int, optional):
             The vocabulary size of the `token_type_ids` passed when calling `~transformers.ErnieModel`.
-            Defaults to 2
-        initializer_range (`float`, optional):
+            Defaults to `2`.
+        initializer_range (float, optional):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-            Defaults to ``0.02``.
-        pad_token_id(`int`, optional):
-            The pad token index in the token vocabulary.
+            Defaults to `0.02`.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `SkepModel`.
+
+        pad_token_id(int, optional):
+            The pad token index in the token vocabulary. Defaults to `0`.
 
     """
 
@@ -269,36 +274,36 @@ class SkepModel(SkepPretrainedModel):
                 attention_mask=None):
         r"""
         Args:
-            input_ids (`Tensor`):
+            input_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary.
                 Indices can be obtained using :class:`~transformers.BertTokenizer`. See
                 :meth:`paddlenlp.transformers.PreTrainedTokenizer.tokenize` and :meth:`transformers.PreTrainedTokenizer.__call__` for
                 details.
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 Segment token indices to indicate first and second portions of the inputs. Indices are selected in ``[0,
                 1]``:
                 - 0 corresponds to a `sentence A` token,
                 - 1 corresponds to a `sentence B` token.
                 Defaults to `None`.
-            position_ids (`Tensor`, `optional`):
+            position_ids (Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
                 config.max_position_embeddings - 1]``.
                 Defaults to `None`.
-            attention_mask (`Tensor`, optional):
+            attention_mask (Tensor, optional):
                 Mask to avoid performing attention on padding token indices. Mask values selected in ``[0, 1]``:
                 - 1 for tokens that are **not masked**,
                 - 0 for tokens that are **masked**.
                 Defaults to `None`.
 
         Returns:
-            A tuple of shape (``sequence_output``, ``pooled_output``).
+            Tuple: A tuple of shape (``sequence_output``, ``pooled_output``).
 
             With the fields:
-            - sequence_output (`Tensor`):
+            - sequence_output (Tensor):
                 Sequence of hidden-states at the last layer of the model.
                 It's data type should be float32 and has a shape of (batch_size, seq_lens, hidden_size].
                 ``seq_lens`` corresponds to the length of input sequence.
-            - pooled_output (`Tensor`):
+            - pooled_output (Tensor):
                 A Tensor of the first token representation.
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
 
@@ -312,10 +317,11 @@ class SkepModel(SkepPretrainedModel):
                 model = SkepModel.from_pretrained('skep_ernie_1.0_large_ch')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 sequence_output, pooled_output = model(**inputs)
 
         """
+
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
@@ -333,17 +339,18 @@ class SkepModel(SkepPretrainedModel):
 
 class SkepForSequenceClassification(SkepPretrainedModel):
     r"""
-    Model for sentence (pair) classification task with SKEP.
+    Skep Model with a sequence classification/regression head on top
+    (a linear layer on top of the pooled output) e.g. for GLUE tasks.
 
     Args:
         skep (`SkepModel`): 
             An instance of `SkepModel`.
-        num_classes (`int`, optional): 
+        num_classes (int, optional):
             The number of classes. Default to `2`.
-        dropout (`float`, optional): 
+        dropout (float, optional):
             The dropout probability for output of SKEP. 
             If None, use the same value as `hidden_dropout_prob` 
-            of `SkepModel` instance `Ernie`. Defaults to `None`.
+            of `SkepModel` instance. Defaults to `None`.
     """
 
     def __init__(self, skep, num_classes=2, dropout=None):
@@ -363,30 +370,20 @@ class SkepForSequenceClassification(SkepPretrainedModel):
                 attention_mask=None):
         r"""
         Args:
-            input_ids (`Tensor`):
-                Indices of input sequence tokens in the vocabulary.
-                Indices can be obtained using :class:`~transformers.BertTokenizer`. See
-                :meth:`paddlenlp.transformers.PreTrainedTokenizer.tokenize` and :meth:`transformers.PreTrainedTokenizer.__call__` for
-                details.
-            token_type_ids (`Tensor`, optional):
-                Segment token indices to indicate first and second portions of the inputs. Indices are selected in ``[0,
-                1]``:
-                - 0 corresponds to a `sentence A` token,
-                - 1 corresponds to a `sentence B` token.
-                Defaults to `None`.
-            position_ids (`Tensor`, `optional`):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`.
-            attention_mask (`Tensor`, optional):
-                Mask to avoid performing attention on padding token indices. Mask values selected in ``[0, 1]``:
-                - 1 for tokens that are **not masked**,
-                - 0 for tokens that are **masked**.
-                Defaults to `None`.
+            input_ids (Tensor):
+                See :class:`SkepModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`SkepModel`.
+            position_ids (Tensor, `optional`):
+                See :class:`SkepModel`.
+            attention_mask (Tensor, optional):
+                See :class:`SkepModel`.
 
         Returns:
-            logits (`Tensor`):
-                A Tensor of the input text classification logits, shape as (batch_size, `num_classes`).
+            Tensor: logits (Tensor):
+                Classification scores before SoftMax (also called logits). It's data type should be `float32`
+                and has a shape of [batch_size, num_classes].
+
 
         Example:
             .. code-block::
@@ -394,11 +391,11 @@ class SkepForSequenceClassification(SkepPretrainedModel):
                 import paddle
                 from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 
-                tokenizer = SkepTokenizer.from_pretrained('ernie-1.0')
-                model = SkepForSequenceClassification.from_pretrained('ernie-1.0')
+                tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
+                model = SkepForSequenceClassification.from_pretrained('skep_ernie_1.0_large_ch')
 
                 inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
         """
@@ -414,6 +411,21 @@ class SkepForSequenceClassification(SkepPretrainedModel):
 
 
 class SkepForTokenClassification(SkepPretrainedModel):
+    r"""
+    Skep Model with a token classification head on top (a linear layer on top of the hidden-states output)
+    e.g. for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        skep (`SkepModel`):
+            An instance of `SkepModel`.
+        num_classes (int, optional):
+            The number of classes. Default to `2`.
+        dropout (float, optional):
+            The dropout probability for output of SKEP.
+            If None, use the same value as `hidden_dropout_prob`
+            of `SkepModel` instance. Defaults to `None`.
+    """
+
     def __init__(self, skep, num_classes=2, dropout=None):
         super(SkepForTokenClassification, self).__init__()
         self.num_classes = num_classes
@@ -429,6 +441,37 @@ class SkepForTokenClassification(SkepPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`SkepModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`SkepModel`.
+            position_ids (Tensor, `optional`):
+                See :class:`SkepModel`.
+            attention_mask (Tensor, optional):
+                See :class:`SkepModel`.
+
+        Returns:
+            Tensor: logits (Tensor):
+                Classification scores before SoftMax (also called logits). It's data type should be `float32`
+                and has a shape of [batch_size, sequence_length, num_classes].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import SkepForTokenClassification, SkepTokenizer
+
+                tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
+                model = SkepForTokenClassification.from_pretrained('skep_ernie_1.0_large_ch')
+
+                inputs = tokenizer("这是个测试样例")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+
+        """
+
         sequence_output, _ = self.skep(
             input_ids,
             token_type_ids=token_type_ids,
@@ -441,6 +484,17 @@ class SkepForTokenClassification(SkepPretrainedModel):
 
 
 class SkepCrfForTokenClassification(nn.Layer):
+    r"""
+    Skep Model with a token classification head and a CRF layer on top.
+    e.g. for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        skep (`SkepModel`):
+            An instance of `SkepModel`.
+        num_classes (int, optional):
+            The number of classes. Default to `2`.
+    """
+
     def __init__(self, skep, num_classes):
         super().__init__()
         self.num_classes = num_classes
@@ -471,6 +525,46 @@ class SkepCrfForTokenClassification(nn.Layer):
                 attention_mask=None,
                 seq_lens=None,
                 labels=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`SkepModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`SkepModel`.
+            position_ids (Tensor, `optional`):
+                See :class:`SkepModel`.
+            attention_mask (Tensor, optional):
+                See :class:`SkepModel`.
+            seq_lens(tensor, optional):
+                The input length tensor storing real length of each sequence
+                for correctness. Its dtype is int64 and has a shape of `[batch_size]`.
+                Defaults to `None`.
+            labels(tensor, optional):
+                The labels of tokens. Defaults to `None`.
+
+
+        Returns:
+            Tensor: loss or prediction (Tensor):
+                If the labels of tokens are given, the `skep` model will return
+                the loss computed by `LinearChainCrfLoss`, else, the `skep` model
+                will  return `prediction`, the scores tensor containing the score
+                for the Viterbi sequence. Its dtype is float32 and has a shape of [batch_size, sequence_length, num_classes].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import SkepCrfForTokenClassification, SkepTokenizer
+
+                tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
+                model = SkepForTokenClassification.from_pretrained('skep_ernie_1.0_large_ch')
+
+                inputs = tokenizer("这是个测试样例")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+
+        """
+
         sequence_output, _ = self.skep(
             input_ids,
             token_type_ids=token_type_ids,
