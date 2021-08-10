@@ -2,7 +2,6 @@
 import math
 import paddle
 from paddle import nn
-from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from paddlenlp.transformers import PretrainedModel, register_base_model
 
 __all__ = [
@@ -372,21 +371,26 @@ class SqueezeBertLMPredictionHead(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.transform = SqueezeBertPredictionHeadTransform(config)
-
-        # The output weights are the same as the input embeddings, but there is
-        # an output-only bias for each token.
         self.decoder = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
-
-        # self.bias = nn.Parameter(paddle.zeros(config.vocab_size))
-        self.bias = paddle.create_parameter([config.vocab_size], is_bias=True)
-
-        # Need a link between the two variables so that the bias is correctly resized with `resize_token_embeddings`
+        self.bias = paddle.create_parameter([config.vocab_size], dtype='float32', is_bias=True)
         self.decoder.bias = self.bias
 
     def forward(self, hidden_states):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.decoder(hidden_states)
         return hidden_states
+
+
+class SqueezeBertPreTrainingHeads(nn.Layer):
+    def __init__(self, config):
+        super().__init__()
+        self.predictions = SqueezeBertLMPredictionHead(config)
+        self.seq_relationship = nn.Linear(config.hidden_size, 2)
+
+    def forward(self, sequence_output, pooled_output):
+        prediction_scores = self.predictions(sequence_output)
+        seq_relationship_score = self.seq_relationship(pooled_output)
+        return prediction_scores, seq_relationship_score
 
 
 class SqueezeBertPreTrainedModel(PretrainedModel):
@@ -567,7 +571,6 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
             inputs_embeds=None,
             output_attentions=None,
             output_hidden_states=None,
-            return_dict=None,
     ):
 
         if input_ids is not None and inputs_embeds is not None:
@@ -602,12 +605,38 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
             head_mask=head_mask,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
         )
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output)
 
         return (sequence_output, pooled_output) + encoder_outputs[1:]
+
+
+class SqueezeBertForPretraining(SqueezeBertPreTrainedModel):
+
+    def __init__(self, squeezebert):
+        super().__init__()
+        self.squeezebert = squeezebert
+        self.initializer_range = self.squeezebert.config['initializer_range']
+        self.cls = SqueezeBertPreTrainingHeads(create_config(self.squeezebert.config))
+        self.init_weights()
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None,
+                masked_positions=None):
+        with paddle.static.amp.fp16_guard():
+            outputs = self.bert(
+                input_ids,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask)
+            sequence_output, pooled_output = outputs[:2]
+            prediction_scores, seq_relationship_score = self.cls(
+                sequence_output, pooled_output, masked_positions)
+            return prediction_scores, seq_relationship_score
 
 
 class SqueezeBertForSequenceClassification(SqueezeBertPreTrainedModel):
@@ -688,6 +717,6 @@ class SqueezeBertForTokenClassification(SqueezeBertPreTrainedModel):
             position_ids=position_ids,
             attention_mask=attention_mask)
 
-        pooled_output = self.dropout(sequence_output)
+        sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
         return logits
