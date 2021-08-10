@@ -28,7 +28,7 @@ python compare.py
 ### 下游任务微调
 
 #### 1、GLUE
-以QQP数据集为例，运行其他glue数据集，请参考`train_glue.sh`文件。（超参数遵循原论文的仓库的[README](https://github.com/microsoft/MPNet/blob/master/MPNet/README.glue.md)）
+以QQP数据集为例，运行其他glue数据集，请参考`train.sh`文件。（超参数遵循原论文的仓库的[README](https://github.com/microsoft/MPNet/blob/master/MPNet/README.glue.md)）
 
 ##### （1）模型微调：
 ```shell
