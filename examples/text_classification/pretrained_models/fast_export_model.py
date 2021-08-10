@@ -22,6 +22,10 @@ import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 
+import paddle.fluid.core as core
+
+from model import FastBertForSequenceClassification
+
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True, default='./checkpoint/model_900/model_state.pdparams', help="The path to model parameters to be loaded.")
@@ -32,8 +36,13 @@ args = parser.parse_args()
 if __name__ == "__main__":
     # The number of labels should be in accordance with the training dataset.
     label_map = {0: 'negative', 1: 'positive'}
-    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        "ernie-tiny", num_classes=len(label_map))
+    # If you wanna use bert/roberta/electra pretrained model,
+    # model = ppnlp.transformers.BertForSequenceClassification.from_pretrained(
+    #     'bert-base-chinese', num_class=len(train_ds.label_list))
+    # tokenizer = FastTokenizer("/root/.paddlenlp/models/bert-base-chinese/bert-base-chinese-vocab.txt")
+    model = FastBertForSequenceClassification(
+        "/root/.paddlenlp/models/bert-base-chinese/bert-base-chinese-vocab.txt",
+        num_classes=len(label_map))
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
@@ -46,9 +55,7 @@ if __name__ == "__main__":
         model,
         input_spec=[
             paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64")  # segment_ids
+                shape=[None], dtype=core.VarDesc.VarType.STRINGS),  # texts
         ])
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")
