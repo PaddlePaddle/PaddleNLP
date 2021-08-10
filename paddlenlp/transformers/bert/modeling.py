@@ -550,9 +550,12 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 See :class:`BertModel`.
 
         Returns:
-            logits (Tensor):
-                A Tensor of the input text classification logits.
-                Shape as `(batch_size, num_classes)` and dtype as `float`.
+            A tuple of shape (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - start_logits(Tensor): The logits of start position of prediction answer.
+            - end_logits(Tensor): The logits of end position of prediction answer.
 
         Example:
             .. code-block::
@@ -859,34 +862,15 @@ class BertForPretraining(BertPretrainedModel):
 
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                See :class:`BertModel`.
             token_tycpe_ids (Tensor, optional):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
-
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
-
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-                Defaults to None, which means no segment embeddings is added to token embeddings.
+                See :class:`BertModel`.
             position_ids (Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                See :class:`BertModel`.
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
-                Defaults to `None`.
-
+                See :class:`BertModel`.
+            masked_positions(Tensor, optional):
+                See :class:`BertModel`.
 
         Returns:
             Tuple: A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
@@ -929,20 +913,26 @@ class BertPretrainingCriterion(paddle.nn.Layer):
         """
         Args:
             prediction_scores(Tensor):
-                The scores of prediction on masked token.
+                The logits of masked token prediction. Its data type should be float32 and
+                its shape is [batch_size, sequence_len, vocab_size]
             seq_relationship_score(Tensor):
-                The scores of next sentence prediction.
+                The logits whether 2 sequences are NSP relationship. Its data type should be float32 and
+                its shape is [batch_size, 2]
             masked_lm_labels(Tensor):
                 The labels of the masked language modeling, the dimensionality of `masked_lm_labels`
-                is equal to `prediction_scores`.
+                is equal to `prediction_scores`. Its data type should be int64 and
+                its shape is [mask_token_num, 1]
             next_sentence_labels(Tensor):
-                The labels of the next sentence prediction, the dimensionality of `next_sentence_labels`
-                is equal to `seq_relation_lables`.
-            masked_lm_scale(float):
-                Used for the normalization of masked language modeling loss.
+                The labels of the next sentence prediction task, the dimensionality of `next_sentence_labels`
+                is equal to `seq_relation_lables`. Its data type should be int64 and
+                its shape is [batch_size, 1]
+            masked_lm_scale(Tensor or int):
+                The scale of masked tokens. Used for the normalization of masked language modeling loss.
+                If it is a `Tensor`, its data type should be int64 and
+                its shape is [mask_token_num, 1]
 
         Returns:
-            Tensor: The loss of the model, equals to the sum of `masked_lm_loss` plus the mean of `next_sentence_loss`.
+            Float: The pretraining loss, equals to the sum of `masked_lm_loss` plus the mean of `next_sentence_loss`.
 
         """
         with paddle.static.amp.fp16_guard():
