@@ -24,7 +24,6 @@ from operator import mul
 import numpy as np
 import paddle.nn as nn
 import paddle.nn.functional as F
-from easydict import EasyDict as Config
 from paddle.autograd import PyLayer
 from ...ops.einsum import einsum
 from .. import PretrainedModel, register_base_model
@@ -32,12 +31,9 @@ from ..nezha.modeling import ACT2FN
 
 import paddle
 
-from .utils import (
-    MaskedLMOutput,
-    QuestionAnsweringModelOutput,
-    ReformerModelOutput,
-    ReformerModelWithLMHeadOutput,
-    SequenceClassifierOutput, )
+from .utils import (MaskedLMOutput, QuestionAnsweringModelOutput,
+                    ReformerModelOutput, ReformerModelWithLMHeadOutput,
+                    SequenceClassifierOutput, Config)
 
 logger = logging.getLogger(__name__)
 
