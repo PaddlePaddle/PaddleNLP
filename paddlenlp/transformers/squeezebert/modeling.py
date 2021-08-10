@@ -12,7 +12,6 @@ __all__ = [
     'SqueezeBertForQuestionAnswering',
 ]
 
-
 ACT2FN = {'gelu': nn.GELU()}
 
 
@@ -390,61 +389,95 @@ class SqueezeBertLMPredictionHead(nn.Layer):
         return hidden_states
 
 
-
 class SqueezeBertPreTrainedModel(PretrainedModel):
     base_model_prefix = "squeezebert"
     model__file = "model_json"
 
-    # pretrained general uration
-    gen_weight = 1.0
-    disc_weight = 50.0
-    tie_word_embeddings = True
-    untied_generator_embeddings = False
-    use_softmax_sample = True
-
-    # model init uration
-    pretrained_init_uration = {
-        "mobilebert-uncased": {
+    pretrained_init_configuration = {
+        "squeezebert-uncased": {
             "attention_probs_dropout_prob": 0.1,
-            "classifier_activation": False,
-            "embedding_size": 128,
-            "hidden_act": "relu",
-            "hidden_dropout_prob": 0.0,
-            "hidden_size": 512,
+            "embedding_size": 768,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
             "initializer_range": 0.02,
-            "intermediate_size": 512,
-            "intra_bottleneck_size": 128,
-            "key_query_shared_bottleneck": True,
-            "layer_norm_eps": 1e-12,
+            "intermediate_size": 3072,
             "max_position_embeddings": 512,
-            "model_type": "mobilebert",
-            "normalization_type": "no_norm",
-            "num_attention_heads": 4,
-            "num_feedforward_networks": 4,
-            "num_hidden_layers": 24,
-            "pad_token_id": 0,
-            "transformers_version": "4.6.0.dev0",
-            "trigram_input": True,
-            "true_hidden_size": 128,
+            "model_type": "squeezebert",
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
             "type_vocab_size": 2,
-            "use_bottleneck": True,
-            "use_bottleneck_attention": False,
-            "vocab_size": 30522
+            "vocab_size": 30528,
+            "q_groups": 4,
+            "k_groups": 4,
+            "v_groups": 4,
+            "post_attention_groups": 1,
+            "intermediate_groups": 4,
+            "output_groups": 4,
+            "pad_token_id": 0,
+            'layer_norm_eps': 1e-12
         },
+        "squeezebert-mnli": {
+            "attention_probs_dropout_prob": 0.1,
+            "embedding_size": 768,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 512,
+            "model_type": "squeezebert",
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 30528,
+            "q_groups": 4,
+            "k_groups": 4,
+            "v_groups": 4,
+            "post_attention_groups": 1,
+            "intermediate_groups": 4,
+            "output_groups": 4,
+            "num_labels": 3,
+            "pad_token_id": 0,
+            'layer_norm_eps': 1e-12
+        },
+        "squeezebert-mnli-headless": {
+            "attention_probs_dropout_prob": 0.1,
+            "embedding_size": 768,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 512,
+            "model_type": "squeezebert",
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 30528,
+            "q_groups": 4,
+            "k_groups": 4,
+            "v_groups": 4,
+            "post_attention_groups": 1,
+            "intermediate_groups": 4,
+            "output_groups": 4,
+            "pad_token_id": 0,
+            'layer_norm_eps': 1e-12
+        }
 
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
 
-    # pretrained_resource_files_map = {
-    #     "model_state": {
-    #         "convbert-base":
-    #             "http://paddlenlp.bj.bcebos.com/models/transformers/convbert/convbert-base/model_state.pdparams",
-    #         "convbert-medium-small":
-    #             "http://paddlenlp.bj.bcebos.com/models/transformers/convbert/convbert-medium-small/model_state.pdparams",
-    #         "convbert-small":
-    #             "http://paddlenlp.bj.bcebos.com/models/transformers/convbert/convbert-small/model_state.pdparams",
-    #     }
-    # }
+    pretrained_resource_files_map = {
+        "model_state": {
+            "squeezebert-uncased":
+                "http://paddlenlp.bj.bcebos.com/models/transformers/squeezebert/squeezebert-uncased/model_state.pdparams",
+            "squeezebert-mnli":
+                "http://paddlenlp.bj.bcebos.com/models/transformers/squeezebert/squeezebert-mnli/model_state.pdparams",
+            "squeezebert-mnli-headless":
+                "http://paddlenlp.bj.bcebos.com/models/transformers/squeezebert/squeezebert-mnli-headless/model_state.pdparams",
+        }
+    }
 
     def init_weights(self):
         """
@@ -658,5 +691,3 @@ class SqueezeBertForTokenClassification(SqueezeBertPreTrainedModel):
         pooled_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
         return logits
-
-
