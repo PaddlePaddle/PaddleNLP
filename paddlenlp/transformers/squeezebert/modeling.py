@@ -7,7 +7,6 @@ from paddlenlp.transformers import PretrainedModel, register_base_model
 
 __all__ = [
     'SqueezeBertModel',
-    "SqueezeBertForPretraining",
     'SqueezeBertForSequenceClassification',
     'SqueezeBertForTokenClassification',
     'SqueezeBertForQuestionAnswering',
@@ -391,22 +390,8 @@ class SqueezeBertLMPredictionHead(nn.Layer):
         return hidden_states
 
 
-class SqueezeBertForPretraining(nn.Layer):
-    def __init__(self, config):
-        super().__init__()
-        self.predictions = SqueezeBertLMPredictionHead(config)
-
-    def forward(self, sequence_output):
-        prediction_scores = self.predictions(sequence_output)
-        return prediction_scores
-
 
 class SqueezeBertPreTrainedModel(PretrainedModel):
-    """
-    An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
-    models.
-    """
-
     base_model_prefix = "squeezebert"
     model__file = "model_json"
 
