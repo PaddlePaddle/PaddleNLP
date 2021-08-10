@@ -53,3 +53,5 @@ from .bart.modeling import *
 from .bart.tokenizer import *
 from .roformer.modeling import *
 from .roformer.tokenizer import *
+from .mpnet.modeling import *
+from .mpnet.tokenizer import *
