@@ -40,6 +40,7 @@ parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Direct
 parser.add_argument("--train_data_path", type=str, default='./data/train.txt', help="The path of train dataset to be loaded.")
 parser.add_argument("--dev_data_path", type=str, default='./data/test.txt', help="The path of dev dataset to be loaded.")
 parser.add_argument("--test_data_path", type=str, default='./data/test.txt', help="The path of test dataset to be loaded.")
+parser.add_argument("--infer_result_path", type=str, default='./infer_result', help="The path of test dataset to be loaded.")
 parser.add_argument("--batch_size", type=int, default=1000, help="Numbers of examples a batch for training.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
@@ -91,11 +92,10 @@ def evaluate(args, model, metric, criterion, data_loader):
         arc_preds, rel_preds = decode(args, s_arc, s_rel, mask)
         metric.update(arc_preds, rel_preds, arcs, rels, mask)
         uas, las = metric.accumulate()
-
-    print("eval loss: %.5f, UAS: %.5f, LAS: %.5f" % (np.mean(losses), uas, las))
-    logging.info("eval loss: %.5f, UAS: %.5f, LAS: %.5f" % (np.mean(losses), uas, las))
+    total_loss = np.mean(losses)
     model.train()
     metric.reset()
+    return total_loss, uas, las
 
 @paddle.no_grad()
 def predict(env, args, model, data_loader):
@@ -126,6 +126,7 @@ def do_train(env):
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
+    # Load datasets
     train = Corpus.load(args.train_data_path, env.fields)
     dev = Corpus.load(args.dev_data_path, env.fields)
 
@@ -135,11 +136,13 @@ def do_train(env):
     train_data_loader = batchify(train_ds, args.batch_size, shuffle=True, use_multiprocess=True)
     dev_data_loader = batchify(dev_ds, args.batch_size)
     
+    # Load pretrained model if encoding model is ernie-1.0, ernie-tiny or ernie-gram-zh
     if args.encoding_model in ["ernie-1.0", "ernie-tiny"]:
         pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(args.encoding_model)
     elif args.encoding_model == "ernie-gram-zh":
         pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(args.encoding_model)       
 
+    # Define ddparser model and learning rate
     if args.encoding_model.startswith("ernie"):
         lr = args.ernie_lr
         model = DDParserModel(args=args, pretrained_model=pretrained_model)
@@ -147,15 +150,18 @@ def do_train(env):
         lr = args.lstm_lr
         model = DDParserModel(args=args)
 
+    # Continue training from a pretrained model if the checkpoint is specified
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)
+
+    # Data parallel for distributed training
     model = paddle.DataParallel(model)
     num_training_steps = len(train_data_loader) * args.epochs
 
+    # Define the training strategy
     lr_scheduler = LinearDecayWithWarmup(lr, num_training_steps, args.warmup_proportion)
     grad_clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.clip)
-
     if args.encoding_model.startswith("ernie"):
         optimizer = paddle.optimizer.AdamW(
             learning_rate=lr_scheduler,
@@ -173,14 +179,16 @@ def do_train(env):
             grad_clip=grad_clip,
         )
 
+    # Load metric and criterion
+    best_las = 0
     metric = ParserEvaluator()
     criterion = ParserCriterion()
 
+    # Epoch train
     global_step = 0
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
-        total_loss = 0
-        for step, inputs in enumerate(train_data_loader(), start=1):
+        for inputs in train_data_loader():
             if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
                 words, arcs, rels = inputs
                 s_arc, s_rel, words = model(words)
@@ -202,39 +210,43 @@ def do_train(env):
             global_step += 1
             if global_step % 100 == 0 and rank == 0:
                 print(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss.numpy().item(), 10 / (time.time() - tic_train)))
+                    "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, loss.numpy().item(), 10 / (time.time() - tic_train)))
                 tic_train = time.time()
 
-            total_loss += loss.numpy().item()
         if rank == 0:
-            save_dir = os.path.join(args.save_dir, "model_epoch_%d" % epoch)
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
-            evaluate(args, model, metric, criterion, dev_data_loader)
-            save_param_path = os.path.join(save_dir, "model_state.pdparams")
-            paddle.save(model.state_dict(), save_param_path)
-            if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
-                env.tokenizer.save_pretrained(save_dir)                           
-        total_loss /= len(train_data_loader)
+            # Epoch evaluate
+            loss, uas, las = evaluate(args, model, metric, criterion, dev_data_loader)
+            print("eval loss: %.5f, UAS: %.5f, LAS: %.5f" % (loss, uas, las))
+            # Save the model if it get a higher las
+            if las > best_las:
+                if not os.path.exists(args.save_dir):
+                    os.makedirs(args.save_dir)
+                save_param_path = os.path.join(args.save_dir, "model_state.pdparams")
+                paddle.save(model.state_dict(), save_param_path)  
+                best_las = las                 
 
 def do_evaluate(env):
     args = env.args
 
+    # Load dataset
     data = Corpus.load(args.test_data_path, env.fields)
     evaluate_ds = TextDataset(data, env.fields, args.n_buckets)
     evaluate_data_loader = batchify(evaluate_ds, args.batch_size)
 
+    # Load pretrained model if encoding model is ernie-1.0, ernie-tiny or ernie-gram-zh
     if args.encoding_model in ["ernie-1.0", "ernie-tiny"]:
         pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(args.encoding_model)
     elif args.encoding_model == "ernie-gram-zh":
         pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(args.encoding_model)
 
+    # Define ddparser model
     if args.encoding_model.startswith("ernie"):
         model = DDParserModel(args=args, pretrained_model=pretrained_model)
     else:
         model = DDParserModel(args=args)
     
+    # Load saved model parameters
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
@@ -242,27 +254,35 @@ def do_evaluate(env):
     else:
         raise ValueError("The parameters path is incorrect or not specified.")
 
+    # Load metric and criterion
     metric = ParserEvaluator()
     criterion = ParserCriterion()
-    evaluate(args, model, metric, criterion, evaluate_data_loader)
+
+    # Start evaluate
+    loss, uas, las = evaluate(args, model, metric, criterion, evaluate_data_loader)
+    print("eval loss: %.5f, UAS: %.5f, LAS: %.5f" % (loss, uas, las))
     
 def do_predict(env):
     args = env.args
 
+    # Load dataset
     data = Corpus.load(args.test_data_path, env.fields)
     predict_ds = TextDataset(data, [env.WORD, env.FEAT], args.n_buckets)
     predict_data_loader = batchify(predict_ds, args.batch_size)
 
+    # Load pretrained model if encoding model is ernie-1.0, ernie-tiny or ernie-gram-zh
     if args.encoding_model in ["ernie-1.0", "ernie-tiny"]:
         pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(args.encoding_model)
     elif args.encoding_model == "ernie-gram-zh":
         pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(args.encoding_model)
 
+    # Define ddparser model
     if args.encoding_model.startswith("ernie"):
         model = DDParserModel(args=args, pretrained_model=pretrained_model)
     else:
         model = DDParserModel(args=args)
     
+    # Load saved model parameters
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
@@ -270,11 +290,14 @@ def do_predict(env):
     else:
         raise ValueError("The parameters path is incorrect or not specified.")
 
+    # Start predict
     pred_arcs, pred_rels = predict(env, args, model, predict_data_loader)
-
     indices = np.argsort(np.array([i for bucket in predict_ds.buckets.values() for i in bucket]))
     data.head = [pred_arcs[i] for i in indices]
     data.deprel = [pred_rels[i] for i in indices]
+
+    # Save results
+    data.save(args.infer_result_path)
 
 class Parser(object):
     def __init__(
@@ -341,8 +364,8 @@ class Parser(object):
         return outputs
 
 if __name__ == "__main__":
-    env = Environment(args)
     paddle.set_device(args.device)
+    env = Environment(args)
 
     if args.mode == "train":   
         do_train(env)
