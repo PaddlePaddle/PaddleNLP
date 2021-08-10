@@ -272,60 +272,60 @@ class BigBirdModel(BigBirdPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        num_layers (`int`):
+        num_layers (int):
             Number of hidden layers in the Transformer encoder.
-        vocab_size (`int`):
+        vocab_size (int):
             Vocabulary size of the BigBird model. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling BigBirdModel.
-        nhead (`int`):
+        nhead (int):
             Number of heads in attention part.
-        attn_dropout (`float`, optional):
+        attn_dropout (float, optional):
             The dropout probability for all attention layers.
-            Defaults to ``0.1``.
-        dim_feedforward (`int`, optional):
+            Defaults to `0.1`.
+        dim_feedforward (int, optional):
             Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
-            Defaults to ``3072``.
-        activation (`str`, optional):
+            Defaults to `3072`.
+        activation (str, optional):
             The non-linear activation function in the feed-forward layer.
             ``"gelu"``, ``"relu"``, ``"silu"`` and ``"gelu_new"`` are supported.
-            Defaults to ``"gelu"``.
-        normalize_before (`bool`, optional):
+            Defaults to `"gelu"`.
+        normalize_before (bool, optional):
             Indicates whether to put layer normalization into preprocessing of MHA and FFN sub-layers.
             If True, pre-process is layer normalization and post-precess includes dropout,
             residual connection. Otherwise, no pre-process and post-precess includes dropout,
             residual connection, layer normalization. 
             Defaults to ``False``.
-        block_size (`int`, optional):
+        block_size (int, optional):
             The block size for the attention mask. 
-            Defaults to ``1``.
-        window_size (`int`, optional):
+            Defaults to `1`.
+        window_size (int, optional):
             The number of block in a window. 
             Defaults to ``3``.
-        num_global_blocks (`int`, optional):
+        num_global_blocks (int, optional):
             Number of global blocks per sequence.
-            Defaults to ``1``.
-        num_rand_blocks (`int`, optional):
+            Defaults to `1`.
+        num_rand_blocks (int, optional):
             Number of random blocks per row.
-            Defaults to ``2``.
-        seed (`int`, `None`, optional):
+            Defaults to `2`.
+        seed (int, `None`, optional):
             The random seed for generating random block id.
-            Defaults to ``None``.
-        pad_token_id (`int`, optional):
+            Defaults to `None`.
+        pad_token_id (int, optional):
             The index of padding token for BigBird embedding.
-            Defaults to ``0``.
-        hidden_size (`int`, optional):
+            Defaults to `0`.
+        hidden_size (int, optional):
             Dimensionality of the encoder layers and the pooler layer.
-            Defaults to ``768``.
-        hidden_dropout_prob (`float`, optional):
+            Defaults to `768`.
+        hidden_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to ``0.1``.
-        max_position_embeddings (`int`, optional):
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
             The size position embeddings of matrix, which dictates the maximum length
             for which the model can be run.
-            Defaults to ``512``.
-        type_vocab_size (`int`, optional):
+            Defaults to `512`.
+        type_vocab_size (int, optional):
             The vocabulary size of the `token_type_ids`. 
-            Defaults to ``2``.
+            Defaults to `2`.
     """
 
     def __init__(self,
@@ -394,10 +394,10 @@ class BigBirdModel(BigBirdPretrainedModel):
         The BigBirdModel forward method, overrides the __call__() special method.
         
         Args:
-            input_ids (`Tensor`):
+            input_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 Segment token indices to indicate first and second portions of the inputs.
                 Indices can either be 0 or 1:
 
@@ -406,24 +406,24 @@ class BigBirdModel(BigBirdPretrainedModel):
 
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to ``None``, which means we don't add segment embeddings.
-            attention_mask_list (`list`, optional):
+            attention_mask_list (list, optional):
                 A list which contains some tensors used in multi-head attention
                 to prevents attention to some unwanted positions, usually the
                 paddings or the subsequent positions. The tensors' shape will be
                 broadcasted to `[batch_size, n_head, sequence_length, sequence_length]`
-            rand_mask_idx_list (`list`, optional):
+            rand_mask_idx_list (list, optional):
                 A list which contains some tensors used in bigbird random block.
 
         Returns:
-            `Tuple`: (``encoder_output``, ``pooled_output``).
+            Tuple: (``encoder_output``, ``pooled_output``).
             
             With the fields:
 
-            - encoder_output (`Tensor`):
+            - encoder_output (Tensor):
                 Sequence of output at the last layer of the model. Its data type should be float32 and
                 has a shape of [batch_size, sequence_length, hidden_size].
 
-            - pooled_output (`Tensor`):
+            - pooled_output (Tensor):
                 The output of first token (`[CLS]`) in sequence. Its data type should be float32 and
                 has a shape of [batch_size, hidden_size].
 
@@ -478,7 +478,7 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
     Args:
         bigbird (:class:`BigBirdModel`):
             An instance of :class:`BigBirdModel`.
-        num_classes (`int`, optional):
+        num_classes (int, optional):
             The number of classes. Defaults to ``None``.
     """
 
@@ -501,17 +501,17 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
         The BigBirdForSequenceClassification forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (`Tensor`):
+            input_ids (Tensor):
                 See :class:`BigBirdModel`.
-            token_type_ids (`Tensor`):
+            token_type_ids (Tensor):
                 See :class:`BigBirdModel`.
-            attention_mask_list (`List`):
+            attention_mask_list (List):
                 See :class:`BigBirdModel`.
-            rand_mask_idx_list (`List`):
+            rand_mask_idx_list (List):
                 See :class:`BigBirdModel`.
 
         Returns:
-            `Tensor`: Probability of each class. Its data type should be float32 and it has a shape of [batch_size, num_classes].
+            Tensor: Probability of each class. Its data type should be float32 and it has a shape of [batch_size, num_classes].
 
         Examples:
             .. code-block::
@@ -596,13 +596,13 @@ class BigBirdPretrainingHeads(Layer):
     The BigBird pretraining heads for a pretraiing task on top.
 
     Args:
-        hidden_size (`int`):
+        hidden_size (int):
             See :class:`BigBirdModel`.
-        vocab_size (`int`):
+        vocab_size (int):
             See :class:`BigBirdModel`.
-        activation (`str`):
+        activation (str):
             See :class:`BigBirdModel`.
-        embedding_weights (`Tensor`, optional):
+        embedding_weights (Tensor, optional):
             The weight of pretraining embedding layer. Its data type should be float32
             and its shape is [hidden_size, vocab_size].
             If set to `None`, use normal distribution to initialize weight.
@@ -624,17 +624,17 @@ class BigBirdPretrainingHeads(Layer):
         The BigBirdPretrainingHeads forward method, overrides the __call__() special method.
 
         Args:
-            sequence_output (`Tensor`):
+            sequence_output (Tensor):
                 The sequence output of BigBirdModel. Its data type should be float32 and
                 has a shape of [batch_size, sequence_length, hidden_size].
-            pooled_output (`Tensor`):
+            pooled_output (Tensor):
                 The pooled output of BigBirdModel. Its data type should be float32 and
                 has a shape of [batch_size, hidden_size].
-            masked_positions (`Tensor`):
+            masked_positions (Tensor):
                 The list of masked positions. Its data type should be int64
                 and has a shape of [mask_token_num, hidden_size]. Defaults to `None`.
         Returns:
-            `Tuple`: (``prediction_scores``, ``seq_relationship_score``).
+            Tuple: (``prediction_scores``, ``seq_relationship_score``).
             
             With the fields:
 
@@ -681,15 +681,15 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
         The BigBirdForPretraining forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (`Tensor`):
+            input_ids (Tensor):
                 See :class:`BigBirdModel`.
-            token_type_ids (`Tensor`):
+            token_type_ids (Tensor):
                 See :class:`BigBirdModel`.
             attention_mask_list (`List`):
                 See :class:`BigBirdModel`.
-            rand_mask_idx_list (`List`):
+            rand_mask_idx_list (List):
                 See :class:`BigBirdModel`.
-            masked_positions (`List`):
+            masked_positions (List):
                 The list of masked positions.
 
         Returns:
@@ -697,10 +697,10 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
             
             With the fields:
 
-            - prediction_scores (`Tensor`):
+            - prediction_scores (Tensor):
                 The prediction score of masked tokens. Its data type should be float32 and
                 has a shape of [batch_size, sequence_length, vocab_size].
-            - seq_relationship_score (`Tensor`):
+            - seq_relationship_score (Tensor):
                 The logits whether 2 sequences are NSP relationship. Its data type should be float32 and
                 has a shape of [batch_size, 2].
 
@@ -753,12 +753,12 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
     BigBird Criterion for a pretraiing task on top.
 
     Args:
-        vocab_size (`int`):
+        vocab_size (int):
             See :class:`BigBirdModel`.
-        use_nsp (`bool`, optional):
+        use_nsp (bool, optional):
             It decides whether it considers NSP loss.
             Defaults: False
-        ignore_index (`int`):
+        ignore_index (int):
             Specifies a target value that is ignored and does
             not contribute to the input gradient. Only valid
             if :attr:`soft_label` is set to :attr:`False`.
@@ -780,27 +780,27 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
         The BigBirdPretrainingCriterion forward method, overrides the __call__() special method.
 
         Args:
-            prediction_scores (`Tensor`):
+            prediction_scores (Tensor):
                 The logits of masked token prediction. Its data type should be float32 and
                 its shape is [batch_size, sequence_len, vocab_size]
-            seq_relationship_score (`Tensor`):
+            seq_relationship_score (Tensor):
                 The logits whether 2 sequences are NSP relationship. Its data type should be float32 and
                 its shape is [batch_size, 2]
-            masked_lm_labels (`Tensor`):
+            masked_lm_labels (Tensor):
                 The masked token labels. Its data type should be int64 and
                 its shape is [mask_token_num, 1]
-            next_sentence_labels (`Tensor`):
+            next_sentence_labels (Tensor):
                 The labels of NSP tasks.  Its data type should be int64 and
                 its shape is [batch_size, 1]
-            masked_lm_scale (`Tensor` or `int`):
+            masked_lm_scale (Tensor or int):
                 The scale of masked tokens. If it is a `Tensor`, its data type should be int64 and
                 its shape is [mask_token_num, 1]
-            masked_lm_weights (`Tensor`):
+            masked_lm_weights (Tensor):
                 The weight of masked tokens. Its data type should be float32 and its shape
                 is [mask_token_num, 1]
 
         Returns:
-            `Float`: The pretraining loss.
+            Float: The pretraining loss.
 
         Example:
             .. code-block::
