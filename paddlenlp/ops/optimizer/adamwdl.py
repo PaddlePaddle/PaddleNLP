@@ -26,7 +26,7 @@ def layerwise_lr_decay(decay_rate, name_dict, n_layers, param):
     """
     Args:
         decay_rate (float): 
-            Layer-wise decay ratio.
+            The layer-wise decay ratio.
         name_dict (dict): 
             The keys of name_dict is dynamic name of model while the value
             of name_dict is static name.
@@ -48,12 +48,88 @@ def layerwise_lr_decay(decay_rate, name_dict, n_layers, param):
 class AdamWDL(AdamW):
     """
     The AdamWDL optimizer is implemented based on the AdamW Optimization with dynamic lr setting.
+    Generally it's used for transfomer model.
 
-    We use "Layer-wise lr decay" as default dynamic lr setting method of AdamWDL.
+    We use "layerwise_lr_decay" as default dynamic lr setting method of AdamWDL.
     “Layer-wise decay” means exponentially decaying the learning rates of individual 
     layers in a top-down manner. For example, suppose the 24-th layer uses a learning
     rate l, and the Layer-wise decay rate is α, then the learning rate of layer m 
     is lα^(24-m). See more details on: https://arxiv.org/abs/1906.08237
+
+    Args:
+        learning_rate (float|LRScheduler, optional): The learning rate used to update ``Parameter``.
+            It can be a float value or a LRScheduler. The default value is 0.001.
+        beta1 (float, optional): The exponential decay rate for the 1st moment estimates.
+            It should be a float number or a Tensor with shape [1] and data type as float32.
+            The default value is 0.9.
+        beta2 (float, optional): The exponential decay rate for the 2nd moment estimates.
+            It should be a float number or a Tensor with shape [1] and data type as float32.
+            The default value is 0.999.
+        epsilon (float, optional): A small float value for numerical stability.
+            It should be a float number or a Tensor with shape [1] and data type as float32.
+            The default value is 1e-08.
+        parameters (list|tuple, optional): List/Tuple of ``Tensor`` to update to minimize ``loss``. \
+            This parameter is required in dygraph mode. \
+            The default value is None in static mode, at this time all parameters will be updated.
+        weight_decay (float, optional): The weight decay coefficient, it can be float or Tensor. The default value is 0.01.
+        apply_decay_param_fun (function|None, optional): If it is not None,
+            only tensors that makes apply_decay_param_fun(Tensor.name)==True
+            will be updated. It only works when we want to specify tensors.
+            Default: None.
+        grad_clip (GradientClipBase, optional): Gradient cliping strategy, it's an instance of
+            some derived class of ``GradientClipBase`` . There are three cliping strategies
+            ( :ref:`api_fluid_clip_GradientClipByGlobalNorm` , :ref:`api_fluid_clip_GradientClipByNorm` ,
+            :ref:`api_fluid_clip_GradientClipByValue` ). Default None, meaning there is no gradient clipping.
+        lazy_mode (bool, optional): The official Adam algorithm has two moving-average accumulators.
+            The accumulators are updated at every step. Every element of the two moving-average
+            is updated in both dense mode and sparse mode. If the size of parameter is very large,
+            then the update may be very slow. The lazy mode only update the element that has
+            gradient in current mini-batch, so it will be much more faster. But this mode has
+            different semantics with the original Adam algorithm and may lead to different result.
+            The default value is False.
+        multi_precision (bool, optional): Whether to use multi-precision during weight updating. Default is false.  
+        layerwise_decay (float, optional): The layer-wise decay ratio. Defaults to 1.0.
+        n_layers (int, optional): The total number of encoder layers. Defaults to 12.
+        set_param_lr_fun (function|None, optional): If it's not None, set_param_lr_fun() will set the the parameter 
+            learning rate before it executes Adam Operator. Defaults to :ref:`layerwise_lr_decay`.
+        name_dict (dict, optional): The keys of name_dict is dynamic name of model while the value
+            of name_dict is static name. Use model.named_parameters() to get name_dict.
+        name (str, optional): Normally there is no need for user to set this property.
+            For more information, please refer to :ref:`api_guide_Name`.
+            The default value is None.
+
+    Examples:
+        .. code-block:: python
+
+            import paddle
+            from paddlenlp.ops.optimizer import AdamWDL
+            def simple_lr_setting(decay_rate, name_dict, n_layers, param):
+                ratio = 1.0
+                static_name = name_dict[param.name]
+                if "weight" in static_name:
+                    ratio = decay_rate**0.5
+                param.optimize_attr["learning_rate"] *= ratio
+            
+            linear = paddle.nn.Linear(10, 10)
+
+            name_dict = dict()
+            for n, p in linear.named_parameters():
+                name_dict[p.name] = n
+
+            inp = paddle.rand([10,10], dtype="float32")
+            out = linear(inp)
+            loss = paddle.mean(out)
+
+            adamwdl = AdamWDL(
+                learning_rate=1e-4,
+                parameters=linear.parameters(),
+                set_param_lr_fun=simple_lr_setting,
+                layerwise_decay=0.8,
+                name_dict=name_dict)
+            
+            loss.backward()
+            adamwdl.step()
+            adamwdl.clear_grad()
     """
 
     def __init__(self,
@@ -67,7 +143,7 @@ class AdamWDL(AdamW):
                  grad_clip=None,
                  lazy_mode=False,
                  multi_precision=False,
-                 layerwise_decay=0,
+                 layerwise_decay=1.0,
                  n_layers=12,
                  set_param_lr_fun=layerwise_lr_decay,
                  name_dict=None,
