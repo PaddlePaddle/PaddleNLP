@@ -130,3 +130,4 @@ class BiAffine(nn.Layer):
         if s.shape[1] == 1:
             s = paddle.squeeze(s, axis=1)
         return s
+        

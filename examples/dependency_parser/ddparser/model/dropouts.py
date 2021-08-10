@@ -58,3 +58,4 @@ class IndependentDropout(nn.Layer):
             masks = [mask * scale for mask in masks]
             items = [item * paddle.unsqueeze(mask, axis=-1) for item, mask in zip(items, masks)]
         return items
+        

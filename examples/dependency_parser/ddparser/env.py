@@ -27,22 +27,17 @@ class Environment(object):
     """initialize the enviroment"""
     def __init__(self, args):
         self.args = args
-        paddle.set_device(args.device)
         
-        if not args.mode.startswith("predict"):
+        if not args.mode == "train":
             random.seed(args.seed)
             np.random.seed(args.seed)
             paddle.seed(args.seed)
-        os.environ["FLAGS_paddle_num_threads"] = str("16")
+        #os.environ["FLAGS_paddle_num_threads"] = str("16")
 
-        if not args.mode.startswith("predict") and args.preprocess:
+        if args.preprocess and args.mode == "train":
             if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
-                if args.encoding_model in ["ernie-1.0", "ernie-tiny"]:
-                    self.pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(args.encoding_model)
-                    self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(args.encoding_model)
-                elif args.encoding_model == "ernie-gram-zh":
-                    self.pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(args.encoding_model)
-                    self.tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(args.encoding_model)
+                if args.encoding_model == "ernie-gram-zh":
+                    self.tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained("ernie-gram-zh")
                 else:
                     self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained("ernie-1.0")
                 
