@@ -296,12 +296,17 @@ def main():
     pool = multiprocessing.Pool(args.workers, initializer=convert.initializer)
 
     # We use BytesIO to store the ids.
-    memory_stream = io.BytesIO()
-    # Lengths of sentence.
-    lens = []
-    # Position of docs
-    docs = [0]
+    token_ids_stream = io.BytesIO()
+    sentlens_stream = io.BytesIO()
+    # Cumsum on tokens num
+    sent_cumsum_stream = io.BytesIO()
+    sent_cumsum_stream.write((0).to_bytes(8, byteorder='little', signed=True))
+    # Cunsum on document on every sentence num, type=np.int64
+    doc_cumsum_stream = io.BytesIO()
+    doc_cumsum_stream.write((0).to_bytes(8, byteorder='little', signed=True))
 
+    sent_count = 0
+    token_count = 0
     for file_path in tqdm(file_paths):
         total_bytes_processed = 0
         text = open(file_path, 'r', encoding='utf-8')
@@ -317,13 +322,24 @@ def main():
                 continue
 
             for sentence in doc:
-                if len(sentence) == 0:
+                sentence_len = len(sentence)
+                if sentence_len == 0:
                     continue
-                lens.append(len(sentence))
-                memory_stream.write(
+                sentlens_stream.write(
+                    sentence_len.to_bytes(
+                        4, byteorder='little', signed=True))
+                token_count += sentence_len
+                sent_cumsum_stream.write(
+                    token_count.to_bytes(
+                        8, byteorder='little', signed=True))
+                sent_count += 1
+                token_ids_stream.write(
                     np.array(
                         sentence, dtype=save_dtype).tobytes(order='C'))
-            docs.append(len(lens))
+
+            doc_cumsum_stream.write(
+                sent_count.to_bytes(
+                    8, byteorder='little', signed=True))
 
             if i % args.log_interval == 0:
                 current = time.time()
@@ -336,16 +352,13 @@ def main():
 
     pool.close()
     print("Saving tokens to npz file...")
-    all_doc_ids = np.frombuffer(memory_stream.getbuffer(), dtype=save_dtype)
-    # print(sample_tokenizer.vocab.to_tokens(all_doc_ids.tolist()))
-    # print(sample_tokenizer.convert_tokens_to_string(sample_tokenizer.vocab.to_tokens(all_doc_ids.tolist())))
-    lens = np.array(lens, dtype=np.int32)
-    docs = np.array(docs, dtype=np.int64)
-    np.savez(
-        args.output_prefix + "_ids_lens.npz",
-        ids=all_doc_ids,
-        lens=lens,
-        docs=docs)
+    all_doc_ids = np.frombuffer(token_ids_stream.getbuffer(), dtype=save_dtype)
+    lens = np.frombuffer(sentlens_stream.getbuffer(), dtype=np.int32)
+    sents = np.frombuffer(sent_cumsum_stream.getbuffer(), dtype=np.int64)
+    docs = np.frombuffer(doc_cumsum_stream.getbuffer(), dtype=np.int64)
+    np.save(args.output_prefix + "_ids.npy", all_doc_ids)
+    np.savez(args.output_prefix + "_idx.npz", lens=lens, sents=sents, docs=docs)
+
     print("Total sentences num: %d" % len(lens))
     print("Total documents num: %d" % (len(docs) - 1))
     print("Total tokens num: %d" % len(all_doc_ids))
@@ -356,4 +369,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #profile.run("main()", "testprof")

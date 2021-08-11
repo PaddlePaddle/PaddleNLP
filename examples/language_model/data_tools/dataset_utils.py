@@ -43,11 +43,18 @@ class MMapIndexedDataset(paddle.io.Dataset):
         super().__init__()
 
         self._path = path
-        process_datas = np.load(path, mmap_mode="r", allow_pickle=True)
+
         # All documment ids, extend as 1-D array.
-        self._token_ids = process_datas["ids"]
+
+        for suffix in ["_ids.npy", "_idx.npz"]:
+            if not os.path.isfile(path + suffix):
+                raise ValueError("File Not found, %s" % (path + suffix))
+
+        self._token_ids = np.load(
+            path + "_ids.npy", mmap_mode="r", allow_pickle=True)
+        process_datas = np.load(path + "_idx.npz")
         self._sizes = process_datas["lens"]
-        self._pointers = np.insert(np.cumsum(self._sizes), 0, 0)
+        self._pointers = process_datas["sents"]
         self._doc_idx = process_datas["docs"]
 
     def __getstate__(self):

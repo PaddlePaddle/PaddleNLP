@@ -35,6 +35,7 @@ from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCr
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 
 from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer
+
 from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearDecayWithWarmup
 
 from paddlenlp.ops import guard, Topology, get_rng_state_tracker
@@ -107,6 +108,7 @@ def create_pretrained_dataset(args, data_file, tokenizer, data_world_size,
                 out[3][mask_token_num] = i * seq_length + pos
                 out[4][mask_token_num] = x[4][j]
                 mask_token_num += 1
+
         return out
 
     def loader(dataset):
@@ -122,7 +124,7 @@ def create_pretrained_dataset(args, data_file, tokenizer, data_world_size,
             places=places,
             feed_list=data_holders,
             batch_sampler=batch_sampler,
-            num_workers=0,
+            num_workers=args.num_workers,
             worker_init_fn=None,
             collate_fn=_collate_data,
             return_list=False)
@@ -131,7 +133,7 @@ def create_pretrained_dataset(args, data_file, tokenizer, data_world_size,
     return tuple([loader(x) for x in [train_ds, valid_ds, test_ds]])
 
 
-def create_input_specs(args=None):
+def create_data_holder(args=None):
     input_ids = paddle.static.data(
         name="input_ids", shape=[-1, -1], dtype="int64")
     segment_ids = paddle.static.data(
@@ -163,12 +165,19 @@ def dist_optimizer(args, topo):
     acc_steps = bsz_per_dp // micro_batch_size
 
     exec_strategy = paddle.fluid.ExecutionStrategy()
-    exec_strategy.num_threads = 2
-    exec_strategy.num_iteration_per_drop_scope = 1
+    exec_strategy.num_threads = 1
+    exec_strategy.num_iteration_per_drop_scope = 10000
+
+    build_strategy = paddle.static.BuildStrategy()
+    #build_strategy.enable_sequential_execution = True # for profile
+    build_strategy.fuse_broadcast_ops = True
+    build_strategy.enable_inplace = True
 
     dist_strategy = fleet.DistributedStrategy()
     dist_strategy.execution_strategy = exec_strategy
+    dist_strategy.build_strategy = build_strategy
     dist_strategy.nccl_comm_num = 3
+    dist_strategy.fuse_grad_size_in_MB = 16
 
     dist_strategy.recompute = args.use_recompute
     dist_strategy.pipeline = args.pp_degree > 1
@@ -211,18 +220,11 @@ def dist_optimizer(args, topo):
 def get_train_data_file(args):
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_" not in
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in
             str(f))
     ]
+    files = [x.replace("_idx.npz", "") for x in files]
     return files
-
-
-def init_static_with_params(model, dygraph_params, topo, prog=None):
-    from paddlenlp.utils.tools import dygraph_params_to_static
-    static_params = dygraph_params_to_static(model, dygraph_params, topo)
-    if prog is None:
-        prog = paddle.static.default_main_program()
-    paddle.static.set_program_state(prog, static_params)
 
 
 def run_evaluate(data_loader,
@@ -312,138 +314,124 @@ def do_train(args):
     main_program = paddle.static.default_main_program()
     startup_program = paddle.static.default_startup_program()
     with paddle.static.program_guard(main_program, startup_program):
-        with paddle.utils.unique_name.guard():
-            with paddle.static.device_guard('gpu:0'):
-                data_holders = create_input_specs(args)
-                # 0. input_ids, 
-                # 1. segment_ids, 
-                # 2. input_mask, 
-                # 3. masked_lm_positions,
-                # 4. masked_lm_labels, 
-                # 5. next_sentence_labels
+        data_holders = create_data_holder(args)
+        # 0. input_ids, 
+        # 1. segment_ids, 
+        # 2. input_mask, 
+        # 3. masked_lm_positions,
+        # 4. masked_lm_labels, 
+        # 5. next_sentence_labels
 
-                [
-                    input_ids, segment_ids, input_mask, masked_lm_positions,
-                    masked_lm_labels, next_sentence_labels
-                ] = data_holders
+        [
+            input_ids, segment_ids, input_mask, masked_lm_positions,
+            masked_lm_labels, next_sentence_labels
+        ] = data_holders
 
-                tokenizer = tokenizer_class.from_pretrained(
-                    args.model_name_or_path)
+        tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-                train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                    args,
-                    data_file,
-                    tokenizer,
-                    data_world_size=topo.data_info.size,
-                    data_world_rank=topo.data_info.rank,
-                    max_seq_len=args.max_seq_len,
-                    places=paddle.static.cuda_places(),
-                    data_holders=data_holders)
+        train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
+            args,
+            data_file,
+            tokenizer,
+            data_world_size=topo.data_info.size,
+            data_world_rank=topo.data_info.rank,
+            max_seq_len=args.max_seq_len,
+            places=paddle.static.cuda_places(),
+            data_holders=data_holders)
 
-                if args.model_name_or_path in pretrained_models_list:
-                    model_config = model_class.pretrained_init_configuration[
-                        args.model_name_or_path]
-                    if model_config["vocab_size"] % 8 != 0:
-                        model_config["vocab_size"] += 8 - (
-                            model_config["vocab_size"] % 8)
-                    print(model_config)
-                    model_config[
-                        "hidden_dropout_prob"] = args.hidden_dropout_prob
-                    model_config[
-                        "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
-                    #model_config["top] = topo
+        if args.model_name_or_path in pretrained_models_list:
+            model_config = model_class.pretrained_init_configuration[
+                args.model_name_or_path]
+            if model_config["vocab_size"] % 8 != 0:
+                model_config["vocab_size"] += 8 - (model_config["vocab_size"] %
+                                                   8)
+            print(model_config)
+            model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
+            model_config[
+                "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
+            model = model_class(base_class(**model_config))
+        else:
+            model, _ = model_class.from_pretrained(
+                args.model_name_or_path,
+                hidden_dropout_prob=args.hidden_dropout_prob,
+                attention_probs_dropout_prob=args.attention_probs_dropout_prob,
+            )
 
-                    model = guard(f'gpu:{args.pp_degree -1}')(model_class)(
-                        guard(f'gpu:0')(base_class)(**model_config))
-                else:
-                    model, _ = model_class.from_pretrained(
-                        args.model_name_or_path,
-                        hidden_dropout_prob=args.hidden_dropout_prob,
-                        attention_probs_dropout_prob=args.
-                        attention_probs_dropout_prob,
-                        #topo=topo,
-                    )
+        # Create the model for the gpt pretrain
+        prediction_scores, seq_relationship_score = model(
+            input_ids=input_ids,
+            token_type_ids=segment_ids,
+            position_ids=None,
+            attention_mask=input_mask,
+            masked_positions=masked_lm_positions)
 
-                # Create the model for the gpt pretrain
-                prediction_scores, seq_relationship_score = model(
-                    input_ids=input_ids,
-                    token_type_ids=segment_ids,
-                    position_ids=None,
-                    attention_mask=input_mask,
-                    masked_positions=masked_lm_positions)
+        criterion = criterion_class()
+        lm_loss, sop_loss = criterion(prediction_scores, seq_relationship_score,
+                                      masked_lm_labels, next_sentence_labels)
+        loss = lm_loss + sop_loss
 
-                criterion = guard(f'gpu:{args.pp_degree -1}')(criterion_class)()
+        # Create the learning_rate sheduler and optimizer
+        if args.decay_steps is None:
+            args.decay_steps = args.max_steps
 
-                lm_loss, sop_loss = criterion(
-                    prediction_scores, seq_relationship_score, masked_lm_labels,
-                    next_sentence_labels)
-                loss = lm_loss + sop_loss
+        # lr_scheduler = LinearDecayWithWarmup(
+        #     max_lr=args.max_lr,
+        #     min_lr=args.min_lr,
+        #     warmup_step=warmup_step,
+        #     decay_step=args.decay_steps)
 
-            # Create the learning_rate sheduler and optimizer
-            if args.decay_steps is None:
-                args.decay_steps = args.max_steps
-            warmup_step = args.warmup_rate * args.decay_steps
+        lr_scheduler = LinearDecayWithWarmup(
+            args.max_lr, args.max_steps, args.warmup_rate, last_epoch=0)
 
-            # lr_scheduler = LinearDecayWithWarmup(
-            #     max_lr=args.max_lr,
-            #     min_lr=args.min_lr,
-            #     warmup_step=warmup_step,
-            #     decay_step=args.decay_steps)
+        clip = None
+        if args.grad_clip > 0:
+            clip = paddle.fluid.clip.GradientClipByGlobalNorm(
+                clip_norm=args.grad_clip)
 
-            lr_scheduler = LinearDecayWithWarmup(
-                args.max_lr, args.max_steps, 10000, last_epoch=0)
+        decay_param = [
+            p.name for n, p in model.named_parameters()
+            if not any(nd in n for nd in ["bias", "norm"])
+        ]
+        if ops.optimizer._jit_compile():
+            logger.info("Using paddlenlp custom AdamW optimizer.")
+            optimizer = ops.optimizer.AdamwOptimizer(
+                learning_rate=lr_scheduler,
+                beta1=args.adam_beta1,
+                beta2=args.adam_beta2,
+                epsilon=args.adam_epsilon,
+                grad_clip=clip,
+                weight_decay=args.weight_decay,
+                apply_decay_param_fun=lambda x: x in decay_param)
+        else:
+            if args.sharding_degree > 1:
+                raise ValueError(
+                    "The paddle.optimizer.AdamW not compatible with Sharding!")
+            logger.info("Using paddle.optimizer.AdamW.")
+            optimizer = paddle.optimizer.AdamW(
+                learning_rate=lr_scheduler,
+                beta1=args.adam_beta1,
+                beta2=args.adam_beta2,
+                epsilon=args.adam_epsilon,
+                grad_clip=clip,
+                weight_decay=args.weight_decay,
+                apply_decay_param_fun=lambda x: x in decay_param)
+            # alias
+            optimizer.apply_optimize = optimizer._apply_optimize
 
-            clip = None
-            if args.grad_clip > 0:
-                clip = paddle.fluid.clip.GradientClipByGlobalNorm(
-                    clip_norm=args.grad_clip)
+        # if args.use_recompute:
+        #     dist_strategy.recompute = True
+        #     dist_strategy.recompute_configs = {
+        #         "checkpoints": model.bert.checkpoints
+        #     }
 
-            decay_param = [
-                p.name for n, p in model.named_parameters()
-                if not any(nd in n for nd in ["bias", "norm"])
-            ]
-            # TODO @ZHUI Use paddle.optimizer.AdamW
-            if ops.optimizer._jit_compile():
-                logger.info("Using paddlenlp custom AdamW optimizer.")
-                optimizer = ops.optimizer.AdamwOptimizer(
-                    learning_rate=lr_scheduler,
-                    beta1=args.adam_beta1,
-                    beta2=args.adam_beta2,
-                    epsilon=args.adam_epsilon,
-                    grad_clip=clip,
-                    weight_decay=args.weight_decay,
-                    apply_decay_param_fun=lambda x: x in decay_param)
-            else:
-                if args.sharding_degree > 1:
-                    raise ValueError(
-                        "The paddle.optimizer.AdamW not compatible with Sharding!"
-                    )
-                logger.info("Using paddle.optimizer.AdamW.")
-                optimizer = paddle.optimizer.AdamW(
-                    learning_rate=lr_scheduler,
-                    beta1=args.adam_beta1,
-                    beta2=args.adam_beta2,
-                    epsilon=args.adam_epsilon,
-                    grad_clip=clip,
-                    weight_decay=args.weight_decay,
-                    apply_decay_param_fun=lambda x: x in decay_param)
-                # alias
-                optimizer.apply_optimize = optimizer._apply_optimize
+        # Use the fleet api to compile the distributed optimizer
+        optimizer = fleet.distributed_optimizer(
+            optimizer, strategy=dist_strategy)
 
-            # if args.use_recompute:
-            #     dist_strategy.recompute = True
-            #     dist_strategy.recompute_configs = {
-            #         "checkpoints": model.bert.checkpoints
-            #     }
-
-            # Use the fleet api to compile the distributed optimizer
-            optimizer = fleet.distributed_optimizer(
-                optimizer, strategy=dist_strategy)
-
-            optimizer.minimize(loss)
-            logger.info(f'final strategy: {fleet._final_strategy()}')
-            logger.info("The training meta optimizer is/are %s" %
-                        fleet._get_applied_meta_list())
+        optimizer.minimize(loss)
+        logger.info(f'final strategy: {fleet._final_strategy()}')
+        logger.info("The training meta optimizer is/are %s" %
+                    fleet._get_applied_meta_list())
 
     program_desc_dir = os.path.join(args.output_dir, "program_desc")
     if not os.path.isdir(program_desc_dir):
@@ -460,6 +448,7 @@ def do_train(args):
     # Define the Executor for running the static model
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
+
     test_program = main_program.clone(for_test=True)
 
     if args.model_name_or_path not in pretrained_models_list:
@@ -519,6 +508,7 @@ def do_train(args):
             if global_step % args.logging_freq == 0:
                 if topo.is_last:
                     loss_return, lm_loss_return, sop_loss_return, lr_return = ret
+
                     speed = args.logging_freq / (time.time() - tic_train)
                     logger.info(
                         "global step %d, epoch: %d, batch: %d, loss: %.9f, lm_loss: %.6f, sop_loss: %.6f, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e"

@@ -232,7 +232,15 @@ def parse_args(MODEL_CLASSES):
         help="The attention probs dropout prob.")
     # Other config
     parser.add_argument(
-        "--seed", type=int, default=1234, help="Random seed for initialization")
+        "--seed",
+        type=int,
+        default=1234,
+        help="Random seed for initialization.")
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=2,
+        help="Num of workers for DataLoader.")
     parser.add_argument(
         "--check_accuracy",
         type=str2bool,
