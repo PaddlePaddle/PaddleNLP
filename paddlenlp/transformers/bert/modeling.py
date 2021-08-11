@@ -380,7 +380,7 @@ class BertModel(BertPretrainedModel):
             The index of padding token in the token vocabulary.
             Defaults to `0`.
 
-        pooled_act (`str`, optional):
+        pooled_act (str, optional):
             The non-linear activation function in the pooling layer.
             Defaults to `"tanh"`.
 

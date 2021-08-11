@@ -131,6 +131,67 @@ class DistilBertPretrainedModel(PretrainedModel):
 
 @register_base_model
 class DistilBertModel(DistilBertPretrainedModel):
+    """
+    The bare DistilBert Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Check the superclass documentation for the generic methods and the library implements for all its model.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in `BertModel`. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling `BertModel`.
+        hidden_size (int, optional):
+            Dimensionality of the encoder layers and the pooler layer. Defaults to `768`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in the Transformer encoder. Defaults to `12`.
+        num_attention_heads (int, optional):
+            Number of attention heads for each attention layer in the Transformer encoder.
+            Defaults to `12`.
+        intermediate_size (int, optional):
+            Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
+            Defaults to `3072`.
+        hidden_act (str, optional):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported. Defaults to `"gelu"`.
+        hidden_dropout_prob (float, optional):
+            The dropout probability for all fully connected layers in the embeddings and encoder.
+            Defaults to `0.1`.
+        attention_probs_dropout_prob (float, optional):
+            The dropout probability for all fully connected layers in the pooler.
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
+            The maximum value of the dimensionality of position encoding. The dimensionality of position encoding
+            is the dimensionality of the sequence in `DistilBertModel`.
+            Defaults to `512`.
+        type_vocab_size (int, optional):
+            The vocabulary size of `token_type_ids` passed when calling `~ transformers.DistilBertModel`.
+            Defaults to `12`.
+            `token_type_ids` are segment token indices to indicate first
+             and second portions of the inputs. Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+        initializer_range (float, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Defaults to `0.02`.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `DistilBertModel`.
+
+        pad_token_id (int, optional):
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
+
+    """
+
     def __init__(self,
                  vocab_size,
                  hidden_size=768,
@@ -162,6 +223,45 @@ class DistilBertModel(DistilBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
+        r'''
+        The BertModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            attention_mask (Tensor, optional):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set to **-infinity**
+                for any positions in mask that are **0**, and will be **unchanged** for positions that
+                are **1**.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It's data type should be 'float32' and has a shape of [batch_size, sequence_length].
+                Defaults to 'None'.
+
+        Returns:
+            Tensor: `encoder_output`(Tensor):
+                Sequence of output at hidden layers of the model. Its data type should be float32 and
+                has a shape of [batch_size, sequence_length, hidden_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import BertModel, BertTokenizer
+
+                tokenizer = BertTokenizer.from_pretrained('bert-wwm-chinese')
+                model = BertModel.from_pretrained('bert-wwm-chinese')
+
+                inputs = tokenizer("这是一个测试样例!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        '''
+
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
