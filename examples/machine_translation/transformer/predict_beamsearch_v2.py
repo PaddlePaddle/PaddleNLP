@@ -59,8 +59,6 @@ def do_predict(args):
     test_loader, to_tokens = reader.create_infer_loader(args)
 
     # Define model
-    # `TransformerGenerator` automatically chioces using `FasterTransformer`
-    # (with jit building) or the slower verison `InferTransformerModel`.
     transformer = TransformerModel(
         src_vocab_size=args.src_vocab_size,
         trg_vocab_size=args.trg_vocab_size,
@@ -98,8 +96,6 @@ def do_predict(args):
 
     with paddle.no_grad():
         for (src_word, ) in test_loader:
-            # The shape of finished_seq is `[seq_len, batch_size, beam_size]`
-            # when `output_time_major` argument is `True` for TransformerGenerator.
             finished_seq, finished_scores = transformer.beam_search_v2(
                 src_word=src_word,
                 beam_size=args.beam_size,
