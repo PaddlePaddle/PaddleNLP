@@ -26,7 +26,7 @@ from paddlenlp.transformers.optimization import LinearDecayWithWarmup
 from env import Environment
 from data import batchify, TextDataset, Corpus
 from model.model import DDParserModel
-from model.metric import ParserEvaluator
+from metric import ParserEvaluator
 from model.model_utils import ParserCriterion, decode, reduce_sum, masked_select, index_sample
 
 # yapf: disable
@@ -50,7 +50,7 @@ parser.add_argument("--seed", type=int, default=1000, help="Random seed for init
 # Evaluate & Predict
 parser.add_argument("--test_data_path", type=str, default='./data/test.txt', help="The path of test dataset to be loaded.")
 parser.add_argument("--model_file_path", type=str, default='model_file/', help="Directory to load model parameters.")
-parser.add_argument("--infer_result_path", type=str, default='infer_result/', help="The path to save infer results.")
+parser.add_argument("--infer_result_dir", type=str, default='infer_result/', help="The path to save infer results.")
 # Preprocess
 parser.add_argument("--min_freq", type=int, default=2, help="The minimum frequency of word when construct the vocabulary.")
 parser.add_argument("--n_buckets", type=int, default=15, help="Number of buckets to devide the dataset.")
@@ -214,12 +214,15 @@ def do_train(env):
         if rank == 0:
             # Epoch evaluate
             loss, uas, las = evaluate(args, model, metric, criterion, dev_data_loader)
-            print("eval loss: %.5f, UAS: %.5f, LAS: %.5f" % (loss, uas, las))
+            print("eval loss: %.5f, UAS: %.5f%, LAS: %.5f%" % (loss, uas*100, las*100))
+            # Save model parameter of last epoch
+            if not os.path.exists(args.save_dir):
+                os.makedirs(args.save_dir)
+            save_param_path = os.path.join(args.save_dir, "last_epoch.pdparams")
+            paddle.save(model.state_dict(), save_param_path)       
             # Save the model if it get a higher las
             if las > best_las:
-                if not os.path.exists(args.save_dir):
-                    os.makedirs(args.save_dir)
-                save_param_path = os.path.join(args.save_dir, "model_state.pdparams")
+                save_param_path = os.path.join(args.save_dir, "best.pdparams")
                 paddle.save(model.state_dict(), save_param_path)  
                 best_las = las                 
 
@@ -258,7 +261,7 @@ def do_evaluate(env):
 
     # Start evaluate
     loss, uas, las = evaluate(args, model, metric, criterion, evaluate_data_loader)
-    print("eval loss: %.5f, UAS: %.5f, LAS: %.5f" % (loss, uas, las))
+    print("eval loss: %.5f, UAS: %.5f%, LAS: %.5f%" % (loss, uas*100, las*100))
     
 def do_predict(env):
     args = env.args
@@ -296,7 +299,7 @@ def do_predict(env):
     data.deprel = [pred_rels[i] for i in indices]
 
     # Save results
-    data.save(args.infer_result_path)
+    data.save(args.infer_result_dir)
 
 
 class Parser(object):
