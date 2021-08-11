@@ -179,52 +179,52 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (`int`):
+        vocab_size (int):
             Vocabulary size of the ErnieCtm model. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling ErnieCtmModel.
-        embedding_size (`int`, optional):
+        embedding_size (int, optional):
             Dimensionality of the embedding layer.
-            Defaults to ``128``.
-        hidden_size (`int`, optional):
+            Defaults to `128`.
+        hidden_size (int, optional):
             Dimensionality of the encoder layers and the pooler layer.
-            Defaults to ``768``.
-        num_hidden_layers (`int`, optional):
+            Defaults to `768`.
+        num_hidden_layers (int, optional):
             The number of encoder layers to be stacked.
-            Defaults to ``12``.
-        num_attention_heads (`int`, optional):
+            Defaults to `12`.
+        num_attention_heads (int, optional):
             The number of heads in multi-head attention(MHA).
-            Defaults to ``12``.
-        intermediate_size (`int`, optional):
+            Defaults to `12`.
+        intermediate_size (int, optional):
             The hidden layer size in the feedforward network(FFN).
-            Defaults to ``3072``.
-        hidden_dropout_prob (`float`, optional):
+            Defaults to `3072`.
+        hidden_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to ``0.1``.
-        attention_probs_dropout_prob (`float`, optional):
+            Defaults to `0.1`.
+        attention_probs_dropout_prob (float, optional):
             The dropout probability used in MHA to drop some attention target.
-            Defaults to ``0.1``.
-        max_position_embeddings (`int`, optional):
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
             The size position embeddings of matrix, which dictates the maximum length
             for which the model can be run.
-            Defaults to ``512``.
-        type_vocab_size (`int`, optional):
+            Defaults to `512`.
+        type_vocab_size (int, optional):
             The vocabulary size of the `token_type_ids`. 
-            Defaults to ``16``.
-        initializer_range (`float`, optional):
+            Defaults to `16`.
+        initializer_range (float, optional):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-            Defaults to ``0.02``.
+            Defaults to `0.02`.
         pad_token_id (`int`, optional):
-            The index of padding token for BigBird embedding.
-            Defaults to ``0``.
-        use_content_summary (`bool`, optional):
+            The index of padding token for Ernie embedding.
+            Defaults to `0`.
+        use_content_summary (bool, optional):
             If adding content summary tokens. 
-            Defaults to ``True``.
-        content_summary_index (`int`, optional):
+            Defaults to `True`.
+        content_summary_index (int, optional):
             The number of the content summary tokens. Only valid when use_content_summary is True.
-            Defaults to ``1``.
-        cls_num (`int`, optional):
+            Defaults to `1`.
+        cls_num (int, optional):
             The number of the CLS tokens. Only valid when use_content_summary is True.
-            Defaults to ``2``.
+            Defaults to `2`.
     """
 
     def __init__(self,
@@ -295,38 +295,43 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
         The ErnieCtmModel forward method, overrides the __call__() special method.
         
         Args:
-            input_ids (`Tensor`):
+            input_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 Segment token indices to indicate first and second portions of the inputs.
                 Indices can either be 0 or 1:
                 - 0 corresponds to a *sentence A* token,
                 - 1 corresponds to a *sentence B* token.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to ``None``, which means we don't add segment embeddings.
-            attention_mask_list (`list`, optional):
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                config.max_position_embeddings - 1]``.
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attention_mask_list (list, optional):
                 A list which contains some tensors used in multi-head attention
                 to prevents attention to some unwanted positions, usually the
                 paddings or the subsequent positions. The tensors' shape will be
                 broadcasted to `[batch_size, n_head, sequence_length, sequence_length]`
-            content_clone (`bool`, optional):
+            content_clone (bool, optional):
                 Whether the content_output is clone from sequence_output. If set to `True`, the content_output is
                 clone from sequence_output, which may cause the classification task impact on the sequence labeling task.
         Returns:
             A tuple of shape (``sequence_output``, ``pooled_output``, ``content_output``).
             
             With the fields:
-            - sequence_output (`Tensor`):
+            - sequence_output (Tensor):
                 Sequence of output at the last layer of the model. Its data type should be float32 and
                 has a shape of [batch_size, sequence_length, hidden_size].
-            - pooled_output (`Tensor`):
+            - pooled_output (Tensor):
                 The output of first token (`[CLS]`) in sequence. Its data type should be float32 and
                 has a shape of [batch_size, hidden_size].
-            - content_output (`Tensor`):
+            - content_output (Tensor):
                 The output of content summary token (`[CLS1]` in sequence). Its data type should be float32 and
                 has a shape of [batch_size, hidden_size].
         """
+
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
@@ -374,13 +379,13 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
     Args:
         ernie_ctm (:clss:`ErnieCtmModel`):
             An instance of :class:`ErnieCtmModel`.
-        num_tag (`int`):
+        num_tag (int):
             The number of tags.
-        num_cls_label (`int`):
+        num_cls_label (int):
             The number of sentence classification label.
-        crf_lr (`float`):
+        crf_lr (float):
             The learning rate of the crf.
-        ignore_index (`index`):
+        ignore_index (index):
             The ignore prediction index when calculating the cross entropy loss.
     """
 
@@ -441,6 +446,20 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
 
 
 class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
+    """
+    ErnieCtm Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        ernie_ctm (:class:`ErnieCtmModel`):
+            An instance of ErnieCtmModel.
+        num_classes (int, optional):
+            The number of classes. Default ``2``.
+        dropout (float, optional):
+            The dropout probability for output of ErnieCtm.
+            If None, use the same value as `hidden_dropout_prob` of `ErnieCtmModel`
+            instance `ernie_ctm`. Default None.
+    """
     def __init__(self, ernie_ctm, num_classes=2, dropout=None):
         super(ErnieCtmForTokenClassification, self).__init__()
         self.num_classes = num_classes
@@ -456,6 +475,41 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r"""
+        The ErnieCtmForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieCtmModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            position_ids(Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            attention_mask_list (list, optional):
+                See :class:`ErnieCtmModel`.
+
+        Returns:
+            logits (Tensor):
+                A Tensor of the input token classification logits.
+                Shape as `(batch_size, num_classes)` and dtype as `float`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ErnieCtmForTokenClassification
+                from paddlenlp.transformers import ErnieCtmTokenizer
+
+                tokenizer = ErnieCtmTokenizer.from_pretrained('bert-base-cased')
+                model = ErnieCtmForTokenClassification.from_pretrained('bert-base-cased')
+
+                inputs = tokenizer("这是一个测试样例!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
+
         sequence_output, _, _ = self.ernie_ctm(
             input_ids,
             token_type_ids=token_type_ids,

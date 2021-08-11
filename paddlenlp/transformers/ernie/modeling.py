@@ -340,7 +340,7 @@ class ErnieModel(ErniePretrainedModel):
                 model = ErnieModel.from_pretrained('ernie-1.0')
 
                 inputs = tokenizer("Hey, paddle-paddle is awesome !")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 sequence_output, pooled_output = model(**inputs)
 
         """

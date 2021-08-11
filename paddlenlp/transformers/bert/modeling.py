@@ -589,7 +589,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
 
 class BertForSequenceClassification(BertPretrainedModel):
     """
-    DistilBert Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    Bert Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
     for GLUE tasks.
 
     Args:
@@ -702,7 +702,7 @@ class BertForTokenClassification(BertPretrainedModel):
         Args:
             input_ids (Tensor):
                 See :class:`BertModel`.
-            token_type_ids (`Tensor`, optional):
+            token_type_ids (Tensor, optional):
                 See :class:`BertModel`.
             position_ids(Tensor, optional):
                 See :class:`BertModel`.
