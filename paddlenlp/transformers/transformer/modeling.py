@@ -1028,9 +1028,8 @@ class TransformerModel(nn.Layer):
 
         # Accounting for corner case: It's possible that no sequence in alive for a
         # particular batch item ever reached EOS. In that case, we should just copy
-        # the contents of alive for that batch item. tf.reduce_any(finished_flags, 1)
-        # if 0, means that no sequence for that batch index had reached EOS. We need
-        # to do the same for the scores as well.
+        # the contents of alive for that batch item. if no sequence for that batch
+        # index had reached EOS. We need to do the same for the scores as well.
         finished_flags = paddle.any(paddle.cast(
             finished_flags, dtype='bool'),
                                     axis=1,
