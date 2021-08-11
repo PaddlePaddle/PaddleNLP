@@ -371,7 +371,8 @@ class BlenderbotForConditionalGeneration(BlenderbotPretrainedModel):
             dtype=self.blenderbot.shared.weight.dtype,
             is_bias=False)
         self.register_buffer("final_logits_bias",
-                             paddle.zeros((1, self.blenderbot.config['vocab_size'])))
+                             paddle.zeros((1, self.blenderbot.config['vocab_size']),
+                                          dtype=paddle.get_default_dtype()))
         self.apply(self.init_weights)
 
     def forward(self,
