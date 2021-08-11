@@ -589,7 +589,8 @@ class BertForQuestionAnswering(BertPretrainedModel):
 
 class BertForSequenceClassification(BertPretrainedModel):
     """
-    Model for sentence (pair) classification task with BERT.
+    DistilBert Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
 
     Args:
         bert (:class:`BertModel`):
@@ -666,7 +667,8 @@ class BertForSequenceClassification(BertPretrainedModel):
 
 class BertForTokenClassification(BertPretrainedModel):
     """
-    Model for token classification task with BERT.
+    Bert Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
 
     Args:
         bert (:class:`BertModel`):

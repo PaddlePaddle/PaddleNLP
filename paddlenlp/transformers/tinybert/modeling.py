@@ -378,7 +378,8 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
 
 class TinyBertForSequenceClassification(TinyBertPretrainedModel):
     """
-    Model for sentence (pair) classification task with TinyBert.
+    TinyBert Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
 
     Args:
         tinybert (:class:`TinyBertModel`):
