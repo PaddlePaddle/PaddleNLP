@@ -33,33 +33,30 @@ from model.model_utils import ParserCriterion, decode, reduce_sum, masked_select
 parser = argparse.ArgumentParser()
 # Run
 parser.add_argument("--mode", choices=["train", "evaluate", "predict"], type=str, default="train", help="Select the task mode.")
-parser.add_argument("--params_path", type=str, help="The path to model parameters to be loaded.")
-parser.add_argument("--epochs", type=int, default=100, help="Number of epoches for training.")
 parser.add_argument("--device", choices=["cpu", "gpu", "xpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
+# Train
+parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
+parser.add_argument("--preprocess", type=bool, default=True, help="Whether to preprocess the dataset.")
+parser.add_argument("--epochs", type=int, default=100, help="Number of epoches for training.")
 parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint.")
 parser.add_argument("--train_data_path", type=str, default='./data/train.txt', help="The path of train dataset to be loaded.")
 parser.add_argument("--dev_data_path", type=str, default='./data/test.txt', help="The path of dev dataset to be loaded.")
-parser.add_argument("--test_data_path", type=str, default='./data/test.txt', help="The path of test dataset to be loaded.")
-parser.add_argument("--infer_result_path", type=str, default='./infer_result', help="The path of test dataset to be loaded.")
 parser.add_argument("--batch_size", type=int, default=1000, help="Numbers of examples a batch for training.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
-parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
 parser.add_argument("--clip", type=float, default=1.0, help="The threshold of gradient clip.")
 parser.add_argument("--lstm_lr", type=float, default=0.002, help="The Learning rate of lstm encoding model.")
 parser.add_argument("--ernie_lr", type=float, default=5e-05, help="The Learning rate of ernie encoding model.")
 parser.add_argument("--seed", type=int, default=1, help="Random seed for initialization.")
+# Evaluate & Predict
+parser.add_argument("--test_data_path", type=str, default='./data/test.txt', help="The path of test dataset to be loaded.")
+parser.add_argument("--model_file_path", type=str, default='checkpoints/', help="Directory to load model checkpoint.")
+parser.add_argument("--infer_result_path", type=str, default='./infer_result', help="The path to save infer results.")
 # Preprocess
 parser.add_argument("--min_freq", type=int, default=2, help="The minimum frequency of word when construct the vocabulary.")
-parser.add_argument("--preprocess", type=bool, default=True, help="Whether to preprocess the dataset.")
-parser.add_argument("--fix_len", type=int, default=20)
 parser.add_argument("--n_buckets", type=int, default=15, help="Number of buckets to devide the dataset.")
-# Decode
+# Postprocess
 parser.add_argument("--tree", type=bool, default=True, help="Ensure the output conforms to the tree structure.")
 # Lstm
-parser.add_argument("--beta1", type=float, default=0.9, help="The coefficient of adam optimizer for computing running average of gradient.")
-parser.add_argument("--beta2", type=float, default=0.9, help="The coefficient of adam optimizer for computing running average of squared-gradient.")
-parser.add_argument("--epsilon", type=float, default=1e-12, help="A small float value for numerical stability.")
-parser.add_argument("--decay_rate", type=float, default=0.75, help="The decay rate of learning rate.")
 parser.add_argument("--feat", choices=["char", "pos"], type=str, default=None, help="The feature representation to use.")
 # Ernie
 parser.add_argument("--warmup_proportion", type=float, default=0.0, help="Linear warmup proportion over total steps.")
@@ -172,9 +169,9 @@ def do_train(env):
     else:
         optimizer = paddle.optimizer.Adam(
             learning_rate=lr_scheduler,
-            beta1=args.beta1,
-            beta2=args.beta2,
-            epsilon=args.epsilon,
+            beta1=0.9,
+            beta2=0.9,
+            epsilon=1e-12,
             parameters=model.parameters(),
             grad_clip=grad_clip,
         )
@@ -247,10 +244,11 @@ def do_evaluate(env):
         model = DDParserModel(args=args)
     
     # Load saved model parameters
-    if args.params_path and os.path.isfile(args.params_path):
-        state_dict = paddle.load(args.params_path)
+    params_path = os.path.join(args.model_file_path, "model_state.pdparams")
+    if params_path and os.path.isfile(params_path):
+        state_dict = paddle.load(params_path)
         model.set_dict(state_dict)
-        print("Loaded parameters from %s" % args.params_path)
+        print("Loaded parameters from %s" % params_path)
     else:
         raise ValueError("The parameters path is incorrect or not specified.")
 
@@ -283,10 +281,11 @@ def do_predict(env):
         model = DDParserModel(args=args)
     
     # Load saved model parameters
-    if args.params_path and os.path.isfile(args.params_path):
-        state_dict = paddle.load(args.params_path)
+    params_path = os.path.join(args.model_file_path, "model_state.pdparams")
+    if params_path and os.path.isfile(params_path):
+        state_dict = paddle.load(params_path)
         model.set_dict(state_dict)
-        print("Loaded parameters from %s" % args.params_path)
+        print("Loaded parameters from %s" % params_path)
     else:
         raise ValueError("The parameters path is incorrect or not specified.")
 
@@ -310,7 +309,6 @@ class Parser(object):
         paddle.set_device(device)
 
         args = parser.parse_args()
-        args.save_dir = encoding_model
         args.encoding_model = encoding_model
 
         self.env = Environment(args)

@@ -34,11 +34,10 @@ class Environment(object):
             paddle.seed(args.seed)
 
         if args.preprocess and args.mode == "train":
-            if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
-                if args.encoding_model == "ernie-gram-zh":
-                    self.tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained("ernie-gram-zh")
-                else:
-                    self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained("ernie-1.0")
+            if args.encoding_model.startswith("ernie"):
+                self.tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(args.encoding_model)
+            elif args.encoding_model == "lstm-pe":
+                self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained("ernie-1.0")
                 
                 args.vocab_size = len(self.tokenizer.vocab)
                 self.WORD = ErnieField(
@@ -47,7 +46,7 @@ class Environment(object):
                     unk='[UNK]',
                     bos='[CLS]',
                     eos='[SEP]',
-                    fix_len=args.fix_len,
+                    fix_len=20,
                     tokenizer=self.tokenizer,
                 )
                 self.WORD.vocab = self.tokenizer.vocab
@@ -68,7 +67,7 @@ class Environment(object):
                     unk='[UNK]',
                     bos='[BOS]',
                     eos='[EOS]',
-                    fix_len=args.fix_len,
+                    fix_len=20,
                     tokenize=list,
                 )
             elif args.feat == "pos":
