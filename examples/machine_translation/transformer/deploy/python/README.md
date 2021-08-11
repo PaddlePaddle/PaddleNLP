@@ -32,7 +32,7 @@ python inference.py \
 * `--config`: yaml 配置文件，和训练时使用的相同，不过因为模型导出时已经固定了模型结构，因此，模型超参相关配置将不会再起作用，仅有 `reader` 相关配置、`infer_batch_size` 以及 `inference_model_dir` 仍会有效。
 * `--batch_size`: 与配置文件中 `infer_batch_size` 意义相同，是指的使用 Paddle Inference 的时候一个 batch 的句子数目。
 * `--device`: 使用的设备，可以是 gpu，xpu 或是 cpu。
-* `--use_mkl`: 是否使用 mkl，没有设定表示不使用 mkl。
+* `--use_mkl`: 是否使用 mkl，没有设定表示不使用 mkl。可以通过 `--use_mkl True` 指定。
 * `--threads`: 仅在使用 mkl 的时候起效，用于指定计算 math 库时的线程数。
 * `--model_dir`: 导出的 Paddle Inference 可用的模型路径，与配置文件中的 `inference_model_dir` 对应。
 
