@@ -143,8 +143,8 @@ class DistilBertModel(DistilBertPretrainedModel):
 
     Args:
         vocab_size (int):
-            Vocabulary size of `inputs_ids` in `BertModel`. Defines the number of different tokens that can
-            be represented by the `inputs_ids` passed when calling `BertModel`.
+            Vocabulary size of `inputs_ids` in `DistilBertModel`. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling `DistilBertModel`.
         hidden_size (int, optional):
             Dimensionality of the encoder layers and the pooler layer. Defaults to `768`.
         num_hidden_layers (int, optional):
@@ -171,7 +171,7 @@ class DistilBertModel(DistilBertPretrainedModel):
             Defaults to `512`.
         type_vocab_size (int, optional):
             The vocabulary size of `token_type_ids` passed when calling `~ transformers.DistilBertModel`.
-            Defaults to `12`.
+            Defaults to `16`.
             `token_type_ids` are segment token indices to indicate first
              and second portions of the inputs. Indices can either be 0 or 1:
 
@@ -224,7 +224,7 @@ class DistilBertModel(DistilBertPretrainedModel):
 
     def forward(self, input_ids, attention_mask=None):
         r'''
-        The BertModel forward method, overrides the `__call__()` special method.
+        The DistilBertModel forward method, overrides the `__call__()` special method.
 
         Args:
             input_ids (Tensor):
@@ -244,7 +244,7 @@ class DistilBertModel(DistilBertPretrainedModel):
                 Defaults to 'None'.
 
         Returns:
-            Tensor: `encoder_output`(Tensor):
+            Tensor: encoder_output(Tensor):
                 Sequence of output at hidden layers of the model. Its data type should be float32 and
                 has a shape of [batch_size, sequence_length, hidden_size].
 
@@ -252,12 +252,12 @@ class DistilBertModel(DistilBertPretrainedModel):
             .. code-block::
 
                 import paddle
-                from paddlenlp.transformers import BertModel, BertTokenizer
+                from paddlenlp.transformers import DistilBertModel, DistilBertTokenizer
 
-                tokenizer = BertTokenizer.from_pretrained('bert-wwm-chinese')
-                model = BertModel.from_pretrained('bert-wwm-chinese')
+                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+                model = DistilBertModel.from_pretrained('distilbert-base-uncased')
 
-                inputs = tokenizer("这是一个测试样例!")
+                inputs = tokenizer("Hey, paddle-paddle is awesome !")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
@@ -274,6 +274,21 @@ class DistilBertModel(DistilBertPretrainedModel):
 
 
 class DistilBertForSequenceClassification(DistilBertPretrainedModel):
+    """
+    DistilBert Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
+
+    Args:
+        distilbert (:class:`DistilBertModel`):
+            An instance of DistilBertModel.
+        num_classes (int, optional):
+            The number of classes. Default `2`.
+        dropout (float, optional):
+            The dropout probability for output of DistilBert.
+            If None, use the same value as `hidden_dropout_prob` of `DistilBertModel`
+            instance `distilbert`. Default None.
+    """
+
     def __init__(self, distilbert, num_classes=2, dropout=None):
         super(DistilBertForSequenceClassification, self).__init__()
         self.num_classes = num_classes
@@ -288,6 +303,37 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
+        r"""
+        The DistilBertForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`DistilBertModel`.
+            attention_mask_list (list, optional):
+                See :class:`DistilBertModel`.
+
+        Returns:
+            logits (Tensor):
+                A Tensor of the input text classification logits.
+                Shape as `(batch_size, num_classes)` and dtype as `float`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.distilbert.modeling import DistilBertForSequenceClassification
+                from paddlenlp.transformers.distilbert.tokenizer import DistilBertTokenizer
+
+                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+                model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
+
+                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
+
         distilbert_output = self.distilbert(
             input_ids=input_ids, attention_mask=attention_mask)
 
@@ -302,6 +348,18 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
 
 
 class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
+    """
+    DistilBert Model with a question answering head on top (a linear layer on top of the pooled output).
+
+    Args:
+        distilbert (:class:`DistilBertModel`):
+            An instance of DistilBertModel.
+        dropout (float, optional):
+            The dropout probability for output of DistilBert.
+            If None, use the same value as `hidden_dropout_prob` of `DistilBertModel`
+            instance `distilbert`. Default None.
+    """
+
     def __init__(self, distilbert, dropout=None):
         super(DistilBertForQuestionAnswering, self).__init__()
         self.distilbert = distilbert  # allow bert to be config
@@ -311,6 +369,41 @@ class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
+        r"""
+        The DistilBertForQuestionAnswering forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`DistilBertModel`.
+            attention_mask_list (list, optional):
+                See :class:`DistilBertModel`.
+
+        Returns:
+            A tuple of shape (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - start_logits(Tensor): The logits of start position of prediction answer.
+            - end_logits(Tensor): The logits of end position of prediction answer.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.distilbert.modeling import DistilBertForQuestionAnswering
+                from paddlenlp.transformers.distilbert.tokenizer import DistilBertTokenizer
+
+                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+                model = DistilBertForQuestionAnswering.from_pretrained('distilbert-base-uncased')
+
+                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                start_logits = outputs[0]
+                end_logits  =outputs[1]
+        """
+
         sequence_output = self.distilbert(
             input_ids, attention_mask=attention_mask)
         sequence_output = self.dropout(sequence_output)
@@ -321,6 +414,21 @@ class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
 
 
 class DistilBertForTokenClassification(DistilBertPretrainedModel):
+    """
+    DistilBert Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        distilbert (:class:`DistilBertModel`):
+            An instance of DistilBertModel.
+        num_classes (int, optional):
+            The number of classes. Default `2`.
+        dropout (float, optional):
+            The dropout probability for output of DistilBert.
+            If None, use the same value as `hidden_dropout_prob` of `DistilBertModel`
+            instance `distilbert`. Default None.
+    """
+
     def __init__(self, distilbert, num_classes=2, dropout=None):
         super(DistilBertForTokenClassification, self).__init__()
         self.num_classes = num_classes
@@ -332,6 +440,37 @@ class DistilBertForTokenClassification(DistilBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
+        r"""
+        The DistilBertForTokenClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`DistilBertModel`.
+            attention_mask_list (list, optional):
+                See :class:`DistilBertModel`.
+
+        Returns:
+            logits (Tensor):
+                A Tensor of the input token classification logits.
+                Shape as `(batch_size, num_classes)` and dtype as `float`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.distilbert.modeling import DistilBertForTokenClassification
+                from paddlenlp.transformers.distilbert.tokenizer import DistilBertTokenizer
+
+                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+                model = DistilBertForTokenClassification.from_pretrained('distilbert-base-uncased')
+
+                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
+
         sequence_output = self.distilbert(
             input_ids, attention_mask=attention_mask)
 
