@@ -144,6 +144,7 @@ def eisner(scores, mask):
 
     return pad_sequence(predicts, fix_len=seq_len)
 
+
 class NODE:
     """NODE class"""
     def __init__(self, id=None, parent=None):
@@ -151,6 +152,7 @@ class NODE:
         self.rights = []
         self.id = int(id)
         self.parent = parent if parent is None else int(parent)
+
 
 class DepTree:
     """

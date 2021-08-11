@@ -16,6 +16,7 @@ import paddle
 import paddle.nn as nn
 import paddle.fluid.layers as layers
 
+
 class SharedDropout(nn.Layer):
     """SharedDropout"""
     def __init__(self, p=0.5, batch_first=True):
@@ -41,6 +42,7 @@ class SharedDropout(nn.Layer):
         mask = paddle.cast(mask, 'float32')
         mask = mask / (1 - p)
         return mask
+
 
 class IndependentDropout(nn.Layer):
     """IndependentDropout"""

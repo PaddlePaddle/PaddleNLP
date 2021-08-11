@@ -38,19 +38,19 @@ parser.add_argument("--device", choices=["cpu", "gpu", "xpu"], default="gpu", he
 parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
 parser.add_argument("--preprocess", type=bool, default=True, help="Whether to preprocess the dataset.")
 parser.add_argument("--epochs", type=int, default=100, help="Number of epoches for training.")
-parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint.")
+parser.add_argument("--save_dir", type=str, default='model_file/', help="Directory to save model parameters.")
 parser.add_argument("--train_data_path", type=str, default='./data/train.txt', help="The path of train dataset to be loaded.")
-parser.add_argument("--dev_data_path", type=str, default='./data/test.txt', help="The path of dev dataset to be loaded.")
+parser.add_argument("--dev_data_path", type=str, default='./data/dev.txt', help="The path of dev dataset to be loaded.")
 parser.add_argument("--batch_size", type=int, default=1000, help="Numbers of examples a batch for training.")
-parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
+parser.add_argument("--init_from_params", type=str, default=None, help="The path of model parameters to be loaded.")
 parser.add_argument("--clip", type=float, default=1.0, help="The threshold of gradient clip.")
 parser.add_argument("--lstm_lr", type=float, default=0.002, help="The Learning rate of lstm encoding model.")
 parser.add_argument("--ernie_lr", type=float, default=5e-05, help="The Learning rate of ernie encoding model.")
-parser.add_argument("--seed", type=int, default=1, help="Random seed for initialization.")
+parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
 # Evaluate & Predict
 parser.add_argument("--test_data_path", type=str, default='./data/test.txt', help="The path of test dataset to be loaded.")
-parser.add_argument("--model_file_path", type=str, default='checkpoints/', help="Directory to load model checkpoint.")
-parser.add_argument("--infer_result_path", type=str, default='./infer_result', help="The path to save infer results.")
+parser.add_argument("--model_file_path", type=str, default='model_file/', help="Directory to load model parameters.")
+parser.add_argument("--infer_result_path", type=str, default='infer_result/', help="The path to save infer results.")
 # Preprocess
 parser.add_argument("--min_freq", type=int, default=2, help="The minimum frequency of word when construct the vocabulary.")
 parser.add_argument("--n_buckets", type=int, default=15, help="Number of buckets to devide the dataset.")
@@ -148,8 +148,8 @@ def do_train(env):
         model = DDParserModel(args=args)
 
     # Continue training from a pretrained model if the checkpoint is specified
-    if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
-        state_dict = paddle.load(args.init_from_ckpt)
+    if args.init_from_params and os.path.isfile(args.init_from_params):
+        state_dict = paddle.load(args.init_from_params)
         model.set_dict(state_dict)
 
     # Data parallel for distributed training
@@ -298,6 +298,7 @@ def do_predict(env):
     # Save results
     data.save(args.infer_result_path)
 
+
 class Parser(object):
     def __init__(
         self,
@@ -331,7 +332,7 @@ class Parser(object):
 
         self.lac = LAC.LAC(mode="seg", use_cuda=True if args.device == "gpu" else False)
 
-    def parse(self, inputs):
+    def predict(self, inputs):
 
         if isinstance(inputs, str):
             inputs = [inputs]

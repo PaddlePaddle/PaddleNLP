@@ -21,6 +21,7 @@ from paddle.fluid.core_avx import VarDesc
 
 import utils
 
+
 class ParserCriterion(nn.Layer):
     def __init__(self, *args, **kwargs):
         super(ParserCriterion, self).__init__(*args, **kwargs)
