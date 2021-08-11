@@ -19,11 +19,11 @@ ddparser/
 ├── model # 部署
 │   ├── dropouts.py # dropout
 │   ├── encoder.py # 编码器
-│   ├── metric.py # 指标计算
 │   ├── model.py # 模型网络
 │   └── model_utils.py # 模型网络工具函数
 ├── README.md # 使用说明
 ├── data.py # 数据结构
+├── metric.py # 指标计算
 ├── env.py # 环境配置工具
 ├── run.py # 主入口，包含训练、评估和预测任务
 └── utils.py # 任务工具函数
@@ -32,46 +32,74 @@ ddparser/
 ## 快速开始
 
 ### 环境依赖
-* `python`: >=3.6.0
-* `paddlepaddle`: >=2.1
-* `LAC`: >=2.1
+* `LAC`
 * `dill`
+安装命令：`pip install LAC dill`
 
 ### 句法分析任务
 
 #### 模型训练
 
+
+
+通过指定`--preprocess`，任务会基于训练数据进行词统计等操作并保存`fields`文件到`model_file`路径下。
+用户可以通过`--feat`来指定输入的特征，通过`--encoding_model`来指定不同的encoder，以下是以BiLSTM为encoder训练ddparser的示例：
+
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run.py \
-                                                --mode train \
+                                                --mode=train \
+                                                --preprocess \
                                                 --device=gpu \
-                                                --batch_size=4000 \
+                                                --save_dir=model_file \
+                                                --encoding_model=lstm \
+                                                --feat=pos \
+                                                --train_data_path=data/train.txt \
+                                                --dev_data_path=data/dev.txt 
+```
+
+除了以BiLSTM作为encoder，我们还提供了`ernie-1.0`、`ernie-tiny`和`ernie-gram-zh`等预训练模型作为encoder来训练ddparser的方法。
+以下是一个基于预训练模型`ernie-gram-zh`训练ddparser的示例：
+
+```shell
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" run.py \
+                                                --mode=train \
+                                                --device=gpu \
                                                 --encoding_model=ernie-gram-zh \
                                                 --train_data_path=data/train.txt \
                                                 --dev_data_path=data/dev.txt 
 ```
 
 #### 模型评估
+用户可以执行以下命令对模型效果进行验证，通过`--model_file_path`来指定待评估的模型文件：
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 python -m paddle.distributed.launch --gpus "0" run.py \
-                                                --mode evaluate \
+                                                --mode=evaluate \
                                                 --device=gpu \
-                                                --model_file_path=checkpoint \
+                                                --model_file_path=model_file/best.pdparams \
                                                 --tree
 ```
+命令执行后返回示例：
+```shell
+eval loss: 0.27116, UAS: 95.747%, LAS: 94.034%
+```
+其中UAS为只考虑head的准确率，LAS为预测head和relation的准确率。
 
 #### 模型预测
+用户可以执行一下命令进行模型预测，通过`--test_data_path`指定待预测数据，`--model_file_path`来指定模型文件，`--infer_result_dir`指定预测结果存放路径。
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 python -m paddle.distributed.launch --gpus "0" run.py \
-                                                --mode predict \
+                                                --mode=predict \
                                                 --device=gpu \
-                                                --model_file_path=checkpoint \
-                                                --infer_result_path=infer_result \
+                                                --test_data_path=data/test.txt \
+                                                --model_file_path=model_file/best.pdparams \
+                                                --infer_result_dir=infer_result \
                                                 --tree
 ```
+命令执行后会在`infer_result`路径下生成预测结果文件。
 
 #### 可配置参数说明
 
@@ -91,7 +119,7 @@ python -m paddle.distributed.launch --gpus "0" run.py \
 * `seed`: 随机种子，默认为1000。
 * `test_data_path`: 测试集文件路径。
 * `model_file_path`: 评估和预测模式下的使用参数，设置后会从该路径加载已训练保存的模型文件进行模型评估或预测，默认为model_file文件夹。
-* `infer_result_path`: 预测结果保存路径，默认保存在当前目录infer_result文件夹下。
+* `infer_result_dir`: 预测结果保存路径，默认保存在当前目录infer_result文件夹下。
 * `min_freq`: 训练模式下的使用参数，基于训练数据生成的词表的最小词频，默认为2。
 * `n_buckets`: 训练模式下的使用参数，选择数据分桶数，对训练数据按照长度进行分桶。
 * `tree`: 确保输出结果是正确的依存句法树，默认为True。
