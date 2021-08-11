@@ -280,9 +280,6 @@ class ClassifierIterator(object):
     def _prepare_batch_data(self, examples):
         batch_records, max_len, gather_idx = [], 0, []
         for index, example in enumerate(examples):
-            if example.cal_loss == 1:
-                gather_idx.append(index % self.batch_size)
-
             max_len = max(max_len, len(example.src_ids))
             if self.in_tokens:
                 to_append = (len(batch_records) + 1
@@ -291,6 +288,8 @@ class ClassifierIterator(object):
                 to_append = len(batch_records) < self.batch_size
             if to_append:
                 batch_records.append(example)
+                if example.cal_loss == 1:
+                    gather_idx.append(index % self.batch_size)
             else:
                 yield self._pad_batch_records(batch_records, gather_idx)
                 batch_records, max_len = [example], len(example.src_ids)

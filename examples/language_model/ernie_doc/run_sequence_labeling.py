@@ -93,9 +93,9 @@ def evaluate(model, metric, data_loader, memories0):
             gather_idxs, need_cal_loss = batch
         logits, memories = model(input_ids, memories, token_type_ids,
                                  position_ids, attn_mask)
-        logits, labels, qids = list(
+        logits, labels, qids, lengths = list(
             map(lambda x: paddle.gather(x, gather_idxs),
-                [logits, labels, qids]))
+                [logits, labels, qids, lengths]))
         loss = loss_fct(logits, labels)
         avg_loss = loss.mean()
         losses.append(avg_loss)
