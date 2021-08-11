@@ -317,6 +317,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             content_clone (bool, optional):
                 Whether the content_output is clone from sequence_output. If set to `True`, the content_output is
                 clone from sequence_output, which may cause the classification task impact on the sequence labeling task.
+
         Returns:
             A tuple of shape (``sequence_output``, ``pooled_output``, ``content_output``).
             
@@ -330,6 +331,23 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             - content_output (Tensor):
                 The output of content summary token (`[CLS1]` in sequence). Its data type should be float32 and
                 has a shape of [batch_size, hidden_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ErnieCtmModel, ErnieCtmTokenizer
+
+                tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-ctm')
+                model = ErnieCtmModel.from_pretrained('ernie-ctm')
+
+                inputs = tokenizer("Hey, paddle-paddle is awesome !")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                ouputs = model(**inputs)
+
+                sequence_output = outputs[0]
+                pooled_output = output[1]
+                content_output = output[2]
         """
 
         if attention_mask is None:
@@ -420,6 +438,22 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
                 lengths=None,
                 tag_labels=None,
                 cls_label=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieCtmModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            position_ids (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+
+        Returns:
+            Tuple: (total_loss, seq_logits, cls_logits) or (seq_logits, cls_logits)
+
+        """
+
         outputs = self.ernie_ctm(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -500,10 +534,10 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
                 from paddlenlp.transformers import ErnieCtmForTokenClassification
                 from paddlenlp.transformers import ErnieCtmTokenizer
 
-                tokenizer = ErnieCtmTokenizer.from_pretrained('bert-base-cased')
-                model = ErnieCtmForTokenClassification.from_pretrained('bert-base-cased')
+                tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-ctm')
+                model = ErnieCtmForTokenClassification.from_pretrained('ernie-ctm')
 
-                inputs = tokenizer("这是一个测试样例!")
+                inputs = tokenizer("这是一个测试样例")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
