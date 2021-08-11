@@ -15,7 +15,6 @@
 from collections import defaultdict, namedtuple, Counter
 from collections.abc import Iterable
 import math
-import six
 import numpy as np
 import paddle
 
@@ -25,6 +24,7 @@ from model.model_utils import pad_sequence
 CoNLL = namedtuple(typename='CoNLL',
                    field_names=['ID', 'FORM', 'LEMMA', 'CPOS', 'POS', 'FEATS', 'HEAD', 'DEPREL', 'PHEAD', 'PDEPREL'])
 CoNLL.__new__.__defaults__ = tuple([None] * 10)
+
 
 class Vocab(object):
     """Vocab"""
@@ -42,11 +42,11 @@ class Vocab(object):
 
     def __getitem__(self, key):
         """According to the key or index, return the index and key"""
-        if isinstance(key, six.string_types):
+        if isinstance(key, str):
             return self.stoi[key]
         elif not isinstance(key, Iterable):
             return self.itos[key]
-        elif isinstance(key[0], six.string_types):
+        elif isinstance(key[0], str):
             return [self.stoi[i] for i in key]
         else:
             return [self.itos[i] for i in key]
@@ -75,6 +75,7 @@ class Vocab(object):
         self.itos.extend(sorted(set(tokens).difference(self.stoi)))
         self.stoi.update({token: i for i, token in enumerate(self.itos)})
 
+
 class RawField(object):
     """Field base class"""
     def __init__(self, name, fn=None):
@@ -96,6 +97,7 @@ class RawField(object):
     def transform(self, sequences):
         """Sequences transform function"""
         return [self.preprocess(seq) for seq in sequences]
+
 
 class Field(RawField):
     """Field"""
@@ -254,6 +256,7 @@ class SubwordField(Field):
 
         return sequences
 
+
 class ErnieField(Field):
     """SubwordField"""
     def __init__(self, *args, **kwargs):
@@ -277,6 +280,7 @@ class ErnieField(Field):
             for seq in sequences
         ]
         return sequences
+
 
 class Sentence(object):
     """Sentence"""
@@ -315,6 +319,7 @@ class Sentence(object):
             elif not field.name.isdigit():
                 output[field.name] = getattr(self, field.name)
         return output
+
 
 class Corpus(object):
     """Corpus"""
@@ -416,6 +421,7 @@ class Corpus(object):
             output.append(sentence.get_result())
         return output
 
+
 class TextDataLoader(object):
     """TextDataLoader"""
     def __init__(self, dataset, batch_sampler, collate_fn, use_multiprocess=True):
@@ -450,7 +456,6 @@ class TextDataLoader(object):
         """Returns the number of batches"""
         return len(self.batch_sampler)
 
-
 class TextDataset(object):
     """TextDataset"""
     def __init__(self, corpus, fields, n_buckets=None):
@@ -483,6 +488,7 @@ class TextDataset(object):
     def collate_fn(cls, batch):
         """Return batch samples according to field"""
         return (field for field in zip(*batch))
+
 
 class BucketsSampler(object):
     """BucketsSampler"""
@@ -528,6 +534,7 @@ class SequentialSampler(object):
         else:
             if len(batch):
                 yield batch
+
 
 def batchify(
     dataset,

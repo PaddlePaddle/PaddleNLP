@@ -19,6 +19,7 @@ from paddle.metric import Metric
 
 from model.model_utils import masked_select
 
+
 class ParserEvaluator(Metric):
     """
     UAS and LAS for dependency parser.

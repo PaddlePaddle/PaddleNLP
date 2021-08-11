@@ -35,6 +35,7 @@ ddparser/
 * `python`: >=3.6.0
 * `paddlepaddle`: >=2.1
 * `LAC`: >=2.1
+* `dill`
 
 ### 句法分析任务
 
@@ -45,9 +46,10 @@ unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run.py \
                                                 --mode train \
                                                 --device=gpu \
-                                                --encoding_model=ernie-1.0 \
+                                                --batch_size=4000 \
+                                                --encoding_model=ernie-gram-zh \
                                                 --train_data_path=data/train.txt \
-                                                --dev_data_path=data/dev.txt \
+                                                --dev_data_path=data/dev.txt 
 ```
 
 #### 模型评估
@@ -56,7 +58,7 @@ export CUDA_VISIBLE_DEVICES=0
 python -m paddle.distributed.launch --gpus "0" run.py \
                                                 --mode evaluate \
                                                 --device=gpu \
-                                                --model_file_path=checkpoints \
+                                                --model_file_path=checkpoint \
                                                 --tree
 ```
 
@@ -66,7 +68,7 @@ export CUDA_VISIBLE_DEVICES=0
 python -m paddle.distributed.launch --gpus "0" run.py \
                                                 --mode predict \
                                                 --device=gpu \
-                                                --model_file_path=checkpoints \
+                                                --model_file_path=checkpoint \
                                                 --infer_result_path=infer_result \
                                                 --tree
 ```
@@ -78,17 +80,17 @@ python -m paddle.distributed.launch --gpus "0" run.py \
 * `encoding_model`: 选择模型编码网络，可选lstm、lstm-pe、ernie-1.0、ernie-tiny和ernie-gram-zh。
 * `preprocess`: 训练模式下的使用参数，设置表示会基于训练数据进行词统计等操作，不设置则使用已统计好的信息；针对统一训练数据，多次训练可不设置该参数; 默认为True。
 * `epochs`: 训练轮数。
-* `save_dir`: 保存训练模型的目录；默认保存在当前目录checkpoints文件夹下。
+* `save_dir`: 保存训练模型的路径；默认将当前在验证集上效果最好的模型保存在目录model_file文件夹下。
 * `train_data_path`: 训练集文件路径。
 * `dev_data_path`: 开发集文件路径。
 * `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为1000。
-* `init_from_ckpt`: 模型参数路径，热启动模型训练；默认为None。
+* `init_from_params`: 模型参数路径，热启动模型训练；默认为None。
 * `clip`: 梯度裁剪阈值，将梯度限制在阈值范围内。
 * `lstm_lr`: 模型编码网络为lstm或lstm-pe时的学习率，默认为0.002。
 * `ernie_lr`: 模型编码网络为ernie-1.0、ernie-tiny、ernie-gram-zh时的学习率，默认为5e-5。
 * `seed`: 随机种子，默认为1000。
 * `test_data_path`: 测试集文件路径。
-* `model_file_path`: 评估和预测模式下的使用参数，设置后会从该路径加载已训练保存的模型文件进行模型评估或预测。
+* `model_file_path`: 评估和预测模式下的使用参数，设置后会从该路径加载已训练保存的模型文件进行模型评估或预测，默认为model_file文件夹。
 * `infer_result_path`: 预测结果保存路径，默认保存在当前目录infer_result文件夹下。
 * `min_freq`: 训练模式下的使用参数，基于训练数据生成的词表的最小词频，默认为2。
 * `n_buckets`: 训练模式下的使用参数，选择数据分桶数，对训练数据按照长度进行分桶。

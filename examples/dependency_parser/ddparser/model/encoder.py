@@ -18,6 +18,7 @@ import paddle.nn as nn
 from model.model_utils import reduce_sum, masked_select, pad_sequence_paddle, mask_fill, index_sample
 from model.dropouts import SharedDropout, IndependentDropout
 
+
 class ErnieEncoder(nn.Layer):
     def __init__(self, 
                  args, 
@@ -48,6 +49,7 @@ class ErnieEncoder(nn.Layer):
         )
         words = index_sample(words, position)
         return words, x
+
 
 class LSTMByWPEncoder(nn.Layer):
     def __init__(self,
@@ -98,6 +100,7 @@ class LSTMByWPEncoder(nn.Layer):
         words = paddle.index_sample(words, position)
         x = self.lstm_dropout(x)
         return words, x
+
 
 class LSTMEncoder(nn.Layer):
     def __init__(self, 
@@ -152,6 +155,7 @@ class LSTMEncoder(nn.Layer):
         x, _ = self.lstm(embed, sequence_length=seq_lens)
         x = self.lstm_dropout(x)
         return words, x
+
 
 class CharLSTMEncoder(nn.Layer):
     def __init__(self, 

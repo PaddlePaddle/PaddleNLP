@@ -23,6 +23,7 @@ import paddlenlp as ppnlp
 import utils
 from data import CoNLL, Field, SubwordField, ErnieField, Corpus
 
+
 class Environment(object):
     """initialize the enviroment"""
     def __init__(self, args):
@@ -34,11 +35,12 @@ class Environment(object):
             paddle.seed(args.seed)
 
         if args.preprocess and args.mode == "train":
-            if args.encoding_model.startswith("ernie"):
-                self.tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(args.encoding_model)
-            elif args.encoding_model == "lstm-pe":
-                self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained("ernie-1.0")
-                
+            if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
+                if args.encoding_model == "lstm-pe":
+                    self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained("ernie-1.0")
+                else:
+                    self.tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(args.encoding_model)
+
                 args.vocab_size = len(self.tokenizer.vocab)
                 self.WORD = ErnieField(
                     "word",
@@ -87,7 +89,7 @@ class Environment(object):
             else:
                 self.fields = CoNLL(FORM=self.WORD, CPOS=self.FEAT, HEAD=self.ARC, DEPREL=self.REL)
 
-            train = Corpus.load("./data/train.txt", self.fields)
+            train = Corpus.load(args.train_data_path, self.fields)
 
             if not args.encoding_model.startswith("ernie") and not args.encoding_model == "lstm-pe":
                 self.WORD.build(train, args.min_freq)

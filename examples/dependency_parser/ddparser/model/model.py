@@ -19,6 +19,7 @@ from paddle.fluid import layers
 from model.dropouts import SharedDropout
 from model.encoder import LSTMEncoder, LSTMByWPEncoder, ErnieEncoder
 
+
 class DDParserModel(nn.Layer):
     """DDParser"""
     def __init__(self,
@@ -69,6 +70,7 @@ class DDParserModel(nn.Layer):
             paddle.cast(s_arc_mask, 'int32'), scale=1e5, bias=-1, bias_after_scale=False)
         return s_arc, s_rel, words
         
+
 class MLP(nn.Layer):
     """MLP"""
     def __init__(self, 
@@ -91,6 +93,7 @@ class MLP(nn.Layer):
         x = self.leaky_relu(x)
         x = self.dropout(x)
         return x
+
 
 class BiAffine(nn.Layer):
     """BiAffine"""
