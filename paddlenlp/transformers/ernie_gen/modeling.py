@@ -211,6 +211,13 @@ class ErnieEncoderStack(nn.Layer):
 
 @six.add_metaclass(InitTrackerMeta)
 class ErnieGenPretrainedModel(object):
+    """
+    An abstract class for pretrained ErnieGen models. It provides ErnieGen related
+    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
+    `pretrained_init_configuration`, `base_model_prefix` for downloading and
+    loading pretrained models. See `PretrainedModel` for more details.
+    """
+
     model_config_file = "model_config.json"
     ernie_gen_pretrained_init_configuration = {
         "ernie-gen-base-en": {
@@ -571,13 +578,17 @@ class ErnieForGeneration(ErnieModel):
 
     def forward(self, *args, **kwargs):
         """
-        Args
+        The ErnieForGeneration forward method, overrides the __call__() special method.
+
+        Args:
+
             tgt_labels(`Variable` of shape [batch_size, seqlen] or [batch, seqlen, vocab_size]):
                 ground trouth target sequence id (hard label) or distribution (soft label)
             tgt_pos(`Variable` of shape [n_targets, 2]):
                 index of tgt_labels in `src_ids`, can be obtained from `fluid.layers.where(src_ids==mask_id)`
             encoder_only(Bool):
                 if set, will not return loss, logits_2d
+
         Returns:
             loss(`Variable` of shape []):
                 cross entropy loss mean over every target label. if `encode_only`, returns None.
