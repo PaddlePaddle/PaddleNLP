@@ -48,7 +48,7 @@ parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--rdrop_coef", default=1.0, type=float, help="The coefficient of" 
+parser.add_argument("--rdrop_coef", default=0.0, type=float, help="The coefficient of" 
     "KL-Divergence loss in R-Drop paper, for more detail please refer to https://arxiv.org/abs/2106.14448), if rdrop_coef > 0 then R-Drop works")
 
 args = parser.parse_args()
