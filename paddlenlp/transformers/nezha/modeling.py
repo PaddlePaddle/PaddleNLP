@@ -789,6 +789,17 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
 
 
 class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
+    r"""
+    Model for Question Answering task with NeZha.
+
+    Args:
+        nezha (NeZhaModel):
+            An instance of `paddlenlp.transformers.NeZhaModel`.
+        dropout (float, optional):
+            The dropout probability for output of NeZha.
+            If None, use the same value as `hidden_dropout_prob`
+            of `paddlenlp.transformers.NeZhaModel` instance. Defaults to `None`.
+    """
     def __init__(self, nezha, dropout=None):
         super(NeZhaForQuestionAnswering, self).__init__()
         self.nezha = nezha
@@ -796,6 +807,40 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`NeZhaModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`NeZhaModel`.
+            attention_mask (Tensor, optional):
+                See :class:`NeZhaModel`.
+
+        Returns:
+            A tuple of shape (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - start_logits(Tensor): The logits of start position of prediction answer.
+            - end_logits(Tensor): The logits of end position of prediction answer.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import NeZhaForSequenceClassification, NeZhaTokenizer
+
+                tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
+                model = NeZhaForSequenceClassification.from_pretrained('nezha-base-chinese')
+
+                inputs = tokenizer("这是一个测试样例")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+                start_logits = outputs[0]
+                end_logits = outputs[1]
+
+        """
+
         sequence_output, _ = self.nezha(input_ids, token_type_ids, attention_mask)
 
         logits = self.classifier(sequence_output)
@@ -808,7 +853,8 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
 
 class NeZhaForSequenceClassification(NeZhaPretrainedModel):
     """
-    Model for sentence (pair) classification task with NeZha.
+    Nezha Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
 
     Args:
         nezha (:class:`NeZhaModel`):
@@ -875,7 +921,8 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
 
 class NeZhaForTokenClassification(NeZhaPretrainedModel):
     """
-    Model for token classification task with NeZha.
+    NeZha Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
 
     Args:
         nezha (:class:`NeZhaModel`):
@@ -979,6 +1026,7 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
                 A Tensor of the input token classification logits.
                 Shape as `(batch_size, num_classes)` and dtype as `float`.
         """
+
         # input_ids: [bs, num_choice, seq_l]
         input_ids = input_ids.reshape((-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
         
