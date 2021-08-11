@@ -34,6 +34,7 @@ ddparser/
 ### 环境依赖
 * `LAC`
 * `dill`
+
 安装命令：`pip install LAC dill`
 
 ### 句法分析任务
@@ -42,8 +43,11 @@ ddparser/
 
 
 
-通过指定`--preprocess`，任务会基于训练数据进行词统计等操作并保存`fields`文件到`model_file`路径下。
-用户可以通过`--feat`来指定输入的特征，通过`--encoding_model`来指定不同的encoder，以下是以BiLSTM为encoder训练ddparser的示例：
+通过指定`--preprocess`，任务会基于训练数据自动生成词表和关系表等信息并保存`fields`文件到`--save_dir`所指定的路径下。
+
+用户可以通过`--feat`来指定输入的特征，`--encoding_model`指定不同的encoder，
+
+以下是以BiLSTM为encoder训练ddparser的示例：
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
@@ -59,6 +63,7 @@ python -m paddle.distributed.launch --gpus "0" run.py \
 ```
 
 除了以BiLSTM作为encoder，我们还提供了`ernie-1.0`、`ernie-tiny`和`ernie-gram-zh`等预训练模型作为encoder来训练ddparser的方法。
+
 以下是一个基于预训练模型`ernie-gram-zh`训练ddparser的示例：
 
 ```shell
@@ -72,7 +77,7 @@ python -m paddle.distributed.launch --gpus "0" run.py \
 ```
 
 #### 模型评估
-用户可以执行以下命令对模型效果进行验证，通过`--model_file_path`来指定待评估的模型文件：
+通过`--model_file_path`指定待评估的模型文件，执行以下命令可对模型效果进行验证：
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 python -m paddle.distributed.launch --gpus "0" run.py \
@@ -85,7 +90,11 @@ python -m paddle.distributed.launch --gpus "0" run.py \
 ```shell
 eval loss: 0.27116, UAS: 95.747%, LAS: 94.034%
 ```
-其中UAS为只考虑head的准确率，LAS为预测head和relation的准确率。
+指标释义：
+```shell
+UAS = number of words assigned correct head / total words
+LAS = number of words assigned correct head and relation / total words
+```
 
 #### 模型预测
 用户可以执行一下命令进行模型预测，通过`--test_data_path`指定待预测数据，`--model_file_path`来指定模型文件，`--infer_result_dir`指定预测结果存放路径。
