@@ -73,7 +73,13 @@ def infer_transformer_decoding(
         'DecoderLayernormBias': decoder_ln_bias,
         'EmbWeight': linear_weight,
         'EmbBias': linear_bias,
-        'PositionEncEmb': pos_emb
+        'PositionEncEmb': pos_emb,
+        # The input of custom op must be given.
+        # Dispensable() and Intermediate() are not supported. 
+        'TrgWord': [paddle.zeros(
+            shape=[0, 0], dtype="int32")],
+        'TrgLength': [paddle.zeros(
+            shape=[0, 0], dtype="int32")]
     }
 
     attrs = {
