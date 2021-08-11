@@ -46,7 +46,7 @@ def layerwise_lr_decay(decay_rate, name_dict, n_layers, param):
 
 
 class AdamWDL(AdamW):
-    """
+    r"""
     The AdamWDL optimizer is implemented based on the AdamW Optimization with dynamic lr setting.
     Generally it's used for transfomer model.
 
@@ -55,6 +55,19 @@ class AdamWDL(AdamW):
     layers in a top-down manner. For example, suppose the 24-th layer uses a learning
     rate l, and the Layer-wise decay rate is α, then the learning rate of layer m 
     is lα^(24-m). See more details on: https://arxiv.org/abs/1906.08237
+
+    .. math::
+
+        t & = t + 1
+    
+        moment\_1\_out & = {\\beta}_1 * moment\_1 + (1 - {\\beta}_1) * grad
+
+        moemnt\_2\_out & = {\\beta}_2 * moment\_2 + (1 - {\\beta}_2) * grad * grad
+
+        learning\_rate & = learning\_rate * \\
+            \\frac{\sqrt{1 - {\\beta}_2^t}}{1 - {beta}_1^t}
+
+        param\_out & = param - learning\_rate * (\\frac{moment\_1}{\sqrt{moment\_2} + \epsilon} + \lambda * param)
 
     Args:
         learning_rate (float|LRScheduler, optional): The learning rate used to update ``Parameter``.

@@ -166,7 +166,7 @@ python -m paddle.distributed.launch --gpus "0,1" --log_dir cail run_semantic_mat
 
 | Dataset        | Model             |   Dev/Test Acc   |
 |:--------------:|:-----------------:|:----------------:|
-| CAIL2019-SCM   | ernie-doc-base-zh |  0.6646/0.6796   |
+| CAIL2019-SCM   | ernie-doc-base-zh |  0.6420/0.6484   |
 
 
 ### 序列标注任务
