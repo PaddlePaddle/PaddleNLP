@@ -1,6 +1,8 @@
 #!/bin/bash
 
-base_dir="./data_v2/"
+#base_dir="./data_v2/"
+base_dir="./data_v4/"
+
 mkdir -p ${base_dir}/train/ALL
 
 cat ${base_dir}/train/LCQMC/train ${base_dir}/train/BQ/train ${base_dir}/train/OPPO/train > ${base_dir}/train/ALL/train

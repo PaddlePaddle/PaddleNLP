@@ -110,10 +110,6 @@ def do_train():
     dev_ds = load_dataset(
         read_text_pair, data_path=args.dev_set, is_test=False, lazy=False)
 
-    # If you want to use ernie1.0 model, plesace uncomment the following code
-    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
-
     pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
         'ernie-gram-zh')
     tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
