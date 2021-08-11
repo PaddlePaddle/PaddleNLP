@@ -98,6 +98,9 @@ class BlenderbotSmallPretrainedModel(PretrainedModel):
 
     def init_weights(self, layer):
         """ Initialization hook """
+        if paddle.get_default_dtype() not in ['float32','float64']:
+            # gaussian/standard_normal/randn/normal only supports [float32, float64]
+            return
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
