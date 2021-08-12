@@ -119,8 +119,8 @@ if __name__ == "__main__":
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
-        pprint(args)
     args.decoder_lib = ARGS.decoder_lib
     args.use_fp16_decoder = ARGS.use_fp16_decoder
+    pprint(args)
 
     do_predict(args)

@@ -1,8 +1,6 @@
 # Batch size during inference. 
 infer_batch_size: 8
 max_out_len: 256
-# The number of decoded sentences to output.
-n_best: 1
 
 # Hyparams for model:
 # These following five vocabularies related configurations will be set
@@ -37,7 +35,5 @@ dropout: 0.1
 # Vocabularies in source and target should be same for weight sharing.
 weight_sharing: True
 
-# decoding step number
-step: 0
-# 
+# Path of trained parameter, to make prediction
 init_from_params: base_trained_models/step_final
