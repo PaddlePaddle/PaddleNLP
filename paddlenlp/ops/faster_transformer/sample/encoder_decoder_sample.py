@@ -52,7 +52,8 @@ def do_predict(args):
         src_vocab_size=args.src_vocab_size,
         trg_vocab_size=args.trg_vocab_size,
         max_length=args.max_length + 1,
-        n_layer=args.n_layer,
+        num_encoder_layers=args.num_encoder_layers,
+        num_decoder_layers=args.num_decoder_layers,
         n_head=args.n_head,
         d_model=args.d_model,
         d_inner_hid=args.d_inner_hid,
@@ -72,7 +73,10 @@ def do_predict(args):
 
     # Generate src_word randomly
     src_word = paddle.randint(
-        0, 30000, shape=[args.infer_batch_size, args.max_length], dtype='int64')
+        0,
+        args.src_vocab_size,
+        shape=[args.infer_batch_size, args.max_length],
+        dtype='int64')
 
     with paddle.no_grad():
         for i in range(100):
