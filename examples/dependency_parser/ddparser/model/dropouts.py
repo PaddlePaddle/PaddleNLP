@@ -14,7 +14,6 @@
 
 import paddle
 import paddle.nn as nn
-import paddle.fluid.layers as layers
 
 
 class SharedDropout(nn.Layer):
@@ -55,8 +54,8 @@ class IndependentDropout(nn.Layer):
         if self.training and self.p > 0:
             masks = [paddle.uniform(shape=x.shape[:2], min=0, max=1) >= self.p for x in items]
             masks = [paddle.cast(x, 'float32') for x in masks]
-            total = layers.elementwise_add(*masks)
-            scale = len(items) / layers.elementwise_max(total, paddle.ones_like(total))
+            total = paddle.add(*masks)
+            scale = len(items) / paddle.maximum(total, paddle.ones_like(total))
             masks = [mask * scale for mask in masks]
             items = [item * paddle.unsqueeze(mask, axis=-1) for item, mask in zip(items, masks)]
         return items

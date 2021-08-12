@@ -121,11 +121,13 @@ class BiAffine(nn.Layer):
         b = x.shape[0]
         o = self.weight.shape[0]
         # Shape x: (batch_size, output_size, num_tokens, input_size + bias_x)
-        x = layers.expand(paddle.unsqueeze(x, axis=1), expand_times=(1, o, 1, 1))
+        x = paddle.expand(paddle.unsqueeze(x, axis=1), shape=(x.shape[0], o, x.shape[1], x.shape[2]))
         # Shape y: (batch_size, output_size, num_tokens, input_size + bias_y)
-        y = layers.expand(paddle.unsqueeze(y, axis=1), expand_times=(1, o, 1, 1))
+        y = paddle.expand(paddle.unsqueeze(y, axis=1), shape=(y.shape[0], o, y.shape[1], y.shape[2]))
         # Shape weight: (batch_size, output_size, input_size + bias_x, input_size + bias_y)
-        weight = layers.expand(paddle.unsqueeze(self.weight, axis=0), expand_times=(b, 1, 1, 1))
+        weight = paddle.expand(
+            paddle.unsqueeze(self.weight, axis=0), 
+                shape=(b, self.weight.shape[0], self.weight.shape[1], self.weight.shape[2]))
         
         # Shape: (batch_size, output_size, num_tokens, num_tokens)
         s = paddle.matmul(paddle.matmul(x, weight), paddle.transpose(y, perm=[0, 1, 3, 2]))

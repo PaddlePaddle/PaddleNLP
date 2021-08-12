@@ -15,7 +15,7 @@
 import paddle
 import paddle.nn as nn
 
-from model.model_utils import reduce_sum, masked_select, pad_sequence_paddle, mask_fill, index_sample
+from model.model_utils import pad_sequence_paddle, mask_fill, index_sample
 from model.dropouts import SharedDropout, IndependentDropout
 
 
@@ -29,12 +29,14 @@ class ErnieEncoder(nn.Layer):
         self.mlp_input_size = self.ptm.config["hidden_size"]
 
     def _flat_words(self, words):
-        lens = reduce_sum(words != self.args.pad_index, dim=-1)
+        mask = words != self.args.pad_index
+        lens = paddle.sum(paddle.cast(mask, "int32"), axis=-1)
         position = paddle.cumsum(lens + paddle.cast((lens == 0), "int32"), axis=1) - 1
-        flat_words = masked_select(words, words != self.args.pad_index)
+        select = paddle.nonzero(mask)
+        flat_words = paddle.gather_nd(words, select)
         flat_words = pad_sequence_paddle(
             paddle.split(flat_words,
-                         paddle.sum(lens, axis=-1).numpy().tolist(), self.args.pad_index))
+                            paddle.sum(lens, axis=-1).numpy().tolist(), self.args.pad_index))
         max_len = flat_words.shape[1]
         position = mask_fill(position, position >= max_len, max_len - 1)
         return flat_words, position
@@ -76,9 +78,11 @@ class LSTMByWPEncoder(nn.Layer):
         self.mlp_input_size = n_lstm_hidden * 2
 
     def _flat_words(self, words):
-        lens = reduce_sum(words != self.args.pad_index, dim=-1)
+        mask = words != self.args.pad_index
+        lens = paddle.sum(paddle.cast(mask, "int32"), axis=-1)
         position = paddle.cumsum(lens + paddle.cast((lens == 0), "int32"), axis=1) - 1
-        flat_words = masked_select(words, words != self.args.pad_index)
+        select = paddle.nonzero(mask)
+        flat_words = paddle.gather_nd(words, select)
         flat_words = pad_sequence_paddle(
             paddle.split(flat_words,
                          paddle.sum(lens, axis=-1).numpy().tolist(), self.args.pad_index))
@@ -89,10 +93,10 @@ class LSTMByWPEncoder(nn.Layer):
     def forward(self, words, feats):
         words, position = self._flat_words(words)
         word_embed = self.word_embed(words)
-        embed = word_embed
         mask = words != self.args.pad_index
-        seq_lens = reduce_sum(mask, -1)
-        x, _ = self.lstm(embed, sequence_length=seq_lens)
+        seq_lens = paddle.sum(paddle.cast(mask, "int32"), axis=-1)
+
+        x, _ = self.lstm(word_embed, sequence_length=seq_lens)
         x = paddle.reshape(
             index_sample(x, position),
             shape=position.shape[:2] + [x.shape[2]],
@@ -151,7 +155,7 @@ class LSTMEncoder(nn.Layer):
         word_embed, feat_embed = self.embed_dropout(word_embed, feat_embed)
         embed = paddle.concat([word_embed, feat_embed], axis=-1)
         mask = words != self.args.pad_index
-        seq_lens = reduce_sum(mask, -1)
+        seq_lens = paddle.sum(paddle.cast(mask, 'int32'))
         x, _ = self.lstm(embed, sequence_length=seq_lens)
         x = self.lstm_dropout(x)
         return words, x
@@ -177,11 +181,12 @@ class CharLSTMEncoder(nn.Layer):
     def forward(self, x):
         """Forward network"""
         mask = paddle.any(x != self.pad_index, axis=-1)
-        lens = reduce_sum(mask, -1)
-        masked_x = masked_select(x, mask)
+        lens = paddle.sum(paddle.cast(mask, 'int32'))
+        select = paddle.nonzero(mask)
+        masked_x = paddle.gather_nd(x, select)
         char_mask = masked_x != self.pad_index
         emb = self.embed(masked_x)
-        word_lens = reduce_sum(char_mask, -1)
+        word_lens = paddle.sum(paddle.cast(char_mask, 'int32'))
         _, (h, _) = self.lstm(emb, sequence_length=word_lens)
         h = paddle.concat(paddle.unstack(h), axis=-1)
         feat_embed = pad_sequence_paddle(paddle.split(h, lens.numpy().tolist(), axis=0), self.pad_index)
