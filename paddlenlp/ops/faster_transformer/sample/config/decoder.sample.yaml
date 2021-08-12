@@ -27,8 +27,10 @@ d_model: 512
 d_inner_hid: 2048
 # Number of head used in multi-head attention.
 n_head: 8
-# Number of sub-layers to be stacked in the encoder and decoder.
-n_layer: 6
+# Number of sub-layers to be stacked in the encoder.
+num_encoder_layers: 6
+# Number of sub-layers to be stacked in the decoder.
+num_decoder_layers: 6
 # Dropout rates.
 dropout: 0.1
 # The flag indicating whether to share embedding and softmax weights.

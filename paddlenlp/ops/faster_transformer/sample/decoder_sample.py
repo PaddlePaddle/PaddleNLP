@@ -53,7 +53,8 @@ def do_predict(args):
         src_vocab_size=args.src_vocab_size,
         trg_vocab_size=args.trg_vocab_size,
         max_length=args.max_length + 1,
-        n_layer=args.n_layer,
+        num_encoder_layers=args.num_encoder_layers,
+        num_decoder_layers=args.num_decoder_layers,
         n_head=args.n_head,
         d_model=args.d_model,
         d_inner_hid=args.d_inner_hid,
@@ -87,11 +88,13 @@ def do_predict(args):
         dec_input = paddle.cast(dec_input, dtype=dtype)
         enc_output = paddle.cast(enc_output, dtype=dtype)
     self_cache = paddle.zeros(
-        shape=[args.n_layer, 2, 0, args.infer_batch_size, args.d_model],
+        shape=[
+            args.num_decoder_layers, 2, 0, args.infer_batch_size, args.d_model
+        ],
         dtype=dtype)
     mem_cache = paddle.zeros(
         shape=[
-            args.n_layer, 2, args.infer_batch_size, args.max_length,
+            args.num_decoder_layers, 2, args.infer_batch_size, args.max_length,
             args.d_model
         ],
         dtype=dtype)

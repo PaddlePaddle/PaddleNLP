@@ -248,7 +248,8 @@ class FasterDecoder(nn.Layer):
                  src_vocab_size,
                  trg_vocab_size,
                  max_length,
-                 n_layer,
+                 num_encoder_layers,
+                 num_decoder_layers,
                  n_head,
                  d_model,
                  d_inner_hid,
@@ -268,7 +269,7 @@ class FasterDecoder(nn.Layer):
         self.max_out_len = max_out_len
         self.max_length = max_length
         self.use_fp16_decoder = use_fp16_decoder
-        self.n_layer = n_layer
+        self.num_decoder_layers = num_decoder_layers
         self.d_model = d_model
 
         self.src_word_embedding = WordEmbedding(
@@ -291,8 +292,8 @@ class FasterDecoder(nn.Layer):
         self.transformer = paddle.nn.Transformer(
             d_model=d_model,
             nhead=n_head,
-            num_encoder_layers=n_layer,
-            num_decoder_layers=n_layer,
+            num_encoder_layers=num_encoder_layers,
+            num_decoder_layers=num_decoder_layers,
             dim_feedforward=d_inner_hid,
             dropout=dropout,
             activation="relu",
@@ -355,10 +356,13 @@ class FasterDecoder(nn.Layer):
 
         # Init cache
         self_cache = paddle.zeros(
-            shape=[self.n_layer, 2, 0, batch_size, self.d_model],
+            shape=[self.num_decoder_layers, 2, 0, batch_size, self.d_model],
             dtype=enc_output.dtype)
         mem_cache = paddle.zeros(
-            shape=[self.n_layer, 2, batch_size, src_max_len, self.d_model],
+            shape=[
+                self.num_decoder_layers, 2, batch_size, src_max_len,
+                self.d_model
+            ],
             dtype=enc_output.dtype)
 
         for i in range(self.max_out_len):
