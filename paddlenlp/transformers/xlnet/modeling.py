@@ -962,7 +962,7 @@ class XLNetModel(XLNetPretrainedModel):
                 tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
                 model = XLNetModel.from_pretrained('xlnet-base-cased')
 
-                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -1303,7 +1303,7 @@ class XLNetForSequenceClassification(XLNetPretrainedModel):
                 tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
                 model = XLNetForSequenceClassification.from_pretrained('xlnet-base-cased')
 
-                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -1428,7 +1428,7 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
                 tokenizer = XLNetTokenizer.from_pretrained('xlnet-base-cased')
                 model = XLNetForTokenClassification.from_pretrained('xlnet-base-cased')
 
-                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 

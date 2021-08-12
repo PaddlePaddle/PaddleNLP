@@ -199,39 +199,39 @@ class RobertaModel(RobertaPretrainedModel):
         vocab_size (int):
             Vocabulary size of the RoBERTa model. Also is the vocab size of token embedding matrix.
         hidden_size (int, optional):
-            Dimension of the encoder layers and the pooler layer. Defaults to ``768``.
+            Dimension of the encoder layers and the pooler layer. Defaults to `768`.
         num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to ``12``.
+            Number of hidden layers in the Transformer encoder. Defaults to `12`.
         num_attention_heads (int, optional):
             Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to ``12``.
+            Defaults to `12`.
         intermediate_size (int, optional):
             Dimension of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
-            Defaults to ``3072``.
+            Defaults to `3072`.
         hidden_act (str, optional):
             The non-linear activation function in the feed-forward layer.
             ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to ``"gelu"``.
+            are supported. Defaults to `"gelu"`.
         hidden_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the embeddings and encoder.
             Defaults to ``0.1``.
         attention_probs_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the pooler.
-            Defaults to ``0.1``.
+            Defaults to `0.1`.
         max_position_embeddings (int, optional):
-            The max position index of an input sequence. Defaults to ``512``.
+            The max position index of an input sequence. Defaults to `512`.
         type_vocab_size (int, optional):
             The vocabulary size of the `token_type_ids` passed when calling `~transformers.RobertaModel`.
             Defaults to ``2``.
         initializer_range (float, optional):
-            The standard deviation of the normal initializer. Defaults to 0.02.
+            The standard deviation of the normal initializer. Defaults to `0.02`.
             
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
                 See :meth:`RobertaPretrainedModel._init_weights()` for how weights are initialized in `RobertaModel`.
 
         pad_token_id(int, optional):
-            The pad token index in the token vocabulary.
+            The pad token index in the token vocabulary. Defaults to `0`.
 
     """
 
@@ -325,7 +325,7 @@ class RobertaModel(RobertaPretrainedModel):
                 tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
                 model = RobertaModel.from_pretrained('roberta-wwm-ext')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 sequence_output, pooled_output = model(**inputs)
 
@@ -350,7 +350,7 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
     Model for Question Answering task with RoBERTa.
 
     Args:
-        roberta (RobertaModel): 
+        roberta (`RobertaModel`):
             An instance of `paddlenlp.transformers.RobertaModel`.
         dropout (float, optional): 
             The dropout probability for output of RoBERTa. 
@@ -389,7 +389,7 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
                 tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
                 model = RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
@@ -465,7 +465,7 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
                 model = RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
@@ -527,7 +527,7 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
 
         Returns:
             logits (Tensor):
-                A Tensor of the input text classification logits, shape as (batch_size, seq_lens, `num_classes`).
+                A Tensor of the input text classification logits, shape as (`batch_size, seq_lens, num_classes`).
                 seq_lens mean the number of tokens of the input sequence.
 
         Example:
@@ -539,7 +539,7 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
                 tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
                 model = RobertaForTokenClassification.from_pretrained('roberta-wwm-ext')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 

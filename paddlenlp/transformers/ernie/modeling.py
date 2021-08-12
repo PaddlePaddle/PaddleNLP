@@ -339,7 +339,7 @@ class ErnieModel(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieModel.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("Hey, paddle-paddle is awesome !")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 sequence_output, pooled_output = model(**inputs)
 
@@ -361,7 +361,8 @@ class ErnieModel(ErniePretrainedModel):
 
 class ErnieForSequenceClassification(ErniePretrainedModel):
     r"""
-    Model for sentence (pair) classification task with ERNIE.
+    ERNIE Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
 
     Args:
         ernie (ErnieModel): 
@@ -411,7 +412,7 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("Hey, paddle-paddle is awesome !")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
@@ -476,7 +477,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("Hey, paddle-paddle is awesome !")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
@@ -572,7 +573,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("Hey, paddle-paddle is awesome !")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """

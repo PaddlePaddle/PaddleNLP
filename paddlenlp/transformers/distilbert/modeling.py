@@ -257,7 +257,7 @@ class DistilBertModel(DistilBertPretrainedModel):
                 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
                 model = DistilBertModel.from_pretrained('distilbert-base-uncased')
 
-                inputs = tokenizer("Hey, paddle-paddle is awesome !")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
@@ -327,7 +327,7 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
                 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
                 model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
 
-                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -396,7 +396,7 @@ class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
                 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
                 model = DistilBertForQuestionAnswering.from_pretrained('distilbert-base-uncased')
 
-                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -464,7 +464,7 @@ class DistilBertForTokenClassification(DistilBertPretrainedModel):
                 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
                 model = DistilBertForTokenClassification.from_pretrained('distilbert-base-uncased')
 
-                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 

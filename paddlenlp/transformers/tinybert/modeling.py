@@ -320,7 +320,7 @@ class TinyBertModel(TinyBertPretrainedModel):
                 tokenizer = TinyBertTokenizer.from_pretrained('tinybert-4l-312d')
                 model = TinyBertModel.from_pretrained('tinybert-4l-312d')
 
-                inputs = tokenizer("Hey, paddle-paddle is awesome!")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
@@ -431,7 +431,7 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
                 tokenizer = TinyBertTokenizer.from_pretrained('tinybert-4l-312d')
                 model = TinyBertForSequenceClassification.from_pretrained('tinybert-4l-312d')
 
-                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 

@@ -489,7 +489,7 @@ class BertModel(BertPretrainedModel):
                 tokenizer = BertTokenizer.from_pretrained('bert-wwm-chinese')
                 model = BertModel.from_pretrained('bert-wwm-chinese')
 
-                inputs = tokenizer("这是一个测试样例!")
+                inputs = tokenizer("这是一个测试样例。")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
@@ -567,7 +567,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
                 model = BertForQuestionAnswering.from_pretrained('bert-base-cased')
 
-                inputs = tokenizer("这是一个测试样例!")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -647,7 +647,7 @@ class BertForSequenceClassification(BertPretrainedModel):
                 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
                 model = BertForSequenceClassification.from_pretrained('bert-base-cased')
 
-                inputs = tokenizer("Hey, Paddle-paddle is awesome !")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -724,7 +724,7 @@ class BertForTokenClassification(BertPretrainedModel):
                 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
                 model = BertForTokenClassification.from_pretrained('bert-base-cased')
 
-                inputs = tokenizer("这是一个测试样例!")
+                inputs = tokenizer("This is a test example.")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 

@@ -316,7 +316,7 @@ class SkepModel(SkepPretrainedModel):
                 tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
                 model = SkepModel.from_pretrained('skep_ernie_1.0_large_ch')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("这是一个测试样例。")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 sequence_output, pooled_output = model(**inputs)
 
@@ -384,7 +384,6 @@ class SkepForSequenceClassification(SkepPretrainedModel):
                 Classification scores before SoftMax (also called logits). It's data type should be `float32`
                 and has a shape of [batch_size, num_classes].
 
-
         Example:
             .. code-block::
 
@@ -394,7 +393,7 @@ class SkepForSequenceClassification(SkepPretrainedModel):
                 tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
                 model = SkepForSequenceClassification.from_pretrained('skep_ernie_1.0_large_ch')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("这是一个测试样例。")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
@@ -466,7 +465,7 @@ class SkepForTokenClassification(SkepPretrainedModel):
                 tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
                 model = SkepForTokenClassification.from_pretrained('skep_ernie_1.0_large_ch')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("这是一个测试样例。")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
@@ -559,7 +558,7 @@ class SkepCrfForTokenClassification(nn.Layer):
                 tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
                 model = SkepForTokenClassification.from_pretrained('skep_ernie_1.0_large_ch')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("这是一个测试样例。")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 

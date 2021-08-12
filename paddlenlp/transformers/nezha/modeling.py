@@ -578,7 +578,7 @@ class NeZhaModel(NeZhaPretrainedModel):
                 Defaults to 'None'.
 
         Returns:
-            `Tuple`: A tuple of shape (``sequence_output``, ``pooled_output``).
+            Tuple: A tuple of shape (``sequence_output``, ``pooled_output``).
 
             With the fields:
 
@@ -793,7 +793,7 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
     Model for Question Answering task with NeZha.
 
     Args:
-        nezha (NeZhaModel):
+        nezha (:class:`NeZhaModel`):
             An instance of `paddlenlp.transformers.NeZhaModel`.
         dropout (float, optional):
             The dropout probability for output of NeZha.
