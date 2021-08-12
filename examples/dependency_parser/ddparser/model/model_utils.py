@@ -16,8 +16,6 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.fluid import layers
-from paddle.fluid.core_avx import VarDesc
 
 import utils
 
@@ -27,13 +25,18 @@ class ParserCriterion(nn.Layer):
         super(ParserCriterion, self).__init__(*args, **kwargs)
 
     def forward(self, s_arc, s_rel, arcs, rels, mask):
-        arcs = masked_select(arcs, mask)
-        rels = masked_select(rels, mask)
-        s_arc = masked_select(s_arc, mask)
-        s_rel = masked_select(s_rel, mask)
+
+        arcs = paddle.masked_select(arcs, mask)
+        rels = paddle.masked_select(rels, mask)
+
+        select = paddle.nonzero(mask)
+        s_arc = paddle.gather_nd(s_arc, select)
+        s_rel = paddle.gather_nd(s_rel, select)
+
         s_rel = index_sample(s_rel, paddle.unsqueeze(arcs, axis=1))
-        arc_cost = layers.cross_entropy(F.softmax(s_arc), arcs)
-        rel_cost = layers.cross_entropy(F.softmax(s_rel), rels)
+
+        arc_cost = F.cross_entropy(s_arc, arcs)
+        rel_cost = F.cross_entropy(s_rel, rels)
 
         avg_cost = paddle.mean(arc_cost + rel_cost)
         return avg_cost
@@ -76,10 +79,10 @@ def pad_sequence_paddle(sequences, padding_value=0):
     out_tensor = []
     for tensor in sequences:
         length = tensor.shape[0]
-        pad_tensor = layers.concat(
-            (tensor, layers.fill_constant([max_len - length] + trailing_dims, dtype=tensor.dtype, value=padding_value)))
+        pad_tensor = paddle.concat(
+            (tensor, paddle.full(shape=[max_len - length] + trailing_dims, dtype=tensor.dtype, fill_value=padding_value)))            
         out_tensor.append(pad_tensor)
-    out_tensor = layers.stack(out_tensor)
+    out_tensor = paddle.stack(out_tensor)
     return out_tensor
 
 def fill_diagonal(x, value, offset=0, dim1=0, dim2=1):
@@ -154,32 +157,6 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
                                            shape=[n, w] + list(x.shape[2:]),
                                            strides=[m, k] + list(strides[2:]))
 
-def masked_select(input, mask):
-    """Select the input value according to the mask
-    
-    Arags：
-        input: input matrix
-        mask: mask matrix
-
-    Returns:
-        output
-
-    >>> input
-    [
-        [1, 2, 3],
-        [4, 5, 6]
-    ]
-    >>> mask
-    [
-        [True, True, False],
-        [True, False, False]
-    ]
-    >>> masked_select(input, mask)
-    [1, 2, 4]
-    """
-    select = layers.where(mask)
-    output = layers.gather_nd(input, select)
-    return output
 
 def index_sample(x, index):
     """Select input value according to index
@@ -208,18 +185,18 @@ def index_sample(x, index):
     x_s = x.shape
     dim = len(index.shape) - 1
     assert x_s[:dim] == index.shape[:dim]
-    r_x = layers.reshape(x, shape=[-1] + x_s[dim:])
-    index = layers.reshape(index, shape=(len(r_x), -1, 1))
+    r_x = paddle.reshape(x, shape=[-1] + x_s[dim:])
+    index = paddle.reshape(index, shape=[len(r_x), -1, 1])
     # generate arange index, shape like index
     arr_index = paddle.arange(start=0, end=len(index), dtype=index.dtype)
-    arr_index = layers.unsqueeze(arr_index, axes=[1, 2])
-    arr_index = layers.expand_as(arr_index, index)
+    arr_index = paddle.unsqueeze(arr_index, axis=[1, 2])
+    arr_index = paddle.expand_as(arr_index, index)
     #  genrate new index
-    new_index = layers.concat((arr_index, index), -1)
-    new_index = layers.reshape(new_index, (-1, 2))
+    new_index = paddle.concat((arr_index, index), -1)
+    new_index = paddle.reshape(new_index, (-1, 2))
     # get output
-    out = layers.gather_nd(r_x, new_index)
-    out = layers.reshape(out, x_s[:dim] + [-1])
+    out = paddle.gather_nd(r_x, new_index)
+    out = paddle.reshape(out, x_s[:dim] + [-1])
     return out
 
 def mask_fill(input, mask, value):
@@ -249,23 +226,5 @@ def mask_fill(input, mask, value):
         [4, 0, 0]
     ]
     """
-    return input * layers.logical_not(mask) + layers.cast(mask, input.dtype) * value
-
-def unsqueeze(input, axes):
-    """Increase the number of axes of input"""
-    input_dtype = input.dtype
-    if input_dtype == VarDesc.VarType.BOOL:
-        input = layers.cast(input, 'int32')
-    output = layers.unsqueeze(input, axes=axes)
-    if input_dtype == VarDesc.VarType.BOOL:
-        output = layers.cast(output, 'bool')
-    return output
-
-def reduce_sum(input, dim):
-    """Computes the sum of tensor elements over the given dimension."""
-    input_dtype = input.dtype
-    if input_dtype == VarDesc.VarType.BOOL:
-        input = layers.cast(input, 'int32')
-    output = layers.reduce_sum(input, dim=dim)
-    return output
+    return input * paddle.logical_not(mask) + paddle.cast(mask, input.dtype) * value
     

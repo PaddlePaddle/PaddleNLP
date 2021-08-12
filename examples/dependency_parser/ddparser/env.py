@@ -38,8 +38,10 @@ class Environment(object):
             if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
                 if args.encoding_model == "lstm-pe":
                     self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained("ernie-1.0")
-                else:
+                elif args.encoding_model == "ernie-gram-zh":
                     self.tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(args.encoding_model)
+                else:
+                    self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(args.encoding_model)
 
                 args.vocab_size = len(self.tokenizer.vocab)
                 self.WORD = ErnieField(

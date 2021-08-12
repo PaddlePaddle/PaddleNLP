@@ -27,7 +27,7 @@ from env import Environment
 from data import batchify, TextDataset, Corpus
 from model.model import DDParserModel
 from metric import ParserEvaluator
-from model.model_utils import ParserCriterion, decode, reduce_sum, masked_select, index_sample
+from model.model_utils import ParserCriterion, decode, index_sample
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -64,6 +64,7 @@ parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight deca
 args = parser.parse_args()
 # yapf: enable
 
+
 @paddle.no_grad()
 def evaluate(args, model, metric, criterion, data_loader):
     model.eval()
@@ -94,6 +95,7 @@ def evaluate(args, model, metric, criterion, data_loader):
     metric.reset()
     return total_loss, uas, las
 
+
 @paddle.no_grad()
 def predict(env, args, model, data_loader):
     arcs, rels = [], []
@@ -108,15 +110,16 @@ def predict(env, args, model, data_loader):
             paddle.logical_and(words != args.pad_index, words != args.bos_index),
             words != args.eos_index,
         )
-        lens = reduce_sum(mask, -1)
+        lens = paddle.sum(paddle.cast(mask, "int32"), axis=-1)
         arc_preds, rel_preds = decode(args, s_arc, s_rel, mask)
-        arcs.extend(paddle.split(masked_select(arc_preds, mask), lens.numpy().tolist()))
-        rels.extend(paddle.split(masked_select(rel_preds, mask), lens.numpy().tolist()))
+        arcs.extend(paddle.split(paddle.masked_select(arc_preds, mask), lens.numpy().tolist()))
+        rels.extend(paddle.split(paddle.masked_select(rel_preds, mask), lens.numpy().tolist()))
 
     arcs = [seq.numpy().tolist() for seq in arcs]
     rels = [env.REL.vocab[seq.numpy().tolist()] for seq in rels]           
 
     return arcs, rels
+
 
 def do_train(env):
     rank = paddle.distributed.get_rank()
@@ -214,7 +217,7 @@ def do_train(env):
         if rank == 0:
             # Epoch evaluate
             loss, uas, las = evaluate(args, model, metric, criterion, dev_data_loader)
-            print("eval loss: %.5f, UAS: %.5f%, LAS: %.5f%" % (loss, uas*100, las*100))
+            print("eval loss: %.5f, UAS: %.2f%%, LAS: %.2f%%" % (loss, uas*100, las*100))
             # Save model parameter of last epoch
             if not os.path.exists(args.save_dir):
                 os.makedirs(args.save_dir)
@@ -225,6 +228,7 @@ def do_train(env):
                 save_param_path = os.path.join(args.save_dir, "best.pdparams")
                 paddle.save(model.state_dict(), save_param_path)  
                 best_las = las                 
+
 
 def do_evaluate(env):
     args = env.args
@@ -247,11 +251,10 @@ def do_evaluate(env):
         model = DDParserModel(args=args)
     
     # Load saved model parameters
-    params_path = os.path.join(args.model_file_path, "model_state.pdparams")
-    if params_path and os.path.isfile(params_path):
-        state_dict = paddle.load(params_path)
+    if os.path.isfile(args.model_file_path):
+        state_dict = paddle.load(args.model_file_path)
         model.set_dict(state_dict)
-        print("Loaded parameters from %s" % params_path)
+        print("Loaded parameters from %s" % args.model_file_path)
     else:
         raise ValueError("The parameters path is incorrect or not specified.")
 
@@ -261,8 +264,9 @@ def do_evaluate(env):
 
     # Start evaluate
     loss, uas, las = evaluate(args, model, metric, criterion, evaluate_data_loader)
-    print("eval loss: %.5f, UAS: %.5f%, LAS: %.5f%" % (loss, uas*100, las*100))
+    print("eval loss: %.5f, UAS: %.2f%%, LAS: %.2f%%" % (loss, uas*100, las*100))
     
+
 def do_predict(env):
     args = env.args
 
@@ -284,11 +288,10 @@ def do_predict(env):
         model = DDParserModel(args=args)
     
     # Load saved model parameters
-    params_path = os.path.join(args.model_file_path, "model_state.pdparams")
-    if params_path and os.path.isfile(params_path):
-        state_dict = paddle.load(params_path)
+    if os.path.isfile(args.model_file_path):
+        state_dict = paddle.load(args.model_file_path)
         model.set_dict(state_dict)
-        print("Loaded parameters from %s" % params_path)
+        print("Loaded parameters from %s" % args.model_file_path)
     else:
         raise ValueError("The parameters path is incorrect or not specified.")
 
@@ -324,6 +327,7 @@ class Parser(object):
             self.pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(args.encoding_model)
 
         if args.encoding_model.startswith("ernie"):
+            import time
             self.model = DDParserModel(args=self.args, pretrained_model=self.pretrained_model)
         else:
             self.model = DDParserModel(args=self.args)
@@ -334,6 +338,7 @@ class Parser(object):
         self.model.eval()
 
         self.lac = LAC.LAC(mode="seg", use_cuda=True if args.device == "gpu" else False)
+
 
     def predict(self, inputs):
 
@@ -356,19 +361,21 @@ class Parser(object):
             use_multiprocess=False,
             sequential_sampler=True    
         )
-
+        import time
+        begin = time.time()
         pred_arcs, pred_rels = predict(self.env, self.args, self.model, predict_data_loader)
+        end = time.time() - begin
 
         indices = range(len(pred_arcs))
         data.head = [pred_arcs[i] for i in indices]
         data.deprel = [pred_rels[i] for i in indices]
         outputs = data.get_result()
-        return outputs
+        return outputs, end
+
 
 if __name__ == "__main__":
     paddle.set_device(args.device)
     env = Environment(args)
-
     if args.mode == "train":   
         do_train(env)
     elif args.mode == "evaluate":
