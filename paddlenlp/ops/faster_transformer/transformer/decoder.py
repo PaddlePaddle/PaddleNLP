@@ -375,6 +375,7 @@ class FasterDecoder(nn.Layer):
                 trg_emb, p=self.dropout,
                 training=self.training) if self.dropout else trg_emb
 
+            # TODO(gongenlei): do cast in op
             if self.use_fp16_decoder:
                 dec_input = paddle.cast(dec_input, "float16")
 
@@ -403,6 +404,7 @@ class FasterDecoder(nn.Layer):
 
             predict_ids.append(topk_indices)
 
+            #TODO(gongenlei): support static graph
             if paddle.all(finished).numpy():
                 break
 
