@@ -70,10 +70,9 @@ def do_predict(args):
     # Set evaluate mode
     transformer.eval()
 
-    # Support generating src_word randomly
-    src_word = paddle.to_tensor(
-        [[i] * args.max_length for i in range(1, args.infer_batch_size + 1)],
-        dtype='int64')
+    # Generate src_word randomly
+    src_word = paddle.randint(
+        0, 30000, shape=[args.infer_batch_size, args.max_length], dtype='int64')
 
     with paddle.no_grad():
         for i in range(100):
