@@ -67,28 +67,24 @@ std::vector<paddle::Tensor> decoder_kernel(
     cublasHandle_t cublas_handle_,
     cudaStream_t stream) {
   auto input_dims = memory_tensor_input.shape();
-  const int batch_size_ = (int)input_dims[0];
-  const int max_seq_len_ = (int)input_dims[1];
-  const int memory_hidden_dim_ = (int)input_dims[2];
+  const int batch_size_ = static_cast<int>(input_dims[0]);
+  const int max_seq_len_ = static_cast<int>(input_dims[1]);
+  const int memory_hidden_dim_ = static_cast<int>(input_dims[2]);
 
   typedef PDTraits<D> traits_;
   typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t_;
-
   typedef DecoderTransformerTraits<traits_::OpType> DecoderTraits_;
   OpenDecoder<DecoderTraits_::OpType>* decoder_;
-
   decoder_ = new OpenDecoder<DecoderTraits_::OpType>(
       batch_size_, max_seq_len_, n_head, size_per_head, memory_hidden_dim_);
+
   DataType_* decoder_output = reinterpret_cast<DataType_*>(
       decoder_output_tensor.mutable_data<data_t_>());
-
   DataType_* self_cache =
       reinterpret_cast<DataType_*>(old_self_cache.data<data_t_>());
   DataType_* memory_cache =
       reinterpret_cast<DataType_*>(old_mem_cache.data<data_t_>());
-
-
   const DataType_* from_tensor =
       reinterpret_cast<const DataType_*>(from_tensor_input.data<data_t_>());
   const DataType_* memory_tensor =
@@ -99,7 +95,6 @@ std::vector<paddle::Tensor> decoder_kernel(
   params.cublas_handle = cublas_handle_;
   params.stream = stream;
   fastertransformer::Allocator<AllocatorType::PD> allocator_(stream);
-  const int hidden_units = n_head * size_per_head;
 
   params.self_layernorm.gamma =
       reinterpret_cast<const DataType_*>(self_ln_weight.data<data_t_>());
@@ -153,8 +148,9 @@ std::vector<paddle::Tensor> decoder_kernel(
       reinterpret_cast<const DataType_*>(ffn_out_weight.data<data_t_>());
   params.ffn.output_weight.bias =
       reinterpret_cast<const DataType_*>(ffn_out_bias.data<data_t_>());
-  const int step = (int)old_self_cache.shape()[1];
 
+  const int step = static_cast<int>(old_self_cache.shape()[1]);
+  const int hidden_units = n_head * size_per_head;
   DataType_* K_cache = self_cache;
   DataType_* V_cache = self_cache + batch_size_ * step * hidden_units;
   DataType_* K_mem_cache = memory_cache;
