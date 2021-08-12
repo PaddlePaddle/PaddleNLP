@@ -111,10 +111,10 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
     --learning_rate 2e-5 \
     --num_train_epochs 4 \
     --scheduler_type linear \
-    --logging_steps 500 \
-    --save_steps 500 \
+    --logging_steps 25 \
+    --save_steps 25 \
     --warmup_proportion 0.1 \
-    --weight_decay 0.01 \
+    --weight_decay 0.1 \
     --output_dir squad1.1/ \
     --device gpu \
     --do_train \
@@ -125,13 +125,12 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
 训练过程中模型会自动对结果进行评估，其中最好的结果如下所示：
 
 ```python
-# global step=21000
 {
-  "exact": 86.50898770104068,
-  "f1": 92.71873272105263,
+  "exact": 86.84957426679281,
+  "f1": 92.82031917884066,
   "total": 10570,
-  "HasAns_exact": 86.50898770104068,
-  "HasAns_f1": 92.71873272105263,
+  "HasAns_exact": 86.84957426679281,
+  "HasAns_f1": 92.82031917884066,
   "HasAns_total": 10570
 }
 ```
@@ -150,10 +149,10 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
     --learning_rate 2e-5 \
     --num_train_epochs 4 \
     --scheduler_type linear \
-    --logging_steps 500 \
-    --save_steps 500 \
+    --logging_steps 200 \
+    --save_steps 200 \
     --warmup_proportion 0.1 \
-    --weight_decay 0.01 \
+    --weight_decay 0.1 \
     --output_dir squad2/ \
     --device gpu \
     --do_train \
@@ -167,21 +166,20 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
 训练过程中模型会自动对结果进行评估，其中最好的结果如下所示：
 
 ```python
-# global step 24000
 {
-  "exact": 81.51267581908532,
-  "f1": 84.59661450171035,
+  "exact": 82.27912069401162,
+  "f1": 85.2774124891565,
   "total": 11873,
-  "HasAns_exact": 78.74493927125506,
-  "HasAns_f1": 84.92166059021716,
+  "HasAns_exact": 80.34750337381917,
+  "HasAns_f1": 86.35268530427743,
   "HasAns_total": 5928,
-  "NoAns_exact": 84.27249789739277,
-  "NoAns_f1": 84.27249789739277,
+  "NoAns_exact": 84.20521446593776,
+  "NoAns_f1": 84.20521446593776,
   "NoAns_total": 5945,
-  "best_exact": 82.31281057862377,
-  "best_exact_thresh": -2.569451332092285,
-  "best_f1": 85.2005829057288,
-  "best_f1_thresh": -1.9268460273742676
+  "best_exact": 82.86869367472417,
+  "best_exact_thresh": -2.450321674346924,
+  "best_f1": 85.67634263296013,
+  "best_f1_thresh": -2.450321674346924
 }
 ```
 
