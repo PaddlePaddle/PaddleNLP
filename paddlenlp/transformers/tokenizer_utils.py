@@ -1239,15 +1239,15 @@ class PretrainedTokenizer(object):
                         if i == len(sub_tokens) - 1:
                             token_offset_mapping.append(
                                 (token_start_offset, token_start_offset +
-                                 len(sub_tokens[i].strip("##"))))
+                                 len(sub_tokens[i].replace("##", ""))))
                             token_start_offset += (
-                                len(sub_tokens[i].strip("##")) + 1)
+                                len(sub_tokens[i].replace("##", "")) + 1)
                         else:
                             token_offset_mapping.append(
                                 (token_start_offset, token_start_offset +
-                                 len(sub_tokens[i].strip("##"))))
+                                 len(sub_tokens[i].replace("##", ""))))
                             token_start_offset += (
-                                len(sub_tokens[i].strip("##")))
+                                len(sub_tokens[i].replace("##", "")))
 
                 token_start_offset = 0
                 for token in token_pair:
@@ -1261,15 +1261,15 @@ class PretrainedTokenizer(object):
                         if i == len(sub_tokens) - 1:
                             token_pair_offset_mapping.append(
                                 (token_start_offset, token_start_offset +
-                                 len(sub_tokens[i].strip("##"))))
+                                 len(sub_tokens[i].replace("##", ""))))
                             token_start_offset += (
-                                len(sub_tokens[i].strip("##")) + 1)
+                                len(sub_tokens[i].replace("##", "")) + 1)
                         else:
                             token_pair_offset_mapping.append(
                                 (token_start_offset, token_start_offset +
-                                 len(sub_tokens[i].strip("##"))))
+                                 len(sub_tokens[i].replace("##", ""))))
                             token_start_offset += (
-                                len(sub_tokens[i].strip("##")))
+                                len(sub_tokens[i].replace("##", "")))
 
                 offset = 0
                 while offset < len(second_ids):
