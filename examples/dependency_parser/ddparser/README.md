@@ -16,11 +16,11 @@
 
 ## 模型简介
 
-依存句法分析任务通过分析句子中词语之间的依存关系来确定句子的句法结构，DDParser是一款依存句法分析工具，
+依存句法分析任务通过分析句子中词语之间的依存关系来确定句子的句法结构,
 该用例是基于Paddle v2.1的[baidu/ddparser](https://github.com/baidu/DDParser)实现，
 模型结构为[Biaffine Dependency Parser](https://arxiv.org/abs/1611.01734)。
 同时本用例引入了[ERNIE](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/transformers.rst)系列预训练模型，
-用户可以基于预训练模型finetune完成依存句法分析训练（参考以下[示例](####模型训练)）。
+用户可以基于预训练模型finetune完成依存句法分析训练（参考以下[示例](#模型训练)）。
 
 ## 数据格式
 
