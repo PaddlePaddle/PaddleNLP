@@ -18,8 +18,7 @@ import math
 import numpy as np
 import paddle
 
-import utils
-from model.model_utils import pad_sequence
+from utils import kmeans, pad_sequence
 
 CoNLL = namedtuple(typename='CoNLL',
                    field_names=['ID', 'FORM', 'LEMMA', 'CPOS', 'POS', 'FEATS', 'HEAD', 'DEPREL', 'PHEAD', 'PDEPREL'])
@@ -473,7 +472,7 @@ class TextDataset(object):
             setattr(self, field.name, field.transform(getattr(corpus, field.name)))
         if n_buckets:
             self.lengths = [len(i) + int(bool(field.bos)) for i in corpus]
-            self.buckets = dict(zip(*utils.kmeans(self.lengths, n_buckets)))
+            self.buckets = dict(zip(*kmeans(self.lengths, n_buckets)))
 
     def __getitem__(self, index):
         """Returns an iterator containing all fileds of a sample"""

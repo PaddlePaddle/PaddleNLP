@@ -18,16 +18,16 @@ import os
 import time
 
 import numpy as np
-import LAC
 import paddle
 import paddlenlp as ppnlp
 from paddlenlp.transformers.optimization import LinearDecayWithWarmup
 
 from env import Environment
 from data import batchify, TextDataset, Corpus
-from model.model import DDParserModel
+from model.dep import BiaffineDependencyModel
 from metric import ParserEvaluator
-from model.model_utils import ParserCriterion, decode, index_sample
+from criterion import ParserCriterion
+from utils import decode, index_sample
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -145,10 +145,10 @@ def do_train(env):
     # Define ddparser model and learning rate
     if args.encoding_model.startswith("ernie"):
         lr = args.ernie_lr
-        model = DDParserModel(args=args, pretrained_model=pretrained_model)
+        model = BiaffineDependencyModel(args=args, pretrained_model=pretrained_model)
     else:
         lr = args.lstm_lr
-        model = DDParserModel(args=args)
+        model = BiaffineDependencyModel(args=args)
 
     # Continue training from a pretrained model if the checkpoint is specified
     if args.init_from_params and os.path.isfile(args.init_from_params):
@@ -246,9 +246,9 @@ def do_evaluate(env):
 
     # Define ddparser model
     if args.encoding_model.startswith("ernie"):
-        model = DDParserModel(args=args, pretrained_model=pretrained_model)
+        model = BiaffineDependencyModel(args=args, pretrained_model=pretrained_model)
     else:
-        model = DDParserModel(args=args)
+        model = BiaffineDependencyModel(args=args)
     
     # Load saved model parameters
     if os.path.isfile(args.model_file_path):
@@ -283,9 +283,9 @@ def do_predict(env):
 
     # Define ddparser model
     if args.encoding_model.startswith("ernie"):
-        model = DDParserModel(args=args, pretrained_model=pretrained_model)
+        model = BiaffineDependencyModel(args=args, pretrained_model=pretrained_model)
     else:
-        model = DDParserModel(args=args)
+        model = BiaffineDependencyModel(args=args)
     
     # Load saved model parameters
     if os.path.isfile(args.model_file_path):
@@ -303,74 +303,6 @@ def do_predict(env):
 
     # Save results
     data.save(args.infer_result_dir)
-
-
-class Parser(object):
-    def __init__(
-        self,
-        device="gpu",
-        tree=True,
-        buckets=False,
-        encoding_model="ernie-1.0",
-    ):
-        paddle.set_device(device)
-
-        args = parser.parse_args()
-        args.encoding_model = encoding_model
-
-        self.env = Environment(args)
-        self.args = self.env.args
-
-        if args.encoding_model in ["ernie-1.0", "ernie-tiny"]:
-            self.pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(args.encoding_model)
-        elif args.encoding_model == "ernie-gram-zh":
-            self.pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(args.encoding_model)
-
-        if args.encoding_model.startswith("ernie"):
-            import time
-            self.model = DDParserModel(args=self.args, pretrained_model=self.pretrained_model)
-        else:
-            self.model = DDParserModel(args=self.args)
-    
-        params_path = os.path.join(args.encoding_model, "model_state.pdparams")
-        state_dict = paddle.load(params_path)
-        self.model.set_dict(state_dict)
-        self.model.eval()
-
-        self.lac = LAC.LAC(mode="seg", use_cuda=True if args.device == "gpu" else False)
-
-
-    def predict(self, inputs):
-
-        if isinstance(inputs, str):
-            inputs = [inputs]
-
-        lac_results = []
-        position = 0
-
-        while position < len(inputs):
-            lac_results += self.lac.run(inputs[position:position + self.args.batch_size])
-            position += self.args.batch_size
-        data = Corpus.load_lac_results(lac_results, self.env.fields)
-
-        predict_ds = TextDataset(data, [self.env.WORD, self.env.FEAT], self.args.n_buckets)
-
-        predict_data_loader = batchify(
-            predict_ds, 
-            self.args.batch_size, 
-            use_multiprocess=False,
-            sequential_sampler=True    
-        )
-        import time
-        begin = time.time()
-        pred_arcs, pred_rels = predict(self.env, self.args, self.model, predict_data_loader)
-        end = time.time() - begin
-
-        indices = range(len(pred_arcs))
-        data.head = [pred_arcs[i] for i in indices]
-        data.deprel = [pred_rels[i] for i in indices]
-        outputs = data.get_result()
-        return outputs, end
 
 
 if __name__ == "__main__":

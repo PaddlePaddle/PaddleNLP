@@ -20,7 +20,7 @@ from model.dropouts import SharedDropout
 from model.encoder import LSTMEncoder, LSTMByWPEncoder, ErnieEncoder
 
 
-class DDParserModel(nn.Layer):
+class BiaffineDependencyModel(nn.Layer):
     """DDParser"""
     def __init__(self,
                  args=None,
@@ -28,7 +28,7 @@ class DDParserModel(nn.Layer):
                  n_mlp_arc=500,
                  n_mlp_rel=100,
                  mlp_dropout=0.33):
-        super(DDParserModel, self).__init__()
+        super(BiaffineDependencyModel, self).__init__()
         self.args = args
         self.pretrained_model = pretrained_model
 

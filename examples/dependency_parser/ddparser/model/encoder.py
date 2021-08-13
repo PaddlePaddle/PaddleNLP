@@ -15,7 +15,7 @@
 import paddle
 import paddle.nn as nn
 
-from model.model_utils import pad_sequence_paddle, mask_fill, index_sample
+from utils import pad_sequence_paddle, mask_fill, index_sample
 from model.dropouts import SharedDropout, IndependentDropout
 
 
