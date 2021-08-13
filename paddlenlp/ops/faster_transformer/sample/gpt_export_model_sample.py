@@ -45,7 +45,7 @@ def parse_args():
     )
     parser.add_argument(
         "--decoding_lib",
-        default="../build/lib/libdecoding_op.so",
+        default="../../build/lib/libdecoding_op.so",
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(

@@ -20,12 +20,13 @@ INCLUDE(ExternalProject)
 
 set(CXX_STD "14" CACHE STRING "C++ standard")
 
-option(ON_INFER         "Compile with inference. "                                OFF)
-option(WITH_GPU         "Compile with GPU/CPU, default use CPU."                  ON)
-option(USE_TENSORRT     "Compile with TensorRT."                                  OFF)
-option(WITH_TRANSFORMER "Compile with Transformer"                                ON)
-option(WITH_GPT         "Compile with GPT"                                        OFF)
-option(WITH_UNIFIED         "Compile with Unified Transformer"                        ON)
+option(ON_INFER         "Compiled with inference. "                                 OFF)
+option(WITH_GPU         "Compiled with GPU/CPU, default use CPU."                   ON)
+option(USE_TENSORRT     "Compiled with TensorRT."                                   OFF)
+option(WITH_TRANSFORMER "Compiled with Transformer."                                ON)
+option(WITH_GPT         "Compiled with GPT."                                        OFF)
+option(WITH_UNIFIED     "Compiled with Unified Transformer."                        ON)
+option(WITH_SP          "Compiled with sentencepiece. Only works when WITH_GPT and ON_INFER is ON." ON)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
@@ -239,7 +240,7 @@ link_directories(
   ${FT_LIB_PATH}
 )
 
-if(ON_INFER AND WITH_GPT)
+if(ON_INFER AND WITH_GPT AND WITH_SP)
   ExternalProject_Add(
     extern_sentencepiece
     GIT_REPOSITORY    https://github.com/google/sentencepiece.git
@@ -256,6 +257,8 @@ if(ON_INFER AND WITH_GPT)
   link_directories(
     ${THIRD_PATH}/build/sentencepiece/src/
   )
+
+  add_definitions(-DGPT_ON_SENTENCEPIECE)
 endif()
 
 add_subdirectory(faster_transformer)
