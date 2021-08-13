@@ -1,33 +1,61 @@
 # DDParser
 
 * [模型简介](#模型简介)
+* [数据格式](#数据格式)
+* [标注关系](#标注关系)
 * [快速开始](#快速开始)
     * [环境依赖](#环境依赖)
-    * [句法分析任务](#句法分析任务)
+    * [文件结构](#文件结构)
+    * [一键预测](#一键预测)
+    * [模型训练](#模型训练)
+    * [模型评估](#模型评估)
+    * [模型预测](#模型预测)
+    * [可配置参数说明](#可配置参数说明)
 * [致谢](#致谢)
 * [参考论文](#参考论文)
 
 ## 模型简介
 
 依存句法分析任务通过分析句子中词语之间的依存关系来确定句子的句法结构，DDParser是一款依存句法分析工具，
-该用例是基于Paddle v2.1的[baidu/ddparser](https://github.com/baidu/DDParser)实现。
+该用例是基于Paddle v2.1的[baidu/ddparser](https://github.com/baidu/DDParser)实现，
+模型结构为[Biaffine Dependency Parser](https://arxiv.org/abs/1611.01734)。
+同时本用例引入了[ERNIE](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/transformers.rst)系列预训练模型，
+用户可以基于预训练模型finetune完成依存句法分析训练（参考以下[示例](####模型训练)）。
 
-以下是本项目主要代码结构及说明：
+## 数据格式
 
-```text
-ddparser/
-├── model # 部署
-│   ├── dropouts.py # dropout
-│   ├── encoder.py # 编码器
-│   ├── model.py # 模型网络
-│   └── model_utils.py # 模型网络工具函数
-├── README.md # 使用说明
-├── data.py # 数据结构
-├── metric.py # 指标计算
-├── env.py # 环境配置工具
-├── run.py # 主入口，包含训练、评估和预测任务
-└── utils.py # 任务工具函数
+本用例数据格式基于[CoNLL-X](https://ilk.uvt.nl/~emarsi/download/pubs/14964.pdf)数据格式。
+
+示例：
 ```
+ID      FROM   LEMMA CPOSTAG POSTAG  FEATS   HEAD    DEPREL   PROB   PDEPREL
+1       百度    百度    -       -       -       2       SBV     1.0     -
+2       是      是      -       -       -       0       HED     1.0     -
+3       一家    一家    -       -       -       5       ATT     1.0     -
+4       高科技  高科技  -       -       -       5       ATT     1.0     -
+5       公司    公司    -       -       -       2       VOB     1.0     -
+```
+
+## 标注关系
+
+标注关系说明：
+
+| Label |  关系类型  | 说明                     | 示例                           |
+| :---: | :--------: | :----------------------- | :----------------------------- |
+|  SBV  |  主谓关系  | 主语与谓词间的关系       | 他送了一本书(他<--送)          |
+|  VOB  |  动宾关系  | 宾语与谓词间的关系       | 他送了一本书(送-->书)          |
+|  POB  |  介宾关系  | 介词与宾语间的关系       | 我把书卖了（把-->书）          |
+|  ADV  |  状中关系  | 状语与中心词间的关系     | 我昨天买书了（昨天<--买）      |
+|  CMP  |  动补关系  | 补语与中心词间的关系     | 我都吃完了（吃-->完）          |
+|  ATT  |  定中关系  | 定语与中心词间的关系     | 他送了一本书(一本<--书)        |
+|   F   |  方位关系  | 方位词与中心词的关系     | 在公园里玩耍(公园-->里)        |
+|  COO  |  并列关系  | 同类型词语间关系         | 叔叔阿姨(叔叔-->阿姨)          |
+|  DBL  |  兼语结构  | 主谓短语做宾语的结构     | 他请我吃饭(请-->我，请-->吃饭) |
+|  DOB  | 双宾语结构 | 谓语后出现两个宾语       | 他送我一本书(送-->我，送-->书) |
+|  VV   |  连谓结构  | 同主语的多个谓词间关系   | 他外出吃饭(外出-->吃饭)        |
+|  IC   |  子句结构  | 两个结构独立或关联的单句 | 你好，书店怎么走？(你好<--走)  |
+|  MT   |  虚词成分  | 虚词与中心词间的关系     | 他送了一本书(送-->了)          |
+|  HED  |  核心关系  | 指整个句子的核心         |                                |
 
 ## 快速开始
 
@@ -37,11 +65,43 @@ ddparser/
 
 安装命令：`pip install LAC dill`
 
-### 句法分析任务
+### 文件结构
 
-#### 模型训练
+```text
+ddparser/
+├── model # 部署
+│   ├── dropouts.py # dropout
+│   ├── encoder.py # 编码器
+│   └── dep.py # 模型网络
+├── README.md # 使用说明
+├── criterion.py # 损失函数
+├── data.py # 数据结构
+├── env.py # 环境配置工具
+├── metric.py # 指标计算
+├── parser.py # 一键预测工具
+├── run.py # 主入口，包含训练、评估和预测任务
+└── utils.py # 工具函数
+```
 
+### 一键预测
 
+使用默认模型进行一键预测：
+```python
+>>> from parser import Parser
+>>> parser = Parser()
+>>> parser.predict("百度是一家高科技公司")
+[{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+```
+
+使用`ddparser-ernie-gram`进行一键预测：
+```python
+>>> from parser import Parser
+>>> parser = Parser(encoding_model="ernie-gram-zh")
+>>> parser.predict("百度是一家高科技公司")
+[{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+```
+
+### 模型训练
 
 通过指定`--preprocess`，任务会基于训练数据自动生成词表和关系表等信息并保存`fields`文件到`--save_dir`所指定的路径下。
 
@@ -76,7 +136,7 @@ python -m paddle.distributed.launch --gpus "0" run.py \
                                                 --dev_data_path=data/dev.txt 
 ```
 
-#### 模型评估
+### 模型评估
 通过`--model_file_path`指定待评估的模型文件，执行以下命令可对模型效果进行验证：
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -91,12 +151,12 @@ python -m paddle.distributed.launch --gpus "0" run.py \
 eval loss: 0.27116, UAS: 95.747%, LAS: 94.034%
 ```
 指标释义：
-```shell
+```text
 UAS = number of words assigned correct head / total words
 LAS = number of words assigned correct head and relation / total words
 ```
 
-#### 模型预测
+### 模型预测
 用户可以执行一下命令进行模型预测，通过`--test_data_path`指定待预测数据，`--model_file_path`来指定模型文件，`--infer_result_dir`指定预测结果存放路径。
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -110,7 +170,7 @@ python -m paddle.distributed.launch --gpus "0" run.py \
 ```
 命令执行后会在`infer_result`路径下生成预测结果文件。
 
-#### 可配置参数说明
+### 可配置参数说明
 
 * `mode`: 任务模式，可选为train、evaluate和predict。
 * `device`: 选用什么设备进行训练，可选cpu、gpu或xpu。如使用gpu训练则参数gpus指定GPU卡号。

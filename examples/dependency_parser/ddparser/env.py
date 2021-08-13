@@ -29,7 +29,7 @@ class Environment(object):
     def __init__(self, args):
         self.args = args
         
-        if not args.mode == "train":
+        if args.mode == "train":
             random.seed(args.seed)
             np.random.seed(args.seed)
             paddle.seed(args.seed)
