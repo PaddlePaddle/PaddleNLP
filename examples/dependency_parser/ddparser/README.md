@@ -2,11 +2,10 @@
 
 * [模型简介](#模型简介)
 * [数据格式](#数据格式)
-* [标注关系](#标注关系)
 * [快速开始](#快速开始)
     * [环境依赖](#环境依赖)
     * [文件结构](#文件结构)
-    * [一键预测](#一键预测)
+    * [数据准备](#数据准备)
     * [模型训练](#模型训练)
     * [模型评估](#模型评估)
     * [模型预测](#模型预测)
@@ -16,46 +15,70 @@
 
 ## 模型简介
 
-依存句法分析任务通过分析句子中词语之间的依存关系来确定句子的句法结构,
+依存句法分析任务通过分析句子中词语之间的依存关系来确定句子的句法结构，
 该用例是基于Paddle v2.1的[baidu/ddparser](https://github.com/baidu/DDParser)实现，
-模型结构为[Biaffine Dependency Parser](https://arxiv.org/abs/1611.01734)。
+模型结构为[Deep Biaffine Attention for Neural Dependency Parsing](https://arxiv.org/abs/1611.01734)。
 同时本用例引入了[ERNIE](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/transformers.rst)系列预训练模型，
 用户可以基于预训练模型finetune完成依存句法分析训练（参考以下[示例](#模型训练)）。
 
+### 模型效果
+以下展示了该用例在清华大学语义依存网络语料（THU）和哈尔滨工业大学依存网络语料（HIT）开发集上的效果验证，数据集获取方式参考[数据准备](#数据准备)。
+
+#### THU开发集
+
+| 模型名称                   |  UAS  |   LAS |
+| ------------------------- | :---: | ----: |
+| `biaffine-dep`            | 82.93 | 74.07 |
+| `biaffine-dep-lstm-pe`    | 80.02 | 70.17 |
+| `biaffine-dep-ernie-tiny` | 88.68 | 81.19 |
+| `biaffine-dep-ernie-1.0`  | 91.72 | 84.59 |
+| `biaffine-dep-ernie-gram` | 91.68 | 84.63 |
+
+#### HIT开发集
+
+| 模型名称                   |  UAS  |   LAS |
+| ------------------------- | :---: | ----: |
+| `biaffine-dep`            | 83.52 | 68.25 |
+| `biaffine-dep-lstm-pe`    | - | - |
+| `biaffine-dep-ernie-tiny` | 87.79 | 79.67 |
+| `biaffine-dep-ernie-1.0`  | - | - |
+| `biaffine-dep-ernie-gram` | - | - |
+
+其中`lstm-pe`表示lstm by positional encoding，`biaffine-dep`模型使用了句子的word级表示和pos词性标签，其他模型使用句子的word级表示和char级表示。
+
+指标释义：
+```text
+UAS = number of words assigned correct head / total words
+LAS = number of words assigned correct head and relation / total words
+```
+
 ## 数据格式
 
-本用例数据格式基于[CoNLL-X](https://ilk.uvt.nl/~emarsi/download/pubs/14964.pdf)数据格式。
+本用例数据格式基于[CoNLL-X](https://ilk.uvt.nl/~emarsi/download/pubs/14964.pdf)。
+
+| 名称 | 含义 |
+| --- | --- |
+| ID |  单词ID，序号从1开始 |
+| FORM | 当前单词 |  
+| LEMMA | 当前词语的原型或词干，在中文中此列与FORM相同 |  
+| CPOSTAG | 当前词语的词性（粗粒度） |
+| POSTAG | 当前词语的词性（细粒度） |
+| FEATS | 句法特征 | 
+| HEAD | 当前单词的中心词 | 
+| DEPREL | 当前词语与中心词的依存关系 |
 
 示例：
 ```
-ID      FROM   LEMMA CPOSTAG POSTAG  FEATS   HEAD    DEPREL   PROB   PDEPREL
-1       百度    百度    -       -       -       2       SBV     1.0     -
-2       是      是      -       -       -       0       HED     1.0     -
-3       一家    一家    -       -       -       5       ATT     1.0     -
-4       高科技  高科技  -       -       -       5       ATT     1.0     -
-5       公司    公司    -       -       -       2       VOB     1.0     -
+ID      FROM   LEMMA CPOSTAG POSTAG  FEATS   HEAD    DEPREL 
+1       世界    世界    n       n       _       5       限定
+2       第      第      m       m       _       4       限定
+3       八      八      m       m       _       2       连接依存
+4       大      大      a       a       _       5       限定
+5       奇迹    奇迹    n       n       _       6       存现体
+6       出现    出现    v       v       _       0       核心成分
 ```
 
-## 标注关系
-
-标注关系说明：
-
-| Label |  关系类型  | 说明                     | 示例                           |
-| :---: | :--------: | :----------------------- | :----------------------------- |
-|  SBV  |  主谓关系  | 主语与谓词间的关系       | 他送了一本书(他<--送)          |
-|  VOB  |  动宾关系  | 宾语与谓词间的关系       | 他送了一本书(送-->书)          |
-|  POB  |  介宾关系  | 介词与宾语间的关系       | 我把书卖了（把-->书）          |
-|  ADV  |  状中关系  | 状语与中心词间的关系     | 我昨天买书了（昨天<--买）      |
-|  CMP  |  动补关系  | 补语与中心词间的关系     | 我都吃完了（吃-->完）          |
-|  ATT  |  定中关系  | 定语与中心词间的关系     | 他送了一本书(一本<--书)        |
-|   F   |  方位关系  | 方位词与中心词的关系     | 在公园里玩耍(公园-->里)        |
-|  COO  |  并列关系  | 同类型词语间关系         | 叔叔阿姨(叔叔-->阿姨)          |
-|  DBL  |  兼语结构  | 主谓短语做宾语的结构     | 他请我吃饭(请-->我，请-->吃饭) |
-|  DOB  | 双宾语结构 | 谓语后出现两个宾语       | 他送我一本书(送-->我，送-->书) |
-|  VV   |  连谓结构  | 同主语的多个谓词间关系   | 他外出吃饭(外出-->吃饭)        |
-|  IC   |  子句结构  | 两个结构独立或关联的单句 | 你好，书店怎么走？(你好<--走)  |
-|  MT   |  虚词成分  | 虚词与中心词间的关系     | 他送了一本书(送-->了)          |
-|  HED  |  核心关系  | 指整个句子的核心         |                                |
+- '_'表示数值不可用。
 
 ## 快速开始
 
@@ -83,22 +106,23 @@ ddparser/
 └── utils.py # 工具函数
 ```
 
-### 一键预测
+### 数据准备
 
-使用默认模型进行一键预测：
-```python
->>> from parser import Parser
->>> parser = Parser()
->>> parser.predict("百度是一家高科技公司")
-[{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
-```
+该用例使用的是[第二届自然语言处理与中文计算会议（NLP&CC 2013）](http://tcci.ccf.org.cn/conference/2013/pages/page04_sam.html)
+提供的数据集，其中`THU`文件夹为清华大学语义依存网络语料，`HIT`文件夹为哈尔滨工业大学依存网络语料。
+下载并解压[数据集](http://tcci.ccf.org.cn/conference/2013/dldoc/evsam05.zip)，
+将`THU`和`HIT`文件夹分别放置在当前路径的`./data`路径下。
 
-使用`ddparser-ernie-gram`进行一键预测：
-```python
->>> from parser import Parser
->>> parser = Parser(encoding_model="ernie-gram-zh")
->>> parser.predict("百度是一家高科技公司")
-[{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+`./data`路径结构如下：
+
+```text
+data/
+├── HIT # 清华大学语义依存网络语料
+│   ├── train.conll # 训练集
+│   └── dev.conll # 开发集
+└── THU # 哈尔滨工业大学依存网络语料
+    ├── train.conll # 训练集
+    └── dev.conll # 开发集
 ```
 
 ### 模型训练
@@ -112,14 +136,14 @@ ddparser/
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run.py \
-                                                --mode=train \
-                                                --preprocess \
-                                                --device=gpu \
-                                                --save_dir=model_file \
-                                                --encoding_model=lstm \
-                                                --feat=pos \
-                                                --train_data_path=data/train.txt \
-                                                --dev_data_path=data/dev.txt 
+    --mode=train \
+    --preprocess \
+    --device=gpu \
+    --save_dir=model_file \
+    --encoding_model=lstm \
+    --feat=pos \
+    --train_data_path=data/THU/train.conll \
+    --dev_data_path=data/THU/dev.conll
 ```
 
 除了以BiLSTM作为encoder，我们还提供了`ernie-1.0`、`ernie-tiny`和`ernie-gram-zh`等预训练模型作为encoder来训练ddparser的方法。
@@ -129,11 +153,11 @@ python -m paddle.distributed.launch --gpus "0" run.py \
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run.py \
-                                                --mode=train \
-                                                --device=gpu \
-                                                --encoding_model=ernie-gram-zh \
-                                                --train_data_path=data/train.txt \
-                                                --dev_data_path=data/dev.txt 
+    --mode=train \
+    --device=gpu \
+    --encoding_model=ernie-gram-zh \
+    --train_data_path=data/THU/train.conll \
+    --dev_data_path=data/THU/dev.conll 
 ```
 
 ### 模型评估
@@ -141,32 +165,28 @@ python -m paddle.distributed.launch --gpus "0" run.py \
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 python -m paddle.distributed.launch --gpus "0" run.py \
-                                                --mode=evaluate \
-                                                --device=gpu \
-                                                --model_file_path=model_file/best.pdparams \
-                                                --tree
+    --mode=evaluate \
+    --device=gpu \
+    --model_file_path=model_file/best.pdparams \
+    --test_data_path=data/THU/dev.conll
+    --tree
 ```
 命令执行后返回示例：
 ```shell
-eval loss: 0.27116, UAS: 95.747%, LAS: 94.034%
-```
-指标释义：
-```text
-UAS = number of words assigned correct head / total words
-LAS = number of words assigned correct head and relation / total words
+eval loss: 0.27116, UAS: 82.69%, LAS: 73.66%
 ```
 
 ### 模型预测
-用户可以执行一下命令进行模型预测，通过`--test_data_path`指定待预测数据，`--model_file_path`来指定模型文件，`--infer_result_dir`指定预测结果存放路径。
+用户可以执行一下命令进行模型预测，通过`--test_data_path`指定待预测数据，`--model_file_path`指定模型文件，`--infer_result_dir`指定预测结果存放路径。
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 python -m paddle.distributed.launch --gpus "0" run.py \
-                                                --mode=predict \
-                                                --device=gpu \
-                                                --test_data_path=data/test.txt \
-                                                --model_file_path=model_file/best.pdparams \
-                                                --infer_result_dir=infer_result \
-                                                --tree
+    --mode=predict \
+    --device=gpu \
+    --test_data_path=data/THU/dev.conll \
+    --model_file_path=model_file/best.pdparams \
+    --infer_result_dir=infer_result \
+    --tree
 ```
 命令执行后会在`infer_result`路径下生成预测结果文件。
 

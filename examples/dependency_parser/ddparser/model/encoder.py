@@ -155,7 +155,7 @@ class LSTMEncoder(nn.Layer):
         word_embed, feat_embed = self.embed_dropout(word_embed, feat_embed)
         embed = paddle.concat([word_embed, feat_embed], axis=-1)
         mask = words != self.args.pad_index
-        seq_lens = paddle.sum(paddle.cast(mask, 'int32'))
+        seq_lens = paddle.sum(paddle.cast(mask, 'int32'), axis=-1)
         x, _ = self.lstm(embed, sequence_length=seq_lens)
         x = self.lstm_dropout(x)
         return words, x
@@ -186,7 +186,7 @@ class CharLSTMEncoder(nn.Layer):
         masked_x = paddle.gather_nd(x, select)
         char_mask = masked_x != self.pad_index
         emb = self.embed(masked_x)
-        word_lens = paddle.sum(paddle.cast(char_mask, 'int32'))
+        word_lens = paddle.sum(paddle.cast(char_mask, 'int32'), axis=-1)
         _, (h, _) = self.lstm(emb, sequence_length=word_lens)
         h = paddle.concat(paddle.unstack(h), axis=-1)
         feat_embed = pad_sequence_paddle(paddle.split(h, lens.numpy().tolist(), axis=0), self.pad_index)
