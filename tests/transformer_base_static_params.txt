@@ -4,7 +4,7 @@ python:python3.7
 gpu_list:0|0,1
 null:null
 null:null
---max_iter:501
+--max_iter:lite_train_infer=500
 null:null
 null:null
 null:null
@@ -13,7 +13,7 @@ null:null
 null:null
 ##
 trainer:norm_train
-norm_train:../examples/machine_translation/transformer/static/train.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --benchmark
+norm_train:../examples/machine_translation/transformer/static/train.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --distributed --train_file ../examples/machine_translation/transformer/train.en ../examples/machine_translation/transformer/train.de --dev_file ../examples/machine_translation/transformer/dev.en ../examples/machine_translation/transformer/dev.de
 pact_train:null
 fpgm_train:null
 distill_train:null
@@ -21,7 +21,7 @@ null:null
 null:null
 ##
 ===========================eval_params=========================== 
-eval:../examples/machine_translation/transformer/static/predict.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --benchmark
+eval:../examples/machine_translation/transformer/static/predict.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --test_file ../examples/machine_translation/transformer/test.en ../examples/machine_translation/transformer/test.de
 null:null
 ##
 ===========================infer_params===========================
