@@ -33,14 +33,14 @@ from utils import decode, index_sample
 parser = argparse.ArgumentParser()
 # Run
 parser.add_argument("--mode", choices=["train", "evaluate", "predict"], type=str, default="train", help="Select the task mode.")
-parser.add_argument("--device", choices=["cpu", "gpu", "xpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
 # Train
 parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
 parser.add_argument("--preprocess", type=bool, default=True, help="Whether to preprocess the dataset.")
-parser.add_argument("--epochs", type=int, default=100, help="Number of epoches for training.")
+parser.add_argument("--epochs", type=int, default=1000, help="Number of epoches for training.")
 parser.add_argument("--save_dir", type=str, default='model_file/', help="Directory to save model parameters.")
-parser.add_argument("--train_data_path", type=str, default='./data/train.txt', help="The path of train dataset to be loaded.")
-parser.add_argument("--dev_data_path", type=str, default='./data/dev.txt', help="The path of dev dataset to be loaded.")
+parser.add_argument("--train_data_path", type=str, default='./data/THU/train.conll', help="The path of train dataset to be loaded.")
+parser.add_argument("--dev_data_path", type=str, default='./data/THU/dev.conll', help="The path of dev dataset to be loaded.")
 parser.add_argument("--batch_size", type=int, default=1000, help="Numbers of examples a batch for training.")
 parser.add_argument("--init_from_params", type=str, default=None, help="The path of model parameters to be loaded.")
 parser.add_argument("--clip", type=float, default=1.0, help="The threshold of gradient clip.")
@@ -48,7 +48,7 @@ parser.add_argument("--lstm_lr", type=float, default=0.002, help="The Learning r
 parser.add_argument("--ernie_lr", type=float, default=5e-05, help="The Learning rate of ernie encoding model.")
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
 # Evaluate & Predict
-parser.add_argument("--test_data_path", type=str, default='./data/test.txt', help="The path of test dataset to be loaded.")
+parser.add_argument("--test_data_path", type=str, default='./data/THU/dev.conll', help="The path of test dataset to be loaded.")
 parser.add_argument("--model_file_path", type=str, default='model_file/', help="Directory to load model parameters.")
 parser.add_argument("--infer_result_dir", type=str, default='infer_result/', help="The path to save infer results.")
 # Preprocess
