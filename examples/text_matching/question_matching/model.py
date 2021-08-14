@@ -16,6 +16,8 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+import paddlenlp as ppnlp
+
 
 class QuestionMatching(nn.Layer):
     def __init__(self, pretrained_model, dropout=None, rdrop_coef=0.0):
@@ -26,21 +28,6 @@ class QuestionMatching(nn.Layer):
         # num_labels = 2 (similar or dissimilar)
         self.classifier = nn.Linear(self.ptm.config["hidden_size"], 2)
         self.rdrop_coef = rdrop_coef
-
-    def compute_kl_loss(self, p, q, pad_mask=None):
-        p_loss = F.kl_div(F.log_softmax(p, axis=-1), F.softmax(q, axis=-1), reduction='none')
-        q_loss = F.kl_div(F.log_softmax(q, axis=-1), F.softmax(p, axis=-1), reduction='none')
-        
-        # pad_mask is for seq-level tasks
-        if pad_mask is not None:
-            p_loss.masked_fill_(pad_mask, 0.)
-            q_loss.masked_fill_(pad_mask, 0.)
-
-        # You can choose whether to use function "sum" and "mean" depending on your task
-        p_loss = p_loss.sum()
-        q_loss = q_loss.sum()
-        loss = (p_loss + q_loss) / 2
-        return loss
 
     def forward(self,
                 input_ids,
@@ -61,7 +48,7 @@ class QuestionMatching(nn.Layer):
                                     attention_mask)
             cls_embedding2 = self.dropout(cls_embedding2)
             logits2 = self.classifier(cls_embedding2)
-            kl_loss = self.compute_kl_loss(logits1, logits2)
+            kl_loss = ppnlp.layers.rdrop_loss(logits1, logits2)
         else:
             kl_loss = 0.0
 
