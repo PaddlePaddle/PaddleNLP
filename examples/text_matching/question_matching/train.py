@@ -63,7 +63,7 @@ def set_seed(seed):
 
 
 @paddle.no_grad()
-def evaluate(model, criterion, metric, data_loader, phase="dev"):
+def evaluate(model, criterion, metric, data_loader):
     """
     Given a dataset, it evals model and computes the metric.
 
@@ -101,8 +101,6 @@ def do_train():
         paddle.distributed.init_parallel_env()
 
     set_seed(args.seed)
-
-    #train_ds, dev_ds = load_dataset("lcqmc", splits=["train", "dev"])
 
     train_ds = load_dataset(
         read_text_pair, data_path=args.train_set, is_test=False, lazy=False)

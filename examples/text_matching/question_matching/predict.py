@@ -47,7 +47,7 @@ def predict(model, data_loader):
     Predicts the data labels.
 
     Args:
-        model (obj:`SemanticIndexBase`): A model to extract text embedding or calculate similarity of text pair.
+        model (obj:`QuestionMatching`): A model to calculate whether the question pair is semantic similar or not.
         data_loaer (obj:`List(Example)`): The processed data ids of text pair: [query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids]
     Returns:
         results(obj:`List`): cosine similarity of text pairs.
