@@ -98,13 +98,18 @@ class Environment(object):
                 self.FEAT.build(train)
 
             self.REL.build(train)
+            
             if not os.path.exists(args.save_dir):
                 os.makedirs(args.save_dir)
             with open(os.path.join(args.save_dir, "fields"), "wb") as f:
                 dill.dump(self.fields, f)
         else:
-            with open(os.path.join(args.save_dir, "fields"), "rb") as f:
-                self.fields = dill.load(f)
+            if args.mode == "train":
+                with open(os.path.join(args.save_dir, "fields"), "rb") as f:
+                    self.fields = dill.load(f)
+            else:
+                with open(os.path.join(os.path.split(args.model_file_path)[0], "fields"), "rb") as f:
+                    self.fields = dill.load(f)               
 
             if isinstance(self.fields.FORM, tuple):
                 self.WORD, self.FEAT = self.fields.FORM
@@ -117,7 +122,7 @@ class Environment(object):
         else:
             vocab_items = self.WORD.vocab.stoi.items()
         self.puncts = np.array([i for s, i in vocab_items if utils.ispunct(s)], dtype=np.int64)
-
+        
         self.args.n_words = len(self.WORD.vocab)
         self.args.n_feats = self.FEAT and len(self.FEAT.vocab)
         self.args.n_rels = len(self.REL.vocab)

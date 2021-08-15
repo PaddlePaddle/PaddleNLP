@@ -24,7 +24,7 @@ class ParserCriterion(nn.Layer):
     def __init__(self, *args, **kwargs):
         super(ParserCriterion, self).__init__(*args, **kwargs)
 
-    def forward(self, s_arc, s_rel, arcs, rels, mask):
+    def __call__(self, s_arc, s_rel, arcs, rels, mask):
 
         arcs = paddle.masked_select(arcs, mask)
         rels = paddle.masked_select(rels, mask)
