@@ -37,7 +37,7 @@ parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu", help="Sel
 # Train
 parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
 parser.add_argument("--preprocess", type=bool, default=True, help="Whether to preprocess the dataset.")
-parser.add_argument("--epochs", type=int, default=1000, help="Number of epoches for training.")
+parser.add_argument("--epochs", type=int, default=100, help="Number of epoches for training.")
 parser.add_argument("--save_dir", type=str, default='model_file/', help="Directory to save model parameters.")
 parser.add_argument("--train_data_path", type=str, default='./data/THU/train.conll', help="The path of train dataset to be loaded.")
 parser.add_argument("--dev_data_path", type=str, default='./data/THU/dev.conll', help="The path of dev dataset to be loaded.")
@@ -141,14 +141,17 @@ def do_train(env):
         pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(args.encoding_model)
     elif args.encoding_model == "ernie-gram-zh":
         pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(args.encoding_model)       
+    else:
+        pretrained_model = None
 
-    # Define ddparser model and learning rate
+    # Load ddparser model
+    model = BiaffineDependencyModel(args=args, pretrained_model=pretrained_model)
+
+    # Define learning rate
     if args.encoding_model.startswith("ernie"):
         lr = args.ernie_lr
-        model = BiaffineDependencyModel(args=args, pretrained_model=pretrained_model)
     else:
         lr = args.lstm_lr
-        model = BiaffineDependencyModel(args=args)
 
     # Continue training from a pretrained model if the checkpoint is specified
     if args.init_from_params and os.path.isfile(args.init_from_params):
@@ -208,7 +211,7 @@ def do_train(env):
             optimizer.clear_grad()
 
             global_step += 1
-            if global_step % 100 == 0 and rank == 0:
+            if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, loss.numpy().item(), 10 / (time.time() - tic_train)))
@@ -243,12 +246,11 @@ def do_evaluate(env):
         pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(args.encoding_model)
     elif args.encoding_model == "ernie-gram-zh":
         pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(args.encoding_model)
-
-    # Define ddparser model
-    if args.encoding_model.startswith("ernie"):
-        model = BiaffineDependencyModel(args=args, pretrained_model=pretrained_model)
     else:
-        model = BiaffineDependencyModel(args=args)
+        pretrained_model = None
+
+    # Load ddparser model
+    model = BiaffineDependencyModel(args=args, pretrained_model=pretrained_model)
     
     # Load saved model parameters
     if os.path.isfile(args.model_file_path):
@@ -280,12 +282,11 @@ def do_predict(env):
         pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(args.encoding_model)
     elif args.encoding_model == "ernie-gram-zh":
         pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(args.encoding_model)
-
-    # Define ddparser model
-    if args.encoding_model.startswith("ernie"):
-        model = BiaffineDependencyModel(args=args, pretrained_model=pretrained_model)
     else:
-        model = BiaffineDependencyModel(args=args)
+        pretrained_model = None
+
+    # Load ddparser model
+    model = BiaffineDependencyModel(args=args, pretrained_model=pretrained_model)
     
     # Load saved model parameters
     if os.path.isfile(args.model_file_path):

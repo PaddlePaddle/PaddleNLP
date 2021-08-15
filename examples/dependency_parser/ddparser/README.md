@@ -11,7 +11,7 @@
     * [模型预测](#模型预测)
     * [可配置参数说明](#可配置参数说明)
 * [致谢](#致谢)
-* [参考论文](#参考论文)
+* [Reference](#Reference)
 
 ## 模型简介
 
@@ -30,21 +30,21 @@
 | ------------------------- | :---: | ----: |
 | `biaffine-dep`            | 82.93 | 74.07 |
 | `biaffine-dep-lstm-pe`    | 80.02 | 70.17 |
-| `biaffine-dep-ernie-tiny` | 88.68 | 81.19 |
-| `biaffine-dep-ernie-1.0`  | 91.72 | 84.59 |
-| `biaffine-dep-ernie-gram` | 91.68 | 84.63 |
+| `biaffine-dep-ernie-tiny` | 89.02 | 81.39 |
+| `biaffine-dep-ernie-1.0`  | 92.25 | 84.77 |
+| `biaffine-dep-ernie-gram` | 92.20 | 85.10 |
 
 #### HIT开发集
 
 | 模型名称                   |  UAS  |   LAS |
 | ------------------------- | :---: | ----: |
 | `biaffine-dep`            | 83.52 | 68.25 |
-| `biaffine-dep-lstm-pe`    | - | - |
-| `biaffine-dep-ernie-tiny` | 87.79 | 79.67 |
-| `biaffine-dep-ernie-1.0`  | - | - |
-| `biaffine-dep-ernie-gram` | - | - |
+| `biaffine-dep-lstm-pe`    | 77.48 | 61.34 |
+| `biaffine-dep-ernie-tiny` | 83.75 | 69.01 |
+| `biaffine-dep-ernie-1.0`  | 89.21 | 74.37 |
+| `biaffine-dep-ernie-gram` | 89.59 | 74.75 |
 
-其中`lstm-pe`表示lstm by positional encoding，`biaffine-dep`模型使用了句子的word级表示和pos词性标签，其他模型使用句子的word级表示和char级表示。
+其中`lstm-pe`表示lstm by positional encoding，`biaffine-dep`使用了句子的word级表示和pos词性标签，其他模型使用句子的word级表示和char级表示。在小数据集上使用`lstm`作为encoder进行训练时建议增加pos词性标签作为数据输入以增强模型效果。
 
 指标释义：
 ```text
@@ -65,9 +65,11 @@ LAS = number of words assigned correct head and relation / total words
 | POSTAG | 当前词语的词性（细粒度） |
 | FEATS | 句法特征 | 
 | HEAD | 当前单词的中心词 | 
-| DEPREL | 当前词语与中心词的依存关系 |
+| DEPREL | 当前单词与中心词的依存关系 |
+| PHEAD | 当前单词的主观中心词 |
+| PDEPREL | 当前单词与主观中心词的依存关系 |
 
-示例：
+THU数据集示例：
 ```
 ID      FROM   LEMMA CPOSTAG POSTAG  FEATS   HEAD    DEPREL 
 1       世界    世界    n       n       _       5       限定
@@ -78,7 +80,18 @@ ID      FROM   LEMMA CPOSTAG POSTAG  FEATS   HEAD    DEPREL
 6       出现    出现    v       v       _       0       核心成分
 ```
 
-- '_'表示数值不可用。
+HIT数据集示例：
+```
+1       城建    城建    NN      NN      _       2       relevant        _    _
+2       成为    成为    VV      VV      _       0       ROOT            _    _
+3       外商    外商    NN      NN      _       4       agent           _    _
+4       投资    投资    VV      VV      _       7       d-restrictive   _    _
+5       青海    青海    NR      NR      _       4       patient         _    _
+6       新      新      JJ      JJ     _       7       d-attribute     _    _
+7       热点    热点    NN      NN      _       2       isa             _    _
+```
+
+- 该用例中用户只需关注`FORM`、`POSTTAG`、`HEAD`和`DEPREL`这几列信息即可，'_'表示数值不可用。
 
 ## 快速开始
 
@@ -216,10 +229,7 @@ python -m paddle.distributed.launch --gpus "0" run.py \
 * `warmup_proportion`: 学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.0。
 * `weight_decay`: 控制正则项力度的参数，用于防止过拟合，默认为0.0。
 
-## 致谢
-
-* 感谢[百度NLP](https://github.com/baidu/DDParser)提供ddparser的开源代码实现。
-
-## 参考论文
+## Reference
 
 - [Deep Biaffine Attention for Neural Dependency Parsing](https://arxiv.org/abs/1611.01734)
+- [baidu/ddparser](https://github.com/baidu/DDParser)
