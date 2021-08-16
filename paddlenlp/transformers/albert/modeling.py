@@ -750,6 +750,77 @@ class AlbertPretrainedModel(PretrainedModel):
 
 @register_base_model
 class AlbertModel(AlbertPretrainedModel):
+    """
+    The bare Albert Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Check the superclass documentation for the generic methods and the library implements for all its model.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in `AlbertModel`. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling `AlbertModel`. Defaults to `30000`.
+        hidden_size (int, optional):
+            Dimensionality of the encoder layers and the pooler layer. Defaults to `768`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in a hidden group in the Transformer encoder. Defaults to `12`.
+        num_hidden_groups (int, optional):
+            Number of hidden groups in the Transformer encoder. Defaults to `1`.
+        num_attention_heads (int, optional):
+            Number of attention heads for each attention layer in the Transformer encoder.
+            Defaults to `12`.
+        intermediate_size (int, optional):
+            Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
+            Defaults to `3072`.
+        inner_group_num (int, optional):
+            Number of inner groups in a hidden group. Defaults to `1`.
+        hidden_act (str, optional):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported. Defaults to `"gelu"`.
+        hidden_dropout_prob (float, optional):
+            The dropout probability for all fully connected layers in the embeddings and encoder.
+            Defaults to `0`.
+        attention_probs_dropout_prob (float, optional):
+            The dropout probability for all fully connected layers in the pooler.
+            Defaults to `0`.
+        max_position_embeddings (int, optional):
+            The maximum value of the dimensionality of position encoding. The dimensionality of position encoding
+            is the dimensionality of the sequence in `BertModel`.
+            Defaults to `512`.
+        type_vocab_size (int, optional):
+            The vocabulary size of `token_type_ids` passed when calling `~ transformers.BertModel`.
+            Defaults to `12`.
+            `token_type_ids` are segment token indices to indicate first
+             and second portions of the inputs. Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+        initializer_range (float, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Defaults to `0.02`.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`AlbertPretrainedModel.init_weights()` for how weights are initialized in `AlbertModel`.
+
+        layer_norm_eps(float, optional):
+            The `epsilon` parameter used in :class:`paddle.nn.LayerNorm` for initializing layer normalization layers.
+            A small value to the variance added to the normalization layer to prevent division by zero.
+            Defaults to `1e-12`.
+        pad_token_id (int, optional):
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
+        add_pooling_layer(bool, optional):
+            Whether or not to add the pooling layer. Defaults to `False`.
+
+    """
+
     def __init__(self,
                  vocab_size=30000,
                  embedding_size=128,
@@ -841,6 +912,91 @@ class AlbertModel(AlbertPretrainedModel):
             inputs_embeds=None,
             return_dict=False,
     ):
+        r'''
+        The AlbertModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            attention_mask (Tensor, optional):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set to **-infinity**
+                for any positions in mask that are **0**, and will be **unchanged** for positions that
+                are **1**.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It's data type should be 'float32' and has a shape of [batch_size, sequence_length].
+                Defaults to 'None'.
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate first and second portions of the inputs.
+                Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                config.max_position_embeddings - 1]``.
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            head_mask (Tensor, optional):
+                Mask to nullify selected heads of the self-attention modules. Masks values can either be 0 or 1:
+
+                - 1 indicates the head is **not masked**,
+                - 0 indicated the head is **masked**.
+            inputs_embeds (Tensor, optional):
+                Instead of passing `inputs_ids`, you can choose to to directly pass an embedded representation.
+                This is useful if you want more control over how to convert `inputs_ids` indices into
+                associated vectors than the model's internal embedding matrix.
+            return_dict (bool, optional):
+                Whether or not to return a dict instead of a plain tuple. Defautls to `False`.
+
+        Returns:
+            Tuple or Dict: A tuple of shape (`sequence_output`, `pooled_output`) or a dict with
+            `last_hidden_state`, `pooled_output`, `all_hidden_states`, `all_attentions` fields.
+
+            With the fields:
+
+            - `sequence_output` (Tensor):
+                Sequence of hidden-states at the last layer of the model.
+                It's data type should be float32 and has a shape of (`batch_size, seq_lens, hidden_size`].
+                `seq_lens` corresponds to the length of input sequence.
+
+            - `pooled_output` (Tensor):
+                The output of first token (`[CLS]`) in sequence.
+                We "pool" the model by simply taking the hidden state corresponding to the first token.
+                Its data type should be float32 and
+                has a shape of [batch_size, hidden_size].
+
+            - `last_hidden_state` (Tensor):
+                The output of the last encoder layer, it is also the `sequence_output`.
+
+            - `all_hidden_states` (Tensor):
+                The `hidden_states` of all encoder layers.
+
+            - `all_attentions` (Tensor):
+                The `all_attention` of all outputs of encoder layers.
+
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import AlbertModel, AlbertTokenizer
+
+                tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
+                model = AlbertModel.from_pretrained('albert-base-v1')
+
+                inputs = tokenizer("This is a test example.")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        '''
+
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
@@ -890,6 +1046,20 @@ class AlbertModel(AlbertPretrainedModel):
 
 
 class AlbertForPretraining(AlbertPretrainedModel):
+    r"""
+    Albert Model with two heads on top as done during the pretraining:
+    a `masked language modeling` head and a `sentence-order prediction (classification)` head.
+
+    Args:
+        albert (:class:`AlbertModel`):
+            An instance of AlbertModel.
+        lm_head:
+            Language modeling head.
+        sop_head:
+            Sentence order prediction head.
+        vocab_size(int):
+            See :class:`AlbertModel`.
+    """
     def __init__(self, albert, lm_head, sop_head, vocab_size):
         super(AlbertForPretraining, self).__init__()
 
@@ -918,6 +1088,45 @@ class AlbertForPretraining(AlbertPretrainedModel):
                 sentence_order_label=None,
                 return_dict=False,
                 ):
+        r'''
+        The AlbertModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`AlbertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`AlbertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`AlbertModel`.
+            position_ids(Tensor, optional):
+                See :class:`AlbertModel`.
+            head_mask (Tensor, optional):
+                See :class:`AlbertModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`AlbertModel`.
+            sentence_order_label (Tensor, optional):
+                Labels of sentence order prediction task.
+            return_dict (bool, optional):
+                See :class:`AlbertModel`.
+
+        Returns:
+            Tuple or Dict: A tuple of shape (`prediction_score`,`sop_scores`) or a dict with `prediction_logits`, `sop_logits`, `hidden_states`, `attentions` fields.
+
+            With the fields:
+
+            - `prediction_scores` (Tensor): Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+            - `sop_scores` (Tensor): Prediction scores of the sentence-order prediction (classification) head (scores of True/False continuation
+            before SoftMax).
+
+            - `prediction_logits`(Tensor): Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+            - `sop_logits` (Tensor):Prediction scores of the sentence-order prediction (classification) head (scores of True/False continuation
+            before SoftMax).
+
+            - `hidden_states` (Tensor): Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+            - `attention` (Tensor): Attentions in all outputs of transformers .
+
+        '''
+
         outputs = self.transformer(
             input_ids,
             attention_mask=attention_mask,
@@ -993,6 +1202,14 @@ class AlbertSOPHead(Layer):
 
 
 class AlbertForMaskedLM(AlbertPretrainedModel):
+    """
+    Albert Model with a `language modeling` head on top.
+
+    Args:
+        albert (:class:`AlbertModel`):
+            An instance of AlbertModel.
+    """
+
     def __init__(self, albert):
         super(AlbertForMaskedLM, self).__init__()
 
@@ -1025,6 +1242,55 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
         labels=None,
         return_dict=False,
     ):
+        r'''
+        The AlbertModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`AlbertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`AlbertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`AlbertModel`.
+            position_ids(Tensor, optional):
+                See :class:`AlbertModel`.
+            head_mask (Tensor, optional):
+                See :class:`AlbertModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`AlbertModel`.
+            labels ( Tnesor, optional):
+                Labels for computing the masked language modeling loss. Indices should be in
+                ``[-100, 0, ..., vocab_size]``. Tokens with indices set to ``-100`` are ignored (masked),
+                the loss is only computed for the tokens with labels in ``[0, ..., vocab_size].
+            return_dict (bool, optional):
+                See :class:`AlbertModel`.
+
+        Returns:
+            Tensor or Dict: `prediction_score` or a dict with `logits`, `hidden_states`, `attentions` fields.
+
+            With the fields:
+
+            - `prediction_scores` (Tensor): Prediction scores of the masked tokens.
+            - `logits` (Tensor): Also is `prediction_scores`.
+            - `hidden_states` (Tensor): Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+            - `attention` (Tensor): Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import AlbertForMaskedLM, AlbertTokenizer
+
+                tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
+                model = AlbertForMaskedLM.from_pretrained('albert-base-v1')
+
+                inputs = tokenizer("This is a test example.")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                prediction_scores = model(**inputs)
+        '''
+
         transformer_outputs = self.transformer(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -1049,6 +1315,19 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
 
 
 class AlbertForSequenceClassification(AlbertPretrainedModel):
+    """
+    Albert Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
+
+    Args:
+        albert (:class:`AlbertModel`):
+            An instance of AlbertModel.
+        classifier_dropout_prob (float, optional):
+            The dropout probability for output of classifier. Defaults to `0`.
+        num_classes (int, optional):
+            The number of classes. Default to `2`.
+    """
+
     def __init__(self, albert, classifier_dropout_prob=0, num_classes=2):
         super(AlbertForSequenceClassification, self).__init__()
         self.num_classes = num_classes
@@ -1069,6 +1348,50 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
         inputs_embeds=None,
         return_dict=False,
     ):
+        r'''
+        The AlbertForSequenceClassification forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`AlbertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`AlbertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`AlbertModel`.
+            position_ids(Tensor, optional):
+                See :class:`AlbertModel`.
+            head_mask (Tensor, optional):
+                See :class:`AlbertModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`AlbertModel`.
+            return_dict (bool, optional):
+                See :class:`AlbertModel`.
+
+        Returns:
+            Tensor or Dict: `logits` or a dict with `logits`, `hidden_states`, `attentions` fields.
+
+            With the fields:
+
+            - `logits` (Tensor): A Tensor of the input text classification logits. Shape as `(batch_size, num_classes)` and dtype as `float`.
+            - `hidden_states` (Tensor): Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+            - `attention` (Tensor): Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import AlbertForSequenceClassification, AlbertTokenizer
+
+                tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
+                model = AlbertForSequenceClassification.from_pretrained('albert-base-v1')
+
+                inputs = tokenizer("This is a test example.")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        '''
+
         transformer_outputs = self.transformer(
             input_ids,
             attention_mask=attention_mask,
@@ -1094,6 +1417,17 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
 
 
 class AlbertForTokenClassification(AlbertPretrainedModel):
+    """
+    Albert Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        albert (:class:`AlbertModel`):
+            An instance of AlbertModel.
+        num_classes (int, optional):
+            The number of classes. Default `2`.
+    """
+
     def __init__(self, albert, num_classes=2):
         super(AlbertForTokenClassification, self).__init__()
         self.num_classes = num_classes
@@ -1114,6 +1448,50 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
         inputs_embeds=None,
         return_dict=False,
     ):
+        r'''
+        The AlbertForSequenceClassification forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`AlbertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`AlbertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`AlbertModel`.
+            position_ids(Tensor, optional):
+                See :class:`AlbertModel`.
+            head_mask (Tensor, optional):
+                See :class:`AlbertModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`AlbertModel`.
+            return_dict (bool, optional):
+                See :class:`AlbertModel`.
+
+        Returns:
+            Tensor or Dict: `logits` or a dict with `logits`, `hidden_states`, `attentions` fields.
+
+            With the fields:
+
+            - `logits` (Tensor): A Tensor of the input text classification logits, shape as `(batch_size, seq_lens, num_classes)`.
+                seq_lens mean the number of tokens of the input sequence.
+            - `hidden_states` (Tensor): Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+            - `attention` (Tensor): Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import AlbertForTokenClassification, AlbertTokenizer
+
+                tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
+                model = AlbertForTokenClassification.from_pretrained('albert-base-v1')
+
+                inputs = tokenizer("This is a test example.")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        '''
+
         transformer_outputs = self.transformer(
             input_ids,
             attention_mask=attention_mask,
@@ -1138,6 +1516,18 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
 
 
 class AlbertForQuestionAnswering(AlbertPretrainedModel):
+    """
+    Albert Model with a span classification head on top for extractive question-answering tasks like
+    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
+    `span end logits`).
+
+    Args:
+        albert (:class:`AlbertModel`):
+            An instance of AlbertModel.
+        num_classes (int, optional):
+            The number of classes. Default to `2`.
+    """
+
     def __init__(self, albert, num_labels):
         super(AlbertForQuestionAnswering, self).__init__()
         self.num_labels = num_labels
@@ -1158,6 +1548,45 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
         end_positions=None,
         return_dict=False,
     ):
+        r'''
+        The AlbertForQuestionAnswering forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`AlbertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`AlbertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`AlbertModel`.
+            position_ids(Tensor, optional):
+                See :class:`AlbertModel`.
+            head_mask (Tensor, optional):
+                See :class:`AlbertModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`AlbertModel`.
+            return_dict (bool, optional):
+                See :class:`AlbertModel`.
+
+        Returns:
+            Tuple or Dict: A tuple of shape (`start_logits`, `end_logits`) or a dict with `start_logits`, `end_logits, `hidden_states`, `attentions` fields.
+
+            With the fields:
+
+            - `start_logits` (Tensor): Labels for position (index) of the start of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            sequence are not taken into account for computing the loss.
+
+            - `end_logits` (Tensor): Labels for position (index) of the end of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            sequence are not taken into account for computing the loss.
+
+            - `hidden_states` (Tensor): Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+
+            - `attention` (Tensor): Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+
+        '''
+
         transformer_outputs = self.transformer(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -1186,6 +1615,15 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
 
 
 class AlbertForMultipleChoice(AlbertPretrainedModel):
+    """
+    Albert Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
+    softmax) e.g. for RocStories/SWAG tasks.
+
+    Args:
+        albert (:class:`AlbertModel`):
+            An instance of AlbertModel.
+    """
+
     def __init__(self, albert):
         super(AlbertForMultipleChoice, self).__init__()
         self.transformer = albert
@@ -1204,6 +1642,42 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
         labels=None,
         return_dict=False,
     ):
+        r'''
+        The AlbertForMultipleChoice forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`AlbertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`AlbertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`AlbertModel`.
+            position_ids(Tensor, optional):
+                See :class:`AlbertModel`.
+            head_mask (Tensor, optional):
+                See :class:`AlbertModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`AlbertModel`.
+            labels (Tensor, optional):
+                Labels for computing the multiple choice classification loss. Indices should be in
+                 ``[0, ..., num_choices-1]`` where `num_choices` is the size of the second dimension of the
+                 input tensors. (see `input_ids` above).
+            return_dict (bool, optional):
+                See :class:`AlbertModel`.
+
+        Returns:
+            Tensor or dict: `reshaped_logits` or a dict with `logits`, `hidden_states`, `attentions` fields.
+
+            With the fields:
+
+            - `reshaped_logits` (Tensor): The reshaped logits of the claissifer.
+            - `logits`: Also is `reshaped_logits`.
+            - `hidden_states` (Tensor): Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+            - `attention` (Tensor): Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+
+        '''
+
         num_choices = input_ids.shape[1] if input_ids is not None else inputs_embeds.shape[1]
 
         input_ids = input_ids.reshape([-1, input_ids.shape[-1]]) \

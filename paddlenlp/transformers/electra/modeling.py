@@ -305,6 +305,60 @@ class ElectraPretrainedModel(PretrainedModel):
 
 @register_base_model
 class ElectraModel(ElectraPretrainedModel):
+    """
+    The bare Electra Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Check the superclass documentation for the generic methods and the library implements for all its model.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in `ElectraModel`. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling `ElectraModel`.
+        hidden_size (int):
+            Dimensionality of the encoder layers and the pooler layer.
+        num_hidden_layers (int):
+            Number of hidden layers in a hidden group in the Transformer encoder.
+        num_attention_heads (int):
+            Number of attention heads for each attention layer in the Transformer encoder.
+        intermediate_size (int):
+            Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
+        hidden_act (str):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported.
+        hidden_dropout_prob (float):
+            The dropout probability for all fully connected layers in the embeddings and encoder.
+        attention_probs_dropout_prob (float):
+            The dropout probability for all fully connected layers in the pooler.
+        max_position_embeddings (int):
+            The maximum value of the dimensionality of position encoding. The dimensionality of position encoding
+            is the dimensionality of the sequence in `ElectraModel`.
+        type_vocab_size (int):
+            The vocabulary size of `token_type_ids` passed when calling `~ transformers.BertModel`.
+            `token_type_ids` are segment token indices to indicate first
+             and second portions of the inputs. Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+        initializer_range (float):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`ElectraPretrainedModel.init_weights()` for how weights are initialized in `ElectraModel`.
+
+        pad_token_id (int, optional):
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
+
+    """
+
     def __init__(self, vocab_size, embedding_size, hidden_size,
                  num_hidden_layers, num_attention_heads, intermediate_size,
                  hidden_act, hidden_dropout_prob, attention_probs_dropout_prob,
@@ -343,6 +397,58 @@ class ElectraModel(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r'''
+        The ElectraModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate first and second portions of the inputs.
+                Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                config.max_position_embeddings - 1]``.
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attention_mask (Tensor, optional):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set to **-infinity**
+                for any positions in mask that are **0**, and will be **unchanged** for positions that
+                are **1**.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It's data type should be 'float32' and has a shape of [batch_size, sequence_length].
+                Defaults to 'None'.
+
+
+        Returns:
+            Tensor: encoder_output(Tensor):
+                Sequence of output at hidden layers of the model. Its data type should be float32 and
+                has a shape of [batch_size, sequence_length, hidden_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ElectraModel, ElectraTokenizer
+
+                tokenizer = ElectraTokenizer.from_pretrained('electra-small')
+                model = ElectraModel.from_pretrained('electra-small')
+
+                inputs = tokenizer("This is a test example.")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        '''
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
@@ -364,6 +470,14 @@ class ElectraModel(ElectraPretrainedModel):
 
 
 class ElectraDiscriminator(ElectraPretrainedModel):
+    """
+    Electra Model with a discriminator head on top
+
+    Args:
+        electra (:class:`ElectraModel`):
+            An instance of ElectraModel.
+    """
+
     def __init__(self, electra):
         super(ElectraDiscriminator, self).__init__()
 
@@ -378,6 +492,38 @@ class ElectraDiscriminator(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r"""
+        The ElectraDiscriminator forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ElectraModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            position_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ElectraModel`.
+
+        Returns:
+            logits (Tensor):
+                A Tensor of the discriminator_predictions logits.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ElectraDiscriminator
+                from paddlenlp.transformers import ElectraTokenizer
+
+                tokenizer = ElectraTokenizer.from_pretrained('electra-base')
+                model = ElectraDiscriminator.from_pretrained('electra-base',num_classes=2)
+
+                inputs = tokenizer("This is a test example.")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+
+        """
 
         discriminator_sequence_output = self.electra(
             input_ids, token_type_ids, position_ids, attention_mask)
@@ -388,6 +534,14 @@ class ElectraDiscriminator(ElectraPretrainedModel):
 
 
 class ElectraGenerator(ElectraPretrainedModel):
+    """
+    Electra Model with a generator head on top (a linear layer on top of the pooled output).
+
+    Args:
+        electra (:class:`ElectraModel`):
+            An instance of ElectraModel.
+    """
+
     def __init__(self, electra):
         super(ElectraGenerator, self).__init__()
 
@@ -416,6 +570,40 @@ class ElectraGenerator(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r"""
+        The ElectraGenerator forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ElectraModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            position_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ElectraModel`.
+
+        Returns:
+            prediction_scores (Tensor):
+                A Tensor of the generator logits.
+                Shape as `(batch_size, seq_lens, vocab_size)`, seq_lens mean the number of tokens of the input sequence.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ElectraGenerator
+                from paddlenlp.transformers import ElectraTokenizer
+
+                tokenizer = ElectraTokenizer.from_pretrained('electra-base')
+                model = ElectraGenerator.from_pretrained('electra-base',num_classes=2)
+
+                inputs = tokenizer("This is a test example.")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                prediction_scores = model(**inputs)
+
+        """
+
 
         generator_sequence_output = self.electra(input_ids, token_type_ids,
                                                  position_ids, attention_mask)
@@ -436,7 +624,17 @@ class ElectraGenerator(ElectraPretrainedModel):
 
 # class ElectraClassificationHead and ElectraForSequenceClassification for fine-tuning
 class ElectraClassificationHead(nn.Layer):
-    """Head for sentence-level classification tasks."""
+    """
+    Head for sentence-level classification tasks.
+
+    Args:
+            hidden_size (int):
+                See :class:`ElectraModel`.
+            hidden_dropout_prob (int):
+                See :class:`ElectraModel`.
+            num_classes (int):
+                See :class:`ElectraModel`.
+    """
 
     def __init__(self, hidden_size, hidden_dropout_prob, num_classes):
         super(ElectraClassificationHead, self).__init__()
@@ -446,6 +644,16 @@ class ElectraClassificationHead(nn.Layer):
         self.act = get_activation("gelu")
 
     def forward(self, features, **kwargs):
+        """
+
+    Args:
+            features (Tensor):
+                Features of the classification model.
+            **kwargs (list):
+                unpacked dict arguments
+
+        """
+
         x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
         x = self.dropout(x)
         x = self.dense(x)
@@ -456,6 +664,17 @@ class ElectraClassificationHead(nn.Layer):
 
 
 class ElectraForSequenceClassification(ElectraPretrainedModel):
+    """
+    Electra Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
+
+    Args:
+        electrabert (:class:`ElectraModel`):
+            An instance of ElectraModel.
+        num_classes (int, optional):
+            The number of classes.
+    """
+
     def __init__(self, electra, num_classes):
         super(ElectraForSequenceClassification, self).__init__()
         self.num_classes = num_classes
@@ -471,6 +690,40 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r"""
+        The ElectraForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ElectraModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            position_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ElectraModel`.
+
+        Returns:
+            logits (Tensor):
+                A Tensor of the input text classification logits.
+                Shape as `(batch_size, num_classes)` and dtype as `float`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ElectraForSequenceClassification
+                from paddlenlp.transformers import ElectraTokenizer
+
+                tokenizer = ElectraTokenizer.from_pretrained('electra-base')
+                model = ElectraForSequenceClassification.from_pretrained('electra-base',num_classes=2)
+
+                inputs = tokenizer("This is a test example.")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
 
         sequence_output = self.electra(input_ids, token_type_ids, position_ids,
                                        attention_mask)
@@ -481,6 +734,17 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
 
 
 class ElectraForTokenClassification(ElectraPretrainedModel):
+    """
+    Electra Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        electrabert (:class:`ElectraModel`):
+            An instance of ElectraModel.
+        num_classes (int, optional):
+            The number of classes.
+    """
+
     def __init__(self, electra, num_classes):
         super(ElectraForTokenClassification, self).__init__()
         self.num_classes = num_classes
@@ -495,6 +759,40 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r"""
+        The ElectraForTokenClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ElectraModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            position_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ElectraModel`.
+
+        Returns:
+            logits (Tensor):
+                A Tensor of the input text classification logits, shape as `(batch_size, seq_lens, num_classes)`.
+                seq_lens mean the number of tokens of the input sequence.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ElectraForTokenClassification
+                from paddlenlp.transformers import ElectraTokenizer
+
+                tokenizer = ElectraTokenizer.from_pretrained('electra-small')
+                model = ElectraForTokenClassification.from_pretrained('electra-small',num_classes=2)
+
+                inputs = tokenizer("This is a test example.")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
 
         sequence_output = self.electra(input_ids, token_type_ids, position_ids,
                                        attention_mask)
@@ -675,6 +973,29 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
                 attention_mask=None,
                 raw_input_ids=None,
                 gen_labels=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+               See :class:`ElectraModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            position_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ElectraModel`.
+
+        Returns:
+            Tuple: A tuple of shape `(gen_logits, disc_logits, disc_labels, attention_mask)`.
+
+            With the fields:
+
+            - `gen_logits`(Tensor): Logits of the generator.
+            - `disc_logits`(Tensor): Logits of the discriminator.
+            - `disc_labels`(Tensor): Labels of the discriminator.
+            - `attention_mask`(Tensor): Mask to indicate whether to perform attention on each input token or not.
+
+        """
 
         assert (
             gen_labels is not None
@@ -700,6 +1021,19 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
 
 
 class ElectraPretrainingCriterion(paddle.nn.Layer):
+    """
+    Electra Criterion for a pretraining task on top.
+
+    Args:
+        vocab_size (int):
+            See :class:`ElectraModel`.
+        gen_weight (Tensor):
+            Weights of the electra generator.
+        disc_weight (Tensor):
+            Weights of the electra discriminator.
+
+    """
+
     def __init__(self, vocab_size, gen_weight, disc_weight):
         super(ElectraPretrainingCriterion, self).__init__()
 
@@ -712,6 +1046,25 @@ class ElectraPretrainingCriterion(paddle.nn.Layer):
     def forward(self, generator_prediction_scores,
                 discriminator_prediction_scores, generator_labels,
                 discriminator_labels, attention_mask):
+        r"""
+        The ElectraPretrainingCriterion forward method, overrides the __call__() special method.
+
+        Args:
+            generator_prediction_scores (Tensor):
+                The logits of generator.
+            discriminator_prediction_scores (Tensor):
+                The logits of discriminator.
+            generator_labels (Tensor):
+                The labels of the generator.
+            discriminator_labels (Tensor):
+                The labels of the discriminator.
+            attention_mask (Tensor or int):
+                Mask to indicate whether to perform attention on each input token or not.
+
+        Returns:
+            Float: The pretraining loss.
+        """
+
         # generator loss
         gen_loss = self.gen_loss_fct(
             paddle.reshape(generator_prediction_scores, [-1, self.vocab_size]),

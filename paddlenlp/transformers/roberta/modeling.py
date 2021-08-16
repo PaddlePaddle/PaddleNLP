@@ -347,7 +347,9 @@ class RobertaModel(RobertaPretrainedModel):
 
 class RobertaForQuestionAnswering(RobertaPretrainedModel):
     r"""
-    Model for Question Answering task with RoBERTa.
+    RoBERTa Model with a span classification head on top for extractive question-answering tasks like
+    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
+    `span end logits`).
 
     Args:
         roberta (`RobertaModel`):
@@ -377,8 +379,13 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
 
             With the fields:
 
-            - start_logits(Tensor): The logits of start position of prediction answer.
-            - end_logits(Tensor): The logits of end position of prediction answer.
+            - start_logits(Tensor): Labels for position (index) of the start of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            sequence are not taken into account for computing the loss.
+
+            - end_logits(Tensor): Labels for position (index) of the end of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            sequence are not taken into account for computing the loss.
 
         Example:
             .. code-block::
@@ -449,7 +456,6 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 See :class:`RoBertaModel`.
             attention_mask (Tensor, optional):
                 See :class:`RoBertaModel`.
-
 
         Returns:
             logits (Tensor):
@@ -527,7 +533,7 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
 
         Returns:
             logits (Tensor):
-                A Tensor of the input text classification logits, shape as (`batch_size, seq_lens, num_classes`).
+                A Tensor of the input text classification logits, shape as `(batch_size, seq_lens, num_classes)`.
                 seq_lens mean the number of tokens of the input sequence.
 
         Example:

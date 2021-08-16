@@ -430,8 +430,9 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
 
 class ErnieForQuestionAnswering(ErniePretrainedModel):
     """
-    Model for Question and Answering task with ERNIE.
-
+    ERNIE Model with a span classification head on top for extractive question-answering tasks like
+    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
+    `span end logits`).
 
     Args:
         ernie (`ErnieModel`): 
@@ -465,8 +466,13 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
 
             With the fields:
 
-            - start_logits(Tensor): The logits of start position of prediction answer.
-            - end_logits(Tensor): The logits of end position of prediction answer.
+            - start_logits(Tensor): Labels for position (index) of the start of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            sequence are not taken into account for computing the loss.
+
+            - end_logits(Tensor): Labels for position (index) of the end of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            sequence are not taken into account for computing the loss.
 
         Example:
             .. code-block::

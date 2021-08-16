@@ -750,7 +750,7 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
 
 class BigBirdPretrainingCriterion(paddle.nn.Layer):
     """
-    BigBird Criterion for a pretraiing task on top.
+    BigBird Criterion for a pretraining task on top.
 
     Args:
         vocab_size (int):

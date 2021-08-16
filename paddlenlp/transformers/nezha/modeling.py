@@ -492,7 +492,7 @@ class NeZhaModel(NeZhaPretrainedModel):
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `BertModel`.
+                See :meth:`NeZhaPretrainedModel.init_weights()` for how weights are initialized in `NeZhaModel`.
 
         max_relative_positions(int, optional):
             The maximum value of relative position.
@@ -790,7 +790,9 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
 
 class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
     r"""
-    Model for Question Answering task with NeZha.
+    NeZha Model with a span classification head on top for extractive question-answering tasks like
+    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
+    `span end logits`).
 
     Args:
         nezha (:class:`NeZhaModel`):
@@ -821,8 +823,13 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
 
             With the fields:
 
-            - start_logits(Tensor): The logits of start position of prediction answer.
-            - end_logits(Tensor): The logits of end position of prediction answer.
+            - start_logits(Tensor): Labels for position (index) of the start of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            sequence are not taken into account for computing the loss.
+
+            - end_logits(Tensor): Labels for position (index) of the end of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            sequence are not taken into account for computing the loss.
 
         Example:
             .. code-block::
@@ -959,8 +966,8 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
 
         Returns:
             logits (Tensor):
-                A Tensor of the input token classification logits.
-                Shape as `(batch_size, num_classes)` and dtype as `float`.
+                A Tensor of the input text classification logits, shape as `(batch_size, seq_lens, num_classes)`.
+                seq_lens mean the number of tokens of the input sequence.
 
         Example:
             .. code-block::
@@ -989,7 +996,8 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
 
 class NeZhaForMultipleChoice(NeZhaPretrainedModel):
     """
-    Model for multiple choice task with NeZha.
+    NeZha Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
+    softmax) e.g. for RocStories/SWAG tasks..
 
     Args:
         nezha (:class:`NeZhaModel`):
@@ -1022,9 +1030,8 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
                 See :class:`NeZhaModel`.
 
         Returns:
-            logits (Tensor):
-                A Tensor of the input token classification logits.
-                Shape as `(batch_size, num_classes)` and dtype as `float`.
+            reshaped_logits (Tensor): The reshaped logits of the claissifer.
+
         """
 
         # input_ids: [bs, num_choice, seq_l]

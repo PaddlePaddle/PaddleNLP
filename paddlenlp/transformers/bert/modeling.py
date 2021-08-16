@@ -523,7 +523,9 @@ class BertModel(BertPretrainedModel):
 
 class BertForQuestionAnswering(BertPretrainedModel):
     """
-    Model for question answering task with BERT.
+    Bert Model with a span classification head on top for extractive question-answering tasks like
+    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
+    `span end logits`).
 
     Args:
         bert (:class:`BertModel`):
@@ -554,8 +556,13 @@ class BertForQuestionAnswering(BertPretrainedModel):
 
             With the fields:
 
-            - start_logits(Tensor): The logits of start position of prediction answer.
-            - end_logits(Tensor): The logits of end position of prediction answer.
+            - start_logits(Tensor): Labels for position (index) of the start of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            sequence are not taken into account for computing the loss.
+
+            - end_logits(Tensor): Labels for position (index) of the end of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            sequence are not taken into account for computing the loss.
 
         Example:
             .. code-block::
@@ -711,8 +718,8 @@ class BertForTokenClassification(BertPretrainedModel):
 
         Returns:
             logits (Tensor):
-                A Tensor of the input token classification logits.
-                Shape as `(batch_size, num_classes)` and dtype as `float`.
+                A Tensor of the input text classification logits, shape as `(batch_size, seq_lens, num_classes)`.
+                seq_lens mean the number of tokens of the input sequence.
 
         Example:
             .. code-block::

@@ -184,7 +184,7 @@ class DistilBertModel(DistilBertPretrainedModel):
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `DistilBertModel`.
+                See :meth:`DistilBertPretrainedModel.init_weights()` for how weights are initialized in `DistilBertModel`.
 
         pad_token_id (int, optional):
             The index of padding token in the token vocabulary.
@@ -349,7 +349,9 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
 
 class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
     """
-    DistilBert Model with a question answering head on top (a linear layer on top of the pooled output).
+    DistilBert Model with a span classification head on top for extractive question-answering tasks like
+    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
+    `span end logits`).
 
     Args:
         distilbert (:class:`DistilBertModel`):
@@ -383,8 +385,13 @@ class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
 
             With the fields:
 
-            - start_logits(Tensor): The logits of start position of prediction answer.
-            - end_logits(Tensor): The logits of end position of prediction answer.
+            - start_logits(Tensor): Labels for position (index) of the start of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            sequence are not taken into account for computing the loss.
+
+            - end_logits(Tensor): Labels for position (index) of the end of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            sequence are not taken into account for computing the loss.
 
         Example:
             .. code-block::
@@ -451,8 +458,8 @@ class DistilBertForTokenClassification(DistilBertPretrainedModel):
 
         Returns:
             logits (Tensor):
-                A Tensor of the input token classification logits.
-                Shape as `(batch_size, num_classes)` and dtype as `float`.
+                A Tensor of the input text classification logits, shape as `(batch_size, seq_lens, num_classes)`.
+                seq_lens mean the number of tokens of the input sequence.
 
         Example:
             .. code-block::
@@ -480,6 +487,14 @@ class DistilBertForTokenClassification(DistilBertPretrainedModel):
 
 
 class DistilBertForMaskedLM(DistilBertPretrainedModel):
+    """
+    DistilBert Model with a `language modeling` head on top.
+
+    Args:
+        distilbert (:class:`DistilBertModel`):
+            An instance of DistilBertModel.
+    """
+
     def __init__(self, distilbert):
         super(DistilBertForMaskedLM, self).__init__()
         self.distilbert = distilbert
@@ -494,6 +509,32 @@ class DistilBertForMaskedLM(DistilBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids=None, attention_mask=None):
+        r'''
+        The DistilBertModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`DistilBertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`DistilBertModel`.
+
+        Returns:
+            prediction_logits (Tensor): The scores of prediction on masked token.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import DistilBertForMaskedLM, AlbertTokenizer
+
+                tokenizer = AlbertTokenizer.from_pretrained('distilbert-base-uncased')
+                model = DistilBertForMaskedLM.from_pretrained('distilbert-base-uncased')
+
+                inputs = tokenizer("This is a test example.")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                prediction_logits = model(**inputs)
+        '''
+
         distilbert_output = self.distilbert(
             input_ids=input_ids, attention_mask=attention_mask)
         prediction_logits = self.vocab_transform(distilbert_output)

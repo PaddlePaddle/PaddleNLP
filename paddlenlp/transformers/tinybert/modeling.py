@@ -214,7 +214,7 @@ class TinyBertModel(TinyBertPretrainedModel):
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `BertModel`.
+                See :meth:`TinyBertPretrainedModel.init_weights()` for how weights are initialized in `TinyBertModel`.
 
         pad_token_id (int, optional):
             The index of padding token in the token vocabulary.
