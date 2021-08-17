@@ -28,6 +28,7 @@ class QuestionMatching(nn.Layer):
         # num_labels = 2 (similar or dissimilar)
         self.classifier = nn.Linear(self.ptm.config["hidden_size"], 2)
         self.rdrop_coef = rdrop_coef
+        self.rdrop_loss = ppnlp.losses.RDropLoss()
 
     def forward(self,
                 input_ids,
@@ -48,7 +49,7 @@ class QuestionMatching(nn.Layer):
                                     attention_mask)
             cls_embedding2 = self.dropout(cls_embedding2)
             logits2 = self.classifier(cls_embedding2)
-            kl_loss = ppnlp.layers.rdrop_loss(logits1, logits2)
+            kl_loss = self.rdrop_loss(logits1, logits2)
         else:
             kl_loss = 0.0
 
