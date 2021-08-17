@@ -140,9 +140,6 @@ def do_train(args):
         batch_id = 0
         batch_start = time.time()
         for input_data in train_loader:
-            #NOTE: Used for benchmark and use None as default. 
-            if args.max_iter and step_idx == args.max_iter:
-                break
             train_reader_cost = time.time() - batch_start
             (src_word, trg_word, lbl_word) = input_data
 
@@ -237,6 +234,9 @@ def do_train(args):
                     paddle.save(optimizer.state_dict(),
                                 os.path.join(model_dir, "transformer.pdopt"))
 
+            #NOTE: Used for benchmark and use None as default. 
+            if args.max_iter and step_idx == args.max_iter:
+                break
             batch_id += 1
             step_idx += 1
             scheduler.step()

@@ -17,6 +17,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.fluid.framework import in_dygraph_mode
 
 from paddle.fluid.layer_helper import LayerHelper
 import paddle
@@ -182,7 +183,12 @@ def finalize(beam_size,
 
 def transfer_param(p, is_bias=False, restore_data=False):
     param_shape = p.shape
-    param_data = p.numpy()
+    if restore_data:
+        if in_dygraph_mode():
+            param_data = p.numpy()
+        else:
+            param_data = np.array(paddle.static.global_scope().find_var(p.name)
+                                  .get_tensor())
     del p
     return paddle.create_parameter(
         shape=param_shape,
