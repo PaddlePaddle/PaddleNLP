@@ -9,6 +9,10 @@
 |—— task_label_description.py # 各个 task 的 label 文本描述
 |—— evaluate.py # 针对 FewCLUE 9 个数据集的评估函数
 |—— predict.py # 针对 FewCLUE 9 个数据集进行预测
+|—— export_model.py # 动态图参数导出静态图参数脚本
+|—— deploy # 部署
+	|—— python # 部署
+		|—— predict.py # python预测部署示例
 ```
 
 ## 基于 FewCLUE 进行 EFL 实验
@@ -47,6 +51,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
 模型每训练 1 个 epoch,  会在验证集上进行评估，并针对测试集进行预测存储到预测结果文件。
 
 ### 模型预测
+#### 基于动态图的预测
 通过如下命令，指定 GPU 0 卡， 在 `FewCLUE` 的 `iflytek` 数据集上进行预测
 ```
 python -u -m paddle.distributed.launch --gpus "0" predict.py \
@@ -56,6 +61,20 @@ python -u -m paddle.distributed.launch --gpus "0" predict.py \
         --output_dir "./output" \
         --batch_size 32 \
         --max_seq_length 512
+```
+
+#### 基于静态图的预测部署
+
+使用动态图训练结束之后，可以将动态图参数导出成静态图参数，从而获得最优的预测部署性能，执行如下命令完成动态图转换静态图的功能:
+```
+python export_model.py --params_path=./checkpoint/model_100/model_state.pdparams --output_path=./output
+
+```
+
+导出静态图模型之后，可以用于部署，`deploy/python/predict.py` 脚本提供了 python 部署预测示例。运行方式：
+```
+python deploy/python/predict.py --model_dir=./output
+
 ```
 
 ## References
