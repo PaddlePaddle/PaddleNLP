@@ -50,7 +50,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
 模型每训练 1 个 epoch,  会在验证集上进行评估
 
 ### 模型预测
-通过如下命令，指定 GPU 0 卡， 在 `FewCLUE` 的 `iflytek` 数据集上进行预测
+通过如下命令，指定 GPU 0 卡， 在 `FewCLUE` 的 `tnews` 数据集上进行预测
 ```
 python -u -m paddle.distributed.launch --gpus "0" predict.py \
         --task_name "tnews" \
@@ -62,4 +62,4 @@ python -u -m paddle.distributed.launch --gpus "0" predict.py \
 ```
 
 ## References
-[1] Wang, S., Fang, H., Khabsa, M., Mao, H., and Ma, H., “Entailment as Few-Shot Learner”, ArXiv:2001.07676 [Cs], 2021. https://arxiv.org/abs/2001.07676
+[1] Schick, Timo, and Hinrich Schütze. “Exploiting Cloze Questions for Few Shot Text Classification and Natural Language Inference.” ArXiv:2001.07676 [Cs], January 25, 2021. http://arxiv.org/abs/2001.07676.
