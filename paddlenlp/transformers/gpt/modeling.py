@@ -805,7 +805,8 @@ class GPTModel(GPTPretrainedModel):
                 It's data type should be 'float32' and has a shape of [batch_size, sequence_length].
                 Defaults to 'None'.
             use_cache (bool, optional):
-                Whether or not to use cache. Defaults to `False`.
+                Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
+                can be used to speed up decoding.
             cache (Tensor, optional):
                 Model cache, defaults to `None`.
 
@@ -925,7 +926,7 @@ class GPTForPretraining(GPTPretrainedModel):
         Returns:
             (`logits`,`cached_kvs`) or `logits`(Tensor):
                 `logits` is the output of the gpt model.
-                 `cache_kvs` is the cache output of gpt model if `use_cache` is True.
+                `cache_kvs` is the cache output of gpt model if `use_cache` is True.
 
         """
 
@@ -950,9 +951,7 @@ class GPTForPretraining(GPTPretrainedModel):
 
 class GPTPretrainingCriterion(paddle.nn.Layer):
     """
-    Criterion for GPT.
-
-    It calculates the final loss.
+    GPT Criterion for a pretraining task on top. It calculates the final loss.
     """
 
     def __init__(self, topo=None):
@@ -963,6 +962,7 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
             self.loss_func = paddle.distributed.collective._c_softmax_with_cross_entropy
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
+
         masked_lm_loss = self.loss_func(prediction_scores,
                                         masked_lm_labels.unsqueeze(2))
 
@@ -1037,12 +1037,18 @@ class GPTLMHead(nn.Layer):
             is_bias=True) if embedding_weights is None else embedding_weights
 
     def forward(self, hidden_states):
+        """
+        Args:
+            hidden_states(Tensor):
+                hidden states of the
+        """
         logits = paddle.tensor.matmul(
             hidden_states, self.decoder_weight, transpose_y=True)
         return logits
 
 
 class GPTLMHeadModel(GPTPretrainedModel):
+
     def __init__(self, gpt):
         super(GPTLMHeadModel, self).__init__()
         self.gpt = gpt
@@ -1057,6 +1063,29 @@ class GPTLMHeadModel(GPTPretrainedModel):
                 attention_mask=None,
                 use_cache=False,
                 cache=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`GPTModel`.
+            position_ids (Tensor, optional):
+                See :class:`GPTModel`.
+            attention_mask (Tensor, optional):
+                See :class:`GPTModel`.
+            masked_positions (Tensor, optional):
+                See :class:`GPTModel`.
+            use_cache (bool, optional):
+                See :class:`GPTModel`.
+            cache (Tensor, optional):
+                See :class:`GPTModel`.
+
+        Returns:
+            (`logits`,`cached_kvs`) or `logits`(Tensor):
+                `logits` is the output of the gpt model.
+                `cache_kvs` is the cache output of gpt model if `use_cache` is True.
+
+        """
+
         outputs = self.gpt(input_ids,
                            position_ids=position_ids,
                            attention_mask=attention_mask,
