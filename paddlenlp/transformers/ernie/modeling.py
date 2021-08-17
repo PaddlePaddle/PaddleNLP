@@ -744,7 +744,31 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
 
     def forward(self, prediction_scores, seq_relationship_score,
                 masked_lm_labels, next_sentence_labels, masked_lm_scale):
+        """
+        Args:
+            prediction_scores(Tensor):
+                The logits of masked token prediction. Its data type should be float32 and
+                its shape is [batch_size, sequence_len, vocab_size]
+            seq_relationship_score(Tensor):
+                The logits whether 2 sequences are NSP relationship. Its data type should be float32 and
+                its shape is [batch_size, 2]
+            masked_lm_labels(Tensor):
+                The labels of the masked language modeling, the dimensionality of `masked_lm_labels`
+                is equal to `prediction_scores`. Its data type should be int64 and
+                its shape is [mask_token_num, 1]
+            next_sentence_labels(Tensor):
+                The labels of the next sentence prediction task, the dimensionality of `next_sentence_labels`
+                is equal to `seq_relation_lables`. Its data type should be int64 and
+                its shape is [batch_size, 1]
+            masked_lm_scale(Tensor or int):
+                The scale of masked tokens. Used for the normalization of masked language modeling loss.
+                If it is a `Tensor`, its data type should be int64 and
+                its shape is [mask_token_num, 1]
 
+        Returns:
+            Float: The pretraining loss, equals to the sum of `masked_lm_loss` plus the mean of `next_sentence_loss`.
+
+        """
         with paddle.static.amp.fp16_guard():
             masked_lm_loss = F.cross_entropy(
                 prediction_scores,

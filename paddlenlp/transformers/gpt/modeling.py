@@ -962,7 +962,21 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
             self.loss_func = paddle.distributed.collective._c_softmax_with_cross_entropy
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
+        """
+        Args:
+            prediction_scores(Tensor):
+                The logits of masked token prediction. Its data type should be float32 and
+                its shape is [batch_size, sequence_len, vocab_size]
+            masked_lm_labels(Tensor):
+                The labels of the masked language modeling, the dimensionality of `masked_lm_labels`
+                is equal to `prediction_scores`. Its data type should be int64 and
+                its shape is [mask_token_num, 1]
+            loss_mask(Tensor):
+                The loss of masked tokens.
+        Returns:
+            Float: The pretraining loss.
 
+        """
         masked_lm_loss = self.loss_func(prediction_scores,
                                         masked_lm_labels.unsqueeze(2))
 
@@ -976,6 +990,14 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
     """
     The generate model for GPT-2.
     It use the greedy strategy and generate the next word with highest probability.
+
+    Args:
+
+        gpt (:class:`GPTModel`):
+            An instance of `paddlenlp.transformers.GPTModel`.
+        max_predict_len(int):
+            The max length of the prediction.
+
     """
 
     def __init__(self, gpt, max_predict_len):
@@ -1011,6 +1033,23 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
             return logits
 
     def forward(self, input_ids, end_id):
+        """
+
+        Args:
+
+            input_ids(Tensor):
+                See :class:`GPTModel`.
+            end_id(Tensor):
+                End id of the GreedyGeneration model.
+
+        Returns:
+            src_ids(Tensor):
+                Indices of output sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the output sequence.
+
+
+        """
+
         output, cached_kvs = self.model(input_ids, use_cache=True, cache=None)
         src_ids = input_ids
         nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
@@ -1037,17 +1076,17 @@ class GPTLMHead(nn.Layer):
             is_bias=True) if embedding_weights is None else embedding_weights
 
     def forward(self, hidden_states):
-        """
-        Args:
-            hidden_states(Tensor):
-                hidden states of the
-        """
         logits = paddle.tensor.matmul(
             hidden_states, self.decoder_weight, transpose_y=True)
         return logits
 
 
 class GPTLMHeadModel(GPTPretrainedModel):
+    """
+    The GPT Model with a language modeling head on top (linear layer with weights tied to the input
+    embeddings).
+
+    """
 
     def __init__(self, gpt):
         super(GPTLMHeadModel, self).__init__()
