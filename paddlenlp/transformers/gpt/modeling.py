@@ -653,8 +653,55 @@ class GPTPretrainedModel(PretrainedModel):
 
 @register_base_model
 class GPTModel(GPTPretrainedModel):
-    """
-    The base model of gpt.
+    r"""
+    The bare GPT Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+
+        vocab_size (int):
+            Vocabulary size of the ERNIE model. Also is the vocab size of token embedding matrix.
+        hidden_size (int, optional):
+            Dimension of the encoder layers and the pooler layer. Defaults to `768`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in the Transformer encoder. Defaults to `12`.
+        num_attention_heads (int, optional):
+            Number of attention heads for each attention layer in the Transformer encoder.
+            Defaults to `12`.
+        intermediate_size (int, optional):
+            Dimension of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
+            Defaults to `3072`.
+        hidden_act (str, optional):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported. Defaults to `"gelu"`.
+        hidden_dropout_prob (float, optional):
+            The dropout probability for all fully connected layers in the embeddings and encoder.
+            Defaults to `0.1`.
+        attention_probs_dropout_prob (float, optional):
+            The dropout probability for all fully connected layers in the pooler.
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
+            The max position index of an input sequence. Defaults to `512`.
+        type_vocab_size (int, optional):
+            The vocabulary size of the `token_type_ids` passed when calling `~transformers.ErnieModel`.
+            Defaults to `2`.
+        initializer_range (float, optional):
+            The standard deviation of the normal initializer. Defaults to `0.02`.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`GPTPretrainedModel._init_weights()` for how weights are initialized in `GPTModel`.
+
+        pad_token_id(int, optional):
+            The pad token index in the token vocabulary.
+
     """
 
     def __init__(self,
@@ -734,6 +781,53 @@ class GPTModel(GPTPretrainedModel):
                 attention_mask=None,
                 use_cache=False,
                 cache=None):
+        r'''
+        The GPTModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                config.max_position_embeddings - 1]``.
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attention_mask (Tensor, optional):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set to **-infinity**
+                for any positions in mask that are **0**, and will be **unchanged** for positions that
+                are **1**.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It's data type should be 'float32' and has a shape of [batch_size, sequence_length].
+                Defaults to 'None'.
+            use_cache (bool, optional):
+                Whether or not to use cache. Defaults to `False`.
+            cache (Tensor, optional):
+                Model cache, defaults to `None`.
+
+        Returns:
+            encoder_output(Tensor):
+                Sequence of output at the last layer of the model. Its data type should be float32 and
+                has a shape of [batch_size, sequence_length, hidden_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import GPTModel, GPTTokenizer
+
+                tokenizer = GPTTokenizer.from_pretrained('gpt2-en')
+                model = GPTModel.from_pretrained('gpt2-en')
+
+                inputs = tokenizer("This is a test example.")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        '''
+
         self.checkpoints = []
         if position_ids is None:
             past_length = 0
@@ -776,9 +870,12 @@ class GPTModel(GPTPretrainedModel):
 
 class GPTForPretraining(GPTPretrainedModel):
     """
-    The pretraining model of GPT.
+    The pretraining model of GPT. It returns some logits and cached_kvs.
 
-    It returns some logits and cached_kvs.
+    Args:
+        gpt (:class:`GPTModel`):
+            An instance of :class:`GPTModel`.
+
     """
 
     def __init__(self, gpt):
@@ -809,6 +906,29 @@ class GPTForPretraining(GPTPretrainedModel):
                 masked_positions=None,
                 use_cache=False,
                 cache=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`GPTModel`.
+            position_ids (Tensor, optional):
+                See :class:`GPTModel`.
+            attention_mask (Tensor, optional):
+                See :class:`GPTModel`.
+            masked_positions (Tensor, optional):
+                See :class:`GPTModel`.
+            use_cache (bool, optional):
+                See :class:`GPTModel`.
+            cache (Tensor, optional):
+                See :class:`GPTModel`.
+
+        Returns:
+            (`logits`,`cached_kvs`) or `logits`(Tensor):
+                `logits` is the output of the gpt model.
+                 `cache_kvs` is the cache output of gpt model if `use_cache` is True.
+
+        """
+
         outputs = self.gpt(input_ids,
                            position_ids=position_ids,
                            attention_mask=attention_mask,
@@ -855,7 +975,7 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
 class GPTForGreedyGeneration(GPTPretrainedModel):
     """
     The generate model for GPT-2.
-    It use the greedy stategy and generate the next word with highest probablity.
+    It use the greedy strategy and generate the next word with highest probability.
     """
 
     def __init__(self, gpt, max_predict_len):

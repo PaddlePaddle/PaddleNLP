@@ -746,7 +746,7 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
         Args:
             input_ids (Tensor):
                 See :class:`NeZhaModel`.
-            token_tycpe_ids (Tensor, optional):
+            token_type_ids (Tensor, optional):
                 See :class:`NeZhaModel`.
             attention_mask (Tensor, optional):
                 See :class:`NeZhaModel`.
