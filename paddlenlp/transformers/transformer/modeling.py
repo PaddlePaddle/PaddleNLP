@@ -838,6 +838,7 @@ class TransformerModel(nn.Layer):
             np.array(
                 [[0.] + [-inf] * (beam_size - 1)], dtype="float32"))
         alive_log_probs = paddle.tile(initial_log_probs, [batch_size, 1])
+        # (batch_size, beam_size, 1)
         alive_seq = paddle.to_tensor(
             np.tile(
                 np.array(
@@ -868,50 +869,48 @@ class TransformerModel(nn.Layer):
         ## init states (caches) for transformer, need to be updated according to selected beam
         caches = self.transformer.decoder.gen_cache(enc_output, do_zip=False)
 
-        def update_states(caches, beam_idx, beam_size):
+        def update_states(caches, topk_coordinates, beam_size):
             new_caches = []
             for cache in caches:
-                k = gather_2d_by_gather(cache[0].k, beam_idx, beam_size,
-                                        batch_size, False)
-                v = gather_2d_by_gather(cache[0].v, beam_idx, beam_size,
-                                        batch_size, False)
+                k = gather_2d(
+                    cache[0].k,
+                    topk_coordinates,
+                    beam_size,
+                    batch_size,
+                    need_unmerge=True)
+                v = gather_2d(
+                    cache[0].v,
+                    topk_coordinates,
+                    beam_size,
+                    batch_size,
+                    need_unmerge=True)
                 new_caches.append((nn.MultiHeadAttention.Cache(k, v), cache[1]))
             return new_caches
 
-        def gather_2d_by_gather(tensor_nd,
-                                beam_idx,
-                                beam_size,
-                                batch_size,
-                                need_flat=True):
-            batch_idx = paddle.arange(
-                0, batch_size, 1, dtype="int64") * beam_size
-            flat_tensor = merge_beam_dim(tensor_nd) if need_flat else tensor_nd
-            idx = paddle.reshape(
-                paddle.add(beam_idx, batch_idx.unsqueeze(-1)), [-1])
-            new_flat_tensor = paddle.gather(flat_tensor, idx)
+        def get_topk_coordinates(beam_idx, beam_size, batch_size):
+            batch_pos = paddle.arange(batch_size * beam_size) // beam_size
+            batch_pos = paddle.reshape(batch_pos, [batch_size, beam_size])
+            topk_coordinates = paddle.stack([batch_pos, beam_idx], axis=2)
+            return topk_coordinates
+
+        def gather_2d(tensor_nd,
+                      topk_coordinates,
+                      beam_size,
+                      batch_size,
+                      need_unmerge=False):
             new_tensor_nd = paddle.reshape(
-                new_flat_tensor,
-                shape=[batch_size, beam_idx.shape[1]] +
-                tensor_nd.shape[2:]) if need_flat else new_flat_tensor
-            return new_tensor_nd
+                tensor_nd, shape=[batch_size, beam_size] +
+                tensor_nd.shape[1:]) if need_unmerge else tensor_nd
+            topk_seq = paddle.gather_nd(new_tensor_nd, topk_coordinates)
+            return merge_beam_dim(topk_seq) if need_unmerge else topk_seq
 
         def early_finish(alive_log_probs, finished_scores,
                          finished_in_finished):
             max_length_penalty = np.power(((5. + max_len) / 6.), alpha)
-            # The best possible score of the most likely alive sequence
             lower_bound_alive_scores = alive_log_probs[:,
                                                        0] / max_length_penalty
-
-            # Now to compute the lowest score of a finished sequence in finished
-            # If the sequence isn't finished, we multiply it's score by 0. since
-            # scores are all -ve, taking the min will give us the score of the lowest
-            # finished item.
             lowest_score_of_fininshed_in_finished = paddle.min(
                 finished_scores * finished_in_finished, 1)
-            # If none of the sequences have finished, then the min will be 0 and
-            # we have to replace it by -ve INF if it is. The score of any seq in alive
-            # will be much higher than -ve INF and the termination condition will not
-            # be met.
             lowest_score_of_fininshed_in_finished += (
                 1. - paddle.max(finished_in_finished, 1)) * -inf
             bound_is_met = paddle.all(
@@ -921,12 +920,18 @@ class TransformerModel(nn.Layer):
             return bound_is_met
 
         def grow_topk(i, logits, alive_seq, alive_log_probs, states):
+            """
+            This function takes the current alive sequences, and grows them to topk
+            sequences where k = 2*beam.
+            """
             logits = paddle.reshape(logits, [batch_size, beam_size, -1])
             candidate_log_probs = paddle.log(F.softmax(logits, axis=2))
             log_probs = paddle.add(candidate_log_probs,
                                    alive_log_probs.unsqueeze(-1))
 
-            length_penalty = np.power(5.0 + (i + 1.0) / 6.0, alpha)
+            # Length penalty is given by = (5+len(decode)/6) ^ -\alpha. Pls refer to
+            # https://arxiv.org/abs/1609.08144.
+            length_penalty = np.power(5.0 + (i.numpy()[0] + 1.0) / 6.0, alpha)
             curr_scores = log_probs / length_penalty
             flat_curr_scores = paddle.reshape(curr_scores, [batch_size, -1])
 
@@ -938,13 +943,14 @@ class TransformerModel(nn.Layer):
             topk_beam_index = topk_ids // self.trg_vocab_size
             topk_ids = topk_ids % self.trg_vocab_size
 
-            # use gather as gather_nd, TODO: use gather_nd
-            topk_seq = gather_2d_by_gather(alive_seq, topk_beam_index,
-                                           beam_size, batch_size)
+            topk_coordinates = get_topk_coordinates(topk_beam_index,
+                                                    beam_size * 2, batch_size)
+            topk_seq = gather_2d(alive_seq, topk_coordinates, beam_size,
+                                 batch_size)
             topk_seq = paddle.concat(
                 [topk_seq, paddle.reshape(topk_ids, topk_ids.shape + [1])],
                 axis=2)
-            states = update_states(states, topk_beam_index, beam_size)
+            states = update_states(states, topk_coordinates, beam_size)
             eos = paddle.full(
                 shape=topk_ids.shape, dtype="int64", fill_value=self.eos_id)
             topk_finished = paddle.cast(paddle.equal(topk_ids, eos), "float32")
@@ -955,18 +961,27 @@ class TransformerModel(nn.Layer):
 
         def grow_alive(curr_seq, curr_scores, curr_log_probs, curr_finished,
                        states):
+            """
+            Given sequences and scores, will gather the top k=beam size sequences
+            """
             curr_scores += curr_finished * -inf
             _, topk_indexes = paddle.topk(curr_scores, k=beam_size)
-            alive_seq = gather_2d_by_gather(curr_seq, topk_indexes,
-                                            beam_size * 2, batch_size)
-            alive_log_probs = gather_2d_by_gather(curr_log_probs, topk_indexes,
-                                                  beam_size * 2, batch_size)
-            states = update_states(states, topk_indexes, beam_size * 2)
+            topk_coordinates = get_topk_coordinates(topk_indexes, beam_size,
+                                                    batch_size)
+            alive_seq = gather_2d(curr_seq, topk_coordinates, beam_size,
+                                  batch_size)
+
+            alive_log_probs = gather_2d(curr_log_probs, topk_coordinates,
+                                        beam_size, batch_size)
+            states = update_states(states, topk_coordinates, beam_size * 2)
 
             return alive_seq, alive_log_probs, states
 
         def grow_finished(finished_seq, finished_scores, finished_flags,
                           curr_seq, curr_scores, curr_finished):
+            """
+            Given sequences and scores, will gather the top k=beam size sequences.
+            """
             # finished scores
             finished_seq = paddle.concat(
                 [
@@ -976,25 +991,26 @@ class TransformerModel(nn.Layer):
                         fill_value=self.eos_id)
                 ],
                 axis=2)
-            # Set the scores of the unfinished seq in curr_seq to large negative
-            # values
             curr_scores += (1. - curr_finished) * -inf
-            # concatenating the sequences and scores along beam axis
             curr_finished_seq = paddle.concat([finished_seq, curr_seq], axis=1)
             curr_finished_scores = paddle.concat(
                 [finished_scores, curr_scores], axis=1)
             curr_finished_flags = paddle.concat(
                 [finished_flags, curr_finished], axis=1)
             _, topk_indexes = paddle.topk(curr_finished_scores, k=beam_size)
-            finished_seq = gather_2d_by_gather(curr_finished_seq, topk_indexes,
-                                               beam_size * 3, batch_size)
-            finished_scores = gather_2d_by_gather(
-                curr_finished_scores, topk_indexes, beam_size * 3, batch_size)
-            finished_flags = gather_2d_by_gather(
-                curr_finished_flags, topk_indexes, beam_size * 3, batch_size)
+            topk_coordinates = get_topk_coordinates(topk_indexes, beam_size,
+                                                    batch_size)
+            finished_seq = gather_2d(curr_finished_seq, topk_coordinates,
+                                     beam_size, batch_size)
+            finished_scores = gather_2d(curr_finished_scores, topk_coordinates,
+                                        beam_size, batch_size)
+            finished_flags = gather_2d(curr_finished_flags, topk_coordinates,
+                                       beam_size, batch_size)
+
             return finished_seq, finished_scores, finished_flags
 
-        for i in range(max_len):
+        def inner_loop(i, trg_word, alive_seq, alive_log_probs, finished_seq,
+                       finished_scores, finished_flags, caches):
             trg_pos = paddle.full(
                 shape=trg_word.shape, dtype="int64", fill_value=i)
             trg_emb = self.trg_word_embedding(trg_word)
@@ -1006,11 +1022,7 @@ class TransformerModel(nn.Layer):
 
             logits, caches = self.transformer.decoder(
                 dec_input, enc_output, None, trg_src_attn_bias, caches)
-            logits = paddle.reshape(
-                logits,
-                shape=[-1, logits.shape[-1]], )
             logits = self.linear(logits)
-
             topk_seq, topk_log_probs, topk_scores, topk_finished, states = grow_topk(
                 i, logits, alive_seq, alive_log_probs, caches)
             alive_seq, alive_log_probs, states = grow_alive(
@@ -1021,15 +1033,23 @@ class TransformerModel(nn.Layer):
                 topk_scores, topk_finished)
             trg_word = paddle.reshape(alive_seq[:, :, -1],
                                       [batch_size * beam_size, 1])
+            return (i + 1, trg_word, alive_seq, alive_log_probs, finished_seq,
+                    finished_scores, finished_flags, caches)
 
-            if early_finish(alive_log_probs, finished_scores,
-                            finished_flags).numpy():
-                break
+        def is_not_finish(i, trg_word, alive_seq, alive_log_probs, finished_seq,
+                          finished_scores, finished_flags, caches):
+            return paddle.to_tensor(
+                i.numpy()[0] < max_len and
+                not (early_finish(alive_log_probs, finished_scores,
+                                  finished_flags).numpy()[0]))
 
-        # Accounting for corner case: It's possible that no sequence in alive for a
-        # particular batch item ever reached EOS. In that case, we should just copy
-        # the contents of alive for that batch item. if no sequence for that batch
-        # index had reached EOS. We need to do the same for the scores as well.
+        _, trg_word, alive_seq, alive_log_probs, finished_seq, finished_scores, finished_flags, caches = paddle.static.nn.while_loop(
+            is_not_finish,
+            inner_loop, [
+                paddle.zeros(shape=[1]), trg_word, alive_seq, alive_log_probs,
+                finished_seq, finished_scores, finished_flags, caches
+            ])
+
         finished_flags = paddle.any(paddle.cast(
             finished_flags, dtype='bool'),
                                     axis=1,
@@ -1039,7 +1059,6 @@ class TransformerModel(nn.Layer):
             finished_seq, alive_seq)
         finished_scores = paddle.where(finished_flags, finished_scores,
                                        alive_log_probs)
-
         return finished_seq, finished_scores
 
 
