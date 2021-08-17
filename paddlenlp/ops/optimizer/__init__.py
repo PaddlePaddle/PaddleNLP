@@ -16,6 +16,7 @@ from paddle.utils.cpp_extension import load
 
 from .adamw import AdamW
 from .AdamwOptimizer import AdamwOptimizer
+from .adamwdl import AdamWDL
 
 
 def _jit_compile():
@@ -43,4 +44,5 @@ __all__ = [
     '_jit_compile',
     'AdamW',
     'AdamwOptimizer',
+    'AdamWDL',
 ]

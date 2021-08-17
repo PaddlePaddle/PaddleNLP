@@ -77,7 +77,7 @@ python train.py --config ./configs/transformer.base.yaml
 同样，可以执行如下命令实现八卡训练：
 
 ``` sh
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train.py --config ./configs/transformer.base.yaml
 ```
 
@@ -154,7 +154,7 @@ python train.py --config ../configs/transformer.base.yaml
 ##### fleet 的方式启动单机多卡：
 ``` shell
 cd static/
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus="0,1,2,3,4,5,6,7" train.py --config ../configs/transformer.base.yaml --distributed
 ```
 
