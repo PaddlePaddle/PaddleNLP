@@ -39,8 +39,8 @@ class LinearChainCrf(nn.Layer):
             Num of labels.
         crf_lr (float, optional):
             The crf layer learning rate. Defaults to `0.1`.
-        with_start_stop_tag (`bool`, optional): 
-            If set to True, the start tag and stop tag will be considered, the transitions params will be a tensor with a shape of `[num_labels+2, num_labels+2]`.
+        with_start_stop_tag (bool, optional):
+            Weather to consider the start tag and stop tag. If set to True, the start tag and stop tag will be considered, the transitions params will be a tensor with a shape of `[num_labels+2, num_labels+2]`.
             Else, the transitions params will be a tensor with a shape of `[num_labels, num_labels]`.
     """
 
@@ -84,7 +84,8 @@ class LinearChainCrf(nn.Layer):
 
     def forward(self, inputs, lengths):
         """
-        Computes the normalization in a linear-chain CRF. See http://www.cs.columbia.edu/~mcollins/fb.pdf for reference.
+        Computes the normalization in a linear-chain CRF.
+        See http://www.cs.columbia.edu/~mcollins/fb.pdf for reference.
 
         .. math::
 
@@ -113,7 +114,7 @@ class LinearChainCrf(nn.Layer):
                 The input length. Its dtype is int64 and has a shape of `[batch_size]`.
 
         Returns:
-            norm_score (Tensor):
+            Tensor:norm_score:
                 The normalizers tensor. Its dtype is float32 and has a shape of `[batch_size]`.
         """
         batch_size, seq_len, n_labels = inputs.shape

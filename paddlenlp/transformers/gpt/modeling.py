@@ -811,7 +811,7 @@ class GPTModel(GPTPretrainedModel):
                 Model cache, defaults to `None`.
 
         Returns:
-            encoder_output(Tensor):
+            Tensor: encoder_output:
                 Sequence of output at the last layer of the model. Its data type should be float32 and
                 has a shape of [batch_size, sequence_length, hidden_size].
 
@@ -924,7 +924,7 @@ class GPTForPretraining(GPTPretrainedModel):
                 See :class:`GPTModel`.
 
         Returns:
-            (`logits`,`cached_kvs`) or `logits`(Tensor):
+            Tensor or Tuple: (`logits`,`cached_kvs`) or `logits`(Tensor):
                 `logits` is the output of the gpt model.
                 `cache_kvs` is the cache output of gpt model if `use_cache` is True.
 
@@ -1043,7 +1043,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
                 End id of the GreedyGeneration model.
 
         Returns:
-            src_ids(Tensor):
+            Tensor: src_ids:
                 Indices of output sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the output sequence.
 
@@ -1119,7 +1119,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
                 See :class:`GPTModel`.
 
         Returns:
-            (`logits`,`cached_kvs`) or `logits`(Tensor):
+            Tensor or Tuple: (`logits`,`cached_kvs`) or `logits`(Tensor):
                 `logits` is the output of the gpt model.
                 `cache_kvs` is the cache output of gpt model if `use_cache` is True.
 
