@@ -35,10 +35,10 @@ class LinearChainCrf(nn.Layer):
     See https://repository.upenn.edu/cgi/viewcontent.cgi?article=1162&context=cis_papers for reference.
 
     Args:
-        num_labels (`int`): 
-            The label number.
-        crf_lr (`float`, optional): 
-            The crf layer learning rate. Defaults to ``0.1``.
+        num_labels (int):
+            Num of labels.
+        crf_lr (float, optional):
+            The crf layer learning rate. Defaults to `0.1`.
         with_start_stop_tag (`bool`, optional): 
             If set to True, the start tag and stop tag will be considered, the transitions params will be a tensor with a shape of `[num_labels+2, num_labels+2]`.
             Else, the transitions params will be a tensor with a shape of `[num_labels, num_labels]`.
@@ -87,6 +87,7 @@ class LinearChainCrf(nn.Layer):
         Computes the normalization in a linear-chain CRF. See http://www.cs.columbia.edu/~mcollins/fb.pdf for reference.
 
         .. math::
+
             F & = logZ(x) = log\\sum_y exp(score(x,y))
 
             score(x,y) & = \\sum_i Emit(x_i,y_i) + Trans(y_{i-1}, y_i)
@@ -96,6 +97,7 @@ class LinearChainCrf(nn.Layer):
         then we can get:
 
         .. math::
+
             F(1) = log\\sum_{y1} exp(p(y_1) + T([START], y1))
 
         .. math::
@@ -105,13 +107,13 @@ class LinearChainCrf(nn.Layer):
         Further, We can get F(n) is a recursive formula with F(n-1).
 
         Args:
-            inputs (`Tensor`): 
+            inputs (Tensor):
                 The input predicted tensor. Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_tags]`.
-            lengths (`Tensor`): 
+            lengths (Tensor):
                 The input length. Its dtype is int64 and has a shape of `[batch_size]`.
 
         Returns:
-            norm_score (`Tensor`): 
+            norm_score (Tensor):
                 The normalizers tensor. Its dtype is float32 and has a shape of `[batch_size]`.
         """
         batch_size, seq_len, n_labels = inputs.shape
