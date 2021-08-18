@@ -1108,6 +1108,9 @@ class InferTransformerModel(TransformerModel):
             `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
             to `False`.
+        beam_search_version (str): Specify beam search version. It should be in one
+            of [`v1`, `v2`]. If `v2`, need to set `alpha`(default to 0.6) for length
+            penalty. Default to `v1`.
     """
 
     def __init__(self,
@@ -1127,7 +1130,9 @@ class InferTransformerModel(TransformerModel):
                  eos_id=1,
                  beam_size=4,
                  max_out_len=256,
-                 output_time_major=False):
+                 output_time_major=False,
+                 beam_search_version='v1',
+                 **kwargs):
         args = dict(locals())
         args.pop("self")
         args.pop("__class__", None)
@@ -1135,6 +1140,13 @@ class InferTransformerModel(TransformerModel):
         self.max_out_len = args.pop("max_out_len")
         self.output_time_major = args.pop("output_time_major")
         self.dropout = dropout
+        self.beam_search_version = args.pop('beam_search_version')
+        kwargs = args.pop("kwargs")
+        if self.beam_search_version == 'v2':
+            if 'alpha' in kwargs:
+                self.alpha = kwargs['alpha']
+            else:
+                self.alpha = 0.6
         super(InferTransformerModel, self).__init__(**args)
 
         cell = TransformerDecodeCell(
@@ -1191,48 +1203,59 @@ class InferTransformerModel(TransformerModel):
                 transformer(
                     src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
         """
-        src_max_len = paddle.shape(src_word)[-1]
-        src_slf_attn_bias = paddle.cast(
-            src_word == self.bos_id,
-            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
-        trg_src_attn_bias = src_slf_attn_bias
-        src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
-                start=0, end=src_max_len)
+        if self.beam_search_version == 'v1':
+            src_max_len = paddle.shape(src_word)[-1]
+            src_slf_attn_bias = paddle.cast(
+                src_word == self.bos_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+            trg_src_attn_bias = src_slf_attn_bias
+            src_pos = paddle.cast(
+                src_word != self.bos_id, dtype="int64") * paddle.arange(
+                    start=0, end=src_max_len)
 
-        # Run encoder
-        src_emb = self.src_word_embedding(src_word)
-        src_pos_emb = self.src_pos_embedding(src_pos)
-        src_emb = src_emb + src_pos_emb
-        enc_input = F.dropout(
-            src_emb, p=self.dropout,
-            training=False) if self.dropout else src_emb
-        enc_output = self.transformer.encoder(enc_input, src_slf_attn_bias)
+            # Run encoder
+            src_emb = self.src_word_embedding(src_word)
+            src_pos_emb = self.src_pos_embedding(src_pos)
+            src_emb = src_emb + src_pos_emb
+            enc_input = F.dropout(
+                src_emb, p=self.dropout,
+                training=False) if self.dropout else src_emb
+            enc_output = self.transformer.encoder(enc_input, src_slf_attn_bias)
 
-        # Init states (caches) for transformer, need to be updated according to selected beam
-        incremental_cache, static_cache = self.transformer.decoder.gen_cache(
-            enc_output, do_zip=True)
+            # Init states (caches) for transformer, need to be updated according to selected beam
+            incremental_cache, static_cache = self.transformer.decoder.gen_cache(
+                enc_output, do_zip=True)
 
-        static_cache, enc_output, trg_src_attn_bias = TransformerBeamSearchDecoder.tile_beam_merge_with_batch(
-            (static_cache, enc_output, trg_src_attn_bias), self.beam_size)
+            static_cache, enc_output, trg_src_attn_bias = TransformerBeamSearchDecoder.tile_beam_merge_with_batch(
+                (static_cache, enc_output, trg_src_attn_bias), self.beam_size)
 
-        if trg_word is not None:
-            trg_length = paddle.sum(paddle.cast(
-                trg_word != self.bos_id, dtype="int64"),
-                                    axis=-1)
-        else:
-            trg_length = None
+            if trg_word is not None:
+                trg_length = paddle.sum(paddle.cast(
+                    trg_word != self.bos_id, dtype="int64"),
+                                        axis=-1)
+            else:
+                trg_length = None
 
-        rs, _ = nn.decode.dynamic_decode(
-            decoder=self.decode,
-            inits=incremental_cache,
-            max_step_num=self.max_out_len,
-            memory=enc_output,
-            trg_src_attn_bias=trg_src_attn_bias,
-            static_cache=static_cache,
-            is_test=True,
-            output_time_major=self.output_time_major,
-            trg_word=trg_word,
-            trg_length=trg_length)
+            rs, _ = nn.decode.dynamic_decode(
+                decoder=self.decode,
+                inits=incremental_cache,
+                max_step_num=self.max_out_len,
+                memory=enc_output,
+                trg_src_attn_bias=trg_src_attn_bias,
+                static_cache=static_cache,
+                is_test=True,
+                output_time_major=self.output_time_major,
+                trg_word=trg_word,
+                trg_length=trg_length)
 
-        return rs
+            return rs
+
+        elif self.beam_search_version == 'v2':
+            finished_seq, finished_scores = self.beam_search_v2(
+                src_word, self.beam_size, self.max_out_len, self.alpha)
+            if self.output_time_major:
+                finished_seq = finished_seq.transpose([2, 0, 1])
+            else:
+                finished_seq = finished_seq.transpose([0, 2, 1])
+
+            return finished_seq
