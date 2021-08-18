@@ -317,9 +317,11 @@ class FasterDecoder(nn.Layer):
                 bias_attr=False)
 
     def forward(self, src_word):
-        batch_size, src_max_len = paddle.shape(src_word)
-        mem_seq_lens = paddle.full(
-            shape=[batch_size, 1], fill_value=src_max_len, dtype='int32')
+        src_max_len = paddle.shape(src_word)[-1]
+        mem_seq_lens = paddle.sum(paddle.cast(
+            src_word != self.bos_id, dtype="int32"),
+                                  axis=-1,
+                                  keepdim=True)
 
         src_slf_attn_bias = paddle.cast(
             src_word == self.bos_id,
@@ -404,7 +406,7 @@ class FasterDecoder(nn.Layer):
 
             predict_ids.append(topk_indices)
 
-            #TODO(gongenlei): support static graph
+            # TODO(gongenlei): support static graph
             if paddle.all(finished).numpy():
                 break
 
