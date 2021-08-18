@@ -9,9 +9,9 @@ PYTHON_BIN="/usr/local/bin/python3.7"
 
 
 model="ernie1.0"
-gpu=5
+gpu="0,1"
 tasks=(LCQMC BQ ATEC PAWSX STS-B)
-tasks=(ATEC PAWSX STS-B)
+tasks=(LCQMC)
 lrs=(1E-5 5E-5)
 dropouts=(0.1 0.3)
 

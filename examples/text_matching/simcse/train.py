@@ -172,7 +172,7 @@ def do_train():
         model.set_dict(state_dict)
         print("warmup from:{}".format(args.init_from_ckpt))
 
-    # model = paddle.DataParallel(model)
+    model = paddle.DataParallel(model)
 
     num_training_steps = len(train_data_loader) * args.epochs
 
