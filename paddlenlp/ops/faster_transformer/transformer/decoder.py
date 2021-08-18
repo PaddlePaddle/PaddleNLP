@@ -88,6 +88,22 @@ def infer_transformer_decoder(
 
 
 class InferTransformerDecoder(nn.Layer):
+    """
+    FasterTransformer decoder block.
+
+    Args:
+        decoder (`TransformerDecoder`):
+            Transformer decoder block.
+        n_head (`int`):
+            The number of head used in multi-head attention.
+        size_per_head (`int`):
+            The size of per head used in multi-head attention.
+        decoder_lib (`str`):
+            The path to decoder_lib. Default to None.
+        use_fp16_decoder (`bool`):
+            Whether to use fp16 for decoder. Default to False.
+    """
+
     def __init__(self,
                  decoder,
                  n_head,
@@ -99,7 +115,6 @@ class InferTransformerDecoder(nn.Layer):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 decoder_lib)
-
         super(InferTransformerDecoder, self).__init__()
         self.n_head = n_head
         self.size_per_head = size_per_head
@@ -244,6 +259,44 @@ class InferTransformerDecoder(nn.Layer):
 
 
 class FasterDecoder(nn.Layer):
+    """
+    FasterTransformer decoder for auto-regressive generation.
+
+    Args:
+        src_vocab_size (`int`):
+            The size of source vocabulary.
+        trg_vocab_size (`int`):
+            The size of target vocabulary.
+        max_length (`int`):
+            The maximum length of input sequences.
+        num_encoder_layers (`int`):
+            The number of sub-layers to be stacked in the encoder.
+        num_decoder_layers (`int`):
+            The number of sub-layers to be stacked in the decoder.
+        n_head (`int`):
+            The number of head used in multi-head attention.
+        d_model (`int`):
+            The dimension for word embeddings, which is also the last dimension of
+            the input and output of multi-head attention, position-wise feed-forward
+            networks, encoder and decoder.
+        d_inner_hid (`int`):
+            Size of the hidden layer in position-wise feed-forward networks.
+        dropout (`float`):
+            Dropout rates. Used for pre-process, activation and inside attention.
+        weight_sharing (`bool`):
+            Whether to use weight sharing.
+        bos_id (`int`, optional):
+            The start token id and also is used as padding id. Defaults to 0.
+        eos_id (`int`, optional):
+            The end token id. Defaults to 1.
+        max_out_len (int, optional):
+            The maximum output length. Defaults to 256.
+        decoder_lib (`str`):
+            The path to decoder_lib. Default to None.
+        use_fp16_decoder (`bool`):
+            Whether to use fp16 for decoder. Default to False.
+    """
+
     def __init__(self,
                  src_vocab_size,
                  trg_vocab_size,
