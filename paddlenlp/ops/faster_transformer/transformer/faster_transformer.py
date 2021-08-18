@@ -344,7 +344,8 @@ class TransformerGenerator(paddle.nn.Layer):
                     eos_id=eos_id,
                     beam_size=beam_size,
                     max_out_len=max_out_len,
-                    output_time_major=self.output_time_major)
+                    output_time_major=self.output_time_major,
+                    **kwargs)
         else:
             self.transformer = InferTransformerModel(
                 src_vocab_size=src_vocab_size,
@@ -361,7 +362,8 @@ class TransformerGenerator(paddle.nn.Layer):
                 eos_id=eos_id,
                 beam_size=beam_size,
                 max_out_len=max_out_len,
-                output_time_major=self.output_time_major)
+                output_time_major=self.output_time_major,
+                **kwargs)
 
     def forward(self, src_word):
         r"""
