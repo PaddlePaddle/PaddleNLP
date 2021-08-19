@@ -53,6 +53,7 @@ class UNIMOPretrainedModel(PretrainedModel):
             "max_position_embeddings": 513,
             "type_vocab_size": 4,
             "initializer_range": 0.02,
+            "unk_token_id": 17963,
             "pad_token_id": 0,
             "bos_token_id": 1,
             "eos_token_id": 3,
@@ -71,6 +72,7 @@ class UNIMOPretrainedModel(PretrainedModel):
             "max_position_embeddings": 512,
             "type_vocab_size": 4,
             "initializer_range": 0.02,
+            "unk_token_id": 12088,
             "pad_token_id": 0,
             "bos_token_id": 1,
             "eos_token_id": 3,
@@ -213,7 +215,7 @@ class UNIMOModel(UNIMOPretrainedModel):
             max_position_embeddings=513,
             type_vocab_size=4,
             initializer_range=0.02,
-            unk_token_id=0,
+            unk_token_id=17963,
             pad_token_id=0,
             bos_token_id=1,
             eos_token_id=3,
@@ -316,14 +318,13 @@ class UNIMOModel(UNIMOPretrainedModel):
                 from paddlenlp.transformers import UNIMOModel
                 from paddlenlp.transformers import UNIMOTokenizer
 
-                model = UNIMOModel.from_pretrained('plato-mini')
-                tokenizer = UNIMOTokenizer.from_pretrained('plato-mini')
+                model = UNIMOModel.from_pretrained('unimo-text-1.0')
+                tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
 
                 source = '我爱祖国'
                 inputs = tokenizer.gen_encode(
                     source,
-                    return_tensors=True,
-                    is_split_into_words=False)
+                    return_tensors=True)
                 outputs = model(**inputs)
         """
 
@@ -452,7 +453,6 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
         outputs = self.unimo(input_ids, token_type_ids, position_ids,
                              attention_mask, use_cache, cache)
         sequence_output = outputs[0] if use_cache else outputs
-        #print('sequence_output:',sequence_output)
         logits = self.lm_head(sequence_output, masked_positions)
         if use_cache:
             cache = outputs[1]
@@ -463,6 +463,7 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
     def adjust_logits_during_generation(self, logits):
         # pre-process distribution
         logits[:, self.unimo.unk_token_id] = -1e9
+        logits[:, self.unimo.pad_token_id] = -1e9
         logits[:, self.unimo.bos_token_id] = -1e9
         return logits
 
