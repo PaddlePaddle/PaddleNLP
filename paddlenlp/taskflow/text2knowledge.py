@@ -261,7 +261,6 @@ class WordTagTask(Task):
         if the text length greater than 512, will this function that spliting the long text.
         """
         short_input_texts = []
-        short_input_texts_lens = []
         for text in input_texts:
             if len(text) <= max_text_len:
                 short_input_texts.append(text)
@@ -279,13 +278,35 @@ class WordTagTask(Task):
                     ]
                     short_input_texts.extend(temp_text_list)
                 else:
-                    count = 0
-                    for temp_text in temp_text_list:
-                        if len(temp_text) + count < lens:
-                            temp_text = text[:len(temp_text) + count + 1]
-                        count += len(temp_text)
+                    list_len = len(temp_text_list)
+                    start = 0
+                    end = 0
+                    for i in range(0, list_len):
+                        if len(temp_text_list[i]) + 1 >= max_text_len:
+                            if start != end:
+                                short_input_texts.extend(
+                                    self._split_long_text_input(
+                                        [text[start:end]], max_text_len))
+                            short_input_texts.extend(
+                                self._split_long_text_input([
+                                    text[end:end + len(temp_text_list[i]) + 1]
+                                ], max_text_len))
+                            start = end + len(temp_text_list[i]) + 1
+                            end = start
+                        else:
+                            if start + len(temp_text_list[
+                                    i]) + 1 > max_text_len:
+                                short_input_texts.extend(
+                                    self._split_long_text_input(
+                                        [text[start:end]], max_text_len))
+                                start = end
+                                end = end + len(temp_text_list[i]) + 1
+                            else:
+                                end = len(temp_text_list[i]) + 1
+                    if start != end:
                         short_input_texts.extend(
-                            self._split_long_text2short_text_list([temp_text]))
+                            self._split_long_text_input([text[start:end]],
+                                                        max_text_len))
         return short_input_texts
 
     def _concat_short_text_reuslts(self, input_texts, results):
@@ -318,7 +339,6 @@ class WordTagTask(Task):
             pred_words = result['items']
             pred_words = self._reset_offset(pred_words)
             result['items'] = pred_words
-
         return concat_results
 
     def _preprocess_text(self, input_texts):
@@ -333,7 +353,7 @@ class WordTagTask(Task):
         lazy_load = self.kwargs[
             'lazy_load'] if 'lazy_load' in self.kwargs else False
 
-        max_seq_length = 128
+        max_seq_length = 512
         if 'max_position_embedding' in self.kwargs:
             max_seq_length = self.kwargs['max_position_embedding']
         infer_data = []
@@ -533,7 +553,7 @@ class WordTagTask(Task):
         """
         results = self._decode(inputs['short_input_texts'],
                                inputs['all_pred_tags'])
-        resulte = self._concat_short_text_reuslts(inputs['inputs'], results)
+        results = self._concat_short_text_reuslts(inputs['inputs'], results)
         if self.linking is True:
             for res in results:
                 self._term_linking(res)

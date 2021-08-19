@@ -24,14 +24,20 @@ import unicodedata
 from shutil import copyfile
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 
+from paddle.utils import try_import
 from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
+try:
+    from functools import lru_cache
+except ImportError:
+    from backports.functools_lru_cache import lru_cache
+
 from ..data.vocab import Vocab
 from .utils import InitTrackerMeta, fn_args_to_dict
 
-__all__ = ['PretrainedTokenizer']
+__all__ = ['PretrainedTokenizer', 'BPETokenizer', 'tokenize_chinese_chars']
 
 
 def convert_to_unicode(text):
@@ -105,6 +111,49 @@ def _is_punctuation(char):
     if cat.startswith("P"):
         return True
     return False
+
+
+def tokenize_chinese_chars(text):
+    """Adds whitespace around any CJK character."""
+
+    def _is_chinese_char(cp):
+        """Checks whether CP is the codepoint of a CJK character."""
+        # This defines a "chinese character" as anything in the CJK Unicode block:
+        #     https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
+        #
+        # Note that the CJK Unicode block is NOT all Japanese and Korean characters,
+        # despite its name. The modern Korean Hangul alphabet is a different block,
+        # as is Japanese Hiragana and Katakana. Those alphabets are used to write
+        # space-separated words, so they are not treated specially and handled
+        # like the all of the other languages.
+        if ((cp >= 0x4E00 and cp <= 0x9FFF) or  #
+            (cp >= 0x3400 and cp <= 0x4DBF) or  #
+            (cp >= 0x20000 and cp <= 0x2A6DF) or  #
+            (cp >= 0x2A700 and cp <= 0x2B73F) or  #
+            (cp >= 0x2B740 and cp <= 0x2B81F) or  #
+            (cp >= 0x2B820 and cp <= 0x2CEAF) or
+            (cp >= 0xF900 and cp <= 0xFAFF) or  #
+            (cp >= 0x2F800 and cp <= 0x2FA1F)):  #
+            return True
+
+        return False
+
+    output = []
+    buff = ""
+    for char in text:
+        cp = ord(char)
+        if _is_chinese_char(cp):
+            if buff != "":
+                output.append(buff)
+                buff = ""
+            output.append(char)
+        else:
+            buff += char
+
+    if buff != "":
+        output.append(buff)
+
+    return output
 
 
 @six.add_metaclass(InitTrackerMeta)
@@ -1190,15 +1239,15 @@ class PretrainedTokenizer(object):
                         if i == len(sub_tokens) - 1:
                             token_offset_mapping.append(
                                 (token_start_offset, token_start_offset +
-                                 len(sub_tokens[i].strip("##"))))
+                                 len(sub_tokens[i].replace("##", ""))))
                             token_start_offset += (
-                                len(sub_tokens[i].strip("##")) + 1)
+                                len(sub_tokens[i].replace("##", "")) + 1)
                         else:
                             token_offset_mapping.append(
                                 (token_start_offset, token_start_offset +
-                                 len(sub_tokens[i].strip("##"))))
+                                 len(sub_tokens[i].replace("##", ""))))
                             token_start_offset += (
-                                len(sub_tokens[i].strip("##")))
+                                len(sub_tokens[i].replace("##", "")))
 
                 token_start_offset = 0
                 for token in token_pair:
@@ -1212,15 +1261,15 @@ class PretrainedTokenizer(object):
                         if i == len(sub_tokens) - 1:
                             token_pair_offset_mapping.append(
                                 (token_start_offset, token_start_offset +
-                                 len(sub_tokens[i].strip("##"))))
+                                 len(sub_tokens[i].replace("##", ""))))
                             token_start_offset += (
-                                len(sub_tokens[i].strip("##")) + 1)
+                                len(sub_tokens[i].replace("##", "")) + 1)
                         else:
                             token_pair_offset_mapping.append(
                                 (token_start_offset, token_start_offset +
-                                 len(sub_tokens[i].strip("##"))))
+                                 len(sub_tokens[i].replace("##", ""))))
                             token_start_offset += (
-                                len(sub_tokens[i].strip("##")))
+                                len(sub_tokens[i].replace("##", "")))
 
                 offset = 0
                 while offset < len(second_ids):
@@ -1340,3 +1389,272 @@ class PretrainedTokenizer(object):
                         return_special_tokens_mask=return_special_tokens_mask))
 
         return batch_encode_inputs
+
+
+class BPETokenizer(PretrainedTokenizer):
+    """
+    The base class for all bpe tokenizers. It mainly provides common tokenize
+    methods for bpe type tokenizer. 
+    
+    Args:
+        vocab_file (str): 
+            file path of the vocabulary.
+        encoder_json_path (str, optional):
+            file path of the id to vocab.
+        vocab_bpe_path (str, optional):
+            file path of word merge text.
+        unk_token (str, optional): 
+            The special token for unknown words. 
+            Defaults to "[UNK]".
+        sep_token (str, optional): 
+            The special token for separator token. 
+            Defaults to "[SEP]".
+        pad_token (str, optional): 
+            The special token for padding. 
+            Defaults to "[PAD]".
+        cls_token (str, optional): 
+            The special token for cls. 
+            Defaults to "[CLS]".
+        mask_token (str, optional): 
+            The special token for mask.
+            Defaults to "[MASK]".
+
+    """
+
+    class Encoder(object):
+        def __init__(self,
+                     encoder,
+                     bpe_merges,
+                     errors='replace',
+                     special_tokens=["[SEP]", "[p]", "[q]", "[/q]"]):
+            self.encoder = encoder
+            self.decoder = {v: k for k, v in self.encoder.items()}
+            self.errors = errors  # how to handle errors in decoding
+            self.byte_encoder = self._bytes_to_unicode()
+            self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
+            self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
+            self.cache = {}
+            self.re = try_import("regex")
+            self.special_tokens = special_tokens
+
+            # Should haved added re.IGNORECASE so BPE merges can happen for capitalized versions of contractions
+            self.pat = self.re.compile(
+                r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+            )
+
+        @lru_cache()
+        def _bytes_to_unicode(self):
+            """
+            Returns list of utf-8 byte and a corresponding list of unicode strings.
+            The reversible bpe codes work on unicode strings.
+            This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
+            When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
+            This is a signficant percentage of your normal, say, 32K bpe vocab.
+            To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
+            And avoids mapping to whitespace/control characters the bpe code barfs on.
+            """
+
+            bs = (list(range(ord("!"), ord("~") + 1)) +
+                  list(range(ord("¡"), ord("¬") + 1)) +
+                  list(range(ord("®"), ord("ÿ") + 1)))
+            cs = bs[:]
+
+            n = 0
+            for b in range(2**8):
+                if b not in bs:
+                    bs.append(b)
+                    cs.append(2**8 + n)
+                    n += 1
+
+            cs = [chr(n) for n in cs]
+
+            ddict = dict(zip(bs, cs))
+            return dict(zip(bs, cs))
+
+        def _get_pairs(self, word):
+            """Return set of symbol pairs in a word.
+            Word is represented as tuple of symbols (symbols being variable-length strings).
+            """
+            pairs = set()
+            prev_char = word[0]
+            for char in word[1:]:
+                pairs.add((prev_char, char))
+                prev_char = char
+            return pairs
+
+        def bpe(self, token):
+            if token in self.cache:
+                return self.cache[token]
+            word = tuple(token)
+            pairs = self._get_pairs(word)
+
+            if not pairs:
+                return token
+
+            while True:
+                bigram = min(
+                    pairs,
+                    key=lambda pair: self.bpe_ranks.get(pair, float('inf')))
+                if bigram not in self.bpe_ranks:
+                    break
+                first, second = bigram
+                new_word = []
+                i = 0
+                while i < len(word):
+                    try:
+                        j = word.index(first, i)
+                        new_word.extend(word[i:j])
+                        i = j
+                    except:
+                        new_word.extend(word[i:])
+                        break
+
+                    if word[i] == first and i < len(word) - 1 and word[
+                            i + 1] == second:
+                        new_word.append(first + second)
+                        i += 2
+                    else:
+                        new_word.append(word[i])
+                        i += 1
+                new_word = tuple(new_word)
+                word = new_word
+                if len(word) == 1:
+                    break
+                else:
+                    pairs = self._get_pairs(word)
+            word = ' '.join(word)
+            self.cache[token] = word
+
+            return word
+
+        def tokenize(self, text):
+            tokens = text.split(' ')
+            sub_tokens = []
+            for token_i, token in enumerate(tokens):
+                if self.is_special_token(token):
+                    if token_i == 0:
+                        sub_tokens.extend([token])
+                    else:
+                        sub_tokens.extend([" " + token])
+                else:
+                    if token_i == 0:
+                        sub_tokens.extend(self.re.findall(self.pat, token))
+                    else:
+                        sub_tokens.extend(
+                            self.re.findall(self.pat, " " + token))
+            return sub_tokens
+
+        def tokenize_old(self, text):
+            return self.re.findall(self.pat, text)
+
+        def is_special_token(self, tok):
+            if isinstance(tok, int):
+                return False
+            res = False
+            for t in self.special_tokens:
+                # if tok.find(t) != -1:
+                if tok.strip() == t:
+                    res = True
+                    break
+            return res
+
+        def tokenize_bpe(self, token):
+
+            if self.is_special_token(token):
+                return [token.strip()]  # remove space for convert_to_ids
+            else:
+
+                token = ''.join(self.byte_encoder[b]
+                                for b in token.encode('utf-8'))
+                return [
+                    self.encoder[bpe_token]
+                    for bpe_token in self.bpe(token).split(' ')
+                ]
+
+        def encode(self, text):
+            bpe_tokens = []
+            for token in self.tokenize(text):
+                bpe_tokens.extend(self.tokenize_bpe(token))
+            return bpe_tokens
+
+        def decode(self, tokens):
+            pre_token_i = 0
+            texts = []
+            for token_i, token in enumerate(tokens):
+                if self.is_special_token(token):
+                    # proprecess tokens before token_i
+                    if token_i - pre_token_i > 0:
+                        text = ''.join([
+                            self.decoder[int(tok)]
+                            for tok in tokens[pre_token_i:token_i]
+                        ])
+                        text = bytearray(
+                            [self.byte_decoder[c] for c in text]).decode(
+                                'utf-8', errors=self.errors)
+                        texts.append(text)
+                    # texts.append(token)
+                    if token_i == 0:
+                        texts.append(
+                            token
+                        )  # in the beginning, there is no space before special tokens
+                    else:
+                        texts.extend(
+                            [" ", token]
+                        )  # in middle sentence, there must be a space before special tokens
+                    pre_token_i = token_i + 1
+
+            if pre_token_i < len(tokens):
+                text = ''.join(
+                    [self.decoder[int(tok)] for tok in tokens[pre_token_i:]])
+                text = bytearray([self.byte_decoder[c] for c in text]).decode(
+                    'utf-8', errors=self.errors)
+                texts.append(text)
+
+            return ''.join(texts)
+
+    def __init__(self,
+                 vocab_file,
+                 encoder_json_path="./configs/encoder.json",
+                 vocab_bpe_path="./configs/vocab.bpe",
+                 unk_token="[UNK]",
+                 sep_token="[SEP]",
+                 pad_token="[PAD]",
+                 cls_token="[CLS]",
+                 mask_token="[MASK]"):
+        self.vocab = self.load_vocabulary(
+            vocab_file,
+            unk_token=unk_token,
+            sep_token=sep_token,
+            cls_token=cls_token,
+            mask_token=mask_token)
+        self.encoder_json_path = encoder_json_path
+        self.vocab_bpe_path = vocab_bpe_path
+        self.encoder = self._get_encoder(encoder_json_path, vocab_bpe_path)
+
+    def _tokenize(self, text, is_sentencepiece=True):
+        text = convert_to_unicode(text)
+        text = " ".join(text.split())  # remove duplicate whitespace
+        nltk = try_import('nltk')
+        if is_sentencepiece:
+            sents = nltk.tokenize.sent_tokenize(text)
+            bpe_ids = sum([self.encoder.encode(sent) for sent in sents], [])
+        else:
+            bpe_ids = self.encoder.encode(text)
+        tokens = [str(bpe_id) for bpe_id in bpe_ids]
+        return tokens
+
+    def tokenize(self, text, is_sentencepiece=True):
+        return self._tokenize(text, is_sentencepiece)
+
+    def _get_encoder(self, encoder_json_path, vocab_bpe_path):
+        with open(encoder_json_path, 'r') as f:
+            encoder = json.load(f)
+        with open(vocab_bpe_path, 'r') as f:
+            bpe_data = f.read()
+        bpe_merges = [
+            tuple(merge_str.split()) for merge_str in bpe_data.split('\n')[1:-1]
+        ]
+
+        return self.Encoder(
+            encoder=encoder,
+            bpe_merges=bpe_merges, )
