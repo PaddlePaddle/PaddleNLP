@@ -35,7 +35,7 @@ class SimCSE(nn.Layer):
         self.ptm = pretrained_model
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
 
-        # if output_emb_size is not None, then add Linear layer to reduce embedding_size, 
+        # if output_emb_size is greater than 0, then add Linear layer to reduce embedding_size, 
         # we recommend set output_emb_size = 256 considering the trade-off beteween 
         # recall performance and efficiency
         self.output_emb_size = output_emb_size
@@ -71,19 +71,6 @@ class SimCSE(nn.Layer):
 
         return cls_embedding
 
-    def get_semantic_embedding(self, data_loader):
-        self.eval()
-        with paddle.no_grad():
-            for batch_data in data_loader:
-                input_ids, token_type_ids = batch_data
-                input_ids = paddle.to_tensor(input_ids)
-                token_type_ids = paddle.to_tensor(token_type_ids)
-
-                text_embeddings = self.get_pooled_embedding(
-                    input_ids, token_type_ids=token_type_ids)
-
-                yield text_embeddings
-
     def cosine_sim(self,
                    query_input_ids,
                    title_input_ids,
@@ -92,17 +79,22 @@ class SimCSE(nn.Layer):
                    query_attention_mask=None,
                    title_token_type_ids=None,
                    title_position_ids=None,
-                   title_attention_mask=None):
+                   title_attention_mask=None,
+                   with_pooler=True):
 
         query_cls_embedding = self.get_pooled_embedding(
             query_input_ids,
             query_token_type_ids,
             query_position_ids,
-            query_attention_mask, )
+            query_attention_mask,
+            with_pooler=with_pooler)
 
         title_cls_embedding = self.get_pooled_embedding(
-            title_input_ids, title_token_type_ids, title_position_ids,
-            title_attention_mask)
+            title_input_ids,
+            title_token_type_ids,
+            title_position_ids,
+            title_attention_mask,
+            with_pooler=with_pooler)
 
         cosine_sim = paddle.sum(query_cls_embedding * title_cls_embedding,
                                 axis=-1)

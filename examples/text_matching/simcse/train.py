@@ -38,7 +38,7 @@ parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The ou
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization."
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--output_emb_size", default=None, type=int, help="Output_embedding_size")
+parser.add_argument("--output_emb_size", default=0, type=int, help="Output_embedding_size, 0 means use hidden_size as output embedding size.")
 parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
@@ -55,12 +55,7 @@ parser.add_argument("--scale", default=20, type=int, help="Scale for pair-wise m
 parser.add_argument("--dropout", default=0.1, type=float, help="Dropout for pretrained model encoder.")
 parser.add_argument("--infer_with_fc_pooler", action='store_true', help="Whether use fc layer after cls embedding or not for when infer.")
 
-
 args = parser.parse_args()
-
-print("************************************************************")
-print(args)
-print("************************************************************")
 
 def set_seed(seed):
     """sets random seed"""
@@ -111,20 +106,11 @@ def do_train():
     dev_ds = load_dataset(
         read_text_pair, data_path=args.test_set_file, lazy=False)
 
-    # If you wanna use bert/roberta pretrained model,
-    #pretrained_model = ppnlp.transformers.BertModel.from_pretrained('simbert-base-chinese', hidden_dropout_prob=0.3,  attention_probs_dropout_prob=0.3)
-    #pretrained_model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese', hidden_dropout_prob=0.3,  attention_probs_dropout_prob=0.3)
-
-    # pretrained_model = ppnlp.transformers.RobertaModel.from_pretrained('roberta-wwm-ext')
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
        'ernie-1.0',
        hidden_dropout_prob=args.dropout,
        attention_probs_dropout_prob=args.dropout)
-
-    # If you wanna use bert/roberta pretrained model,
-    #tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('simbert-base-chinese')
-    #tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-chinese')
-    #tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext')
+       
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
     trans_func = partial(
@@ -212,7 +198,8 @@ def do_train():
                 tic_train = time.time()
 
             if global_step % args.eval_steps == 0 and rank == 0:
-                spearman_corr, total_num = do_evaluate(model, tokenizer, dev_data_loader, args.infer_with_fc_pooler)
+                # need better way to get model Layers
+                spearman_corr, total_num = do_evaluate(model._layers, tokenizer, dev_data_loader, args.infer_with_fc_pooler)
                 print("global step: {}, spearman_corr: {:.4f}, total_num: {}".format(global_step, spearman_corr, total_num))
 
             loss.backward()

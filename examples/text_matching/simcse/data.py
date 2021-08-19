@@ -87,11 +87,16 @@ def read_simcse_text(data_path):
             yield {'text_a': data, 'text_b': data}
 
 
-def read_text_pair(data_path):
+def read_text_pair(data_path, is_test=False):
     """Reads data."""
     with open(data_path, 'r', encoding='utf-8') as f:
         for line in f:
             data = line.rstrip().split("\t")
-            if len(data) != 3:
-                continue
-            yield {'text_a': data[0], 'text_b': data[1], 'label': data[2]}
+            if is_test == False:
+                if len(data) != 3:
+                    continue
+                yield {'text_a': data[0], 'text_b': data[1], 'label': data[2]}
+            else:
+                if len(data) != 2:
+                    continue
+                yield {'text_a': data[0], 'text_b': data[1]}
