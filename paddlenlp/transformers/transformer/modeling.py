@@ -931,7 +931,7 @@ class TransformerModel(nn.Layer):
 
             # Length penalty is given by = (5+len(decode)/6) ^ -\alpha. Pls refer to
             # https://arxiv.org/abs/1609.08144.
-            length_penalty = np.power(5.0 + (i.numpy()[0] + 1.0) / 6.0, alpha)
+            length_penalty = paddle.pow(5.0 + (i + 1.0) / 6.0, alpha)
             curr_scores = log_probs / length_penalty
             flat_curr_scores = paddle.reshape(curr_scores, [batch_size, -1])
 
@@ -1038,10 +1038,9 @@ class TransformerModel(nn.Layer):
 
         def is_not_finish(i, trg_word, alive_seq, alive_log_probs, finished_seq,
                           finished_scores, finished_flags, caches):
-            return paddle.to_tensor(
-                i.numpy()[0] < max_len and
-                not (early_finish(alive_log_probs, finished_scores,
-                                  finished_flags).numpy()[0]))
+            return paddle.greater_than(
+                i < max_len,
+                early_finish(alive_log_probs, finished_scores, finished_flags))
 
         _, trg_word, alive_seq, alive_log_probs, finished_seq, finished_scores, finished_flags, caches = paddle.static.nn.while_loop(
             is_not_finish,
