@@ -17,7 +17,7 @@ for batch_size in "1" "2" "4"; do
             --config="../../configs/transformer.${model}.yaml" \
             --model_dir=${model_dir} \
             --device cpu \
-            --use_mkl \
+            --use_mkl True \
             --threads=${threads} \
             --batch_size=${batch_size} \
             --profile > ${log_path}/transformer_${model}_cpu_mkl_threads${threads}_bs${batch_size}_inference.log 2>&1 
