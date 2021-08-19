@@ -787,6 +787,206 @@ class TransformerModel(nn.Layer):
 
         return predict
 
+
+class InferTransformerModel(TransformerModel):
+    """
+    The Transformer model for auto-regressive generation.
+
+    Args:
+        src_vocab_size (int):
+            The size of source vocabulary.
+        trg_vocab_size (int):
+            The size of target vocabulary.
+        max_length (int):
+            The maximum length of input sequences.
+        num_encoder_layers (int):
+            The number of sub-layers to be stacked in the encoder.
+        num_decoder_layers (int):
+            The number of sub-layers to be stacked in the decoder.
+        n_head (int):
+            The number of head used in multi-head attention.
+        d_model (int):
+            The dimension for word embeddings, which is also the last dimension of
+            the input and output of multi-head attention, position-wise feed-forward
+            networks, encoder and decoder.
+        d_inner_hid (int):
+            Size of the hidden layer in position-wise feed-forward networks.
+        dropout (float):
+            Dropout rates. Used for pre-process, activation and inside attention.
+        weight_sharing (bool):
+            Whether to use weight sharing. 
+        attn_dropout (float):
+            The dropout probability used in MHA to drop some attention target.
+            If None, use the value of dropout. Defaults to None.
+        act_dropout (float):
+            The dropout probability used after FFN activition. If None, use
+            the value of dropout. Defaults to None.
+        bos_id (int, optional):
+            The start token id and also is used as padding id. Defaults to 0.
+        eos_id (int, optional):
+            The end token id. Defaults to 1.
+        beam_size (int, optional):
+            The beam width for beam search. Defaults to 4. 
+        max_out_len (int, optional):
+            The maximum output length. Defaults to 256.
+        output_time_major(bool, optional): Indicate the data layout of predicted
+            Tensor. If `False`, the data layout would be batch major with shape
+            `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
+            be time major with shape `[seq_len, batch_size, beam_size]`. Default
+            to `False`.
+        beam_search_version (str): Specify beam search version. It should be in one
+            of [`v1`, `v2`]. If `v2`, need to set `alpha`(default to 0.6) for length
+            penalty. Default to `v1`.
+    """
+
+    def __init__(self,
+                 src_vocab_size,
+                 trg_vocab_size,
+                 max_length,
+                 num_encoder_layers,
+                 num_decoder_layers,
+                 n_head,
+                 d_model,
+                 d_inner_hid,
+                 dropout,
+                 weight_sharing,
+                 attn_dropout=None,
+                 act_dropout=None,
+                 bos_id=0,
+                 eos_id=1,
+                 beam_size=4,
+                 max_out_len=256,
+                 output_time_major=False,
+                 beam_search_version='v1',
+                 pos_dtype="int64",
+                 **kwargs):
+        args = dict(locals())
+        args.pop("self")
+        args.pop("__class__", None)
+        self.beam_size = args.pop("beam_size")
+        self.max_out_len = args.pop("max_out_len")
+        self.output_time_major = args.pop("output_time_major")
+        self.dropout = dropout
+        self.beam_search_version = args.pop('beam_search_version')
+        kwargs = args.pop("kwargs")
+        if self.beam_search_version == 'v2':
+            if 'alpha' in kwargs:
+                self.alpha = kwargs['alpha']
+            else:
+                self.alpha = 0.6
+        super(InferTransformerModel, self).__init__(**args)
+
+        cell = TransformerDecodeCell(
+            self.transformer.decoder, self.trg_word_embedding,
+            self.trg_pos_embedding, self.linear, self.dropout)
+
+        self.decode = TransformerBeamSearchDecoder(
+            cell, bos_id, eos_id, beam_size, var_dim_in_state=2)
+
+    def forward(self, src_word, trg_word=None):
+        r"""
+        The Transformer forward method.
+
+        Args:
+            src_word (Tensor):
+                The ids of source sequence words. It is a tensor with shape
+                `[batch_size, source_sequence_length]` and its data type can be
+                int or int64.
+            trg_word (Tensor):
+                The ids of target sequence words. Normally, it should NOT be
+                given. If it's given, force decoding with previous output token
+                will be trigger. Defaults to None. 
+        
+        Returns:
+            Tensor:
+                An int64 tensor shaped indicating the predicted ids. Its shape is
+                `[batch_size, seq_len, beam_size]` or `[seq_len, batch_size, beam_size]`
+                according to `output_time_major`.
+        
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import InferTransformerModel
+
+                transformer = InferTransformerModel(
+                    src_vocab_size=30000,
+                    trg_vocab_size=30000,
+                    max_length=256,
+                    num_encoder_layers=6,
+                    num_decoder_layers=6,
+                    n_head=8,
+                    d_model=512,
+                    d_inner_hid=2048,
+                    dropout=0.1,
+                    weight_sharing=True,
+                    bos_id=0,
+                    eos_id=1,
+                    beam_size=4,
+                    max_out_len=256)
+
+                batch_size = 5
+                seq_len = 10
+                transformer(
+                    src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
+        """
+        if self.beam_search_version == 'v1':
+            src_max_len = paddle.shape(src_word)[-1]
+            src_slf_attn_bias = paddle.cast(
+                src_word == self.bos_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+            trg_src_attn_bias = src_slf_attn_bias
+            src_pos = paddle.cast(
+                src_word != self.bos_id, dtype="int64") * paddle.arange(
+                    start=0, end=src_max_len)
+
+            # Run encoder
+            src_emb = self.src_word_embedding(src_word)
+            src_pos_emb = self.src_pos_embedding(src_pos)
+            src_emb = src_emb + src_pos_emb
+            enc_input = F.dropout(
+                src_emb, p=self.dropout,
+                training=False) if self.dropout else src_emb
+            enc_output = self.transformer.encoder(enc_input, src_slf_attn_bias)
+
+            # Init states (caches) for transformer, need to be updated according to selected beam
+            incremental_cache, static_cache = self.transformer.decoder.gen_cache(
+                enc_output, do_zip=True)
+
+            static_cache, enc_output, trg_src_attn_bias = TransformerBeamSearchDecoder.tile_beam_merge_with_batch(
+                (static_cache, enc_output, trg_src_attn_bias), self.beam_size)
+
+            if trg_word is not None:
+                trg_length = paddle.sum(paddle.cast(
+                    trg_word != self.bos_id, dtype="int64"),
+                                        axis=-1)
+            else:
+                trg_length = None
+
+            rs, _ = nn.decode.dynamic_decode(
+                decoder=self.decode,
+                inits=incremental_cache,
+                max_step_num=self.max_out_len,
+                memory=enc_output,
+                trg_src_attn_bias=trg_src_attn_bias,
+                static_cache=static_cache,
+                is_test=True,
+                output_time_major=self.output_time_major,
+                trg_word=trg_word,
+                trg_length=trg_length)
+
+            return rs
+
+        elif self.beam_search_version == 'v2':
+            finished_seq, finished_scores = self.beam_search_v2(
+                src_word, self.beam_size, self.max_out_len, self.alpha)
+            if self.output_time_major:
+                finished_seq = finished_seq.transpose([2, 0, 1])
+            else:
+                finished_seq = finished_seq.transpose([0, 2, 1])
+
+            return finished_seq
+
     def beam_search_v2(self, src_word, beam_size=4, max_len=None, alpha=0.6):
         """
         Beam search with the alive and finished two queues, both have a beam size
@@ -1061,202 +1261,3 @@ class TransformerModel(nn.Layer):
         finished_scores = paddle.where(finished_flags, finished_scores,
                                        alive_log_probs)
         return finished_seq, finished_scores
-
-
-class InferTransformerModel(TransformerModel):
-    """
-    The Transformer model for auto-regressive generation.
-
-    Args:
-        src_vocab_size (int):
-            The size of source vocabulary.
-        trg_vocab_size (int):
-            The size of target vocabulary.
-        max_length (int):
-            The maximum length of input sequences.
-        num_encoder_layers (int):
-            The number of sub-layers to be stacked in the encoder.
-        num_decoder_layers (int):
-            The number of sub-layers to be stacked in the decoder.
-        n_head (int):
-            The number of head used in multi-head attention.
-        d_model (int):
-            The dimension for word embeddings, which is also the last dimension of
-            the input and output of multi-head attention, position-wise feed-forward
-            networks, encoder and decoder.
-        d_inner_hid (int):
-            Size of the hidden layer in position-wise feed-forward networks.
-        dropout (float):
-            Dropout rates. Used for pre-process, activation and inside attention.
-        weight_sharing (bool):
-            Whether to use weight sharing. 
-        attn_dropout (float):
-            The dropout probability used in MHA to drop some attention target.
-            If None, use the value of dropout. Defaults to None.
-        act_dropout (float):
-            The dropout probability used after FFN activition. If None, use
-            the value of dropout. Defaults to None.
-        bos_id (int, optional):
-            The start token id and also is used as padding id. Defaults to 0.
-        eos_id (int, optional):
-            The end token id. Defaults to 1.
-        beam_size (int, optional):
-            The beam width for beam search. Defaults to 4. 
-        max_out_len (int, optional):
-            The maximum output length. Defaults to 256.
-        output_time_major(bool, optional): Indicate the data layout of predicted
-            Tensor. If `False`, the data layout would be batch major with shape
-            `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
-            be time major with shape `[seq_len, batch_size, beam_size]`. Default
-            to `False`.
-        beam_search_version (str): Specify beam search version. It should be in one
-            of [`v1`, `v2`]. If `v2`, need to set `alpha`(default to 0.6) for length
-            penalty. Default to `v1`.
-    """
-
-    def __init__(self,
-                 src_vocab_size,
-                 trg_vocab_size,
-                 max_length,
-                 num_encoder_layers,
-                 num_decoder_layers,
-                 n_head,
-                 d_model,
-                 d_inner_hid,
-                 dropout,
-                 weight_sharing,
-                 attn_dropout=None,
-                 act_dropout=None,
-                 bos_id=0,
-                 eos_id=1,
-                 beam_size=4,
-                 max_out_len=256,
-                 output_time_major=False,
-                 beam_search_version='v1',
-                 **kwargs):
-        args = dict(locals())
-        args.pop("self")
-        args.pop("__class__", None)
-        self.beam_size = args.pop("beam_size")
-        self.max_out_len = args.pop("max_out_len")
-        self.output_time_major = args.pop("output_time_major")
-        self.dropout = dropout
-        self.beam_search_version = args.pop('beam_search_version')
-        kwargs = args.pop("kwargs")
-        if self.beam_search_version == 'v2':
-            if 'alpha' in kwargs:
-                self.alpha = kwargs['alpha']
-            else:
-                self.alpha = 0.6
-        super(InferTransformerModel, self).__init__(**args)
-
-        cell = TransformerDecodeCell(
-            self.transformer.decoder, self.trg_word_embedding,
-            self.trg_pos_embedding, self.linear, self.dropout)
-
-        self.decode = TransformerBeamSearchDecoder(
-            cell, bos_id, eos_id, beam_size, var_dim_in_state=2)
-
-    def forward(self, src_word, trg_word=None):
-        r"""
-        The Transformer forward method.
-
-        Args:
-            src_word (Tensor):
-                The ids of source sequence words. It is a tensor with shape
-                `[batch_size, source_sequence_length]` and its data type can be
-                int or int64.
-            trg_word (Tensor):
-                The ids of target sequence words. Normally, it should NOT be
-                given. If it's given, force decoding with previous output token
-                will be trigger. Defaults to None. 
-        
-        Returns:
-            Tensor:
-                An int64 tensor shaped indicating the predicted ids. Its shape is
-                `[batch_size, seq_len, beam_size]` or `[seq_len, batch_size, beam_size]`
-                according to `output_time_major`.
-        
-        Example:
-            .. code-block::
-
-                import paddle
-                from paddlenlp.transformers import InferTransformerModel
-
-                transformer = InferTransformerModel(
-                    src_vocab_size=30000,
-                    trg_vocab_size=30000,
-                    max_length=256,
-                    num_encoder_layers=6,
-                    num_decoder_layers=6,
-                    n_head=8,
-                    d_model=512,
-                    d_inner_hid=2048,
-                    dropout=0.1,
-                    weight_sharing=True,
-                    bos_id=0,
-                    eos_id=1,
-                    beam_size=4,
-                    max_out_len=256)
-
-                batch_size = 5
-                seq_len = 10
-                transformer(
-                    src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
-        """
-        if self.beam_search_version == 'v1':
-            src_max_len = paddle.shape(src_word)[-1]
-            src_slf_attn_bias = paddle.cast(
-                src_word == self.bos_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
-            trg_src_attn_bias = src_slf_attn_bias
-            src_pos = paddle.cast(
-                src_word != self.bos_id, dtype="int64") * paddle.arange(
-                    start=0, end=src_max_len)
-
-            # Run encoder
-            src_emb = self.src_word_embedding(src_word)
-            src_pos_emb = self.src_pos_embedding(src_pos)
-            src_emb = src_emb + src_pos_emb
-            enc_input = F.dropout(
-                src_emb, p=self.dropout,
-                training=False) if self.dropout else src_emb
-            enc_output = self.transformer.encoder(enc_input, src_slf_attn_bias)
-
-            # Init states (caches) for transformer, need to be updated according to selected beam
-            incremental_cache, static_cache = self.transformer.decoder.gen_cache(
-                enc_output, do_zip=True)
-
-            static_cache, enc_output, trg_src_attn_bias = TransformerBeamSearchDecoder.tile_beam_merge_with_batch(
-                (static_cache, enc_output, trg_src_attn_bias), self.beam_size)
-
-            if trg_word is not None:
-                trg_length = paddle.sum(paddle.cast(
-                    trg_word != self.bos_id, dtype="int64"),
-                                        axis=-1)
-            else:
-                trg_length = None
-
-            rs, _ = nn.decode.dynamic_decode(
-                decoder=self.decode,
-                inits=incremental_cache,
-                max_step_num=self.max_out_len,
-                memory=enc_output,
-                trg_src_attn_bias=trg_src_attn_bias,
-                static_cache=static_cache,
-                is_test=True,
-                output_time_major=self.output_time_major,
-                trg_word=trg_word,
-                trg_length=trg_length)
-
-            return rs
-
-        elif self.beam_search_version == 'v2':
-            finished_seq, finished_scores = self.beam_search_v2(
-                src_word, self.beam_size, self.max_out_len, self.alpha)
-            if self.output_time_major:
-                finished_seq = finished_seq.transpose([2, 0, 1])
-            else:
-                finished_seq = finished_seq.transpose([0, 2, 1])
-
-            return finished_seq
