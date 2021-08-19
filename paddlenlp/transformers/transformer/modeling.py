@@ -650,14 +650,12 @@ class TransformerModel(nn.Layer):
                  attn_dropout=None,
                  act_dropout=None,
                  bos_id=0,
-                 eos_id=1,
-                 ids_dtype="int64"):
+                 eos_id=1):
         super(TransformerModel, self).__init__()
         self.trg_vocab_size = trg_vocab_size
         self.emb_dim = d_model
         self.bos_id = bos_id
         self.eos_id = eos_id
-        self.ids_dtype = ids_dtype
         self.dropout = dropout
 
         self.src_word_embedding = WordEmbedding(
@@ -756,10 +754,10 @@ class TransformerModel(nn.Layer):
         trg_slf_attn_bias.stop_gradient = True
         trg_src_attn_bias = src_slf_attn_bias
         src_pos = paddle.cast(
-            src_word != self.bos_id, dtype=self.ids_dtype) * paddle.arange(
+            src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
                 start=0, end=src_max_len)
         trg_pos = paddle.cast(
-            trg_word != self.bos_id, dtype=self.ids_dtype) * paddle.arange(
+            trg_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
                 start=0, end=trg_max_len)
         with paddle.static.amp.fp16_guard():
             src_emb = self.src_word_embedding(src_word)
@@ -829,12 +827,14 @@ class InferTransformerModel(TransformerModel):
             The beam width for beam search. Defaults to 4. 
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
-        output_time_major(bool, optional): Indicate the data layout of predicted
+        output_time_major(bool, optional):
+            Indicate the data layout of predicted
             Tensor. If `False`, the data layout would be batch major with shape
             `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
             to `False`.
-        beam_search_version (str): Specify beam search version. It should be in one
+        beam_search_version (str):
+            Specify beam search version. It should be in one
             of [`v1`, `v2`]. If `v2`, need to set `alpha`(default to 0.6) for length
             penalty. Default to `v1`.
     """
@@ -858,7 +858,6 @@ class InferTransformerModel(TransformerModel):
                  max_out_len=256,
                  output_time_major=False,
                  beam_search_version='v1',
-                 ids_dtype="int64",
                  **kwargs):
         args = dict(locals())
         args.pop("self")
@@ -937,7 +936,7 @@ class InferTransformerModel(TransformerModel):
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
             trg_src_attn_bias = src_slf_attn_bias
             src_pos = paddle.cast(
-                src_word != self.bos_id, dtype=self.ids_dtype) * paddle.arange(
+                src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
                     start=0, end=src_max_len)
 
             # Run encoder
@@ -1018,7 +1017,7 @@ class InferTransformerModel(TransformerModel):
             dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
         src_slf_attn_bias.stop_gradient = True
         src_pos = paddle.cast(
-            src_word != self.bos_id, dtype=self.ids_dtype) * paddle.arange(
+            src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
                 start=0, end=src_max_len)
         src_emb = self.src_word_embedding(src_word)
         src_pos_emb = self.src_pos_embedding(src_pos)
@@ -1044,7 +1043,7 @@ class InferTransformerModel(TransformerModel):
         alive_seq = paddle.to_tensor(
             np.tile(
                 np.array(
-                    [[[self.bos_id]]], dtype=self.ids_dtype), (batch_size,
+                    [[[self.bos_id]]], dtype=src_word.dtype), (batch_size,
                                                                beam_size, 1)))
 
         ## init for the finished ##
@@ -1055,7 +1054,7 @@ class InferTransformerModel(TransformerModel):
         finished_seq = paddle.to_tensor(
             np.tile(
                 np.array(
-                    [[[self.bos_id]]], dtype=self.ids_dtype), (batch_size,
+                    [[[self.bos_id]]], dtype=src_word.dtype), (batch_size,
                                                                beam_size, 1)))
         finished_flags = paddle.zeros_like(finished_scores)
 
@@ -1155,7 +1154,7 @@ class InferTransformerModel(TransformerModel):
             states = update_states(states, topk_coordinates, beam_size)
             eos = paddle.full(
                 shape=topk_ids.shape,
-                dtype=self.ids_dtype,
+                dtype=alive_seq.dtype,
                 fill_value=self.eos_id)
             topk_finished = paddle.cast(paddle.equal(topk_ids, eos), "float32")
 
@@ -1191,7 +1190,7 @@ class InferTransformerModel(TransformerModel):
                 [
                     finished_seq, paddle.full(
                         shape=[batch_size, beam_size, 1],
-                        dtype=self.ids_dtype,
+                        dtype=finished_seq.dtype,
                         fill_value=self.eos_id)
                 ],
                 axis=2)
@@ -1216,7 +1215,7 @@ class InferTransformerModel(TransformerModel):
         def inner_loop(i, trg_word, alive_seq, alive_log_probs, finished_seq,
                        finished_scores, finished_flags, caches):
             trg_pos = paddle.full(
-                shape=trg_word.shape, dtype=self.ids_dtype, fill_value=i)
+                shape=trg_word.shape, dtype=alive_seq.dtype, fill_value=i)
             trg_emb = self.trg_word_embedding(trg_word)
             trg_pos_emb = self.trg_pos_embedding(trg_pos)
             trg_emb = trg_emb + trg_pos_emb

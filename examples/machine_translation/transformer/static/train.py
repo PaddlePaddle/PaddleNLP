@@ -111,8 +111,7 @@ def do_train(args):
             dropout=args.dropout,
             weight_sharing=args.weight_sharing,
             bos_id=args.bos_idx,
-            eos_id=args.eos_idx,
-            ids_dtype=args.input_dtype)
+            eos_id=args.eos_idx)
         # Define loss
         criterion = CrossEntropyCriterion(args.label_smooth_eps, args.bos_idx)
 

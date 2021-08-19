@@ -84,8 +84,7 @@ def do_predict(args):
         eos_id=args.eos_idx,
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
-        use_ft=not args.without_ft,
-        ids_dtype=args.input_dtype)
+        use_ft=not args.without_ft)
 
     # Load the trained model
     assert args.init_from_params, (

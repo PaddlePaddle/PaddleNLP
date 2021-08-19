@@ -13,7 +13,7 @@ save_model: "trained_models"
 # The directory for saving inference model 
 inference_model_dir: "infer_model"
 # Set seed for CE or debug
-random_seed: None
+random_seed: 128
 # The file to output the translation results of predict_file to.
 output_file: "predict.txt"
 # The <bos>, <eos> and <unk> tokens in the dictionary.
@@ -33,9 +33,9 @@ pool_size: 200000
 sort_type: "global"
 batch_size: 4096
 infer_batch_size: 8
-shuffle_batch: True
+shuffle_batch: False
 # Data shuffle only works when sort_type is pool or none
-shuffle: True
+shuffle: False
 # shuffle_seed must be set when shuffle is True and using multi-cards to train. 
 # Otherwise, the number of batches cannot be guaranteed. 
 shuffle_seed: 128
@@ -61,7 +61,7 @@ label_smooth_eps: 0.1
 # Hyparams for generation:
 # The parameters for beam search.
 beam_size: 5
-max_out_len: 1024
+max_out_len: 16
 # The number of decoded sentences to output.
 n_best: 1
 
