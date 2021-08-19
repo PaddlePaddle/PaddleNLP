@@ -650,12 +650,14 @@ class TransformerModel(nn.Layer):
                  attn_dropout=None,
                  act_dropout=None,
                  bos_id=0,
-                 eos_id=1):
+                 eos_id=1,
+                 pos_dtype="int64"):
         super(TransformerModel, self).__init__()
         self.trg_vocab_size = trg_vocab_size
         self.emb_dim = d_model
         self.bos_id = bos_id
         self.eos_id = eos_id
+        self.pos_dtype = pos_dtype
         self.dropout = dropout
 
         self.src_word_embedding = WordEmbedding(
@@ -754,10 +756,10 @@ class TransformerModel(nn.Layer):
         trg_slf_attn_bias.stop_gradient = True
         trg_src_attn_bias = src_slf_attn_bias
         src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
+            src_word != self.bos_id, dtype=self.pos_dtype) * paddle.arange(
                 start=0, end=src_max_len)
         trg_pos = paddle.cast(
-            trg_word != self.bos_id, dtype="int64") * paddle.arange(
+            trg_word != self.bos_id, dtype=self.pos_dtype) * paddle.arange(
                 start=0, end=trg_max_len)
         with paddle.static.amp.fp16_guard():
             src_emb = self.src_word_embedding(src_word)

@@ -92,11 +92,11 @@ def do_train(args):
     startup_program = paddle.static.Program()
     with paddle.static.program_guard(train_program, startup_program):
         src_word = paddle.static.data(
-            name="src_word", shape=[None, None], dtype="int64")
+            name="src_word", shape=[None, None], dtype=args.input_dtype)
         trg_word = paddle.static.data(
-            name="trg_word", shape=[None, None], dtype="int64")
+            name="trg_word", shape=[None, None], dtype=args.input_dtype)
         lbl_word = paddle.static.data(
-            name="lbl_word", shape=[None, None, 1], dtype="int64")
+            name="lbl_word", shape=[None, None, 1], dtype=args.input_dtype)
 
         # Define model
         transformer = TransformerModel(
@@ -111,7 +111,8 @@ def do_train(args):
             dropout=args.dropout,
             weight_sharing=args.weight_sharing,
             bos_id=args.bos_idx,
-            eos_id=args.eos_idx)
+            eos_id=args.eos_idx,
+            pos_dtype=args.input_dtype)
         # Define loss
         criterion = CrossEntropyCriterion(args.label_smooth_eps, args.bos_idx)
 

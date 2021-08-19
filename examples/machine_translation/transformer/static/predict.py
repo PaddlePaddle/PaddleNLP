@@ -85,7 +85,7 @@ def do_predict(args):
     startup_program = paddle.static.Program()
     with paddle.static.program_guard(test_program, startup_program):
         src_word = paddle.static.data(
-            name="src_word", shape=[None, None], dtype="int64")
+            name="src_word", shape=[None, None], dtype=args.input_dtype)
 
         # Define model
         transformer = InferTransformerModel(
