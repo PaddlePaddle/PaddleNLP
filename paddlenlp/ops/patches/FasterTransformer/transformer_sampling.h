@@ -513,12 +513,19 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
 
-      if (decoding_params.logits_mask_T || args_.temperature_ != 1.0 ||
-          args_.len_penalty != 1.0 || args_.repeat_penalty != 1.0) {
+      if (args_.candidate_num_ != 0) {
+        // top k sampling
+        update_logits_without_softmax(logits_buf_,
+                                      decoding_params.embedding_bias_T,
+                                      args_.end_id_,
+                                      finished_buf_,
+                                      m,
+                                      n,
+                                      decoding_params.stream);
+
         // TODO(): repeat penalty vertification.
         apply_penalties_Launcher(step,
                                  logits_buf_,
-                                 decoding_params.embedding_bias_T,
                                  finished_buf_,
                                  nullptr, /*current_ids*/
                                  nullptr, /*previous_ids*/
@@ -532,10 +539,7 @@ public:
                                  args_.repeat_penalty,
                                  decoding_params.stream,
                                  decoding_params.logits_mask_T);
-      }
 
-      if (args_.candidate_num_ != 0) {
-        // top k sampling
         topK_sampling_kernel_kernelLauncher(
             topk_workspace_,
             topk_workspace_size_,
@@ -549,12 +553,29 @@ public:
       } else if (args_.probability_threshold_ != 0.0) {
         // top p sampling
         softmax_kernelLauncher(logits_buf_,
-                               (DataType_ *)nullptr,
+                               decoding_params.embedding_bias_T,
                                args_.end_id_,
-                               nullptr,
+                               finished_buf_,
                                m,
                                n,
                                decoding_params.stream);
+
+        // TODO(): repeat penalty vertification.
+        apply_penalties_Launcher(step,
+                                 logits_buf_,
+                                 finished_buf_,
+                                 nullptr, /*current_ids*/
+                                 nullptr, /*previous_ids*/
+                                 nullptr, /*parent_ids*/
+                                 args_.batch_size_,
+                                 1,
+                                 args_.vocab_size_,
+                                 args_.end_id_,
+                                 args_.temperature_,
+                                 args_.len_penalty,
+                                 args_.repeat_penalty,
+                                 decoding_params.stream,
+                                 decoding_params.logits_mask_T);
 
         topP_sampling_kernel_kernelLauncher(
             topp_workspace_,

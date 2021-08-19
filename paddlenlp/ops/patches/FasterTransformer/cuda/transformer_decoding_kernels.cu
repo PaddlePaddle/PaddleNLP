@@ -166,7 +166,6 @@ __global__ void apply_penalties_kernel(int step,
                                        int vocab_size,
                                        int beam_width,
                                        T* log_probs,
-                                       const T* bias,
                                        const bool* finished,
                                        int* current_ids,
                                        int* previous_ids,
@@ -185,22 +184,13 @@ __global__ void apply_penalties_kernel(int step,
 
   bool finish = (finished != nullptr) ? finished[bbid] : false;
 
-  const bool IS_FP16 = std::is_same<T, half>::value;
-  const T MAX_T_VAL = (IS_FP16) ? HALF_FLT_MAX : FLT_MAX;
-  for (int i = tid + bid * blockDim.x; i < vocab_size;
-       i += blockDim.x * gridDim.x) {
-    if (finish) {
-      log_probs[i + bbid * vocab_size] = (i == end_id) ? MAX_T_VAL : -MAX_T_VAL;
-    } else {
-      log_probs[i + bbid * vocab_size] += bias[i];
-    }
-  }
-
   if (!finish) {
     // temperature
-    for (int i = tid + bid * blockDim.x; i < vocab_size;
-         i += blockDim.x * gridDim.x) {
-      log_probs[i + bbid * vocab_size] *= inv_temp;
+    if (inv_temp != 1.0) {
+      for (int i = tid + bid * blockDim.x; i < vocab_size;
+           i += blockDim.x * gridDim.x) {
+        log_probs[i + bbid * vocab_size] *= inv_temp;
+      }
     }
 
     if (tid == 0 && bid == 0) {
@@ -271,7 +261,6 @@ __global__ void apply_penalties_kernel(int step,
 template <typename T>
 void apply_penalties_Launcher(int step,
                               T* log_probs,
-                              const T* bias,
                               const bool* finished,
                               int* current_ids,
                               int* previous_ids,
@@ -292,7 +281,6 @@ void apply_penalties_Launcher(int step,
                                                         vocab_size,
                                                         beam_width,
                                                         log_probs,
-                                                        bias,
                                                         finished,
                                                         current_ids,
                                                         previous_ids,
@@ -302,6 +290,38 @@ void apply_penalties_Launcher(int step,
                                                         len_penalty,
                                                         repeat_penalty,
                                                         logits_mask);
+}
+
+template <typename T>
+void update_KV_cache_kernelLauncher(T** key_cache,
+                                    T** value_cache,
+                                    const int* beam_ids,
+                                    const int batch_size,
+                                    const int beam_width,
+                                    const int hidden_dim,
+                                    const int step,
+                                    const int start_len,
+                                    const int cache_size,
+                                    const int decoder_layers,
+                                    cudaStream_t stream) {
+  dim3 grid(decoder_layers * batch_size * beam_width * (step + start_len));
+  dim3 block(min(1024, hidden_dim));
+  block.x = block.x / (4 / sizeof(T));
+
+  int src_id = step & 0x1;
+  int tgt_id = 1 - src_id;
+
+  update_KV_cache_kernel<<<grid, block, 0, stream>>>(key_cache[src_id],
+                                                     key_cache[tgt_id],
+                                                     value_cache[src_id],
+                                                     value_cache[tgt_id],
+                                                     beam_ids,
+                                                     batch_size,
+                                                     beam_width,
+                                                     hidden_dim,
+                                                     cache_size,
+                                                     step + start_len,
+                                                     decoder_layers);
 }
 
 template void embeddings_kernel_launcher(float* from_tensor,
@@ -368,7 +388,6 @@ template void init_logits_mask_Launcher(half* logits_mask,
 
 template void apply_penalties_Launcher(int step,
                                        float* log_probs,
-                                       const float* bias,
                                        const bool* finished,
                                        int* current_ids,
                                        int* previous_ids,
@@ -385,7 +404,6 @@ template void apply_penalties_Launcher(int step,
 
 template void apply_penalties_Launcher(int step,
                                        half* log_probs,
-                                       const half* bias,
                                        const bool* finished,
                                        int* current_ids,
                                        int* previous_ids,
@@ -399,4 +417,28 @@ template void apply_penalties_Launcher(int step,
                                        float repeat_penalty,
                                        cudaStream_t stream,
                                        const half* logits_mask);
+
+template void update_KV_cache_kernelLauncher(float** key_cache,
+                                             float** value_cache,
+                                             const int* beam_ids,
+                                             const int batch_size,
+                                             const int beam_width,
+                                             const int hidden_dim,
+                                             const int step,
+                                             const int start_len,
+                                             const int cache_size,
+                                             const int decoder_layers,
+                                             cudaStream_t stream);
+
+template void update_KV_cache_kernelLauncher(half** key_cache,
+                                             half** value_cache,
+                                             const int* beam_ids,
+                                             const int batch_size,
+                                             const int beam_width,
+                                             const int hidden_dim,
+                                             const int step,
+                                             const int start_len,
+                                             const int cache_size,
+                                             const int decoder_layers,
+                                             cudaStream_t stream);
 }

@@ -381,8 +381,11 @@ public:
 #endif
       }
 
-      float alpha = (float)1.0f;
-      float beta = (float)0.0f;
+      int cublasAlgo = (sizeof(DataType_) == 2) ? CUBLAS_GEMM_DEFAULT_TENSOR_OP
+                                                : CUBLAS_GEMM_DEFAULT;
+
+      DataType_ alpha = (DataType_)1.0f;
+      DataType_ beta = (DataType_)0.0f;
 
       if (args_.normalization_before_) {
         decoder_->decoder_norm1(from_tensor_[out_id],
@@ -417,7 +420,8 @@ public:
                          CType_,
                          k,
                          computeType_,
-                         static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
+                         static_cast<cublasGemmAlgo_t>(cublasAlgo)));
+
       } else {
         // trans here
         check_cuda_error(
@@ -439,7 +443,7 @@ public:
                          CType_,
                          k,
                          computeType_,
-                         static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
+                         static_cast<cublasGemmAlgo_t>(cublasAlgo)));
       }
 #ifndef NDEBUG
       cudaDeviceSynchronize();
@@ -470,6 +474,9 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
 
+      float alpha_ = (DataType_)1.0f;
+      float beta_ = (DataType_)0.0f;
+
       check_cuda_error(
           cublasGemmEx(decoding_params.cublas_handle,
                        CUBLAS_OP_N,
@@ -477,22 +484,18 @@ public:
                        n,
                        m,
                        k,
-                       &alpha,
+                       &alpha_,
                        decoding_params.embedding_kernel,
                        AType_,
                        n,
                        lm_normed_result_buf_,
                        BType_,
                        k,
-                       &beta,
+                       &beta_,
                        logits_buf_,
                        CUDA_R_32F,
                        n,
-#ifdef CUDA11_MODE
-                       CUBLAS_COMPUTE_32F_PEDANTIC,
-#else
                        CUDA_R_32F,
-#endif
                        static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
 
 #ifndef NDEBUG
@@ -500,101 +503,77 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
 
-      if (decoding_params.logits_mask || args_.temperature_ != 1.0 ||
-          args_.len_penalty != 1.0 || args_.repeat_penalty != 1.0) {
-        // TODO(): repeat penalty vertification.
-        apply_penalties_Launcher<float>(step,
-                                        logits_buf_,
-                                        decoding_params.embedding_bias,
-                                        finished_buf_,
-                                        nullptr, /*current_ids*/
-                                        nullptr, /*previous_ids*/
-                                        nullptr, /*parent_ids*/
-                                        args_.batch_size_,
-                                        1,
-                                        args_.vocab_size_,
-                                        args_.end_id_,
-                                        args_.temperature_,
-                                        args_.len_penalty,
-                                        args_.repeat_penalty,
-                                        decoding_params.stream,
-                                        decoding_params.logits_mask);
-      }
-
       // Beamsearch
-      // NOTE: k is limited.
-      if (is_fuse_topk_softMax_ &&
-          (k == 1 || k == 2 || k == 3 || k == 4 || k == 8 || k == 16)) {
-        topK_softMax(logits_buf_,
-                     nullptr,
-                     finished_buf_,
-                     cum_log_buf_,
-                     word_ids_buf_,
-                     reinterpret_cast<void *>(temp_storage_),
-                     args_,
-                     decoding_params.stream);
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-
-        update_kernelLauncher_v2(finished_buf_,
-                                 decoding_params.parent_ids + (step - 1) * m,
-                                 decoding_params.sequence_length,
-                                 word_ids_buf_,
-                                 decoding_params.output_ids + (step - 1) * m,
-                                 finished_count_buf_,
-                                 args_,
-                                 decoding_params.stream);
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-      } else {
-        update_logits_without_bias(
-            logits_buf_, args_.end_id_, m, n, decoding_params.stream);
+      update_logits(logits_buf_,
+                    decoding_params.embedding_bias,
+                    args_.end_id_,
+                    finished_buf_,
+                    m,
+                    n,
+                    decoding_params.stream);
 
 #ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
 #endif
 
-        /* adding cum_log_buf_ to logits_buf_ */
-        broadcast_kernelLauncher(logits_buf_,
-                                 cum_log_buf_,
-                                 args_.batch_size_,
-                                 args_.beam_width_,
-                                 args_.vocab_size_,
-                                 decoding_params.stream);
+      // TODO(): repeat penalty vertification.
+      apply_penalties_Launcher<float>(step,
+                                      logits_buf_,
+                                      finished_buf_,
+                                      nullptr, /*current_ids*/
+                                      nullptr, /*previous_ids*/
+                                      nullptr, /*parent_ids*/
+                                      args_.batch_size_,
+                                      args_.beam_width_,
+                                      args_.vocab_size_,
+                                      args_.end_id_,
+                                      args_.temperature_,
+                                      args_.len_penalty,
+                                      args_.repeat_penalty,
+                                      decoding_params.stream,
+                                      decoding_params.logits_mask);
+
 #ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
 #endif
 
-        topK_kernelLauncher(topK_kernel_workspace,
-                            topk_workspace_size_,
-                            logits_buf_,
+      /* adding cum_log_buf_ to logits_buf_ */
+      broadcast_kernelLauncher(logits_buf_,
+                               cum_log_buf_,
+                               args_.batch_size_,
+                               args_.beam_width_,
+                               args_.vocab_size_,
+                               decoding_params.stream);
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+
+      topK_kernelLauncher(topK_kernel_workspace,
+                          topk_workspace_size_,
+                          logits_buf_,
+                          word_ids_buf_,
+                          args_,
+                          decoding_params.stream);
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+      update_kernelLauncher(logits_buf_,
+                            cum_log_buf_,
+                            finished_buf_,
+                            decoding_params.parent_ids + (step - 1) * m,
+                            decoding_params.sequence_length,
                             word_ids_buf_,
-                            args_,
-                            decoding_params.stream);
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-        update_kernelLauncher(logits_buf_,
-                              cum_log_buf_,
-                              finished_buf_,
-                              decoding_params.parent_ids + (step - 1) * m,
-                              decoding_params.sequence_length,
-                              word_ids_buf_,
-                              decoding_params.output_ids + (step - 1) * m,
-                              args_.batch_size_,
-                              args_.beam_width_,
-                              args_.vocab_size_,
-                              decoding_params.stream,
-                              args_.end_id_,
-                              finished_count_buf_);
-      }
+                            decoding_params.output_ids + (step - 1) * m,
+                            args_.batch_size_,
+                            args_.beam_width_,
+                            args_.vocab_size_,
+                            decoding_params.stream,
+                            args_.end_id_,
+                            finished_count_buf_);
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();
@@ -608,7 +587,8 @@ public:
           args_.batch_size_,
           args_.beam_width_,
           args_.hidden_units_,
-          step + args_.start_len_,
+          step,
+          args_.start_len_,
           cache_size,
           args_.decoder_layers_,
           decoding_params.stream);

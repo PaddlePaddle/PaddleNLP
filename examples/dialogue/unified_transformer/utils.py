@@ -197,61 +197,55 @@ def select_response(ids,
                     max_dec_len=None,
                     num_return_sequences=1,
                     keep_space=True):
-    ids = ids.numpy()
-    scores = scores.numpy()
-
-    if len(ids) != len(scores) or (len(ids) % num_return_sequences) != 0:
-        raise ValueError(
-            "the length of `ids` is {}, but the `num_return_sequences` is {}".
-            format(len(ids), num_return_sequences))
-
-    group = []
-    tmp = []
-    for pred, score in zip(ids, scores):
-        pred_token_ids, pred_tokens = post_process_response(pred, tokenizer)
-        num_token = len(pred_token_ids)
-        if keep_space:
-            response = " ".join(pred_tokens)
-        else:
-            response = "".join(pred_tokens)
-
-        in_turn_repetition = get_in_turn_repetition(
-            pred_tokens, True) or get_in_turn_repetition(pred_token_ids)
-        # not ending
-        if max_dec_len is not None and num_token >= max_dec_len:
-            score -= 1e3
-        elif in_turn_repetition:
-            score -= 1e3
-
-        tmp.append([response, score])
-        if len(tmp) == num_return_sequences:
-            group.append(tmp)
-            tmp = []
-
     results = []
-    for preds in group:
-        preds = sorted(preds, key=lambda x: -x[1])
-        results.append(preds[0][0])
-    return results
+    if scores is not None:
+        ids = ids.numpy()
+        scores = scores.numpy()
 
+        if len(ids) != len(scores) or (len(ids) % num_return_sequences) != 0:
+            raise ValueError(
+                "the length of `ids` is {}, but the `num_return_sequences` is {}".
+                format(len(ids), num_return_sequences))
 
-def select_response_without_scores(ids, tokenizer, keep_space=True):
-    if len(ids.shape) > 2:
-        ids = ids[:, :, 0].squeeze()
-    ids = ids.numpy().transpose()
+        group = []
+        tmp = []
+        for pred, score in zip(ids, scores):
+            pred_token_ids, pred_tokens = post_process_response(pred, tokenizer)
+            num_token = len(pred_token_ids)
+            if keep_space:
+                response = " ".join(pred_tokens)
+            else:
+                response = "".join(pred_tokens)
 
-    results = []
-    tmp = []
-    for pred in ids:
-        pred_token_ids, pred_tokens = post_process_response(pred, tokenizer)
-        num_token = len(pred_token_ids)
-        if keep_space:
-            response = " ".join(pred_tokens)
-        else:
-            response = "".join(pred_tokens)
+            in_turn_repetition = get_in_turn_repetition(
+                pred_tokens, True) or get_in_turn_repetition(pred_token_ids)
+            # not ending
+            if max_dec_len is not None and num_token >= max_dec_len:
+                score -= 1e3
+            elif in_turn_repetition:
+                score -= 1e3
 
-        in_turn_repetition = get_in_turn_repetition(
-            pred_tokens, True) or get_in_turn_repetition(pred_token_ids)
+            tmp.append([response, score])
+            if len(tmp) == num_return_sequences:
+                group.append(tmp)
+                tmp = []
 
-        results.append(response)
+        for preds in group:
+            preds = sorted(preds, key=lambda x: -x[1])
+            results.append(preds[0][0])
+    else:
+        if len(ids.shape) > 2:
+            ids = ids[:, :, 0]
+        ids = ids.numpy().transpose()
+
+        results = []
+        for pred in ids:
+            pred_token_ids, pred_tokens = post_process_response(pred, tokenizer)
+            num_token = len(pred_token_ids)
+            if keep_space:
+                response = " ".join(pred_tokens)
+            else:
+                response = "".join(pred_tokens)
+
+            results.append(response)
     return results

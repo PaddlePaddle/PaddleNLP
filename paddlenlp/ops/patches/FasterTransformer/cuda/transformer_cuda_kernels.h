@@ -53,7 +53,6 @@ void init_logits_mask_Launcher(T* logits_mask,
 template <typename T>
 void apply_penalties_Launcher(int step,
                               T* log_probs,
-                              const T* bias,
                               const bool* finished,
                               int* current_ids,
                               int* previous_ids,
@@ -83,4 +82,17 @@ void update_logits_without_bias(float* logits,
                                 const int m,
                                 const int n,
                                 cudaStream_t stream);
+
+template <typename T>
+void update_KV_cache_kernelLauncher(T** key_cache,
+                                    T** value_cache,
+                                    const int* beam_ids,
+                                    const int batch_size,
+                                    const int beam_width,
+                                    const int hidden_dim,
+                                    const int step,
+                                    const int start_len,
+                                    const int cache_size,
+                                    const int decoder_layers,
+                                    cudaStream_t stream);
 }

@@ -7,7 +7,7 @@ from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransfo
 from paddlenlp.metrics import BLEU, Distinct
 from paddlenlp.ops import FasterUnifiedTransformer
 
-from utils import print_args, set_seed, create_data_loader, select_response, select_response_without_scores
+from utils import print_args, set_seed, create_data_loader, select_response
 
 
 # yapf: disable
@@ -122,7 +122,7 @@ def infer(args):
 
         if args.faster:
             ids = output
-            results = select_response_without_scores(ids, tokenizer)
+            results = select_response(ids, None, tokenizer)
         else:
             ids, scores = output
             results = select_response(ids, scores, tokenizer, args.max_dec_len,
