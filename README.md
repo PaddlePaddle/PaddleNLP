@@ -257,6 +257,8 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
   <img src="./docs/imgs/qq.png" width="200" height="200" />
 </div>  
 
+
+
 ## 版本更新
 
 更多版本更新说明请查看[ChangeLog](./docs/changelog.md)
