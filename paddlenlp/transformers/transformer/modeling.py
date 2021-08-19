@@ -651,13 +651,13 @@ class TransformerModel(nn.Layer):
                  act_dropout=None,
                  bos_id=0,
                  eos_id=1,
-                 pos_dtype="int64"):
+                 ids_dtype="int64"):
         super(TransformerModel, self).__init__()
         self.trg_vocab_size = trg_vocab_size
         self.emb_dim = d_model
         self.bos_id = bos_id
         self.eos_id = eos_id
-        self.pos_dtype = pos_dtype
+        self.ids_dtype = ids_dtype
         self.dropout = dropout
 
         self.src_word_embedding = WordEmbedding(
@@ -756,10 +756,10 @@ class TransformerModel(nn.Layer):
         trg_slf_attn_bias.stop_gradient = True
         trg_src_attn_bias = src_slf_attn_bias
         src_pos = paddle.cast(
-            src_word != self.bos_id, dtype=self.pos_dtype) * paddle.arange(
+            src_word != self.bos_id, dtype=self.ids_dtype) * paddle.arange(
                 start=0, end=src_max_len)
         trg_pos = paddle.cast(
-            trg_word != self.bos_id, dtype=self.pos_dtype) * paddle.arange(
+            trg_word != self.bos_id, dtype=self.ids_dtype) * paddle.arange(
                 start=0, end=trg_max_len)
         with paddle.static.amp.fp16_guard():
             src_emb = self.src_word_embedding(src_word)
@@ -858,7 +858,7 @@ class InferTransformerModel(TransformerModel):
                  max_out_len=256,
                  output_time_major=False,
                  beam_search_version='v1',
-                 pos_dtype="int64",
+                 ids_dtype="int64",
                  **kwargs):
         args = dict(locals())
         args.pop("self")
@@ -937,7 +937,7 @@ class InferTransformerModel(TransformerModel):
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
             trg_src_attn_bias = src_slf_attn_bias
             src_pos = paddle.cast(
-                src_word != self.bos_id, dtype="int64") * paddle.arange(
+                src_word != self.bos_id, dtype=self.ids_dtype) * paddle.arange(
                     start=0, end=src_max_len)
 
             # Run encoder
@@ -958,7 +958,7 @@ class InferTransformerModel(TransformerModel):
 
             if trg_word is not None:
                 trg_length = paddle.sum(paddle.cast(
-                    trg_word != self.bos_id, dtype="int64"),
+                    trg_word != self.bos_id, dtype="int32"),
                                         axis=-1)
             else:
                 trg_length = None
@@ -1018,7 +1018,7 @@ class InferTransformerModel(TransformerModel):
             dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
         src_slf_attn_bias.stop_gradient = True
         src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
+            src_word != self.bos_id, dtype=self.ids_dtype) * paddle.arange(
                 start=0, end=src_max_len)
         src_emb = self.src_word_embedding(src_word)
         src_pos_emb = self.src_pos_embedding(src_pos)
@@ -1044,8 +1044,8 @@ class InferTransformerModel(TransformerModel):
         alive_seq = paddle.to_tensor(
             np.tile(
                 np.array(
-                    [[[self.bos_id]]], dtype="int64"), (batch_size, beam_size, 1
-                                                        )))
+                    [[[self.bos_id]]], dtype=self.ids_dtype), (batch_size,
+                                                               beam_size, 1)))
 
         ## init for the finished ##
         finished_scores = paddle.to_tensor(
@@ -1055,8 +1055,8 @@ class InferTransformerModel(TransformerModel):
         finished_seq = paddle.to_tensor(
             np.tile(
                 np.array(
-                    [[[self.bos_id]]], dtype="int64"), (batch_size, beam_size, 1
-                                                        )))
+                    [[[self.bos_id]]], dtype=self.ids_dtype), (batch_size,
+                                                               beam_size, 1)))
         finished_flags = paddle.zeros_like(finished_scores)
 
         ### initialize inputs and states of transformer decoder ###
@@ -1154,7 +1154,9 @@ class InferTransformerModel(TransformerModel):
                 axis=2)
             states = update_states(states, topk_coordinates, beam_size)
             eos = paddle.full(
-                shape=topk_ids.shape, dtype="int64", fill_value=self.eos_id)
+                shape=topk_ids.shape,
+                dtype=self.ids_dtype,
+                fill_value=self.eos_id)
             topk_finished = paddle.cast(paddle.equal(topk_ids, eos), "float32")
 
             # topk_seq: [batch_size, 2*beam_size, i+1]
@@ -1189,7 +1191,7 @@ class InferTransformerModel(TransformerModel):
                 [
                     finished_seq, paddle.full(
                         shape=[batch_size, beam_size, 1],
-                        dtype="int64",
+                        dtype=self.ids_dtype,
                         fill_value=self.eos_id)
                 ],
                 axis=2)
@@ -1214,7 +1216,7 @@ class InferTransformerModel(TransformerModel):
         def inner_loop(i, trg_word, alive_seq, alive_log_probs, finished_seq,
                        finished_scores, finished_flags, caches):
             trg_pos = paddle.full(
-                shape=trg_word.shape, dtype="int64", fill_value=i)
+                shape=trg_word.shape, dtype=self.ids_dtype, fill_value=i)
             trg_emb = self.trg_word_embedding(trg_word)
             trg_pos_emb = self.trg_pos_embedding(trg_pos)
             trg_emb = trg_emb + trg_pos_emb

@@ -108,7 +108,7 @@ class FasterTransformer(TransformerModel):
             src_word == self.bos_id,
             dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
         src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
+            src_word != self.bos_id, dtype=self.ids_dtype) * paddle.arange(
                 start=0, end=src_max_len)
 
         # Run encoder
@@ -305,6 +305,7 @@ class TransformerGenerator(paddle.nn.Layer):
         self.output_time_major = kwargs.pop("output_time_major", True)
         use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
         use_ft = kwargs.pop("use_ft", True)
+        ids_dtype = kwargs.pop("ids_dtype", "int64")
 
         if use_ft:
             try:
@@ -324,7 +325,8 @@ class TransformerGenerator(paddle.nn.Layer):
                     eos_id=eos_id,
                     beam_size=beam_size,
                     max_out_len=max_out_len,
-                    use_fp16_decoding=use_fp16_decoding)
+                    use_fp16_decoding=use_fp16_decoding,
+                    ids_dtype=ids_dtype)
             except Exception:
                 logger.warning(
                     "Exception occurs when using Faster Transformer. " \
@@ -345,6 +347,7 @@ class TransformerGenerator(paddle.nn.Layer):
                     beam_size=beam_size,
                     max_out_len=max_out_len,
                     output_time_major=self.output_time_major,
+                    ids_dtype=ids_dtype,
                     **kwargs)
         else:
             self.transformer = InferTransformerModel(
@@ -363,6 +366,7 @@ class TransformerGenerator(paddle.nn.Layer):
                 beam_size=beam_size,
                 max_out_len=max_out_len,
                 output_time_major=self.output_time_major,
+                ids_dtype=ids_dtype,
                 **kwargs)
 
     def forward(self, src_word):

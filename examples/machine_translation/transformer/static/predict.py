@@ -102,7 +102,8 @@ def do_predict(args):
             bos_id=args.bos_idx,
             eos_id=args.eos_idx,
             beam_size=args.beam_size,
-            max_out_len=args.max_out_len)
+            max_out_len=args.max_out_len,
+            ids_dtype=args.input_dtype)
 
         finished_seq = transformer(src_word=src_word)
 
