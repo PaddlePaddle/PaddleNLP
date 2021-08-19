@@ -77,12 +77,6 @@ void softmax_kernelLauncher(T* logits,
                             cudaStream_t stream,
                             const T* logits_mask);
 
-void update_logits_without_bias(float* logits,
-                                const int end_ids,
-                                const int m,
-                                const int n,
-                                cudaStream_t stream);
-
 template <typename T>
 void update_KV_cache_kernelLauncher(T** key_cache,
                                     T** value_cache,
