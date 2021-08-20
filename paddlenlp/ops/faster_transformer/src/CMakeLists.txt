@@ -145,8 +145,7 @@ if(ON_INFER)
     set(DEPS ${DEPS} shlwapi.lib)
   endif(NOT WIN32)
 
-  cuda_add_library(pd_infer_custom_op ${decoding_op_files} SHARED)
-  cuda_add_library(pd_infer_custom_op ${decoder_op_files} SHARED)
+  cuda_add_library(pd_infer_custom_op ${decoding_op_files} ${decoder_op_files} SHARED)
   add_dependencies(pd_infer_custom_op extern_${THIRD_PARTY_NAME})
   string(REPLACE "/" ";" DEMO_PATH ${DEMO})
 
