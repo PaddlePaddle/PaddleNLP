@@ -17,8 +17,6 @@ from paddlenlp.metrics import BLEU
 
 from gen_utils import print_args, set_seed, create_data_loader, select_sum
 
-paddle.DataParallel.generate = UNIMOLMHeadModel.generate
-
 
 # yapf: disable
 def parse_args():
