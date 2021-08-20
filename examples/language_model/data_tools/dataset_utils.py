@@ -30,7 +30,7 @@ import paddle.distributed.fleet as fleet
 print_rank_0 = print
 
 #from megatron.data.indexed_dataset import make_dataset as make_indexed_dataset
-
+COMPILED = False
 DSET_TYPE_BERT = 'standard_bert'
 DSET_TYPE_T5 = 't5'
 DSET_TYPE_ERNIE = 'ernie'
@@ -704,8 +704,9 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
     indexmap_filename += '_{}s'.format(seed)
     indexmap_filename += '.npy'
 
+    local_rank = int(fleet.local_rank())
     # Build the indexed mapping if not exist.
-    if paddle.distributed.get_rank() == 0 and \
+    if local_rank == 0 and \
        not os.path.isfile(indexmap_filename):
         print(' > WARNING: could not find index map file {}, building '
               'the indices on rank 0 ...'.format(indexmap_filename))
@@ -716,11 +717,14 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
         assert indexed_dataset.sizes.dtype == np.int32
 
         # Build samples mapping
-        verbose = paddle.distributed.get_rank() == 0
+        verbose = local_rank == 0
         start_time = time.time()
         print_rank_0(' > building sapmles index mapping for {} ...'.format(
             name))
         # First compile and then import.
+        if local_rank == 0 and not COMPILED:
+            compile_helper()
+            COMPILED = True
         import data_tools.helpers as helpers
         samples_mapping = helpers.build_mapping(
             indexed_dataset.doc_idx, indexed_dataset.sizes, num_epochs,
@@ -740,9 +744,13 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
                 time.sleep(3)
             else:
                 break
+
     # This should be a barrier but nccl barrier assumes
     # device_index=rank which is not the case for model
     # parallel case
+    if paddle.distributed.get_world_size() > 1:
+        fleet.barrier_worker()
+
     # counts = paddle.to_tensor([1])
     # paddle.distributed.all_reduce(counts, group=fleet.get_data_parallel_group())
     # paddle.distributed.all_reduce(counts, group=fleet.get_pipeline_model_parallel_group())

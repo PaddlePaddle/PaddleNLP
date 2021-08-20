@@ -351,7 +351,7 @@ def main():
                     file=sys.stderr)
 
     pool.close()
-    print("Saving tokens to npz file...")
+    print("Saving tokens to files...")
     all_doc_ids = np.frombuffer(token_ids_stream.getbuffer(), dtype=save_dtype)
     lens = np.frombuffer(sentlens_stream.getbuffer(), dtype=np.int32)
     sents = np.frombuffer(sent_cumsum_stream.getbuffer(), dtype=np.int64)

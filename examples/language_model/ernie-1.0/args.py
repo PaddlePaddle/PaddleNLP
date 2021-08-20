@@ -141,6 +141,11 @@ def parse_args(MODEL_CLASSES):
         help="If > 0: set total number of training steps to perform. Override num_train_epochs."
     )
     parser.add_argument(
+        "--checkpoint_steps",
+        type=int,
+        default=500,
+        help="Save checkpoint every X updates steps to the model_last folder.")
+    parser.add_argument(
         "--save_steps",
         type=int,
         default=500,

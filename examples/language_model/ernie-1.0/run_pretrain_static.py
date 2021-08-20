@@ -19,6 +19,8 @@ import math
 import os
 import random
 import time
+import yaml
+import shutil
 
 os.path.expandvars('$HOME')
 os.path.expanduser('~')
@@ -28,6 +30,7 @@ import paddle
 import paddle.distributed.fleet as fleet
 from paddle.distributed.fleet.meta_optimizers.sharding.utils import save_persistables
 from paddle.io import DataLoader, Dataset
+from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 
@@ -56,15 +59,21 @@ MODEL_CLASSES = {
 }
 
 
-def create_pretrained_dataset(args, data_file, tokenizer, data_world_size,
-                              data_world_rank, max_seq_len, places,
-                              data_holders):
+def create_pretrained_dataset(
+        args,
+        data_file,
+        tokenizer,
+        data_world_size,
+        data_world_rank,
+        max_seq_len,
+        places,
+        data_holders,
+        consumed_samples=0, ):
 
     train_valid_test_num_samples = [
-        args.micro_batch_size * args.max_steps * data_world_size,
-        args.micro_batch_size * (args.max_steps // args.eval_freq + 1) *
-        args.eval_iters * data_world_size,
-        args.micro_batch_size * args.test_iters * data_world_size
+        args.global_batch_size * args.max_steps, args.micro_batch_size *
+        (args.max_steps // args.eval_freq + 1) * args.eval_iters *
+        data_world_size, args.micro_batch_size * args.test_iters
     ]
     train_ds, valid_ds, test_ds = build_train_valid_test_datasets(
         data_prefix=data_file,
@@ -84,11 +93,11 @@ def create_pretrained_dataset(args, data_file, tokenizer, data_world_size,
     def _collate_data(data, stack_fn=Stack()):
         num_fields = len(data[0])
         out = [None] * num_fields
-        # 0. input_ids, 
-        # 1. segment_ids, 
-        # 2. input_mask, 
+        # 0. input_ids,
+        # 1. segment_ids,
+        # 2. input_mask,
         # 3. masked_lm_positions,
-        # 4. masked_lm_labels, 
+        # 4. masked_lm_labels,
         # 5. next_sentence_labels
         for i in (0, 1, 2, 5):
             out[i] = stack_fn([x[i] for x in data])
@@ -112,13 +121,14 @@ def create_pretrained_dataset(args, data_file, tokenizer, data_world_size,
         return out
 
     def loader(dataset):
-        batch_sampler = paddle.io.DistributedBatchSampler(
+        batch_sampler = DistributedBatchSampler(
             dataset,
             batch_size=args.micro_batch_size,
             num_replicas=data_world_size,
             rank=data_world_rank,
             shuffle=False,
-            drop_last=True)
+            drop_last=True,
+            consumed_samples=consumed_samples)
         data_loader = paddle.io.DataLoader(
             dataset=dataset,
             places=places,
@@ -162,7 +172,7 @@ def dist_optimizer(args, topo):
     micro_batch_size = args.micro_batch_size
     assert args.global_batch_size % micro_batch_size == 0, "cannot do gradient accumulate, global_batch_size: {} micro_batch_size: {}".format(
         args.global_batch_size, micro_batch_size)
-    acc_steps = bsz_per_dp // micro_batch_size
+    accumulate_steps = bsz_per_dp // micro_batch_size
 
     exec_strategy = paddle.fluid.ExecutionStrategy()
     exec_strategy.num_threads = 1
@@ -181,6 +191,12 @@ def dist_optimizer(args, topo):
 
     dist_strategy.recompute = args.use_recompute
     dist_strategy.pipeline = args.pp_degree > 1
+
+    if args.pp_degree <= 1 and accumulate_steps > 1:
+        dist_strategy.gradient_merge = True
+        dist_strategy.gradient_merge_configs = {'k_steps': accumulate_steps}
+    args.eval_iters *= accumulate_steps
+    args.test_iters *= accumulate_steps
 
     if args.use_amp:
         dist_strategy.amp = True
@@ -208,11 +224,11 @@ def dist_optimizer(args, topo):
         dist_strategy.pipeline_configs = {
             "schedule_mode": "1F1B",
             "micro_micro_batch_size": micro_batch_size,
-            "accumulate_steps": acc_steps,
+            "accumulate_steps": accumulate_steps,
         }
-    else:
-        assert acc_steps == 1, "Only support accumulate steps in piplinemode. Please set you global_batch_size={}".format(
-            default_global_batch_size)
+    # else:
+    #     assert accumulate_steps == 1, "Only support accumulate steps in piplinemode. Please set you global_batch_size={}".format(
+    #         default_global_batch_size)
 
     return dist_strategy
 
@@ -279,6 +295,7 @@ def do_train(args):
 
     worker_num = fleet.worker_num()
     worker_index = fleet.worker_index()
+    assert args.dp_degree * args.sharding_degree * args.mp_degree * args.pp_degree == worker_num, "The product of degree num should be equal to worker_num."
 
     topo = Topology(
         device_rank=worker_index,
@@ -310,16 +327,30 @@ def do_train(args):
     pretrained_models_list = list(
         model_class.pretrained_init_configuration.keys())
 
+    # load config in checkpoint
+    global_step = 0
+    consumed_samples = 0
+    checkpoint_dir = os.path.join(args.output_dir, "model_last")
+    if os.path.exists(checkpoint_dir):
+        if os.path.isfile(os.path.join(checkpoint_dir, "./config.yml")):
+            with open(os.path.join(checkpoint_dir, "./config.yml"), "r") as f:
+                step_config = yaml.load(f, Loader=yaml.FullLoader)
+                assert step_config[
+                    "global_batch_size"] == args.global_batch_size, "Please ensure checkpoint global batch size is the same. Folder: {}".format(
+                        checkpoint_dir)
+                consumed_samples = step_config["consumed_samples"]
+                global_step = step_config["global_step"]
+
     data_file = get_train_data_file(args)
     main_program = paddle.static.default_main_program()
     startup_program = paddle.static.default_startup_program()
     with paddle.static.program_guard(main_program, startup_program):
         data_holders = create_data_holder(args)
-        # 0. input_ids, 
-        # 1. segment_ids, 
-        # 2. input_mask, 
+        # 0. input_ids,
+        # 1. segment_ids,
+        # 2. input_mask,
         # 3. masked_lm_positions,
-        # 4. masked_lm_labels, 
+        # 4. masked_lm_labels,
         # 5. next_sentence_labels
 
         [
@@ -337,7 +368,9 @@ def do_train(args):
             data_world_rank=topo.data_info.rank,
             max_seq_len=args.max_seq_len,
             places=paddle.static.cuda_places(),
-            data_holders=data_holders)
+            data_holders=data_holders,
+            consumed_samples=consumed_samples)
+        fleet.init(is_collective=True)
 
         if args.model_name_or_path in pretrained_models_list:
             model_config = model_class.pretrained_init_configuration[
@@ -345,7 +378,6 @@ def do_train(args):
             if model_config["vocab_size"] % 8 != 0:
                 model_config["vocab_size"] += 8 - (model_config["vocab_size"] %
                                                    8)
-            print(model_config)
             model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
             model_config[
                 "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
@@ -374,14 +406,17 @@ def do_train(args):
         if args.decay_steps is None:
             args.decay_steps = args.max_steps
 
-        # lr_scheduler = LinearDecayWithWarmup(
+        # lr_scheduler = CosineAnnealingWithWarmupDecay(
         #     max_lr=args.max_lr,
         #     min_lr=args.min_lr,
-        #     warmup_step=warmup_step,
-        #     decay_step=args.decay_steps)
+        #     warmup_step=args.warmup_rate * args.max_steps,
+        #     decay_step=args.decay_steps, last_epoch=global_step)
 
         lr_scheduler = LinearDecayWithWarmup(
-            args.max_lr, args.max_steps, args.warmup_rate, last_epoch=0)
+            args.max_lr,
+            args.max_steps,
+            args.warmup_rate,
+            last_epoch=global_step)
 
         clip = None
         if args.grad_clip > 0:
@@ -482,7 +517,12 @@ def do_train(args):
         if not flag_loaded:
             logger.error("No checkpoint load.")
 
-    global_step = 0
+    # load checkpoint vars 
+    if os.path.exists(checkpoint_dir):
+        if os.path.isfile(os.path.join(checkpoint_dir, "./config.yml")):
+            paddle.static.load(main_program,
+                               os.path.join(checkpoint_dir, "static_vars"), exe)
+
     tic_train = time.time()
     epoch = 0
     learning_rate = main_program.global_block().vars["learning_rate_0"]
@@ -524,11 +564,11 @@ def do_train(args):
                                           global_step)
                 tic_train = time.time()
 
-            if args.check_accuracy:
-                if global_step >= args.max_steps:
-                    return
-                else:
-                    continue
+            #if args.check_accuracy:
+            #    if global_step >= args.max_steps:
+            #        return
+            #    else:
+            #        continue
 
             if global_step % args.eval_freq == 0:
                 # TODO, check the input data of validation
@@ -554,6 +594,39 @@ def do_train(args):
                 model.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
                 tic_train = time.time()
+
+            if global_step % args.checkpoint_steps == 0:
+                output_dir = os.path.join(args.output_dir, "model_last")
+                if worker_index == 0:
+                    if not os.path.exists(output_dir):
+                        os.mkdir(output_dir)
+                    output_dir_bak = os.path.join(args.output_dir,
+                                                  "model_last_bak")
+                    if os.path.exists(output_dir):
+                        if os.path.exists(output_dir_bak):
+                            shutil.rmtree(output_dir_bak)
+                        shutil.copytree(output_dir, output_dir_bak)
+
+                    step_config = {
+                        "model_name": args.model_name_or_path,
+                        "global_step": global_step,
+                        "global_batch_size": args.global_batch_size,
+                        "consumed_samples":
+                        global_step * args.global_batch_size,
+                    }
+
+                    with open(os.path.join(output_dir, "config.yml"), "w") as f:
+                        yaml.dump(
+                            step_config,
+                            f,
+                            encoding='utf-8',
+                            allow_unicode=True)
+
+                fleet.barrier_worker()
+                logger.debug("saving models to {}".format(output_dir))
+                save_persistables(exe,
+                                  os.path.join(output_dir, "static_vars"),
+                                  main_program)
 
             if global_step >= args.max_steps:
                 eval_fetch = []
