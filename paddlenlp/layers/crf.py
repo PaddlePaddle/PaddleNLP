@@ -114,7 +114,7 @@ class LinearChainCrf(nn.Layer):
                 The input length. Its dtype is int64 and has a shape of `[batch_size]`.
 
         Returns:
-            Tensor:norm_score:
+            Tensor: norm_score:
                 The normalizers tensor. Its dtype is float32 and has a shape of `[batch_size]`.
         """
         batch_size, seq_len, n_labels = inputs.shape
@@ -157,15 +157,15 @@ class LinearChainCrf(nn.Layer):
         $$ score(x,y) = \\sum_i Emit(x_i,y_i) + Trans(y_{i-1}, y_i) $$
 
         Args:
-            inputs (`Tensor`): 
+            inputs (Tensor):
                 The input predicted tensor. Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_tags]`.
-            labels (`Tensor`) : 
+            labels (Tensor) :
                 The input label tensor. Its dtype is int64 and has a shape of `[batch_size, sequence_length]`
-            lengths (`Tensor`): 
+            lengths (Tensor):
                 The input length. Its dtype is int64 and has a shape of `[batch_size]`.
 
         Returns:
-            unnorm_score (`Tensor`): 
+            Tensor: unnorm_score:
                 The unnormalized sequence scores tensor. Its dtype is float32 and has a shape of `[batch_size]`.
         """
         unnorm_score = self._point_score(
@@ -289,16 +289,16 @@ class LinearChainCrfLoss(nn.Layer):
         then we have $$ loss = -logp(y|x) = -log(exp(score(x,y))/Z(x)) = -score(x,y) + logZ(x) $$
 
         Args:
-            inputs (`Tensor`): 
+            inputs (Tensor):
                 The input predicted tensor. Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_tags]`.
-            lengths (`Tensor`): 
+            lengths (Tensor):
                 The input length. Its dtype is int64 and has a shape of `[batch_size]`.
-            labels (`Tensor`) : 
+            labels (Tensor) :
                 The input label tensor. Its dtype is int64 and has a shape of `[batch_size, sequence_length]`
-            old_version_labels (`Tensor`, optional): Unnecessary parameter for compatibility with older versions. Defaults to ``None``.
+            old_version_labels (Tensor, optional): Unnecessary parameter for compatibility with older versions. Defaults to ``None``.
 
         Returns:
-            loss (`Tensor`): The crf loss. Its dtype is float32 and has a shape of `[batch_size]`.
+            Tensor: loss: The crf loss. Its dtype is float32 and has a shape of `[batch_size]`.
         """
         # Note: When closing to convergence, the loss could be a small negative number. This may caused by underflow when calculating exp in logsumexp.
         #       We add relu here to avoid negative loss. In theory, the crf loss must be greater than or equal to 0, relu will not impact on it.
@@ -321,10 +321,10 @@ class ViterbiDecoder(nn.Layer):
     ViterbiDecoder can decode the highest scoring sequence of tags, it should only be used at test time.
 
     Args:
-        transitions (`Tensor`): 
+        transitions (Tensor):
             The transition matrix.  Its dtype is float32 and has a shape of `[num_tags, num_tags]`.
-        with_start_stop_tag (`bool`, optional): 
-            If set to True, the last row and the last column of transitions will be considered as start tag,
+        with_start_stop_tag (bool, optional):
+            Weather to consider the start tag and stop tag. If set to True, the last row and the last column of transitions will be considered as start tag,
             the the penultimate row and the penultimate column of transitions will be considered as stop tag.
             Else, all the rows and columns will be considered as the real tag. Defaults to ``None``.
     """
@@ -366,16 +366,23 @@ class ViterbiDecoder(nn.Layer):
         Decode the highest scoring sequence of tags.
 
         Args:
-            inputs (`Tensor`):  
+            inputs (Tensor):
                 The unary emission tensor. Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_tags]`.
-            length (`Tensor`):  
+            length (Tensor):
                 The input length tensor storing real length of each sequence for correctness. Its dtype is int64 and has a shape of `[batch_size]`.
+
         Returns:
-            scores(`Tensor`): 
+            Tuple:  tuple of shape (`scores`, `paths`).
+
+            With the fields:
+
+            - scores(Tensor):
                 The scores tensor containing the score for the Viterbi sequence. Its dtype is float32 and has a shape of `[batch_size]`.
-            paths(`Tensor`): 
+
+            - paths(Tensor):
                 The paths tensor containing the highest scoring tag indices. Its dtype is int64 and has a shape of `[batch_size, sequence_length`].
         """
+
         input_shape = paddle.shape(inputs)
         batch_size = input_shape[0]
         seq_len = input_shape[1]
