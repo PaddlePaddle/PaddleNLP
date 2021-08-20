@@ -125,6 +125,7 @@ class FasterTransformer(TransformerModel):
 
         mem_seq_lens = paddle.sum(paddle.cast(
             src_word != self.bos_id, dtype="int32"),
+                                  dtype="int32",
                                   axis=1)
         ids = self.decoding(enc_output, mem_seq_lens)
 
