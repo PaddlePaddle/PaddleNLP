@@ -754,10 +754,10 @@ class TransformerModel(nn.Layer):
         trg_slf_attn_bias.stop_gradient = True
         trg_src_attn_bias = src_slf_attn_bias
         src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
+            src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
                 start=0, end=src_max_len)
         trg_pos = paddle.cast(
-            trg_word != self.bos_id, dtype="int64") * paddle.arange(
+            trg_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
                 start=0, end=trg_max_len)
         with paddle.static.amp.fp16_guard():
             src_emb = self.src_word_embedding(src_word)
@@ -784,281 +784,6 @@ class TransformerModel(nn.Layer):
             predict = self.linear(dec_output)
 
         return predict
-
-    def beam_search_v2(self, src_word, beam_size=4, max_len=None, alpha=0.6):
-        """
-        Beam search with the alive and finished two queues, both have a beam size
-        capicity separately. It includes `grow_topk` `grow_alive` `grow_finish` as
-        steps.
-        1. `grow_topk` selects the top `2*beam_size` candidates to avoid all getting
-        EOS.
-        2. `grow_alive` selects the top `beam_size` non-EOS candidates as the inputs
-        of next decoding step.
-        3. `grow_finish` compares the already finished candidates in the finished queue
-        and newly added finished candidates from `grow_topk`, and selects the top
-        `beam_size` finished candidates.
-        """
-
-        def expand_to_beam_size(tensor, beam_size):
-            tensor = paddle.reshape(tensor,
-                                    [tensor.shape[0], 1] + tensor.shape[1:])
-            tile_dims = [1] * len(tensor.shape)
-            tile_dims[1] = beam_size
-            return paddle.tile(tensor, tile_dims)
-
-        def merge_beam_dim(tensor):
-            return paddle.reshape(tensor, [-1] + tensor.shape[2:])
-
-        # run encoder
-        src_max_len = paddle.shape(src_word)[-1]
-        src_slf_attn_bias = paddle.cast(
-            src_word == self.bos_id,
-            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
-        src_slf_attn_bias.stop_gradient = True
-        src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
-                start=0, end=src_max_len)
-        src_emb = self.src_word_embedding(src_word)
-        src_pos_emb = self.src_pos_embedding(src_pos)
-        src_emb = src_emb + src_pos_emb
-        enc_input = F.dropout(
-            src_emb, p=self.dropout,
-            training=self.training) if self.dropout else src_emb
-
-        enc_output = self.transformer.encoder(enc_input, src_slf_attn_bias)
-
-        # constant number
-        inf = float(1. * 1e7)
-        batch_size = enc_output.shape[0]
-        max_len = (enc_output.shape[1] + 20) if max_len is None else max_len
-
-        ### initialize states of beam search ###
-        ## init for the alive ##
-        initial_log_probs = paddle.to_tensor(
-            np.array(
-                [[0.] + [-inf] * (beam_size - 1)], dtype="float32"))
-        alive_log_probs = paddle.tile(initial_log_probs, [batch_size, 1])
-        # (batch_size, beam_size, 1)
-        alive_seq = paddle.to_tensor(
-            np.tile(
-                np.array(
-                    [[[self.bos_id]]], dtype="int64"), (batch_size, beam_size, 1
-                                                        )))
-
-        ## init for the finished ##
-        finished_scores = paddle.to_tensor(
-            np.array(
-                [[-inf] * beam_size], dtype="float32"))
-        finished_scores = paddle.tile(finished_scores, [batch_size, 1])
-        finished_seq = paddle.to_tensor(
-            np.tile(
-                np.array(
-                    [[[self.bos_id]]], dtype="int64"), (batch_size, beam_size, 1
-                                                        )))
-        finished_flags = paddle.zeros_like(finished_scores)
-
-        ### initialize inputs and states of transformer decoder ###
-        ## init inputs for decoder, shaped `[batch_size*beam_size, ...]`
-        trg_word = paddle.reshape(alive_seq[:, :, -1],
-                                  [batch_size * beam_size, 1])
-        trg_src_attn_bias = src_slf_attn_bias
-        trg_src_attn_bias = merge_beam_dim(
-            expand_to_beam_size(trg_src_attn_bias, beam_size))
-        enc_output = merge_beam_dim(expand_to_beam_size(enc_output, beam_size))
-
-        ## init states (caches) for transformer, need to be updated according to selected beam
-        caches = self.transformer.decoder.gen_cache(enc_output, do_zip=False)
-
-        def update_states(caches, topk_coordinates, beam_size):
-            new_caches = []
-            for cache in caches:
-                k = gather_2d(
-                    cache[0].k,
-                    topk_coordinates,
-                    beam_size,
-                    batch_size,
-                    need_unmerge=True)
-                v = gather_2d(
-                    cache[0].v,
-                    topk_coordinates,
-                    beam_size,
-                    batch_size,
-                    need_unmerge=True)
-                new_caches.append((nn.MultiHeadAttention.Cache(k, v), cache[1]))
-            return new_caches
-
-        def get_topk_coordinates(beam_idx, beam_size, batch_size):
-            batch_pos = paddle.arange(batch_size * beam_size) // beam_size
-            batch_pos = paddle.reshape(batch_pos, [batch_size, beam_size])
-            topk_coordinates = paddle.stack([batch_pos, beam_idx], axis=2)
-            return topk_coordinates
-
-        def gather_2d(tensor_nd,
-                      topk_coordinates,
-                      beam_size,
-                      batch_size,
-                      need_unmerge=False):
-            new_tensor_nd = paddle.reshape(
-                tensor_nd, shape=[batch_size, beam_size] +
-                tensor_nd.shape[1:]) if need_unmerge else tensor_nd
-            topk_seq = paddle.gather_nd(new_tensor_nd, topk_coordinates)
-            return merge_beam_dim(topk_seq) if need_unmerge else topk_seq
-
-        def early_finish(alive_log_probs, finished_scores,
-                         finished_in_finished):
-            max_length_penalty = np.power(((5. + max_len) / 6.), alpha)
-            lower_bound_alive_scores = alive_log_probs[:,
-                                                       0] / max_length_penalty
-            lowest_score_of_fininshed_in_finished = paddle.min(
-                finished_scores * finished_in_finished, 1)
-            lowest_score_of_fininshed_in_finished += (
-                1. - paddle.max(finished_in_finished, 1)) * -inf
-            bound_is_met = paddle.all(
-                paddle.greater_than(lowest_score_of_fininshed_in_finished,
-                                    lower_bound_alive_scores))
-
-            return bound_is_met
-
-        def grow_topk(i, logits, alive_seq, alive_log_probs, states):
-            """
-            This function takes the current alive sequences, and grows them to topk
-            sequences where k = 2*beam.
-            """
-            logits = paddle.reshape(logits, [batch_size, beam_size, -1])
-            candidate_log_probs = paddle.log(F.softmax(logits, axis=2))
-            log_probs = paddle.add(candidate_log_probs,
-                                   alive_log_probs.unsqueeze(-1))
-
-            # Length penalty is given by = (5+len(decode)/6) ^ -\alpha. Pls refer to
-            # https://arxiv.org/abs/1609.08144.
-            length_penalty = paddle.pow(5.0 + (i + 1.0) / 6.0, alpha)
-            curr_scores = log_probs / length_penalty
-            flat_curr_scores = paddle.reshape(curr_scores, [batch_size, -1])
-
-            topk_scores, topk_ids = paddle.topk(
-                flat_curr_scores, k=beam_size * 2)
-
-            topk_log_probs = topk_scores * length_penalty
-
-            topk_beam_index = topk_ids // self.trg_vocab_size
-            topk_ids = topk_ids % self.trg_vocab_size
-
-            topk_coordinates = get_topk_coordinates(topk_beam_index,
-                                                    beam_size * 2, batch_size)
-            topk_seq = gather_2d(alive_seq, topk_coordinates, beam_size,
-                                 batch_size)
-            topk_seq = paddle.concat(
-                [topk_seq, paddle.reshape(topk_ids, topk_ids.shape + [1])],
-                axis=2)
-            states = update_states(states, topk_coordinates, beam_size)
-            eos = paddle.full(
-                shape=topk_ids.shape, dtype="int64", fill_value=self.eos_id)
-            topk_finished = paddle.cast(paddle.equal(topk_ids, eos), "float32")
-
-            # topk_seq: [batch_size, 2*beam_size, i+1]
-            # topk_log_probs, topk_scores, topk_finished: [batch_size, 2*beam_size]
-            return topk_seq, topk_log_probs, topk_scores, topk_finished, states
-
-        def grow_alive(curr_seq, curr_scores, curr_log_probs, curr_finished,
-                       states):
-            """
-            Given sequences and scores, will gather the top k=beam size sequences
-            """
-            curr_scores += curr_finished * -inf
-            _, topk_indexes = paddle.topk(curr_scores, k=beam_size)
-            topk_coordinates = get_topk_coordinates(topk_indexes, beam_size,
-                                                    batch_size)
-            alive_seq = gather_2d(curr_seq, topk_coordinates, beam_size,
-                                  batch_size)
-
-            alive_log_probs = gather_2d(curr_log_probs, topk_coordinates,
-                                        beam_size, batch_size)
-            states = update_states(states, topk_coordinates, beam_size * 2)
-
-            return alive_seq, alive_log_probs, states
-
-        def grow_finished(finished_seq, finished_scores, finished_flags,
-                          curr_seq, curr_scores, curr_finished):
-            """
-            Given sequences and scores, will gather the top k=beam size sequences.
-            """
-            # finished scores
-            finished_seq = paddle.concat(
-                [
-                    finished_seq, paddle.full(
-                        shape=[batch_size, beam_size, 1],
-                        dtype="int64",
-                        fill_value=self.eos_id)
-                ],
-                axis=2)
-            curr_scores += (1. - curr_finished) * -inf
-            curr_finished_seq = paddle.concat([finished_seq, curr_seq], axis=1)
-            curr_finished_scores = paddle.concat(
-                [finished_scores, curr_scores], axis=1)
-            curr_finished_flags = paddle.concat(
-                [finished_flags, curr_finished], axis=1)
-            _, topk_indexes = paddle.topk(curr_finished_scores, k=beam_size)
-            topk_coordinates = get_topk_coordinates(topk_indexes, beam_size,
-                                                    batch_size)
-            finished_seq = gather_2d(curr_finished_seq, topk_coordinates,
-                                     beam_size, batch_size)
-            finished_scores = gather_2d(curr_finished_scores, topk_coordinates,
-                                        beam_size, batch_size)
-            finished_flags = gather_2d(curr_finished_flags, topk_coordinates,
-                                       beam_size, batch_size)
-
-            return finished_seq, finished_scores, finished_flags
-
-        def inner_loop(i, trg_word, alive_seq, alive_log_probs, finished_seq,
-                       finished_scores, finished_flags, caches):
-            trg_pos = paddle.full(
-                shape=trg_word.shape, dtype="int64", fill_value=i)
-            trg_emb = self.trg_word_embedding(trg_word)
-            trg_pos_emb = self.trg_pos_embedding(trg_pos)
-            trg_emb = trg_emb + trg_pos_emb
-            dec_input = F.dropout(
-                trg_emb, p=self.dropout,
-                training=self.training) if self.dropout else trg_emb
-
-            logits, caches = self.transformer.decoder(
-                dec_input, enc_output, None, trg_src_attn_bias, caches)
-            logits = self.linear(logits)
-            topk_seq, topk_log_probs, topk_scores, topk_finished, states = grow_topk(
-                i, logits, alive_seq, alive_log_probs, caches)
-            alive_seq, alive_log_probs, states = grow_alive(
-                topk_seq, topk_scores, topk_log_probs, topk_finished, states)
-            caches = states
-            finished_seq, finished_scores, finished_flags = grow_finished(
-                finished_seq, finished_scores, finished_flags, topk_seq,
-                topk_scores, topk_finished)
-            trg_word = paddle.reshape(alive_seq[:, :, -1],
-                                      [batch_size * beam_size, 1])
-            return (i + 1, trg_word, alive_seq, alive_log_probs, finished_seq,
-                    finished_scores, finished_flags, caches)
-
-        def is_not_finish(i, trg_word, alive_seq, alive_log_probs, finished_seq,
-                          finished_scores, finished_flags, caches):
-            return paddle.greater_than(
-                i < max_len,
-                early_finish(alive_log_probs, finished_scores, finished_flags))
-
-        _, trg_word, alive_seq, alive_log_probs, finished_seq, finished_scores, finished_flags, caches = paddle.static.nn.while_loop(
-            is_not_finish,
-            inner_loop, [
-                paddle.zeros(shape=[1]), trg_word, alive_seq, alive_log_probs,
-                finished_seq, finished_scores, finished_flags, caches
-            ])
-
-        finished_flags = paddle.any(paddle.cast(
-            finished_flags, dtype='bool'),
-                                    axis=1,
-                                    keepdim=True).tile([1, beam_size])
-        finished_seq = paddle.where(
-            finished_flags.unsqueeze(-1).tile([1, 1, alive_seq.shape[-1]]),
-            finished_seq, alive_seq)
-        finished_scores = paddle.where(finished_flags, finished_scores,
-                                       alive_log_probs)
-        return finished_seq, finished_scores
 
 
 class InferTransformerModel(TransformerModel):
@@ -1102,12 +827,14 @@ class InferTransformerModel(TransformerModel):
             The beam width for beam search. Defaults to 4. 
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
-        output_time_major(bool, optional): Indicate the data layout of predicted
+        output_time_major(bool, optional):
+            Indicate the data layout of predicted
             Tensor. If `False`, the data layout would be batch major with shape
             `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
             to `False`.
-        beam_search_version (str): Specify beam search version. It should be in one
+        beam_search_version (str):
+            Specify beam search version. It should be in one
             of [`v1`, `v2`]. If `v2`, need to set `alpha`(default to 0.6) for length
             penalty. Default to `v1`.
     """
@@ -1209,7 +936,7 @@ class InferTransformerModel(TransformerModel):
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
             trg_src_attn_bias = src_slf_attn_bias
             src_pos = paddle.cast(
-                src_word != self.bos_id, dtype="int64") * paddle.arange(
+                src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
                     start=0, end=src_max_len)
 
             # Run encoder
@@ -1230,7 +957,7 @@ class InferTransformerModel(TransformerModel):
 
             if trg_word is not None:
                 trg_length = paddle.sum(paddle.cast(
-                    trg_word != self.bos_id, dtype="int64"),
+                    trg_word != self.bos_id, dtype="int32"),
                                         axis=-1)
             else:
                 trg_length = None
@@ -1258,3 +985,280 @@ class InferTransformerModel(TransformerModel):
                 finished_seq = finished_seq.transpose([0, 2, 1])
 
             return finished_seq
+
+    def beam_search_v2(self, src_word, beam_size=4, max_len=None, alpha=0.6):
+        """
+        Beam search with the alive and finished two queues, both have a beam size
+        capicity separately. It includes `grow_topk` `grow_alive` `grow_finish` as
+        steps.
+        1. `grow_topk` selects the top `2*beam_size` candidates to avoid all getting
+        EOS.
+        2. `grow_alive` selects the top `beam_size` non-EOS candidates as the inputs
+        of next decoding step.
+        3. `grow_finish` compares the already finished candidates in the finished queue
+        and newly added finished candidates from `grow_topk`, and selects the top
+        `beam_size` finished candidates.
+        """
+
+        def expand_to_beam_size(tensor, beam_size):
+            tensor = paddle.reshape(tensor,
+                                    [tensor.shape[0], 1] + tensor.shape[1:])
+            tile_dims = [1] * len(tensor.shape)
+            tile_dims[1] = beam_size
+            return paddle.tile(tensor, tile_dims)
+
+        def merge_beam_dim(tensor):
+            return paddle.reshape(tensor, [-1] + tensor.shape[2:])
+
+        # run encoder
+        src_max_len = paddle.shape(src_word)[-1]
+        src_slf_attn_bias = paddle.cast(
+            src_word == self.bos_id,
+            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+        src_slf_attn_bias.stop_gradient = True
+        src_pos = paddle.cast(
+            src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
+                start=0, end=src_max_len)
+        src_emb = self.src_word_embedding(src_word)
+        src_pos_emb = self.src_pos_embedding(src_pos)
+        src_emb = src_emb + src_pos_emb
+        enc_input = F.dropout(
+            src_emb, p=self.dropout,
+            training=self.training) if self.dropout else src_emb
+
+        enc_output = self.transformer.encoder(enc_input, src_slf_attn_bias)
+
+        # constant number
+        inf = float(1. * 1e7)
+        batch_size = enc_output.shape[0]
+        max_len = (enc_output.shape[1] + 20) if max_len is None else max_len
+
+        ### initialize states of beam search ###
+        ## init for the alive ##
+        initial_log_probs = paddle.to_tensor(
+            np.array(
+                [[0.] + [-inf] * (beam_size - 1)], dtype="float32"))
+        alive_log_probs = paddle.tile(initial_log_probs, [batch_size, 1])
+        # (batch_size, beam_size, 1)
+        alive_seq = paddle.to_tensor(
+            np.tile(
+                np.array(
+                    [[[self.bos_id]]], dtype=src_word.dtype), (batch_size,
+                                                               beam_size, 1)))
+
+        ## init for the finished ##
+        finished_scores = paddle.to_tensor(
+            np.array(
+                [[-inf] * beam_size], dtype="float32"))
+        finished_scores = paddle.tile(finished_scores, [batch_size, 1])
+        finished_seq = paddle.to_tensor(
+            np.tile(
+                np.array(
+                    [[[self.bos_id]]], dtype=src_word.dtype), (batch_size,
+                                                               beam_size, 1)))
+        finished_flags = paddle.zeros_like(finished_scores)
+
+        ### initialize inputs and states of transformer decoder ###
+        ## init inputs for decoder, shaped `[batch_size*beam_size, ...]`
+        trg_word = paddle.reshape(alive_seq[:, :, -1],
+                                  [batch_size * beam_size, 1])
+        trg_src_attn_bias = src_slf_attn_bias
+        trg_src_attn_bias = merge_beam_dim(
+            expand_to_beam_size(trg_src_attn_bias, beam_size))
+        enc_output = merge_beam_dim(expand_to_beam_size(enc_output, beam_size))
+
+        ## init states (caches) for transformer, need to be updated according to selected beam
+        caches = self.transformer.decoder.gen_cache(enc_output, do_zip=False)
+
+        def update_states(caches, topk_coordinates, beam_size):
+            new_caches = []
+            for cache in caches:
+                k = gather_2d(
+                    cache[0].k,
+                    topk_coordinates,
+                    beam_size,
+                    batch_size,
+                    need_unmerge=True)
+                v = gather_2d(
+                    cache[0].v,
+                    topk_coordinates,
+                    beam_size,
+                    batch_size,
+                    need_unmerge=True)
+                new_caches.append((nn.MultiHeadAttention.Cache(k, v), cache[1]))
+            return new_caches
+
+        def get_topk_coordinates(beam_idx, beam_size, batch_size):
+            batch_pos = paddle.arange(batch_size * beam_size) // beam_size
+            batch_pos = paddle.reshape(batch_pos, [batch_size, beam_size])
+            topk_coordinates = paddle.stack([batch_pos, beam_idx], axis=2)
+            return topk_coordinates
+
+        def gather_2d(tensor_nd,
+                      topk_coordinates,
+                      beam_size,
+                      batch_size,
+                      need_unmerge=False):
+            new_tensor_nd = paddle.reshape(
+                tensor_nd, shape=[batch_size, beam_size] +
+                tensor_nd.shape[1:]) if need_unmerge else tensor_nd
+            topk_seq = paddle.gather_nd(new_tensor_nd, topk_coordinates)
+            return merge_beam_dim(topk_seq) if need_unmerge else topk_seq
+
+        def early_finish(alive_log_probs, finished_scores,
+                         finished_in_finished):
+            max_length_penalty = np.power(((5. + max_len) / 6.), alpha)
+            lower_bound_alive_scores = alive_log_probs[:,
+                                                       0] / max_length_penalty
+            lowest_score_of_fininshed_in_finished = paddle.min(
+                finished_scores * finished_in_finished, 1)
+            lowest_score_of_fininshed_in_finished += (
+                1. - paddle.max(finished_in_finished, 1)) * -inf
+            bound_is_met = paddle.all(
+                paddle.greater_than(lowest_score_of_fininshed_in_finished,
+                                    lower_bound_alive_scores))
+
+            return bound_is_met
+
+        def grow_topk(i, logits, alive_seq, alive_log_probs, states):
+            """
+            This function takes the current alive sequences, and grows them to topk
+            sequences where k = 2*beam.
+            """
+            logits = paddle.reshape(logits, [batch_size, beam_size, -1])
+            candidate_log_probs = paddle.log(F.softmax(logits, axis=2))
+            log_probs = paddle.add(candidate_log_probs,
+                                   alive_log_probs.unsqueeze(-1))
+
+            # Length penalty is given by = (5+len(decode)/6) ^ -\alpha. Pls refer to
+            # https://arxiv.org/abs/1609.08144.
+            length_penalty = paddle.pow(5.0 + (i + 1.0) / 6.0, alpha)
+            curr_scores = log_probs / length_penalty
+            flat_curr_scores = paddle.reshape(curr_scores, [batch_size, -1])
+
+            topk_scores, topk_ids = paddle.topk(
+                flat_curr_scores, k=beam_size * 2)
+
+            topk_log_probs = topk_scores * length_penalty
+
+            topk_beam_index = topk_ids // self.trg_vocab_size
+            topk_ids = topk_ids % self.trg_vocab_size
+
+            topk_coordinates = get_topk_coordinates(topk_beam_index,
+                                                    beam_size * 2, batch_size)
+            topk_seq = gather_2d(alive_seq, topk_coordinates, beam_size,
+                                 batch_size)
+            topk_seq = paddle.concat(
+                [topk_seq, paddle.reshape(topk_ids, topk_ids.shape + [1])],
+                axis=2)
+            states = update_states(states, topk_coordinates, beam_size)
+            eos = paddle.full(
+                shape=topk_ids.shape,
+                dtype=alive_seq.dtype,
+                fill_value=self.eos_id)
+            topk_finished = paddle.cast(paddle.equal(topk_ids, eos), "float32")
+
+            # topk_seq: [batch_size, 2*beam_size, i+1]
+            # topk_log_probs, topk_scores, topk_finished: [batch_size, 2*beam_size]
+            return topk_seq, topk_log_probs, topk_scores, topk_finished, states
+
+        def grow_alive(curr_seq, curr_scores, curr_log_probs, curr_finished,
+                       states):
+            """
+            Given sequences and scores, will gather the top k=beam size sequences
+            """
+            curr_scores += curr_finished * -inf
+            _, topk_indexes = paddle.topk(curr_scores, k=beam_size)
+            topk_coordinates = get_topk_coordinates(topk_indexes, beam_size,
+                                                    batch_size)
+            alive_seq = gather_2d(curr_seq, topk_coordinates, beam_size,
+                                  batch_size)
+
+            alive_log_probs = gather_2d(curr_log_probs, topk_coordinates,
+                                        beam_size, batch_size)
+            states = update_states(states, topk_coordinates, beam_size * 2)
+
+            return alive_seq, alive_log_probs, states
+
+        def grow_finished(finished_seq, finished_scores, finished_flags,
+                          curr_seq, curr_scores, curr_finished):
+            """
+            Given sequences and scores, will gather the top k=beam size sequences.
+            """
+            # finished scores
+            finished_seq = paddle.concat(
+                [
+                    finished_seq, paddle.full(
+                        shape=[batch_size, beam_size, 1],
+                        dtype=finished_seq.dtype,
+                        fill_value=self.eos_id)
+                ],
+                axis=2)
+            curr_scores += (1. - curr_finished) * -inf
+            curr_finished_seq = paddle.concat([finished_seq, curr_seq], axis=1)
+            curr_finished_scores = paddle.concat(
+                [finished_scores, curr_scores], axis=1)
+            curr_finished_flags = paddle.concat(
+                [finished_flags, curr_finished], axis=1)
+            _, topk_indexes = paddle.topk(curr_finished_scores, k=beam_size)
+            topk_coordinates = get_topk_coordinates(topk_indexes, beam_size,
+                                                    batch_size)
+            finished_seq = gather_2d(curr_finished_seq, topk_coordinates,
+                                     beam_size, batch_size)
+            finished_scores = gather_2d(curr_finished_scores, topk_coordinates,
+                                        beam_size, batch_size)
+            finished_flags = gather_2d(curr_finished_flags, topk_coordinates,
+                                       beam_size, batch_size)
+
+            return finished_seq, finished_scores, finished_flags
+
+        def inner_loop(i, trg_word, alive_seq, alive_log_probs, finished_seq,
+                       finished_scores, finished_flags, caches):
+            trg_pos = paddle.full(
+                shape=trg_word.shape, dtype=alive_seq.dtype, fill_value=i)
+            trg_emb = self.trg_word_embedding(trg_word)
+            trg_pos_emb = self.trg_pos_embedding(trg_pos)
+            trg_emb = trg_emb + trg_pos_emb
+            dec_input = F.dropout(
+                trg_emb, p=self.dropout,
+                training=self.training) if self.dropout else trg_emb
+
+            logits, caches = self.transformer.decoder(
+                dec_input, enc_output, None, trg_src_attn_bias, caches)
+            logits = self.linear(logits)
+            topk_seq, topk_log_probs, topk_scores, topk_finished, states = grow_topk(
+                i, logits, alive_seq, alive_log_probs, caches)
+            alive_seq, alive_log_probs, states = grow_alive(
+                topk_seq, topk_scores, topk_log_probs, topk_finished, states)
+            caches = states
+            finished_seq, finished_scores, finished_flags = grow_finished(
+                finished_seq, finished_scores, finished_flags, topk_seq,
+                topk_scores, topk_finished)
+            trg_word = paddle.reshape(alive_seq[:, :, -1],
+                                      [batch_size * beam_size, 1])
+            return (i + 1, trg_word, alive_seq, alive_log_probs, finished_seq,
+                    finished_scores, finished_flags, caches)
+
+        def is_not_finish(i, trg_word, alive_seq, alive_log_probs, finished_seq,
+                          finished_scores, finished_flags, caches):
+            return paddle.greater_than(
+                i < max_len,
+                early_finish(alive_log_probs, finished_scores, finished_flags))
+
+        _, trg_word, alive_seq, alive_log_probs, finished_seq, finished_scores, finished_flags, caches = paddle.static.nn.while_loop(
+            is_not_finish,
+            inner_loop, [
+                paddle.zeros(shape=[1]), trg_word, alive_seq, alive_log_probs,
+                finished_seq, finished_scores, finished_flags, caches
+            ])
+
+        finished_flags = paddle.any(paddle.cast(
+            finished_flags, dtype='bool'),
+                                    axis=1,
+                                    keepdim=True).tile([1, beam_size])
+        finished_seq = paddle.where(
+            finished_flags.unsqueeze(-1).tile([1, 1, alive_seq.shape[-1]]),
+            finished_seq, alive_seq)
+        finished_scores = paddle.where(finished_flags, finished_scores,
+                                       alive_log_probs)
+        return finished_seq, finished_scores

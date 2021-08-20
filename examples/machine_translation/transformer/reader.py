@@ -95,7 +95,8 @@ def create_data_loader(args, places=None):
                 bos_idx=args.bos_idx,
                 eos_idx=args.eos_idx,
                 pad_idx=args.bos_idx,
-                pad_seq=args.pad_seq),
+                pad_seq=args.pad_seq,
+                dtype=args.input_dtype),
             num_workers=0)
         data_loaders[i] = (data_loader)
     return data_loaders
@@ -142,7 +143,8 @@ def create_infer_loader(args):
             bos_idx=args.bos_idx,
             eos_idx=args.eos_idx,
             pad_idx=args.bos_idx,
-            pad_seq=args.pad_seq),
+            pad_seq=args.pad_seq,
+            dtype=args.input_dtype),
         num_workers=0,
         return_list=True)
     return data_loader, trg_vocab.to_tokens
@@ -163,11 +165,16 @@ def adapt_vocab_size(args):
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
 
 
-def prepare_train_input(insts, bos_idx, eos_idx, pad_idx, pad_seq=1):
+def prepare_train_input(insts,
+                        bos_idx,
+                        eos_idx,
+                        pad_idx,
+                        pad_seq=1,
+                        dtype="int64"):
     """
     Put all padded data needed by training into a list.
     """
-    word_pad = Pad(pad_idx, dtype="int64")
+    word_pad = Pad(pad_idx, dtype=dtype)
     src_max_len = (
         max([len(inst[0]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
     trg_max_len = (
@@ -190,11 +197,16 @@ def prepare_train_input(insts, bos_idx, eos_idx, pad_idx, pad_seq=1):
     return data_inputs
 
 
-def prepare_infer_input(insts, bos_idx, eos_idx, pad_idx, pad_seq=1):
+def prepare_infer_input(insts,
+                        bos_idx,
+                        eos_idx,
+                        pad_idx,
+                        pad_seq=1,
+                        dtype="int64"):
     """
     Put all padded data needed by beam search decoder into a list.
     """
-    word_pad = Pad(pad_idx, dtype="int64")
+    word_pad = Pad(pad_idx, dtype=dtype)
     src_max_len = (
         max([len(inst[0]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
     src_word = word_pad([
