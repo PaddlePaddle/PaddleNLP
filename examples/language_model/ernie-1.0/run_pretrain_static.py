@@ -68,7 +68,7 @@ def create_pretrained_dataset(
         max_seq_len,
         places,
         data_holders,
-        consumed_samples=0, ):
+        current_step=0, ):
 
     train_valid_test_num_samples = [
         args.global_batch_size * args.max_steps, args.micro_batch_size *
@@ -120,7 +120,7 @@ def create_pretrained_dataset(
 
         return out
 
-    def loader(dataset):
+    def loader(dataset, consumed_samples=0):
         batch_sampler = DistributedBatchSampler(
             dataset,
             batch_size=args.micro_batch_size,
@@ -140,7 +140,13 @@ def create_pretrained_dataset(
             return_list=False)
         return data_loader
 
-    return tuple([loader(x) for x in [train_ds, valid_ds, test_ds]])
+    train_dl = loader(train_ds, args.global_batch_size * current_step)
+    valid_dl = loader(valid_ds, args.micro_batch_size * (
+        (current_step + 1) // args.eval_freq) * args.eval_iters *
+                      data_world_size)
+    test_dl = loader(test_ds, 0)
+
+    return train_dl, valid_dl, test_dl
 
 
 def create_data_holder(args=None):
@@ -192,7 +198,7 @@ def dist_optimizer(args, topo):
     dist_strategy.recompute = args.use_recompute
     dist_strategy.pipeline = args.pp_degree > 1
 
-    if args.pp_degree <= 1 and accumulate_steps > 1:
+    if args.pp_degree <= 1 and args.sharding_degree <= 1 and accumulate_steps > 1:
         dist_strategy.gradient_merge = True
         dist_strategy.gradient_merge_configs = {'k_steps': accumulate_steps}
     args.eval_iters *= accumulate_steps
@@ -218,6 +224,8 @@ def dist_optimizer(args, topo):
             "mp_degree": args.mp_degree,
             "pp_degree": args.pp_degree,
             "dp_degree": args.dp_degree,
+            "gradient_merge_acc_step": accumulate_steps
+            if args.sharding_degree > 1 else 1,
             "optimize_offload": False,
         }
     if args.pp_degree > 1:
@@ -250,28 +258,40 @@ def run_evaluate(data_loader,
                  log_writer,
                  global_step,
                  args,
-                 epoch,
                  is_last,
                  eval_fetch,
                  task_name="valid"):
-    all_loss = []
+    all_loss, all_lm_loss, all_sop_loss = [], [], []
     local_time = time.time()
 
     for eval_step, batch in enumerate(data_loader):
-        loss_return = exe.run(program, feed=batch, fetch_list=eval_fetch)
+        ret = exe.run(program, feed=batch, fetch_list=eval_fetch)
+        loss_return, lm_loss_return, sop_loss_return = ret
         if is_last:
             all_loss.append(float(loss_return[0]))
+            all_lm_loss.append(float(lm_loss_return[0]))
+            all_sop_loss.append(float(sop_loss_return[0]))
+
         if eval_step >= iter_steps - 1:
             if not is_last:
                 break
             average_loss = sum(all_loss) / len(all_loss)
+            average_lm_loss = sum(all_lm_loss) / len(all_lm_loss)
+            average_sop_loss = sum(all_sop_loss) / len(all_sop_loss)
             logger.info(
-                "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.0f tokens/s"
-                % (task_name, global_step, epoch, eval_step, average_loss,
+                "%s step %d, batch: %d, loss: %f, lm_loss: %.6f, sop_loss: %.6f, speed: %.0f tokens/s"
+                % (task_name, global_step, eval_step, average_loss,
+                   average_lm_loss, average_sop_loss,
                    iter_steps * args.micro_batch_size * args.max_seq_len /
                    (time.time() - local_time)))
+
             log_writer.add_scalar(task_name + "_loss", average_loss,
                                   global_step)
+            log_writer.add_scalar(task_name + "_lm_loss", average_lm_loss,
+                                  global_step)
+            log_writer.add_scalar(task_name + "_sop_loss", average_sop_loss,
+                                  global_step)
+
             break
 
 
@@ -369,7 +389,7 @@ def do_train(args):
             max_seq_len=args.max_seq_len,
             places=paddle.static.cuda_places(),
             data_holders=data_holders,
-            consumed_samples=consumed_samples)
+            current_step=global_step)
         fleet.init(is_collective=True)
 
         if args.model_name_or_path in pretrained_models_list:
@@ -551,9 +571,9 @@ def do_train(args):
 
                     speed = args.logging_freq / (time.time() - tic_train)
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, lm_loss: %.6f, sop_loss: %.6f, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e"
-                        % (global_step, epoch, step, loss_return[0],
-                           lm_loss_return[0], sop_loss_return[0], speed,
+                        "global step %d, loss: %.9f, lm_loss: %.6f, sop_loss: %.6f, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e"
+                        % (global_step, loss_return[0], lm_loss_return[0],
+                           sop_loss_return[0], speed,
                            speed * args.global_batch_size, lr_return[0]))
                     log_writer.add_scalar("loss", loss_return[0], global_step)
                     log_writer.add_scalar("lm_loss", lm_loss_return[0],
@@ -574,11 +594,11 @@ def do_train(args):
                 # TODO, check the input data of validation
                 eval_fetch = []
                 if topo.is_last:
-                    eval_fetch = [loss]
+                    eval_fetch = [loss, lm_loss, sop_loss]
 
                 run_evaluate(valid_data_loader, exe, test_program,
                              args.eval_iters, log_writer, global_step, args,
-                             epoch, topo.is_last, eval_fetch, "valid")
+                             topo.is_last, eval_fetch, "valid")
                 tic_train = time.time()
 
             if global_step % args.save_steps == 0 or global_step >= args.max_steps:
@@ -605,7 +625,8 @@ def do_train(args):
                     if os.path.exists(output_dir):
                         if os.path.exists(output_dir_bak):
                             shutil.rmtree(output_dir_bak)
-                        shutil.copytree(output_dir, output_dir_bak)
+                        shutil.move(output_dir, output_dir_bak)
+                        os.mkdir(output_dir)
 
                     step_config = {
                         "model_name": args.model_name_or_path,
@@ -623,10 +644,19 @@ def do_train(args):
                             allow_unicode=True)
 
                 fleet.barrier_worker()
+
                 logger.debug("saving models to {}".format(output_dir))
-                save_persistables(exe,
-                                  os.path.join(output_dir, "static_vars"),
-                                  main_program)
+                if args.sharding_degree <= 1:
+                    # Save on the first worker by default.
+                    if worker_index == 0:
+                        paddle.static.save(main_program,
+                                           os.path.join(output_dir,
+                                                        "static_vars"))
+                else:
+                    # Use save_persistables in sharding, but more slower
+                    save_persistables(exe,
+                                      os.path.join(output_dir, "static_vars"),
+                                      main_program)
 
             if global_step >= args.max_steps:
                 eval_fetch = []
@@ -635,10 +665,9 @@ def do_train(args):
 
                 run_evaluate(test_data_loader, exe, test_program,
                              args.test_iters, log_writer, global_step, args,
-                             epoch, topo.is_last, eval_fetch, "test")
+                             topo.is_last, eval_fetch, "test")
                 del train_data_loader
                 return
-        epoch += 1
 
 
 if __name__ == "__main__":
