@@ -114,7 +114,7 @@ python -m paddle.distributed.launch --gpus "0" --log_dir ./log run_gen.py \
 
 ### 模型预测
 
-本基线还提供了一个finetune好的unimo-text-1.0模型，可以从xx下载。
+运行下方脚本可以使用训练好的模型进行预测。
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -127,7 +127,7 @@ python run_gen.py \
     --max_target_len=30 \
     --do_predict \
     --max_dec_len=20 \
-    --max_dec_len=3 \
+    --min_dec_len=3 \
     --device=gpu
 ```
 
