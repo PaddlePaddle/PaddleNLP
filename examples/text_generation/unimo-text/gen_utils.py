@@ -66,7 +66,7 @@ def convert_example(example,
             add_start_token_for_decoding=True,
             return_position_ids=True)
 
-        if 'target' in example:
+        if 'target' in example and example['target']:
             tokenized_example['target'] = example['target']
         return tokenized_example
 
