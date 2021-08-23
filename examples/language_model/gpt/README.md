@@ -9,6 +9,7 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 .
 ├── args.py                 # 训练参数配置
 ├── create_pretraining_data.py         # 数据预处理脚本
+├── converter.py            # 权重转化脚本
 ├── dataset.py              # 数据处理
 ├── decompress.sh           # 数据集解压脚本
 ├── deploy/                 # 模型部署的inference脚本
@@ -28,7 +29,8 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 - regex
 - sentencepiece
 - tqdm
-安装命令 `pip install regex sentencepiece tqdm`
+- visualdl
+安装命令 `pip install regex sentencepiece tqdm visualdl`
 
 ### 数据准备
 
@@ -218,12 +220,9 @@ python deploy/python/inference.py --model_type gpt \
 
 用户可以看到屏幕输出预测结果。
 
-## 飞桨4D混合并行训练
-飞桨4D混合并行，使用sharding、模型并行、流水线并行和数据并行策略，使得训练千亿参数规模的模型成为可能。在本示例中，我们提供了基于飞桨最新混合并行策略的GPT预训练模型。运行下面脚本，即可进行模型预训练：
-```shell
-sh scripts/run_static.sh
-```
-用户可以根据自己的机器资源，灵活调整并行策略，选择最合适的策略来训练模型。更多关于混合并行策略的的例子详见[飞桨4D混合并行训练使用指南](https://fleet-x.readthedocs.io/en/latest/paddle_fleet_rst/collective/collective_mp/hybrid_parallelism.html)
+## 其他
+
+本项目提供了Huggingface的权重转化示例`converter.py`，`python xxx-gpt.bin`即可完成转换。用户可以参考转化脚本，转换自己需要的模型权重。
 
 ## 参考文献
 - [Language Models are Unsupervised Multitask Learners](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
