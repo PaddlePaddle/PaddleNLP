@@ -29,11 +29,14 @@ __all__ = ['BasicTokenizer', 'BertTokenizer', 'WordpieceTokenizer']
 class BasicTokenizer(object):
     """
     Runs basic tokenization (punctuation splitting, lower casing, etc.).
+
     Args:
-        do_lower_case (bool): Whether the text strips accents and convert to
+        do_lower_case (bool):
+            Whether the text strips accents and convert to
             lower case. If you use the BERT Pretrained model, lower is set to
-            Flase when using the cased model, otherwise it is set to True.
-            Default: True.
+            False when using the cased model, otherwise it is set to True.
+            Default: `True`.
+
     """
 
     def __init__(self, do_lower_case=True):
@@ -44,11 +47,25 @@ class BasicTokenizer(object):
     def tokenize(self, text):
         """
         Tokenizes a piece of text using basic tokenizer.
+
         Args:
             text (str): A piece of text.
+
         Returns: 
             list(str): A list of tokens.
+
+        Examples:
+        .. code-block::
+
+            from paddlenlp.transformers import BasicTokenizer
+            basictokenizer = BasicTokenizer()
+            tokens = basictokenizer.tokenize('He was a puppeteer')
+            '''
+            ['he', 'was', 'a', 'puppeteer']
+            '''
+
         """
+
         text = convert_to_unicode(text)
         text = self._clean_text(text)
         text = self._tokenize_chinese_chars(text)
@@ -158,10 +175,14 @@ class BasicTokenizer(object):
 class WordpieceTokenizer(object):
     """
     Runs WordPiece tokenization.
+
     Args:
-        vocab (Vocab|dict): Vocab of the word piece tokenizer.
-        unk_token (str):  A specific token to replace all unkown tokens.
-        max_input_chars_per_word (int):  If a word's length is more than
+        vocab (Vocab|dict):
+            Vocab of the word piece tokenizer.
+        unk_token (str):
+            A specific token to replace all unkown tokens.
+        max_input_chars_per_word (int):
+            If a word's length is more than
             max_input_chars_per_word, it will be dealt as unknown word.
             Default: 100.
     """
@@ -176,14 +197,20 @@ class WordpieceTokenizer(object):
         Tokenizes a piece of text into its word pieces.
         This uses a greedy longest-match-first algorithm to perform tokenization
         using the given vocabulary.
+
         Args:
             text: A single token or whitespace separated tokens. This should have
                 already been passed through `BasicTokenizer`.
+
         Returns:
             list (str): A list of wordpiece tokens.
+
         Example:
+
             input = "unaffable"
+
             output = ["un", "##aff", "##able"]
+
         """
 
         output_tokens = []
@@ -225,26 +252,25 @@ class BertTokenizer(PretrainedTokenizer):
     Constructs a BERT tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
+
     Args:
-        vocab_file (str): file path of the vocabulary
-        do_lower_case (bool): Whether the text strips accents and convert to
-            lower case. If you use the BERT pretrained model, lower is set to
+        vocab_file (str):
+            The vocabulary file required to instantiate
+            a `SentencePiece <https://github.com/google/sentencepiece>`__ tokenizer.
+        do_lower_case (bool):
+            Whether the text strips accents and convert to lower case.
+            If you use the BERT pretrained model, lower is set to
             Flase when using the cased model, otherwise it is set to True.
-            Default: True.
+            Default: `True`.
         unk_token (str): The special token for unkown words. Default: "[UNK]".
         sep_token (str): The special token for separator token . Default: "[SEP]".
         pad_token (str): The special token for padding. Default: "[PAD]".
-        cls_token (str): The special token for cls. Default: "[CLS]".
+        cls_token (str):
+            The special token for sequence classification.
+            It is the last token of the sequence when built with special tokens.
+            Default: "[CLS]".
         mask_token (str): The special token for mask. Default: "[MASK]".
-    
-    Examples:
-        .. code-block:: python
-            from paddle.hapi.text import BertTokenizer
-            tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-            # the following line get: ['he', 'was', 'a', 'puppet', '##eer']
-            tokens = tokenizer('He was a puppeteer')
-            # the following line get: 'he was a puppeteer'
-            tokenizer.convert_tokens_to_string(tokens)
+
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
@@ -339,14 +365,17 @@ class BertTokenizer(PretrainedTokenizer):
     def vocab_size(self):
         """
         return the size of vocabulary.
+
         Returns:
             int: the size of vocabulary.
         """
+
         return len(self.vocab)
 
     def _tokenize(self, text):
         """
         End-to-end tokenization for BERT models.
+
         Args:
             text (str): The text to be tokenized.
         
@@ -362,12 +391,25 @@ class BertTokenizer(PretrainedTokenizer):
     def tokenize(self, text):
         """
         End-to-end tokenization for BERT models.
+
         Args:
             text (str): The text to be tokenized.
         
         Returns:
             list: A list of string representing converted tokens.
+
+        Examples:
+        .. code-block::
+
+            from paddlenlp.transformers import BertTokenizer
+            berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+            tokens = berttokenizer.tokenize('He was a puppeteer')
+            '''
+            ['he', 'was', 'a', 'puppet', '##eer']
+            '''
+
         """
+
         return self._tokenize(text)
 
     def convert_tokens_to_string(self, tokens):
@@ -375,11 +417,28 @@ class BertTokenizer(PretrainedTokenizer):
         Converts a sequence of tokens (list of string) in a single string. Since
         the usage of WordPiece introducing `##` to concat subwords, also remove
         `##` when converting.
+
         Args:
             tokens (list): A list of string representing tokens to be converted.
+
         Returns:
             str: Converted string from tokens.
+
+        Examples:
+        .. code-block::
+
+            from paddlenlp.transformers import BertTokenizer
+            berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+            tokens = berttokenizer.tokenize('He was a puppeteer')
+            '''
+            ['he', 'was', 'a', 'puppet', '##eer']
+            '''
+            strings = tokenizer.convert_tokens_to_string(tokens)
+            '''
+            he was a puppeteer
+            '''
         """
+
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
 
@@ -396,7 +455,7 @@ class BertTokenizer(PretrainedTokenizer):
                 number of added tokens in the case of a single sequence if set to False.
 
         Returns:
-            Number of tokens added to sequences
+            Number of tokens added to sequences.
         """
         token_ids_0 = []
         token_ids_1 = []
@@ -415,9 +474,9 @@ class BertTokenizer(PretrainedTokenizer):
             - pair of sequences: ``[CLS] A [SEP] B [SEP]``
 
         Args:
-            token_ids_0 (:obj:`List[int]`):
+            token_ids_0 (:obj:List[int]):
                 List of IDs to which the special tokens will be added.
-            token_ids_1 (:obj:`List[int]`, `optional`):
+            token_ids_1 (:obj:List[int], optional):
                 Optional second list of IDs for sequence pairs.
 
         Returns:
@@ -441,9 +500,9 @@ class BertTokenizer(PretrainedTokenizer):
             - pair of sequences: `(0,0) A (0,0) B (0,0)``
         
         Args:
-            offset_mapping_ids_0 (:obj:`List[tuple]`):
+            offset_mapping_ids_0 (:obj:List[tuple]):
                 List of char offsets to which the special tokens will be added.
-            offset_mapping_ids_1 (:obj:`List[tuple]`, `optional`):
+            offset_mapping_ids_1 (:obj:List[tuple], optional):
                 Optional second list of char offsets for offset mapping pairs.
 
         Returns:
@@ -470,9 +529,9 @@ class BertTokenizer(PretrainedTokenizer):
         If :obj:`token_ids_1` is :obj:`None`, this method only returns the first portion of the mask (0s).
 
         Args:
-            token_ids_0 (:obj:`List[int]`):
+            token_ids_0 (:obj:List[int]):
                 List of IDs.
-            token_ids_1 (:obj:`List[int]`, `optional`):
+            token_ids_1 (:obj:List[int], optional):
                 Optional second list of IDs for sequence pairs.
 
         Returns:
@@ -500,7 +559,7 @@ class BertTokenizer(PretrainedTokenizer):
                 formatted with special tokens for the model. Defaults to None.
 
         Returns:
-            results (List[int]): The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
+            List: results (List[int]): The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
         """
 
         if already_has_special_tokens:
