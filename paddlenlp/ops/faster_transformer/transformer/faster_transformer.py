@@ -108,7 +108,7 @@ class FasterTransformer(TransformerModel):
             src_word == self.bos_id,
             dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
         src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
+            src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
                 start=0, end=src_max_len)
 
         # Run encoder
@@ -125,6 +125,7 @@ class FasterTransformer(TransformerModel):
 
         mem_seq_lens = paddle.sum(paddle.cast(
             src_word != self.bos_id, dtype="int32"),
+                                  dtype="int32",
                                   axis=1)
         ids = self.decoding(enc_output, mem_seq_lens)
 
@@ -344,7 +345,8 @@ class TransformerGenerator(paddle.nn.Layer):
                     eos_id=eos_id,
                     beam_size=beam_size,
                     max_out_len=max_out_len,
-                    output_time_major=self.output_time_major)
+                    output_time_major=self.output_time_major,
+                    **kwargs)
         else:
             self.transformer = InferTransformerModel(
                 src_vocab_size=src_vocab_size,
@@ -361,7 +363,8 @@ class TransformerGenerator(paddle.nn.Layer):
                 eos_id=eos_id,
                 beam_size=beam_size,
                 max_out_len=max_out_len,
-                output_time_major=self.output_time_major)
+                output_time_major=self.output_time_major,
+                **kwargs)
 
     def forward(self, src_word):
         r"""
