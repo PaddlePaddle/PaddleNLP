@@ -52,6 +52,8 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 | [HYP](https://pan.webis.de/semeval19/semeval19-web/) | 英文政治新闻情感分类语料  | `paddlenlp.datasets.load_dataset('hyp')` |
 
 ## 文本匹配
+|  数据集名称   | 简介 | 调用方法 |
+|  ----  | --------- | ------ |
 | [CAIL2019-SCM](https://github.com/china-ai-law-challenge/CAIL2019/tree/master/scm) | 相似法律案例匹配  | `paddlenlp.datasets.load_dataset('cail2019_scm')` |
 
 ## 序列标注
@@ -87,6 +89,9 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 | ----  | --------- | ------ |
 |  [Poetry](https://github.com/chinese-poetry/chinese-poetry) | 中文诗歌古典文集数据| `paddlenlp.datasets.load_dataset('poetry')`|
 |  [Couplet](https://github.com/v-zich/couplet-clean-dataset) | 中文对联数据集| `paddlenlp.datasets.load_dataset('couplet')`|
+|  [DuReaderQG](https://github.com/PaddlePaddle/Research/tree/master/NLP/DuReader-Robust-BASELINE) | 基于DuReader的问题生成数据集| `paddlenlp.datasets.load_dataset('dureader_qg')`|
+|  [AdvertiseGen](https://github.com/ZhihongShao/Planning-based-Hierarchical-Variational-Model) | 中文文案生成数据集| `paddlenlp.datasets.load_dataset('advertisegen')`|
+|  [LCSTS_new](https://aclanthology.org/D15-1229.pdf) | 中文摘要生成数据集| `paddlenlp.datasets.load_dataset('lcsts_new')`|
 
 ## 语料库
 
