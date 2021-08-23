@@ -34,9 +34,6 @@ from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 
-from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCriterion
-from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
-
 from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer
 
 from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearDecayWithWarmup
@@ -54,8 +51,6 @@ from data_tools.dataset_utils import build_train_valid_test_datasets
 MODEL_CLASSES = {
     "ernie": (ErnieModel, ErnieForPretraining, ErniePretrainingCriterion,
               ErnieTokenizer),
-    "gpt":
-    (GPTModel, GPTForPretraining, GPTPretrainingCriterion, ErnieTokenizer),
 }
 
 
@@ -176,7 +171,8 @@ def dist_optimizer(args, topo):
 
     bsz_per_dp = args.global_batch_size // topo.data_info.size
     micro_batch_size = args.micro_batch_size
-    assert args.global_batch_size % micro_batch_size == 0, "cannot do gradient accumulate, global_batch_size: {} micro_batch_size: {}".format(
+    assert args.global_batch_size % micro_batch_size == 0, \
+        "cannot do gradient accumulate, global_batch_size: {} micro_batch_size: {}".format(
         args.global_batch_size, micro_batch_size)
     accumulate_steps = bsz_per_dp // micro_batch_size
 
@@ -188,6 +184,7 @@ def dist_optimizer(args, topo):
     #build_strategy.enable_sequential_execution = True # for profile
     build_strategy.fuse_broadcast_ops = True
     build_strategy.enable_inplace = True
+    build_strategy.enable_addto = args.enable_addto
 
     dist_strategy = fleet.DistributedStrategy()
     dist_strategy.execution_strategy = exec_strategy
@@ -238,6 +235,7 @@ def dist_optimizer(args, topo):
     #     assert accumulate_steps == 1, "Only support accumulate steps in piplinemode. Please set you global_batch_size={}".format(
     #         default_global_batch_size)
 
+    args.accumulate_steps = accumulate_steps
     return dist_strategy
 
 
@@ -315,7 +313,8 @@ def do_train(args):
 
     worker_num = fleet.worker_num()
     worker_index = fleet.worker_index()
-    assert args.dp_degree * args.sharding_degree * args.mp_degree * args.pp_degree == worker_num, "The product of degree num should be equal to worker_num."
+    assert args.dp_degree * args.sharding_degree * args.mp_degree * args.pp_degree == worker_num, \
+        "The product of degree num should be equal to worker_num."
 
     topo = Topology(
         device_rank=worker_index,
@@ -544,7 +543,6 @@ def do_train(args):
                                os.path.join(checkpoint_dir, "static_vars"), exe)
 
     tic_train = time.time()
-    epoch = 0
     learning_rate = main_program.global_block().vars["learning_rate_0"]
     while True:
         fetchs = []
@@ -557,11 +555,14 @@ def do_train(args):
         test_data_loader = test_data_loader()
 
         for step, batch in enumerate(train_data_loader()):
-            global_step += 1
             ret = exe.run(main_program,
                           feed=batch,
                           fetch_list=fetchs,
                           use_program_cache=True)
+            # Skip for accumulate_steps in global step
+            if (step + 1) % args.accumulate_steps != 0:
+                continue
+            global_step += 1
             # In the new 2.0 api, must call this function to change the learning_rate
             lr_scheduler.step()
 

@@ -704,7 +704,7 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
     indexmap_filename += '_{}s'.format(seed)
     indexmap_filename += '.npy'
 
-    local_rank = int(fleet.local_rank())
+    local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank())
     # Build the indexed mapping if not exist.
     if local_rank == 0 and \
        not os.path.isfile(indexmap_filename):
@@ -722,9 +722,8 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
         print_rank_0(' > building sapmles index mapping for {} ...'.format(
             name))
         # First compile and then import.
-        if local_rank == 0 and not COMPILED:
+        if local_rank == 0:
             compile_helper()
-            COMPILED = True
         import data_tools.helpers as helpers
         samples_mapping = helpers.build_mapping(
             indexed_dataset.doc_idx, indexed_dataset.sizes, num_epochs,

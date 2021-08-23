@@ -217,6 +217,7 @@ def parse_args(MODEL_CLASSES):
         type=str2bool,
         nargs='?',
         const=True,
+        default=True,
         help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training."
     )
     parser.add_argument(

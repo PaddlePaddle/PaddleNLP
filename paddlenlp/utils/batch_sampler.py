@@ -121,47 +121,17 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
         self.total_size = self.num_samples * self.nranks
 
     def __iter__(self):
+        assert self.consumed_samples % self.nranks == 0, \
+            "The consumed_samples should be divided by nranks. consumed_samples=%d, nranks=%s" % (
+            self.consumed_samples, nranks)
         self.remain_num_samples = int(
             math.ceil((len(self.dataset) - self.consumed_samples) * 1.0 /
                       self.nranks))
         self.remain_total_size = self.remain_num_samples * self.nranks
 
-        num_samples = len(self.dataset)
-        indices = np.arange(self.consumed_samples, num_samples).tolist()
-        indices += indices[:(self.remain_total_size - len(indices))]
-
-        assert len(indices) == self.remain_total_size
-        if self.shuffle:
-            np.random.RandomState(self.epoch).shuffle(indices)
-            self.epoch += 1
-
-        # subsample
-        def _get_indices_by_batch_size(indices):
-            subsampled_indices = []
-            last_batch_size = self.remain_total_size % (self.batch_size *
-                                                        self.nranks)
-            assert last_batch_size % self.nranks == 0
-            last_local_batch_size = last_batch_size // self.nranks
-
-            for i in range(self.local_rank * self.batch_size,
-                           len(indices) - last_batch_size,
-                           self.batch_size * self.nranks):
-                subsampled_indices.extend(indices[i:i + self.batch_size])
-
-            indices = indices[len(indices) - last_batch_size:]
-            subsampled_indices.extend(indices[
-                self.local_rank * last_local_batch_size:(
-                    self.local_rank + 1) * last_local_batch_size])
-            return subsampled_indices
-
-        if self.nranks > 1:
-            indices = _get_indices_by_batch_size(indices)
-
-        assert len(indices) == self.remain_num_samples
-        _sample_iter = iter(indices)
-
         batch_indices = []
-        for idx in _sample_iter:
+        for idx in range(self.consumed_samples + self.local_rank,
+                         self.remain_num_samples, self.nranks):
             batch_indices.append(idx)
             if len(batch_indices) == self.batch_size:
                 yield batch_indices
@@ -174,7 +144,7 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
         num_samples += int(not self.drop_last) * (self.batch_size - 1)
         return num_samples // self.batch_size
 
-    def set_epoch(self, epoch):
+    def set_epoch(self, epoch, consumed_samples=0):
         """
         Sets the epoch number. When :attr:`shuffle=True`, this number is used
         as seeds of random numbers. By default, users may not set this, all
