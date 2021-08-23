@@ -15,6 +15,8 @@
 from functools import partial
 import argparse
 import os
+import random
+import numpy as np
 
 import paddle
 from paddlenlp.data import Stack, Tuple, Pad
@@ -34,6 +36,13 @@ parser.add_argument("--data_dir", default='./waybill_ie/data', type=str, help="T
 
 args = parser.parse_args()
 # yapf: enable
+
+
+def set_seed(seed):
+    """sets random seed"""
+    random.seed(seed)
+    np.random.seed(seed)
+    paddle.seed(seed)
 
 
 def convert_to_features(example, tokenizer, label_vocab):
@@ -107,6 +116,7 @@ if __name__ == '__main__':
     trainer_num = paddle.distributed.get_world_size()
     if trainer_num > 1:
         paddle.distributed.init_parallel_env()
+    set_seed(102)
     # Create dataset, tokenizer and dataloader.
     train_ds, dev_ds, test_ds = load_dataset(
         datafiles=(os.path.join(args.data_dir, 'train.txt'),
