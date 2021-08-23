@@ -34,7 +34,7 @@ class BasicTokenizer(object):
         do_lower_case (bool):
             Whether the text strips accents and convert to
             lower case. If you use the BERT Pretrained model, lower is set to
-            Flase when using the cased model, otherwise it is set to True.
+            False when using the cased model, otherwise it is set to True.
             Default: `True`.
 
     """
@@ -57,9 +57,12 @@ class BasicTokenizer(object):
         Examples:
         .. code-block::
 
-            from paddlenlp.transformers import Basictokenizer
+            from paddlenlp.transformers import BasicTokenizer
             basictokenizer = BasicTokenizer()
             tokens = basictokenizer.tokenize('He was a puppeteer')
+            '''
+            ['he', 'was', 'a', 'puppeteer']
+            '''
 
         """
 
@@ -203,8 +206,11 @@ class WordpieceTokenizer(object):
             list (str): A list of wordpiece tokens.
 
         Example:
+
             input = "unaffable"
+
             output = ["un", "##aff", "##able"]
+
         """
 
         output_tokens = []
@@ -264,14 +270,6 @@ class BertTokenizer(PretrainedTokenizer):
             It is the last token of the sequence when built with special tokens.
             Default: "[CLS]".
         mask_token (str): The special token for mask. Default: "[MASK]".
-    
-    Examples:
-        .. code-block::
-
-            from paddlenlp.transformers import BertTokenizer
-            tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-            tokens = tokenizer('He was a puppeteer')
-            tokenizer.convert_tokens_to_string(tokens)
 
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
@@ -371,6 +369,7 @@ class BertTokenizer(PretrainedTokenizer):
         Returns:
             int: the size of vocabulary.
         """
+
         return len(self.vocab)
 
     def _tokenize(self, text):
@@ -398,7 +397,19 @@ class BertTokenizer(PretrainedTokenizer):
         
         Returns:
             list: A list of string representing converted tokens.
+
+        Examples:
+        .. code-block::
+
+            from paddlenlp.transformers import BertTokenizer
+            berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+            tokens = berttokenizer.tokenize('He was a puppeteer')
+            '''
+            ['he', 'was', 'a', 'puppet', '##eer']
+            '''
+
         """
+
         return self._tokenize(text)
 
     def convert_tokens_to_string(self, tokens):
@@ -412,7 +423,22 @@ class BertTokenizer(PretrainedTokenizer):
 
         Returns:
             str: Converted string from tokens.
+
+        Examples:
+        .. code-block::
+
+            from paddlenlp.transformers import BertTokenizer
+            berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+            tokens = berttokenizer.tokenize('He was a puppeteer')
+            '''
+            ['he', 'was', 'a', 'puppet', '##eer']
+            '''
+            strings = tokenizer.convert_tokens_to_string(tokens)
+            '''
+            he was a puppeteer
+            '''
         """
+
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
 
@@ -429,7 +455,7 @@ class BertTokenizer(PretrainedTokenizer):
                 number of added tokens in the case of a single sequence if set to False.
 
         Returns:
-            Number of tokens added to sequences
+            Number of tokens added to sequences.
         """
         token_ids_0 = []
         token_ids_1 = []
@@ -448,9 +474,9 @@ class BertTokenizer(PretrainedTokenizer):
             - pair of sequences: ``[CLS] A [SEP] B [SEP]``
 
         Args:
-            token_ids_0 (:obj:`List[int]`):
+            token_ids_0 (:obj:List[int]):
                 List of IDs to which the special tokens will be added.
-            token_ids_1 (:obj:`List[int]`, `optional`):
+            token_ids_1 (:obj:List[int], optional):
                 Optional second list of IDs for sequence pairs.
 
         Returns:
@@ -474,9 +500,9 @@ class BertTokenizer(PretrainedTokenizer):
             - pair of sequences: `(0,0) A (0,0) B (0,0)``
         
         Args:
-            offset_mapping_ids_0 (:obj:`List[tuple]`):
+            offset_mapping_ids_0 (:obj:List[tuple]):
                 List of char offsets to which the special tokens will be added.
-            offset_mapping_ids_1 (:obj:`List[tuple]`, `optional`):
+            offset_mapping_ids_1 (:obj:List[tuple], optional):
                 Optional second list of char offsets for offset mapping pairs.
 
         Returns:
@@ -503,9 +529,9 @@ class BertTokenizer(PretrainedTokenizer):
         If :obj:`token_ids_1` is :obj:`None`, this method only returns the first portion of the mask (0s).
 
         Args:
-            token_ids_0 (:obj:`List[int]`):
+            token_ids_0 (:obj:List[int]):
                 List of IDs.
-            token_ids_1 (:obj:`List[int]`, `optional`):
+            token_ids_1 (:obj:List[int], optional):
                 Optional second list of IDs for sequence pairs.
 
         Returns:
@@ -533,7 +559,7 @@ class BertTokenizer(PretrainedTokenizer):
                 formatted with special tokens for the model. Defaults to None.
 
         Returns:
-            results (List[int]): The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
+            List: results (List[int]): The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
         """
 
         if already_has_special_tokens:
