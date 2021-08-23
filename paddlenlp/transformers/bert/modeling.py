@@ -551,17 +551,17 @@ class BertForQuestionAnswering(BertPretrainedModel):
 
             With the fields:
 
-            - `start_logits`(Tensor):
+            - `start_logits` (Tensor):
                 Labels for position (index) of the start of the labelled span for computing the
-            token classification loss. Positions are clamped to the length of the sequence (:obj:`sequence_length`).
-            Position outside of the sequence are not taken into account for computing the loss.
-            Its data type should be float32 and has a shape of [batch_size, sequence_length].
+                token classification loss. Positions are clamped to the length of the sequence (:obj:`sequence_length`).
+                Position outside of the sequence are not taken into account for computing the loss.
+                Its data type should be float32 and has a shape of [batch_size, sequence_length].
 
-            - `end_logits`(Tensor):
-                Labels for position (index) of the end of the labelled span for computing the
-            token classification loss. Positions are clamped to the length of the sequence (:obj:`sequence_length`).
-            Position outside of the sequence are not taken into account for computing the loss.
-            Its data type should be float32 and has a shape of [batch_size, sequence_length].
+            - `end_logits` (Tensor):
+                Labels for position (index) of the end of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the sequence are not taken
+                into account for computing the loss. Its data type should be float32
+                and has a shape of [batch_size, sequence_length].
 
         Example:
             .. code-block::
@@ -829,11 +829,13 @@ class BertPretrainingHeads(Layer):
 
             With the fields:
 
-            - `prediction_scores` (Tensor): The scores of prediction on masked token.
-            Its data type should be float32 and has a shape of [batch_size, sequence_length, vocab_size].
+            - `prediction_scores` (Tensor):
+                The scores of prediction on masked token.
+                Its data type should be float32 and has a shape of [batch_size, sequence_length, vocab_size].
 
-            - `seq_relationship_score` (Tensor): The scores of next sentence prediction.
-            Its data type should be float32 and has a shape of [batch_size, num_classes].
+            - `seq_relationship_score` (Tensor):
+                The scores of next sentence prediction.
+                Its data type should be float32 and has a shape of [batch_size, num_classes].
 
         """
         prediction_scores = self.predictions(sequence_output, masked_positions)
@@ -887,10 +889,13 @@ class BertForPretraining(BertPretrainedModel):
 
             With the fields:
 
-            - `prediction_scores` (Tensor): The scores of prediction on masked token.
-            Its data type should be float32 and has a shape of [batch_size, sequence_length, vocab_size].
-            - `seq_relationship_score` (Tensor): The scores of next sentence prediction.
-            Its data type should be float32 and has a shape of [batch_size, num_classes].
+            - `prediction_scores` (Tensor):
+                The scores of prediction on masked token.
+                Its data type should be float32 and has a shape of [batch_size, sequence_length, vocab_size].
+
+            - `seq_relationship_score` (Tensor):
+                The scores of next sentence prediction.
+                Its data type should be float32 and has a shape of [batch_size, num_classes].
 
         """
         with paddle.static.amp.fp16_guard():

@@ -180,7 +180,7 @@ class WordpieceTokenizer(object):
         vocab (Vocab|dict):
             Vocab of the word piece tokenizer.
         unk_token (str):
-            A specific token to replace all unkown tokens.
+            A specific token to replace all unknown tokens.
         max_input_chars_per_word (int):
             If a word's length is more than
             max_input_chars_per_word, it will be dealt as unknown word.
