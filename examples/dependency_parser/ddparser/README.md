@@ -16,12 +16,13 @@
 ## 模型简介
 
 依存句法分析任务通过分析句子中词语之间的依存关系来确定句子的句法结构，
-该用例是基于Paddle v2.1的[baidu/ddparser](https://github.com/baidu/DDParser)实现，
+该项目是基于Paddle v2.1的[baidu/ddparser](https://github.com/baidu/DDParser)实现，
 模型结构为[Deep Biaffine Attention for Neural Dependency Parsing](https://arxiv.org/abs/1611.01734)。
-同时本用例引入了[ERNIE](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/transformers.rst)系列预训练模型，
+同时本项目引入了[ERNIE](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/transformers.rst)系列预训练模型，
 用户可以基于预训练模型finetune完成依存句法分析训练（参考以下[示例](#模型训练)）。
 
 ### 模型效果
+
 以下是NLPCC2013_EVSAM05_THU和NLPCC2013_EVSAM05_HIT数据集的模型性能对比，baseline为第二届自然语言处理与中文计算会议发布的[评测报告](http://tcci.ccf.org.cn/conference/2013/dldoc/evrpt05.rar)。
 
 #### NLPCC2013_EVSAM05_THU
@@ -123,6 +124,7 @@ train_ds, dev_ds, test_ds = load_dataset("nlpcc13_evsam05_hit", splits=["train",
 
 
 ### 文件结构
+
 以下是本项目主要代码结构及说明：
 
 ```text
@@ -140,17 +142,16 @@ ddparser/
 └── utils.py # 工具函数
 ```
 
-### 模型训练
+### 模型训练与评估
 
-模型训练示例代码如下，用户可以通过`--feat`来指定输入的特征，`--encoding_model`指定不同的encoder。
-
-以下是以BiLSTM为encoder训练ddparser的示例：
+通过如下命令，指定GPU 0卡，以`lstm`为encoder在`nlpcc13_evsam05_thu`数据集上训练与评估：
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
     --device=gpu \
     --epochs=100 \
+    --dataset=nlpcc13_evsam05_thu \
     --save_dir=model_file \
     --encoding_model=lstm \
     --feat=pos \
@@ -158,15 +159,14 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --lstm_lr=0.002
 ```
 
-除了以BiLSTM作为encoder，我们还提供了`ernie-1.0`、`ernie-tiny`和`ernie-gram-zh`等预训练模型作为encoder来训练ddparser的方法。
-
-以下是基于预训练模型`ernie-gram-zh`训练ddparser的示例：
+通过如下命令，指定GPU 0卡，以预训练模型`ernie-gram-zh`为encoder在`nlpcc13_evsam05_hit`数据集上训练与评估：
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
     --device=gpu \
     --epochs=100 \
+    --dataset=nlpcc13_evsam05_hit \
     --encoding_model=ernie-gram-zh \
     --save_dir=model_file \
     --ernie_lr=5e-5 \
@@ -194,19 +194,21 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `weight_decay`: 控制正则项力度的参数，用于防止过拟合，默认为0.0。
 
 ### 模型预测
-用户可以执行一下命令进行模型预测，通过`--predict_data_file`指定待预测数据文件（需符合CONLL[数据格式](#数据格式)），`--model_file_path`指定模型文件，`--infer_output_file`指定预测结果存放路径。
+
+通过以下命令，指定GPU 0卡，对`${predict_data_file}`进行预测：
+
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 python -m paddle.distributed.launch --gpus "0" predict.py \
     --device=gpu \
     --encoding_model=ernie-gram-zh
-    --test_data_path=data/THU/dev.conll \
+    --predict_data_file=${predict_data_file} \
     --model_file_path=model_file/best.pdparams \
-    --infer_result_dir=infer_result \
+    --infer_output_file=infer_output.conll \
     --tree
 ```
 
-NOTE: `--encoding_model`指定的encoder需与`--model_file_path`模型参数文件所使用的encoder一致。
+NOTE: `--predict_data_file`指定的数据文件需符合[CONLL数据格式](#数据格式)。`--encoding_model`指定的encoder需与`--model_file_path`模型参数文件所使用的encoder一致。
 
 ### 可配置参数说明
 
