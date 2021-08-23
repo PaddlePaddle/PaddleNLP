@@ -566,8 +566,8 @@ class ErnieForTokenClassification(ErniePretrainedModel):
 
 
         Returns:
-            logits (Tensor):
-                A Tensor of the input text classification logits, shape as (batch_size, seq_lens, num_classes).
+            Tensor: logits:
+                A Tensor of the input text classification logits, shape as [batch_size, seq_lens, num_classes].
                 seq_lens mean the number of tokens of the input sequence.
 
         Example:
