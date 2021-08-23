@@ -42,6 +42,7 @@ class SharedDropout(nn.Layer):
         mask = mask / (1 - p)
         return mask
 
+from paddle.fluid import layers
 
 class IndependentDropout(nn.Layer):
     """IndependentDropout"""
@@ -58,5 +59,6 @@ class IndependentDropout(nn.Layer):
             scale = len(items) / paddle.maximum(total, paddle.ones_like(total))
             masks = [mask * scale for mask in masks]
             items = [item * paddle.unsqueeze(mask, axis=-1) for item, mask in zip(items, masks)]
+
         return items
         
