@@ -62,6 +62,6 @@ class LCSTSNew(DatasetBuilder):
 
                 yield {
                     'source': json_data["content"],
-                    'target': json_data["summary"],
+                    'target': json_data.get("summary", ''),
                     'id': json_data['id']
                 }

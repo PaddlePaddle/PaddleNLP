@@ -9,8 +9,7 @@ import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddle.optimizer import AdamW, SGD
-from paddlenlp.ops.optimizer import AdamwOptimizer
+from paddle.optimizer import AdamW
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer, BasicTokenizer
@@ -24,6 +23,8 @@ def parse_args():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument('--dataset_name', type=str, default='dureader_qg', help='The name of the dataset to load.')
     parser.add_argument('--model_name_or_path', type=str, default='unimo-text-1.0', help='The path or shortcut name of the pre-trained model.')
+    parser.add_argument("--train_file", type=str, required=False, default=None, help="Train data path.")
+    parser.add_argument("--predict_file", type=str, required=False, default=None, help="Predict data path.")
     parser.add_argument('--save_dir', type=str, default='./checkpoints', help='The directory where the checkpoints will be saved.')
     parser.add_argument('--logging_steps', type=int, default=100, help='Log every X updates steps.')
     parser.add_argument('--save_steps', type=int, default=1000, help='Save checkpoint every X updates steps.')
@@ -103,7 +104,10 @@ def run(args):
     if world_size > 1:
         model = paddle.DataParallel(model)
 
-    train_ds, dev_ds = load_dataset(args.dataset_name, splits=['train', 'dev'])
+    train_ds = load_dataset(
+        args.dataset_name, splits='train', data_files=args.train_file)
+    dev_ds = load_dataset(
+        args.dataset_name, splits='dev', data_files=args.predict_file)
 
     train_ds, train_data_loader = create_data_loader(train_ds, tokenizer, args,
                                                      'train')
@@ -165,13 +169,18 @@ def run(args):
                         save_ckpt(model, tokenizer, args.save_dir, step)
                         print('Saved step {} model.\n'.format(step))
                         if args.do_predict:
-                            evaluation(model, dev_data_loader, args, tokenizer)
+                            model_eval = model._layers if isinstance(
+                                model, paddle.DataParallel) else model
+                            evaluation(model_eval, dev_data_loader, args,
+                                       tokenizer)
 
                 batch_start_time = time.time()
 
         print('\nTraining completed.')
     elif args.do_predict:
-        evaluation(model, dev_data_loader, args, tokenizer)
+        model_eval = model._layers if isinstance(model,
+                                                 paddle.DataParallel) else model
+        evaluation(model_eval, dev_data_loader, args, tokenizer)
 
 
 @paddle.no_grad()
@@ -198,8 +207,9 @@ def evaluation(model, data_loader, args, tokenizer):
             eos_token_id=tokenizer.mask_token_id)
 
         total_time += (time.time() - start_time)
-        if step % 100 == 0:
-            print('step %d - %.3fs/step' % (step, total_time / 100))
+        if step % args.logging_steps == 0:
+            print('step %d - %.3fs/step' %
+                  (step, total_time / args.logging_steps))
             total_time = 0.0
 
         results = select_sum(ids, scores, tokenizer, args.max_dec_len,
