@@ -134,7 +134,8 @@ def run(args):
             beta1=args.beta1,
             beta2=args.beta2,
             epsilon=args.epsilon,
-            apply_decay_param_fun=lambda x: x in decay_params)
+            apply_decay_param_fun=lambda x: x in decay_params,
+            grad_clip=paddle.nn.ClipGradByGlobalNorm(args.max_grad_norm))
 
         step = 0
         total_time = 0.0
