@@ -148,7 +148,3 @@ if __name__ == "__main__":
         dev_loader,
         epochs=args.epochs,
         save_dir=args.save_dir, )
-
-    # Finally tests model.
-    results = model.evaluate(test_loader)
-    print("Finally test acc: %.5f" % results['acc'])

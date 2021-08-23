@@ -108,7 +108,7 @@ class FasterTransformer(TransformerModel):
             src_word == self.bos_id,
             dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
         src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
+            src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
                 start=0, end=src_max_len)
 
         # Run encoder
@@ -125,6 +125,7 @@ class FasterTransformer(TransformerModel):
 
         mem_seq_lens = paddle.sum(paddle.cast(
             src_word != self.bos_id, dtype="int32"),
+                                  dtype="int32",
                                   axis=1)
         ids = self.decoding(enc_output, mem_seq_lens)
 
@@ -268,13 +269,14 @@ class TransformerGenerator(paddle.nn.Layer):
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
         kwargs:
-            The key word arguments can be `output_time_major` and `use_fp16_decoding`.
+            The key word arguments can be `output_time_major`, `use_fp16_decoding` and `use_ft`.
             `output_time_major(bool, optional)`: Indicate the data layout of predicted
             Tensor. If `False`, the data layout would be batch major with shape
             `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
             to `False`. `use_fp16_decoding(bool, optional)`: Whether to use fp16
-            for decoding.
+            for decoding. `use_ft(bool, optional)`: Whether to use Faster Transformer
+            for decoding. 
     """
 
     def __init__(self,
@@ -303,25 +305,49 @@ class TransformerGenerator(paddle.nn.Layer):
         self.max_length = max_length
         self.output_time_major = kwargs.pop("output_time_major", True)
         use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
-        try:
-            load("FasterTransformer", verbose=True)
-            self.transformer = FasterTransformer(
-                src_vocab_size=src_vocab_size,
-                trg_vocab_size=trg_vocab_size,
-                max_length=max_length,
-                num_encoder_layers=num_encoder_layers,
-                num_decoder_layers=num_decoder_layers,
-                n_head=n_head,
-                d_model=d_model,
-                d_inner_hid=d_inner_hid,
-                dropout=dropout,
-                weight_sharing=weight_sharing,
-                bos_id=bos_id,
-                eos_id=eos_id,
-                beam_size=beam_size,
-                max_out_len=max_out_len,
-                use_fp16_decoding=use_fp16_decoding)
-        except Exception:
+        use_ft = kwargs.pop("use_ft", True)
+
+        if use_ft:
+            try:
+                load("FasterTransformer", verbose=True)
+                self.transformer = FasterTransformer(
+                    src_vocab_size=src_vocab_size,
+                    trg_vocab_size=trg_vocab_size,
+                    max_length=max_length,
+                    num_encoder_layers=num_encoder_layers,
+                    num_decoder_layers=num_decoder_layers,
+                    n_head=n_head,
+                    d_model=d_model,
+                    d_inner_hid=d_inner_hid,
+                    dropout=dropout,
+                    weight_sharing=weight_sharing,
+                    bos_id=bos_id,
+                    eos_id=eos_id,
+                    beam_size=beam_size,
+                    max_out_len=max_out_len,
+                    use_fp16_decoding=use_fp16_decoding)
+            except Exception:
+                logger.warning(
+                    "Exception occurs when using Faster Transformer. " \
+                    "The original forward will be involved. ")
+                self.transformer = InferTransformerModel(
+                    src_vocab_size=src_vocab_size,
+                    trg_vocab_size=trg_vocab_size,
+                    max_length=max_length,
+                    num_encoder_layers=num_encoder_layers,
+                    num_decoder_layers=num_decoder_layers,
+                    n_head=n_head,
+                    d_model=d_model,
+                    d_inner_hid=d_inner_hid,
+                    dropout=dropout,
+                    weight_sharing=weight_sharing,
+                    bos_id=bos_id,
+                    eos_id=eos_id,
+                    beam_size=beam_size,
+                    max_out_len=max_out_len,
+                    output_time_major=self.output_time_major,
+                    **kwargs)
+        else:
             self.transformer = InferTransformerModel(
                 src_vocab_size=src_vocab_size,
                 trg_vocab_size=trg_vocab_size,
@@ -337,7 +363,8 @@ class TransformerGenerator(paddle.nn.Layer):
                 eos_id=eos_id,
                 beam_size=beam_size,
                 max_out_len=max_out_len,
-                output_time_major=self.output_time_major)
+                output_time_major=self.output_time_major,
+                **kwargs)
 
     def forward(self, src_word):
         r"""

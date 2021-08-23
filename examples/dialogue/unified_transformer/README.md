@@ -48,7 +48,7 @@ train_ds, dev_ds, test1_ds, test2_ds = load_dataset('duconv', splits=('train', '
 
 ### 模型训练
 
-运行如下命令即可在练集上进行finetune，并在验证集上进行验证
+运行如下命令即可在训练集上进行finetune，并在验证集上进行验证
 
 ```shell
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
@@ -81,7 +81,6 @@ python -m paddle.distributed.launch --gpus '0' --log_dir ./log finetune.py \
    |---------------------------------|
    | unified_transformer-12L-cn      |
    | unified_transformer-12L-cn-luge |
-   | plato-mini |
 
 - `save_dir` 表示模型的保存路径。
 - `logging_steps` 表示日志打印间隔。
@@ -143,7 +142,6 @@ python infer.py \
    |---------------------------------|
    | unified_transformer-12L-cn      |
    | unified_transformer-12L-cn-luge |
-   | plato-mini |
 
 - `output_path` 表示预测结果的保存路径。
 - `logging_steps` 表示日志打印间隔。

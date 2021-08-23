@@ -37,8 +37,7 @@ def create_data_loader(args, places=None):
     if args.train_file is not None and args.dev_file is not None:
         datasets = load_dataset(
             'wmt14ende',
-            datafiles={'train': args.train_file,
-                       'dev': args.dev_file},
+            data_files=[args.train_file, args.dev_file],
             splits=('train', 'dev'))
     elif args.train_file is None and args.dev_file is None:
         datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
@@ -96,7 +95,8 @@ def create_data_loader(args, places=None):
                 bos_idx=args.bos_idx,
                 eos_idx=args.eos_idx,
                 pad_idx=args.bos_idx,
-                pad_seq=args.pad_seq),
+                pad_seq=args.pad_seq,
+                dtype=args.input_dtype),
             num_workers=0)
         data_loaders[i] = (data_loader)
     return data_loaders
@@ -105,7 +105,7 @@ def create_data_loader(args, places=None):
 def create_infer_loader(args):
     if args.test_file is not None:
         dataset = load_dataset(
-            'wmt14ende', datafiles={'test': args.test_file}, splits=('test'))
+            'wmt14ende', data_files=[args.test_file], splits=['test'])
     else:
         dataset = load_dataset('wmt14ende', splits=('test'))
 
@@ -143,7 +143,8 @@ def create_infer_loader(args):
             bos_idx=args.bos_idx,
             eos_idx=args.eos_idx,
             pad_idx=args.bos_idx,
-            pad_seq=args.pad_seq),
+            pad_seq=args.pad_seq,
+            dtype=args.input_dtype),
         num_workers=0,
         return_list=True)
     return data_loader, trg_vocab.to_tokens
@@ -151,7 +152,10 @@ def create_infer_loader(args):
 
 def adapt_vocab_size(args):
     dataset = load_dataset('wmt14ende', splits=('test'))
-    src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
+    if not args.benchmark:
+        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
+    else:
+        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
     trg_vocab = src_vocab
 
     padding_vocab = (
@@ -161,11 +165,16 @@ def adapt_vocab_size(args):
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
 
 
-def prepare_train_input(insts, bos_idx, eos_idx, pad_idx, pad_seq=1):
+def prepare_train_input(insts,
+                        bos_idx,
+                        eos_idx,
+                        pad_idx,
+                        pad_seq=1,
+                        dtype="int64"):
     """
     Put all padded data needed by training into a list.
     """
-    word_pad = Pad(pad_idx, dtype="int64")
+    word_pad = Pad(pad_idx, dtype=dtype)
     src_max_len = (
         max([len(inst[0]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
     trg_max_len = (
@@ -188,11 +197,16 @@ def prepare_train_input(insts, bos_idx, eos_idx, pad_idx, pad_seq=1):
     return data_inputs
 
 
-def prepare_infer_input(insts, bos_idx, eos_idx, pad_idx, pad_seq=1):
+def prepare_infer_input(insts,
+                        bos_idx,
+                        eos_idx,
+                        pad_idx,
+                        pad_seq=1,
+                        dtype="int64"):
     """
     Put all padded data needed by beam search decoder into a list.
     """
-    word_pad = Pad(pad_idx, dtype="int64")
+    word_pad = Pad(pad_idx, dtype=dtype)
     src_max_len = (
         max([len(inst[0]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
     src_word = word_pad([

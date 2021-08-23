@@ -16,6 +16,7 @@ from paddle.utils.cpp_extension import load
 
 from .adamw import AdamW
 from .AdamwOptimizer import AdamwOptimizer
+from .adamwdl import AdamWDL
 
 
 def _jit_compile():
@@ -30,10 +31,11 @@ def _jit_compile():
                 ]
             ])
         return True
-    except RuntimeError:
+    except RuntimeError as e:
         import sys
+        sys.stderr.write(str(e) + "\n\n")
         sys.stderr.write(
-            '''Warning with compile custom ops: compile custom adamw op failed. \nIf you do not use custom ops, please ignore this warning! \n'''
+            '''Warning with compile custom ops: compile custom adamw op failed. \nIf you do not use custom ops, please ignore this warning! \n\n'''
         )
         return False
 
@@ -42,4 +44,5 @@ __all__ = [
     '_jit_compile',
     'AdamW',
     'AdamwOptimizer',
+    'AdamWDL',
 ]

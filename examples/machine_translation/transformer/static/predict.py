@@ -13,7 +13,8 @@ import paddle
 
 from paddlenlp.transformers import InferTransformerModel
 
-sys.path.append("../")
+sys.path.append(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
 import reader
 
 
@@ -45,6 +46,7 @@ def parse_args():
     )
     parser.add_argument(
         "--test_file",
+        nargs='+',
         default=None,
         type=str,
         help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
@@ -83,7 +85,7 @@ def do_predict(args):
     startup_program = paddle.static.Program()
     with paddle.static.program_guard(test_program, startup_program):
         src_word = paddle.static.data(
-            name="src_word", shape=[None, None], dtype="int64")
+            name="src_word", shape=[None, None], dtype=args.input_dtype)
 
         # Define model
         transformer = InferTransformerModel(

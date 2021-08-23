@@ -18,6 +18,8 @@ random_seed: None
 output_file: "predict.txt"
 # The <bos>, <eos> and <unk> tokens in the dictionary.
 special_token: ["<s>", "<e>", "<unk>"]
+# The data type of input ids. 
+input_dtype: "int64"
 
 # Device to use. 
 device: "gpu"

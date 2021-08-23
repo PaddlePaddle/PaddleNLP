@@ -42,11 +42,12 @@ class BeamHypotheses:
         """
         return len(self.beams)
 
-    def add(self, hyp, sum_logprobs):
+    def add(self, hyp, sum_logprobs, origin_len=0):
         """
         Add a new hypothesis to the list.
         """
-        score = sum_logprobs / (hyp.shape[-1]**self.length_penalty)
+        score = sum_logprobs / (((hyp.shape[-1] - origin_len + 5) / 6)
+                                **self.length_penalty)
         if len(self) < self.num_beams or score > self.worst_score:
             self.beams.append((score, hyp))
             if len(self) > self.num_beams:
@@ -57,7 +58,7 @@ class BeamHypotheses:
             else:
                 self.worst_score = min(score, self.worst_score)
 
-    def is_done(self, best_sum_logprobs, cur_len):
+    def is_done(self, best_sum_logprobs, cur_len, origin_len=0):
         """
         If there are enough hypotheses and that none of the hypotheses being 
         generated can become better than the worst one in the heap, then we 
@@ -68,7 +69,8 @@ class BeamHypotheses:
         elif self.early_stopping:
             return True
         else:
-            cur_score = best_sum_logprobs / cur_len**self.length_penalty
+            cur_score = best_sum_logprobs / (
+                (cur_len - origin_len + 5) / 6)**self.length_penalty
             ret = self.worst_score >= cur_score
             return ret
 
@@ -129,6 +131,7 @@ class BeamSearchScorer(object):
                 next_scores,
                 next_tokens,
                 next_indices,
+                origin_len=0,
                 pad_token_id=None,
                 eos_token_id=None):
         cur_len = input_ids.shape[-1]
@@ -175,7 +178,8 @@ class BeamSearchScorer(object):
                         continue
                     beam_hyp.add(
                         input_ids[batch_beam_idx.numpy().item()].clone(),
-                        next_score.numpy().item())
+                        next_score.numpy().item(), origin_len)
+
                 else:
                     # add next predicted token since it is not eos_token
                     next_beam_scores[batch_idx, beam_idx] = next_score
@@ -197,7 +201,7 @@ class BeamSearchScorer(object):
 
             # Check if we are done so that we can save a pad step if all(done)
             if beam_hyp.is_done(next_scores[batch_idx].max().numpy().item(),
-                                cur_len):
+                                cur_len, origin_len):
                 self._done[batch_idx] = 1
 
         return {
@@ -354,10 +358,7 @@ class GenerationMixin(object):
         if "position_ids" in model_kwargs:
             position_ids = model_kwargs["position_ids"]
             model_kwargs["position_ids"] = paddle.concat(
-                [
-                    position_ids,
-                    paddle.max(position_ids, axis=-1, keepdim=True) + 1
-                ],
+                [position_ids, position_ids[:, -1].reshape((-1, 1)) + 1],
                 axis=-1)
 
         # update attention_mask
@@ -412,7 +413,7 @@ class GenerationMixin(object):
                  top_k=0,
                  top_p=1.0,
                  num_beams=1,
-                 length_penalty=1.0,
+                 length_penalty=0.0,
                  early_stopping=False,
                  bos_token_id=None,
                  eos_token_id=None,
@@ -452,11 +453,9 @@ class GenerationMixin(object):
             num_beams (int, optional): The number of beams in the "beam_search"
                 strategy. Default to 1.
             length_penalty (float, optional): The exponential penalty to the 
-                sequence length in the "beam_search" strategy. If 
-                :math:`length\_penalty < 1.0`, the model will generate shorter 
-                sequences. If :math:`length\_penalty > 1.0`, the model will 
-                generate longer sequences. Default to 1.0, which means no 
-                penalty.
+                sequence length in the "beam_search" strategy. The larger this
+                param is, the more that the model would generate shorter 
+                sequences. Default to 0.0, which means no penalty.
             early_stopping (bool, optional): Whether to stop searching in the 
                 "beam_search" strategy when at least `num_beams` sentences are 
                 finished per batch or not. Default to False.
@@ -597,7 +596,7 @@ class GenerationMixin(object):
 
         model_kwargs["use_cache"] = use_cache
         max_length += input_ids.shape[-1]
-
+        min_length += input_ids.shape[-1]
         logits_processors = self.get_logits_processor(min_length, eos_token_id)
 
         if decode_strategy == 'greedy_search':
@@ -672,7 +671,6 @@ class GenerationMixin(object):
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
             logits = logits_processors(input_ids, logits)
-
             # greedy
             probs = F.softmax(logits)
             probs = paddle.log(probs)
@@ -857,6 +855,7 @@ class GenerationMixin(object):
                 next_scores,
                 next_tokens,
                 next_indices,
+                origin_len=origin_len,
                 pad_token_id=pad_token_id,
                 eos_token_id=eos_token_id, )
             beam_scores = beam_outputs["next_beam_scores"]
