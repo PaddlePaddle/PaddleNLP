@@ -41,19 +41,19 @@ class TemporalBlock(nn.Layer):
     See the Figure 1(b) in https://arxiv.org/pdf/1803.01271.pdf for more details.
 
     Args:
-        n_inputs (`int`): 
+        n_inputs (int):
             The number of channels in the input tensor.
-        n_outputs (`int`): 
+        n_outputs (int):
             The number of filters.
-        kernel_size (`int`): 
+        kernel_size (int):
             The filter size.
-        stride (`int`): 
+        stride (int):
             The stride size.
-        dilation (`int`): 
+        dilation (int):
             The dilation size.
-        padding (`int`): 
+        padding (int):
             The size of zeros to be padded.
-        dropout (`float`, optional): 
+        dropout (float, optional):
             Probability of dropout the units. Defaults to 0.2.
     """
 

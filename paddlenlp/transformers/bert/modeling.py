@@ -361,12 +361,7 @@ class BertModel(BertPretrainedModel):
             Defaults to `512`.
         type_vocab_size (int, optional):
             The vocabulary size of `token_type_ids` passed when calling `~ transformers.BertModel`.
-            Defaults to `12`.
-            `token_type_ids` are segment token indices to indicate first
-             and second portions of the inputs. Indices can either be 0 or 1:
-
-                - 0 corresponds to a *sentence A* token,
-                - 1 corresponds to a *sentence B* token.
+            Defaults to `16`.
 
         initializer_range (float, optional):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
@@ -443,8 +438,8 @@ class BertModel(BertPretrainedModel):
                 Defaults to `None`, which means we don't add segment embeddings.
             position_ids(Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                max_position_embeddings - 1]``.
+                Defaults to `None`. Shape as `(batch_size, num_tokens)` and dtype as `int32` or `int64`.
             attention_mask (Tensor, optional):
                 Mask to indicate whether to perform attention on each input token or not.
                 The values should be either 0 or 1. The attention scores will be set to **-infinity**
@@ -454,8 +449,8 @@ class BertModel(BertPretrainedModel):
                 - **1** for tokens that **not masked**,
                 - **0** for tokens that **masked**.
 
-                It's data type should be 'float32' and has a shape of [batch_size, sequence_length].
-                Defaults to 'None'.
+                It's data type should be float32 and has a shape of [batch_size, sequence_length].
+                Defaults to `None`.
             output_hidden_states (bool, optional):
                 Whether to return the output of each layer in the hidden layers.
                 Defaults to be `False`.
@@ -467,14 +462,13 @@ class BertModel(BertPretrainedModel):
 
             - `sequence_output` (Tensor):
                 Sequence of hidden-states at the last layer of the model.
-                It's data type should be float32 and has a shape of (`batch_size, seq_lens, hidden_size`].
+                It's data type should be float32 and has a shape of [batch_size, seq_lens, hidden_size].
                 `seq_lens` corresponds to the length of input sequence.
 
             - `pooled_output` (Tensor):
                 The output of first token (`[CLS]`) in sequence.
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
-                Its data type should be float32 and
-                has a shape of [batch_size, hidden_size].
+                Its data type should be float32 and has a shape of [batch_size, hidden_size].
 
             - `encoder_output` (Tensor):
                 Sequence of output at hidden layers of the model. Its data type should be float32 and
@@ -489,7 +483,7 @@ class BertModel(BertPretrainedModel):
                 tokenizer = BertTokenizer.from_pretrained('bert-wwm-chinese')
                 model = BertModel.from_pretrained('bert-wwm-chinese')
 
-                inputs = tokenizer("这是一个测试样例。")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
@@ -535,6 +529,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
             If None, use the same value as `hidden_dropout_prob` of `BertModel`
             instance `bert`. Default None.
         """
+
     def __init__(self, bert, dropout=None):
         super(BertForQuestionAnswering, self).__init__()
         self.bert = bert  # allow bert to be config
@@ -552,17 +547,19 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 See :class:`BertModel`.
 
         Returns:
-            A tuple of shape (`start_logits`, `end_logits`).
+            Tuple: Shape as (`start_logits`, `end_logits`).
 
             With the fields:
 
-            - start_logits(Tensor): Labels for position (index) of the start of the labelled span for computing the token classification loss.
-            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
-            sequence are not taken into account for computing the loss.
+            - `start_logits`(Tensor): Labels for position (index) of the start of the labelled span for computing the
+            token classification loss. Positions are clamped to the length of the sequence (:obj:`sequence_length`).
+            Position outside of the sequence are not taken into account for computing the loss.
+            Its data type should be float32 and has a shape of [batch_size, sequence_length].
 
-            - end_logits(Tensor): Labels for position (index) of the end of the labelled span for computing the token classification loss.
-            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
-            sequence are not taken into account for computing the loss.
+            - `end_logits`(Tensor): Labels for position (index) of the end of the labelled span for computing the
+            token classification loss. Positions are clamped to the length of the sequence (:obj:`sequence_length`).
+            Position outside of the sequence are not taken into account for computing the loss.
+            Its data type should be float32 and has a shape of [batch_size, sequence_length].
 
         Example:
             .. code-block::
@@ -574,7 +571,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
                 model = BertForQuestionAnswering.from_pretrained('bert-base-cased')
 
-                inputs = tokenizer("This is a test example.")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -640,9 +637,9 @@ class BertForSequenceClassification(BertPretrainedModel):
                 See :class:`BertModel`.
 
         Returns:
-            logits (Tensor):
+            Tensor: logits:
                 A Tensor of the input text classification logits.
-                Shape as `(batch_size, num_classes)` and dtype as `float`.
+                Shape as `[batch_size, num_classes]` and dtype as `float32`.
 
         Example:
             .. code-block::
@@ -654,7 +651,7 @@ class BertForSequenceClassification(BertPretrainedModel):
                 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
                 model = BertForSequenceClassification.from_pretrained('bert-base-cased')
 
-                inputs = tokenizer("This is a test example.")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -717,8 +714,8 @@ class BertForTokenClassification(BertPretrainedModel):
                 See :class:`BertModel`.
 
         Returns:
-            logits (Tensor):
-                A Tensor of the input text classification logits, shape as `(batch_size, seq_lens, num_classes)`.
+            Tensor: logits:
+                A Tensor of the input text classification logits, shape as `[batch_size, seq_lens, num_classes]`.
                 seq_lens mean the number of tokens of the input sequence.
 
         Example:
@@ -731,7 +728,7 @@ class BertForTokenClassification(BertPretrainedModel):
                 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
                 model = BertForTokenClassification.from_pretrained('bert-base-cased')
 
-                inputs = tokenizer("This is a test example.")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
@@ -826,13 +823,14 @@ class BertPretrainingHeads(Layer):
                 The masked positions embeddings. Defaults to `None`.
 
         Returns:
-            A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
+            Tuple: Shape as (``prediction_scores``, ``seq_relationship_score``).
 
             With the fields:
 
             - `prediction_scores` (Tensor): The scores of prediction on masked token.
+            Its data type should be float32 and has a shape of [batch_size, sequence_length, vocab_size].
             - `seq_relationship_score` (Tensor): The scores of next sentence prediction.
-
+            Its data type should be float32 and has a shape of [batch_size, num_classes].
 
         """
         prediction_scores = self.predictions(sequence_output, masked_positions)
@@ -842,7 +840,7 @@ class BertPretrainingHeads(Layer):
 
 class BertForPretraining(BertPretrainedModel):
     """
-    Bert Model for pretraining tasks on top.
+    Bert Model with pretraining tasks on top.
 
     Args:
         bert (:class:`BertModel`):
@@ -882,12 +880,14 @@ class BertForPretraining(BertPretrainedModel):
                 See :class:`BertModel`.
 
         Returns:
-            Tuple: A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
+            Tuple: Shape as (``prediction_scores``, ``seq_relationship_score``).
 
             With the fields:
 
             - `prediction_scores` (Tensor): The scores of prediction on masked token.
+            Its data type should be float32 and has a shape of [batch_size, sequence_length, vocab_size].
             - `seq_relationship_score` (Tensor): The scores of next sentence prediction.
+            Its data type should be float32 and has a shape of [batch_size, num_classes].
 
         """
         with paddle.static.amp.fp16_guard():
@@ -941,7 +941,7 @@ class BertPretrainingCriterion(paddle.nn.Layer):
                 its shape is [mask_token_num, 1]
 
         Returns:
-            Float: The pretraining loss, equals to the sum of `masked_lm_loss` plus the mean of `next_sentence_loss`.
+            float: The pretraining loss, equals to the sum of `masked_lm_loss` plus the mean of `next_sentence_loss`.
 
         """
         with paddle.static.amp.fp16_guard():
