@@ -551,12 +551,14 @@ class BertForQuestionAnswering(BertPretrainedModel):
 
             With the fields:
 
-            - `start_logits`(Tensor): Labels for position (index) of the start of the labelled span for computing the
+            - `start_logits`(Tensor):
+                Labels for position (index) of the start of the labelled span for computing the
             token classification loss. Positions are clamped to the length of the sequence (:obj:`sequence_length`).
             Position outside of the sequence are not taken into account for computing the loss.
             Its data type should be float32 and has a shape of [batch_size, sequence_length].
 
-            - `end_logits`(Tensor): Labels for position (index) of the end of the labelled span for computing the
+            - `end_logits`(Tensor):
+                Labels for position (index) of the end of the labelled span for computing the
             token classification loss. Positions are clamped to the length of the sequence (:obj:`sequence_length`).
             Position outside of the sequence are not taken into account for computing the loss.
             Its data type should be float32 and has a shape of [batch_size, sequence_length].
@@ -829,6 +831,7 @@ class BertPretrainingHeads(Layer):
 
             - `prediction_scores` (Tensor): The scores of prediction on masked token.
             Its data type should be float32 and has a shape of [batch_size, sequence_length, vocab_size].
+
             - `seq_relationship_score` (Tensor): The scores of next sentence prediction.
             Its data type should be float32 and has a shape of [batch_size, num_classes].
 
