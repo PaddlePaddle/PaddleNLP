@@ -13,11 +13,10 @@
 ![GitHub](https://img.shields.io/github/license/paddlepaddle/paddlenlp)
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
-
+* [2021-08-22][《千言：面向事实一致性的生成评测比赛》](https://aistudio.baidu.com/aistudio/competition/detail/105)正式开赛啦🔥🔥🔥，欢迎大家踊跃报名!! [PaddleNLP比赛基线地址](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text)
+* [2021-08-22] PaddleNLP 2.0.8版本已发布！:tada:更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.0.8).
 * [2021-06-07]《基于深度学习的自然语言处理》直播打卡课正在进行中🔥🔥🔥，快来打卡吧：[https://aistudio.baidu.com/aistudio/course/introduce/24177](https://aistudio.baidu.com/aistudio/course/introduce/24177)
 * [2021-06-04] 新增多粒度语言知识预训练模型[ERNIE-Gram](https://arxiv.org/abs/2010.12148)，多项中文NLP任务取得SOTA成绩，获取2.0.2版本快速体验吧！
-* [2021-05-20] PaddleNLP 2.0正式版已发布！:tada:更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.0.0).
-
 
 ## 简介
 
