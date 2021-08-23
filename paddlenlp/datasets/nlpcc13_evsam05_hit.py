@@ -72,6 +72,4 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
                 _, FORM, _, CPOS, _, _, HEAD, DEPREL, _, _ = values
                 if values:
                     yield {"FORM": FORM, "CPOS": CPOS, "HEAD": HEAD, "DEPREL": DEPREL}
-                start = i + 1
-
-        
+                start = i + 1 
