@@ -110,33 +110,107 @@ endif()
 if(BUILD_PD)
   add_definitions(-DPADDLE_WITH_CUDA)
 
-  execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.sysconfig.get_include())"
-                  RESULT_VARIABLE _INC_PYTHON_SUCCESS
-                  OUTPUT_VARIABLE _INC_PYTHON_VALUES)
-  if (NOT _INC_PYTHON_SUCCESS MATCHES 0)
-      message(FATAL_ERROR "Python config Error.")
+  if(ON_INFER)
+    add_definitions(-DPADDLE_ON_INFERENCE)
+
+    link_directories(${COMMON_LIB_DIRS})
+
+    if(NOT WITH_STATIC_LIB)
+      add_definitions("-DPADDLE_WITH_SHARED_LIB")
+    else()
+      # PD_INFER_DECL is mainly used to set the dllimport/dllexport attribute in dynamic library mode.
+      # Set it to empty in static library mode to avoid compilation issues.
+      add_definitions("/DPD_INFER_DECL=")
+    endif()
+
+    macro(safe_set_static_flag)
+        foreach(flag_var
+            CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+            CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+          if(${flag_var} MATCHES "/MD")
+            string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+          endif(${flag_var} MATCHES "/MD")
+        endforeach(flag_var)
+    endmacro()
+
+    if(NOT DEFINED PADDLE_LIB)
+      message(FATAL_ERROR "please set PADDLE_LIB with -DPADDLE_LIB=/path/paddle/lib")
+    endif()
+
+    include_directories("${PADDLE_LIB}/")
+    set(PADDLE_LIB_THIRD_PARTY_PATH "${PADDLE_LIB}/third_party/install/")
+    include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}protobuf/include")
+    include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}glog/include")
+    include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}gflags/include")
+    include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}xxhash/include")
+
+    link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}protobuf/lib")
+    link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}glog/lib")
+    link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}gflags/lib")
+    link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}xxhash/lib")
+    link_directories("${PADDLE_LIB}/paddle/lib")
+
+    if(WITH_MKL)
+      set(FLAG_OPENMP "-fopenmp")
+    endif()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 ${FLAG_OPENMP}")
+
+    if (USE_TENSORRT AND WITH_GPU)
+      set(TENSORRT_ROOT "" CACHE STRING "The root directory of TensorRT library")
+      if("${TENSORRT_ROOT}" STREQUAL "")
+          message(FATAL_ERROR "The TENSORRT_ROOT is empty, you must assign it a value with CMake command. Such as: -DTENSORRT_ROOT=TENSORRT_ROOT_PATH ")
+      endif()
+      set(TENSORRT_INCLUDE_DIR ${TENSORRT_ROOT}/include)
+      set(TENSORRT_LIB_DIR ${TENSORRT_ROOT}/lib)
+    endif()
+
+    if (USE_TENSORRT AND WITH_GPU)
+        include_directories("${TENSORRT_INCLUDE_DIR}")
+        link_directories("${TENSORRT_LIB_DIR}")
+    endif()
+
+    if(WITH_MKL)
+      set(MATH_LIB_PATH "${PADDLE_LIB_THIRD_PARTY_PATH}mklml")
+      include_directories("${MATH_LIB_PATH}/include")
+      set(MKLDNN_PATH "${PADDLE_LIB_THIRD_PARTY_PATH}mkldnn")
+      if(EXISTS ${MKLDNN_PATH})
+        include_directories("${MKLDNN_PATH}/include")
+        set(MKLDNN_LIB ${MKLDNN_PATH}/lib/libmkldnn.so.0)
+      endif()
+    else()
+      set(OPENBLAS_LIB_PATH "${PADDLE_LIB_THIRD_PARTY_PATH}openblas")
+      include_directories("${OPENBLAS_LIB_PATH}/include/openblas")
+    endif()
+
+  else()
+    execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.sysconfig.get_include())"
+                    RESULT_VARIABLE _INC_PYTHON_SUCCESS
+                    OUTPUT_VARIABLE _INC_PYTHON_VALUES)
+    if (NOT _INC_PYTHON_SUCCESS MATCHES 0)
+        message(FATAL_ERROR "Python config Error.")
+    endif()
+    string(REGEX REPLACE ";" "\\\\;" _INC_PYTHON_VALUES ${_INC_PYTHON_VALUES})
+    string(REGEX REPLACE "\n" ";" _INC_PYTHON_VALUES ${_INC_PYTHON_VALUES})
+    list(GET _INC_PYTHON_VALUES 0 PY_INCLUDE_DIR)
+
+    list(APPEND COMMON_HEADER_DIRS ${PY_INCLUDE_DIR})
+    list(APPEND COMMON_HEADER_DIRS ${PY_INCLUDE_DIR}/third_party)
+
+    execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.sysconfig.get_lib())"
+                    RESULT_VARIABLE _LIB_PYTHON_SUCCESS
+                    OUTPUT_VARIABLE _LIB_PYTHON_VALUES)
+    if (NOT _LIB_PYTHON_SUCCESS MATCHES 0)
+        message(FATAL_ERROR "Python config Error.")
+    endif()
+    string(REGEX REPLACE ";" "\\\\;" _LIB_PYTHON_VALUES ${_LIB_PYTHON_VALUES})
+    string(REGEX REPLACE "\n" ";" _LIB_PYTHON_VALUES ${_LIB_PYTHON_VALUES})
+    list(GET _LIB_PYTHON_VALUES 0 PY_LIB_DIR)
+    list(APPEND COMMON_LIB_DIRS ${PY_LIB_DIR})
+
+    include_directories(${PY_INCLUDE_DIR})
+    include_directories(${PY_INCLUDE_DIR}\third_party)
+
   endif()
-  string(REGEX REPLACE ";" "\\\\;" _INC_PYTHON_VALUES ${_INC_PYTHON_VALUES})
-  string(REGEX REPLACE "\n" ";" _INC_PYTHON_VALUES ${_INC_PYTHON_VALUES})
-  list(GET _INC_PYTHON_VALUES 0 PY_INCLUDE_DIR)
-
-  list(APPEND COMMON_HEADER_DIRS ${PY_INCLUDE_DIR})
-  list(APPEND COMMON_HEADER_DIRS ${PY_INCLUDE_DIR}/third_party)
-
-  execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.sysconfig.get_lib())"
-                  RESULT_VARIABLE _LIB_PYTHON_SUCCESS
-                  OUTPUT_VARIABLE _LIB_PYTHON_VALUES)
-  if (NOT _LIB_PYTHON_SUCCESS MATCHES 0)
-      message(FATAL_ERROR "Python config Error.")
-  endif()
-  string(REGEX REPLACE ";" "\\\\;" _LIB_PYTHON_VALUES ${_LIB_PYTHON_VALUES})
-  string(REGEX REPLACE "\n" ";" _LIB_PYTHON_VALUES ${_LIB_PYTHON_VALUES})
-  list(GET _LIB_PYTHON_VALUES 0 PY_LIB_DIR)
-  list(APPEND COMMON_LIB_DIRS ${PY_LIB_DIR})
-
-  include_directories(${PY_INCLUDE_DIR})
-  include_directories(${PY_INCLUDE_DIR}\third_party)
-
 endif()
 
 include_directories(

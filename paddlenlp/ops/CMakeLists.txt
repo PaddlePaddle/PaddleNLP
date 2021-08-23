@@ -22,6 +22,7 @@ set(CXX_STD "14" CACHE STRING "C++ standard")
 
 option(ON_INFER         "Compiled with inference. "                                 OFF)
 option(WITH_GPU         "Compiled with GPU/CPU, default use CPU."                   ON)
+option(WITH_MKL         "Compile with MKL. Only works when ON_INFER is ON."         ON)
 option(USE_TENSORRT     "Compiled with TensorRT."                                   OFF)
 option(WITH_TRANSFORMER "Compiled with Transformer."                                ON)
 option(WITH_GPT         "Compiled with GPT."                                        OFF)
@@ -223,7 +224,7 @@ ExternalProject_Add(
   PATCH_COMMAND     ${FT_PATCH_COMMAND}
   BINARY_DIR        ${THIRD_PATH}/build/${THIRD_PARTY_NAME}
   INSTALL_COMMAND   ""
-  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DPY_CMD=${PY_CMD}
+  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_WITH_STATIC_LIB=${WITH_STATIC_LIB}
 )
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} BINARY_DIR)
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} SOURCE_DIR)
