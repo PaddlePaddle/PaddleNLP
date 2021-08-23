@@ -12,484 +12,215 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import defaultdict, namedtuple, Counter
-from collections.abc import Iterable
 import math
 import numpy as np
-import paddle
 
+import paddle
+import paddlenlp as ppnlp
+from paddlenlp.data import Vocab
 from utils import kmeans, pad_sequence
 
-CoNLL = namedtuple(typename='CoNLL',
-                   field_names=['ID', 'FORM', 'LEMMA', 'CPOS', 'POS', 'FEATS', 'HEAD', 'DEPREL', 'PHEAD', 'PDEPREL'])
-CoNLL.__new__.__defaults__ = tuple([None] * 10)
 
+def build_vocab(corpus, tokenizer, encoding_model, feat):
+    word_examples, feat_examples, rel_examples = corpus
 
-class Vocab(object):
-    """Vocab"""
-    def __init__(self, counter, min_freq=1, specials=None, unk_index=0):
-        self.itos = list(specials) if specials else []
-        self.stoi = defaultdict(lambda: unk_index)
-        self.stoi.update({token: i for i, token in enumerate(self.itos)})
-        self.extend([token for token, freq in counter.items() if freq >= min_freq])
-        self.unk_index = unk_index
-        self.n_init = len(self)
-
-    def __len__(self):
-        """Returns the size of the vocabulary"""
-        return len(self.itos)
-
-    def __getitem__(self, key):
-        """According to the key or index, return the index and key"""
-        if isinstance(key, str):
-            return self.stoi[key]
-        elif not isinstance(key, Iterable):
-            return self.itos[key]
-        elif isinstance(key[0], str):
-            return [self.stoi[i] for i in key]
+    # Construct word vocab and feature vocab
+    if encoding_model == "lstm":
+        word_vocab = Vocab.build_vocab(
+            word_examples, 
+            min_freq=2, 
+            token_to_idx={"[PAD]": 0, "[UNK]": 1, "[BOS]": 2, "[EOS]": 3},
+            unk_token="[UNK]",
+            pad_token="[PAD]",
+            bos_token="[BOS]",
+            eos_token="[EOS]",
+        )
+        if feat == "pos":
+            feat_vocab = Vocab.build_vocab(
+                feat_examples,
+                token_to_idx={"[BOS]": 0, "[EOS]": 1, "[UNK]": 2},
+                bos_token="[BOS]",
+                eos_token="[EOS]",
+                unk_token="[UNK]",
+            )
         else:
-            return [self.itos[i] for i in key]
+            feat_vocab = Vocab.build_vocab(
+                feat_examples,
+                token_to_idx={"[PAD]": 0, "[UNK]": 1, "[BOS]": 2, "[EOS]": 3},
+                unk_token="[UNK]",
+                pad_token="[PAD]",
+                bos_token="[BOS]",
+                eos_token="[EOS]",
+            )
+    else:
+        word_vocab = tokenizer.vocab
+        feat_vocab = None
 
-    def __contains__(self, token):
-        """contains"""
-        return token in self.stoi
+    # Construct relation vocab
+    rel_vocab = Vocab.build_vocab(
+        rel_examples,
+        token_to_idx={"[BOS]": 0, "[EOS]": 1, "[UNK]": 2},
+        bos_token="[BOS]",
+        eos_token="[EOS]",
+        unk_token="[UNK]",
+    )
 
-    def __getstate__(self):
-        """getstate"""
-        # avoid picking defaultdict
-        attrs = dict(self.__dict__)
-        # cast to regular dict
-        attrs['stoi'] = dict(self.stoi)
-        return attrs
+    return [word_vocab, feat_vocab, rel_vocab]
 
-    def __setstate__(self, state):
-        """setstate"""
-        stoi = defaultdict(lambda: self.unk_index)
-        stoi.update(state['stoi'])
-        state['stoi'] = stoi
-        self.__dict__.update(state)
+def convert_example(example, tokenizer, vocabs, encoding_model, feat, fix_len=20):
+    word_vocab, feat_vocab, rel_vocab = vocabs
+    if encoding_model == "lstm":
+        word_bos_index = word_vocab.to_indices("[BOS]")
+        word_eos_index = word_vocab.to_indices("[EOS]")
+    else:
+        word_bos_index = word_vocab.to_indices("[CLS]")
+        word_eos_index = word_vocab.to_indices("[SEP]")
 
-    def extend(self, tokens):
-        """Update tokens to itos and stoi"""
-        self.itos.extend(sorted(set(tokens).difference(self.stoi)))
-        self.stoi.update({token: i for i, token in enumerate(self.itos)})
+    if feat_vocab:
+        feat_bos_index = feat_vocab.to_indices("[BOS]")
+        feat_eos_index = feat_vocab.to_indices("[EOS]")
 
+    arc_bos_index, arc_eos_index = 0, 1
 
-class RawField(object):
-    """Field base class"""
-    def __init__(self, name, fn=None):
-        super(RawField, self).__init__()
+    rel_bos_index = rel_vocab.to_indices("[BOS]")
+    rel_eos_index = rel_vocab.to_indices("[EOS]")  
 
-        self.name = name
-        self.fn = fn
+    arcs = list(example["HEAD"])
+    arcs = [arc_bos_index] + arcs + [arc_eos_index]
+    arcs = np.array(arcs, dtype=np.int64)
 
-    def __repr__(self):
-        """repr"""
-        return "({}): {}()".format(self.name, self.__class__.__name__)
+    rels = rel_vocab.to_indices(example["DEPREL"])
+    rels = [rel_bos_index] + rels + [rel_eos_index]
+    rels = np.array(rels, dtype=np.int64)
+    if encoding_model == "lstm":
+        words = word_vocab.to_indices(example["FORM"])
+        words = [word_bos_index] + words + [word_eos_index]
+        words = np.array(words, dtype=np.int64)
 
-    def preprocess(self, sequence):
-        """preprocess"""
-        if self.fn is not None:
-            sequence = self.fn(sequence)
-        return sequence
-
-    def transform(self, sequences):
-        """Sequences transform function"""
-        return [self.preprocess(seq) for seq in sequences]
-
-
-class Field(RawField):
-    """Field"""
-    def __init__(self,
-                 name,
-                 pad=None,
-                 unk=None,
-                 bos=None,
-                 eos=None,
-                 lower=False,
-                 use_vocab=True,
-                 tokenize=None,
-                 tokenizer=None,
-                 fn=None):
-        self.name = name
-        self.pad = pad
-        self.unk = unk
-        self.bos = bos
-        self.eos = eos
-        self.lower = lower
-        self.use_vocab = use_vocab
-        self.tokenize = tokenize
-        self.tokenizer = tokenizer
-        self.fn = fn
-
-        self.specials = [token for token in [pad, unk, bos, eos] if token is not None]
-
-    def __repr__(self):
-        """repr"""
-        s, params = "({}): {}(".format(self.name, self.__class__.__name__), []
-        if self.pad is not None:
-            params.append("pad={}".format(self.pad))
-        if self.unk is not None:
-            params.append("unk={}".format(self.unk))
-        if self.bos is not None:
-            params.append("bos={}".format(self.bos))
-        if self.eos is not None:
-            params.append("eos={}".format(self.eos))
-        if self.lower:
-            params.append("lower={}".format(self.lower))
-        if not self.use_vocab:
-            params.append("use_vocab={}".format(self.use_vocab))
-        s += ", ".join(params)
-        s += ")"
-
-        return s
-
-    @property
-    def pad_index(self):
-        """pad index"""
-        if self.pad is None:
-            return 0
-        if hasattr(self, 'vocab'):
-            if self.tokenizer is not None:
-                return self.vocab.to_indices(self.pad)
-            return self.vocab[self.pad]
-        return self.specials.index(self.pad)
-
-    @property
-    def unk_index(self):
-        """unk index"""
-        if self.unk is None:
-            return 0
-        if hasattr(self, 'vocab'):
-            if self.tokenizer is not None:
-                return self.vocab.to_indices(self.unk)
-            return self.vocab[self.unk]
-        return self.specials.index(self.unk)
-
-    @property
-    def bos_index(self):
-        """bos index"""
-        if self.bos is None:
-            return 0
-        if hasattr(self, 'vocab'):
-            if self.tokenizer is not None:
-                return self.vocab.to_indices(self.bos)
-            return self.vocab[self.bos]
-        return self.specials.index(self.bos)
-
-    @property
-    def eos_index(self):
-        """eos index"""
-        if self.eos is None:
-            return 0
-        if hasattr(self, 'vocab'):
-            if self.tokenizer is not None:
-                return self.vocab.to_indices(self.eos)
-            return self.vocab[self.eos]
-        return self.specials.index(self.eos)
-
-    def preprocess(self, sequence):
-        """preprocess"""
-        if self.fn is not None:
-            sequence = self.fn(sequence)
-        if self.tokenize is not None:
-            sequence = self.tokenize(sequence)
-        elif self.tokenizer is not None:
-            sequence = self.tokenizer(sequence)["input_ids"][1:-1]
-            if not sequence: sequence = [self.unk]
-        if self.lower:
-            sequence = [token.lower() for token in sequence]
-
-        return sequence
-
-    def build(self, corpus, min_freq=1):
-        """Create vocab based on corpus"""
-        if hasattr(self, 'vocab'):
-            return
-        sequences = getattr(corpus, self.name)
-        counter = Counter(token for seq in sequences for token in self.preprocess(seq))
-        self.vocab = Vocab(counter, min_freq, self.specials, self.unk_index)
-
-    def transform(self, sequences):
-        """Sequences transform function, such as converting word to id, adding bos tags to sequences, etc."""
-        sequences = [self.preprocess(seq) for seq in sequences]
-        if self.use_vocab:
-            sequences = [self.vocab[seq] for seq in sequences]
-        if self.bos:
-            sequences = [[self.bos_index] + seq for seq in sequences]
-        if self.eos:
-            sequences = [seq + [self.eos_index] for seq in sequences]
-        sequences = [np.array(seq, dtype=np.int64) for seq in sequences]
-        return sequences
-
-
-class SubwordField(Field):
-    """SubwordField"""
-    def __init__(self, *args, **kwargs):
-        self.fix_len = kwargs.pop('fix_len') if 'fix_len' in kwargs else 0
-        super(SubwordField, self).__init__(*args, **kwargs)
-
-    def build(self, corpus, min_freq=1):
-        """Create vocab based on corpus"""
-        if hasattr(self, 'vocab'):
-            return
-        sequences = getattr(corpus, self.name)
-        counter = Counter(piece for seq in sequences for token in seq for piece in self.preprocess(token))
-        self.vocab = Vocab(counter, min_freq, self.specials, self.unk_index)
-
-    def transform(self, sequences):
-        """Sequences transform function, such as converting word to id, adding bos tags to sequences, etc."""
-        sequences = [[self.preprocess(token) for token in seq] for seq in sequences]
-        if self.fix_len <= 0:
-            self.fix_len = max(len(token) for seq in sequences for token in seq)
-        if self.use_vocab:
-            sequences = [[[self.vocab[i] for i in token] for token in seq] for seq in sequences]
-        if self.bos:
-            sequences = [[[self.bos_index]] + seq for seq in sequences]
-        if self.eos:
-            sequences = [seq + [[self.eos_index]] for seq in sequences]
-        sequences = [
-            pad_sequence([np.array(ids[:self.fix_len], dtype=np.int64) for ids in seq], self.pad_index, self.fix_len)
-            for seq in sequences
-        ]
-
-        return sequences
-
-
-class ErnieField(Field):
-    """SubwordField"""
-    def __init__(self, *args, **kwargs):
-        self.fix_len = kwargs.pop('fix_len') if 'fix_len' in kwargs else 0
-        super(ErnieField, self).__init__(*args, **kwargs)
-
-    def transform(self, sequences):
-        """Sequences transform function, such as converting word to id, adding bos tags to sequences, etc."""
-
-        sequences = [[self.preprocess(token) for token in seq] for seq in sequences]
-
-        if self.fix_len <= 0:
-            self.fix_len = max(len(token) for seq in sequences for token in seq)
-        if self.bos:
-            sequences = [[[self.bos_index]] + seq for seq in sequences]
-        if self.eos:
-            sequences = [seq + [[self.eos_index]] for seq in sequences]
-
-        sequences = [
-            pad_sequence([np.array(ids[:self.fix_len], dtype=np.int64) for ids in seq], self.pad_index, self.fix_len)
-            for seq in sequences
-        ]
-        return sequences
-
-
-class Sentence(object):
-    """Sentence"""
-    def __init__(self, fields, values):
-        for field, value in zip(fields, values):
-            if isinstance(field, Iterable):
-                for j in range(len(field)):
-                    setattr(self, field[j].name, value)
-            else:
-                setattr(self, field.name, value)
-        self.fields = fields
-
-    @property
-    def values(self):
-        """Returns an iterator containing all the features of one sentence"""
-        for field in self.fields:
-            if isinstance(field, Iterable):
-                yield getattr(self, field[0].name)
-            else:
-                yield getattr(self, field.name)
-
-    def __len__(self):
-        """Get sentence length"""
-        return len(next(iter(self.values)))
-
-    def __repr__(self):
-        """repr"""
-        return '\n'.join('\t'.join(map(str, line)) for line in zip(*self.values)) + '\n'
-
-    def get_result(self):
-        """Returns json style result"""
-        output = {}
-        for field in self.fields:
-            if isinstance(field, Iterable) and not field[0].name.isdigit():
-                output[field[0].name] = getattr(self, field[0].name)
-            elif not field.name.isdigit():
-                output[field.name] = getattr(self, field.name)
-        return output
-
-
-class Corpus(object):
-    """Corpus"""
-    def __init__(self, fields, sentences):
-        super(Corpus, self).__init__()
-
-        self.fields = fields
-        self.sentences = sentences
-
-    def __len__(self):
-        """Returns the data set size"""
-        return len(self.sentences)
-
-    def __repr__(self):
-        """repr"""
-        return '\n'.join(str(sentence) for sentence in self)
-
-    def __getitem__(self, index):
-        """Get the sentence according to the index"""
-        return self.sentences[index]
-
-    def __getattr__(self, name):
-        """Get the value of name and return an iterator"""
-        if not hasattr(self.sentences[0], name):
-            raise AttributeError
-        for sentence in self.sentences:
-            yield getattr(sentence, name)
-
-    def __setattr__(self, name, value):
-        """Add a property"""
-        if name in ['fields', 'sentences']:
-            self.__dict__[name] = value
+        if feat == "pos":
+            feats = feat_vocab.to_indices(example["CPOS"])
+            feats = [feat_bos_index] + feats + [feat_eos_index]
+            feats = np.array(feats, dtype=np.int64)
         else:
-            for i, sentence in enumerate(self.sentences):
-                setattr(sentence, name, value[i])
+            feats = [[feat_vocab.to_indices(token) for token in word] 
+                for word in example["FORM"]]
+            feats = [[feat_bos_index]] + feats + [[feat_eos_index]]
+            feats = pad_sequence([np.array(ids[:fix_len], dtype=np.int64)
+                for ids in feats], fix_len=fix_len)
 
-    @classmethod
-    def load(cls, path, fields):
-        """Load data from path to generate corpus"""
-        start, sentences = 0, []
-        fields = [fd if fd is not None else Field(str(i)) for i, fd in enumerate(fields)]
-        with open(path, 'r', encoding='utf-8') as f:
-            
-            lines = []
-            for line in f.readlines():
-                if not line.startswith(" "):
-                    if not line.startswith('#') and (len(line) == 1 or line.split()[0].isdigit()):
-                        lines.append(line.strip())
-                else:
-                    lines.append("")
+        return words, feats, arcs, rels
+    else:
+        words = [tokenizer(word)["input_ids"][1:-1] for word in example["FORM"]]
+        words = [[word_bos_index]] + words + [[word_eos_index]]
+        words = pad_sequence([np.array(ids[:fix_len], dtype=np.int64) 
+            for ids in words], fix_len=fix_len)
 
-        for i, line in enumerate(lines):
-            if not line:
-                values = list(zip(*[j.split('\t') for j in lines[start:i]]))
-                if values:
-                    sentences.append(Sentence(fields, values))
-                start = i + 1
-        return cls(fields, sentences)
+        return words, arcs, rels
 
-    @classmethod
-    def load_lac_results(cls, inputs, fields):
-        """Load data from lac results to generate corpus"""
-        sentences = []
-        fields = [fd if fd is not None else Field(str(i)) for i, fd in enumerate(fields)]
-        for _input in inputs:
-            if isinstance(_input[0], list):
-                tokens, poss = _input
+
+def create_dataloader(dataset, 
+                      vocabs,
+                      batch_size, 
+                      mode="train", 
+                      n_buckets=15,
+                      trans_fn=None): 
+    if n_buckets:
+        word_examples = [seq["FORM"] for seq in dataset]
+        lengths = [len(i) + 1 for i in word_examples]
+        buckets = dict(zip(*kmeans(lengths, n_buckets)))
+
+    if trans_fn:
+        dataset = dataset.map(trans_fn)
+
+    if mode == "train":
+        batch_sampler = BucketsSampler(
+            buckets=buckets, 
+            batch_size=batch_size, 
+            shuffle=True,
+        )
+    else:
+        batch_sampler = BucketsSampler(
+            buckets=buckets, 
+            batch_size=batch_size, 
+            shuffle=False,
+        )
+    dataloader = paddle.io.DataLoader.from_generator(
+        capacity=10, 
+        return_list=True, 
+        use_multiprocess=True,
+    )
+    dataloader.set_batch_generator(
+        generator_creator(dataset, batch_sampler))
+  
+    return dataloader, buckets
+    
+
+def read_predict_data(filename):
+    """Reads data."""
+    start = 0
+    with open(filename, 'r', encoding='utf-8') as f:
+        lines = []
+        for line in f.readlines():
+            if not line.startswith(" "):
+                if not line.startswith('#') and (len(line) == 1 or line.split()[0].isdigit()):
+                    lines.append(line.strip())
             else:
-                tokens = _input
-                poss = ['-'] * len(tokens)
-            values = [list(range(1,
-                                 len(tokens) + 1)), tokens, tokens, poss, poss] + [['-'] * len(tokens)
-                                                                                   for _ in range(5)]
+                lines.append("")
 
-            sentences.append(Sentence(fields, values))
-        return cls(fields, sentences)
-
-    @classmethod
-    def load_word_segments(cls, inputs, fields):
-        """Load data from word segmentation results to generate corpus"""
-        fields = [fd if fd is not None else Field(str(i)) for i, fd in enumerate(fields)]
-        sentences = []
-        for tokens in inputs:
-            values = [list(range(1, len(tokens) + 1)), tokens, tokens] + [['-'] * len(tokens) for _ in range(7)]
-
-            sentences.append(Sentence(fields, values))
-        return cls(fields, sentences)
-
-    def save(self, path):
-        """Dumping corpus to disk"""
-        with open(path, 'w') as f:
-            f.write(u"{}\n".format(self))
-
-    def _print(self):
-        """Print self"""
-        print(self)
-
-    def get_result(self):
-        """Get result"""
-        output = []
-        for sentence in self:
-            output.append(sentence.get_result())
-        return output
-
-
-class TextDataLoader(object):
-    """TextDataLoader"""
-    def __init__(self, dataset, batch_sampler, collate_fn, use_multiprocess=True):
-        self.dataset = dataset
-        self.batch_sampler = batch_sampler
-        self.fields = self.dataset.fields
-        self.collate_fn = collate_fn
-        self.dataloader = paddle.io.DataLoader.from_generator(capacity=10, return_list=True, use_multiprocess=use_multiprocess)
-        self.dataloader.set_batch_generator(self.generator_creator())
-
-    def __call__(self):
-        """call"""
-        return self.dataloader()
-
-    def generator_creator(self):
-        """Returns a generator, each iteration returns a batch of data"""
-        def __reader():
-            for batch_sample_id in self.batch_sampler:
-                batch = []
-                raw_batch = self.collate_fn([self.dataset[sample_id] for sample_id in batch_sample_id])
-                for data, field in zip(raw_batch, self.fields):
-                    if isinstance(data[0], np.ndarray):
-                        data = pad_sequence(data, field.pad_index)
-                    elif isinstance(data[0], Iterable):
-                        data = [pad_sequence(f, field.pad_index) for f in zip(*data)]
-                    batch.append(data)
-                yield batch
-
-        return __reader
-
-    def __len__(self):
-        """Returns the number of batches"""
-        return len(self.batch_sampler)
-
-class TextDataset(object):
-    """TextDataset"""
-    def __init__(self, corpus, fields, n_buckets=None):
-        self.corpus = corpus
-        self.fields = []
-        for field in fields:
-            if field is None:
-                continue
-            if isinstance(field, Iterable):
-                self.fields.extend(field)
+    for i, line in enumerate(lines):
+        if not line:
+            values = list(zip(*[j.split('\t') for j in lines[start:i]]))
+            if len(values) == 10:
+                # CONLL-X format (NLPCC13_EVSAM05_HIT style)
+                ID, FORM, LEMMA, CPOS, POS, FEATS, HEAD, DEPREL, PHEAD, PDEPREL = values
             else:
-                self.fields.append(field)
+                # CONLL-X format (NLPCC13_EVSAM05_THU style)
+                ID, FORM, LEMMA, CPOS, POS, FEATS, HEAD, DEPREL = values
+            if values and len(values) == 10:
+                yield {
+                    "ID": ID,
+                    "FORM": FORM,
+                    "LEMMA": LEMMA,
+                    "CPOS": CPOS, 
+                    "POS": POS,
+                    "FEATS": FEATS,
+                    "HEAD": HEAD, 
+                    "DEPREL": DEPREL,
+                    "PHEAD": PHEAD,
+                    "PDEPREL": PDEPREL,
+                }
+            else:
+                yield {
+                    "ID": ID,
+                    "FORM": FORM,
+                    "LEMMA": LEMMA,
+                    "CPOS": CPOS, 
+                    "POS": POS,
+                    "FEATS": FEATS,
+                    "HEAD": HEAD, 
+                    "DEPREL": DEPREL,
+                }                
+            start = i + 1  
 
-        for field in self.fields:
-            setattr(self, field.name, field.transform(getattr(corpus, field.name)))
-        if n_buckets:
-            self.lengths = [len(i) + int(bool(field.bos)) for i in corpus]
-            self.buckets = dict(zip(*kmeans(self.lengths, n_buckets)))
 
-    def __getitem__(self, index):
-        """Returns an iterator containing all fileds of a sample"""
-        for field in self.fields:
-            yield getattr(self, field.name)[index]
+def collate_fn(batch):
+    """Return batch samples"""
+    return (raw for raw in zip(*batch))
 
-    def __len__(self):
-        """The dataset size"""
-        return len(self.corpus)
 
-    @classmethod
-    def collate_fn(cls, batch):
-        """Return batch samples according to field"""
-        return (field for field in zip(*batch))
+def generator_creator(dataset, batch_sampler):
+    def __reader():
+        for batch_sample_id in batch_sampler:
+            batch = []
+            raw_batch = collate_fn([dataset[sample_id] for sample_id in batch_sample_id])
+            for data in raw_batch:
+                if isinstance(data[0], np.ndarray):
+                    data = pad_sequence(data)
+                elif isinstance(data[0], Iterable):
+                    data = [pad_sequence(f) for f in zip(*data)]
+                batch.append(data)
+            yield batch
+    return __reader
 
 
 class BucketsSampler(object):
@@ -517,45 +248,3 @@ class BucketsSampler(object):
     def __len__(self):
         """Returns the number of batches"""
         return sum(self.chunks)
-
-
-class SequentialSampler(object):
-    """SequentialSampler"""
-    def __init__(self, batch_size, corpus_length):
-        self.batch_size = batch_size
-        self.corpus_length = corpus_length
-
-    def __iter__(self):
-        """iter"""
-        batch = []
-        for i in range(self.corpus_length):
-            batch.append(i)
-            if len(batch) == self.batch_size:
-                yield batch
-                batch = []
-        else:
-            if len(batch):
-                yield batch
-
-
-def batchify(
-    dataset,
-    batch_size,
-    shuffle=False,
-    use_multiprocess=True,
-    sequential_sampler=False,
-):
-    """Returns data loader"""
-    if sequential_sampler:
-        batch_sampler = SequentialSampler(batch_size=batch_size, corpus_length=len(dataset))
-    else:
-        batch_sampler = BucketsSampler(buckets=dataset.buckets, batch_size=batch_size, shuffle=shuffle)
-    loader = TextDataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=dataset.collate_fn,
-        use_multiprocess=use_multiprocess,
-    )
-
-    return loader
-    

@@ -19,14 +19,14 @@ import copy
 import numpy as np
 import paddle
 
-def decode(args, s_arc, s_rel, mask):
+def decode(s_arc, s_rel, mask, tree=True):
     """Decode function"""
     mask = mask.numpy()
     lens = np.sum(mask, -1)
     # prevent self-loops
     arc_preds = paddle.argmax(s_arc, axis=-1).numpy()
     bad = [not istree(seq[:i + 1]) for i, seq in zip(lens, arc_preds)]
-    if args.tree and any(bad):
+    if tree and any(bad):
         arc_preds[bad] = eisner(s_arc.numpy()[bad], mask[bad])
     arc_preds = paddle.to_tensor(arc_preds)
     rel_preds = paddle.argmax(s_rel, axis=-1)

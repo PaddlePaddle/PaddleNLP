@@ -23,36 +23,42 @@ from model.encoder import LSTMEncoder, LSTMByWPEncoder, ErnieEncoder
 class BiaffineDependencyModel(nn.Layer):
     """DDParser"""
     def __init__(self,
-                 args=None,
+                 encoding_model,
+                 feat,
+                 n_rels,
+                 n_feats,
+                 n_words,
+                 pad_index,
+                 eos_index,
                  pretrained_model=None,
                  n_mlp_arc=500,
                  n_mlp_rel=100,
                  mlp_dropout=0.33):
         super(BiaffineDependencyModel, self).__init__()
-        self.args = args
-        self.pretrained_model = pretrained_model
+        self.pad_index = pad_index
+        self.eos_index = eos_index
 
-        if args.encoding_model == "lstm":
-            self.embed = LSTMEncoder(self.args)
-        elif args.encoding_model == "lstm-pe":
-            self.embed = LSTMByWPEncoder(self.args)
+        if encoding_model == "lstm":
+            self.embed = LSTMEncoder(feat, n_feats, n_words)
+        elif encoding_model == "lstm-pe":
+            self.embed = LSTMByWPEncoder(n_words, pad_index)
         else:
-            self.embed = ErnieEncoder(self.args, self.pretrained_model)
+            self.embed = ErnieEncoder(pad_index, pretrained_model)
 
-        # mlp layer
+        # MLP layer
         self.mlp_arc_h = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_arc, dropout=mlp_dropout)
         self.mlp_arc_d = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_arc, dropout=mlp_dropout)
         self.mlp_rel_h = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_rel, dropout=mlp_dropout)
         self.mlp_rel_d = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_rel, dropout=mlp_dropout)
 
-        # biaffine layer
+        # Biaffine layer
         self.arc_attn = BiAffine(n_in=n_mlp_arc, bias_x=True, bias_y=False)
-        self.rel_attn = BiAffine(n_in=n_mlp_rel, n_out=self.args.n_rels, bias_x=True, bias_y=True)
+        self.rel_attn = BiAffine(n_in=n_mlp_rel, n_out=n_rels, bias_x=True, bias_y=True)
 
     def forward(self, words, feats=None):
 
         words, x = self.embed(words, feats)
-        mask = paddle.logical_and(words != self.args.pad_index, words != self.args.eos_index)
+        mask = paddle.logical_and(words != self.pad_index, words != self.eos_index)
 
         arc_h = self.mlp_arc_h(x)
         arc_d = self.mlp_arc_d(x)
