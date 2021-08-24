@@ -135,9 +135,21 @@ def chinese_segmentation_fn():
     return process
 
 
+def jieba_segmentation_fn():
+    import jieba
+    jieba.initialize()  # 手动初始化（可选）
+
+    def process(line):
+        words = jieba.cut(line)
+        return list(words)
+
+    return process
+
+
 CHINESE_SEG_FUNC = {
     'lac': lexical_analysis_fn(),
     'seg': chinese_segmentation_fn(),
+    'jieba': jieba_segmentation_fn(),
 }
 
 
