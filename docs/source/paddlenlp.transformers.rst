@@ -17,6 +17,7 @@ paddlenlp.transformers
    paddlenlp.transformers.electra
    paddlenlp.transformers.ernie
    paddlenlp.transformers.ernie_ctm
+   paddlenlp.transformers.ernie_doc
    paddlenlp.transformers.ernie_gen
    paddlenlp.transformers.ernie_gram
    paddlenlp.transformers.gpt

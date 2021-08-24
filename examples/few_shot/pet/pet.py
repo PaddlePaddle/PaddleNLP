@@ -100,19 +100,6 @@ def do_train(args):
             Stack(dtype="int64"),  # masked_positions
             Stack(dtype="int64"),  # candidate_labels_ids [candidate_num, label_length]
         ): [data for data in fn(samples)]
-    elif args.task_name == "cluewsc":
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-            Stack(dtype="int64"),  # masked_positions
-            Stack(dtype="int64"),  # masked_lm_labels
-        ): [data for data in fn(samples)]
-        batchify_test_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-            Stack(dtype="int64"),  # masked_positions
-            Stack(dtype="int64"),  # masked_positions
-        ): [data for data in fn(samples)]
     else:
         # [src_ids, token_type_ids, masked_positions, masked_lm_labels]
         batchify_fn = lambda samples, fn=Tuple(
@@ -232,7 +219,7 @@ def do_train(args):
 
         test_accuracy, total_num = evaluate_fn(
             model, tokenizer, public_test_data_loader, label_norm_dict)
-        print("epoch:{}\ttest_accuracy:{:.3f}\ttotal_num:{}".format(
+        print("epoch:{}, test_accuracy:{:.3f}, total_num:{}".format(
             epoch, test_accuracy, total_num))
 
 
