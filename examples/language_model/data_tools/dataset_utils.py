@@ -706,6 +706,7 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
 
     local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank())
     # Build the indexed mapping if not exist.
+
     if local_rank == 0 and \
        not os.path.isfile(indexmap_filename):
         print(' > WARNING: could not find index map file {}, building '
@@ -742,13 +743,21 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
             if (not os.path.isfile(indexmap_filename)):
                 time.sleep(3)
             else:
-                break
+                try:
+                    np.load(indexmap_filename, allow_pickle=True, mmap_mode='r')
+                    break
+                except Exception as e:
+                    print(
+                        "%s file is still writing or damaged, please wait a moment."
+                        % indexmap_filename)
+                    time.sleep(3)
 
     # This should be a barrier but nccl barrier assumes
     # device_index=rank which is not the case for model
     # parallel case
     if paddle.distributed.get_world_size() > 1:
-        fleet.barrier_worker()
+        if paddle.fluid.framework.in_dygraph_mode():
+            paddle.distributed.barrier()
 
     # counts = paddle.to_tensor([1])
     # paddle.distributed.all_reduce(counts, group=fleet.get_data_parallel_group())

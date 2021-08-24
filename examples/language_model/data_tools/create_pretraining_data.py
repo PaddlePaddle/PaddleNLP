@@ -54,7 +54,7 @@ def get_args():
     group.add_argument(
         '--data_format',
         type=str,
-        required=True,
+        default='text',
         choices=['JSON'],
         help='Only support json format for now. One document per line.')
     group.add_argument(
@@ -81,7 +81,7 @@ def get_args():
         '--cn_seg_func',
         type=str,
         default='lac',
-        choices=['lac', 'seg'],
+        choices=['lac', 'seg', 'jieba'],
         help='Words segment function for chinese words.')
     group.add_argument(
         '--cn_splited',
@@ -99,7 +99,7 @@ def get_args():
         action='store_true',
         help='Append an <eos> token to the end of a document.')
     group.add_argument(
-        '--log-interval',
+        '--log_interval',
         type=int,
         default=100,
         help='Interval between progress updates')

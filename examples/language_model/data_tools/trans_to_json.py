@@ -47,7 +47,7 @@ def get_args():
         '--doc_spliter',
         type=str,
         default='',
-        help="Spliter between documents. The spacial char is hard to input in shell, you can change it here."
+        help="Spliter between documents. We will strip the line, if you use blank line to split doc, leave it blank."
     )
     parser.add_argument(
         '--min_doc_length',
@@ -60,7 +60,7 @@ def get_args():
         default=1,
         help='Number of worker processes to launch')
     parser.add_argument(
-        '--log-interval',
+        '--log_interval',
         type=int,
         default=1,
         help='Interval between progress updates.')

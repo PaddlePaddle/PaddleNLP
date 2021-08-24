@@ -31,11 +31,11 @@ PYTHONPATH=../../../  python -u  -m paddle.distributed.launch \
     --max_lr 0.0001 \
     --min_lr 0.00001 \
     --max_steps 4000000 \
-    --save_steps 100000 \
-    --checkpoint_steps 500 \
-    --decay_steps 1980000 \
-    --weight_decay 0.0025\
-    --warmup_rate 0.01 \
+    --save_steps 50000 \
+    --checkpoint_steps 5000 \
+    --decay_steps 3960000 \
+    --weight_decay 0.01 \
+    --warmup_rate 0.0025 \
     --grad_clip 1.0 \
     --logging_freq 20\
     --num_workers 2 \

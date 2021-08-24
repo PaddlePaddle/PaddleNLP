@@ -336,7 +336,6 @@ def do_train(args):
                 args.model_name_or_path, args.global_batch_size, args.use_amp,
                 args.use_recompute, worker_index).lower())
         if os.path.exists(log_writer_path):
-            import shutil
             shutil.rmtree(log_writer_path)
         log_writer = LogWriter(log_writer_path)
 
@@ -446,7 +445,7 @@ def do_train(args):
             p.name for n, p in model.named_parameters()
             if not any(nd in n for nd in ["bias", "norm"])
         ]
-        if ops.optimizer._jit_compile():
+        if False:  #ops.optimizer._jit_compile():
             logger.info("Using paddlenlp custom AdamW optimizer.")
             optimizer = ops.optimizer.AdamwOptimizer(
                 learning_rate=lr_scheduler,
