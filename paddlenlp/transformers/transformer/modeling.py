@@ -758,7 +758,7 @@ class TransformerModel(nn.Layer):
                 start=0, end=src_max_len, dtype=src_word.dtype)
         trg_pos = paddle.cast(
             trg_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
-                start=0, end=trg_max_len, dtype=src_word.dtype)
+                start=0, end=trg_max_len, dtype=trg_word.dtype)
         with paddle.static.amp.fp16_guard():
             src_emb = self.src_word_embedding(src_word)
             src_pos_emb = self.src_pos_embedding(src_pos)
