@@ -153,7 +153,6 @@ CHINESE_SEG_FUNC = {
 }
 
 
-# Complexity is k*n**2, too high for long documents
 def get_whole_word_mask_tokens(tokens, words, max_word_length=4):
     """
     Do whole word mask on Chinese word.
