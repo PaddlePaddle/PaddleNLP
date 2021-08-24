@@ -214,7 +214,6 @@ class WordpieceTokenizer(object):
                 unk_token = berttokenizer.unk_token
 
                 wordpiecetokenizer = WordpieceTokenizer(vocab,unk_token)
-
                 inputs = wordpiecetokenizer.tokenize("unaffable")
                 print(inputs)
                 '''
@@ -268,10 +267,9 @@ class BertTokenizer(PretrainedTokenizer):
             The vocabulary file required to instantiate
             a `WordpieceTokenizer`.
         do_lower_case (bool):
-            Whether the text strips accents and convert to lower case.
-            If you use the BERT pretrained model, lower is set to
-            Flase when using the cased model, otherwise it is set to True.
-            Default to `True`.
+            Whether to convert the texts to lower case and strip accents. If you use the BERT Pretrained model, lower is set to
+            False when using the cased model, otherwise it will be set to True.
+            Default to`True`.
         unk_token (str): The special token for unkown words. Default to "[UNK]".
         sep_token (str): The special token for separator token. Default to "[SEP]".
         pad_token (str): The special token for padding. Default to "[PAD]".
@@ -425,6 +423,7 @@ class BertTokenizer(PretrainedTokenizer):
             .. code-block::
 
                 from paddlenlp.transformers import BertTokenizer
+
                 berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
                 tokens = berttokenizer.tokenize('He was a puppeteer')
                 '''
@@ -451,6 +450,7 @@ class BertTokenizer(PretrainedTokenizer):
             .. code-block::
 
                 from paddlenlp.transformers import BertTokenizer
+                
                 berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
                 tokens = berttokenizer.tokenize('He was a puppeteer')
                 '''
@@ -474,8 +474,10 @@ class BertTokenizer(PretrainedTokenizer):
             inside your training loop.
 
         Args:
-            pair: Returns the number of added tokens in the case of a sequence pair if set to True, returns the
-                number of added tokens in the case of a single sequence if set to False.
+            pair(bool):
+                Returns the number of added tokens in the case of a sequence pair if set to True,
+                returns the number of added tokens in the case of a single sequence if set to False.
+                Default to False.
 
         Returns:
             Number of tokens added to sequences.
@@ -497,9 +499,9 @@ class BertTokenizer(PretrainedTokenizer):
             - pair of sequences: ``[CLS] A [SEP] B [SEP]``
 
         Args:
-            token_ids_0 (:obj:List[int]):
+            token_ids_0 (List[int]):
                 List of IDs to which the special tokens will be added.
-            token_ids_1 (:obj:List[int], optional):
+            token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs.
 
         Returns:
