@@ -564,7 +564,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         scores = paddle.scatter(
             scores.flatten(),
             paddle.arange(
-                0, batch_size * beam_size, step=beam_size),
+                0, batch_size * beam_size, step=beam_size, dtype=scores_dtype),
             paddle.zeros([batch_size])).reshape([batch_size, beam_size])
 
         force_position = paddle.unsqueeze(trg_length > time, [1])
@@ -755,10 +755,10 @@ class TransformerModel(nn.Layer):
         trg_src_attn_bias = src_slf_attn_bias
         src_pos = paddle.cast(
             src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
-                start=0, end=src_max_len)
+                start=0, end=src_max_len, dtype=src_word.dtype)
         trg_pos = paddle.cast(
             trg_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
-                start=0, end=trg_max_len)
+                start=0, end=trg_max_len, dtype=src_word.dtype)
         with paddle.static.amp.fp16_guard():
             src_emb = self.src_word_embedding(src_word)
             src_pos_emb = self.src_pos_embedding(src_pos)
@@ -937,7 +937,7 @@ class InferTransformerModel(TransformerModel):
             trg_src_attn_bias = src_slf_attn_bias
             src_pos = paddle.cast(
                 src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
-                    start=0, end=src_max_len)
+                    start=0, end=src_max_len, dtype=src_word.dtype)
 
             # Run encoder
             src_emb = self.src_word_embedding(src_word)
@@ -1018,7 +1018,7 @@ class InferTransformerModel(TransformerModel):
         src_slf_attn_bias.stop_gradient = True
         src_pos = paddle.cast(
             src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
-                start=0, end=src_max_len)
+                start=0, end=src_max_len, dtype=src_word.dtype)
         src_emb = self.src_word_embedding(src_word)
         src_pos_emb = self.src_pos_embedding(src_pos)
         src_emb = src_emb + src_pos_emb
