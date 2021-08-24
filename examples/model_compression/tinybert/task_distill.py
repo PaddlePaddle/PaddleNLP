@@ -386,12 +386,12 @@ def do_train(args):
     teacher = to_distill(
         teacher,
         return_attentions=True,
-        return_qkv=True,
+        return_qkv=False,
         return_layer_outputs=True)
     student = to_distill(
         student,
         return_attentions=True,
-        return_qkv=True,
+        return_qkv=False,
         return_layer_outputs=True)
     pad_token_id = 0
     global_step = 0
@@ -426,10 +426,6 @@ def do_train(args):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
             input_ids, segment_ids, labels = batch
-            attention_mask = paddle.unsqueeze(
-                (input_ids == pad_token_id).astype(paddle.get_default_dtype()) *
-                -1e9,
-                axis=[1, 2])
             logits = student(input_ids, segment_ids)
             with paddle.no_grad():
                 teacher_logits = teacher(input_ids, segment_ids)

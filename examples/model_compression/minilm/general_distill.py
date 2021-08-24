@@ -27,14 +27,13 @@ from paddlenlp.utils.log import logger
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.utils.tools import TimeCostAverage
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import TinyBertForPretraining, TinyBertTokenizer
-from paddlenlp.transformers import RobertaModel, RobertaTokenizer
+from paddlenlp.transformers import TinyBertForPretraining, TinyBertTokenizer, BertForSequenceClassification, BertTokenizer, TinyBertModel
 
 from paddlenlp.transformers.distill_utils import to_distill, calc_minilm_loss
 
 MODEL_CLASSES = {
-    "roberta": (RobertaModel, RobertaTokenizer),
     "tinybert": (TinyBertForPretraining, TinyBertTokenizer),
+    "bert": (BertForSequenceClassification, BertTokenizer),
 }
 
 
@@ -43,7 +42,7 @@ def parse_args():
 
     # Required parameters
     parser.add_argument(
-        "--model_type",
+        "--student_model_type",
         default="tinybert",
         type=str,
         required=True,
@@ -127,6 +126,16 @@ def parse_args():
         help="The number of relation heads is 48 and 64 for base and large-size teacher model.",
     )
     parser.add_argument(
+        "--teacher_layer_index",
+        default=11,
+        type=int,
+        help="The transformer layer index of teacher model to distill.", )
+    parser.add_argument(
+        "--student_layer_index",
+        default=5,
+        type=int,
+        help="The transformer layer index of student model to distill.", )
+    parser.add_argument(
         "--weight_decay",
         default=0.01,
         type=float,
@@ -179,8 +188,7 @@ class WorkerInitObj(object):
         random.seed(self.seed + id)
 
 
-def create_pretraining_dataset(input_file, shared_list, args, worker_init,
-                               tokenizer):
+def create_pretraining_dataset(input_file, args, worker_init, tokenizer):
     train_data = PretrainingDataset(
         input_file=input_file,
         tokenizer=tokenizer,
@@ -235,12 +243,13 @@ def do_train(args):
     set_seed(args)
 
     worker_init = WorkerInitObj(args.seed + paddle.distributed.get_rank())
-    args.model_type = args.model_type.lower()
+    args.student_model_type = args.student_model_type.lower()
 
     # For student
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    model_class, tokenizer_class = MODEL_CLASSES[args.student_model_type]
     tokenizer = tokenizer_class.from_pretrained(args.student_model_name_or_path)
-    student = model_class.from_pretrained(args.student_model_name_or_path)
+    tinybert = TinyBertModel(vocab_size=21128, num_hidden_layers=6)
+    student = model_class(tinybert)
 
     # For teacher
     teacher_model_class, _ = MODEL_CLASSES[args.teacher_model_type]
@@ -258,7 +267,7 @@ def do_train(args):
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          warmup)
 
-    clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=1.0)
+    clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.max_grad_norm)
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
     decay_params = [
@@ -277,8 +286,10 @@ def do_train(args):
 
     pool = ThreadPoolExecutor(1)
 
-    teacher = to_distill(teacher, return_qkv=True, layer_index=18)
-    student = to_distill(student, return_qkv=True, layer_index=5)
+    teacher = to_distill(
+        teacher, return_qkv=True, layer_index=args.teacher_layer_index)
+    student = to_distill(
+        student, return_qkv=True, layer_index=args.student_layer_index)
 
     global_step = 0
     tic_train = time.time()
@@ -291,8 +302,6 @@ def do_train(args):
         num_files = len(files)
         random.Random(args.seed + epoch).shuffle(files)
         f_start_id = 0
-
-        shared_file_list = {}
 
         if paddle.distributed.get_world_size() > num_files:
             remainder = paddle.distributed.get_world_size() % num_files
@@ -308,7 +317,7 @@ def do_train(args):
         previous_file = data_file
 
         train_data_loader, _ = create_pretraining_dataset(
-            data_file, shared_file_list, args, worker_init, tokenizer)
+            data_file, args, worker_init, tokenizer)
 
         # TODO(guosheng): better way to process single file
         single_file = True if f_start_id + 1 == len(files) else False
@@ -326,10 +335,9 @@ def do_train(args):
                                    paddle.distributed.get_rank()) % num_files]
             previous_file = data_file
             dataset_future = pool.submit(create_pretraining_dataset, data_file,
-                                         shared_file_list, args, worker_init,
-                                         tokenizer)
+                                         args, worker_init, tokenizer)
 
-            kl_loss_fct = paddle.nn.KLDivLoss('sum')
+            kl_loss_func = paddle.nn.KLDivLoss('sum')
             train_cost_avg = TimeCostAverage()
             total_samples = 0
             batch_start = time.time()
@@ -340,26 +348,26 @@ def do_train(args):
                     (input_ids == pad_token_id
                      ).astype(paddle.get_default_dtype()) * -1e9,
                     axis=[1, 2])
-                student(input_ids, attention_mask=attention_mask)
+                student(input_ids)
                 with paddle.no_grad():
-                    teacher(input_ids, attention_mask=attention_mask)
+                    teacher(input_ids)
                 # Q-Q relation
                 q_t, q_s = teacher.outputs.q, student.outputs.q
                 batch_size = q_t.shape[0]
                 pad_seq_len = q_t.shape[2]
-                loss_qr = calc_minilm_loss(kl_loss_fct, q_s, q_t,
+                loss_qr = calc_minilm_loss(kl_loss_func, q_s, q_t,
                                            attention_mask,
                                            args.num_relation_heads)
                 del q_t, q_s
                 # K-K relation
                 k_t, k_s = teacher.outputs.k, student.outputs.k
-                loss_kr = calc_minilm_loss(kl_loss_fct, k_s, k_t,
+                loss_kr = calc_minilm_loss(kl_loss_func, k_s, k_t,
                                            attention_mask,
                                            args.num_relation_heads)
                 del k_t, k_s
                 # V-V relation
                 v_t, v_s = teacher.outputs.v, student.outputs.v
-                loss_vr = calc_minilm_loss(kl_loss_fct, v_s, v_t,
+                loss_vr = calc_minilm_loss(kl_loss_func, v_s, v_t,
                                            attention_mask,
                                            args.num_relation_heads)
 
