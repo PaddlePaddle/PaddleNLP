@@ -32,10 +32,9 @@ class BasicTokenizer(object):
 
     Args:
         do_lower_case (bool):
-            Whether the text strips accents and convert to
-            lower case. If you use the BERT Pretrained model, lower is set to
-            False when using the cased model, otherwise it is set to True.
-            Default: `True`.
+            Whether to convert the texts to lower case and strip accents. If you use the BERT Pretrained model, lower is set to
+            False when using the cased model, otherwise it will be set to True.
+            Default to`True`.
 
     """
 
@@ -55,14 +54,14 @@ class BasicTokenizer(object):
             list(str): A list of tokens.
 
         Examples:
-        .. code-block::
+            .. code-block::
 
-            from paddlenlp.transformers import BasicTokenizer
-            basictokenizer = BasicTokenizer()
-            tokens = basictokenizer.tokenize('He was a puppeteer')
-            '''
-            ['he', 'was', 'a', 'puppeteer']
-            '''
+                from paddlenlp.transformers import BasicTokenizer
+                basictokenizer = BasicTokenizer()
+                tokens = basictokenizer.tokenize('He was a puppeteer')
+                '''
+                ['he', 'was', 'a', 'puppeteer']
+                '''
 
         """
 
@@ -184,7 +183,7 @@ class WordpieceTokenizer(object):
         max_input_chars_per_word (int):
             If a word's length is more than
             max_input_chars_per_word, it will be dealt as unknown word.
-            Default: 100.
+            Default to 100.
     """
 
     def __init__(self, vocab, unk_token, max_input_chars_per_word=100):
@@ -205,11 +204,22 @@ class WordpieceTokenizer(object):
         Returns:
             list (str): A list of wordpiece tokens.
 
-        Example:
+        Examples:
+            .. code-block::
 
-            input = "unaffable"
+                from paddlenlp.transformers import BertTokenizer, WordpieceTokenizer
 
-            output = ["un", "##aff", "##able"]
+                berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+                vocab  = berttokenizer.vocab
+                unk_token = berttokenizer.unk_token
+
+                wordpiecetokenizer = WordpieceTokenizer(vocab,unk_token)
+
+                inputs = wordpiecetokenizer.tokenize("unaffable")
+                print(inputs)
+                '''
+                ["un", "##aff", "##able"]
+                '''
 
         """
 
@@ -256,20 +266,33 @@ class BertTokenizer(PretrainedTokenizer):
     Args:
         vocab_file (str):
             The vocabulary file required to instantiate
-            a `SentencePiece <https://github.com/google/sentencepiece>`__ tokenizer.
+            a `WordpieceTokenizer`.
         do_lower_case (bool):
             Whether the text strips accents and convert to lower case.
             If you use the BERT pretrained model, lower is set to
             Flase when using the cased model, otherwise it is set to True.
-            Default: `True`.
-        unk_token (str): The special token for unkown words. Default: "[UNK]".
-        sep_token (str): The special token for separator token . Default: "[SEP]".
-        pad_token (str): The special token for padding. Default: "[PAD]".
+            Default to `True`.
+        unk_token (str): The special token for unkown words. Default to "[UNK]".
+        sep_token (str): The special token for separator token. Default to "[SEP]".
+        pad_token (str): The special token for padding. Default to "[PAD]".
         cls_token (str):
             The special token for sequence classification.
             It is the last token of the sequence when built with special tokens.
-            Default: "[CLS]".
-        mask_token (str): The special token for mask. Default: "[MASK]".
+            Default to "[CLS]".
+        mask_token (str): The special token for mask. Default to "[MASK]".
+
+    Examples:
+        .. code-block::
+
+            from paddlenlp.transformers import BertTokenizer
+            berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+            inputs = berttokenizer.tokenize('He was a puppeteer')
+            print(inputs)
+
+            '''
+            {'input_ids': [101, 2002, 2001, 1037, 13997, 11510, 102], 'token_type_ids': [0, 0, 0, 0, 0, 0, 0]}
+            '''
 
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
@@ -399,14 +422,14 @@ class BertTokenizer(PretrainedTokenizer):
             list: A list of string representing converted tokens.
 
         Examples:
-        .. code-block::
+            .. code-block::
 
-            from paddlenlp.transformers import BertTokenizer
-            berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-            tokens = berttokenizer.tokenize('He was a puppeteer')
-            '''
-            ['he', 'was', 'a', 'puppet', '##eer']
-            '''
+                from paddlenlp.transformers import BertTokenizer
+                berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+                tokens = berttokenizer.tokenize('He was a puppeteer')
+                '''
+                ['he', 'was', 'a', 'puppet', '##eer']
+                '''
 
         """
 
@@ -425,18 +448,18 @@ class BertTokenizer(PretrainedTokenizer):
             str: Converted string from tokens.
 
         Examples:
-        .. code-block::
+            .. code-block::
 
-            from paddlenlp.transformers import BertTokenizer
-            berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-            tokens = berttokenizer.tokenize('He was a puppeteer')
-            '''
-            ['he', 'was', 'a', 'puppet', '##eer']
-            '''
-            strings = tokenizer.convert_tokens_to_string(tokens)
-            '''
-            he was a puppeteer
-            '''
+                from paddlenlp.transformers import BertTokenizer
+                berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+                tokens = berttokenizer.tokenize('He was a puppeteer')
+                '''
+                ['he', 'was', 'a', 'puppet', '##eer']
+                '''
+                strings = tokenizer.convert_tokens_to_string(tokens)
+                '''
+                he was a puppeteer
+                '''
         """
 
         out_string = " ".join(tokens).replace(" ##", "").strip()
@@ -500,9 +523,9 @@ class BertTokenizer(PretrainedTokenizer):
             - pair of sequences: `(0,0) A (0,0) B (0,0)``
         
         Args:
-            offset_mapping_ids_0 (:obj:List[tuple]):
+            offset_mapping_ids_0 (List[tuple]):
                 List of char offsets to which the special tokens will be added.
-            offset_mapping_ids_1 (:obj:List[tuple], optional):
+            offset_mapping_ids_1 (List[tuple], optional):
                 Optional second list of char offsets for offset mapping pairs.
 
         Returns:
@@ -529,9 +552,9 @@ class BertTokenizer(PretrainedTokenizer):
         If :obj:`token_ids_1` is :obj:`None`, this method only returns the first portion of the mask (0s).
 
         Args:
-            token_ids_0 (:obj:List[int]):
+            token_ids_0 (List[int]):
                 List of IDs.
-            token_ids_1 (:obj:List[int], optional):
+            token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs.
 
         Returns:

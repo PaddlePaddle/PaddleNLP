@@ -325,7 +325,7 @@ class BertModel(BertPretrainedModel):
     The bare BERT Model transformer outputting raw hidden-states without any specific head on top.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
-    Check the superclass documentation for the generic methods and the library implements for all its model.
+    Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
     /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
@@ -353,14 +353,13 @@ class BertModel(BertPretrainedModel):
             The dropout probability for all fully connected layers in the embeddings and encoder.
             Defaults to `0.1`.
         attention_probs_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the pooler.
+            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
             Defaults to `0.1`.
         max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding. The dimensionality of position encoding
-            is the dimensionality of the sequence in `BertModel`.
-            Defaults to `512`.
+            The maximum value of the dimensionality of position encoding, which dictates the maximum length of an input
+            sequence. Defaults to `512`.
         type_vocab_size (int, optional):
-            The vocabulary size of `token_type_ids` passed when calling `~ transformers.BertModel`.
+            The vocabulary size of `token_type_ids`.
             Defaults to `16`.
 
         initializer_range (float, optional):
@@ -441,10 +440,8 @@ class BertModel(BertPretrainedModel):
                 max_position_embeddings - 1]``.
                 Defaults to `None`. Shape as `(batch_size, num_tokens)` and dtype as `int32` or `int64`.
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set to **-infinity**
-                for any positions in mask that are **0**, and will be **unchanged** for positions that
-                are **1**.
+                Mask to avoid performing attention on padding token indices.
+                The values should be either 0 or 1.
 
                 - **1** for tokens that **not masked**,
                 - **0** for tokens that **masked**.
@@ -456,7 +453,7 @@ class BertModel(BertPretrainedModel):
                 Defaults to be `False`.
 
         Returns:
-            Tuple: A tuple of shape (`sequence_output`, `pooled_output`) or (`encoder_output`, `pooled_output`).
+            tuple: Returns tuple (`sequence_output`, `pooled_output`) or (`encoder_output`, `pooled_output`).
 
             With the fields:
 
@@ -527,12 +524,14 @@ class BertForQuestionAnswering(BertPretrainedModel):
         dropout (float, optional):
             The dropout probability for output of BERT.
             If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Default None.
+            instance `bert`. Default to None.
         """
 
     def __init__(self, bert, dropout=None):
         super(BertForQuestionAnswering, self).__init__()
         self.bert = bert  # allow bert to be config
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.bert.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.bert.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
@@ -547,7 +546,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 See :class:`BertModel`.
 
         Returns:
-            Tuple: Shape as (`start_logits`, `end_logits`).
+            tuple: Returns tuple (`start_logits`, `end_logits`).
 
             With the fields:
 
@@ -559,9 +558,9 @@ class BertForQuestionAnswering(BertPretrainedModel):
 
             - `end_logits` (Tensor):
                 Labels for position (index) of the end of the labelled span for computing the token classification loss.
-                Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the sequence are not taken
-                into account for computing the loss. Its data type should be float32
-                and has a shape of [batch_size, sequence_length].
+                Positions are clamped to the length of the sequence (:obj:`sequence_length`).
+                Position outside of the sequence are not taken into account for computing the loss.
+                Its data type should be float32 and has a shape of [batch_size, sequence_length].
 
         Example:
             .. code-block::
@@ -602,11 +601,11 @@ class BertForSequenceClassification(BertPretrainedModel):
         bert (:class:`BertModel`):
             An instance of BertModel.
         num_classes (int, optional):
-            The number of classes. Default `2`.
+            The number of classes. Default to `2`.
         dropout (float, optional):
             The dropout probability for output of BERT.
             If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Default None.
+            instance `bert`. Default to None.
     """
 
     def __init__(self, bert, num_classes=2, dropout=None):
@@ -639,9 +638,8 @@ class BertForSequenceClassification(BertPretrainedModel):
                 See :class:`BertModel`.
 
         Returns:
-            Tensor: logits:
-                A Tensor of the input text classification logits.
-                Shape as `[batch_size, num_classes]` and dtype as `float32`.
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Shape as `[batch_size, num_classes]` and dtype as `float32`.
 
         Example:
             .. code-block::
@@ -680,11 +678,11 @@ class BertForTokenClassification(BertPretrainedModel):
         bert (:class:`BertModel`):
             An instance of BertModel.
         num_classes (int, optional):
-            The number of classes. Default ``2``.
+            The number of classes. Default to `2`.
         dropout (float, optional):
             The dropout probability for output of BERT.
             If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Default None.
+            instance `bert`. Default to None.
     """
 
     def __init__(self, bert, num_classes=2, dropout=None):
@@ -716,9 +714,8 @@ class BertForTokenClassification(BertPretrainedModel):
                 See :class:`BertModel`.
 
         Returns:
-            Tensor: logits:
-                A Tensor of the input text classification logits, shape as `[batch_size, seq_lens, num_classes]`.
-                seq_lens mean the number of tokens of the input sequence.
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits,
+            shape as `[batch_size, seq_lens, num_classes]` and dtype as `float32`.`seq_lens` corresponds to the length of input sequence.
 
         Example:
             .. code-block::
@@ -825,7 +822,7 @@ class BertPretrainingHeads(Layer):
                 The masked positions embeddings. Defaults to `None`.
 
         Returns:
-            Tuple: Shape as (``prediction_scores``, ``seq_relationship_score``).
+            tuple: Returns tuple (``prediction_scores``, ``seq_relationship_score``).
 
             With the fields:
 
@@ -885,7 +882,7 @@ class BertForPretraining(BertPretrainedModel):
                 See :class:`BertModel`.
 
         Returns:
-            Tuple: Shape as (``prediction_scores``, ``seq_relationship_score``).
+            tuple: Returns tuple (``prediction_scores``, ``seq_relationship_score``).
 
             With the fields:
 
