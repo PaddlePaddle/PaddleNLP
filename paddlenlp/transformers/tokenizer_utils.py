@@ -1222,8 +1222,8 @@ class PretrainedTokenizer(object):
                 max_len_for_pair = max_seq_len - len(
                     first_ids) - self.num_special_tokens_to_add(pair=True)
 
-                token_offset_mapping = self.rematch(text)
-                token_pair_offset_mapping = self.rematch(text_pair)
+                token_offset_mapping = self.get_offset_mapping(text)
+                token_pair_offset_mapping = self.get_offset_mapping(text_pair)
 
                 offset = 0
                 while offset < len(second_ids):
@@ -1344,9 +1344,17 @@ class PretrainedTokenizer(object):
 
         return batch_encode_inputs
 
-    def rematch(self, text):
+    def get_offset_mapping(self, text):
         """
-            changed from https://github.com/bojone/bert4keras/blob/master/bert4keras/tokenizers.py#L372
+        Returns the map of tokens and the start and end index of their start and end character.
+        Modified from https://github.com/bojone/bert4keras/blob/master/bert4keras/tokenizers.py#L372
+
+        Args:
+            text (str):
+                Input text.
+        Returns:
+            list: The offset map of input text.
+            
         """
         split_tokens = []
         for token in self.basic_tokenizer.tokenize(text):
