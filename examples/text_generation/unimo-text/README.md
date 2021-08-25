@@ -15,6 +15,8 @@
 
 ## 快速开始
 
+本基线基于 **PaddleNLP 2.0.8** 版本，该版本包含了基线使用的最新版UNIMO-text模型以及升级后的生成API。更多详细升级信息请查看[Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.0.8)。请选手们**升级PaddleNLP后使用**。
+
 ### 数据准备
 
 比赛使用三个任务数据集测试参赛系统的生成能力，包括文案生成(AdvertiseGen)、摘要生成(LCSTS_new)和问题生成(DuReaderQG)：
