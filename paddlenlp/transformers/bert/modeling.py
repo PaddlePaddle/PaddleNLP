@@ -336,7 +336,7 @@ class BertModel(BertPretrainedModel):
             Vocabulary size of `inputs_ids` in `BertModel`. Also is the vocab size of token embedding matrix.
             Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `BertModel`.
         hidden_size (int, optional):
-            Dimensionality of the the embedding layers, encoder layers and pooler layer. Defaults to `768`.
+            Dimensionality of the embedding layer, encoder layer and pooler layer. Defaults to `768`.
         num_hidden_layers (int, optional):
             Number of hidden layers in the Transformer encoder. Defaults to `12`.
         num_attention_heads (int, optional):
@@ -365,8 +365,8 @@ class BertModel(BertPretrainedModel):
             Defaults to `16`.
 
         initializer_range (float, optional):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-            Defaults to `0.02`.
+            The standard deviation of the normal initializer.
+            Defaults to 0.02.
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
@@ -442,15 +442,16 @@ class BertModel(BertPretrainedModel):
             position_ids(Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
                 max_position_embeddings - 1]``.
-                Shape as `(batch_size, num_tokens)` and dtype as `int32` or `int64`. Defaults to `None`.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
             attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention on padding token indices.
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
                 The values should be either 0 or 1.
 
                 - **1** for tokens that **not masked**,
                 - **0** for tokens that **masked**.
 
-                It's data type should be float32 and has a shape of [batch_size, num_attention_heads, sequence_length, sequence_length].
+                It's data type should be float32 and its shape is [batch_size, num_attention_heads, sequence_length, sequence_length].
                 Defaults to `None`.
             output_hidden_states (bool, optional):
                 Whether to return the output of each hidden layers.
@@ -463,18 +464,17 @@ class BertModel(BertPretrainedModel):
 
             - `sequence_output` (Tensor):
                 Sequence of hidden-states at the last layer of the model.
-                It's data type should be float32 and has a shape of [batch_size, seq_lens, hidden_size].
-                `seq_lens` corresponds to the length of input sequence.
+                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
 
             - `pooled_output` (Tensor):
                 The output of first token (`[CLS]`) in sequence.
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
-                Its data type should be float32 and has a shape of [batch_size, hidden_size].
+                Its data type should be float32 and its shape is [batch_size, hidden_size].
 
             - `encoder_outputs` (List(Tensor)):
                 A list of Tensor containing hidden-states of the model at each hidden layer in the Transformer encoder.
                 The length of the list is `num_hidden_layers`.
-                Each Tensor has a data type of float32 and has a shape of [batch_size, sequence_length, hidden_size].
+                Each Tensor has a data type of float32 and its shape is [batch_size, sequence_length, hidden_size].
 
         Example:
             .. code-block::
@@ -579,7 +579,8 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
 
-                logits = outputs[0]
+                start_logits = outputs[0]
+                end_logits  =outputs[1]
         """
 
         sequence_output, _ = self.bert(
@@ -718,7 +719,7 @@ class BertForTokenClassification(BertPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[batch_size, seq_lens, num_classes]` and dtype as `float32`. `seq_lens` corresponds to the length of input sequence.
+            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
 
         Example:
             .. code-block::
@@ -795,9 +796,9 @@ class BertPretrainingHeads(Layer):
         activation (str):
             Activation function used in the language modeling task.
         embedding_weights (Tensor, optional):
-            Weights of the decoder used in masked token prediction.
+            Weights of the decoder layer used in masked token prediction.
             Its data type should be float32 and its shape is [vocab_size, hidden_size].
-            Defaults to `None`.
+            Defaults to `None`, which means use the same weights of the embedding layer.
 
     """
 
@@ -816,18 +817,16 @@ class BertPretrainingHeads(Layer):
         Args:
             sequence_output(Tensor):
                 Sequence of hidden-states at the last layer of the model.
-                It's data type should be float32 and has a shape of [batch_size, seq_lens, hidden_size].
-                ``seq_lens`` corresponds to the length of input sequence.
+                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
             pooled_output(Tensor):
                 The output of first token (`[CLS]`) in sequence.
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
-                Its data type should be float32 and
-                has a shape of [batch_size, hidden_size].
+                Its data type should be float32 and its shape is [batch_size, hidden_size].
             masked_positions(Tensor, optional):
                 A tensor indicates positions to be masked in the position embedding.
                 Its data type should be int64 and its shape is [batch_size, mask_token_num].
-                `mask_token_num` is the number of masked tokens. It should be no bigger than `seq_lens`.
-                Defaults to `None`.
+                `mask_token_num` is the number of masked tokens. It should be no bigger than `sequence_length`.
+                Defaults to `None`, which means we don't use mask in the position embedding.
 
         Returns:
             tuple: Returns tuple (``prediction_scores``, ``seq_relationship_score``).
@@ -841,8 +840,7 @@ class BertPretrainingHeads(Layer):
 
             - `seq_relationship_score` (Tensor):
                 The scores of next sentence prediction.
-                Its data type should be float32 and its shape is [batch_size, num_classes].
-                `num_classes` is the vocabulary size of `token_type_ids`.
+                Its data type should be float32 and its shape is [batch_size, 2].
 
         """
         prediction_scores = self.predictions(sequence_output, masked_positions)
@@ -903,7 +901,7 @@ class BertForPretraining(BertPretrainedModel):
 
             - `seq_relationship_score` (Tensor):
                 The scores of next sentence prediction.
-                Its data type should be float32 and its shape is [batch_size, num_classes].
+                Its data type should be float32 and its shape is [batch_size, 2].
 
         """
         with paddle.static.amp.fp16_guard():
@@ -943,7 +941,7 @@ class BertPretrainingCriterion(paddle.nn.Layer):
                 Otherwise, its shape is [batch_size, mask_token_num, vocab_size]
             seq_relationship_score(Tensor):
                 The scores of next sentence prediction. Its data type should be float32 and
-                its shape is [batch_size, num_classes]
+                its shape is [batch_size, 2]
             masked_lm_labels(Tensor):
                 The labels of the masked language modeling, its dimensionality is equal to `prediction_scores`.
                 Its data type should be int64. If `masked_positions` is None, its shape is [batch_size, sequence_length, 1].

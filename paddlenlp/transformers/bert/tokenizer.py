@@ -263,11 +263,10 @@ class BertTokenizer(PretrainedTokenizer):
 
     Args:
         vocab_file (str):
-            The vocabulary file required to instantiate
+            The vocabulary file path (ends with '.spm') required to instantiate
             a `WordpieceTokenizer`.
         do_lower_case (bool):
-            Whether or not to lowercase the input when tokenizing. If you use the BERT Pretrained model, lower is set to
-            False when using the cased model, otherwise it will be set to True.
+            Whether or not to lowercase the input when tokenizing.
             Defaults to`True`.
         unk_token (str):
             A special token representing the *unknown (out-of-vocabulary)* token.
@@ -419,13 +418,13 @@ class BertTokenizer(PretrainedTokenizer):
 
     def tokenize(self, text):
         """
-        End-to-end tokenization for BERT models.
+        Converts a string to a list of tokens.
 
         Args:
             text (str): The text to be tokenized.
         
         Returns:
-            list: A list of string representing converted tokens.
+            List(str): A list of string representing converted tokens.
 
         Examples:
             .. code-block::
@@ -529,9 +528,9 @@ class BertTokenizer(PretrainedTokenizer):
 
         Args:
             offset_mapping_ids_0 (List[tuple]):
-                List of char offsets to which the special tokens will be added.
+                List of wordpiece offsets to which the special tokens will be added.
             offset_mapping_ids_1 (List[tuple], optional):
-                Optional second list of char offsets for offset mapping pairs. Defaults to None.
+                Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
 
         Returns:
             List[tuple]: A list of char offsets with the appropriate offsets of special tokens.
@@ -563,7 +562,7 @@ class BertTokenizer(PretrainedTokenizer):
                 Optional second list of IDs for sequence pairs. Defaults to None.
 
         Returns:
-            :obj:`List[int]`: List of token_type_id according to the given sequence(s).
+            List[int]: List of token_type_id according to the given sequence(s).
         """
         _sep = [self.sep_token_id]
         _cls = [self.cls_token_id]
@@ -589,7 +588,7 @@ class BertTokenizer(PretrainedTokenizer):
                 formatted with special tokens for the model. Defaults to None.
 
         Returns:
-            List[int]: The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
+            List[int]: The list of integers either be 0 or 1: 1 for a special token, 0 for a sequence token.
         """
 
         if already_has_special_tokens:
