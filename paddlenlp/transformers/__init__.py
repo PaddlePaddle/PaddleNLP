@@ -57,3 +57,5 @@ from .roformer.modeling import *
 from .roformer.tokenizer import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
+from .ctrl.modeling import *
+from .ctrl.tokenizer import *
