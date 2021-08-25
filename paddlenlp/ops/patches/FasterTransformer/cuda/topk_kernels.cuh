@@ -35,4 +35,21 @@ void topK_softMax_update(
     DecodingBeamsearchArguments args,
     cudaStream_t stream);
 
+template <typename T>
+void topK_update_kernelLauncher(
+    void* workspace,
+    size_t& workspace_size,
+    const T* log_probs,
+    bool* finished,
+    int* sequence_length,
+    int* word_ids,
+    int* parent_ids,  // for update cache, only include alive beams
+    int* output_word_ids,
+    int* output_parent_ids,   // for gather tree, include both alive and finish
+                              // beams
+    T* output_cum_log_probs,  // NOTE: cum_log_probs is T in V3.1
+    const int step,
+    DecodingBeamsearchArguments args,
+    cudaStream_t stream);
+
 }  // namespace fastertransformer

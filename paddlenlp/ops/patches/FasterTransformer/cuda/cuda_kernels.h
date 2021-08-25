@@ -147,6 +147,15 @@ void update_logits(float* logits,
                    const int n,
                    cudaStream_t stream);
 
+template <bool ALIVE>
+void update_logits(float* logits,
+                   const float* bias,
+                   const int end_ids,
+                   const bool* finished,
+                   const int m,
+                   const int n,
+                   cudaStream_t stream);
+
 template <typename T>
 void apply_logit_penalties(int step,
                            T* log_probs,

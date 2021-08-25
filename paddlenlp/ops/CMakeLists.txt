@@ -148,6 +148,8 @@ set(trans_dst ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/faste
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/decoding_beamsearch.h decoding_beamsearch_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/decoding_beamsearch.h decoding_beamsearch_h_dst)
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/cuda_kernels.h cuda_kernels_h_src)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/cuda_kernels.cu cuda_kernels_cu_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/cuda_kernels.cu cuda_kernels_cu_dst)
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/decoding_kernels.cu decoding_kernels_cu_src)
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/online_softmax_beamsearch_kernels.cu online_softmax_beamsearch_kernels_cu_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/online_softmax_beamsearch_kernels.cu online_softmax_beamsearch_kernels_cu_dst)
@@ -165,6 +167,7 @@ set(FT_PATCH_COMMAND
   && cp ${decoding_beamsearch_h_src} ${decoding_beamsearch_h_dst}
   && cp ${decoding_kernels_cu_src} ${decoding_kernels_cu_dst}
   && cp ${cuda_kernels_h_src} ${cuda_kernels_h_dst}
+  && cat ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
   && cp ${online_softmax_beamsearch_kernels_cu_src} ${online_softmax_beamsearch_kernels_cu_dst}
   && cat ${topk_kernels_cuh_src} >> ${topk_kernels_cuh_dst}
   && cp ${beamsearch_h_src} ${trans_dst}
