@@ -958,6 +958,8 @@ class BertPretrainingCriterion(paddle.nn.Layer):
 
         Returns:
             Tensor: The pretraining loss, equals to the sum of `masked_lm_loss` plus the mean of `next_sentence_loss`.
+            Its data type should be float32 and its shape is [1].
+
 
         """
         with paddle.static.amp.fp16_guard():
