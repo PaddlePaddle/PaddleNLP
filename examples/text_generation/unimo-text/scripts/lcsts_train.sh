@@ -16,7 +16,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir ${log_dir} run_ge
     --learning_rate=5e-5 \
     --warmup_propotion=0.02 \
     --weight_decay=0.01 \
-    --max_seq_len=320 \
+    --max_seq_len=360 \
     --max_target_len=30 \
     --max_dec_len=20 \
     --min_dec_len=3 \
