@@ -488,8 +488,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                  model,
                  decoding_strategy="sampling",
                  decoding_lib=None,
-                 use_fp16_decoding=False,
-                 decoding_type_id=1):
+                 use_fp16_decoding=False):
         super(FasterUnifiedTransformer, self).__init__()
         self._model = model
         self._decoding_strategy = decoding_strategy
@@ -505,7 +504,6 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             decoding_strategy=self._decoding_strategy,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding,
-            decoding_type_id=decoding_type_id,
             logits_mask=self.logits_mask)
 
     def prepare_inputs_for_generation(self,
@@ -535,11 +533,15 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
     def generate_logits_mask(self, use_fp16_decoding):
         # pre-process distribution
         d_type = "float16" if use_fp16_decoding and self._decoding_strategy == "sampling" else "float32"
-        logits_mask = paddle.zeros(shape=[self.vocab_size], dtype=d_type)
+        logits_mask = np.zeros(shape=[self.vocab_size], dtype=np.float32)
         logits_mask[self.unk_token_id] = -1e9
         logits_mask[self.bos_token_id] = -1e9
         logits_mask[self.pad_token_id] = -1e9
-        return logits_mask
+        logits_mask_t = paddle.assign(logits_mask)
+        if d_type == "float16":
+            return paddle.cast(logits_mask_t, dtype="float16")
+        else:
+            return logits_mask_t
 
     def sample(self,
                input_ids,
@@ -572,7 +574,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             max_length=max_length,
             top_k=top_k,
             top_p=top_p,
-            temperature=temperature)
+            temperature=temperature,
+            decoding_type_id=model_kwargs.get("decoding_type_id", 1))
 
     def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
                     pad_token_id, eos_token_id, **model_kwargs):
@@ -585,7 +588,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             model_inputs=model_inputs,
             max_length=max_length,
             num_beams=beam_scorer.num_beams,
-            temperature=temperature)
+            temperature=temperature,
+            decoding_type_id=model_kwargs.get("decoding_type_id", 1))
 
     def forward(self,
                 max_length,
@@ -594,7 +598,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 top_p=0.0,
                 num_beams=4,
                 temperature=1.0,
-                model_inputs=None):
+                model_inputs=None,
+                **model_kwargs):
         seq_len = model_inputs.pop('seq_len', None)
 
         outputs = self._model(**model_inputs)
@@ -615,4 +620,5 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             max_out_len=max_length,
             bos_id=self.bos_token_id,
             eos_id=self.eos_token_id,
-            temperature=temperature)
+            temperature=temperature,
+            decoding_type_id=model_kwargs.get("decoding_type_id", 1))

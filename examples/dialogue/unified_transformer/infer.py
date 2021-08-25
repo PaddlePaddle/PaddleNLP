@@ -88,8 +88,7 @@ def infer(args):
             model,
             decoding_strategy=args.decode_strategy,
             decoding_lib=args.decoding_lib,
-            use_fp16_decoding=args.use_fp16_decoding,
-            decoding_type_id=args.decoding_type_id)
+            use_fp16_decoding=args.use_fp16_decoding)
 
     model.eval()
     total_time = 0.0
@@ -112,7 +111,8 @@ def infer(args):
             num_beams=args.num_beams,
             length_penalty=args.length_penalty,
             early_stopping=args.early_stopping,
-            num_return_sequences=args.num_return_sequences)
+            num_return_sequences=args.num_return_sequences,
+            decoding_type_id=args.decoding_type_id)
 
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
@@ -122,6 +122,8 @@ def infer(args):
 
         if args.faster:
             ids = output
+            print(ids)
+            exit()
             results = select_response(ids, None, tokenizer)
         else:
             ids, scores = output

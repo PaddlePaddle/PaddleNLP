@@ -68,16 +68,6 @@ void apply_penalties_Launcher(int step,
                               const T* logits_mask);
 
 template <typename T>
-void softmax_kernelLauncher(T* logits,
-                            const T* bias,
-                            const int end_ids,
-                            const bool* finished,
-                            const int m,
-                            const int n,
-                            cudaStream_t stream,
-                            const T* logits_mask);
-
-template <typename T>
 void update_KV_cache_kernelLauncher(T** key_cache,
                                     T** value_cache,
                                     const int* beam_ids,
@@ -89,4 +79,24 @@ void update_KV_cache_kernelLauncher(T** key_cache,
                                     const int cache_size,
                                     const int decoder_layers,
                                     cudaStream_t stream);
+
+template <typename T>
+void update_logits_with_mask(T* logits,
+                             const T* bias,
+                             const T* logits_mask,
+                             const int end_ids,
+                             const bool* finished,
+                             const int m,
+                             const int n,
+                             cudaStream_t stream);
+
+template <typename T>
+void softmax_with_mask_kernelLauncher(T* logits,
+                                      const T* bias,
+                                      const T* logits_mask,
+                                      const int end_ids,
+                                      const bool* finished,
+                                      const int m,
+                                      const int n,
+                                      cudaStream_t stream);
 }

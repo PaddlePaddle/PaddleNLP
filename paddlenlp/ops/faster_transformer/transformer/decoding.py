@@ -656,7 +656,6 @@ class InferUnifiedDecoding(nn.Layer):
                  decoding_strategy="topk_sampling",
                  decoding_lib=None,
                  use_fp16_decoding=False,
-                 decoding_type_id=1,
                  logits_mask=None):
         if decoding_lib is None:
             raise ValueError(
@@ -932,7 +931,8 @@ class InferUnifiedDecoding(nn.Layer):
                 eos_id=1,
                 temperature=1.0,
                 length_penalty=1.0,
-                beam_search_diversity_rate=0.0):
+                beam_search_diversity_rate=0.0,
+                decoding_type_id=1):
         output_ids, parent_ids, sequence_length = infer_unified_decoding(
             cache_k=cache_k,
             cache_v=cache_v,
@@ -976,7 +976,7 @@ class InferUnifiedDecoding(nn.Layer):
             _eos_id=eos_id,
             _max_out_len=max_out_len,
             _beam_search_diversity_rate=beam_search_diversity_rate,
-            _type_id=self._decoding_type_id,
+            _type_id=decoding_type_id,
             _unk_id=self._unk_id,
             _mask_id=self._mask_id,
             _temperature=temperature,
