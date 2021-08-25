@@ -430,6 +430,7 @@ class BertModel(BertPretrainedModel):
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
             token_type_ids (Tensor, optional):
                 Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
                 If `type_vocab_size` is 2, which means the inputs have two portions.
                 Indices can either be 0 or 1:
 
@@ -484,7 +485,7 @@ class BertModel(BertPretrainedModel):
                 tokenizer = BertTokenizer.from_pretrained('bert-wwm-chinese')
                 model = BertModel.from_pretrained('bert-wwm-chinese')
 
-                inputs = tokenizer("欢迎使用飞浆!")
+                inputs = tokenizer("欢迎使用百度飞浆!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
@@ -717,7 +718,7 @@ class BertForTokenClassification(BertPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[batch_size, seq_lens, num_classes]` and dtype as `float32`.`seq_lens` corresponds to the length of input sequence.
+            Shape as `[batch_size, seq_lens, num_classes]` and dtype as `float32`. `seq_lens` corresponds to the length of input sequence.
 
         Example:
             .. code-block::
