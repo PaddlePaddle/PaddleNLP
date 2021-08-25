@@ -529,7 +529,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
         dropout (float, optional):
             The dropout probability for output of BERT.
             If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Defaults to None.
+            instance `bert`. Defaults to `None`.
         """
 
     def __init__(self, bert, dropout=None):
