@@ -558,14 +558,10 @@ class BertForQuestionAnswering(BertPretrainedModel):
 
             - `start_logits` (Tensor):
                 A tensor of the input token classification logits, indicates the start position of the labelled span.
-                Positions are clamped to the sequence length.
-                Positions outside of the sequence are not taken into account for computing the token classification loss.
                 Its data type should be float32 and its shape is [batch_size, sequence_length].
 
             - `end_logits` (Tensor):
                 A tensor of the input token classification logits, indicates the end position of the labelled span.
-                Positions are clamped to the sequence length.
-                Positions outside of the sequence are not taken into account for computing the token classification loss.
                 Its data type should be float32 and its shape is [batch_size, sequence_length].
 
         Example:
