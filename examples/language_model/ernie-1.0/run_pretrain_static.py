@@ -231,9 +231,6 @@ def dist_optimizer(args, topo):
             "micro_micro_batch_size": micro_batch_size,
             "accumulate_steps": accumulate_steps,
         }
-    # else:
-    #     assert accumulate_steps == 1, "Only support accumulate steps in piplinemode. Please set you global_batch_size={}".format(
-    #         default_global_batch_size)
 
     args.accumulate_steps = accumulate_steps
     return dist_strategy

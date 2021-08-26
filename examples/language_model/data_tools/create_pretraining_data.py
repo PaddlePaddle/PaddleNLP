@@ -20,11 +20,11 @@ import json
 import multiprocessing
 import sys
 import time
-import profile
 
 import numpy as np
-import paddlenlp.transformers as tfs
 from tqdm import tqdm
+
+import paddlenlp.transformers as tfs
 
 
 def get_args():
@@ -296,7 +296,7 @@ def main():
                 file_paths.append(os.path.join(root, f))
     convert = Converter(args)
 
-    # try tokenizer is availiable
+    # Try tokenizer is availiable
     sample_tokenizer = getattr(
         tfs, args.tokenizer_name).from_pretrained(args.model_name)
     if sample_tokenizer.vocab_size < 2**16 - 1:

@@ -25,16 +25,24 @@
 `dataset_utils.py`中包含了index生成、动态mask的实现。
 `ernie_dataset.py`通过调用`dataset_utils.py`的一些函数，产生ernie的输入dataset。
 
+### 环境依赖
+
+ - tqdm
+ - numpy
+ - pybind11
+
+安装命令`pip install tqdm numpy pybind11`。另，部分功能需要`g++>4.8`编译支持
+
 
 ## 训练全流程数据Pipeline
 
 |步骤|阶段|数据格式| 样例|
 |-|-|-|-|
-| - |-|原始数据： <br/> 每个doc之间用空行间隔开 <br/> - 中文，默认每句换行符，作为句子结束。<br/> - 英文，默认使用nltk判断句子结束  | ```百度，是一家中国互联网公司。``` <br/> ```百度为用户提供搜索服务。``` <br/><br/> ```PaddleNLP是自然语言处理领域的优秀工具。```  | 
+| - |-|原始数据： <br/> 每个doc之间用空行间隔开 <br/> - 中文，默认每句换行符，作为句子结束。<br/> - 英文，默认使用nltk判断句子结束  | ```百度，是一家中国互联网公司。``` <br/> ```百度为用户提供搜索服务。``` <br/><br/> ```PaddleNLP是自然语言处理领域的优秀工具。```  |
 |原始数据转换<br/>`trans_to_json.py`|预处理|jsonl格式：每个doc对应一行json字符串| ```{"text": "百度是一家中国互联网公司。百度为..."}```<br/>```{"text": "PaddleNLP是自然语言..."}```
 |数据ID化<br/>`create_pretrain_data.py`|预处理| npy格式：数据id化后的token id <br/>npz格式：数据句子、文章位置索引 | -
 |训练index文件生成|训练启动|npy格式：<br/> 根据训练步数max_steps生成<br/>train、valid、test的每个样本索引文件| -
-|token动态mask（可选）| Dataset取数据 | 无 |- 
+|token动态mask（可选）| Dataset取数据 | 无 |-
 
 
 ## ERNIE预训练例子
@@ -59,7 +67,7 @@ optional arguments:
   --output_path OUTPUT_PATH
                         Path to save the output json files.
                         必须设置，输出文件的名字。
-  --json_key JSON_KEY   The content key of json file. 
+  --json_key JSON_KEY   The content key of json file.
                         建议不修改，默认的key是text
   --doc_spliter DOC_SPLITER
                         Spliter between documents. We will strip the line, if you use blank line to split doc, leave it blank.
@@ -153,10 +161,10 @@ python -u  create_pretraining_data.py \
 ```
 
 ### Ernie预训练开始
-得到了处理好的训练数据之后。就可以开始Ernie模型的预训练了。ernie预训练的代码在`examples/language_model/ernie-1.0`。
+得到了处理好的训练数据，就可以开始Ernie模型的预训练了。ernie预训练的代码在`examples/language_model/ernie-1.0`。
 简单将预处理好的数据，拷贝到data目录，即可开始Ernie模型预训练。
 ```
-cd ../ernie-1.0 
+cd ../ernie-1.0
 mkdir data
 mv ../data_tools/baike_sample* ./data
 sh run_static.sh
@@ -164,11 +172,12 @@ sh run_static.sh
 ```
 代码说明：
 
-- ernie预训练使用的 dataset 文件在 `./data_tools/ernie_dataset.py`
+- ernie预训练使用的 dataset 代码文件在 `./data_tools/ernie_dataset.py`
 - 数据集index生成，动态mask相关代码实现在`./data_tools/dataset_utils.py`
 
-用户可以根据自己的需求，灵活修改mask方式。
-
+用户可以根据自己的需求，灵活修改mask方式。具体可以参考`dataset_utils.py`中`create_masked_lm_predictions`函数。
+可以自定义的选项有do_whole_word_mask, favor_longer_ngram, do_permutation, geometric_dist等，
+可以参考[Megatron](https://github.com/NVIDIA/Megatron-LM)使用这些lm_mask策略。
 
 ## 参考内容
 

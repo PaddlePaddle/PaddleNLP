@@ -759,13 +759,6 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
         if paddle.fluid.framework.in_dygraph_mode():
             paddle.distributed.barrier()
 
-    # counts = paddle.to_tensor([1])
-    # paddle.distributed.all_reduce(counts, group=fleet.get_data_parallel_group())
-    # paddle.distributed.all_reduce(counts, group=fleet.get_pipeline_model_parallel_group())
-    # assert counts[0].item() == (
-    #     paddle.distributed.get_world_size() //
-    #     paddle.distributed.get_world_size(group=fleet.get_tensor_model_parallel_group()))
-
     # Load indexed dataset.
     print_rank_0(' > loading indexed mapping from {}'.format(indexmap_filename))
     start_time = time.time()

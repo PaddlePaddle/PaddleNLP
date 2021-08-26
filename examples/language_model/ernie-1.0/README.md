@@ -6,7 +6,9 @@ ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读
 相关创新成果也被国际顶级学术会议AAAI、IJCAI收录。
 同时，ERNIE在工业界得到了大规模应用，如搜索引擎、新闻推荐、广告系统、语音交互、智能客服等。
 
-本示例采用了全新数据流程，适配了ERNIE预训练任务。支持动态文本mask，自动断点训练重启等。高效易用，方便快捷。
+本示例采用了全新数据流程，适配了ERNIE预训练任务，具有高效易用，方便快捷的特点。支持动态文本mask，自动断点训练重启等。
+用户可以根据自己的需求，灵活修改mask方式。具体可以参考`../data_tools/dataset_utils.py`中`create_masked_lm_predictions`函数。
+用户可以设置`checkpoint_steps`，间隔`checkpoint_steps`数，即保留最新的checkpoint到`model_last`文件夹。重启训练时，程序默认从最新checkpoint重启训练，学习率、数据集都可以恢复到checkpoint时候的状态。
 
 ### 环境依赖
 
@@ -16,7 +18,7 @@ ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读
 安装命令 `pip install visualdl pybind11`
 
 ### 数据准备
-数据准备部分请移步[data_tools](../data_tools)目录，根据文档，创建训练数据。
+数据准备部分请移步[data_tools](../data_tools/)目录，根据文档，创建训练数据。
 
 ### 使用方法
 ```
@@ -62,7 +64,7 @@ python -u  -m paddle.distributed.launch \
 - `dp_degree` 数据并行参数。
 - `use_sharding` 开启sharding策略，sharding_degree > 1时，请设置为True。
 - `use_amp` 开启混合精度策略。
-- `use_recompute` 开启重计算策略。
+- `use_recompute` 开启重计算策略。暂时未支持，后续将支持。
 - `max_lr` 训练学习率。
 - `min_lr` 学习率衰减的最小值。
 - `max_steps` 最大训练步数。
