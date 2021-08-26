@@ -446,13 +446,14 @@ class BertModel(BertPretrainedModel):
             attention_mask (Tensor, optional):
                 Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
                 usually the paddings or the subsequent positions.
-                The values should be either 0 or 1.
+                Its data type can be int, float and bool.
+                If its data type is int, the values should be either 0 or 1.
 
                 - **1** for tokens that **not masked**,
                 - **0** for tokens that **masked**.
 
-                It's data type should be float32 and its shape is [batch_size, num_attention_heads, sequence_length, sequence_length].
-                Defaults to `None`.
+                It a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
             output_hidden_states (bool, optional):
                 Whether to return the output of each hidden layers.
                 Defaults to `False`.
@@ -556,13 +557,15 @@ class BertForQuestionAnswering(BertPretrainedModel):
             With the fields:
 
             - `start_logits` (Tensor):
-                Labels for position (index) of the start of the labelled span. Positions are clamped to the sequence length.
-                Position outside of the sequence are not taken into account for computing the token classification loss.
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Positions are clamped to the sequence length.
+                Positions outside of the sequence are not taken into account for computing the token classification loss.
                 Its data type should be float32 and its shape is [batch_size, sequence_length].
 
             - `end_logits` (Tensor):
-                Labels for position (index) of the end of the labelled span. Positions are clamped to the sequence length.
-                Position outside of the sequence are not taken into account for computing the token classification loss.
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Positions are clamped to the sequence length.
+                Positions outside of the sequence are not taken into account for computing the token classification loss.
                 Its data type should be float32 and its shape is [batch_size, sequence_length].
 
         Example:
@@ -796,7 +799,7 @@ class BertPretrainingHeads(Layer):
         activation (str):
             Activation function used in the language modeling task.
         embedding_weights (Tensor, optional):
-            Weights of the decoder layer used in masked token prediction.
+            Decoding weights used to map hidden_states to logits of the masked token prediction.
             Its data type should be float32 and its shape is [vocab_size, hidden_size].
             Defaults to `None`, which means use the same weights of the embedding layer.
 
@@ -826,7 +829,7 @@ class BertPretrainingHeads(Layer):
                 A tensor indicates positions to be masked in the position embedding.
                 Its data type should be int64 and its shape is [batch_size, mask_token_num].
                 `mask_token_num` is the number of masked tokens. It should be no bigger than `sequence_length`.
-                Defaults to `None`, which means we don't use mask in the position embedding.
+                Defaults to `None`, which means we output hidden-states of all tokens in masked token prediction.
 
         Returns:
             tuple: Returns tuple (``prediction_scores``, ``seq_relationship_score``).

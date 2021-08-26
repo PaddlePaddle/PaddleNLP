@@ -263,7 +263,7 @@ class BertTokenizer(PretrainedTokenizer):
 
     Args:
         vocab_file (str):
-            The vocabulary file path (ends with '.spm') required to instantiate
+            The vocabulary file path (ends with '.txt') required to instantiate
             a `WordpieceTokenizer`.
         do_lower_case (bool):
             Whether or not to lowercase the input when tokenizing.
@@ -533,7 +533,7 @@ class BertTokenizer(PretrainedTokenizer):
                 Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
 
         Returns:
-            List[tuple]: A list of char offsets with the appropriate offsets of special tokens.
+            List[tuple]: A list of wordpiece offsets with the appropriate offsets of special tokens.
         """
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
