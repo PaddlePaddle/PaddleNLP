@@ -452,7 +452,7 @@ class BertModel(BertPretrainedModel):
                 - **1** for tokens that **not masked**,
                 - **0** for tokens that **masked**.
 
-                It a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
             output_hidden_states (bool, optional):
                 Whether to return the output of each hidden layers.
