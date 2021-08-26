@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import paddle
 import paddle.nn as nn
+from paddlenlp.transformers import register_base_model
 from paddlenlp.transformers.ernie_gram.modeling import ErnieGramPretrainedModel, ErniePooler, ErnieGramEmbeddings
 
 
+@register_base_model
 class ErnieGramForCSC(ErnieGramPretrainedModel):
     def __init__(self,
                  vocab_size,
@@ -32,16 +35,18 @@ class ErnieGramForCSC(ErnieGramPretrainedModel):
                  type_vocab_size=2,
                  initializer_range=0.02,
                  pad_token_id=0,
+                 pad_pinyin_id=0,
                  rel_pos_size=None):
-        super(ErnieGramModel, self).__init__()
+        super(ErnieGramForCSC, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         self.embeddings = ErnieGramEmbeddings(
             vocab_size, emb_size, hidden_dropout_prob, max_position_embeddings,
             type_vocab_size, pad_token_id, rel_pos_size, num_attention_heads)
-
+        self.pinyin_vocab_size = pinyin_vocab_size
+        self.pad_pinyin_id = pad_pinyin_id
         self.pinyin_embeddings = nn.Embedding(
-            self.pinyin_vocab_size, emb_size, padding_idx=pad_token_id)
+            self.pinyin_vocab_size, emb_size, padding_idx=pad_pinyin_id)
 
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
@@ -54,7 +59,7 @@ class ErnieGramForCSC(ErnieGramPretrainedModel):
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
         self.detection_layer = nn.Linear(hidden_size, 2)
         self.correction_layer = nn.Linear(hidden_size, vocab_size)
-        self.softmax = paddle.nn.Softmax()
+        self.softmax = nn.Softmax()
         self.apply(self.init_weights)
 
     def forward(self,
@@ -66,7 +71,7 @@ class ErnieGramForCSC(ErnieGramPretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e9,
+                 ).astype(self.detection_layer.weight.dtype) * -1e9,
                 axis=[1, 2])
         embedding_output = self.embeddings(
             input_ids=input_ids,
@@ -86,5 +91,5 @@ class ErnieGramForCSC(ErnieGramPretrainedModel):
         correction_outputs = self.encoder(word_pinyin_embedding_output,
                                           attention_mask)
         # [B, T, V]
-        correction_logits = self.correction_layer(correction_output)
+        correction_logits = self.correction_layer(correction_outputs)
         return detection_error_probs, correction_logits
