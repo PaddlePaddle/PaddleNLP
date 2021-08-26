@@ -288,10 +288,6 @@ class XLNetTokenizer(PretrainedTokenizer):
         """
         Returns the number of added tokens when encoding a sequence with special tokens.
 
-        Note:
-            This encodes inputs and checks the number of added tokens, and is therefore not efficient.
-            Do not put this inside your training loop.
-
         Args:
             pair (bool, optional):
                 Whether the input is a sequence pair or a single sequence.
