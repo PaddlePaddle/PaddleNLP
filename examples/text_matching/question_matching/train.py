@@ -37,6 +37,7 @@ parser.add_argument("--dev_set", type=str, required=True, help="The full path of
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--max_seq_length", default=256, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument('--max_steps', default=-1, type=int, help="If > 0, set total number of training steps to perform.")
 parser.add_argument("--train_batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--eval_batch_size", default=128, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
@@ -208,6 +209,9 @@ def do_train():
                     paddle.save(model.state_dict(), save_param_path)
                     tokenizer.save_pretrained(save_dir)
                     best_accuracy = accuracy
+            
+            if global_step ==  args.max_steps:
+                return
               
 
 if __name__ == "__main__":

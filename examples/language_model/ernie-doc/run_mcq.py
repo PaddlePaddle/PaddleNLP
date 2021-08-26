@@ -54,6 +54,7 @@ parser.add_argument("--dataset", default="c3", choices=["c3"], type=str, help="T
 parser.add_argument("--layerwise_decay", default=0.8, type=float, help="Layerwise decay ratio")
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--gradient_accumulation_steps", default=4, type=int, help="Number of updates steps to accumualte before performing a backward/update pass.")
+parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
 
 # yapf: enable
 args = parser.parse_args()
@@ -308,6 +309,8 @@ def do_train(args):
                         model_to_save.save_pretrained(best_model_dir)
                         tokenizer.save_pretrained(best_model_dir)
 
+            if args.max_steps > 0 and global_steps >= args.max_steps:
+                return
     logger.info("Final test result:")
     eval_acc = evaluate(model, eval_metric, test_dataloader,
                         create_memory(), num_classes)

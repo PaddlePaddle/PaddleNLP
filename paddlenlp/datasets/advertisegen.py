@@ -62,7 +62,7 @@ class AdvertiseGen(DatasetBuilder):
 
                 yield {
                     'source': json_data["content"],
-                    'target': json_data["summary"],
+                    'target': json_data.get("summary", ''),
                     'id': data_id
                 }
                 data_id += 1

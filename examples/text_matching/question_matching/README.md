@@ -4,14 +4,17 @@
 
 ## 评测效果
 本项目分别基于ERNIE-1.0、Bert-base-chinese、ERNIE-Gram 3 个中文预训练模型训练了单塔 Point-wise 的匹配模型, 基于 ERNIE-Gram 的模型效果显著优于其它 2 个预训练模型。  
-此外，在 ERNIE-Gram 模型基础上我们也对最新的正则化策略 [R-Drop](https://arxiv.org/abs/2106.14448) 进行了相关评测, [R-Drop](https://arxiv.org/abs/2106.14448) 策略的核心思想是针对同 1 个训练样本过多次前向网络得到的输出加上正则化的 Loss 约束。
+
+此外，在 ERNIE-Gram 模型基础上我们也对最新的正则化策略 [R-Drop](https://arxiv.org/abs/2106.14448) 进行了相关评测, [R-Drop](https://arxiv.org/abs/2106.14448) 策略的核心思想是针对同 1 个训练样本过多次前向网络得到的输出加上正则化的 Loss 约束。  
+
+我们开源了效果最好的 2 个策略对应模型的 checkpoint: 基于 ERNIE-Gram R-Drop 系数分别为 0.0 和 0.1 的 2 个模型, 用户可以下载相应的模型来复现我们的评测结果。  
 
 | 模型  | rdrop_coef | dev acc | test-A acc | test-B acc|
 | ---- | ---- |-----|--------|------- |
 | ernie-1.0-base |0.0| 86.96 |76.20 | 77.50|
 | bert-base-chinese |0.0| 86.93| 76.90 |77.60 |
-| ernie-gram-zh | 0.0 |87.66 | **80.80** | **81.20** |
-| ernie-gram-zh | 0.1 |87.91 | 80.20 | 80.80 |
+| [ernie-gram-zh](https://paddlenlp.bj.bcebos.com/models/text_matching/question_matching_rdrop0p0_baseline_model.tar) | 0.0 |87.66 | **80.80** | **81.20** |
+| [ernie-gram-zh](https://paddlenlp.bj.bcebos.com/models/text_matching/question_matching_rdrop0p1_baseline_model.tar) | 0.1 |87.91 | 80.20 | 80.80 |
 | ernie-gram-zh | 0.2 |87.47 | 80.10 | 81.00 |
 
 
