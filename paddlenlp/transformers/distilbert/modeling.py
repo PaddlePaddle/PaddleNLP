@@ -131,6 +131,63 @@ class DistilBertPretrainedModel(PretrainedModel):
 
 @register_base_model
 class DistilBertModel(DistilBertPretrainedModel):
+    """
+    The bare DistilBert Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in `DistilBertModel`. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling `DistilBertModel`.
+        hidden_size (int, optional):
+            Dimensionality of the embedding layers, encoder layers and the pooler layer. Defaults to `768`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in the Transformer encoder. Defaults to `12`.
+        num_attention_heads (int, optional):
+            Number of attention heads for each attention layer in the Transformer encoder.
+            Defaults to `12`.
+        intermediate_size (int, optional):
+            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
+            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
+            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
+            Defaults to `3072`.
+        hidden_act (str, optional):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported. Defaults to `"gelu"`.
+        hidden_dropout_prob (float, optional):
+            The dropout probability for all fully connected layers in the embeddings and encoder.
+            Defaults to `0.1`.
+        attention_probs_dropout_prob (float, optional):
+            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
+            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
+            sequence. Defaults to `512`.
+        type_vocab_size (int, optional):
+            The vocabulary size of `token_type_ids`.
+            Defaults to `16`.
+
+        initializer_range (float, optional):
+            The standard deviation of the normal initializer.
+            Defaults to `0.02`.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`DistilBertPretrainedModel.init_weights()` for how weights are initialized in `DistilBertModel`.
+
+        pad_token_id (int, optional):
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
+
+    """
+
     def __init__(self,
                  vocab_size,
                  hidden_size=768,
@@ -162,6 +219,42 @@ class DistilBertModel(DistilBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
+        r'''
+        The DistilBertModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention on padding token indices.
+                The values should be either 0 or 1.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It's data type should be float32 and has a shape of [batch_size, num_attention_heads, sequence_length, sequence_length].
+                Defaults to `None`.
+
+        Returns:
+            Tensor: Returns tensor `encoder_output`, which means the sequence of hidden-states at the last layer of the model.
+            Its data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import DistilBertModel, DistilBertTokenizer
+
+                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+                model = DistilBertModel.from_pretrained('distilbert-base-uncased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        '''
+
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
@@ -174,6 +267,21 @@ class DistilBertModel(DistilBertPretrainedModel):
 
 
 class DistilBertForSequenceClassification(DistilBertPretrainedModel):
+    """
+    DistilBert Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
+
+    Args:
+        distilbert (:class:`DistilBertModel`):
+            An instance of DistilBertModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of DistilBert.
+            If None, use the same value as `hidden_dropout_prob` of `DistilBertModel`
+            instance `distilbert`. Defaults to None.
+    """
+
     def __init__(self, distilbert, num_classes=2, dropout=None):
         super(DistilBertForSequenceClassification, self).__init__()
         self.num_classes = num_classes
@@ -188,6 +296,36 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
+        r"""
+        The DistilBertForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`DistilBertModel`.
+            attention_mask (list, optional):
+                See :class:`DistilBertModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Shape as `[batch_size, num_classes]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.distilbert.modeling import DistilBertForSequenceClassification
+                from paddlenlp.transformers.distilbert.tokenizer import DistilBertTokenizer
+
+                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+                model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
+
         distilbert_output = self.distilbert(
             input_ids=input_ids, attention_mask=attention_mask)
 
@@ -202,6 +340,20 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
 
 
 class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
+    """
+    DistilBert Model with a span classification head on top for extractive question-answering tasks like
+    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
+    `span end logits`).
+
+    Args:
+        distilbert (:class:`DistilBertModel`):
+            An instance of DistilBertModel.
+        dropout (float, optional):
+            The dropout probability for output of DistilBert.
+            If None, use the same value as `hidden_dropout_prob` of `DistilBertModel`
+            instance `distilbert`. Defaults to None.
+    """
+
     def __init__(self, distilbert, dropout=None):
         super(DistilBertForQuestionAnswering, self).__init__()
         self.distilbert = distilbert  # allow bert to be config
@@ -211,6 +363,48 @@ class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
+        r"""
+        The DistilBertForQuestionAnswering forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`DistilBertModel`.
+            attention_mask (list, optional):
+                See :class:`DistilBertModel`.
+
+        Returns:
+            tuple: Returns tuple (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - start_logits(Tensor):
+                Labels for position (index) of the start of the labelled span. Positions are clamped to the sequence length.
+                Position outside of the sequence are not taken into account for computing the token classification loss.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+            - end_logits(Tensor):
+                Labels for position (index) of the end of the labelled span. Positions are clamped to the sequence length.
+                Position outside of the sequence are not taken into account for computing the token classification loss.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.distilbert.modeling import DistilBertForQuestionAnswering
+                from paddlenlp.transformers.distilbert.tokenizer import DistilBertTokenizer
+
+                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+                model = DistilBertForQuestionAnswering.from_pretrained('distilbert-base-uncased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                start_logits = outputs[0]
+                end_logits  =outputs[1]
+        """
+
         sequence_output = self.distilbert(
             input_ids, attention_mask=attention_mask)
         sequence_output = self.dropout(sequence_output)
@@ -221,6 +415,21 @@ class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
 
 
 class DistilBertForTokenClassification(DistilBertPretrainedModel):
+    """
+    DistilBert Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        distilbert (:class:`DistilBertModel`):
+            An instance of DistilBertModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of DistilBert.
+            If None, use the same value as `hidden_dropout_prob` of `DistilBertModel`
+            instance `distilbert`. Defaults to None.
+    """
+
     def __init__(self, distilbert, num_classes=2, dropout=None):
         super(DistilBertForTokenClassification, self).__init__()
         self.num_classes = num_classes
@@ -232,6 +441,36 @@ class DistilBertForTokenClassification(DistilBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
+        r"""
+        The DistilBertForTokenClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`DistilBertModel`.
+            attention_mask (list, optional):
+                See :class:`DistilBertModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.distilbert.modeling import DistilBertForTokenClassification
+                from paddlenlp.transformers.distilbert.tokenizer import DistilBertTokenizer
+
+                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+                model = DistilBertForTokenClassification.from_pretrained('distilbert-base-uncased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
+
         sequence_output = self.distilbert(
             input_ids, attention_mask=attention_mask)
 
@@ -241,6 +480,14 @@ class DistilBertForTokenClassification(DistilBertPretrainedModel):
 
 
 class DistilBertForMaskedLM(DistilBertPretrainedModel):
+    """
+    DistilBert Model with a `language modeling` head on top.
+
+    Args:
+        distilbert (:class:`DistilBertModel`):
+            An instance of DistilBertModel.
+    """
+
     def __init__(self, distilbert):
         super(DistilBertForMaskedLM, self).__init__()
         self.distilbert = distilbert
@@ -255,6 +502,33 @@ class DistilBertForMaskedLM(DistilBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids=None, attention_mask=None):
+        r'''
+        The DistilBertForMaskedLM forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`DistilBertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`DistilBertModel`.
+
+        Returns:
+            Tensor: Returns tensor `prediction_logits`, the scores of masked token prediction.
+            Its data type should be float32 and its shape is [batch_size, sequence_length, vocab_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import DistilBertForMaskedLM, DistilBertTokenizer
+
+                tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+                model = DistilBertForMaskedLM.from_pretrained('distilbert-base-uncased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                prediction_logits = model(**inputs)
+        '''
+
         distilbert_output = self.distilbert(
             input_ids=input_ids, attention_mask=attention_mask)
         prediction_logits = self.vocab_transform(distilbert_output)

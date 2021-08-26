@@ -18,6 +18,14 @@ __all__ = ['TinyBertTokenizer']
 
 
 class TinyBertTokenizer(BertTokenizer):
+    """
+    Constructs a TinyBert tokenizer. It uses a basic tokenizer to do punctuation
+    splitting, lower casing and so on, and follows a WordPiece tokenizer to
+    tokenize as subwords.
+
+    The usage of TinyBertTokenizer is the same as `BertTokenizer`.
+    """
+
     pretrained_resource_files_map = {
         "vocab_file": {
             "tinybert-4l-312d":
