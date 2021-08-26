@@ -187,8 +187,8 @@ def do_train(args):
                     train_avg_batch_cost = args.print_step / batch_cost_avg.get_total_time(
                     )
                     logger.info(
-                        "step_idx: %d, epoch: %d, batch: %d, avg loss: %.6g, "
-                        "normalized loss: %.6g, ppl: %f, avg_speed: %.2f step/sec, "
+                        "step_idx: %d, epoch: %d, batch: %d, avg loss: %f, "
+                        "normalized loss: %f, ppl: %f, avg_speed: %.2f step/sec, "
                         "batch_cost: %.5f sec, reader_cost: %.5f sec, tokens: %d, "
                         "ips: %.5f words/sec" %
                         (step_idx, pass_id, batch_id, total_avg_cost,
