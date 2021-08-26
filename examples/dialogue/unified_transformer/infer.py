@@ -122,8 +122,6 @@ def infer(args):
 
         if args.faster:
             ids = output
-            print(ids)
-            exit()
             results = select_response(ids, None, tokenizer)
         else:
             ids, scores = output
