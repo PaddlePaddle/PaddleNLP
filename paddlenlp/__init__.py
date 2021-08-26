@@ -24,3 +24,4 @@ from . import seq2vec
 from . import transformers
 from . import utils
 from . import taskflow
+from . import losses

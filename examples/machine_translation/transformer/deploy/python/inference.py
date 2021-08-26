@@ -33,7 +33,11 @@ def parse_args():
         choices=["gpu", "xpu", "cpu"],
         help="Device to use during inference. ")
     parser.add_argument(
-        "--use_mkl", action="store_true", help="Whether to use mkl. ")
+        "--use_mkl",
+        default=False,
+        type=eval,
+        choices=[True, False],
+        help="Whether to use mkl. ")
     parser.add_argument(
         "--threads",
         default=1,
@@ -50,6 +54,7 @@ def parse_args():
         "--profile", action="store_true", help="Whether to profile. ")
     parser.add_argument(
         "--test_file",
+        nargs='+',
         default=None,
         type=str,
         help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
