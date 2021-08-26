@@ -271,6 +271,10 @@ class GPTTokenizer(PretrainedTokenizer):
     def __len__(self):
         return len(self.encoder) + len(self.special_tokens)
 
+    @property
+    def vocab_size(self):
+        return len(self.encoder) + len(self.special_tokens)
+
     def set_special_tokens(self, special_tokens):
         """ Add a list of additional tokens to the encoder.
             The additional tokens are indexed starting from the last index of the
