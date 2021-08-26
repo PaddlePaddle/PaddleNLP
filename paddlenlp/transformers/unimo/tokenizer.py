@@ -30,7 +30,7 @@ __all__ = ['UNIMOTokenizer']
 
 class UNIMOTokenizer(PretrainedTokenizer):
     r"""
-    Constructs an ERNIE tokenizer. It uses a basic tokenizer to do punctuation
+    Constructs an UNIMO tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
 
@@ -140,7 +140,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
     def _tokenize(self, text):
         r"""
-        End-to-end tokenization for ERNIE models.
+        End-to-end tokenization for UNIMO models.
 
         Args:
             text (str): The text to be tokenized.
@@ -156,7 +156,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
     def tokenize(self, text):
         r"""
-        End-to-end tokenization for ERNIE models.
+        End-to-end tokenization for UNIMO models.
 
         Args:
             text (str): The text to be tokenized.
@@ -186,13 +186,14 @@ class UNIMOTokenizer(PretrainedTokenizer):
         Returns the number of added tokens when encoding a sequence with special tokens.
 
         Note:
-            This encodes inputs and checks the number of added tokens, and is therefore not efficient. 
-            Do not put this inside your training loop.
+            This encodes inputs and checks the number of added tokens, and is 
+            therefore not efficient. Do not put this inside your training loop.
 
         Args:
-            pair (str, optional): Returns the number of added tokens in the case of a sequence 
-                pair if set to True, returns the number of added tokens in the case of a single sequence 
-                if set to False. Defaults to False.
+            pair (str, optional): Returns the number of added tokens in the 
+                case of a sequence pair if set to True, returns the number 
+                of added tokens in the case of a single sequence if set to 
+                False. Defaults to False.
 
         Returns:
             `int`: Number of tokens added to sequences
@@ -205,10 +206,10 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
-        Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
-        adding special tokens. 
+        Build model inputs from a sequence or a pair of sequence for sequence 
+        classification tasks by concatenating and adding special tokens. 
         
-        A ERNIE sequence has the following format:
+        A UNIMO sequence has the following format:
         ::
             - single sequence: ``[CLS] X [SEP]``
             - pair of sequences: ``[CLS] A [SEP] B [SEP]``
@@ -230,7 +231,16 @@ class UNIMOTokenizer(PretrainedTokenizer):
         return _cls + token_ids_0 + _sep + token_ids_1 + _sep
 
     def merge_subword(self, tokens):
-        """merge subwords"""
+        r"""
+        Converts the subwords in a sequence of tokens (list of string) to whole 
+        words, also remove `##` when converting.
+
+        Args:
+            tokens (List[str]): A list of string representing tokens to be converted.
+
+        Returns:
+            List[str]: Converted sequence of whole words.
+        """
         ret = []
         for token in tokens:
             if token.startswith("##"):
@@ -248,9 +258,10 @@ class UNIMOTokenizer(PretrainedTokenizer):
                                                  offset_mapping_0,
                                                  offset_mapping_1=None):
         r"""
-        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens. 
+        Build offset map from a pair of offset map by concatenating and adding 
+        offsets of special tokens. 
         
-        A ERNIE offset_mapping has the following format:
+        A UNIMO offset_mapping has the following format:
         ::
             - single sequence: ``(0,0) X (0,0)``
             - pair of sequences: `(0,0) A (0,0) B (0,0)``
@@ -263,7 +274,8 @@ class UNIMOTokenizer(PretrainedTokenizer):
                 Defaults to `None`.
 
         Returns:
-            List[tuple]: List of char offsets with the appropriate offsets of special tokens.
+            List[tuple]: List of char offsets with the appropriate offsets 
+                of special tokens.
         """
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
@@ -275,15 +287,17 @@ class UNIMOTokenizer(PretrainedTokenizer):
                                              token_ids_0,
                                              token_ids_1=None):
         r"""
-        Create a mask from the two sequences passed to be used in a sequence-pair classification task. 
+        Create a mask from the two sequences passed to be used in a sequence-pair 
+        classification task. 
 
-        A ERNIE sequence pair mask has the following format:
+        A UNIMO sequence pair mask has the following format:
         ::
 
             0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
             | first sequence    | second sequence |
 
-        If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
+        If `token_ids_1` is `None`, this method only returns the first portion 
+        of the mask (0s).
 
         Args:
             token_ids_0 (List[int]):
@@ -319,29 +333,17 @@ class UNIMOTokenizer(PretrainedTokenizer):
                    is_split_into_words=False,
                    continuous_position=False):
         """
-        Main method to encode the single-turn or multi-turn dialogue conversation. 
-        It will return a dictionary containing the encoded sequence and other 
-        relative informations which meets the input format requirements of the 
-        UnifiedTransformer model. 
-        See detail at 
-        https://github.com/PaddlePaddle/Knover/tree/luge-dialogue/luge-dialogue
+        Main method for encoding the source for generation. It will return a 
+        dictionary containing the encoded sequence and other relative informations 
+        which meets the input format requirements of the UNIMO-text model. 
 
         Args:
-            source (str): The source of dialogue conversation. It 
-                is an utterance or list of utterances to be encoded. Each 
-                utterance is a string. 
-            target (str, optional): The target of dialogue conversation. 
-                It should be set when training the model. It should not be set 
-                when running inference. Defaults to None.
-            title (str, optional): The title information of dialogue 
-                conversation. It should be set if the `task_type` is "title" 
-                or "recommend". Defaults to None.
-            task_type (str, optional): The type of dialogue conversation. It is 
-                one of "chitchat", "title" and "recommend". They represent 
-                the chitchat dialogue, title grounded dialogue and 
-                conversational recommendation respectively. Defaults to None, 
-                which means there is no `special_token` added in output sequence 
-                for identifying different conversation types.
+            source (str): The source text of generation. It should be a string. 
+            target (str, optional): The target text of generation. It should be 
+                set when training the model and should be None when running 
+                inference. Defaults to None.
+            title (str, optional): The additional information of some of the 
+                generation tasks such as summary. Defaults to None.
             max_seq_len (int, optional): The maximum encoded sequence length.
                 Defaults to 512.
             max_target_len (int, optional): The maximum encoded sequence 
@@ -367,7 +369,9 @@ class UNIMOTokenizer(PretrainedTokenizer):
                 sequences to Tensor. Defaults to False.
             is_split_into_words(bool, optinal): Whether or not the input text 
                 (`source`, `target` and `title`) has been pretokenized. 
-                Defaults to True.
+                Defaults to False.
+            continuous_position(bool, optinal): Whether the position ids is  
+                continuous between source ids and target ids. Defaults to False.
 
         Returns: 
             dict: A dictionary containing the encoded sequence and other 
@@ -376,7 +380,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
             With the corresponding fields:
 
             - input_ids (list[int]|Tensor):
-                A list of indices of input tokens to be feed to UnifiedTransformer 
+                A list of indices of input tokens to be feed to UNIMO-text 
                 model. If `return_tensors` is True, it is a Tensor with shape 
                 [1, sequence_length] and data type 'int64'.
             - token_type_ids (list[int]|Tensor, optional):
@@ -403,15 +407,15 @@ class UNIMOTokenizer(PretrainedTokenizer):
         Example:
             .. code-block::
 
-                from paddlenlp.transformers import UnifiedTransformerTokenizer
+                from paddlenlp.transformers import UNIMOTokenizer
 
-                tokenizer = UnifiedTransformerTokenizer.from_pretrained('plato-mini')
+                tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
 
-                inputs = tokenizer.dialogue_encode('我爱祖国')
+                inputs = tokenizer.gen_encode('我爱祖国')
                 for key in inputs:
                     print(key + ':')
                     print(inputs[key])
-                # input_ids: [1, 6, 25445, 26907, 25475, 2]
+                # input_ids: [1, 75, 329, 997, 20, 2]
                 # token_type_ids: [0, 0, 0, 0, 0, 0]
                 # position_ids: [0, 1, 2, 3, 4, 5]
                 # attention_mask: [[0. 0. 0. 0. 0. 0.]
