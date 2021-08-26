@@ -626,7 +626,6 @@ class BertForSequenceClassification(BertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
-
         r"""
         The BertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -642,7 +641,7 @@ class BertForSequenceClassification(BertPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
-            Shape as `[batch_size, num_classes]` and dtype as `float32`.
+            Shape as `[batch_size, num_classes]` and dtype as float32.
 
         Example:
             .. code-block::
@@ -751,6 +750,7 @@ class BertLMPredictionHead(Layer):
     """
     Bert Model with a `language modeling` head on top for CLM fine-tuning.
     """
+
     def __init__(self,
                  hidden_size,
                  vocab_size,
@@ -924,6 +924,7 @@ class BertPretrainingCriterion(paddle.nn.Layer):
             be represented by the `inputs_ids` passed when calling `BertModel`.
 
     """
+
     def __init__(self, vocab_size):
         super(BertPretrainingCriterion, self).__init__()
         # CrossEntropyLoss is expensive since the inner reshape (copy)
