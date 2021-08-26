@@ -111,8 +111,7 @@ def infer(args):
             num_beams=args.num_beams,
             length_penalty=args.length_penalty,
             early_stopping=args.early_stopping,
-            num_return_sequences=args.num_return_sequences,
-            decoding_type_id=args.decoding_type_id)
+            num_return_sequences=args.num_return_sequences)
 
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:

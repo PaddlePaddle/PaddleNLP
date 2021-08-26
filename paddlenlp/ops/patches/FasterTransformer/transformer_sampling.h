@@ -79,7 +79,6 @@ public:
                       const int memory_max_seq_len,
                       const int start_id,
                       const int end_id,
-                      const int type_id,
                       const int candidate_num = 0,
                       const float probability_threshold = 0.0,
                       const bool normalization_before = true,
@@ -104,7 +103,6 @@ public:
     args_.mask_id_ = mask_id;
     args_.temperature_ = temperature;
     args_.normalization_before_ = normalization_before;
-    args_.type_id_ = type_id;
     args_.repeat_penalty = repeat_penalty;
 
     if (args_.candidate_num_ == 0 && args_.probability_threshold_ == 0.0) {
@@ -319,8 +317,8 @@ public:
                                    decoding_params.position_encoding_table,
                                    decoding_params.type_table,
                                    decoding_params.memory_sequence_length,
+                                   decoding_params.type_id,
                                    word_ids_buf_,
-                                   args_.type_id_,
                                    step,
                                    args_.batch_size_,
                                    args_.hidden_units_,
@@ -331,8 +329,8 @@ public:
                                    decoding_params.position_encoding_table,
                                    decoding_params.type_table,
                                    decoding_params.memory_sequence_length,
+                                   decoding_params.type_id,
                                    word_ids_buf_,
-                                   args_.type_id_,
                                    step,
                                    args_.batch_size_,
                                    args_.hidden_units_,
@@ -551,14 +549,13 @@ public:
             decoding_params.stream);
       } else if (args_.probability_threshold_ != 0.0) {
         // top p sampling
-        softmax_with_mask_kernelLauncher(logits_buf_,
-                                         decoding_params.embedding_bias_T,
-                                         decoding_params.logits_mask_T,
-                                         args_.end_id_,
-                                         finished_buf_,
-                                         m,
-                                         n,
-                                         decoding_params.stream);
+        softmax_kernelLauncher(logits_buf_,
+                               decoding_params.embedding_bias_T,
+                               args_.end_id_,
+                               finished_buf_,
+                               m,
+                               n,
+                               decoding_params.stream);
 
         // TODO(): repeat penalty vertification.
         apply_penalties_Launcher(step,
@@ -575,7 +572,7 @@ public:
                                  1.0,
                                  args_.repeat_penalty,
                                  decoding_params.stream,
-                                 (DataType_ *)nullptr);
+                                 decoding_params.logits_mask_T);
 
         topP_sampling_kernel_kernelLauncher(
             topp_workspace_,

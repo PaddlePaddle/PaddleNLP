@@ -31,6 +31,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const std::vector<paddle::Tensor>& cache_k,
     const std::vector<paddle::Tensor>& cache_v,
     const paddle::Tensor& memory_sequence_length,
+    const paddle::Tensor& type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_emb,
     const std::vector<paddle::Tensor>& self_layernorm_weight,
@@ -73,7 +74,6 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const int& end_id_,
     const int64_t& max_seq_len_,
     const float& beam_search_diversity_rate_,
-    const int& type_id,
     const int& unk_id,
     const int& mask_id,
     const float& temperature,
@@ -117,6 +117,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   fastertransformer::Allocator<AllocatorType::PD> allocator_(stream);
 
   decoding_params.memory_sequence_length = memory_sequence_length.data<int>();
+  decoding_params.type_id = type_id.data<int>();
 
   TransformerDecoderInitParam<DataType_>* params =
       new TransformerDecoderInitParam<DataType_>[num_layer_];
@@ -243,7 +244,6 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             memory_max_seq_len,
             start_id_,
             end_id_,
-            type_id,
             beam_search_diversity_rate_,
             false, /*is_fuse_topk_softMax set false cause topk reason*/
             true,  /*normalization_before*/
@@ -270,7 +270,6 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
                                                          memory_max_seq_len,
                                                          start_id_,
                                                          end_id_,
-                                                         type_id,
                                                          candidate_num_,
                                                          probability_threshold_,
                                                          true,
@@ -294,6 +293,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const std::vector<paddle::Tensor>& cache_k,
     const std::vector<paddle::Tensor>& cache_v,
     const paddle::Tensor& mem_seq_len,
+    const paddle::Tensor& type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_embedding,
     const std::vector<paddle::Tensor>& self_ln_weight,
@@ -336,7 +336,6 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const int& eos_id,
     const int64_t& max_len,
     const float& beam_search_diversity_rate,
-    const int& type_id,
     const int& unk_id,
     const int& mask_id,
     const float& temperature,
@@ -354,6 +353,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           cache_k,
           cache_v,
           mem_seq_len,
+          type_id,
           logits_mask,
           word_embedding,
           self_ln_weight,
@@ -396,7 +396,6 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           eos_id,
           max_len,
           beam_search_diversity_rate,
-          type_id,
           unk_id,
           mask_id,
           temperature,
@@ -410,6 +409,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           cache_k,
           cache_v,
           mem_seq_len,
+          type_id,
           logits_mask,
           word_embedding,
           self_ln_weight,
@@ -452,7 +452,6 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           eos_id,
           max_len,
           beam_search_diversity_rate,
-          type_id,
           unk_id,
           mask_id,
           temperature,

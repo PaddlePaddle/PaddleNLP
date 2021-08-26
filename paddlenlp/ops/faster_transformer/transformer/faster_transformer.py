@@ -515,6 +515,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                                       cache=None,
                                       **kwargs):
         input_ids = input_ids[:, :-1]
+        decoding_type_id = token_type_ids[:, -1]
         token_type_ids = token_type_ids[:, :-1]
         position_ids = position_ids[:, :-1]
         attention_mask = attention_mask[:, :, :-1, :-1]
@@ -527,7 +528,9 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             "attention_mask": attention_mask,
             "use_cache": use_cache,
             "cache": cache,
-            "seq_len": seq_len
+            "seq_len": seq_len,
+            "decoding_type_id": paddle.cast(
+                decoding_type_id, dtype="int32")
         }
 
     def generate_logits_mask(self, use_fp16_decoding):
@@ -573,8 +576,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             max_length=max_length,
             top_k=top_k,
             top_p=top_p,
-            temperature=temperature,
-            decoding_type_id=model_kwargs.get("decoding_type_id", 1))
+            temperature=temperature)
 
     def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
                     pad_token_id, eos_token_id, **model_kwargs):
@@ -587,8 +589,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             model_inputs=model_inputs,
             max_length=max_length,
             num_beams=beam_scorer.num_beams,
-            temperature=temperature,
-            decoding_type_id=model_kwargs.get("decoding_type_id", 1))
+            temperature=temperature)
 
     def forward(self,
                 max_length,
@@ -600,6 +601,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 model_inputs=None,
                 **model_kwargs):
         seq_len = model_inputs.pop('seq_len', None)
+        decoding_type_id = model_inputs.pop('decoding_type_id')
 
         outputs = self._model(**model_inputs)
         if isinstance(outputs, tuple):
@@ -620,4 +622,4 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             bos_id=self.bos_token_id,
             eos_id=self.eos_token_id,
             temperature=temperature,
-            decoding_type_id=model_kwargs.get("decoding_type_id", 1))
+            decoding_type_id=decoding_type_id)

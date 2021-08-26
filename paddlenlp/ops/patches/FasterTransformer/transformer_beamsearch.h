@@ -79,7 +79,6 @@ public:
                         const int memory_max_seq_len,
                         const int start_id,
                         const int end_id,
-                        const int type_id,
                         const float beam_search_diversity_rate = -0.0f,
                         const bool is_fuse_topk_softMax = false,
                         const bool normalization_before = true,
@@ -103,7 +102,6 @@ public:
     args_.vocab_size_ = vocab_size;
     args_.start_id_ = start_id;
     args_.end_id_ = end_id;
-    args_.type_id_ = type_id;
     args_.beam_search_diversity_rate_ = beam_search_diversity_rate;
     args_.normalization_before_ = normalization_before;
     args_.unk_id_ = unk_id;
@@ -301,8 +299,8 @@ public:
                                    decoding_params.position_encoding_table,
                                    decoding_params.type_table,
                                    decoding_params.memory_sequence_length,
+                                   decoding_params.type_id,
                                    word_ids_buf_,
-                                   args_.type_id_,
                                    step,
                                    m,
                                    args_.hidden_units_,
@@ -313,8 +311,8 @@ public:
                                    decoding_params.position_encoding_table,
                                    decoding_params.type_table,
                                    decoding_params.memory_sequence_length,
+                                   decoding_params.type_id,
                                    word_ids_buf_,
-                                   args_.type_id_,
                                    step,
                                    m,
                                    args_.hidden_units_,
@@ -502,14 +500,13 @@ public:
 #endif
 
       // Beamsearch
-      update_logits_with_mask(logits_buf_,
-                              decoding_params.embedding_bias,
-                              decoding_params.logits_mask,
-                              args_.end_id_,
-                              finished_buf_,
-                              m,
-                              n,
-                              decoding_params.stream);
+      update_logits(logits_buf_,
+                    decoding_params.embedding_bias,
+                    args_.end_id_,
+                    finished_buf_,
+                    m,
+                    n,
+                    decoding_params.stream);
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();
@@ -543,7 +540,7 @@ public:
                                       args_.len_penalty,
                                       args_.repeat_penalty,
                                       decoding_params.stream,
-                                      (float *)nullptr);
+                                      decoding_params.logits_mask);
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();

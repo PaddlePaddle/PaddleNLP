@@ -22,8 +22,8 @@ void embeddings_kernel_launcher(T* from_tensor,
                                 const T* position_encoding_table,
                                 const T* type_table,
                                 const int* memory_sequence_length,
+                                const int* type_id,
                                 const int* word_ids,
-                                const int type_id,
                                 const int step,
                                 const int batch_size,
                                 const int hidden_units,
@@ -79,24 +79,4 @@ void update_KV_cache_kernelLauncher(T** key_cache,
                                     const int cache_size,
                                     const int decoder_layers,
                                     cudaStream_t stream);
-
-template <typename T>
-void update_logits_with_mask(T* logits,
-                             const T* bias,
-                             const T* logits_mask,
-                             const int end_ids,
-                             const bool* finished,
-                             const int m,
-                             const int n,
-                             cudaStream_t stream);
-
-template <typename T>
-void softmax_with_mask_kernelLauncher(T* logits,
-                                      const T* bias,
-                                      const T* logits_mask,
-                                      const int end_ids,
-                                      const bool* finished,
-                                      const int m,
-                                      const int n,
-                                      cudaStream_t stream);
 }
