@@ -18,6 +18,8 @@ import copy
 
 import numpy as np
 import paddle
+from paddlenlp.data import Pad
+
 
 def decode(s_arc, s_rel, mask, tree=True):
     """Decode function"""
@@ -34,6 +36,7 @@ def decode(s_arc, s_rel, mask, tree=True):
     rel_preds = paddle.squeeze(rel_preds, axis=-1)
     return arc_preds, rel_preds
 
+
 def pad_sequence(sequences, padding_value=0, fix_len=None):
     """Fill sequences(np.ndarray) into a fixed-length matrix."""
     max_size = sequences[0].shape
@@ -49,19 +52,17 @@ def pad_sequence(sequences, padding_value=0, fix_len=None):
         out_tensor[i, :length, ...] = tensor
     return out_tensor
 
-def pad_sequence_paddle(sequences, padding_value=0):
-    """Fill sequences(variable) into a fixed-length matrix"""
-    max_size = sequences[0].shape
-    trailing_dims = max_size[1:]
-    max_len = max([s.shape[0] for s in sequences])
-    out_tensor = []
-    for tensor in sequences:
-        length = tensor.shape[0]
-        pad_tensor = paddle.concat(
-            (tensor, paddle.full(shape=[max_len - length] + trailing_dims, dtype=tensor.dtype, fill_value=padding_value)))            
-        out_tensor.append(pad_tensor)
-    out_tensor = paddle.stack(out_tensor)
-    return out_tensor
+
+def pad_sequence_paddle(inputs, lens, pad_index=0):
+    sequences = []
+    idx = 0
+    for l in lens:
+        sequences.append(inputs[idx:idx+l])
+        idx += l
+    outputs = Pad(pad_val=pad_index)(sequences)
+    output_tensor = paddle.to_tensor(outputs)
+    return output_tensor
+
 
 def fill_diagonal(x, value, offset=0, dim1=0, dim2=1):
     """Fill value into the diagoanl of x that offset is ${offset} and the coordinate system is (dim1, dim2)."""
@@ -87,6 +88,7 @@ def fill_diagonal(x, value, offset=0, dim1=0, dim2=1):
     diagonal[...] = value
     return x
 
+
 def backtrack(p_i, p_c, heads, i, j, complete):
     """Backtrack the position matrix of eisner to generate the tree"""
     if i == j:
@@ -100,6 +102,7 @@ def backtrack(p_i, p_c, heads, i, j, complete):
         i, j = sorted((i, j))
         backtrack(p_i, p_c, heads, i, r, True)
         backtrack(p_i, p_c, heads, j, r + 1, True)
+
 
 def stripe(x, n, w, offset=(0, 0), dim=1):
     r'''Returns a diagonal stripe of the tensor.
@@ -136,6 +139,25 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
                                            strides=[m, k] + list(strides[2:]))
 
 
+def flat_words(words, pad_index=0):
+    mask = words != pad_index
+
+    lens = paddle.sum(paddle.cast(mask, "int64"), axis=-1)
+
+    position = paddle.cumsum(lens + paddle.cast((lens == 0), "int64"), axis=1) - 1
+
+    select = paddle.nonzero(mask)
+    words = paddle.gather_nd(words, select)
+
+    lens = paddle.sum(lens, axis=-1)
+
+    words = pad_sequence_paddle(words, lens, pad_index)
+
+    max_len = words.shape[1]
+    position = mask_fill(position, position >= max_len, max_len - 1)
+    return words, position
+
+
 def index_sample(x, index):
     """Select input value according to index
     
@@ -161,20 +183,29 @@ def index_sample(x, index):
     ]
     """
     x_s = x.shape
-    dim = len(index.shape) - 1
+    dim = len(index.shape) - 1 
     assert x_s[:dim] == index.shape[:dim]
-    r_x = paddle.reshape(x, shape=[-1] + x_s[dim:])
+
+    if len(x_s) == 3 and dim == 1:
+        r_x = paddle.reshape(x, shape=[-1, x_s[1], x_s[-1]])
+    else:
+        r_x = paddle.reshape(x, shape=[-1, x_s[-1]])
+
     index = paddle.reshape(index, shape=[len(r_x), -1, 1])
     # generate arange index, shape like index
     arr_index = paddle.arange(start=0, end=len(index), dtype=index.dtype)
     arr_index = paddle.unsqueeze(arr_index, axis=[1, 2])
-    arr_index = paddle.expand_as(arr_index, index)
+    arr_index = paddle.expand(arr_index, index.shape)
     #  genrate new index
     new_index = paddle.concat((arr_index, index), -1)
     new_index = paddle.reshape(new_index, (-1, 2))
     # get output
     out = paddle.gather_nd(r_x, new_index)
-    out = paddle.reshape(out, x_s[:dim] + [-1])
+    #out = paddle.reshape(out, x_s[:dim] + [-1])
+    if len(x_s) == 3 and dim == 2:
+        out = paddle.reshape(out, shape=[x_s[0], x_s[1], -1])
+    else:
+        out = paddle.reshape(out, shape=[x_s[0], -1])
     return out
 
 

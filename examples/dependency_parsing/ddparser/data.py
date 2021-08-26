@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import math
 import numpy as np
 
@@ -38,10 +39,9 @@ def build_vocab(corpus, tokenizer, encoding_model, feat):
         if feat == "pos":
             feat_vocab = Vocab.build_vocab(
                 feat_examples,
-                token_to_idx={"[BOS]": 0, "[EOS]": 1, "[UNK]": 2},
+                token_to_idx={"[BOS]": 0, "[EOS]": 1},
                 bos_token="[BOS]",
                 eos_token="[EOS]",
-                unk_token="[UNK]",
             )
         else:
             feat_vocab = Vocab.build_vocab(
@@ -59,15 +59,31 @@ def build_vocab(corpus, tokenizer, encoding_model, feat):
     # Construct relation vocab
     rel_vocab = Vocab.build_vocab(
         rel_examples,
-        token_to_idx={"[BOS]": 0, "[EOS]": 1, "[UNK]": 2},
+        token_to_idx={"[BOS]": 0, "[EOS]": 1},
         bos_token="[BOS]",
         eos_token="[EOS]",
-        unk_token="[UNK]",
     )
+    return word_vocab, feat_vocab, rel_vocab
 
-    return [word_vocab, feat_vocab, rel_vocab]
 
-def convert_example(example, tokenizer, vocabs, encoding_model, feat, fix_len=20):
+def load_vocab(vocab_dir):
+    word_vocab = Vocab.from_json(os.path.join(vocab_dir, "word_vocab.json"))
+    rel_vocab = Vocab.from_json(os.path.join(vocab_dir, "rel_vocab.json"))
+    feat_vocab_path = os.path.join(vocab_dir, "feat_vocab.json")
+    if os.path.exists(feat_vocab_path):
+        feat_vocab = Vocab.from_json(os.path.join(feat_vocab_path))
+    else:
+        feat_vocab = None
+    return word_vocab, feat_vocab, rel_vocab
+
+
+def convert_example(example, 
+                    tokenizer, 
+                    vocabs, 
+                    encoding_model, 
+                    feat, 
+                    mode=None, 
+                    fix_len=20):
     word_vocab, feat_vocab, rel_vocab = vocabs
     if encoding_model == "lstm":
         word_bos_index = word_vocab.to_indices("[BOS]")
@@ -85,139 +101,112 @@ def convert_example(example, tokenizer, vocabs, encoding_model, feat, fix_len=20
     rel_bos_index = rel_vocab.to_indices("[BOS]")
     rel_eos_index = rel_vocab.to_indices("[EOS]")  
 
-    arcs = list(example["HEAD"])
-    arcs = [arc_bos_index] + arcs + [arc_eos_index]
-    arcs = np.array(arcs, dtype=np.int64)
+    if mode != "test":
+        arcs = list(example["HEAD"])
+        arcs = [arc_bos_index] + arcs + [arc_eos_index]
+        arcs = np.array(arcs, dtype=int)
 
-    rels = rel_vocab.to_indices(example["DEPREL"])
-    rels = [rel_bos_index] + rels + [rel_eos_index]
-    rels = np.array(rels, dtype=np.int64)
+        rels = rel_vocab.to_indices(example["DEPREL"])
+        rels = [rel_bos_index] + rels + [rel_eos_index]
+        rels = np.array(rels, dtype=int)
+
     if encoding_model == "lstm":
         words = word_vocab.to_indices(example["FORM"])
         words = [word_bos_index] + words + [word_eos_index]
-        words = np.array(words, dtype=np.int64)
+        words = np.array(words, dtype=int)
 
         if feat == "pos":
             feats = feat_vocab.to_indices(example["CPOS"])
             feats = [feat_bos_index] + feats + [feat_eos_index]
-            feats = np.array(feats, dtype=np.int64)
+            feats = np.array(feats, dtype=int)
         else:
             feats = [[feat_vocab.to_indices(token) for token in word] 
                 for word in example["FORM"]]
             feats = [[feat_bos_index]] + feats + [[feat_eos_index]]
-            feats = pad_sequence([np.array(ids[:fix_len], dtype=np.int64)
+            feats = pad_sequence([np.array(ids[:fix_len], dtype=int)
                 for ids in feats], fix_len=fix_len)
-
+        if mode == "test":
+            return words, feats
         return words, feats, arcs, rels
     else:
         words = [tokenizer(word)["input_ids"][1:-1] for word in example["FORM"]]
         words = [[word_bos_index]] + words + [[word_eos_index]]
-        words = pad_sequence([np.array(ids[:fix_len], dtype=np.int64) 
+        words = pad_sequence([np.array(ids[:fix_len], dtype=int) 
             for ids in words], fix_len=fix_len)
-
+        if mode == "test":
+            return [words]
         return words, arcs, rels
 
 
 def create_dataloader(dataset, 
-                      vocabs,
                       batch_size, 
                       mode="train", 
-                      n_buckets=15,
+                      n_buckets=None,
                       trans_fn=None): 
+    """
+    Create dataloader.
+
+    Args:
+        dataset(obj:`paddle.io.Dataset`): Dataset instance.
+        batch_size(obj:`int`, optional, defaults to 1): The sample number of a mini-batch.
+        mode(obj:`str`, optional, defaults to obj:`train`): If mode is 'train', it will 
+            shuffle the dataset randomly.
+        n_buckets(obj:`int`, optional, defaults to `None`): If n_buckets is not None, it will devide 
+            the dataset into n_buckets according to the sequence lengths.
+        trans_fn(obj:`callable`, optional, defaults to `None`): function to convert a 
+            data sample to input ids, etc.
+    """
     if n_buckets:
         word_examples = [seq["FORM"] for seq in dataset]
         lengths = [len(i) + 1 for i in word_examples]
         buckets = dict(zip(*kmeans(lengths, n_buckets)))
-
+    else:
+        buckets = None
     if trans_fn:
         dataset = dataset.map(trans_fn)
 
-    if mode == "train":
-        batch_sampler = BucketsSampler(
-            buckets=buckets, 
-            batch_size=batch_size, 
-            shuffle=True,
-        )
+    if n_buckets:
+        if mode == "train":
+            batch_sampler = BucketsSampler(
+                buckets=buckets, 
+                batch_size=batch_size, 
+                shuffle=True,
+            )
+        else:
+            batch_sampler = BucketsSampler(
+                buckets=buckets, 
+                batch_size=batch_size, 
+                shuffle=False,
+            )
     else:
-        batch_sampler = BucketsSampler(
-            buckets=buckets, 
+        batch_sampler = SequentialSampler(
             batch_size=batch_size, 
-            shuffle=False,
+            corpus_length=len(dataset),
         )
-    dataloader = paddle.io.DataLoader.from_generator(
+
+    data_loader = paddle.io.DataLoader.from_generator(
         capacity=10, 
         return_list=True, 
         use_multiprocess=True,
     )
-    dataloader.set_batch_generator(
+
+    data_loader.set_batch_generator(
         generator_creator(dataset, batch_sampler))
-  
-    return dataloader, buckets
-    
 
-def read_predict_data(filename):
-    """Reads data."""
-    start = 0
-    with open(filename, 'r', encoding='utf-8') as f:
-        lines = []
-        for line in f.readlines():
-            if not line.startswith(" "):
-                if not line.startswith('#') and (len(line) == 1 or line.split()[0].isdigit()):
-                    lines.append(line.strip())
-            else:
-                lines.append("")
-
-    for i, line in enumerate(lines):
-        if not line:
-            values = list(zip(*[j.split('\t') for j in lines[start:i]]))
-            if len(values) == 10:
-                # CONLL-X format (NLPCC13_EVSAM05_HIT style)
-                ID, FORM, LEMMA, CPOS, POS, FEATS, HEAD, DEPREL, PHEAD, PDEPREL = values
-            else:
-                # CONLL-X format (NLPCC13_EVSAM05_THU style)
-                ID, FORM, LEMMA, CPOS, POS, FEATS, HEAD, DEPREL = values
-            if values and len(values) == 10:
-                yield {
-                    "ID": ID,
-                    "FORM": FORM,
-                    "LEMMA": LEMMA,
-                    "CPOS": CPOS, 
-                    "POS": POS,
-                    "FEATS": FEATS,
-                    "HEAD": HEAD, 
-                    "DEPREL": DEPREL,
-                    "PHEAD": PHEAD,
-                    "PDEPREL": PDEPREL,
-                }
-            else:
-                yield {
-                    "ID": ID,
-                    "FORM": FORM,
-                    "LEMMA": LEMMA,
-                    "CPOS": CPOS, 
-                    "POS": POS,
-                    "FEATS": FEATS,
-                    "HEAD": HEAD, 
-                    "DEPREL": DEPREL,
-                }                
-            start = i + 1  
-
-
-def collate_fn(batch):
-    """Return batch samples"""
-    return (raw for raw in zip(*batch))
+    return data_loader, buckets
 
 
 def generator_creator(dataset, batch_sampler):
+    def _collate_fn(batch):
+        """Return batch samples"""
+        return (raw for raw in zip(*batch))
     def __reader():
         for batch_sample_id in batch_sampler:
             batch = []
-            raw_batch = collate_fn([dataset[sample_id] for sample_id in batch_sample_id])
+            raw_batch = _collate_fn([dataset[sample_id] for sample_id in batch_sample_id])
             for data in raw_batch:
                 if isinstance(data[0], np.ndarray):
                     data = pad_sequence(data)
-                elif isinstance(data[0], Iterable):
-                    data = [pad_sequence(f) for f in zip(*data)]
                 batch.append(data)
             yield batch
     return __reader
@@ -248,3 +237,22 @@ class BucketsSampler(object):
     def __len__(self):
         """Returns the number of batches"""
         return sum(self.chunks)
+
+
+class SequentialSampler(object):
+    """SequentialSampler"""
+    def __init__(self, batch_size, corpus_length):
+        self.batch_size = batch_size
+        self.corpus_length = corpus_length
+
+    def __iter__(self):
+        """iter"""
+        batch = []
+        for i in range(self.corpus_length):
+            batch.append(i)
+            if len(batch) == self.batch_size:
+                yield batch
+                batch = []
+        else:
+            if len(batch):
+                yield batch

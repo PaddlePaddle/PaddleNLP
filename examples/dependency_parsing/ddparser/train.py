@@ -25,16 +25,16 @@ from paddlenlp.transformers.optimization import LinearDecayWithWarmup
 from paddlenlp.datasets import load_dataset
 
 from data import create_dataloader, build_vocab, convert_example
-from model.dep import BiaffineDependencyModel
+from model.dep import BiaffineParser
 from metric import ParserEvaluator
 from criterion import ParserCriterion
-from utils import decode, index_sample
+from utils import decode, flat_words
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 # Train
 parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--dataset", choices=["nlpcc13_evsam05_thu", "nlpcc13_evsam05_hit"], type=str, default="nlpcc13_evsam05_thu", help="Select the dataset to train")
+parser.add_argument("--task_name", choices=["nlpcc13_evsam05_thu", "nlpcc13_evsam05_hit"], type=str, default="nlpcc13_evsam05_thu", help="Select the task.")
 parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
 parser.add_argument("--epochs", type=int, default=100, help="Number of epoches for training.")
 parser.add_argument("--save_dir", type=str, default='model_file/', help="Directory to save model parameters.")
@@ -81,7 +81,8 @@ def batch_evaluate(
     for batch in data_loader():
         if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
             words, arcs, rels = batch
-            s_arc, s_rel, words = model(words)
+            words, feats = flat_words(words)
+            s_arc, s_rel, words = model(words, feats)
         else:
             words, feats, arcs, rels = batch
             s_arc, s_rel, words = model(words, feats)   
@@ -120,8 +121,7 @@ def do_train(args):
     else:
         tokenizer = None
 
-    train_ds, dev_ds, test_ds = load_dataset(
-        args.dataset, splits=["train", "dev", "test"])
+    train_ds, dev_ds = load_dataset(args.task_name, splits=["train", "dev"])
 
     # Build the vocabs based on train corpus
     word_examples = [seq["FORM"] for seq in train_ds]
@@ -162,7 +162,6 @@ def do_train(args):
         word_eos_index = word_vocab.to_indices("[SEP]")
 
     n_rels, n_words = len(rel_vocab), len(word_vocab)
-
     trans_fn = partial(
         convert_example, 
         tokenizer=tokenizer,
@@ -172,7 +171,6 @@ def do_train(args):
     )
     train_data_loader, buckets = create_dataloader(
         train_ds,
-        vocabs=vocabs,
         batch_size=args.batch_size,
         mode="train",
         n_buckets=args.n_buckets,
@@ -180,17 +178,8 @@ def do_train(args):
     )
     dev_data_loader, _ = create_dataloader(
         dev_ds,
-        vocabs=vocabs,
         batch_size=args.batch_size,
         mode="dev",
-        n_buckets=args.n_buckets,
-        trans_fn=trans_fn,
-    )
-    test_data_loader, _ = create_dataloader(
-        test_ds,
-        vocabs=vocabs,
-        batch_size=args.batch_size,
-        mode="test",
         n_buckets=args.n_buckets,
         trans_fn=trans_fn,
     )
@@ -204,7 +193,7 @@ def do_train(args):
         pretrained_model = None
 
     # Load ddparser model
-    model = BiaffineDependencyModel(
+    model = BiaffineParser(
         encoding_model=args.encoding_model,
         feat=args.feat,
         n_rels=n_rels,
@@ -253,7 +242,7 @@ def do_train(args):
         )
 
     # Load metric and criterion
-    best_dev_las = 0
+    best_las = 0
     metric = ParserEvaluator()
     criterion = ParserCriterion()
 
@@ -264,7 +253,8 @@ def do_train(args):
         for inputs in train_data_loader():
             if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
                 words, arcs, rels = inputs
-                s_arc, s_rel, words = model(words)
+                words, feats = flat_words(words)
+                s_arc, s_rel, words = model(words, feats)
             else:
                 words, feats, arcs, rels = inputs
                 s_arc, s_rel, words = model(words, feats)
@@ -289,7 +279,7 @@ def do_train(args):
 
         if rank == 0:
             # Evaluate on dev dataset
-            dev_loss, dev_uas, dev_las = batch_evaluate(
+            loss, uas, las = batch_evaluate(
                 model, 
                 metric, 
                 criterion, 
@@ -298,26 +288,15 @@ def do_train(args):
                 word_bos_index,
                 word_eos_index,
             )
-            print("dev eval loss: %.5f, UAS: %.2f%%, LAS: %.2f%%" % (dev_loss, dev_uas*100, dev_las*100))
+            print("eval loss: %.5f, UAS: %.2f%%, LAS: %.2f%%" % (loss, uas*100, las*100))
             # Save model parameter of last epoch
             save_param_path = os.path.join(args.save_dir, "last_epoch.pdparams")
             paddle.save(model.state_dict(), save_param_path)       
-            # Save the model if it get a higher las
-            if dev_las > best_dev_las:
+            # Save the model if it get a higher score of las
+            if las > best_las:
                 save_param_path = os.path.join(args.save_dir, "best.pdparams")
                 paddle.save(model.state_dict(), save_param_path)  
-                best_dev_las = dev_las
-            # Evaluate on test dataset
-            test_loss, test_uas, test_las = batch_evaluate(
-                model, 
-                metric, 
-                criterion, 
-                test_data_loader,
-                word_pad_index,
-                word_bos_index,
-                word_eos_index,
-            )
-            print("test eval loss: %.5f, UAS: %.2f%%, LAS: %.2f%%" % (test_loss, test_uas*100, test_las*100))  
+                best_las = las 
 
 
 if __name__ == "__main__":
