@@ -79,6 +79,7 @@ def do_train(args):
 
     worker_index = paddle.distributed.get_rank()
     worker_num = paddle.distributed.get_world_size()
+    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     set_seed(args)
     # Now, we only support data parallel in dygraph mode for now.
     topo = Topology(
@@ -172,16 +173,17 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_"
-                not in str(f))
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz"
+                in str(f))
         ]
+        files = [x.replace("_idx.npz", "") for x in files]
         files.sort()
         num_files = len(files)
         for f_id in range(num_files):
             data_file = files[f_id]
             train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                args,
-                data_file,
+                args, [data_file],
+                local_rank=local_rank,
                 data_world_size=topo.data_info.size,
                 data_world_rank=topo.data_info.rank,
                 eos_id=tokenizer.eos_token_id)
