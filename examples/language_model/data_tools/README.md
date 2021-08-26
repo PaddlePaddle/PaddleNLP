@@ -31,7 +31,7 @@
  - numpy
  - pybind11
 
-安装命令`pip install tqdm numpy pybind11`。另，部分功能需要`g++>4.8`编译支持
+安装命令`pip install tqdm numpy pybind11`。另，部分功能需要`g++>=4.8`编译支持
 
 
 ## 训练全流程数据Pipeline
