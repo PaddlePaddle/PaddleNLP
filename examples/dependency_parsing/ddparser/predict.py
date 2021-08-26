@@ -21,18 +21,17 @@ from functools import partial
 import numpy as np
 import paddle
 import paddlenlp as ppnlp
-from paddlenlp.data import Vocab
 from paddlenlp.datasets import load_dataset
 
-from data import create_dataloader, read_predict_data, convert_example
-from model.dep import BiaffineDependencyModel
-from utils import decode, index_sample
+from data import create_dataloader, convert_example, load_vocab
+from model.dep import BiaffineParser
+from utils import decode, index_sample, flat_words
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 # Predict
-parser.add_argument("--predict_data_file", type=str, default=None, required=True, help="The path of test dataset to be loaded.")
-parser.add_argument("--model_file_path", type=str, default='model_file/best.pdparams', required=True, help="Directory to load model parameters.")
+parser.add_argument("--params_path", type=str, default='model_file/best.pdparams', required=True, help="Directory to load model parameters.")
+parser.add_argument("--task_name", choices=["nlpcc13_evsam05_thu", "nlpcc13_evsam05_hit"], type=str, default="nlpcc13_evsam05_thu", help="Select the task.")
 parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
 parser.add_argument("--batch_size", type=int, default=1000, help="Numbers of examples a batch for training.")
@@ -57,18 +56,23 @@ def batch_predict(
         word_bos_index,
         word_eos_index,
     ):
+    
+    model.eval()
     arcs, rels = [], []
     for inputs in data_loader():
         if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
             words = inputs[0]
-            s_arc, s_rel, words = model(words)
+            words, feats = flat_words(words)
+            s_arc, s_rel, words = model(words, feats)
         else:
             words, feats = inputs
             s_arc, s_rel, words = model(words, feats)
+
         mask = paddle.logical_and(
             paddle.logical_and(words != word_pad_index, words != word_bos_index),
             words != word_eos_index,
         )
+
         lens = paddle.sum(paddle.cast(mask, "int32"), axis=-1)
         arc_preds, rel_preds = decode(s_arc, s_rel, mask)
         arcs.extend(paddle.split(paddle.masked_select(arc_preds, mask), lens.numpy().tolist()))
@@ -91,21 +95,13 @@ def do_predict(args):
         tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained("ernie-1.0")
     else:
         tokenizer = None
-    
-    predict_ds = load_dataset(read_predict_data, filename=args.predict_data_file, lazy=False)
-    predict_ds_copy = copy.deepcopy(predict_ds)
 
     # Load vocabs from model file path
-    vocab_dir = os.path.split(args.model_file_path)[0]
-    word_vocab = Vocab.from_json(os.path.join(vocab_dir, "word_vocab.json"))
-    rel_vocab = Vocab.from_json(os.path.join(vocab_dir, "rel_vocab.json"))
-    feat_vocab_path = os.path.join(vocab_dir, "feat_vocab.json")
-    if os.path.exists(feat_vocab_path):
-        feat_vocab = Vocab.from_json(os.path.join(feat_vocab_path))
-    else:
-        feat_vocab = None
+    vocab_dir = os.path.split(args.params_path)[0]
+    word_vocab, feat_vocab, rel_vocab = load_vocab(vocab_dir)
 
-    if feat_vocab:
+    n_rels, n_words = len(rel_vocab), len(word_vocab)
+    if args.encoding_model == "lstm":
         n_feats = len(feat_vocab)
         word_pad_index = word_vocab.to_indices("[PAD]")
         word_bos_index = word_vocab.to_indices("[BOS]")
@@ -116,22 +112,22 @@ def do_predict(args):
         word_bos_index = word_vocab.to_indices("[CLS]")
         word_eos_index = word_vocab.to_indices("[SEP]")
 
-    n_rels, n_words = len(rel_vocab), len(word_vocab)
-    vocabs = [word_vocab, feat_vocab, rel_vocab]
+    test_ds = load_dataset(args.task_name, splits=["test"])
+    test_ds_copy = copy.deepcopy(test_ds)
 
     trans_fn = partial(
         convert_example,
         tokenizer=tokenizer,
-        vocabs=vocabs,
+        vocabs=[word_vocab, feat_vocab, rel_vocab],
         encoding_model=args.encoding_model,
         feat=args.feat,
+        mode="test",
     )
 
-    predict_data_loader, buckets = create_dataloader(
-        predict_ds,
-        vocabs=vocabs,
+    test_data_loader, buckets = create_dataloader(
+        test_ds,
         batch_size=args.batch_size,
-        mode="predict",
+        mode="test",
         n_buckets=args.n_buckets,
         trans_fn=trans_fn,
     )
@@ -144,8 +140,8 @@ def do_predict(args):
     else:
         pretrained_model = None
 
-    # Load ddparser model
-    model = BiaffineDependencyModel(
+    # Load model
+    model = BiaffineParser(
         encoding_model=args.encoding_model,
         feat=args.feat,
         n_rels=n_rels,
@@ -157,17 +153,17 @@ def do_predict(args):
     )
     
     # Load saved model parameters
-    if os.path.isfile(args.model_file_path):
-        state_dict = paddle.load(args.model_file_path)
+    if os.path.isfile(args.params_path):
+        state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
-        print("Loaded parameters from %s" % args.model_file_path)
+        print("Loaded parameters from %s" % args.params_path)
     else:
         raise ValueError("The parameters path is incorrect or not specified.")
 
     # Start predict
     pred_arcs, pred_rels = batch_predict(
         model,         
-        predict_data_loader,
+        test_data_loader,
         rel_vocab, 
         word_pad_index,
         word_bos_index,
@@ -175,12 +171,15 @@ def do_predict(args):
     )
 
     # Restore the order of sentences in the buckets
-    indices = np.argsort(np.array([i for bucket in buckets.values() for i in bucket]))
+    if buckets:
+        indices = np.argsort(np.array([i for bucket in buckets.values() for i in bucket]))
+    else:
+        indices = range(len(pred_arcs))
     pred_heads = [pred_arcs[i] for i in indices]
     pred_deprels = [pred_rels[i] for i in indices]
 
     with open(args.infer_output_file, 'w', encoding='utf-8') as out_file:
-        for res, head, rel in zip(predict_ds_copy, pred_heads, pred_deprels):
+        for res, head, rel in zip(test_ds_copy, pred_heads, pred_deprels):
             res["HEAD"] = tuple(head)
             res["DEPREL"] = tuple(rel)
             res = '\n'.join('\t'.join(map(str, line)) for line in zip(*res.values())) + '\n'

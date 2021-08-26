@@ -1,16 +1,15 @@
 # DDParser
 
 * [模型简介](#模型简介)
+    * [模型效果](#模型效果)
 * [数据格式](#数据格式)
+* [数据准备](#数据准备)
+* [文件结构](#文件结构)
 * [快速开始](#快速开始)
-    * [环境依赖](#环境依赖)
-    * [文件结构](#文件结构)
-    * [数据准备](#数据准备)
-    * [模型训练](#模型训练)
-    * [模型评估](#模型评估)
-    * [模型预测](#模型预测)
-    * [可配置参数说明](#可配置参数说明)
-* [致谢](#致谢)
+    * [LSTMEncoder+MLP+BiAffine](#LSTMEncoder+MLP+BiAffine)
+    * [LSTMByWPEncoder+MLP+BiAffine](#LSTMByWPEncoder+MLP+BiAffine)
+    * [ErnieEncoder+MLP+BiAffine](#ErnieEncoder+MLP+BiAffine)
+    * [参数释义](#参数释义)
 * [Reference](#Reference)
 
 ## 模型简介
@@ -27,29 +26,27 @@
 
 #### NLPCC2013_EVSAM05_THU
 
-| model                     |      dev      |      test     |
-| ------------------------- | :---: | ----: | :---: | ----: |
-|                           |  UAS  |   LAS |  UAS  |   LAS |
-| `baseline`                | 81.49 | 72.17 | 84.68 | 76.02 |
-| `biaffine-dep(+char)`     | 84.11 | 75.16 | 85.31 | 76.73 |
-| `biaffine-dep(+pos-tag)`  | 83.28 | 74.20 | 84.54 | 75.33 |
-| `biaffine-dep-lstm-pe`    | 81.02 | 71.20 | 82.86 | 73.86 |
-| `biaffine-dep-ernie-tiny` | 89.02 | 81.39 | 89.31 | 81.51 |
-| `biaffine-dep-ernie-1.0`  | 92.25 | 84.77 | 92.12 | 84.62 |
-| `biaffine-dep-ernie-gram` | 92.20 | 85.10 | 91.96 | 84.10 |
+| model                     | dev UAS | dev LAS | test UAS | test LAS |
+| ------------------------- | :-----: | :------:| :-------:| :-------:|
+| `baseline`                |  81.49  |  72.17  |  84.68   |  76.02   |
+| `biaffine-dep(+char)`     |  84.11  |  75.16  |  85.31   |  76.73   |
+| `biaffine-dep(+pos-tag)`  |  83.28  |  74.20  |  84.54   |  75.33   |
+| `biaffine-dep-lstm-pe`    |  81.02  |  71.20  |  82.86   |  73.86   |
+| `biaffine-dep-ernie-tiny` |  89.02  |  81.39  |  89.31   |  81.51   |
+| `biaffine-dep-ernie-1.0`  |  92.25  |  84.77  |  92.12   |  84.62   |
+| `biaffine-dep-ernie-gram` |  92.20  |  85.10  |  91.96   |  84.10   |
 
 #### NLPCC2013_EVSAM05_HIT
 
-| model                     |      dev      |      test     |
-| ------------------------- | :---: | ----: | :---: | ----: |
-|                           |  UAS  |   LAS |  UAS  |   LAS |
-| `baseline`                | 82.96 | 65.45 | 82.65 | 65.25 |
-| `biaffine-dep(+char)`     | 80.90 | 65.29 | 80.77 | 65.43 |
-| `biaffine-dep(+pos-tag)`  | 83.85 | 68.27 | 83.75 | 68.04 |
-| `biaffine-dep-lstm-pe`    | 77.48 | 61.34 | 76.41 | 60.32 |
-| `biaffine-dep-ernie-tiny` | 84.21 | 68.89 | 83.98 | 68.67 |
-| `biaffine-dep-ernie-1.0`  | 89.24 | 74.12 | 88.64 | 74.09 |
-| `biaffine-dep-ernie-gram` | 89.59 | 74.75 | 88.79 | 74.46 |
+| model                     | dev UAS | dev LAS | test UAS | test LAS |
+| ------------------------- | :-----: | :------:| :-------:| :-------:|
+| `baseline`                |  82.96  |  65.45  |  82.65   |  65.25   |
+| `biaffine-dep(+char)`     |  80.90  |  65.29  |  80.77   |  65.43   |
+| `biaffine-dep(+pos-tag)`  |  83.85  |  68.27  |  83.75   |  68.04   |
+| `biaffine-dep-lstm-pe`    |  77.48  |  61.34  |  76.41   |  60.32   |
+| `biaffine-dep-ernie-tiny` |  84.21  |  68.89  |  83.98   |  68.67   |
+| `biaffine-dep-ernie-1.0`  |  89.24  |  74.12  |  88.64   |  74.09   |
+| `biaffine-dep-ernie-gram` |  89.59  |  74.75  |  88.79   |  74.46   |
 
 其中`lstm-pe`表示lstm by positional encoding，`biaffine-dep`的模型输入可以选择句子的word级表示加char级表示（`biaffine-dep(+char)`）或者句子的word级表示加上pos词性标签（`biaffine-dep(+pos)`），其他模型使用句子的word级表示和char级表示。
 
@@ -101,9 +98,7 @@ ID      FROM   LEMMA CPOSTAG POSTAG  FEATS   HEAD     DEPREL        PHEAD PDEPRE
 
 - 该用例中用户只需关注`FORM`、`POSTTAG`、`HEAD`和`DEPREL`这几列信息即可，'_'表示数值不可用。
 
-## 快速开始
-
-### 数据准备
+## 数据准备
 
 该用例使用的是[第二届自然语言处理与中文计算会议（NLP&CC 2013）](http://tcci.ccf.org.cn/conference/2013/pages/page04_sam.html)
 提供的数据集，其中`NLPCC2013_EVSAM05_THU`为清华大学语义依存网络语料，`NLPCC2013_EVSAM05_HIT`为哈尔滨工业大学依存网络语料。
@@ -122,13 +117,15 @@ from paddlenlp.datasets import load_dataset
 train_ds, dev_ds, test_ds = load_dataset("nlpcc13_evsam05_hit", splits=["train", "dev", "test"])
 ```
 
-
-### 文件结构
+## 文件结构
 
 以下是本项目主要代码结构及说明：
 
 ```text
 ddparser/
+├── deploy # 部署
+│   └── python
+│       └── predict.py # python预测部署示例
 ├── model
 │   ├── dropouts.py # dropout
 │   ├── encoder.py # 编码器
@@ -142,7 +139,13 @@ ddparser/
 └── utils.py # 工具函数
 ```
 
-### 模型训练与评估
+## 快速开始
+
+本项目提供了三种模型结构：LSTMEncoder+MLP+BiAffine、LSTMByWPEncoder+MLP+BiAffine和ErnieEncoder+MLP+BiAffine，用户可通过`--encoding_model`指定所使用的模型结构。
+
+### LSTMEncoder+MLP+BiAffine
+
+#### 训练
 
 通过如下命令，指定GPU 0卡，以`lstm`为encoder在`nlpcc13_evsam05_thu`数据集上训练与评估：
 
@@ -151,13 +154,75 @@ unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
     --device=gpu \
     --epochs=100 \
-    --dataset=nlpcc13_evsam05_thu \
-    --save_dir=model_file \
+    --task_name=nlpcc13_evsam05_thu \
+    --save_dir=./model_file \
     --encoding_model=lstm \
     --feat=pos \
     --batch_size=1000 \
     --lstm_lr=0.002
 ```
+
+#### 基于动态图的预测
+
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python -m paddle.distributed.launch --gpus "0" predict.py \
+    --device=gpu \
+    --task_name=nlpcc13_evsam05_thu \
+    --encoding_model=lstm \
+    --feat=pos \
+    --params_path=./model_file/best.pdparams \
+    --infer_output_file=infer_output.conll 
+```
+
+### LSTMByWPEncoder+MLP+BiAffine
+
+#### 训练
+
+通过如下命令，指定GPU 0卡，以`lstm-pe`为encoder在`nlpcc13_evsam05_hit`数据集上训练与评估：
+
+```shell
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" train.py \
+    --device=gpu \
+    --epochs=100 \
+    --task_name=nlpcc13_evsam05_hit \
+    --encoding_model=lstm-pe \
+    --save_dir=./model_file \
+    --ernie_lr=0.002 
+```
+
+#### 基于动态图的预测
+
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python -m paddle.distributed.launch --gpus "0" predict.py \
+    --device=gpu \
+    --task_name=nlpcc13_evsam05_hit \
+    --encoding_model=lstm-pe \
+    --params_path=./model_file/best.pdparams \
+    --infer_output_file=infer_output.conll 
+```
+
+#### 基于静态图的预测部署
+
+使用动态图训练结束后，可以将动态图参数导出成静态图参数， 从而获得较优的预测部署性能，执行如下命令完成动态图转换静态图的功能：
+
+```shell
+python export_model.py --params_path=./model_file/best.pdparams --output_path=./output 
+
+```
+
+导出静态图模型之后，可以用于部署，`deploy/python/predict.py`脚本提供了python部署预测示例。运行方式：
+```shell
+python deploy/python/predict.py --encoding_model=lstm-pe \
+                                --model_dir=./output \
+                                --task_name=nlpcc13_evsam05_hit
+```
+
+### ErnieEncoder+MLP+BiAffine
+
+#### 训练
 
 通过如下命令，指定GPU 0卡，以预训练模型`ernie-gram-zh`为encoder在`nlpcc13_evsam05_hit`数据集上训练与评估：
 
@@ -166,17 +231,48 @@ unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
     --device=gpu \
     --epochs=100 \
-    --dataset=nlpcc13_evsam05_hit \
+    --task_name=nlpcc13_evsam05_hit \
     --encoding_model=ernie-gram-zh \
-    --save_dir=model_file \
+    --save_dir=./model_file \
     --ernie_lr=5e-5 \
     --warmup_propotion=0.02 \
     --weight_decay=0.01
 ```
 
-参数释义如下：
+#### 基于动态图的预测
+
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python -m paddle.distributed.launch --gpus "0" predict.py \
+    --device=gpu \
+    --task_name=nlpcc13_evsam05_hit \
+    --encoding_model=ernie-gram-zh \
+    --params_path=./model_file/best.pdparams \
+    --infer_output_file=infer_output.conll 
+```
+
+#### 基于静态图的预测部署
+
+使用动态图训练结束后，可以将动态图参数导出成静态图参数， 从而获得较优的预测部署性能，执行如下命令完成动态图转换静态图的功能：
+
+```shell
+python export_model.py --params_path=./model_file/best.pdparams --output_path=./output 
+
+```
+
+导出静态图模型之后，可以用于部署，`deploy/python/predict.py`脚本提供了python部署预测示例。运行方式：
+```shell
+python deploy/python/predict.py --encoding_model=ernie-gram-zh \
+                                --model_dir=./output \
+                                --task_name=nlpcc13_evsam05_hit
+```
+
+### 参数释义
+
+项目中的参数具体说明如下：
+
 * `device`: 选用什么设备进行训练，可选cpu、gpu或xpu。如使用gpu训练则参数gpus指定GPU卡号。
-* `dataset`: 选择训练所用的数据集，可选nlpcc13_evsam05_thu和nlpcc13_evsam05_hit。
+* `task_name`: 选择训练所用的数据集，可选nlpcc13_evsam05_thu和nlpcc13_evsam05_hit。
 * `encoding_model`: 选择模型编码网络，可选lstm、lstm-pe、ernie-1.0、ernie-tiny和ernie-gram-zh。
 * `epochs`: 训练轮数。
 * `save_dir`: 保存训练模型的路径；默认将当前在验证集上LAS指标最高的模型`best.pdparams`和训练最近一个epoch的模型`last_epoch.pdparams`保存在目录model_file文件夹下。
@@ -193,36 +289,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `warmup_proportion`: 学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.0。
 * `weight_decay`: 控制正则项力度的参数，用于防止过拟合，默认为0.0。
 
-### 模型预测
-
-通过以下命令，指定GPU 0卡，对`${predict_data_file}`进行预测：
-
-```shell
-export CUDA_VISIBLE_DEVICES=0
-python -m paddle.distributed.launch --gpus "0" predict.py \
-    --device=gpu \
-    --encoding_model=ernie-gram-zh
-    --predict_data_file=${predict_data_file} \
-    --model_file_path=model_file/best.pdparams \
-    --infer_output_file=infer_output.conll \
-    --tree
-```
-
-NOTE: `--predict_data_file`指定的数据文件需符合[CONLL数据格式](#数据格式)。`--encoding_model`指定的encoder需与`--model_file_path`模型参数文件所使用的encoder一致。
-
-### 可配置参数说明
-
-* `predict_data_file`: 待预测文件路径。
-* `model_file_path`: 评估和预测模式下的使用参数，设置后会从该路径加载已训练保存的模型文件进行模型预测，默认为model_file文件夹。
-* `device`: 选用什么设备进行训练，可选cpu、gpu或xpu。如使用gpu训练则参数gpus指定GPU卡号。
-* `encoding_model`: 选择模型编码网络，可选lstm、lstm-pe、ernie-1.0、ernie-tiny和ernie-gram-zh。
-* `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为1000。
-* `infer_output_file`: 预测结果保存路径，默认保存为infer_output.conll。
-* `n_buckets`: 选择数据分桶数，对训练数据按照长度进行分桶。
-* `tree`: 确保输出结果是正确的依存句法树，默认为True。
-* `feat`: 模型编码网络为lstm时的使用参数，选择输入的特征，可选char（句子的char级表示）和pos（词性标签）；ernie类别的模型只能为None。
-
 ## Reference
 
-- [Deep Biaffine Attention for Neural Dependency Parsing](https://arxiv.org/abs/1611.01734)
 - [baidu/ddparser](https://github.com/baidu/DDParser)
+- [Deep Biaffine Attention for Neural Dependency Parsing](https://arxiv.org/abs/1611.01734)

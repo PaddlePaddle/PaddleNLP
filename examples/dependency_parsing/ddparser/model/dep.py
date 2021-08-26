@@ -14,13 +14,12 @@
 
 import paddle
 import paddle.nn as nn
-from paddle.fluid import layers
 
 from model.dropouts import SharedDropout
 from model.encoder import LSTMEncoder, LSTMByWPEncoder, ErnieEncoder
 
 
-class BiaffineDependencyModel(nn.Layer):
+class BiaffineParser(nn.Layer):
     """DDParser"""
     def __init__(self,
                  encoding_model,
@@ -34,7 +33,7 @@ class BiaffineDependencyModel(nn.Layer):
                  n_mlp_arc=500,
                  n_mlp_rel=100,
                  mlp_dropout=0.33):
-        super(BiaffineDependencyModel, self).__init__()
+        super(BiaffineParser, self).__init__()
         self.pad_index = pad_index
         self.eos_index = eos_index
 
@@ -55,7 +54,7 @@ class BiaffineDependencyModel(nn.Layer):
         self.arc_attn = BiAffine(n_in=n_mlp_arc, bias_x=True, bias_y=False)
         self.rel_attn = BiAffine(n_in=n_mlp_rel, n_out=n_rels, bias_x=True, bias_y=True)
 
-    def forward(self, words, feats=None):
+    def forward(self, words, feats):
 
         words, x = self.embed(words, feats)
         mask = paddle.logical_and(words != self.pad_index, words != self.eos_index)
