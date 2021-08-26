@@ -532,13 +532,12 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
     def generate_logits_mask(self, use_fp16_decoding):
         # pre-process distribution
-        d_type = "float16" if use_fp16_decoding and self._decoding_strategy == "sampling" else "float32"
         logits_mask = np.zeros(shape=[self.vocab_size], dtype=np.float32)
         logits_mask[self.unk_token_id] = -1e9
         logits_mask[self.bos_token_id] = -1e9
         logits_mask[self.pad_token_id] = -1e9
         logits_mask_t = paddle.assign(logits_mask)
-        if d_type == "float16":
+        if use_fp16_decoding and self._decoding_strategy == "sampling":
             return paddle.cast(logits_mask_t, dtype="float16")
         else:
             return logits_mask_t
