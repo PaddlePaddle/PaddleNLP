@@ -363,7 +363,7 @@ class BertTokenizer(PretrainedTokenizer):
         "macbert-base-chinese": {
             "do_lower_case": False
         },
-        "simbert-base-chinese":{
+        "simbert-base-chinese": {
             "do_lower_case": True
         },
     }
@@ -433,6 +433,7 @@ class BertTokenizer(PretrainedTokenizer):
 
                 berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
                 tokens = berttokenizer.tokenize('He was a puppeteer')
+                
                 '''
                 ['he', 'was', 'a', 'puppet', '##eer']
                 '''
