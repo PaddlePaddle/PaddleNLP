@@ -5,6 +5,7 @@ import paddle
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 from paddlenlp.metrics import BLEU, Distinct
+from paddlenlp.ops import FasterUnifiedTransformer
 
 from utils import print_args, set_seed, create_data_loader, select_response
 
@@ -31,6 +32,10 @@ def parse_args():
     parser.add_argument('--length_penalty', type=float, default=1.0, help='The exponential penalty to the sequence length for beam search.')
     parser.add_argument('--early_stopping', type=eval, default=False, help='Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.')
     parser.add_argument('--device', type=str, default='gpu', help='The device to select for training the model.')
+    parser.add_argument('--faster', action='store_true', help='Whether to process inference using faster transformer. ')
+    parser.add_argument('--use_fp16_decoding', action='store_true', help='Whether to use fp16 when using faster transformer. Only works when using faster transformer. ')
+    parser.add_argument('--decoding_lib', type=str, default='../../../paddlenlp/ops/build/lib/libdecoding.so', help='The decoding lib of faster transformer. ')
+    parser.add_argument('--decoding_type_id', type=int, default=1, help='The token type id used for decoding. Only works when using faster transformer. ')
 
     args = parser.parse_args()
     return args
@@ -78,17 +83,25 @@ def infer(args):
     test_ds, test_data_loader = create_data_loader(test_ds, tokenizer, args,
                                                    'test')
 
+    if args.faster:
+        model = FasterUnifiedTransformer(
+            model,
+            decoding_strategy=args.decode_strategy,
+            decoding_lib=args.decoding_lib,
+            use_fp16_decoding=args.use_fp16_decoding)
+
     model.eval()
     total_time = 0.0
     start_time = time.time()
     pred_responses = []
     for step, inputs in enumerate(test_data_loader, 1):
-        input_ids, token_type_ids, position_ids, attention_mask = inputs
-        ids, scores = model.generate(
+        input_ids, token_type_ids, position_ids, attention_mask, seq_len = inputs
+        output = model.generate(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
+            seq_len=seq_len,
             max_length=args.max_dec_len,
             min_length=args.min_dec_len,
             decode_strategy=args.decode_strategy,
@@ -105,8 +118,14 @@ def infer(args):
             print('step %d - %.3fs/step' %
                   (step, total_time / args.logging_steps))
             total_time = 0.0
-        results = select_response(ids, scores, tokenizer, args.max_dec_len,
-                                  args.num_return_sequences)
+
+        if args.faster:
+            ids = output
+            results = select_response(ids, None, tokenizer)
+        else:
+            ids, scores = output
+            results = select_response(ids, scores, tokenizer, args.max_dec_len,
+                                      args.num_return_sequences)
         pred_responses.extend(results)
 
         start_time = time.time()

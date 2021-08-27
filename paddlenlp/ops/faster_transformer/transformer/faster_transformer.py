@@ -22,10 +22,12 @@ import paddle.nn.functional as F
 from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     PositionalEmbedding, position_encoding_init,
                                     InferTransformerModel, GPTModel)
-from paddlenlp.ops import InferTransformerDecoding, InferGptDecoding
+from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
+                           InferUnifiedDecoding)
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
+from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
+                                    UnifiedTransformerPretrainedModel)
 
 
 class FasterTransformer(TransformerModel):
@@ -479,3 +481,145 @@ class FasterGPT(nn.Layer):
             shutil.copyfile(tokenizer._merges_file, merges_file)
         elif isinstance(tokenizer, GPTChineseTokenizer):
             tokenizer.save_resources(path)
+
+
+class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
+    def __init__(self,
+                 model,
+                 decoding_strategy="sampling",
+                 decoding_lib=None,
+                 use_fp16_decoding=False):
+        super(FasterUnifiedTransformer, self).__init__()
+        self._model = model
+        self._decoding_strategy = decoding_strategy
+        self.bos_token_id = model.bos_token_id
+        self.pad_token_id = model.pad_token_id
+        self.eos_token_id = model.eos_token_id
+        self.unk_token_id = model.unk_token_id
+        self.vocab_size = model.lm_head.decoder_bias.shape[0]
+        self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
+
+        self.decoding = InferUnifiedDecoding(
+            model=self._model,
+            decoding_strategy=self._decoding_strategy,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=use_fp16_decoding,
+            logits_mask=self.logits_mask)
+
+    def prepare_inputs_for_generation(self,
+                                      input_ids,
+                                      token_type_ids,
+                                      position_ids,
+                                      attention_mask,
+                                      use_cache=False,
+                                      cache=None,
+                                      **kwargs):
+        input_ids = input_ids[:, :-1]
+        decoding_type_id = token_type_ids[:, -1]
+        token_type_ids = token_type_ids[:, :-1]
+        position_ids = position_ids[:, :-1]
+        attention_mask = attention_mask[:, :, :-1, :-1]
+        seq_len = kwargs.get("seq_len", None) - 1
+
+        return {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "position_ids": position_ids,
+            "attention_mask": attention_mask,
+            "use_cache": use_cache,
+            "cache": cache,
+            "seq_len": seq_len,
+            "decoding_type_id": paddle.cast(
+                decoding_type_id, dtype="int32")
+        }
+
+    def generate_logits_mask(self, use_fp16_decoding):
+        # pre-process distribution
+        logits_mask = np.zeros(shape=[self.vocab_size], dtype=np.float32)
+        logits_mask[self.unk_token_id] = -1e9
+        logits_mask[self.bos_token_id] = -1e9
+        logits_mask[self.pad_token_id] = -1e9
+        logits_mask_t = paddle.assign(logits_mask)
+        if use_fp16_decoding and self._decoding_strategy == "sampling":
+            return paddle.cast(logits_mask_t, dtype="float16")
+        else:
+            return logits_mask_t
+
+    def sample(self,
+               input_ids,
+               logits_processors,
+               max_length,
+               pad_token_id,
+               eos_token_id,
+               top_k=4,
+               top_p=0.0,
+               temperature=1.0,
+               min_tokens_to_keep=1,
+               **model_kwargs):
+        max_length -= input_ids.shape[-1]
+        model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                          **model_kwargs)
+
+        if self._decoding_strategy == "sampling" and (top_p == 1.0 and
+                                                      top_k > 0):
+            top_p = 0.0
+        elif self._decoding_strategy == "sampling" and (top_p != 1.0 and
+                                                        top_k == 0):
+            top_k = 0
+        else:
+            raise ValueError(
+                "Only topk sampling or topp sampling are supported. " \
+                "Topk sampling and topp sampling cannot be both applied. ")
+
+        return self.forward(
+            model_inputs=model_inputs,
+            max_length=max_length,
+            top_k=top_k,
+            top_p=top_p,
+            temperature=temperature)
+
+    def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
+                    pad_token_id, eos_token_id, **model_kwargs):
+        max_length -= input_ids.shape[-1]
+        model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                          **model_kwargs)
+        temperature = model_kwargs.pop('temperature', 1.0)
+
+        return self.forward(
+            model_inputs=model_inputs,
+            max_length=max_length,
+            num_beams=beam_scorer.num_beams,
+            temperature=temperature)
+
+    def forward(self,
+                max_length,
+                decoding_strategy="sampling",
+                top_k=4,
+                top_p=0.0,
+                num_beams=4,
+                temperature=1.0,
+                model_inputs=None,
+                **model_kwargs):
+        seq_len = model_inputs.pop('seq_len', None)
+        decoding_type_id = model_inputs.pop('decoding_type_id')
+
+        outputs = self._model(**model_inputs)
+        if isinstance(outputs, tuple):
+            caches = outputs[1]
+        else:
+            raise RuntimeError('Not support.')
+        cache_k = [c.k for c in caches]
+        cache_v = [c.v for c in caches]
+
+        return self.decoding(
+            cache_k=cache_k,
+            cache_v=cache_v,
+            memory_seq_lens=seq_len,
+            beam_size=num_beams,
+            topk=top_k,
+            topp=top_p,
+            max_out_len=max_length,
+            bos_id=self.bos_token_id,
+            eos_id=self.eos_token_id,
+            temperature=temperature,
+            decoding_type_id=decoding_type_id)
