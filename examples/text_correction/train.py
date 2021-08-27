@@ -61,12 +61,6 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
-@paddle.no_grad()
-def evaluate(model, metric, data_loader):
-    model.eval()
-    model.train()
-
-
 def do_train(args):
     set_seed(args)
     paddle.set_device(args.device)

@@ -29,7 +29,9 @@ def read_test_ds(data_path):
     with open(data_path, 'r', encoding='utf-8') as f:
         for line in f:
             ids, words = line.strip('\n').split('\t')
-            yield {'words': words, 'ids': ids}
+            pinyins = lazy_pinyin(
+                words, style=Style.TONE3, neutral_tone_with_five=True)
+            yield {'words': words, 'pinyins': pinyins}
 
 
 def convert_example(example,
@@ -41,6 +43,7 @@ def convert_example(example,
     words = tokenizer.tokenize(text=example["words"])
     if len(words) > max_seq_length - 2:
         words = words[:max_seq_length - 2]
+    length = len(words)
     words = ['[CLS]'] + words + ['[SEP]']
     input_ids = tokenizer.convert_tokens_to_ids(words)
     token_type_ids = [0] * len(input_ids)
@@ -79,8 +82,7 @@ def convert_example(example,
         detection_labels = [ignore_label] + detection_labels + [ignore_label]
         return input_ids, token_type_ids, pinyin_ids, detection_labels, correction_labels
     else:
-        ids = example["ids"]
-        return input_ids, token_type_ids, pinyin_ids, ids
+        return input_ids, token_type_ids, pinyin_ids, length
 
 
 def create_dataloader(dataset,
