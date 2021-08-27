@@ -50,15 +50,18 @@ def write_result_to_file(args, corr_preds, det_preds, lengths, tokenizer):
     with open(args.test_file, 'r', encoding='utf-8') as fin:
         with open(args.predict_file, 'w', encoding='utf-8') as fout:
             for i, line in enumerate(fin.readlines()):
-                ids, words = line.strip('\n').split('\t')
+                ids, words = line.strip('\n').split('\t')[0:2]
                 ids = ids.split('=')[1][:-1]
                 tokens = tokenizer.tokenize(words)
+                if len(tokens) > args.max_seq_length:
+                    tokens = tokens[:args.max_seq_length - 2]
                 words = list(words)
                 corr_pred = corr_preds[i][1:1 + lengths[i]].tolist()
                 det_pred = det_preds[i][1:1 + lengths[i]].tolist()
                 assert len(tokens) == len(
                     corr_pred
-                ), "The number of tokens should be equal to the number of labels"
+                ), "The number of tokens should be equal to the number of labels {}: {}".format(
+                    len(tokens), len(corr_pred))
                 pred_result = ""
 
                 # need to be aligned

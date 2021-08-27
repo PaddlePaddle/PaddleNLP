@@ -19,7 +19,7 @@ import paddle
 def read_train_ds(data_path):
     with open(data_path, 'r', encoding='utf-8') as f:
         for line in f:
-            words, labels = line.strip('\n').split('\t')
+            words, labels = line.strip('\n').split('\t')[0:2]
             pinyins = lazy_pinyin(
                 words, style=Style.TONE3, neutral_tone_with_five=True)
             yield {'words': words, 'pinyins': pinyins, 'labels': labels}
@@ -28,7 +28,7 @@ def read_train_ds(data_path):
 def read_test_ds(data_path):
     with open(data_path, 'r', encoding='utf-8') as f:
         for line in f:
-            ids, words = line.strip('\n').split('\t')
+            ids, words = line.strip('\n').split('\t')[0:2]
             pinyins = lazy_pinyin(
                 words, style=Style.TONE3, neutral_tone_with_five=True)
             yield {'words': words, 'pinyins': pinyins}
