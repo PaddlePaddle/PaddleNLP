@@ -57,3 +57,5 @@ from .roformer.modeling import *
 from .roformer.tokenizer import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
+from .squeezebert.modeling import *
+from .squeezebert.tokenizer import *
