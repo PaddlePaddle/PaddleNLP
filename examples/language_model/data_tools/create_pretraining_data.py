@@ -329,11 +329,13 @@ def main():
             cctx = zstandard.ZstdDecompressor()
             fh = open(file_path, 'rb')
             text = io.BufferedReader(cctx.stream_reader(fh))
-        else:
+        elif file_path.endswith(".jsonl"):
             text = open(file_path, 'r', encoding='utf-8')
+        else:
+            print("Unexpected data format, skiped %s" % file_path)
+            continue
 
         encoded_docs = pool.imap(convert.encode, text, 256)
-
         print("Processing %s" % file_path)
         for i, (doc, bytes_processed) in enumerate(encoded_docs, start=1):
             global_step += 1
