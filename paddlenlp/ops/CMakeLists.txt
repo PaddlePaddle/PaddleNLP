@@ -28,6 +28,7 @@ option(WITH_TRANSFORMER "Compiled with Transformer."                            
 option(WITH_GPT         "Compiled with GPT."                                        OFF)
 option(WITH_UNIFIED     "Compiled with Unified Transformer."                        ON)
 option(WITH_SP          "Compiled with sentencepiece. Only works when WITH_GPT and ON_INFER is ON." ON)
+option(WITH_DECODER     "Compile with Transformer Decoder"                          ON)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
@@ -45,8 +46,12 @@ if(WITH_UNIFIED)
   list(APPEND decoding_op_files fusion_unified_decoding_op.cc fusion_unified_decoding_op.cu)
 endif()
 
-if(NOT WITH_TRANSFORMER AND NOT WITH_GPT)
-  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON must be set to use FasterTransformer. ")
+if(WITH_DECODER)
+  list(APPEND decoder_op_files fusion_decoder_op.cc fusion_decoder_op.cu)
+endif()
+
+if(NOT WITH_TRANSFORMER AND NOT WITH_GPT AND NOT WITH_DECODER)
+  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON or/and -DWITH_DECODER=ON must be set to use FasterTransformer. ")
 endif()
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})

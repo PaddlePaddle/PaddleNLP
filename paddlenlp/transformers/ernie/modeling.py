@@ -30,20 +30,26 @@ class ErnieEmbeddings(nn.Layer):
     Include embeddings from word, position and token_type embeddings.
     """
 
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 hidden_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=2,
-                 pad_token_id=0):
+    def __init__(
+            self,
+            vocab_size,
+            hidden_size=768,
+            hidden_dropout_prob=0.1,
+            max_position_embeddings=512,
+            type_vocab_size=2,
+            pad_token_id=0,
+            weight_attr=None, ):
         super(ErnieEmbeddings, self).__init__()
 
         self.word_embeddings = nn.Embedding(
-            vocab_size, hidden_size, padding_idx=pad_token_id)
-        self.position_embeddings = nn.Embedding(max_position_embeddings,
-                                                hidden_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
+            vocab_size,
+            hidden_size,
+            padding_idx=pad_token_id,
+            weight_attr=weight_attr)
+        self.position_embeddings = nn.Embedding(
+            max_position_embeddings, hidden_size, weight_attr=weight_attr)
+        self.token_type_embeddings = nn.Embedding(
+            type_vocab_size, hidden_size, weight_attr=weight_attr)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
@@ -68,9 +74,10 @@ class ErnieEmbeddings(nn.Layer):
 
 
 class ErniePooler(nn.Layer):
-    def __init__(self, hidden_size):
+    def __init__(self, hidden_size, weight_attr=None):
         super(ErniePooler, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.dense = nn.Linear(
+            hidden_size, hidden_size, weight_attr=weight_attr)
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states):
@@ -193,7 +200,7 @@ class ErniePretrainedModel(PretrainedModel):
                         self.ernie.config["initializer_range"],
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = 1e-5
+            layer._epsilon = 1e-12
 
 
 @register_base_model
@@ -265,9 +272,11 @@ class ErnieModel(ErniePretrainedModel):
         super(ErnieModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
+        weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(
+            mean=0.0, std=self.initializer_range))
         self.embeddings = ErnieEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, pad_token_id)
+            max_position_embeddings, type_vocab_size, pad_token_id, weight_attr)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -275,9 +284,10 @@ class ErnieModel(ErniePretrainedModel):
             dropout=hidden_dropout_prob,
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0)
+            act_dropout=0,
+            weight_attr=weight_attr, )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = ErniePooler(hidden_size)
+        self.pooler = ErniePooler(hidden_size, weight_attr)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -635,18 +645,23 @@ class ErnieLMPredictionHead(nn.Layer):
     Bert Model with a `language modeling` head on top.
     """
 
-    def __init__(self,
-                 hidden_size,
-                 vocab_size,
-                 activation,
-                 embedding_weights=None):
+    def __init__(
+            self,
+            hidden_size,
+            vocab_size,
+            activation,
+            embedding_weights=None,
+            weight_attr=None, ):
         super(ErnieLMPredictionHead, self).__init__()
-        self.transform = nn.Linear(hidden_size, hidden_size)
+
+        self.transform = nn.Linear(
+            hidden_size, hidden_size, weight_attr=weight_attr)
         self.activation = getattr(nn.functional, activation)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.decoder_weight = self.create_parameter(
             shape=[vocab_size, hidden_size],
             dtype=self.transform.weight.dtype,
+            attr=weight_attr,
             is_bias=False) if embedding_weights is None else embedding_weights
         self.decoder_bias = self.create_parameter(
             shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
@@ -668,15 +683,18 @@ class ErnieLMPredictionHead(nn.Layer):
 
 
 class ErniePretrainingHeads(nn.Layer):
-    def __init__(self,
-                 hidden_size,
-                 vocab_size,
-                 activation,
-                 embedding_weights=None):
+    def __init__(
+            self,
+            hidden_size,
+            vocab_size,
+            activation,
+            embedding_weights=None,
+            weight_attr=None, ):
         super(ErniePretrainingHeads, self).__init__()
-        self.predictions = ErnieLMPredictionHead(hidden_size, vocab_size,
-                                                 activation, embedding_weights)
-        self.seq_relationship = nn.Linear(hidden_size, 2)
+        self.predictions = ErnieLMPredictionHead(
+            hidden_size, vocab_size, activation, embedding_weights, weight_attr)
+        self.seq_relationship = nn.Linear(
+            hidden_size, 2, weight_attr=weight_attr)
 
     def forward(self, sequence_output, pooled_output, masked_positions=None):
         prediction_scores = self.predictions(sequence_output, masked_positions)
@@ -694,11 +712,14 @@ class ErnieForPretraining(ErniePretrainedModel):
     def __init__(self, ernie):
         super(ErnieForPretraining, self).__init__()
         self.ernie = ernie
+        weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(
+            mean=0.0, std=self.ernie.initializer_range))
         self.cls = ErniePretrainingHeads(
             self.ernie.config["hidden_size"],
             self.ernie.config["vocab_size"],
             self.ernie.config["hidden_act"],
-            embedding_weights=self.ernie.embeddings.word_embeddings.weight)
+            embedding_weights=self.ernie.embeddings.word_embeddings.weight,
+            weight_attr=weight_attr, )
 
         self.apply(self.init_weights)
 
@@ -780,20 +801,18 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
 
     """
 
-    def __init__(self, vocab_size):
+    def __init__(self):
         super(ErniePretrainingCriterion, self).__init__()
-        self.loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=-1)
-        self.vocab_size = vocab_size
+        #self.loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=-1)
 
     def forward(self, prediction_scores, seq_relationship_score,
-                masked_lm_labels, next_sentence_labels, masked_lm_scale):
+                masked_lm_labels, next_sentence_labels):
         with paddle.static.amp.fp16_guard():
             masked_lm_loss = F.cross_entropy(
                 prediction_scores,
                 masked_lm_labels,
                 ignore_index=-1,
                 reduction='none')
-            masked_lm_loss = masked_lm_loss / masked_lm_scale
             next_sentence_loss = F.cross_entropy(
                 seq_relationship_score, next_sentence_labels, reduction='none')
-            return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)
+            return paddle.mean(masked_lm_loss), paddle.mean(next_sentence_loss)

@@ -156,6 +156,8 @@ public:
     return 13 * buf_size + sizeof(DataType_ *) * 9;
   }
 
+  void initialize_stream(cudaStream_t stream) { param_.stream = stream; }
+
   void initialize(TransformerDecoderInitParam<DataType_> param,
                   DataType_ *buf) {
 #ifndef NDEBUG
