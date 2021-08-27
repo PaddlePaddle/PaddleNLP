@@ -69,6 +69,11 @@ def parse_args():
         type=str,
         help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
     )
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+    )
     args = parser.parse_args()
     return args
 
@@ -182,7 +187,7 @@ if __name__ == "__main__":
     args.topk = ARGS.topk
     args.topp = ARGS.topp
     args.profile = ARGS.profile
-    args.benchmark = False
+    args.benchmark = ARGS.benchmark
     if ARGS.batch_size:
         args.infer_batch_size = ARGS.batch_size
     args.test_file = ARGS.test_file
