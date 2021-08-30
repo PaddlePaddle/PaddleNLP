@@ -36,13 +36,13 @@ class TriviaQA(DatasetBuilder):
     SPLITS = {
         'train': META_INFO(
             os.path.join('wikipedia-train.json'),
-            '94e4499df3f43b3da596266c7857e5d3',
-            'https://paddlenlp.bj.bcebos.com/datasets/triviaqa/wikipedia-train.json'
+            'e4b3c74e781472d92e68da9c4b7418fe',
+            'https://paddlenlp.bj.bcebos.com/datasets/triviaqa/wikipedia-train.zip'
         ),
         'dev': META_INFO(
             os.path.join('wikipedia-dev.json'),
-            'a5ed9e5e02a22c34bfbbdbaecf5993b3',
-            'https://paddlenlp.bj.bcebos.com/datasets/triviaqa/wikipedia-dev.json'
+            '20d23a2f668a46fe5c590d126f4d2b95',
+            'https://paddlenlp.bj.bcebos.com/datasets/triviaqa/wikipedia-dev.zip'
         )
     }
 
@@ -62,24 +62,23 @@ class TriviaQA(DatasetBuilder):
         for entry in input_data:
             title = entry.get("title", "").strip()
             for paragraph in entry["paragraphs"]:
-                context = paragraph["context"].strip()
+                context = paragraph["context"]
                 for qa in paragraph["qas"]:
                     qas_id = qa["qid"]
-                    question = qa["question"].strip()
+                    question = qa["question"]
                     answer_starts = [
                         answer["answer_start"]
                         for answer in qa.get("answers", [])
                     ]
                     answers = [
-                        answer["text"].strip()
-                        for answer in qa.get("answers", [])
+                        answer["text"] for answer in qa.get("answers", [])
                     ]
-
-                    yield {
-                        'id': qas_id,
-                        'title': title,
-                        'context': context,
-                        'question': question,
-                        'answers': answers,
-                        'answer_starts': answer_starts
-                    }
+                    if len(answers) == 1:
+                        yield {
+                            'id': qas_id,
+                            'title': title,
+                            'context': context,
+                            'question': question,
+                            'answers': answers,
+                            'answer_starts': answer_starts
+                        }
