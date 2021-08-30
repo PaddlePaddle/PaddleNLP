@@ -18,6 +18,11 @@ __all__ = ['TinyBertTokenizer']
 
 
 class TinyBertTokenizer(BertTokenizer):
+    """
+    Constructs a TinyBert tokenizer.
+    The usage of TinyBertTokenizer is the same as `BertTokenizer`.
+    """
+
     pretrained_resource_files_map = {
         "vocab_file": {
             "tinybert-4l-312d":
