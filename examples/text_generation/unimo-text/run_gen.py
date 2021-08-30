@@ -240,8 +240,7 @@ def evaluation(model, data_loader, args, tokenizer):
             ids, scores = output
             results = select_sum(ids, scores, tokenizer, args.max_dec_len,
                                  args.num_return_sequences)
-        print(results)
-        exit()
+
         pred_ref.extend(results)
         start_time = time.time()
 
