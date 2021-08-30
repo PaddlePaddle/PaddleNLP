@@ -29,7 +29,7 @@ from paddlenlp.transformers import ErnieGramTokenizer
 from paddlenlp.utils.log import logger
 
 from model import ErnieGramForCSC
-from data import read_test_ds, convert_example, create_dataloader, is_chinese_char
+from utils import read_test_ds, convert_example, create_dataloader, is_chinese_char
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -159,7 +159,7 @@ def do_predict(args):
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Pad(axis=0, pad_val=pinyin_vocab.token_to_idx[pinyin_vocab.pad_token]),  # pinyin
-        Stack(axis=0),  # length
+        Stack(axis=0, dtype='int64'),  # length
     ): [data for data in fn(samples)]
 
     test_data_loader = create_dataloader(

@@ -30,7 +30,7 @@ from paddlenlp.transformers import ErnieGramTokenizer
 from paddlenlp.utils.log import logger
 
 from model import ErnieGramForCSC
-from data import read_train_ds, convert_example, create_dataloader
+from utils import read_train_ds, convert_example, create_dataloader
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -50,6 +50,7 @@ parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total
 parser.add_argument("--pinyin_vocab_file_path", type=str, default="pinyin_vocab.txt", help="pinyin vocab file path")
 parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
 parser.add_argument("--ignore_label", default=-1, type=int, help="Ignore label for CrossEntropyLoss")
+parser.add_argument("--detection_prob", default=0.5, type=float, help="The fixed parameter to balance the detection and correction loss")
 
 # yapf: enable
 args = parser.parse_args()
@@ -59,6 +60,19 @@ def set_seed(args):
     random.seed(args.seed)
     np.random.seed(args.seed)
     paddle.seed(args.seed)
+
+
+@paddle.no_grad()
+def evaluate(model, eval_data_loader):
+    model.eval()
+    for step, batch in enumerate(data_loader, start=1):
+        input_ids, token_type_ids, pinyin_ids, det_labels, corr_labels, length = batch
+        # det_error_probs shape: [B, T, 2]
+        # corr_logits shape: [B, T, V]
+        det_error_probs, corr_logits = model(input_ids, pinyin_ids,
+                                             token_type_ids)
+
+    model.train()
 
 
 def do_train(args):
@@ -77,6 +91,7 @@ def do_train(args):
         pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
 
     train_ds = load_dataset(read_train_ds, data_path='train.txt', lazy=False)
+    eval_ds = load_dataset(read_train_ds, data_path='eval.txt', lazy=False)
 
     det_loss_act = paddle.nn.CrossEntropyLoss(
         ignore_index=args.ignore_label, use_softmax=False)
@@ -93,12 +108,20 @@ def do_train(args):
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Pad(axis=0, pad_val=pinyin_vocab.token_to_idx[pinyin_vocab.pad_token]),  # pinyin
         Pad(axis=0, dtype="int64"),  # detection label
-        Pad(axis=0, dtype="int64")  # correction label
+        Pad(axis=0, dtype="int64"),  # correction label
+        Stack(axis=0, dtype="int64")  # length
     ): [data for data in fn(samples)]
 
     train_data_loader = create_dataloader(
         train_ds,
         mode='train',
+        batch_size=args.batch_size,
+        batchify_fn=batchify_fn,
+        trans_fn=trans_func)
+
+    eval_data_loader = create_dataloader(
+        eval_ds,
+        mode='eval',
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
@@ -128,7 +151,7 @@ def do_train(args):
     tic_train = time.time()
     for epoch in range(args.epochs):
         for step, batch in enumerate(train_data_loader):
-            input_ids, token_type_ids, pinyin_ids, det_labels, corr_labels = batch
+            input_ids, token_type_ids, pinyin_ids, det_labels, corr_labels, length = batch
             det_error_probs, corr_logits = model(input_ids, pinyin_ids,
                                                  token_type_ids)
 
@@ -138,7 +161,8 @@ def do_train(args):
             init_corr_loss = corr_loss_act(corr_logits, corr_labels)
             corr_loss = init_corr_loss * det_error_probs.max(axis=-1)
 
-            loss = (det_loss + corr_loss).mean()
+            loss = (args.detection_prob * det_loss +
+                    (1 - args.detection_prob) * corr_loss).mean()
             loss.backward()
             optimizer.step()
             lr_scheduler.step()

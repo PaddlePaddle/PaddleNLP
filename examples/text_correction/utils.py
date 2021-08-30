@@ -80,7 +80,7 @@ def convert_example(example,
             detection_label = 0 if input_id == label else 1
             detection_labels += [detection_label]
         detection_labels = [ignore_label] + detection_labels + [ignore_label]
-        return input_ids, token_type_ids, pinyin_ids, detection_labels, correction_labels
+        return input_ids, token_type_ids, pinyin_ids, detection_labels, correction_labels, length
     else:
         return input_ids, token_type_ids, pinyin_ids, length
 
