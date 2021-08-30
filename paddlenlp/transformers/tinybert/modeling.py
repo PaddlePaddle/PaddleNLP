@@ -161,6 +161,65 @@ class TinyBertPretrainedModel(PretrainedModel):
 
 @register_base_model
 class TinyBertModel(TinyBertPretrainedModel):
+    """
+    The bare TinyBert Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in `TinyBertModel`. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling `TinyBertModel`.
+        hidden_size (int, optional):
+            Dimensionality of the embedding layer, encoder layer and pooler layer. Defaults to `768`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in the Transformer encoder. Defaults to `12`.
+        num_attention_heads (int, optional):
+            Number of attention heads for each attention layer in the Transformer encoder.
+            Defaults to `12`.
+        intermediate_size (int, optional):
+            Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
+            Defaults to `3072`.
+        hidden_act (str, optional):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported. Defaults to `"gelu"`.
+        hidden_dropout_prob (float, optional):
+            The dropout probability for all fully connected layers in the embeddings and encoder.
+            Defaults to `0.1`.
+        attention_probs_dropout_prob (float, optional):
+            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
+            The maximum value of the dimensionality of position encoding. The dimensionality of position encoding
+            is the dimensionality of the sequence in `TinyBertModel`.
+            Defaults to `512`.
+        type_vocab_size (int, optional):
+            The vocabulary size of `token_type_ids` passed when calling `~ transformers.TinyBertModel`.
+            Defaults to `16`.
+
+        initializer_range (float, optional):
+            The standard deviation of the normal initializer.
+            Defaults to `0.02`.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`TinyBertPretrainedModel.init_weights()` for how weights are initialized in `TinyBertModel`.
+
+        pad_token_id (int, optional):
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
+        fit_size (int, optional):
+            Dimensionality of the output layer of `fit_dense(s)`.
+            `fit_dense(s)` means a hidden states' transformation from student to teacher.
+            Defaults to `768`.
+    """
+
     def __init__(self,
                  vocab_size,
                  hidden_size=768,
@@ -203,6 +262,65 @@ class TinyBertModel(TinyBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        r'''
+        The TinyBertModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                If its data type is int, the values should be either 0 or 1.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+
+        Returns:
+            tuple: Returns tuple (`encoder_output`, `pooled_output`).
+
+            With the fields:
+
+            - `encoder_output` (Tensor):
+                Sequence of hidden-states at the last layer of the model.
+                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+
+            - `pooled_output` (Tensor):
+                The output of first token (`[CLS]`) in sequence.
+                We "pool" the model by simply taking the hidden state corresponding to the first token.
+                Its data type should be float32 and its shape is [batch_size, hidden_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import TinyBertModel, TinyBertTokenizer
+
+                tokenizer = TinyBertTokenizer.from_pretrained('tinybert-4l-312d')
+                model = TinyBertModel.from_pretrained('tinybert-4l-312d')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP! ")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        '''
+
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
@@ -216,12 +334,37 @@ class TinyBertModel(TinyBertPretrainedModel):
 
 
 class TinyBertForPretraining(TinyBertPretrainedModel):
+    """
+    TinyBert Model for pretraining tasks on top.
+
+    Args:
+        tinybert (:class:`TinyBertModel`):
+            An instance of :class:`TinyBertModel`.
+
+    """
+
     def __init__(self, tinybert):
         super(TinyBertForPretraining, self).__init__()
         self.tinybert = tinybert
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        r"""
+        The TinyBertForPretraining forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`TinyBertModel`.
+            token_tycpe_ids (Tensor, optional):
+                See :class:`TinyBertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`TinyBertModel`.
+
+        Returns:
+            Tensor: Returns tensor `sequence_output`, sequence of hidden-states at the last layer of the model.
+                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+
+        """
         sequence_output, pooled_output = self.tinybert(
             input_ids, token_type_ids, attention_mask)
 
@@ -229,6 +372,21 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
 
 
 class TinyBertForSequenceClassification(TinyBertPretrainedModel):
+    """
+    TinyBert Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
+
+    Args:
+        tinybert (:class:`TinyBertModel`):
+            An instance of TinyBertModel.
+        num_classes (int, optional):
+            The number of classes. Default `2`.
+        dropout (float, optional):
+            The dropout probability for output of TinyBert.
+            If None, use the same value as `hidden_dropout_prob` of `TinyBertModel`
+            instance `tinybert`. Default None.
+    """
+
     def __init__(self, tinybert, num_classes=2, dropout=None):
         super(TinyBertForSequenceClassification, self).__init__()
         self.tinybert = tinybert
@@ -241,6 +399,40 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        r"""
+        The TinyBertForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`TinyBertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`TinyBertModel`.
+            position_ids(Tensor, optional):
+                See :class:`TinyBertModel`.
+            attention_mask_list (list, optional):
+                See :class:`TinyBertModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Shape as `[batch_size, num_classes]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.tinybert.modeling import TinyBertForSequenceClassification
+                from paddlenlp.transformers.tinybert.tokenizer import TinyBertTokenizer
+
+                tokenizer = TinyBertTokenizer.from_pretrained('tinybert-4l-312d')
+                model = TinyBertForSequenceClassification.from_pretrained('tinybert-4l-312d')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP! ")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
+
         sequence_output, pooled_output = self.tinybert(
             input_ids, token_type_ids, attention_mask)
 
