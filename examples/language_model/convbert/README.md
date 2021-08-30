@@ -11,8 +11,6 @@
 
 本项目是 ConvBert 在 Paddle 2.x上的开源实现。
 
-## 快速开始
-
 ## **数据准备**
 
 ### Fine-tuning数据
