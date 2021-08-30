@@ -16,22 +16,11 @@ from pypinyin import lazy_pinyin, Style
 import paddle
 
 
-def read_train_ds(data_path):
-    with open(data_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            words, labels = line.strip('\n').split('\t')[0:2]
-            pinyins = lazy_pinyin(
-                words, style=Style.TONE3, neutral_tone_with_five=True)
-            yield {'words': words, 'pinyins': pinyins, 'labels': labels}
-
-
 def read_test_ds(data_path):
     with open(data_path, 'r', encoding='utf-8') as f:
         for line in f:
             ids, words = line.strip('\n').split('\t')[0:2]
-            pinyins = lazy_pinyin(
-                words, style=Style.TONE3, neutral_tone_with_five=True)
-            yield {'words': words, 'pinyins': pinyins}
+            yield {'source': words}
 
 
 def convert_example(example,
@@ -40,7 +29,8 @@ def convert_example(example,
                     max_seq_length=128,
                     ignore_label=-1,
                     is_test=False):
-    words = tokenizer.tokenize(text=example["words"])
+    source = example["source"]
+    words = tokenizer.tokenize(text=source)
     if len(words) > max_seq_length - 2:
         words = words[:max_seq_length - 2]
     length = len(words)
@@ -49,7 +39,9 @@ def convert_example(example,
     token_type_ids = [0] * len(input_ids)
 
     # use pad token in pinyin emb to map word emb [CLS], [SEP]
-    pinyins = example["pinyins"]
+    pinyins = lazy_pinyin(
+        source, style=Style.TONE3, neutral_tone_with_five=True)
+
     pinyin_ids = [0]
     # align pinyin and chinese char
     pinyin_offset = 0
@@ -69,7 +61,8 @@ def convert_example(example,
         pinyin_ids), "length of input_ids must be equal to length of pinyin_ids"
 
     if not is_test:
-        correction_labels = tokenizer.tokenize(text=example["labels"])
+        target = example["target"]
+        correction_labels = tokenizer.tokenize(text=target)
         if len(correction_labels) > max_seq_length - 2:
             correction_labels = correction_labels[:max_seq_length - 2]
         correction_labels = tokenizer.convert_tokens_to_ids(correction_labels)

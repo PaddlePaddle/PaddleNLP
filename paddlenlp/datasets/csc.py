@@ -65,5 +65,5 @@ class CSC(DatasetBuilder):
         """Reads data."""
         with open(filename, "r", encoding="utf8") as fr:
             for line in fr:
-                soruce, target = line.strip('\n').split('\t')[0:2]
-                yield {'soruce': soruce, 'target': target}
+                source, target = line.strip('\n').split('\t')[0:2]
+                yield {'source': source, 'target': target}

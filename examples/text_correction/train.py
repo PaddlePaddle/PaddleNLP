@@ -103,8 +103,7 @@ def do_train(args):
         pinyin_vocab_size=len(pinyin_vocab),
         pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
 
-    train_ds = load_dataset(read_train_ds, data_path='train.txt', lazy=False)
-    eval_ds = load_dataset(read_train_ds, data_path='eval.txt', lazy=False)
+    train_ds, eval_ds = load_dataset('csc', splits=['train', 'dev'])
 
     det_loss_act = paddle.nn.CrossEntropyLoss(
         ignore_index=args.ignore_label, use_softmax=False)
@@ -208,10 +207,6 @@ def do_train(args):
             if args.max_steps > 0 and global_steps >= args.max_steps:
                 return
             global_steps += 1
-
-            # print("batch:", batch, flush=True)
-            # print("det_error_probs:", det_error_probs, flush=True)
-            # print("corr_logits:", corr_logits, flush=True)
 
 
 if __name__ == "__main__":
