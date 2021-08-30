@@ -124,6 +124,11 @@ def write_sighan_result_to_file(args, corr_preds, det_preds, lengths,
                 pred_result = parse_decode(words, corr_preds[i], det_preds[i],
                                            lengths[i], tokenizer,
                                            args.max_seq_length)
+                words = list(words)
+                if len(words) > args.max_seq_length - 2:
+                    words = words[:args.max_seq_length - 2]
+                word = ''.join(words)
+
                 result = ids
                 if pred_result == words:
                     result += ', 0'
