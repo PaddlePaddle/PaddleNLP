@@ -61,6 +61,7 @@ private:
   int hidden_units_;
   int memory_hidden_units_;
   bool normalization_before_;
+  ActivationType act_;
 
   DataType_ *norm_from_tensor_buf_, *ffn_out_buf_;
   DataType_ *query_buf_;
@@ -81,13 +82,15 @@ public:
                          int head_num,
                          int size_per_head,
                          int memory_hidden_units,
-                         bool normalization_before = true)
+                         bool normalization_before = true,
+                         ActivationType act = ActivationType::GELU)
       : batch_size_(batch_size),
         max_seq_len_(seq_len),
         head_num_(head_num),
         size_per_head_(size_per_head),
         memory_hidden_units_(memory_hidden_units),
-        normalization_before_(normalization_before) {
+        normalization_before_(normalization_before),
+        act_(act) {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -273,7 +276,7 @@ public:
             m,
             4 * n,
             n,
-            ActivationType::GELU);
+            act_);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -316,7 +319,7 @@ public:
             m,
             4 * n,
             n,
-            ActivationType::GELU);
+            act_);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();

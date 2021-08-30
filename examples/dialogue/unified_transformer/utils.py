@@ -238,7 +238,6 @@ def select_response(ids,
             ids = ids[:, :, 0]
         ids = ids.numpy().transpose()
 
-        results = []
         for pred in ids:
             pred_token_ids, pred_tokens = post_process_response(pred, tokenizer)
             num_token = len(pred_token_ids)

@@ -27,6 +27,7 @@ void embeddings_kernel_launcher(T* from_tensor,
                                 const int step,
                                 const int batch_size,
                                 const int hidden_units,
+                                const bool pos_bias,
                                 cudaStream_t stream);
 
 template <typename T>

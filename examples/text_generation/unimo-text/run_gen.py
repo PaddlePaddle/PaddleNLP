@@ -14,6 +14,7 @@ from paddle.optimizer import AdamW
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer, BasicTokenizer
 from paddlenlp.metrics import BLEU
+from paddlenlp.ops import FasterUnimo
 
 from gen_utils import print_args, set_seed, create_data_loader, select_sum
 
@@ -54,6 +55,9 @@ def parse_args():
     parser.add_argument('--output_path', type=str, default='./predict.txt', help='The file path where the infer result will be saved.')
     parser.add_argument("--do_train", action='store_true', help="Whether to train the model.")
     parser.add_argument("--do_predict", action='store_true', help="Whether to eval and predict.")
+    parser.add_argument('--faster', action='store_true', help='Whether to process inference using faster transformer. ')
+    parser.add_argument('--use_fp16_decoding', action='store_true', help='Whether to use fp16 when using faster transformer. Only works when using faster transformer. ')
+    parser.add_argument('--decoding_lib', type=str, default='../../../paddlenlp/ops/build/lib/libdecoding_op.so', help='The decoding lib of faster transformer. ')
 
     args = parser.parse_args()
     return args
@@ -186,21 +190,37 @@ def run(args):
 
 @paddle.no_grad()
 def evaluation(model, data_loader, args, tokenizer):
+    if not args.do_predict and args.faster:
+        raise ValueError(
+            "do_predict and faster must be both set if using FasterTransformer. "
+        )
+
+    if args.faster:
+        model = FasterUnimo(
+            model,
+            decoding_strategy=args.decode_strategy,
+            decoding_lib=args.decoding_lib,
+            use_fp16_decoding=args.use_fp16_decoding)
+
     print('\nEval begin...')
     model.eval()
     pred_ref = []
     total_time = 0.0
     start_time = time.time()
     for step, inputs in enumerate(data_loader, 1):
-        input_ids, token_type_ids, position_ids, attention_mask = inputs
-        ids, scores = model.generate(
+        input_ids, token_type_ids, position_ids, attention_mask, seq_len = inputs
+        output = model.generate(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
+            seq_len=seq_len,
             max_length=args.max_dec_len,
             min_length=args.min_dec_len,
             decode_strategy=args.decode_strategy,
+            temperature=args.temperature,
+            top_k=args.top_k,
+            top_p=args.top_p,
             num_beams=args.num_beams,
             length_penalty=args.length_penalty,
             num_return_sequences=args.num_return_sequences,
@@ -213,8 +233,15 @@ def evaluation(model, data_loader, args, tokenizer):
                   (step, total_time / args.logging_steps))
             total_time = 0.0
 
-        results = select_sum(ids, scores, tokenizer, args.max_dec_len,
-                             args.num_return_sequences)
+        if args.faster:
+            ids = output
+            results = select_sum(ids, None, tokenizer)
+        else:
+            ids, scores = output
+            results = select_sum(ids, scores, tokenizer, args.max_dec_len,
+                                 args.num_return_sequences)
+        print(results)
+        exit()
         pred_ref.extend(results)
         start_time = time.time()
 
