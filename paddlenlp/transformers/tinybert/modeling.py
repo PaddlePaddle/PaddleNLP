@@ -362,7 +362,7 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `sequence_output`, sequence of hidden-states at the last layer of the model.
-                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+            It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
 
         """
         sequence_output, pooled_output = self.tinybert(
@@ -380,11 +380,11 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
         tinybert (:class:`TinyBertModel`):
             An instance of TinyBertModel.
         num_classes (int, optional):
-            The number of classes. Default `2`.
+            The number of classes. Defaults to `2`.
         dropout (float, optional):
             The dropout probability for output of TinyBert.
             If None, use the same value as `hidden_dropout_prob` of `TinyBertModel`
-            instance `tinybert`. Default None.
+            instance `tinybert`. Defaults to `None`.
     """
 
     def __init__(self, tinybert, num_classes=2, dropout=None):
@@ -406,8 +406,6 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
             input_ids (Tensor):
                 See :class:`TinyBertModel`.
             token_type_ids (Tensor, optional):
-                See :class:`TinyBertModel`.
-            position_ids(Tensor, optional):
                 See :class:`TinyBertModel`.
             attention_mask_list (list, optional):
                 See :class:`TinyBertModel`.
