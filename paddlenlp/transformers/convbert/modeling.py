@@ -1005,12 +1005,12 @@ class ConvBertForMultipleChoice(ConvBertPretrainedModel):
         input_ids = input_ids.reshape(
             (-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
-        if token_type_ids:
+        if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape(
                 (-1, token_type_ids.shape[-1]))
-        if position_ids:
+        if position_ids is not None:
             position_ids = position_ids.reshape((-1, position_ids.shape[-1]))
-        if attention_mask:
+        if attention_mask is not None:
             attention_mask = attention_mask.reshape(
                 (-1, attention_mask.shape[-1]))
 
