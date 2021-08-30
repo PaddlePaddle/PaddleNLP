@@ -10,7 +10,9 @@
 | ERNIE-1.0|是| 52.33 | 43.75 | 66.66 | 29.78 |
 | ERNIE-1.0|否| 57.01 | 51.72 | 74.76 | 33.56 |
 
-**Note**:  Infer_with_fc 表示在预测阶段计算文本 embedding 表示的时候网络前向是否会过训练阶段最后一层的 fc, 由表格可知: 预测阶段不使用最后一层 fc 可以显著提升无监督语义匹配的效果.
+**Note**:
+- Infer_with_fc 表示在预测阶段计算文本 embedding 表示的时候网络前向是否会过训练阶段最后一层的 fc, 由表格可知: 预测阶段不使用最后一层 fc 可以显著提升无监督语义匹配的效果。
+- 表格中所有实验训练均是单卡训练, batch_size=64, max_seq_length=64, eval_steps=100, lr 和 dropout 对模型效果影响较大: 我们实验中对 lr=(1E-5 5E-5) 和 dropout=(0.1 0.3) 超参进行了组合寻优。
 
 ## 快速开始
 
@@ -27,7 +29,7 @@ simcse/
 ```
 
 ### 模型训练
-我们以中文文本匹配公开数据集 LCQMC 为示例数据集， 仅使用 LCQMC 的文本数据构造生成了无监督的训练数据。可以运行如下命令，开始模型训练并且在 LCQMC 的验证集上进行 Spearman 相关系数评估.
+我们以中文文本匹配公开数据集 LCQMC 为示例数据集， 仅使用 LCQMC 的文本数据构造生成了无监督的训练数据。可以运行如下命令，开始模型训练并且在 LCQMC 的验证集上进行 Spearman 相关系数评估。
 
 ```shell
 $ unset CUDA_VISIBLE_DEVICES
@@ -57,7 +59,7 @@ python -u -m paddle.distributed.launch --gpus '0' \
 * `batch_size`：可选，批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `learning_rate`：可选，Fine-tune的最大学习率；默认为5e-5。
 * `weight_decay`：可选，控制正则项力度的参数，用于防止过拟合，默认为0.0。
-* `epochs`: 训练轮次，默认为3。
+* `epochs`: 训练轮次，默认为1。
 * `warmup_proption`：可选，学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.0。
 * `init_from_ckpt`：可选，模型参数路径，热启动模型训练；默认为None。
 * `seed`：可选，随机种子，默认为1000.
