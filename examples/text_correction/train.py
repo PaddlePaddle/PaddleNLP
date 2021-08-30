@@ -28,7 +28,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import ErnieGramTokenizer
 from paddlenlp.utils.log import logger
-
+from paddlenlp.metrics.sighan import DetectionF1, CorrectionF1
 from model import ErnieGramForCSC
 from utils import read_train_ds, convert_example, create_dataloader
 
@@ -65,14 +65,27 @@ def set_seed(args):
 @paddle.no_grad()
 def evaluate(model, eval_data_loader):
     model.eval()
-    for step, batch in enumerate(data_loader, start=1):
+    det_metric = DetectionF1()
+    corr_metric = CorrectionF1()
+    for step, batch in enumerate(eval_data_loader, start=1):
         input_ids, token_type_ids, pinyin_ids, det_labels, corr_labels, length = batch
         # det_error_probs shape: [B, T, 2]
         # corr_logits shape: [B, T, V]
         det_error_probs, corr_logits = model(input_ids, pinyin_ids,
                                              token_type_ids)
+        det_metric.update(det_error_probs, det_labels, length)
+        corr_metric.update(det_error_probs, det_labels, corr_logits,
+                           corr_labels, length)
 
+    det_f1, det_precision, det_recall = det_metric.accumulate()
+    corr_f1, corr_precision, corr_recall = corr_metric.accumulate()
+    logger.info("Sentence-Level Performance:")
+    logger.info("Detection  metric: F1={:.4f}, Recall={:.4f}, Precision={:.4f}".
+                format(det_f1, det_recall, det_precision))
+    logger.info("Correction metric: F1={:.4f}, Recall={:.4f}, Precision={:.4f}".
+                format(corr_f1, corr_recall, corr_precision))
     model.train()
+    return det_f1, corr_f1
 
 
 def do_train(args):
@@ -147,10 +160,10 @@ def do_train(args):
         apply_decay_param_fun=lambda x: x in decay_params)
 
     global_steps = 1
-
+    best_f1 = -1
     tic_train = time.time()
     for epoch in range(args.epochs):
-        for step, batch in enumerate(train_data_loader):
+        for step, batch in enumerate(train_data_loader, start=1):
             input_ids, token_type_ids, pinyin_ids, det_labels, corr_labels, length = batch
             det_error_probs, corr_logits = model(input_ids, pinyin_ids,
                                                  token_type_ids)
@@ -176,6 +189,17 @@ def do_train(args):
                 tic_train = time.time()
             if global_steps % args.save_steps == 0:
                 if paddle.distributed.get_rank() == 0:
+                    logger.info("Eval:")
+                    det_f1, corr_f1 = evaluate(model, eval_data_loader)
+                    f1 = (det_f1 + corr_f1) / 2
+                    if f1 > best_f1:
+                        # save best model
+                        paddle.save(model.state_dict(),
+                                    os.path.join(args.output_dir,
+                                                 "best_model.pdparams"))
+                        logger.info("Save best model at {} step.".format(
+                            global_steps))
+                        best_f1 = f1
                     paddle.save(
                         model.state_dict(),
                         os.path.join(args.output_dir,
