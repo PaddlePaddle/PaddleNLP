@@ -632,7 +632,6 @@ class ConvBertGenerator(ConvBertPretrainedModel):
         return prediction_scores
 
 
-# class ConvBertClassificationHead and ConvBertForSequenceClassification for fine-tuning
 class ConvBertClassificationHead(nn.Layer):
     """Head for sentence-level classification tasks."""
 

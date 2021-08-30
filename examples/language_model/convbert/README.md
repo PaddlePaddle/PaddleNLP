@@ -13,21 +13,6 @@
 
 ## 快速开始
 
-### 模型精度对齐
-运行`python compare.py`，对比huggingface与paddle之间的精度，我们可以发现精度的平均误差在10^-7量级，最大误差在10^-6量级。
-```python
-    python compare.py
-    # huggingface YituTech/conv-bert-small vs paddle convbert-small
-    # mean difference: tensor(4.6980e-07)
-    # max difference: tensor(2.8610e-06)
-    # huggingface YituTech/conv-bert-medium-small vs paddle convbert-medium-small
-    # mean difference: tensor(3.4326e-07)
-    # max difference: tensor(2.8014e-06)
-    # huggingface YituTech/conv-bert-base vs paddle convbert-base
-    # mean difference: tensor(4.5306e-07)
-    # max difference: tensor(8.1062e-06)
-```
-
 ## **数据准备**
 
 ### Fine-tuning数据
