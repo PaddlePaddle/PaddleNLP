@@ -729,7 +729,7 @@ class GPTModel(GPTPretrainedModel):
                 Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
                 can be used to speed up decoding.
             cache (list, optional):
-                It is a list, and each element in the list is a tuple( :code:`(incremental_cache, static_cache)` ).
+                It is a list, and each element in the list is a tuple `(incremental_cache, static_cache)`.
                 See `TransformerDecoder.gen_cache` for more details. It is only used for inference
                 and should be None for training.
                 Default to `None`.
@@ -831,7 +831,7 @@ class GPTForPretraining(GPTPretrainedModel):
                 See :class:`GPTModel`.
 
         Returns:
-            Tensor or tuple: Returns tensor `logits` or tuple (`logits`,`cached_kvs`).`logits` is the output of the gpt model.
+            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. `logits` is the output of the gpt model.
             `cache_kvs` is the cache output of gpt model if `use_cache` is True.
 
         """
@@ -1023,7 +1023,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
                 See :class:`GPTModel`.
 
         Returns:
-            Tensor or tuple: Returns tensor `logits` or tuple (`logits`,`cached_kvs`).`logits` is the output of the gpt model.
+            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. `logits` is the output of the gpt model.
             `cache_kvs` is the cache output of gpt model if `use_cache` is True.
 
         """

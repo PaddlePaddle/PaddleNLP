@@ -213,7 +213,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
                 The token id (or token ids) to be converted to token(s).
 
         Returns:
-            int|List[int]: The converted token id or token ids.
+            str|List[str]: The converted token or sequence of tokens.
 
         Example:
             .. code-block::
@@ -545,17 +545,17 @@ class GPTTokenizer(PretrainedTokenizer):
 
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
         """
-        Converts a single token or a sequence of tokens to an index or a
-        sequence of indices.
+        Converts an index or a sequence indices to a single
+        token or a sequence of tokens.
 
         Args:
-            tokens (str|List[str]|tuple(str)):
-                A single token or a sequence of tokens.
+            ids (int|List[int]):
+                The token id (or token ids) to be converted to text.
             skip_special_tokens (bool, optional):
                 Whether or not to skip the special tokens. Defaults to `False`.
 
         Returns:
-            int|List[int]: The converted token id or token ids.
+            str|List[str]: The converted token or the sequence of tokens.
 
         Example:
             .. code-block::
