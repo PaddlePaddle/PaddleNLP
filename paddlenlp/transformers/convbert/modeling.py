@@ -20,15 +20,11 @@ from ..electra.modeling import get_activation
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    "ConvBertModel",
-    "ConvBertPretrainedModel",
-    "ConvBertForTotalPretraining",
-    "ConvBertDiscriminator",
-    "ConvBertGenerator",
-    "ConvBertClassificationHead",
-    "ConvBertForSequenceClassification",
-    "ConvBertForTokenClassification",
-    "ConvBertPretrainingCriterion",
+    "ConvBertModel", "ConvBertPretrainedModel", "ConvBertForTotalPretraining",
+    "ConvBertDiscriminator", "ConvBertGenerator", "ConvBertClassificationHead",
+    "ConvBertForSequenceClassification", "ConvBertForTokenClassification",
+    "ConvBertPretrainingCriterion", "ConvBertForQuestionAnswering",
+    "ConvBertForMultipleChoice"
 ]
 dtype_float = paddle.get_default_dtype()
 
@@ -971,3 +967,80 @@ class ConvBertPretrainingCriterion(paddle.nn.Layer):
             disc_loss = disc_loss.sum() / total_positions.sum()
 
         return self.gen_weight * gen_loss + self.disc_weight * disc_loss
+
+
+class ConvBertPooler(Layer):
+    def __init__(self, hidden_size, pool_act="tanh"):
+        super(ConvBertPooler, self).__init__()
+        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.activation = nn.Tanh()
+        self.pool_act = pool_act
+
+    def forward(self, hidden_states):
+        # We "pool" the model by simply taking the hidden state corresponding
+        # to the first token.
+        first_token_tensor = hidden_states[:, 0]
+        pooled_output = self.dense(first_token_tensor)
+        if self.pool_act == "tanh":
+            pooled_output = self.activation(pooled_output)
+        return pooled_output
+
+
+class ConvBertForMultipleChoice(ConvBertPretrainedModel):
+    def __init__(self, convbert, num_choices=2, dropout=None):
+        super(ConvBertPretrainedModel, self).__init__()
+        self.num_choices = num_choices
+        self.convbert = convbert
+        self.pooler = ConvBertPooler(self.convbert.config["hidden_size"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.convbert.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.convbert.config["hidden_size"], 1)
+        self.init_weights()
+
+    def forward(self,
+                input_ids=None,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        input_ids = input_ids.reshape(
+            (-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+
+        if token_type_ids:
+            token_type_ids = token_type_ids.reshape(
+                (-1, token_type_ids.shape[-1]))
+        if position_ids:
+            position_ids = position_ids.reshape((-1, position_ids.shape[-1]))
+        if attention_mask:
+            attention_mask = attention_mask.reshape(
+                (-1, attention_mask.shape[-1]))
+
+        sequence_output = self.convbert(input_ids, token_type_ids, position_ids,
+                                        attention_mask)
+        pooled_output = self.pooler(sequence_output)
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
+        reshaped_logits = logits.reshape(
+            (-1, self.num_choices))  # logits: (bs, num_choice)
+
+        return reshaped_logits
+
+
+class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
+    def __init__(self, convbert):
+        super(ConvBertForQuestionAnswering, self).__init__()
+        self.convbert = convbert
+        self.classifier = nn.Linear(self.convbert.config["hidden_size"], 2)
+        self.init_weights()
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        sequence_output = self.convbert(input_ids, token_type_ids, position_ids,
+                                        attention_mask)
+        logits = self.classifier(sequence_output)
+        logits = paddle.transpose(logits, perm=[2, 0, 1])
+        start_logits, end_logits = paddle.unstack(x=logits, axis=0)
+
+        return start_logits, end_logits
