@@ -352,7 +352,7 @@ class TransformerGenerator(paddle.nn.Layer):
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
         kwargs:
-            The key word arguments can be `output_time_major`, `use_fp16_decoding` and `use_ft`.
+            The key word arguments can be `output_time_major`, `use_ft`, `use_fp16_decoding`,
             `rel_len`, `alpha`:
 
             - `output_time_major(bool, optional)`: Indicate the data layout of predicted
@@ -360,10 +360,10 @@ class TransformerGenerator(paddle.nn.Layer):
             `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
             to `False`. 
-            - `use_fp16_decoding(bool, optional)`: Whether to use fp16
-            for decoding. 
             - `use_ft(bool, optional)`: Whether to use Faster Transformer
             for decoding. Default to True if not set.
+            - `use_fp16_decoding(bool, optional)`: Whether to use fp16
+            for decoding.  Only works when using Faster Transformer.
             - `beam_search_version(str, optional)`: Indicating the strategy of
             beam search. It can be 'v1' or 'v2'. 'v2' would select the top
             `beam_size * 2` beams and process the top `beam_size` alive and
