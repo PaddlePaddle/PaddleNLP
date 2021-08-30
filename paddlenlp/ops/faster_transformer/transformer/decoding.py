@@ -37,7 +37,7 @@ def infer_transformer_decoding(
         decoder_ln_bias, linear_weight, linear_bias, pos_emb,
         _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
         _n_layer, _bos_id, _eos_id, _max_out_len, _beam_search_diversity_rate,
-        _rel_len):
+        _rel_len, _alpha):
     helper = LayerHelper('fusion_decoding', **locals())
 
     inputs = {
@@ -89,7 +89,8 @@ def infer_transformer_decoding(
         'eos_id': _eos_id,
         'max_len': _max_out_len,
         'beam_search_diversity_rate': _beam_search_diversity_rate,
-        "rel_len": _rel_len
+        "rel_len": _rel_len,
+        "alpha": _alpha
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -303,7 +304,8 @@ class InferTransformerDecoding(nn.Layer):
                  beam_search_diversity_rate=0.0,
                  decoding_lib=None,
                  use_fp16_decoding=False,
-                 rel_len=False):
+                 rel_len=False,
+                 alpha=0.6):
         # if decoding_lib is None:
         #     raise ValueError(
         #         "The args decoding_lib must be set to use Faster Transformer. ")
@@ -473,7 +475,7 @@ class InferTransformerDecoding(nn.Layer):
             self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
             self._bos_id, self._eos_id, self._max_out_len,
-            self._beam_search_diversity_rate, self._rel_len)
+            self._beam_search_diversity_rate, self._rel_len, self._alpha)
 
         ids = finalize(
             self._beam_size,
@@ -665,7 +667,7 @@ class InferUnifiedDecoding(nn.Layer):
                 "The args decoding_lib must be set to use Faster Transformer. ")
         elif not os.path.exists(decoding_lib):
             raise ValueError("The path to decoding lib is not exist.")
-        # TODO(): Using jit. 
+        # TODO(): Using jit.
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(

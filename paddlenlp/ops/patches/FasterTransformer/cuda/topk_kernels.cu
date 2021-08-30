@@ -757,6 +757,7 @@ void topK_update_kernelLauncher(
   const T diversity_rate = args.beam_search_diversity_rate_;
   const int end_id = args.end_id_;
   const int max_out_len = args.seq_len_;
+  const float alpha = args.alpha_;
 
   const int max_block_per_beam = 8;
   int temp_log_probs_buf_size =
@@ -783,8 +784,8 @@ void topK_update_kernelLauncher(
     T* temp_log_probs = (T*)workspace;
     int* topk_tmp_id_buf = (int*)(temp_log_probs + temp_log_probs_buf_size);
     T* topk_tmp_val_buf = (T*)(topk_tmp_id_buf + topk_tmp_ids_buf_size);
-    float length_penalty = std::pow((5. + step + 1) / 6., 0.6);
-    float max_length_penalty = std::pow((5. + max_out_len + 1) / 6., 0.6);
+    float length_penalty = std::pow((5. + step + 1) / 6., alpha);
+    float max_length_penalty = std::pow((5. + max_out_len + 1) / 6., alpha);
     if (diversity_rate == 0.0f) {
       switch (beam_width) {
         CASE_K(1, 128, 128, 8);

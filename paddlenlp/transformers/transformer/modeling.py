@@ -869,10 +869,8 @@ class InferTransformerModel(TransformerModel):
         self.beam_search_version = args.pop('beam_search_version')
         kwargs = args.pop("kwargs")
         if self.beam_search_version == 'v2':
-            if 'alpha' in kwargs:
-                self.alpha = kwargs['alpha']
-            else:
-                self.alpha = 0.6
+            self.alpha = kwargs.get("alpha", 0.6)
+            self.rel_len = kwargs.get("rel_len", False)
         super(InferTransformerModel, self).__init__(**args)
 
         cell = TransformerDecodeCell(
@@ -1031,7 +1029,8 @@ class InferTransformerModel(TransformerModel):
         # constant number
         inf = float(1. * 1e7)
         batch_size = enc_output.shape[0]
-        max_len = (enc_output.shape[1] + 20) if max_len is None else max_len
+        max_len = (enc_output.shape[1] + 20) if max_len is None else (
+            enc_output.shape[1] + max_len if self.rel_len else max_len)
 
         ### initialize states of beam search ###
         ## init for the alive ##

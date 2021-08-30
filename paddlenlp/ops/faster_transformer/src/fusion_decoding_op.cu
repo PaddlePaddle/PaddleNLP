@@ -76,6 +76,7 @@ std::vector<paddle::Tensor> decoding_kernel(
     int end_id_,
     int64_t max_seq_len_,
     float beam_search_diversity_rate_,
+    float alpha,
     cublasHandle_t cublas_handle_,
     cudaStream_t stream) {
   int beam_width_ = (decoding_strategy == "beam_search" ||
@@ -276,8 +277,9 @@ std::vector<paddle::Tensor> decoding_kernel(
         start_id_,
         end_id_,
         beam_search_diversity_rate_,
-        true,   // is_fuse_topk_softMax_
-        true);  // keep_alive_beam_
+        true,  // is_fuse_topk_softMax_
+        true,  // keep_alive_beam_
+        alpha);
 
     decoding_beamsearch_->forward(params, decoding_params);
 
@@ -361,7 +363,8 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
     int bos_id,
     int eos_id,
     int64_t max_len,
-    float beam_search_diversity_rate) {
+    float beam_search_diversity_rate,
+    float alpha) {
   auto stream = input.stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
@@ -420,6 +423,7 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           eos_id,
           max_len,
           beam_search_diversity_rate,
+          alpha,
           cublas_handle_,
           stream);
       break;
@@ -474,6 +478,7 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           eos_id,
           max_len,
           beam_search_diversity_rate,
+          alpha,
           cublas_handle_,
           stream);
       break;

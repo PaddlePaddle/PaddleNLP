@@ -82,7 +82,8 @@ public:
                      const int end_id,
                      const float beam_search_diversity_rate = -0.0f,
                      const bool is_fuse_topk_softMax = false,
-                     const bool keep_alive_beam = false)
+                     const bool keep_alive_beam = false,
+                     const float alpha = 0.6)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam) {
@@ -100,6 +101,7 @@ public:
     args_.start_id_ = start_id;
     args_.end_id_ = end_id;
     args_.beam_search_diversity_rate_ = beam_search_diversity_rate;
+    args_.alpha_ = alpha;
     if (args_.beam_width_ > 16 || args_.beam_width_ > MAX_K)
       is_fuse_topk_softMax_ = false;
 

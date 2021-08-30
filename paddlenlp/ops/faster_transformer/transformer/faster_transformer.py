@@ -53,7 +53,8 @@ class FasterTransformer(TransformerModel):
                  max_out_len=256,
                  decoding_lib=None,
                  use_fp16_decoding=False,
-                 rel_len=False):
+                 rel_len=False,
+                 alpha=0.6):
         # if decoding_lib is None:
         #     raise ValueError(
         #         "The args decoding_lib must be set to use Faster Transformer. ")
@@ -71,6 +72,7 @@ class FasterTransformer(TransformerModel):
         self.decoding_lib = args.pop("decoding_lib")
         self.use_fp16_decoding = args.pop("use_fp16_decoding")
         self.rel_len = args.pop("rel_len")
+        self.alpha = args.pop("alpha")
         self.dropout = dropout
         self.weight_sharing = weight_sharing
         self.trg_vocab_size = trg_vocab_size
@@ -105,7 +107,8 @@ class FasterTransformer(TransformerModel):
             max_out_len=max_out_len,
             decoding_lib=self.decoding_lib,
             use_fp16_decoding=self.use_fp16_decoding,
-            rel_len=self.rel_len)
+            rel_len=self.rel_len,
+            alpha=self.alpha)
 
     def forward(self, src_word):
         src_max_len = paddle.shape(src_word)[-1]
@@ -244,9 +247,9 @@ class FasterTransformer(TransformerModel):
 
 class TransformerGenerator(paddle.nn.Layer):
     """
-    The Transformer model for auto-regressive generation. It wraps `FasterTransformer`
-    and `InferTransformerModel`, and automatically chioces using `FasterTransformer`
-    (with jit building) or the slower verison `InferTransformerModel`.
+    The Transformer model for auto-regressive generation with beam search. It wraps
+    `FasterTransformer` and `InferTransformerModel`, and automatically chioces using
+    `FasterTransformer` (with jit building) or the slower verison `InferTransformerModel`.
 
     Args:
         src_vocab_size (int):
@@ -281,13 +284,31 @@ class TransformerGenerator(paddle.nn.Layer):
             The maximum output length. Defaults to 256.
         kwargs:
             The key word arguments can be `output_time_major`, `use_fp16_decoding` and `use_ft`.
-            `output_time_major(bool, optional)`: Indicate the data layout of predicted
+            `rel_len`, `alpha`:
+
+            - `output_time_major(bool, optional)`: Indicate the data layout of predicted
             Tensor. If `False`, the data layout would be batch major with shape
             `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
-            to `False`. `use_fp16_decoding(bool, optional)`: Whether to use fp16
-            for decoding. `use_ft(bool, optional)`: Whether to use Faster Transformer
+            to `False`. 
+            - `use_fp16_decoding(bool, optional)`: Whether to use fp16
             for decoding. 
+            - `use_ft(bool, optional)`: Whether to use Faster Transformer
+            for decoding. Default to True if not set.
+            - `beam_search_version(str, optional)`: Indicating the strategy of
+            beam search. It can be 'v1' or 'v2'. 'v2' would select the top
+            `beam_size * 2` beams and process the top `beam_size` alive and
+            finish beams in them separately, while 'v1' would only select the
+            top `beam_size` beams and mix up the alive an finish beams. 'v2' always
+            searchs more and get better results, since the alive beams would
+            always be `beam_size` while the number of alive beams in `v1` might
+            decrease when meeting the end token. However, 'v2' always generates
+            longer results thus might do more calculation and be slower.
+            - `rel_len(bool, optional)`: Indicating whether max_out_len in is
+            the length relative to that of source text. Only works in `v2` temporarily.
+            Default to False if not set.
+            - `alpha(float, optional)`: The power number in length penalty
+            calculation. Only works in `v2` temporarily. Default to 0.6 if not set.
     """
 
     def __init__(self,
@@ -321,6 +342,12 @@ class TransformerGenerator(paddle.nn.Layer):
         if use_ft:
             try:
                 load("FasterTransformer", verbose=True)
+                beam_search_version = kwargs.pop("beam_search_version", "v1")
+                rel_len = kwargs.pop("rel_len", True)
+                alpha = kwargs.pop("alpha", 0.6)
+                decoding_strategy = ("beam_search_v2"
+                                     if beam_search_version == "v2" else
+                                     "beam_search")
                 self.transformer = FasterTransformer(
                     src_vocab_size=src_vocab_size,
                     trg_vocab_size=trg_vocab_size,
@@ -336,7 +363,10 @@ class TransformerGenerator(paddle.nn.Layer):
                     eos_id=eos_id,
                     beam_size=beam_size,
                     max_out_len=max_out_len,
-                    use_fp16_decoding=use_fp16_decoding)
+                    decoding_strategy=decoding_strategy,
+                    use_fp16_decoding=use_fp16_decoding,
+                    rel_len=rel_len,
+                    alpha=alpha)
             except Exception:
                 logger.warning(
                     "Exception occurs when using Faster Transformer. " \

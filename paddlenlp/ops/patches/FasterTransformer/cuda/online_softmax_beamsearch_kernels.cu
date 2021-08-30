@@ -1154,6 +1154,7 @@ void topK_softMax_update_kernelLauncher(
     const int step,
     const int max_out_len,
     T diversity_rate,
+    const float alpha,
     cudaStream_t stream) {
   // printf("vocab_size_pad: %d\n", vocab_size);
   const int items_per_thread = 1;
@@ -1225,8 +1226,8 @@ void topK_softMax_update_kernelLauncher(
                                                               beam_width * 2,
                                                               end_id);
 #endif
-  float length_penalty = std::pow((5. + step + 1) / 6., 0.6);
-  float max_length_penalty = std::pow((5. + max_out_len + 1) / 6., 0.6);
+  float length_penalty = std::pow((5. + step + 1) / 6., alpha);
+  float max_length_penalty = std::pow((5. + max_out_len + 1) / 6., alpha);
   batch_topk_update_kernel<T, MAX_K, 32><<<batch_size, 32, 0, stream>>>(
       topk_tmp_id_buf,
       topk_tmp_val_buf,
@@ -1276,6 +1277,7 @@ void topK_softMax_update(
   const int end_id = args.end_id_;
   const T diversity_rate = args.beam_search_diversity_rate_;
   const int max_out_len = args.seq_len_;
+  const float alpha = args.alpha_;
 
   switch (beam_width) {
     case 1:
@@ -1297,6 +1299,7 @@ void topK_softMax_update(
                                                step,
                                                max_out_len,
                                                diversity_rate,
+                                               alpha,
                                                stream);
       break;
     case 2:
@@ -1318,6 +1321,7 @@ void topK_softMax_update(
                                                step,
                                                max_out_len,
                                                diversity_rate,
+                                               alpha,
                                                stream);
       break;
     case 3:
@@ -1339,6 +1343,7 @@ void topK_softMax_update(
                                                step,
                                                max_out_len,
                                                diversity_rate,
+                                               alpha,
                                                stream);
       break;
     case 4:
@@ -1360,6 +1365,7 @@ void topK_softMax_update(
                                                step,
                                                max_out_len,
                                                diversity_rate,
+                                               alpha,
                                                stream);
       break;
     case 8:
@@ -1381,6 +1387,7 @@ void topK_softMax_update(
                                                 step,
                                                 max_out_len,
                                                 diversity_rate,
+                                                alpha,
                                                 stream);
       break;
     case 16:
@@ -1402,6 +1409,7 @@ void topK_softMax_update(
                                                 step,
                                                 max_out_len,
                                                 diversity_rate,
+                                                alpha,
                                                 stream);
       break;
     case 32:
@@ -1423,6 +1431,7 @@ void topK_softMax_update(
                                                 step,
                                                 max_out_len,
                                                 diversity_rate,
+                                                alpha,
                                                 stream);
       break;
     default:
