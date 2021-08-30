@@ -62,7 +62,10 @@ class DetectionF1(Metric):
         recall = np.nan
         if self.tp + self.fn > 0:
             recall = self.tp / (self.tp + self.fn)
-        f1 = 2 * precision * recall / (precision + recall)
+        if self.tp == 0:
+            f1 = 0.0
+        else:
+            f1 = 2 * precision * recall / (precision + recall)
         return f1, precision, recall
 
     def name(self):
