@@ -114,7 +114,8 @@ def parse_decode(words, corr_preds, det_preds, lengths, tokenizer,
     return pred_result
 
 
-def write_result_to_file(args, corr_preds, det_preds, lengths, tokenizer):
+def write_sighan_result_to_file(args, corr_preds, det_preds, lengths,
+                                tokenizer):
     with open(args.test_file, 'r', encoding='utf-8') as fin:
         with open(args.predict_file, 'w', encoding='utf-8') as fout:
             for i, line in enumerate(fin.readlines()):
@@ -198,7 +199,7 @@ def do_predict(args):
         det_preds += [prob for prob in det_pred]
         lengths += [l for l in length]
 
-    write_result_to_file(args, corr_preds, det_preds, lengths, tokenizer)
+    write_sighan_result_to_file(args, corr_preds, det_preds, lengths, tokenizer)
 
 
 if __name__ == "__main__":
