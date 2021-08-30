@@ -54,6 +54,9 @@ const int PAD_IDX = 0;
 const int MAX_LENGTH = 256;
 const int N_BEST = 1;
 
+int batch_size = 1;
+int gpu_id = 0;
+
 namespace paddle {
 namespace inference {
 

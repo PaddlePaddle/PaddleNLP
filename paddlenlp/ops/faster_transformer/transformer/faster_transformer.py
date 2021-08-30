@@ -31,6 +31,75 @@ from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
 
 
 class FasterTransformer(TransformerModel):
+    """
+    FasterTransformer is a faster version for generation with the Transformer
+    model. It uses a custom op based on and enhancing NV FasterTransformer to
+    do fast generation.
+
+    Args:
+        src_vocab_size (int):
+            The size of source vocabulary.
+        trg_vocab_size (int):
+            The size of target vocabulary.
+        max_length (int):
+            The maximum length of input sequences.
+        num_encoder_layers (int):
+            The number of sub-layers to be stacked in the encoder.
+        num_decoder_layers (int):
+            The number of sub-layers to be stacked in the decoder.
+        n_head (int):
+            The number of head used in multi-head attention.
+        d_model (int):
+            The dimension for word embeddings, which is also the last dimension of
+            the input and output of multi-head attention, position-wise feed-forward
+            networks, encoder and decoder.
+        d_inner_hid (int):
+            Size of the hidden layer in position-wise feed-forward networks.
+        dropout (float):
+            Dropout rates. Used for pre-process, activation and inside attention.
+        weight_sharing (bool):
+            Whether to use weight sharing. 
+        attn_dropout (float):
+            The dropout probability used in MHA to drop some attention target.
+            If None, use the value of dropout. Defaults to None.
+        act_dropout (float):
+            The dropout probability used after FFN activition. If None, use
+            the value of dropout. Defaults to None.
+        bos_id (int, optional):
+            The start token id and also is used as padding id. Defaults to 0.
+        eos_id (int, optional):
+            The end token id. Defaults to 1.
+        decoding_strategy (str, optional):
+            Indicating the strategy of decoding. It can be 'beam_search', 'beam_search_v2',
+            'topk_sampling' and 'topp_sampling'. For beam search strategies,
+            'v2' would select the top `beam_size * 2` beams and process the top
+            `beam_size` alive and finish beams in them separately, while 'v1'
+            would only select the top `beam_size` beams and mix up the alive and
+            finish beams. 'v2' always searchs more and get better results, since
+            the alive beams would always be `beam_size` while the number of alive
+            beams in `v1` might decrease when meeting the end token. However,
+            'v2' always generates longer results thus might do more calculation
+            and be slower.
+        beam_size (int, optional):
+            The beam width for beam search. Defaults to 4. 
+        topk (int, optional):
+            The number of highest probability tokens to keep for top-k sampling.
+            Defaults to 4. 
+        topp (float, optional):
+            The most probable tokens whose cumulative probability is not less than
+            `topp` are kept for top-p sampling. Defaults to 4. 
+        max_out_len (int, optional):
+            The maximum output length. Defaults to 256.
+        use_fp16_decoding(bool, optional): Whether to use fp16 for decoding. 
+        rel_len(bool, optional):
+            Indicating whether max_out_len in is the length relative to that of
+            source text. Only works in `beam_search_v2` temporarily. Default to
+            False if not set.
+        alpha(float, optional):
+            The power number in length penalty calculation. Only works in `beam_search_v2`
+            temporarily. Default to 0.6 if not set.
+    """
+
     def __init__(self,
                  src_vocab_size,
                  trg_vocab_size,
@@ -299,7 +368,7 @@ class TransformerGenerator(paddle.nn.Layer):
             beam search. It can be 'v1' or 'v2'. 'v2' would select the top
             `beam_size * 2` beams and process the top `beam_size` alive and
             finish beams in them separately, while 'v1' would only select the
-            top `beam_size` beams and mix up the alive an finish beams. 'v2' always
+            top `beam_size` beams and mix up the alive and finish beams. 'v2' always
             searchs more and get better results, since the alive beams would
             always be `beam_size` while the number of alive beams in `v1` might
             decrease when meeting the end token. However, 'v2' always generates

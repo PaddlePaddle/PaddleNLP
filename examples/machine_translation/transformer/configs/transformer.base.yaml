@@ -63,7 +63,7 @@ label_smooth_eps: 0.1
 # Indicating the strategy of beam search. It can be 'v1' or 'v2'. 'v2' would
 # select the top `beam_size * 2` beams and process the top `beam_size` alive
 # and finish beams in them separately, while 'v1' would only select the top
-# `beam_size` beams and mix up the alive an finish beams. 'v2' always
+# `beam_size` beams and mix up the alive and finish beams. 'v2' always
 # searchs more and get better results, since the alive beams would
 # always be `beam_size` while the number of alive beams in `v1` might
 # decrease when meeting the end token. However, 'v2' always generates
