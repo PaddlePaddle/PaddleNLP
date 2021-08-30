@@ -564,7 +564,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         scores = paddle.scatter(
             scores.flatten(),
             paddle.arange(
-                0, batch_size * beam_size, step=beam_size),
+                0, batch_size * beam_size, step=beam_size, dtype=scores_dtype),
             paddle.zeros([batch_size])).reshape([batch_size, beam_size])
 
         force_position = paddle.unsqueeze(trg_length > time, [1])
@@ -755,10 +755,10 @@ class TransformerModel(nn.Layer):
         trg_src_attn_bias = src_slf_attn_bias
         src_pos = paddle.cast(
             src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
-                start=0, end=src_max_len)
+                start=0, end=src_max_len, dtype=src_word.dtype)
         trg_pos = paddle.cast(
             trg_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
-                start=0, end=trg_max_len)
+                start=0, end=trg_max_len, dtype=trg_word.dtype)
         with paddle.static.amp.fp16_guard():
             src_emb = self.src_word_embedding(src_word)
             src_pos_emb = self.src_pos_embedding(src_pos)
@@ -937,7 +937,7 @@ class InferTransformerModel(TransformerModel):
             trg_src_attn_bias = src_slf_attn_bias
             src_pos = paddle.cast(
                 src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
-                    start=0, end=src_max_len)
+                    start=0, end=src_max_len, dtype=src_word.dtype)
 
             # Run encoder
             src_emb = self.src_word_embedding(src_word)
@@ -1018,7 +1018,7 @@ class InferTransformerModel(TransformerModel):
         src_slf_attn_bias.stop_gradient = True
         src_pos = paddle.cast(
             src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
-                start=0, end=src_max_len)
+                start=0, end=src_max_len, dtype=src_word.dtype)
         src_emb = self.src_word_embedding(src_word)
         src_pos_emb = self.src_pos_embedding(src_pos)
         src_emb = src_emb + src_pos_emb
@@ -1041,10 +1041,8 @@ class InferTransformerModel(TransformerModel):
         alive_log_probs = paddle.tile(initial_log_probs, [batch_size, 1])
         # (batch_size, beam_size, 1)
         alive_seq = paddle.to_tensor(
-            np.tile(
-                np.array(
-                    [[[self.bos_id]]], dtype=src_word.dtype), (batch_size,
-                                                               beam_size, 1)))
+            np.tile(np.array([[[self.bos_id]]]), (batch_size, beam_size, 1)),
+            dtype=src_word.dtype)
 
         ## init for the finished ##
         finished_scores = paddle.to_tensor(
@@ -1052,10 +1050,8 @@ class InferTransformerModel(TransformerModel):
                 [[-inf] * beam_size], dtype="float32"))
         finished_scores = paddle.tile(finished_scores, [batch_size, 1])
         finished_seq = paddle.to_tensor(
-            np.tile(
-                np.array(
-                    [[[self.bos_id]]], dtype=src_word.dtype), (batch_size,
-                                                               beam_size, 1)))
+            np.tile(np.array([[[self.bos_id]]]), (batch_size, beam_size, 1)),
+            dtype=src_word.dtype)
         finished_flags = paddle.zeros_like(finished_scores)
 
         ### initialize inputs and states of transformer decoder ###
@@ -1088,8 +1084,10 @@ class InferTransformerModel(TransformerModel):
                 new_caches.append((nn.MultiHeadAttention.Cache(k, v), cache[1]))
             return new_caches
 
-        def get_topk_coordinates(beam_idx, beam_size, batch_size):
-            batch_pos = paddle.arange(batch_size * beam_size) // beam_size
+        def get_topk_coordinates(beam_idx, beam_size, batch_size,
+                                 dtype="int64"):
+            batch_pos = paddle.arange(
+                batch_size * beam_size, dtype=dtype) // beam_size
             batch_pos = paddle.reshape(batch_pos, [batch_size, beam_size])
             topk_coordinates = paddle.stack([batch_pos, beam_idx], axis=2)
             return topk_coordinates
@@ -1138,14 +1136,19 @@ class InferTransformerModel(TransformerModel):
 
             topk_scores, topk_ids = paddle.topk(
                 flat_curr_scores, k=beam_size * 2)
+            if topk_ids.dtype != alive_seq.dtype:
+                topk_ids = paddle.cast(topk_ids, dtype=alive_seq.dtype)
 
             topk_log_probs = topk_scores * length_penalty
 
             topk_beam_index = topk_ids // self.trg_vocab_size
             topk_ids = topk_ids % self.trg_vocab_size
 
-            topk_coordinates = get_topk_coordinates(topk_beam_index,
-                                                    beam_size * 2, batch_size)
+            topk_coordinates = get_topk_coordinates(
+                topk_beam_index,
+                beam_size * 2,
+                batch_size,
+                dtype=alive_seq.dtype)
             topk_seq = gather_2d(alive_seq, topk_coordinates, beam_size,
                                  batch_size)
             topk_seq = paddle.concat(
@@ -1169,8 +1172,11 @@ class InferTransformerModel(TransformerModel):
             """
             curr_scores += curr_finished * -inf
             _, topk_indexes = paddle.topk(curr_scores, k=beam_size)
-            topk_coordinates = get_topk_coordinates(topk_indexes, beam_size,
-                                                    batch_size)
+            if topk_indexes.dtype != curr_seq.dtype:
+                topk_indexes = paddle.cast(topk_indexes, dtype=curr_seq.dtype)
+
+            topk_coordinates = get_topk_coordinates(
+                topk_indexes, beam_size, batch_size, dtype=curr_seq.dtype)
             alive_seq = gather_2d(curr_seq, topk_coordinates, beam_size,
                                   batch_size)
 
@@ -1201,8 +1207,11 @@ class InferTransformerModel(TransformerModel):
             curr_finished_flags = paddle.concat(
                 [finished_flags, curr_finished], axis=1)
             _, topk_indexes = paddle.topk(curr_finished_scores, k=beam_size)
-            topk_coordinates = get_topk_coordinates(topk_indexes, beam_size,
-                                                    batch_size)
+            if topk_indexes.dtype != curr_seq.dtype:
+                topk_indexes = paddle.cast(topk_indexes, dtype=curr_seq.dtype)
+
+            topk_coordinates = get_topk_coordinates(
+                topk_indexes, beam_size, batch_size, dtype=curr_seq.dtype)
             finished_seq = gather_2d(curr_finished_seq, topk_coordinates,
                                      beam_size, batch_size)
             finished_scores = gather_2d(curr_finished_scores, topk_coordinates,

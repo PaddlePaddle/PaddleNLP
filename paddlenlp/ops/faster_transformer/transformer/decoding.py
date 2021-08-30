@@ -163,6 +163,91 @@ def infer_gpt_decoding(
     return output_ids
 
 
+def infer_unified_decoding(
+        cache_k, cache_v, memory_seq_lens, type_id, logits_mask, word_emb,
+        slf_ln_weight, slf_ln_bias, slf_q_weight, slf_q_bias, slf_k_weight,
+        slf_k_bias, slf_v_weight, slf_v_bias, slf_out_weight, slf_out_bias,
+        ffn_ln_weight, ffn_ln_bias, ffn_inter_weight, ffn_inter_bias,
+        ffn_out_weight, ffn_out_bias, decoder_ln_weight, decoder_ln_bias,
+        trans_weight, trans_bias, lm_ln_weight, lm_ln_bias, linear_weight,
+        linear_bias, pos_emb, type_emb, _decoding_strategy, _beam_size, _topk,
+        _topp, _n_head, _size_per_head, _n_layer, _bos_id, _eos_id,
+        _max_out_len, _beam_search_diversity_rate, _unk_id, _mask_id,
+        _temperature, _len_penalty):
+    helper = LayerHelper('fusion_unified_decoding', **locals())
+
+    inputs = {
+        "CacheK@VECTOR": cache_k,
+        "CacheV@VECTOR": cache_v,
+        "MemSeqLen": memory_seq_lens,
+        "TypeId": type_id,
+        "LogitsMask": logits_mask,
+        "WordEmbedding": word_emb,
+        "SelfLayernormWeight@VECTOR": slf_ln_weight,
+        "SelfLayernormBias@VECTOR": slf_ln_bias,
+        "SelfQueryWeight@VECTOR": slf_q_weight,
+        "SelfQueryBias@VECTOR": slf_q_bias,
+        "SelfKeyWeight@VECTOR": slf_k_weight,
+        "SelfKeyBias@VECTOR": slf_k_bias,
+        "SelfValueWeight@VECTOR": slf_v_weight,
+        "SelfValueBias@VECTOR": slf_v_bias,
+        "SelfOutWeight@VECTOR": slf_out_weight,
+        "SelfOutBias@VECTOR": slf_out_bias,
+        "FFNLayernormWeight@VECTOR": ffn_ln_weight,
+        "FFNLayernormBias@VECTOR": ffn_ln_bias,
+        "FFNInterWeight@VECTOR": ffn_inter_weight,
+        "FFNInterBias@VECTOR": ffn_inter_bias,
+        "FFNOutWeight@VECTOR": ffn_out_weight,
+        "FFNOutBias@VECTOR": ffn_out_bias,
+        "DecoderLayernormWeight": decoder_ln_weight,
+        "DecoderLayernormBias": decoder_ln_bias,
+        "TransWeight": trans_weight,
+        "TransBias": trans_bias,
+        "LMLayernormWeight": lm_ln_weight,
+        "LMLayernormBias": lm_ln_bias,
+        "EmbWeight": linear_weight,
+        "EmbBias": linear_bias,
+        "PositionEncEmb": pos_emb,
+        "TypeEmb": type_emb
+    }
+
+    attrs = {
+        "decoding_strategy": _decoding_strategy,
+        "beam_size": _beam_size,
+        "topk": _topk,
+        "topp": _topp,
+        "n_head": _n_head,
+        "size_per_head": _size_per_head,
+        "num_layer": _n_layer,
+        "bos_id": _bos_id,
+        "eos_id": _eos_id,
+        "max_len": _max_out_len,
+        "beam_search_diversity_rate": _beam_search_diversity_rate,
+        "unk_id": _unk_id,
+        "mask_id": _mask_id,
+        "temperature": _temperature,
+        "len_penalty": _len_penalty
+    }
+
+    output_ids = helper.create_variable(dtype="int32")
+    parent_ids = helper.create_variable(dtype="int32")
+    sequence_length = helper.create_variable(dtype="int32")
+
+    outputs = {
+        'OutputIds': output_ids,
+        'ParentIds': parent_ids,
+        'SequenceLength': sequence_length
+    }
+
+    helper.append_op(
+        type='fusion_unified_decoding',
+        inputs=inputs,
+        outputs=outputs,
+        attrs=attrs)
+
+    return output_ids, parent_ids, sequence_length
+
+
 def finalize(beam_size,
              output_ids,
              parent_ids,
@@ -179,7 +264,7 @@ def finalize(beam_size,
     return ids
 
 
-def transfer_param(p, is_bias=False, restore_data=False):
+def transfer_param(p, is_bias=False, restore_data=False, reserve_var=False):
     param_shape = p.shape
     if restore_data:
         if in_dygraph_mode():
@@ -187,7 +272,8 @@ def transfer_param(p, is_bias=False, restore_data=False):
         else:
             param_data = np.array(paddle.static.global_scope().find_var(p.name)
                                   .get_tensor())
-    del p
+    if not reserve_var:
+        del p
     return paddle.create_parameter(
         shape=param_shape,
         dtype="float16",
@@ -562,3 +648,345 @@ class InferGptDecoding(nn.Layer):
             use_fp16_decoding=self.use_fp16_decoding)
 
         return output_ids
+
+
+class InferUnifiedDecoding(nn.Layer):
+    def __init__(self,
+                 model,
+                 decoding_strategy="topk_sampling",
+                 decoding_lib=None,
+                 use_fp16_decoding=False,
+                 logits_mask=None):
+        if decoding_lib is None:
+            raise ValueError(
+                "The args decoding_lib must be set to use Faster Transformer. ")
+        elif not os.path.exists(decoding_lib):
+            raise ValueError("The path to decoding lib is not exist.")
+        # TODO(): Using jit. 
+        if decoding_lib is not None and os.path.isfile(decoding_lib):
+            # Maybe it has been loadad by `ext_utils.load`
+            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                decoding_lib)
+
+        super(InferUnifiedDecoding, self).__init__()
+        for arg, value in locals().items():
+            if arg not in ["self"]:
+                setattr(self, "_" + arg, value)
+
+        self.sub_modules = {
+            "slf_ln_weight": [],
+            "slf_ln_bias": [],
+            "slf_q_weight": [],
+            "slf_q_bias": [],
+            "slf_k_weight": [],
+            "slf_k_bias": [],
+            "slf_v_weight": [],
+            "slf_v_bias": [],
+            "slf_out_weight": [],
+            "slf_out_bias": [],
+            "ffn_ln_weight": [],
+            "ffn_ln_bias": [],
+            "ffn_inter_weight": [],
+            "ffn_inter_bias": [],
+            "ffn_out_weight": [],
+            "ffn_out_bias": [],
+            "word_emb": None,
+            "pos_emb": None,
+            "type_emb": None,
+            "decoder_ln_weight": None,
+            "decoder_ln_bias": None,
+            "trans_weight": None,
+            "trans_bias": None,
+            "lm_ln_weight": None,
+            "lm_ln_bias": None,
+            "linear_weight": None,
+            "linear_bias": None
+        }
+        if self._use_fp16_decoding:
+            for mod in self._model.encoder.layers:
+                self.sub_modules["slf_q_weight"].append(
+                    transfer_param(
+                        mod.self_attn.q_proj.weight,
+                        restore_data=True,
+                        reserve_var=True))
+                self.sub_modules["slf_q_bias"].append(
+                    transfer_param(
+                        mod.self_attn.q_proj.bias,
+                        is_bias=True,
+                        restore_data=True,
+                        reserve_var=True))
+                self.sub_modules["slf_k_weight"].append(
+                    transfer_param(
+                        mod.self_attn.k_proj.weight,
+                        restore_data=True,
+                        reserve_var=True))
+                self.sub_modules["slf_k_bias"].append(
+                    transfer_param(
+                        mod.self_attn.k_proj.bias,
+                        is_bias=True,
+                        restore_data=True,
+                        reserve_var=True))
+                self.sub_modules["slf_v_weight"].append(
+                    transfer_param(
+                        mod.self_attn.v_proj.weight,
+                        restore_data=True,
+                        reserve_var=True))
+                self.sub_modules["slf_v_bias"].append(
+                    transfer_param(
+                        mod.self_attn.v_proj.bias,
+                        is_bias=True,
+                        restore_data=True,
+                        reserve_var=True))
+                self.sub_modules["slf_out_weight"].append(
+                    transfer_param(
+                        mod.self_attn.out_proj.weight,
+                        restore_data=True,
+                        reserve_var=True))
+                self.sub_modules["slf_out_bias"].append(
+                    transfer_param(
+                        mod.self_attn.out_proj.bias,
+                        is_bias=True,
+                        restore_data=True,
+                        reserve_var=True))
+                self.sub_modules["ffn_inter_weight"].append(
+                    transfer_param(
+                        mod.linear1.weight, restore_data=True,
+                        reserve_var=True))
+                self.sub_modules["ffn_inter_bias"].append(
+                    transfer_param(
+                        mod.linear1.bias,
+                        is_bias=True,
+                        restore_data=True,
+                        reserve_var=True))
+                self.sub_modules["ffn_out_weight"].append(
+                    transfer_param(
+                        mod.linear2.weight, restore_data=True,
+                        reserve_var=True))
+                self.sub_modules["ffn_out_bias"].append(
+                    transfer_param(
+                        mod.linear2.bias,
+                        is_bias=True,
+                        restore_data=True,
+                        reserve_var=True))
+                self.sub_modules["slf_ln_weight"].append(
+                    transfer_param(
+                        mod.norm1.weight, restore_data=True, reserve_var=True))
+                self.sub_modules["slf_ln_bias"].append(
+                    transfer_param(
+                        mod.norm1.bias,
+                        is_bias=True,
+                        restore_data=True,
+                        reserve_var=True))
+                self.sub_modules["ffn_ln_weight"].append(
+                    transfer_param(
+                        mod.norm2.weight, restore_data=True, reserve_var=True))
+                self.sub_modules["ffn_ln_bias"].append(
+                    transfer_param(
+                        mod.norm2.bias,
+                        is_bias=True,
+                        restore_data=True,
+                        reserve_var=True))
+
+            self.sub_modules["word_emb"] = [
+                transfer_param(
+                    self._model.embeddings.word_embeddings.weight,
+                    restore_data=True,
+                    reserve_var=True)
+            ]
+            self.sub_modules["pos_emb"] = [
+                transfer_param(
+                    self._model.embeddings.position_embeddings.weight,
+                    restore_data=True,
+                    reserve_var=True)
+            ]
+            self.sub_modules["type_emb"] = [
+                transfer_param(
+                    self._model.embeddings.token_type_embeddings.weight,
+                    restore_data=True,
+                    reserve_var=True)
+            ]
+            self.sub_modules["decoder_ln_weight"] = [
+                transfer_param(
+                    self._model.encoder.norm.weight,
+                    restore_data=True,
+                    reserve_var=True)
+            ]
+            self.sub_modules["decoder_ln_bias"] = [
+                transfer_param(
+                    self._model.encoder.norm.bias,
+                    is_bias=True,
+                    restore_data=True,
+                    reserve_var=True)
+            ]
+            self.sub_modules["trans_weight"] = [
+                transfer_param(
+                    self._model.lm_head.transform.weight,
+                    restore_data=True,
+                    reserve_var=True)
+            ]
+            self.sub_modules["trans_bias"] = [
+                transfer_param(
+                    self._model.lm_head.transform.bias,
+                    is_bias=True,
+                    restore_data=True,
+                    reserve_var=True)
+            ]
+            self.sub_modules["lm_ln_weight"] = [
+                transfer_param(
+                    self._model.lm_head.layer_norm.weight,
+                    restore_data=True,
+                    reserve_var=True)
+            ]
+            self.sub_modules["lm_ln_bias"] = [
+                transfer_param(
+                    self._model.lm_head.layer_norm.bias,
+                    is_bias=True,
+                    restore_data=True,
+                    reserve_var=True)
+            ]
+            self.sub_modules["linear_weight"] = [
+                paddle.transpose(
+                    transfer_param(
+                        self._model.lm_head.decoder_weight,
+                        restore_data=True,
+                        reserve_var=True), [1, 0])
+            ]
+            if self._decoding_strategy != "beam_search":
+                self.sub_modules["linear_bias"] = [
+                    transfer_param(
+                        self._model.lm_head.decoder_bias,
+                        is_bias=True,
+                        restore_data=True,
+                        reserve_var=True)
+                ]
+            else:
+                self.sub_modules[
+                    "linear_bias"] = [self._model.lm_head.decoder_bias]
+        else:
+            for mod in self._model.encoder.layers:
+                self.sub_modules["slf_q_weight"].append(
+                    mod.self_attn.q_proj.weight)
+                self.sub_modules["slf_q_bias"].append(mod.self_attn.q_proj.bias)
+                self.sub_modules["slf_k_weight"].append(
+                    mod.self_attn.k_proj.weight)
+                self.sub_modules["slf_k_bias"].append(mod.self_attn.k_proj.bias)
+                self.sub_modules["slf_v_weight"].append(
+                    mod.self_attn.v_proj.weight)
+                self.sub_modules["slf_v_bias"].append(mod.self_attn.v_proj.bias)
+                self.sub_modules["slf_out_weight"].append(
+                    mod.self_attn.out_proj.weight)
+                self.sub_modules["slf_out_bias"].append(
+                    mod.self_attn.out_proj.bias)
+                self.sub_modules["ffn_inter_weight"].append(mod.linear1.weight)
+                self.sub_modules["ffn_inter_bias"].append(mod.linear1.bias)
+                self.sub_modules["ffn_out_weight"].append(mod.linear2.weight)
+                self.sub_modules["ffn_out_bias"].append(mod.linear2.bias)
+                self.sub_modules["slf_ln_weight"].append(mod.norm1.weight)
+                self.sub_modules["slf_ln_bias"].append(mod.norm1.bias)
+                self.sub_modules["ffn_ln_weight"].append(mod.norm2.weight)
+                self.sub_modules["ffn_ln_bias"].append(mod.norm2.bias)
+
+            self.sub_modules[
+                "word_emb"] = [self._model.embeddings.word_embeddings.weight]
+            self.sub_modules["pos_emb"] = [
+                self._model.embeddings.position_embeddings.weight
+            ]
+            self.sub_modules["type_emb"] = [
+                self._model.embeddings.token_type_embeddings.weight
+            ]
+            self.sub_modules[
+                "decoder_ln_weight"] = [self._model.encoder.norm.weight]
+            self.sub_modules[
+                "decoder_ln_bias"] = [self._model.encoder.norm.bias]
+
+            self.sub_modules[
+                "trans_weight"] = [self._model.lm_head.transform.weight]
+            self.sub_modules[
+                "trans_bias"] = [self._model.lm_head.transform.bias]
+            self.sub_modules[
+                "lm_ln_weight"] = [self._model.lm_head.layer_norm.weight]
+            self.sub_modules[
+                "lm_ln_bias"] = [self._model.lm_head.layer_norm.bias]
+            self.sub_modules[
+                "linear_weight"] = [self._model.lm_head.decoder_weight.t()]
+            self.sub_modules["linear_bias"] = [self._model.lm_head.decoder_bias]
+        self._n_head = self._model.unified_transformer.encoder.layers[
+            0]._config["nhead"]
+        self._hidden_dims = self._model.unified_transformer.encoder.layers[
+            0]._config["d_model"]
+        self._size_per_head = self._hidden_dims // self._n_head
+        self._n_layer = self._model.unified_transformer.encoder.num_layers
+        self._unk_id = self._model.unified_transformer.unk_token_id
+        self._mask_id = self._model.unified_transformer.mask_token_id
+
+    def forward(self,
+                cache_k,
+                cache_v,
+                memory_seq_lens,
+                decoding_type_id,
+                beam_size=4,
+                topk=4,
+                topp=0.0,
+                max_out_len=256,
+                bos_id=0,
+                eos_id=1,
+                temperature=1.0,
+                length_penalty=1.0,
+                beam_search_diversity_rate=0.0):
+        output_ids, parent_ids, sequence_length = infer_unified_decoding(
+            cache_k=cache_k,
+            cache_v=cache_v,
+            memory_seq_lens=[memory_seq_lens],
+            type_id=[decoding_type_id],
+            logits_mask=[self._logits_mask],
+            word_emb=self.sub_modules["word_emb"],
+            slf_ln_weight=self.sub_modules["slf_ln_weight"],
+            slf_ln_bias=self.sub_modules["slf_ln_bias"],
+            slf_q_weight=self.sub_modules["slf_q_weight"],
+            slf_q_bias=self.sub_modules["slf_q_bias"],
+            slf_k_weight=self.sub_modules["slf_k_weight"],
+            slf_k_bias=self.sub_modules["slf_k_bias"],
+            slf_v_weight=self.sub_modules["slf_v_weight"],
+            slf_v_bias=self.sub_modules["slf_v_bias"],
+            slf_out_weight=self.sub_modules["slf_out_weight"],
+            slf_out_bias=self.sub_modules["slf_out_bias"],
+            ffn_ln_weight=self.sub_modules["ffn_ln_weight"],
+            ffn_ln_bias=self.sub_modules["ffn_ln_bias"],
+            ffn_inter_weight=self.sub_modules["ffn_inter_weight"],
+            ffn_inter_bias=self.sub_modules["ffn_inter_bias"],
+            ffn_out_weight=self.sub_modules["ffn_out_weight"],
+            ffn_out_bias=self.sub_modules["ffn_out_bias"],
+            decoder_ln_weight=self.sub_modules["decoder_ln_weight"],
+            decoder_ln_bias=self.sub_modules["decoder_ln_bias"],
+            trans_weight=self.sub_modules["trans_weight"],
+            trans_bias=self.sub_modules["trans_bias"],
+            lm_ln_weight=self.sub_modules["lm_ln_weight"],
+            lm_ln_bias=self.sub_modules["lm_ln_bias"],
+            linear_weight=self.sub_modules["linear_weight"],
+            linear_bias=self.sub_modules["linear_bias"],
+            pos_emb=self.sub_modules["pos_emb"],
+            type_emb=self.sub_modules["type_emb"],
+            _decoding_strategy=self._decoding_strategy,
+            _beam_size=beam_size,
+            _topk=topk,
+            _topp=topp,
+            _n_head=self._n_head,
+            _size_per_head=self._size_per_head,
+            _n_layer=self._n_layer,
+            _bos_id=bos_id,
+            _eos_id=eos_id,
+            _max_out_len=max_out_len,
+            _beam_search_diversity_rate=beam_search_diversity_rate,
+            _unk_id=self._unk_id,
+            _mask_id=self._mask_id,
+            _temperature=temperature,
+            _len_penalty=length_penalty)
+
+        ids = finalize(
+            beam_size,
+            output_ids,
+            parent_ids,
+            sequence_length,
+            decoding_strategy=self._decoding_strategy)
+
+        return ids
