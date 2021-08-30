@@ -19,6 +19,44 @@ __all__ = ['BartTokenizer']
 class BartTokenizer(GPTTokenizer):
     r"""
     Construct a BART tokenizer.
+
+    Args:
+        vocab_file (str):
+            Path to the vocabulary file.
+        merges_file (str):
+            Path to the merge file.
+        errors (str):
+            Paradigm to follow when decoding bytes to UTF-8.
+            Defaults to `'replace'`.
+        max_len (int, optional):
+            The maximum value of the input sequence length.
+            Defaults to `None`.
+        special_tokens (str, optional):
+            Special tokens not in the vocabulary.
+            Defaults to `None`.
+        eos_token (str, optional):
+            A special token representing the end of a sequence that was used during pretraining.
+            Defaults to `"</s>"`.
+        pad_token (str, optional):
+            A special token used to make arrays of tokens the same size for batching purposes.
+            Defaults to "[PAD]".
+        eol_token (str, optional):
+            A special token representing the token of newline.
+            Defaults to `"\u010a"`.
+
+    Examples:
+        .. code-block::
+
+            from paddlenlp.transformers import BartTokenizer
+
+            tokenizer = BartTokenizer.from_pretrained('bart-base')
+            print(tokenizer('He was a puppeteer'))
+
+            '''
+            {'input_ids': [0, 894, 21, 10, 32986, 9306, 254, 2],
+            'attention_mask': [1, 1, 1, 1, 1, 1, 1, 1]}
+            '''
+
     """
     # merges and vocab same as GPT2
     resource_files_names = {
