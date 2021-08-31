@@ -25,7 +25,7 @@ from paddlenlp.transformers.optimization import LinearDecayWithWarmup
 from paddlenlp.datasets import load_dataset
 
 from data import create_dataloader, build_vocab, convert_example
-from model.dep import BiaffineParser
+from model.dep import BiAffineParser
 from metric import ParserEvaluator
 from criterion import ParserCriterion
 from utils import decode, flat_words
@@ -193,7 +193,7 @@ def do_train(args):
         pretrained_model = None
 
     # Load ddparser model
-    model = BiaffineParser(
+    model = BiAffineParser(
         encoding_model=args.encoding_model,
         feat=args.feat,
         n_rels=n_rels,

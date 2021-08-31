@@ -1,6 +1,7 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# coding:utf-8
+# Copyright (c) 2021  PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License"
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
@@ -14,49 +15,45 @@
 
 import paddle
 import paddle.nn as nn
-
-from model.dropouts import SharedDropout
-from model.encoder import LSTMEncoder, LSTMByWPEncoder, ErnieEncoder
+import paddlenlp as ppnlp
 
 
 class BiAffineParser(nn.Layer):
     """DDParser"""
     def __init__(self,
                  encoding_model,
-                 feat,
                  n_rels,
-                 n_feats,
                  n_words,
                  pad_index,
                  eos_index,
-                 pretrained_model=None,
                  n_mlp_arc=500,
-                 n_mlp_rel=100,
-                 mlp_dropout=0.33):
+                 n_mlp_rel=100):
         super(BiAffineParser, self).__init__()
         self.pad_index = pad_index
         self.eos_index = eos_index
 
-        if encoding_model == "lstm":
-            self.embed = LSTMEncoder(feat, n_feats, n_words)
-        elif encoding_model == "lstm-pe":
+        if encoding_model == "lstm-pe":
             self.embed = LSTMByWPEncoder(n_words, pad_index)
+        elif encoding_model == "ernie-1.0":
+            pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(encoding_model)
+            self.embed = ErnieEncoder(pad_index, pretrained_model)
         else:
+            pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(encoding_model)
             self.embed = ErnieEncoder(pad_index, pretrained_model)
 
         # MLP layer
-        self.mlp_arc_h = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_arc, dropout=mlp_dropout)
-        self.mlp_arc_d = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_arc, dropout=mlp_dropout)
-        self.mlp_rel_h = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_rel, dropout=mlp_dropout)
-        self.mlp_rel_d = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_rel, dropout=mlp_dropout)
+        self.mlp_arc_h = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_arc)
+        self.mlp_arc_d = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_arc)
+        self.mlp_rel_h = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_rel)
+        self.mlp_rel_d = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_rel)
 
         # Biaffine layer
         self.arc_attn = BiAffine(n_in=n_mlp_arc, bias_x=True, bias_y=False)
         self.rel_attn = BiAffine(n_in=n_mlp_rel, n_out=n_rels, bias_x=True, bias_y=True)
 
-    def forward(self, words, feats):
+    def forward(self, words, wp):
 
-        words, x = self.embed(words, feats)
+        words, x = self.embed(words, wp)
         mask = paddle.logical_and(words != self.pad_index, words != self.eos_index)
 
         arc_h = self.mlp_arc_h(x)
@@ -80,8 +77,7 @@ class MLP(nn.Layer):
     """MLP"""
     def __init__(self, 
                  n_in, 
-                 n_out, 
-                 dropout=0):
+                 n_out):
         super(MLP, self).__init__()
 
         self.linear = nn.Linear(
@@ -90,13 +86,11 @@ class MLP(nn.Layer):
             weight_attr=nn.initializer.XavierNormal(),
         )
         self.leaky_relu = nn.LeakyReLU(negative_slope=0.1)
-        self.dropout = SharedDropout(p=dropout)
     
     def forward(self, x):
         # Shape: (batch_size, output_size)
         x = self.linear(x)
         x = self.leaky_relu(x)
-        x = self.dropout(x)
         return x
 
 
@@ -140,4 +134,110 @@ class BiAffine(nn.Layer):
         if s.shape[1] == 1:
             s = paddle.squeeze(s, axis=1)
         return s
-        
+
+
+class ErnieEncoder(nn.Layer):
+    def __init__(self,
+                 pad_index,
+                 pretrained_model):
+        super(ErnieEncoder, self).__init__()
+        self.pad_index = pad_index
+        self.ptm = pretrained_model
+        self.mlp_input_size = self.ptm.config["hidden_size"]
+    
+    def forward(self, words, wp):
+        x, _ = self.ptm(words)
+        x = paddle.reshape(
+            index_sample(x, wp),
+            shape=[wp.shape[0], wp.shape[1], x.shape[2]],
+        )
+        words = index_sample(words, wp)
+        return words, x
+
+
+class LSTMByWPEncoder(nn.Layer):
+    def __init__(self,
+                 n_words,
+                 pad_index,
+                 lstm_by_wp_embed_size=200,
+                 n_embed=300,
+                 n_lstm_hidden=300,
+                 n_lstm_layers=3):
+        super(LSTMByWPEncoder, self).__init__()
+        self.pad_index = pad_index
+        self.word_embed = nn.Embedding(n_words, lstm_by_wp_embed_size)
+
+        self.lstm = nn.LSTM(
+            input_size=lstm_by_wp_embed_size,
+            hidden_size=n_lstm_hidden,
+            num_layers=n_lstm_layers,
+            direction="bidirectional"              
+        )
+
+        self.mlp_input_size = n_lstm_hidden * 2
+
+    def forward(self, words, wp):
+
+        word_embed = self.word_embed(words)
+        mask = words != self.pad_index
+        seq_lens = paddle.sum(paddle.cast(mask, "int32"), axis=-1)
+
+        x, _ = self.lstm(word_embed, sequence_length=seq_lens)
+        x = paddle.reshape(
+            index_sample(x, wp),
+            shape=[wp.shape[0], wp.shape[1], x.shape[2]],
+        )
+        words = paddle.index_sample(words, wp)
+        return words, x
+
+
+def index_sample(x, index):
+    """Select input value according to index
+    
+    Arags：
+        input: input matrix
+        index: index matrix
+    Returns:
+        output
+    >>> input
+    [
+        [1, 2, 3],
+        [4, 5, 6]
+    ]
+    >>> index
+    [
+        [1, 2],
+        [0, 1]
+    ]
+    >>> index_sample(input, index)
+    [
+        [2, 3],
+        [4, 5]
+    ]
+    """
+    x_s = x.shape
+    dim = len(index.shape) - 1 
+    assert x_s[:dim] == index.shape[:dim]
+
+    if len(x_s) == 3 and dim == 1:
+        r_x = paddle.reshape(x, shape=[-1, x_s[1], x_s[-1]])
+    else:
+        r_x = paddle.reshape(x, shape=[-1, x_s[-1]])
+
+    index = paddle.reshape(index, shape=[len(r_x), -1, 1])
+    # generate arange index, shape like index
+    arr_index = paddle.arange(start=0, end=len(index), dtype=index.dtype)
+    arr_index = paddle.unsqueeze(arr_index, axis=[1, 2])
+    arr_index = paddle.expand(arr_index, index.shape)
+    #  genrate new index
+    new_index = paddle.concat((arr_index, index), -1)
+    new_index = paddle.reshape(new_index, (-1, 2))
+    # get output
+    out = paddle.gather_nd(r_x, new_index)
+    #out = paddle.reshape(out, x_s[:dim] + [-1])
+    if len(x_s) == 3 and dim == 2:
+        out = paddle.reshape(out, shape=[x_s[0], x_s[1], -1])
+    else:
+        out = paddle.reshape(out, shape=[x_s[0], -1])
+    return out
+

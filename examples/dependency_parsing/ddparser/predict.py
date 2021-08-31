@@ -24,7 +24,7 @@ import paddlenlp as ppnlp
 from paddlenlp.datasets import load_dataset
 
 from data import create_dataloader, convert_example, load_vocab
-from model.dep import BiaffineParser
+from model.dep import BiAffineParser
 from utils import decode, index_sample, flat_words
 
 # yapf: disable
@@ -141,7 +141,7 @@ def do_predict(args):
         pretrained_model = None
 
     # Load model
-    model = BiaffineParser(
+    model = BiAffineParser(
         encoding_model=args.encoding_model,
         feat=args.feat,
         n_rels=n_rels,

@@ -1,17 +1,5 @@
 # DDParser
 
-* [模型简介](#模型简介)
-    * [模型效果](#模型效果)
-* [数据格式](#数据格式)
-* [数据准备](#数据准备)
-* [文件结构](#文件结构)
-* [快速开始](#快速开始)
-    * [LSTMEncoder+MLP+BiAffine](#LSTMEncoder+MLP+BiAffine)
-    * [LSTMByWPEncoder+MLP+BiAffine](#LSTMByWPEncoder+MLP+BiAffine)
-    * [ErnieEncoder+MLP+BiAffine](#ErnieEncoder+MLP+BiAffine)
-    * [参数释义](#参数释义)
-* [Reference](#Reference)
-
 ## 模型简介
 
 依存句法分析任务通过分析句子中词语之间的依存关系来确定句子的句法结构，
@@ -19,6 +7,79 @@
 模型结构为[Deep Biaffine Attention for Neural Dependency Parsing](https://arxiv.org/abs/1611.01734)。
 同时本项目引入了[ERNIE](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/transformers.rst)系列预训练模型，
 用户可以基于预训练模型finetune完成依存句法分析训练（参考以下[示例](#模型训练)）。
+
+## TaskFlow-DDParser
+
+TaskFlow向用户提供了一个百度基于大规模标注数据集[DuCTB1.0](#数据来源)训练的依存句法分析工具ddparser。用户可以方便地使用该工具完成[一键预测](#一键预测)。
+
+### 环境依赖
+```shell
+pip install LAC
+```
+
+### 一键预测
+
+```python
+from paddlenlp.taskflow import TaskFlow
+
+ddp = TaskFlow("dependency_parsing")
+ddp("百度是一家高科技公司")
+# [{'word': ['百度', '是', '一家', '高科技', '公司'], 
+#   'head': ['2', '0', '5', '5', '2'], 
+#   'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+ddp(["百度是一家高科技公司", "他送了一本书"])
+# [{'word': ['百度', '是', '一家', '高科技', '公司'], 
+#   'head': ['2', '0', '5', '5', '2'], 
+#   'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}, 
+#  {'word': ['他', '送', '了', '一本', '书'], 
+#   'head': ['2', '0', '2', '5', '2'], 
+#   'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
+
+# 输出概率和词性标签
+ddp = TaskFlow("dependency_parsing", prob=True, use_pos=True)
+ddp("百度是一家高科技公司")
+# [{'word': ['百度', '是', '一家', '高科技', '公司'], 
+#   'postag': ['ORG', 'v', 'm', 'n', 'n'], 
+#   'head': ['2', '0', '5', '5', '2'], 
+#   'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 
+#   'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
+
+# 使用ddparser-ernie-1.0进行预测
+ddp-ernie-1.0 = TaskFlow("dependency_parsing", encoding_model="ernie-1.0")
+ddp-ernie-1.0("百度是一家高科技公司")
+# [{'word': ['百度', '是', '一家', '高科技', '公司'], 
+#   'head': ['2', '0', '5', '5', '2'], 
+#   'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+```
+
+### 标注关系说明
+
+DuCTB1.0数据集含14种标注关系，具体含义见下表：
+
+| Label |  关系类型  | 说明                     | 示例                           |
+| :---: | :--------: | :----------------------- | :----------------------------- |
+|  SBV  |  主谓关系  | 主语与谓词间的关系       | 他送了一本书(他<--送)          |
+|  VOB  |  动宾关系  | 宾语与谓词间的关系       | 他送了一本书(送-->书)          |
+|  POB  |  介宾关系  | 介词与宾语间的关系       | 我把书卖了（把-->书）          |
+|  ADV  |  状中关系  | 状语与中心词间的关系     | 我昨天买书了（昨天<--买）      |
+|  CMP  |  动补关系  | 补语与中心词间的关系     | 我都吃完了（吃-->完）          |
+|  ATT  |  定中关系  | 定语与中心词间的关系     | 他送了一本书(一本<--书)        |
+|   F   |  方位关系  | 方位词与中心词的关系     | 在公园里玩耍(公园-->里)        |
+|  COO  |  并列关系  | 同类型词语间关系         | 叔叔阿姨(叔叔-->阿姨)          |
+|  DBL  |  兼语结构  | 主谓短语做宾语的结构     | 他请我吃饭(请-->我，请-->吃饭) |
+|  DOB  | 双宾语结构 | 谓语后出现两个宾语       | 他送我一本书(送-->我，送-->书) |
+|  VV   |  连谓结构  | 同主语的多个谓词间关系   | 他外出吃饭(外出-->吃饭)        |
+|  IC   |  子句结构  | 两个结构独立或关联的单句 | 你好，书店怎么走？(你好<--走)  |
+|  MT   |  虚词成分  | 虚词与中心词间的关系     | 他送了一本书(送-->了)          |
+|  HED  |  核心关系  | 指整个句子的核心         |                                |
+
+### 数据来源
+
+**DuCTB1.0**: `Baidu Chinese Treebank1.0`是百度构建的中文句法树库，即TaskFlow所提供的依存句法分析工具-DDParser的训练数据来源。
+
+## 进阶使用
+
+除了使用TaskFlow进行一键预测，用户还可以基于指定的数据集进行模型训练、预测和部署。以下展示了基于NLPCC2013_EVSAM05_THU和NLPCC2013_EVSAM05_HIT数据集的任务示例。
 
 ### 模型效果
 
@@ -52,8 +113,8 @@
 
 指标释义：
 ```text
-UAS（Labeled Attachment Score）: 依存标注准确率
-LAS (Unlabeled Attachment Score): 依存准备率
+UAS（Unlabeled Attachment Score）: 依存准确率
+LAS (Labeled Attachment Score): 依存标注准备率
 ```
 
 ## 数据格式
@@ -131,6 +192,7 @@ ddparser/
 │   ├── encoder.py # 编码器
 │   └── dep.py # 模型网络
 ├── README.md # 使用说明
+├── export_model.py # 模型导出脚本
 ├── criterion.py # 损失函数
 ├── data.py # 数据结构
 ├── metric.py # 指标计算
@@ -145,7 +207,7 @@ ddparser/
 
 ### LSTMEncoder+MLP+BiAffine
 
-#### 训练
+#### 启动训练
 
 通过如下命令，指定GPU 0卡，以`lstm`为encoder在`nlpcc13_evsam05_thu`数据集上训练与评估：
 
@@ -177,7 +239,7 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
 
 ### LSTMByWPEncoder+MLP+BiAffine
 
-#### 训练
+#### 启动训练
 
 通过如下命令，指定GPU 0卡，以`lstm-pe`为encoder在`nlpcc13_evsam05_hit`数据集上训练与评估：
 
@@ -222,7 +284,7 @@ python deploy/python/predict.py --encoding_model=lstm-pe \
 
 ### ErnieEncoder+MLP+BiAffine
 
-#### 训练
+#### 启动训练
 
 通过如下命令，指定GPU 0卡，以预训练模型`ernie-gram-zh`为encoder在`nlpcc13_evsam05_hit`数据集上训练与评估：
 
