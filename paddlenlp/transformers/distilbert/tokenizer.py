@@ -19,9 +19,8 @@ __all__ = ['DistilBertTokenizer']
 
 class DistilBertTokenizer(BertTokenizer):
     """
-    Constructs a DistilBERT tokenizer. It uses a basic tokenizer to do punctuation
-    splitting, lower casing and so on, and follows a WordPiece tokenizer to
-    tokenize as subwords.
+    Constructs a DistilBERT tokenizer.
+    The usage of DistilBERTTokenizer is the same as `BertTokenizer`.
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
