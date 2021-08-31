@@ -72,7 +72,7 @@ def create_pretrained_dataset(
     ]
     train_ds, valid_ds, test_ds = build_train_valid_test_datasets(
         data_prefix=data_file,
-        data_impl=None,
+        args=args,
         tokenizer=tokenizer,
         splits_string=args.split,
         train_valid_test_num_samples=train_valid_test_num_samples,
