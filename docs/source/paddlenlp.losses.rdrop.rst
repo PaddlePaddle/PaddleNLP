@@ -1,8 +1,7 @@
-sampler
+rdrop
 =============================
 
-.. automodule:: paddlenlp.data.sampler
+.. automodule:: paddlenlp.losses.rdrop
    :members:
    :no-undoc-members:
    :show-inheritance:
-   :special-members: __call__
