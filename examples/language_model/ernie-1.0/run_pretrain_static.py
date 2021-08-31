@@ -332,8 +332,8 @@ def do_train(args):
             "{}_globalbsz_{}_amp_{}_recompute_{}_card_{}".format(
                 args.model_name_or_path, args.global_batch_size, args.use_amp,
                 args.use_recompute, worker_index).lower())
-        if os.path.exists(log_writer_path):
-            shutil.rmtree(log_writer_path)
+        # if os.path.exists(log_writer_path):
+        #     shutil.rmtree(log_writer_path)
         log_writer = LogWriter(log_writer_path)
 
     # Define the input data in the static mode
@@ -442,31 +442,17 @@ def do_train(args):
             p.name for n, p in model.named_parameters()
             if not any(nd in n for nd in ["bias", "norm"])
         ]
-        if False:  #ops.optimizer._jit_compile():
-            logger.info("Using paddlenlp custom AdamW optimizer.")
-            optimizer = ops.optimizer.AdamwOptimizer(
-                learning_rate=lr_scheduler,
-                beta1=args.adam_beta1,
-                beta2=args.adam_beta2,
-                epsilon=args.adam_epsilon,
-                grad_clip=clip,
-                weight_decay=args.weight_decay,
-                apply_decay_param_fun=lambda x: x in decay_param)
-        else:
-            if args.sharding_degree > 1:
-                raise ValueError(
-                    "The paddle.optimizer.AdamW not compatible with Sharding!")
-            logger.info("Using paddle.optimizer.AdamW.")
-            optimizer = paddle.optimizer.AdamW(
-                learning_rate=lr_scheduler,
-                beta1=args.adam_beta1,
-                beta2=args.adam_beta2,
-                epsilon=args.adam_epsilon,
-                grad_clip=clip,
-                weight_decay=args.weight_decay,
-                apply_decay_param_fun=lambda x: x in decay_param)
-            # alias
-            optimizer.apply_optimize = optimizer._apply_optimize
+        logger.info("Using paddle.optimizer.AdamW.")
+        optimizer = paddle.optimizer.AdamW(
+            learning_rate=lr_scheduler,
+            beta1=args.adam_beta1,
+            beta2=args.adam_beta2,
+            epsilon=args.adam_epsilon,
+            grad_clip=clip,
+            weight_decay=args.weight_decay,
+            apply_decay_param_fun=lambda x: x in decay_param)
+        # alias
+        optimizer.apply_optimize = optimizer._apply_optimize
 
         # if args.use_recompute:
         #     dist_strategy.recompute = True
