@@ -122,3 +122,71 @@ def is_chinese_char(cp):
         return True
 
     return False
+
+
+def parse_decode(words, corr_preds, det_preds, lengths, tokenizer,
+                 max_seq_length):
+    UNK = tokenizer.unk_token
+    UNK_id = tokenizer.convert_tokens_to_ids(UNK)
+    tokens = tokenizer.tokenize(words)
+    if len(tokens) > max_seq_length - 2:
+        tokens = tokens[:max_seq_length - 2]
+    corr_pred = corr_preds[1:1 + lengths].tolist()
+    det_pred = det_preds[1:1 + lengths].tolist()
+    words = list(words)
+    if len(words) > max_seq_length - 2:
+        words = words[:max_seq_length - 2]
+
+    assert len(tokens) == len(
+        corr_pred
+    ), "The number of tokens should be equal to the number of labels {}: {}: {}".format(
+        len(tokens), len(corr_pred), tokens)
+    pred_result = ""
+
+    # need to be aligned
+    align_offset = 0
+    if len(words) != len(tokens):
+        first_unk_flag = True
+        for j, word in enumerate(words):
+            if word.isspace():
+                tokens.insert(j + 1, word)
+                corr_pred.insert(j + 1, UNK_id)
+                det_pred.insert(j + 1, 0)  # no error
+            elif tokens[j] != word:
+                if tokenizer.convert_tokens_to_ids(word) == UNK_id:
+                    if first_unk_flag:
+                        first_unk_flag = False
+                        corr_pred[j] = UNK_id
+                        det_pred[j] = 0
+                    else:
+                        tokens.insert(j, UNK)
+                        corr_pred.insert(j, UNK_id)
+                        det_pred.insert(j, 0)  # no error
+                    continue
+                elif tokens[j] == UNK:
+                    # remove rest unk
+                    k = 0
+                    while k + j < len(tokens) and tokens[k + j] == UNK:
+                        k += 1
+                    tokens = tokens[:j] + tokens[j + k:]
+                    corr_pred = corr_pred[:j] + corr_pred[j + k:]
+                    det_pred = det_pred[:j] + det_pred[j + k:]
+                else:  # maybe English, number
+                    if tokens[j].isalnum():
+                        corr_pred = corr_pred[:j] + [UNK_id] * len(tokens[
+                            j]) + corr_pred[j + 1:]
+                        det_pred = det_pred[:j] + [0] * len(tokens[
+                            j]) + det_pred[j + 1:]
+                        tokens = tokens[:j] + list(tokens[j]) + tokens[j + 1:]
+            first_unk_flag = True
+
+    # print("tokens:", tokens)
+    # print("words: ", words)
+    for j, word in enumerate(words):
+        candidates = tokenizer.convert_ids_to_tokens(corr_pred[j])
+        if det_pred[j] == 0 or candidates == UNK or candidates == '[PAD]':
+            pred_result += word
+        else:
+            pred_result += candidates
+
+    return pred_result

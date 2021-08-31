@@ -30,7 +30,7 @@ from paddlenlp.transformers import ErnieGramTokenizer
 from paddlenlp.utils.log import logger
 from paddlenlp.metrics.sighan import DetectionF1, CorrectionF1
 from model import ErnieGramForCSC
-from utils import read_train_ds, convert_example, create_dataloader
+from utils import convert_example, create_dataloader
 
 # yapf: disable
 parser = argparse.ArgumentParser()
