@@ -38,7 +38,7 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
     Examples:
         .. code-block:: python
             from paddlenlp.transformers import SqueezeBertTokenizer
-            tokenizer = SqueezeBertTokenizer.from_pretrained('SqueezeBert-small-discriminator')
+            tokenizer = SqueezeBertTokenizer.from_pretrained('squeezebert-uncased')
             # the following line get: ['he', 'was', 'a', 'puppet', '##eer']
             tokens = tokenizer('He was a puppeteer')
             # the following line get: 'he was a puppeteer'

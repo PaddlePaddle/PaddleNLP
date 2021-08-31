@@ -68,7 +68,7 @@ python run_qqp_torch.py \
 ```
 export CUDA_VISIBLE_DEVICES=0
 python -u ./run_glue.py \
---model_type bert \
+--model_type squeezebert \
 --model_name_or_path ./models/squeezebert-mnli-headless \
 --task_name QQP \
 --batch_size 16 \
