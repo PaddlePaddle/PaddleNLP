@@ -18,7 +18,7 @@ import os
 import paddle
 import paddlenlp as ppnlp
 
-from model.dep import BiaffineParser
+from model.dep import BiAffineParser
 from data import load_vocab
 
 # yapf: disable
@@ -66,7 +66,7 @@ if __name__ == "__main__":
         word_eos_index = word_vocab.to_indices("[SEP]")
 
     # Load ddparser model
-    model = BiaffineParser(
+    model = BiAffineParser(
         encoding_model=args.encoding_model,
         feat=args.feat,
         n_rels=n_rels,

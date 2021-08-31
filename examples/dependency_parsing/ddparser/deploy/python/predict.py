@@ -33,7 +33,7 @@ parser.add_argument("--model_dir", type=str, required=True, help="The path to st
 parser.add_argument("--task_name", choices=["nlpcc13_evsam05_thu", "nlpcc13_evsam05_hit"], type=str, default="nlpcc13_evsam05_thu", help="Select the task.")
 parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
-parser.add_argument("--batch_size", type=int, default=2, help="Numbers of examples a batch for training.")
+parser.add_argument("--batch_size", type=int, default=16, help="Numbers of examples a batch for training.")
 parser.add_argument("--infer_output_file", type=str, default='infer_output.conll', help="The path to save infer results.")
 # Preprocess
 parser.add_argument("--n_buckets", type=int, default=15, help="Number of buckets to devide the dataset.")
@@ -246,8 +246,4 @@ if __name__ == "__main__":
             out_file.write("{}\n".format(res)) 
     out_file.close()
     print("Results saved!")
-
-
-
-
 
