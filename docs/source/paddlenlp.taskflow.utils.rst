@@ -1,8 +1,7 @@
-tokenizer
+utils
 ===============================
 
-.. automodule:: paddlenlp.data.tokenizer
+.. automodule:: paddlenlp.taskflow.utils
    :members:
    :no-undoc-members:
    :show-inheritance:
-   :special-members: __call__
