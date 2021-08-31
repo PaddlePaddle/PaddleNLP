@@ -116,10 +116,10 @@ DuCTB1.0数据集含14种标注关系，具体含义见下表：
 
 其中`lstm-pe`表示lstm by positional encoding，`biaffine-dep`的模型输入可以选择句子的word级表示加char级表示（`biaffine-dep(+char)`）或者句子的word级表示加上pos词性标签（`biaffine-dep(+pos)`），其他模型使用句子的word级表示和char级表示。
 
-指标释义：
+指标计算方式：
 ```text
-UAS（Unlabeled Attachment Score）: 依存准确率
-LAS (Labeled Attachment Score): 依存标注准备率
+UAS (依存准确率) = number of words assigned correct head / total words
+LAS (依存标注准备率) = number of words assigned correct head and relation / total words
 ```
 
 ### 数据格式
@@ -338,7 +338,7 @@ python deploy/python/predict.py --encoding_model=ernie-gram-zh \
 
 项目中的参数具体说明如下：
 
-* `device`: 选用什么设备进行训练，可选cpu、gpu或xpu。如使用gpu训练则参数gpus指定GPU卡号。
+* `device`: 选用什么设备进行训练，可选cpu、gpu。如使用gpu训练则参数gpus指定GPU卡号。
 * `task_name`: 选择训练所用的数据集，可选nlpcc13_evsam05_thu和nlpcc13_evsam05_hit。
 * `encoding_model`: 选择模型编码网络，可选lstm、lstm-pe、ernie-1.0、ernie-tiny和ernie-gram-zh。
 * `epochs`: 训练轮数。
