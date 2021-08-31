@@ -690,9 +690,6 @@ __global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
         finished[finish_num] = 1;
       }
       // If early stop, also mark the alive beams finished.
-      // TODO(guosheng): Maybe we should also mark the unfinished beams in
-      // finish queue as finished to exit, since decoding exits according to
-      // the number of finished beams in both of finish an alive queues.
       for (int i = beam_width; i < beam_width * 2; ++i) finished[i] = 1;
     }
   }

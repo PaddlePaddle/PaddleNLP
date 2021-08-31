@@ -170,10 +170,10 @@ set(FT_PATCH_COMMAND
   && cp ${cmakelists_src} ${cmakelists_dst}
   && cp ${topk_kernels_src} ${topk_kernels_dst}
   && cp ${decoding_beamsearch_h_src} ${decoding_beamsearch_h_dst}
-  && cp ${decoding_kernels_cu_src} ${decoding_kernels_cu_dst}
-  && cp ${cuda_kernels_h_src} ${cuda_kernels_h_dst}
+  && cp ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
+  && cp ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
-  && cp ${online_softmax_beamsearch_kernels_cu_src} ${online_softmax_beamsearch_kernels_cu_dst}
+  && cp ${online_softmax_beamsearch_kernels_cu_src} >> ${online_softmax_beamsearch_kernels_cu_dst}
   && cat ${topk_kernels_cuh_src} >> ${topk_kernels_cuh_dst}
   && cp ${beamsearch_h_src} ${trans_dst}
   && cp ${sampling_h_src} ${trans_dst}
