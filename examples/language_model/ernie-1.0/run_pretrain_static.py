@@ -487,12 +487,12 @@ def do_train(args):
     if not os.path.isdir(program_desc_dir):
         os.mkdir(program_desc_dir)
 
-    with open(program_desc_dir + "/main_program.txt.%d" %
-              (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
+    with open(program_desc_dir + "/main_program.txt.%d" % worker_index,
+              'w') as f:
         f.write(str(main_program))
 
-    with open(program_desc_dir + "/startup_program.txt.%d" %
-              (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
+    with open(program_desc_dir + "/startup_program.txt.%d" % worker_index,
+              'w') as f:
         f.write(str(startup_program))
 
     # Define the Executor for running the static model
