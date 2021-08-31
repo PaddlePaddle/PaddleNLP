@@ -118,6 +118,10 @@ def run(args):
     dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args,
                                                  'test')
 
+    if not args.do_predict and args.faster:
+        raise ValueError(
+            "FasterTransformer only works when do_predict is set. ")
+
     if args.do_train:
         num_training_steps = args.epochs * len(train_data_loader)
 
@@ -190,11 +194,6 @@ def run(args):
 
 @paddle.no_grad()
 def evaluation(model, data_loader, args, tokenizer):
-    if not args.do_predict and args.faster:
-        raise ValueError(
-            "do_predict and faster must be both set if using FasterTransformer. "
-        )
-
     if args.faster:
         model = FasterUnimo(
             model,
