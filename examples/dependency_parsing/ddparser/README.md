@@ -81,7 +81,7 @@ DuCTB1.0数据集含14种标注关系，具体含义见下表：
 
 除了使用TaskFlow进行一键预测，用户还可以基于指定的数据集进行模型训练、预测和部署。以下展示了基于NLPCC2013_EVSAM05_THU和NLPCC2013_EVSAM05_HIT数据集的任务示例。
 
-### 模型效果
+### 效果说明
 
 以下是NLPCC2013_EVSAM05_THU和NLPCC2013_EVSAM05_HIT数据集的模型性能对比，baseline为第二届自然语言处理与中文计算会议发布的[评测报告](http://tcci.ccf.org.cn/conference/2013/dldoc/evrpt05.rar)。
 
@@ -117,7 +117,7 @@ UAS（Unlabeled Attachment Score）: 依存准确率
 LAS (Labeled Attachment Score): 依存标注准备率
 ```
 
-## 数据格式
+### 数据格式
 
 本用例数据格式基于[CoNLL-X](https://ilk.uvt.nl/~emarsi/download/pubs/14964.pdf)。
 
@@ -159,7 +159,7 @@ ID      FROM   LEMMA CPOSTAG POSTAG  FEATS   HEAD     DEPREL        PHEAD PDEPRE
 
 - 该用例中用户只需关注`FORM`、`POSTTAG`、`HEAD`和`DEPREL`这几列信息即可，'_'表示数值不可用。
 
-## 数据准备
+### 数据准备
 
 该用例使用的是[第二届自然语言处理与中文计算会议（NLP&CC 2013）](http://tcci.ccf.org.cn/conference/2013/pages/page04_sam.html)
 提供的数据集，其中`NLPCC2013_EVSAM05_THU`为清华大学语义依存网络语料，`NLPCC2013_EVSAM05_HIT`为哈尔滨工业大学依存网络语料。
@@ -178,7 +178,7 @@ from paddlenlp.datasets import load_dataset
 train_ds, dev_ds, test_ds = load_dataset("nlpcc13_evsam05_hit", splits=["train", "dev", "test"])
 ```
 
-## 文件结构
+### 文件结构
 
 以下是本项目主要代码结构及说明：
 
@@ -201,13 +201,13 @@ ddparser/
 └── utils.py # 工具函数
 ```
 
-## 快速开始
+### 快速开始
 
 本项目提供了三种模型结构：LSTMEncoder+MLP+BiAffine、LSTMByWPEncoder+MLP+BiAffine和ErnieEncoder+MLP+BiAffine，用户可通过`--encoding_model`指定所使用的模型结构。
 
-### LSTMEncoder+MLP+BiAffine
+#### LSTMEncoder+MLP+BiAffine
 
-#### 启动训练
+##### 启动训练
 
 通过如下命令，指定GPU 0卡，以`lstm`为encoder在`nlpcc13_evsam05_thu`数据集上训练与评估：
 
@@ -224,7 +224,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --lstm_lr=0.002
 ```
 
-#### 基于动态图的预测
+##### 基于动态图的预测
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -237,9 +237,9 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
     --infer_output_file=infer_output.conll 
 ```
 
-### LSTMByWPEncoder+MLP+BiAffine
+#### LSTMByWPEncoder+MLP+BiAffine
 
-#### 启动训练
+##### 启动训练
 
 通过如下命令，指定GPU 0卡，以`lstm-pe`为encoder在`nlpcc13_evsam05_hit`数据集上训练与评估：
 
@@ -254,7 +254,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --ernie_lr=0.002 
 ```
 
-#### 基于动态图的预测
+##### 基于动态图的预测
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -266,7 +266,7 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
     --infer_output_file=infer_output.conll 
 ```
 
-#### 基于静态图的预测部署
+##### 基于静态图的预测部署
 
 使用动态图训练结束后，可以将动态图参数导出成静态图参数， 从而获得较优的预测部署性能，执行如下命令完成动态图转换静态图的功能：
 
@@ -282,9 +282,9 @@ python deploy/python/predict.py --encoding_model=lstm-pe \
                                 --task_name=nlpcc13_evsam05_hit
 ```
 
-### ErnieEncoder+MLP+BiAffine
+#### ErnieEncoder+MLP+BiAffine
 
-#### 启动训练
+##### 启动训练
 
 通过如下命令，指定GPU 0卡，以预训练模型`ernie-gram-zh`为encoder在`nlpcc13_evsam05_hit`数据集上训练与评估：
 
@@ -301,7 +301,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --weight_decay=0.01
 ```
 
-#### 基于动态图的预测
+##### 基于动态图的预测
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
@@ -313,7 +313,7 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
     --infer_output_file=infer_output.conll 
 ```
 
-#### 基于静态图的预测部署
+##### 基于静态图的预测部署
 
 使用动态图训练结束后，可以将动态图参数导出成静态图参数， 从而获得较优的预测部署性能，执行如下命令完成动态图转换静态图的功能：
 
@@ -329,7 +329,7 @@ python deploy/python/predict.py --encoding_model=ernie-gram-zh \
                                 --task_name=nlpcc13_evsam05_hit
 ```
 
-### 参数释义
+#### 参数释义
 
 项目中的参数具体说明如下：
 
