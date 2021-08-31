@@ -1,6 +1,6 @@
 # encoding=utf-8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
-
+# Copyright 2021 The Facebook, Inc. and The HuggingFace Inc. team.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -20,6 +20,39 @@ __all__ = ['BlenderbotTokenizer']
 
 
 class BlenderbotTokenizer(GPTTokenizer):
+    r"""
+    Construct a Blenderbot tokenizer, derived from the GPT tokenizer, using
+    byte-level Byte-Pair-Encoding.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.GPTTokenizer`,
+    which contains most of the main methods.
+    Please should refer to the superclass for more information regarding methods.
+    Args:
+        vocab_file (str): file path of the vocabulary
+        merges_file (str): file path of the merges file.
+        errors (str): The method to handle errors in decoding
+        max_len (int): The specified maximum sequence length. Default: "None".
+        special_tokens (dict): The additional special tokens. Default: "None".
+        bos_token (str): The special token for beginning of sequence token. Default: "<s>".
+        eos_token (str): The special token for end of sequence token. Default: "</s>".
+        cls_token (str): The special token for cls. Default: "<s>".
+        sep_token (str): The special token for separator token . Default: "</s>".
+        pad_token (str): The special token for padding. Default: "<pad>".
+        eol_token (str): The special token for newline. Default: "\u010a".
+        add_prefix (bool): Whether or not to add an initial space to the input.
+            This allows to treat the leading word just as any other word.
+            (Blenderbot adds an initial space when tokenizes input text, which
+             is differnt from BlenderbotSmall)
+    Examples:
+        .. code-block:: python
+            from paddlenlp.transformers import BlenderbotTokenizer
+            tokenizer = BlenderbotTokenizer.from_pretrained("blenderbot-400M-distill")
+            text = "My friends are cool but they eat too many carbs."
+            inputs = tokenizer(text)
+            # above line outputs:
+            # {'input_ids': [863, 1329, 366, 1449, 373, 382, 1861, 618, 847, 911, 1372, 21, 2],
+            # 'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
+    """
     resource_files_names = {
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt"
@@ -27,23 +60,32 @@ class BlenderbotTokenizer(GPTTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "blenderbot-400M-distill":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-400M-distill-vocab.json",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-400M-distill-vocab.json",
             "blenderbot-3B":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-3B-vocab.json",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-3B-vocab.json",
             "blenderbot-1B-distill":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-1B-distill-vocab.json"},
+            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-1B-distill-vocab.json"
+        },
         "merges_file": {
             "blenderbot-400M-distill":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-400M-distill-merges.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-400M-distill-merges.txt",
             "blenderbot-3B":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-3B-merges.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-3B-merges.txt",
             "blenderbot-1B-distill":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-1B-distill-merges.txt"
+            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-1B-distill-merges.txt"
         }
     }
-    pretrained_init_configuration = {"blenderbot-3B": {"add_prefix": True},
-                                     "blenderbot-400M-distill": {"add_prefix": True},
-                                     "blenderbot-1B-distill": {"add_prefix": True}}
+    pretrained_init_configuration = {
+        "blenderbot-3B": {
+            "add_prefix": True
+        },
+        "blenderbot-400M-distill": {
+            "add_prefix": True
+        },
+        "blenderbot-1B-distill": {
+            "add_prefix": True
+        }
+    }
 
     def __init__(
             self,
@@ -57,45 +99,39 @@ class BlenderbotTokenizer(GPTTokenizer):
             cls_token="<s>",
             sep_token="</s>",
             pad_token="<pad>",
-            add_prefix=True,  # Add " " before text for tokenize
-            eol_token='\u010a',  # The token of newline.
-    ):
-        super(BlenderbotTokenizer, self).__init__(vocab_file, merges_file, errors,
-                                                  max_len, special_tokens, pad_token,
-                                                  eos_token, eol_token)
+            eol_token='\u010a',
+            add_prefix=True, ):
+        super(BlenderbotTokenizer, self).__init__(
+            vocab_file, merges_file, errors, max_len, special_tokens, pad_token,
+            eos_token, eol_token)
         self.add_prefix = add_prefix
-
-    def __call__(self,
-                 text,
-                 text_pair=None,
-                 max_seq_len=None,
-                 stride=0,
-                 is_split_into_words=False,
-                 pad_to_max_seq_len=False,
-                 truncation_strategy="longest_first",
-                 return_position_ids=False,
-                 return_token_type_ids=False,
-                 return_attention_mask=True,
-                 return_length=False,
-                 return_overflowing_tokens=False,
-                 return_special_tokens_mask=False):
-        return super(BlenderbotTokenizer, self).__call__(
-            text, text_pair, max_seq_len, stride, is_split_into_words,
-            pad_to_max_seq_len, truncation_strategy, return_position_ids,
-            return_token_type_ids, return_attention_mask, return_length,
-            return_overflowing_tokens, return_special_tokens_mask)
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
-        Format of Blenderbot sequence: ``X </s>``
-        :param token_ids_0: List[int]
-        :param token_ids_1: List[int], optional
-        :return: List[int]
+        A Blenderbot sequence has the following format:
+        ::
+            - single sequence: ``X </s>``
+
+        Args:
+            token_ids_0 (:obj:`List[int]`):
+                List of IDs to which the special tokens will be added.
+            token_ids_1 (:obj:`List[int]`, `optional`):
+                token_ids_1 Will be ignored
+
+        Returns:
+            :obj:`List[int]`: List of input_id with the appropriate special tokens.
         """
         return token_ids_0 + [self.eos_token_id]
 
     def _tokenize(self, text):
-        """ Tokenize a string. """
+        """
+        End-to-end tokenization for Blenderbot models.
+        Args:
+            text (str): The text to be tokenized.
+
+        Returns:
+            list: A list of string representing converted tokens.
+        """
         if self.add_prefix:
             text = " " + text
         bpe_tokens = []
@@ -105,4 +141,3 @@ class BlenderbotTokenizer(GPTTokenizer):
             bpe_tokens.extend(
                 bpe_token for bpe_token in self.bpe(token).split(' '))
         return bpe_tokens
-

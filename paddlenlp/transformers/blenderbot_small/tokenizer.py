@@ -1,6 +1,6 @@
 # encoding=utf-8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
-
+# Copyright 2021 The Facebook, Inc. and The HuggingFace Inc. team.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -13,49 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import shutil
-from functools import lru_cache
-
-import json
+from ..gpt.tokenizer import GPTTokenizer
 import re
-from .. import PretrainedTokenizer
-from paddle.utils import try_import
 
 __all__ = ['BlenderbotSmallTokenizer']
 
 
-# Copy from paddlenlp.transformers.gpt.tokenizer.bytes_to_unicode
-@lru_cache()
-def bytes_to_unicode():
-    """
-    Returns list of utf-8 byte and a corresponding list of unicode strings.
-    The reversible bpe codes work on unicode strings.
-    This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
-    When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
-    This is a signficant percentage of your normal, say, 32K bpe vocab.
-    To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
-    And avoids mapping to whitespace/control characters the bpe code barfs on.
-    """
-    _chr = chr
-    bs = list(range(ord("!"), ord("~") + 1)) + list(
-        range(ord("¡"), ord("¬") + 1)) + list(range(ord("®"), ord("ÿ") + 1))
-    cs = bs[:]
-    n = 0
-    for b in range(2 ** 8):
-        if b not in bs:
-            bs.append(b)
-            cs.append(2 ** 8 + n)
-            n += 1
-    cs = [_chr(n) for n in cs]
-    return dict(zip(bs, cs))
-
-
 # Copy from paddlenlp.transformers.gpt.tokenizer.get_pairs
 def get_pairs(word):
-    """Return set of symbol pairs in a word.
+    """
+    Args:
+        word (tuple): tuple of symbols (symbols being variable-length strings).
 
-    Word is represented as tuple of symbols (symbols being variable-length strings).
+    Returns:
+        set: symbol pairs in a word.
     """
     pairs = set()
     prev_char = word[0]
@@ -65,7 +36,34 @@ def get_pairs(word):
     return pairs
 
 
-class BlenderbotSmallTokenizer(PretrainedTokenizer):
+class BlenderbotSmallTokenizer(GPTTokenizer):
+    r"""
+    Constructs a BlenderbotSmall tokenizer based on Byte-Pair-Encoding.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.GPTTokenizer`,
+    which contains most of the main methods.
+    Please should refer to the superclass for more information regarding methods.
+    Args:
+        vocab_file (str): file path of the vocabulary
+        merges_file (str): file path of the merges file.
+        errors (str): The method to handle errors in decoding
+        max_len (int): The specified maximum sequence length. Default: "None".
+        special_tokens (dict): The additional special tokens. Default: "None".
+        bos_token (str): The special token for beginning of sequence token. Default: "__start__".
+        eos_token (str): The special token for end of sequence token. Default: "__end__".
+        unk_token (str): The special token for unknown tokens. Default: "__unk__"
+        pad_token (str): The special token for padding. Default: "__null__".
+        eol_token (str): The special token for newline. Default: "__newln__".
+    Examples:
+        .. code-block:: python
+            from paddlenlp.transformers import BlenderbotSmallTokenizer
+            tokenizer = BlenderbotSmallTokenizer.from_pretrained("blenderbot_small-90M")
+            text = "My friends are cool but they eat too many carbs."
+            inputs = tokenizer(text)
+            # above line outputs:
+            #   {'input_ids': [42, 643, 46, 1430, 45, 52, 1176, 146, 177, 753, 2430, 5],
+            #   'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
+    """
     resource_files_names = {
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt"
@@ -73,11 +71,11 @@ class BlenderbotSmallTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "blenderbot_small-90M":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot_small/blenderbot_small-90M-vocab.json",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot_small/blenderbot_small-90M-vocab.json",
         },
         "merges_file": {
             "blenderbot_small-90M":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot_small/blenderbot_small-90M-merges.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot_small/blenderbot_small-90M-merges.txt",
         }
     }
     pretrained_init_configuration = {"blenderbot_small-90M": {}}
@@ -93,53 +91,24 @@ class BlenderbotSmallTokenizer(PretrainedTokenizer):
             eos_token="__end__",
             unk_token="__unk__",
             pad_token="__null__",
-            eol_token="__newln__",  # The token of newline.
-    ):
-        self._vocab_file = vocab_file
-        self._merges_file = merges_file
-        self.max_len = max_len if max_len is not None else int(1e12)
-        self.num_command_tokens = 2
-        self.num_type_tokens = 2
-
-        self.encoder = json.load(open(vocab_file))
-        self.decoder = {v: k for k, v in self.encoder.items()}
-
-        self.num_tokens = len(self.encoder)
-        self.num_text_tokens = self.num_tokens - 1
-        self.errors = errors  # how to handle errors in decoding
-        self.byte_encoder = bytes_to_unicode()
-        self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
-        bpe_data = open(merges_file, encoding='utf-8').read().split('\n')[1:-1]
-        bpe_merges = [tuple(merge.split()) for merge in bpe_data]
-        self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
-        self.cache = {}
-        self.pat = r"\S+\n?" # blenderbot small use different string match pattern from blenderbot
+            eol_token="__newln__", ):
+        super(BlenderbotSmallTokenizer, self).__init__(
+            vocab_file, merges_file, errors, max_len, special_tokens, pad_token,
+            eos_token, eol_token)
+        self.pat = r"\S+\n?"  # String matching pattern of BlenderbotSmall is different from Blenderbot
         self.unk_id = self.encoder[unk_token]
-        self.special_tokens = {}
-        self.special_tokens_decoder = {}
-        self.set_special_tokens(special_tokens)
         self.eol_token = eol_token
 
-    def __len__(self):
-        return len(self.encoder) + len(self.special_tokens)
-
-    def set_special_tokens(self, special_tokens):
-        """ Add a list of additional tokens to the encoder.
-            The additional tokens are indexed starting from the last index of the
-            current vocabulary in the order of the `special_tokens` list.
-        """
-        if not special_tokens:
-            self.special_tokens = {}
-            self.special_tokens_decoder = {}
-            return
-        self.special_tokens = dict((tok, len(self.encoder) + i)
-                                   for i, tok in enumerate(special_tokens))
-        self.special_tokens_decoder = {
-            v: k
-            for k, v in self.special_tokens.items()
-        }
-
     def bpe(self, token):
+        """
+        Apply Byte-Pair-Encoding on token.
+        The bpe process of BlenderbotSmall is different from Blenderbot.
+        Args:
+            token (str): The token to be converted.
+
+        Returns:
+            str: Converted token.
+        """
         if token in self.cache:
             return self.cache[token]
         token = re.sub("([.,!?()])", r" \1", token)
@@ -164,7 +133,9 @@ class BlenderbotSmallTokenizer(PretrainedTokenizer):
                 continue
 
             while True:
-                bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
+                bigram = min(
+                    pairs,
+                    key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
                 if bigram not in self.bpe_ranks:
                     break
                 first, second = bigram
@@ -180,7 +151,8 @@ class BlenderbotSmallTokenizer(PretrainedTokenizer):
                         new_word.extend(word[i:])
                         break
 
-                    if word[i] == first and i < len(word) - 1 and word[i + 1] == second:
+                    if word[i] == first and i < len(word) - 1 and word[
+                            i + 1] == second:
                         new_word.append(first + second)
                         i += 2
                     else:
@@ -199,18 +171,15 @@ class BlenderbotSmallTokenizer(PretrainedTokenizer):
             words.append(word)
         return " ".join(words)
 
-    def tokenize(self, text):
-        return self._tokenize(text)
-
-    def _tokenize(self, text):
-        """Split a string into tokens using BPE."""
-        bpe_tokens = []
-        for token in re.findall(self.pat, text):
-            bpe_tokens.extend([t for t in self.bpe(token).split(" ")])
-        return bpe_tokens
-
     def convert_tokens_to_ids(self, tokens):
-        """ Converts a sequence of tokens into ids using the vocab. """
+        """
+        Converts a sequence of tokens into ids.
+        Args：
+            tokens (list[int]): List of token ids.
+
+        Returns:
+            list: Converted id list.
+        """
         ids = []
         if isinstance(tokens, str):
             if tokens in self.special_tokens:
@@ -224,32 +193,24 @@ class BlenderbotSmallTokenizer(PretrainedTokenizer):
                 ids.append(self.encoder.get(token, self.unk_id))
         return ids
 
-    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
-        tokens = []
-        for i in ids:
-            if i in self.special_tokens_decoder:
-                if not skip_special_tokens:
-                    tokens.append(self.special_tokens_decoder[i])
-            else:
-                tokens.append(self.decoder[i])
-        return tokens
-
     def convert_tokens_to_string(self, tokens):
+        """
+        Converts a sequence of tokens (list of string) to a single string.
+        Args:
+            tokens (list[str]): A sequence of tokens.
+
+        Returns:
+            str: Converted string.
+        """
         return " ".join(tokens).replace("@@ ", "").strip()
 
-
     def convert_ids_to_string(self, ids):
-        text = ''.join([self.decoder[id] for id in ids])
-        text = bytearray([self.byte_decoder[c] for c in text]).decode(
-            'utf-8', errors=self.errors)
-        return text
-
-    def save_resources(self, save_directory):
         """
-        Save tokenizer related resources to files under `save_directory`.
+        Converts a sequence of ids (list of integers) to a single string.
         Args:
-            save_directory (str): Directory to save files into.
+            ids (list[int]): A sequence of tokens.
+
+        Returns:
+            str: Converted string.
         """
-        for name, file_name in self.resource_files_names.items():
-            save_path = os.path.join(save_directory, file_name)
-            shutil.copyfile(getattr(self, "_%s" % name), save_path)
+        return self.convert_tokens_to_string(self.convert_ids_to_tokens(ids))

@@ -1,6 +1,6 @@
 # encoding=utf-8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
-
+# Copyright 2021 The Facebook, Inc. and The HuggingFace Inc. team.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -17,16 +17,14 @@ import numpy as np
 import math
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
 import paddle.tensor as tensor
-from paddle.nn import Layer, Embedding
+from paddle.nn import Embedding
 
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'BlenderbotModel', 'BlenderbotPretrainedModel',
-    'BlenderbotEncoder', 'BlenderbotDecoder',
-    'BlenderbotForConditionalGeneration'
+    'BlenderbotModel', 'BlenderbotPretrainedModel', 'BlenderbotEncoder',
+    'BlenderbotDecoder', 'BlenderbotForConditionalGeneration'
 ]
 
 
@@ -42,6 +40,13 @@ def shift_tokens_right(input_ids: tensor, decoder_start_token_id: int):
 
 
 class BlenderbotPretrainedModel(PretrainedModel):
+    r"""
+    An abstract class for pretrained Blenderbot models. It provides Blenderbot related
+    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
+    `pretrained_init_configuration`, `base_model_prefix` for downloading and
+    loading pretrained models.
+    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+    """
     base_model_prefix = "blenderbot"
     model_config_file = "model_config.json"
 
@@ -117,11 +122,11 @@ class BlenderbotPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "blenderbot-3B":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-3B.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-3B.pdparams",
             "blenderbot-1B-distill":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-1B-distill.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-1B-distill.pdparams",
             "blenderbot-400M-distill":
-                "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-400M-distill.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/blenderbot/blenderbot-400M-distill.pdparams",
         }
     }
 
@@ -143,14 +148,25 @@ class BlenderbotPretrainedModel(PretrainedModel):
 
 
 class BlenderbotLearnedPositionalEmbedding(Embedding):
-    def __init__(self, num_embeddings, embedding_dim, padding_idx):
-        super().__init__(
-            num_embeddings,
-            embedding_dim,
-        )
+    """
+    This module learns positional embeddings up to a fixed maximum size.
+
+    Please should refer to the superclass for more information regarding methods and arguments.
+    """
+
+    def __init__(self, num_embeddings, embedding_dim, padding_idx=None):
+        super().__init__(num_embeddings, embedding_dim)
 
     def forward(self, input_ids_shape, past_key_values_length=0):
-        """`input_ids_shape` is expected to be [bsz x seqlen]."""
+        """
+        Args:
+            input_ids_shape (`tuple`): Expected to be [batch_size, sequence_length].
+            past_key_values_length (`int`, optional): The length of past_key_value,
+            which is used only when the ``use_cache=True`` during prediction generating.
+
+        Returns:
+            (Tensor): The generated positional embedding.
+        """
         bsz, seq_len = input_ids_shape[:2]
         positions = paddle.arange(
             past_key_values_length,
@@ -160,19 +176,26 @@ class BlenderbotLearnedPositionalEmbedding(Embedding):
 
 
 class BlenderbotEncoder(BlenderbotPretrainedModel):
+    """
+    The encoder of Blenderbot Model.
+    Please refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` or
+    :class:`~paddlenlp.transformers.Blenderbot.BlenderbotModel` for more information
+    regarding methods and parameters.
+    """
+
     def __init__(self,
                  embed_tokens,
                  vocab_size,
                  pad_token_id=0,
-                 d_model=768,
-                 num_encoder_layers=6,
-                 encoder_attention_heads=12,
-                 encoder_ffn_dim=3072,
+                 d_model=1280,
+                 num_encoder_layers=2,
+                 encoder_attention_heads=32,
+                 encoder_ffn_dim=5120,
                  dropout=0.1,
                  activation_function='gelu',
-                 attention_dropout=0.1,
-                 activation_dropout=0.1,
-                 max_position_embeddings=1024,
+                 attention_dropout=0.0,
+                 activation_dropout=0.0,
+                 max_position_embeddings=128,
                  init_std=0.02,
                  scale_embedding=True,
                  normalize_before=True):
@@ -203,7 +226,16 @@ class BlenderbotEncoder(BlenderbotPretrainedModel):
 
         self.apply(self.init_weights)
 
-    def forward(self, input_ids=None, attention_mask=None, ):
+    def forward(
+            self,
+            input_ids,
+            attention_mask=None, ):
+        """
+        Returns:
+            Tensor: The last hidden states at the last layer of the encoder.
+            It's data type should be `float` and has a shape of `(batch_size, seq_lens, hidden_size)`.
+            ``seq_lens`` corresponds to the length of input sequence.
+        """
         if input_ids is None:
             raise ValueError("Input_ids cannot be None.")
 
@@ -225,19 +257,26 @@ class BlenderbotEncoder(BlenderbotPretrainedModel):
 
 
 class BlenderbotDecoder(BlenderbotPretrainedModel):
+    """
+    The decoder of Blenderbot Model.
+    Please refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` and
+    :class:`~paddlenlp.transformers.Blenderbot.BlenderbotModel` for more information
+    regarding methods and parameters.
+    """
+
     def __init__(self,
                  embed_tokens,
                  vocab_size,
                  pad_token_id=0,
-                 d_model=768,
-                 num_decoder_layers=6,
-                 decoder_attention_heads=12,
-                 decoder_ffn_dim=3072,
+                 d_model=1280,
+                 num_decoder_layers=12,
+                 decoder_attention_heads=32,
+                 decoder_ffn_dim=5120,
                  dropout=0.1,
                  activation_function='gelu',
-                 attention_dropout=0.1,
-                 activation_dropout=0.1,
-                 max_position_embeddings=1024,
+                 attention_dropout=0.0,
+                 activation_dropout=0.0,
+                 max_position_embeddings=128,
                  init_std=0.02,
                  scale_embedding=True,
                  normalize_before=True):
@@ -272,6 +311,16 @@ class BlenderbotDecoder(BlenderbotPretrainedModel):
                 memory_mask=None,
                 use_cache=False,
                 cache=None):
+        """
+        Please refer to :class:`~paddlenlp.transformers.Blenderbot.BlenderbotModel` for more
+        information regarding the parameters.
+        Returns:
+            Tensor|tuple:
+                If ``use_cache=False``, the return will be the last hidden state of decoder with shape
+                of [batch_size, seq_lens, hidden_size]. ``seq_lens`` corresponds to the length of input sequence.
+                Otherwise, the return will be a tuple of ``(decoder_output, cache)``. Please refer to
+                class :class:`paddle.nn.TransformerDecoder` for more information regarding ``cache``.
+        """
         if decoder_attention_mask is None:
             decoder_length = paddle.shape(decoder_input_ids)[-1]
             decoder_attention_mask = paddle.tensor.triu(
@@ -280,8 +329,10 @@ class BlenderbotDecoder(BlenderbotPretrainedModel):
                     -np.inf,
                     dtype=paddle.get_default_dtype())),
                 1)
-        decoder_inputs_embeds = self.embed_tokens(decoder_input_ids) * self.embed_scale
-        decoder_inputs_embed_pos = self.decoder_embed_positions(decoder_input_ids.shape)
+        decoder_inputs_embeds = self.embed_tokens(
+            decoder_input_ids) * self.embed_scale
+        decoder_inputs_embed_pos = self.decoder_embed_positions(
+            decoder_input_ids.shape)
 
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         decoder_input = self.decoder_dropout(hidden_states)
@@ -296,31 +347,100 @@ class BlenderbotDecoder(BlenderbotPretrainedModel):
             tgt_mask=decoder_attention_mask,
             memory_mask=memory_mask,
             cache=cache)
-        decoder_output = self.decoder_layernorm(decoder_output)
-
-        return decoder_output
+        if use_cache:
+            decoder_output, cache = decoder_output
+            decoder_output = self.decoder_layernorm(decoder_output)
+            return decoder_output, cache
+        else:
+            decoder_output = self.decoder_layernorm(decoder_output)
+            return decoder_output
 
 
 @register_base_model
 class BlenderbotModel(BlenderbotPretrainedModel):
+    """
+     Construct a bare Blenderbot Model.
+
+     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+     Check the superclass documentation for the generic methods and the library implements for all its model.
+
+     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+     /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+     and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+     Args:
+         vocab_size (`int`):
+             Vocabulary size of the Blenderbot model.
+         bos_token_id (`int`, optional):
+            The id for begging of sentences token. Defaults to ``1``.
+         pad_token_id (`int`, optional):
+            The id for padding token. Defaults to ``0``.
+         eos_token_id (`int`, optional):
+            The id for end of sentence token. Defaults to ``2``.
+         decoder_start_token_id (`int`, optional):
+            The id indicating the start of decoding sentence. Defaults to ``1``.
+         d_model (`int`, optional):
+            Dimensionality of the layers and the pooler layer. Defaults to ``1280``.
+         num_encoder_layers (`int`, optional):
+            Number of Transformer encoder layers for BlenderbotEncoder. Defaults to ``2``.
+         num_decoder_layers (`int`, optional):
+            Number of Transformer decoder layers for BlenderbotDecoder. Defaults to ``12``.
+         encoder_attention_heads (`int`, optional):
+            Number of attention heads for each Transformer encoder layer in BlenderbotEncoder.
+            Defaults to ``32``.
+         decoder_attention_heads (`int`, optional):
+            Number of attention heads for each Transformer decoder layer in BlenderbotDecoder.
+            Defaults to ``32``.
+         encoder_ffn_dim (`int`, optional):
+            Dimensionality of the feed-forward layer for each Transformer encoder layer in
+            BlenderbotEncoder. Defaults to ``5120``.
+         decoder_ffn_dim (`int`, optional):
+            Dimensionality of the feed-forward layer for each Transformer dncoder layer in
+            BlenderbotDncoder. Defaults to ``5120``.
+         dropout (`float`, optional):
+            The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
+            Defaults to ``0.1``.
+         activation_function (`str`, optional):
+            The non-linear activation function (function or string) in the encoder and pooler.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported. Defaults to ``"gelu"``.
+         attention_dropout (`float`, optional):
+            The dropout ratio for the attention probabilities.
+            Defaults to ``0.0``.
+         activation_dropout (`float`, optional):
+            The dropout ratio for activations inside the fully connected layer.
+         max_position_embeddings (`int`, optional):,
+            The max position index of an input sequence. Defaults to ``128``.
+         init_std (`float`, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Defaults to ``0.02``.
+         scale_embedding (`bool`, optional):
+            Indicate whether to scale embeddings by diving by sqrt(d_model). Defaults to ``True``.
+         normalize_before (bool, optional):
+            Indicate whether to put layer normalization into preprocessing of MHA and FFN sub-layers.
+            If True, pre-process is layer normalization and post-precess includes dropout,
+            residual connection. Otherwise, no pre-process and post-precess includes dropout,
+            residual connection, layer normalization. Defaults to ``True``.
+     """
+
     def __init__(self,
                  vocab_size,
-                 bos_token_id=0,
+                 bos_token_id=1,
                  pad_token_id=0,
                  eos_token_id=2,
-                 decoder_start_token_id=2,
-                 d_model=768,
-                 num_encoder_layers=6,
-                 num_decoder_layers=6,
-                 encoder_attention_heads=12,
-                 decoder_attention_heads=12,
-                 encoder_ffn_dim=3072,
-                 decoder_ffn_dim=3072,
+                 decoder_start_token_id=1,
+                 d_model=1280,
+                 num_encoder_layers=2,
+                 num_decoder_layers=12,
+                 encoder_attention_heads=32,
+                 decoder_attention_heads=32,
+                 encoder_ffn_dim=5120,
+                 decoder_ffn_dim=5120,
                  dropout=0.1,
                  activation_function='gelu',
                  attention_dropout=0.0,
                  activation_dropout=0.0,
-                 max_position_embeddings=1024,
+                 max_position_embeddings=128,
                  init_std=0.02,
                  scale_embedding=True,
                  normalize_before=True):
@@ -335,13 +455,15 @@ class BlenderbotModel(BlenderbotPretrainedModel):
             self.shared, vocab_size, pad_token_id, d_model, num_encoder_layers,
             encoder_attention_heads, encoder_ffn_dim, dropout,
             activation_function, attention_dropout, activation_dropout,
-            max_position_embeddings, init_std, scale_embedding, normalize_before)
+            max_position_embeddings, init_std, scale_embedding,
+            normalize_before)
 
         self.decoder = BlenderbotDecoder(
             self.shared, vocab_size, pad_token_id, d_model, num_decoder_layers,
             decoder_attention_heads, decoder_ffn_dim, dropout,
             activation_function, attention_dropout, activation_dropout,
-            max_position_embeddings, init_std, scale_embedding, normalize_before)
+            max_position_embeddings, init_std, scale_embedding,
+            normalize_before)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -351,7 +473,67 @@ class BlenderbotModel(BlenderbotPretrainedModel):
                 decoder_attention_mask=None,
                 encoder_output=None,
                 use_cache=False,
-                cache=None):
+                cache=None,
+                **kwargs):
+        r"""
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+
+            attention_mask (Tensor, optional):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set
+                to **-infinity** for any positions in the mask that are **0**, and will be
+                **unchanged** for positions that are **1**.
+
+                - **1** for tokens that are **not masked**,
+                - **0** for tokens that are **masked**.
+
+                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+                Defaults to `None`.
+
+            decoder_input_ids (Tensor, optional):
+                If not provided, ``decoder_input_ids`` will be automatically generated based
+                on ``decoder_start_token_id`` and ``input_ids``.
+
+            decoder_attention_mask (Tensor, optional):
+                If not provided, the default ``decoder_attention_mask`` will be a tensor with
+                upper triangular part being ``-np.inf``. the shape will be ``(decoder_length, decoder_length)``
+
+            encoder_output (Tensor, optional):
+                The output of encoder. If not provided, a ``encoder_output`` will be generated
+                from BlenderbotEncoder. Defaults to ``None``.
+
+            use_cache (bool, optional):
+                Indicates whether to use cache to speed up decoding. Defaults to ``False``
+
+            cache (list, optional): It is a list, and each element in the list
+                is a tuple( :code:`(incremental_cache, static_cache)` ). See
+                `paddle.nn.TransformerDecoder.gen_cache` for more details. It is only
+                used for inference and should be None for training. Default None.
+        Returns:
+            tuple: A tuple of `decoder_output` and `encoder_output`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import BlenderbotTokenizer, BlenderbotModel
+
+                # "blenderbot-400M-distill" is pretrained weight of BlenderbotForConditionalGeneration,
+                # Therefore some weight of additional layers in BlenderbotForConditionalGeneration
+                # might not be loaded and used.
+                pretrained_model_name = "blenderbot-400M-distill"
+                tokenizer = BlenderbotTokenizer.from_pretrained(pretrained_model_name)
+                model = BlenderbotModel.from_pretrained(pretrained_model_name)
+
+                sample_text = "My friends are cool but they eat too many carbs."
+                inputs = tokenizer(sample_text, return_attention_mask=True, return_token_type_ids=False)
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                decoder_output, encoder_output = model(**inputs)
+        """
         if decoder_input_ids is None:
             decoder_input_ids = shift_tokens_right(input_ids,
                                                    self.decoder_start_token_id)
@@ -364,7 +546,8 @@ class BlenderbotModel(BlenderbotPretrainedModel):
         memory_mask.stop_gradient = True
 
         decoder_output = self.decoder(decoder_input_ids, decoder_attention_mask,
-                                      encoder_output, memory_mask, use_cache, cache)
+                                      encoder_output, memory_mask, use_cache,
+                                      cache)
         # return encoder output for decoder to generate sequence.
         return decoder_output, encoder_output
 
@@ -378,13 +561,16 @@ class BlenderbotForConditionalGeneration(BlenderbotPretrainedModel):
         self.pad_token_id = blenderbot.pad_token_id
         self.lm_head_weight = self.create_parameter(
             shape=[
-                self.blenderbot.config['vocab_size'], self.blenderbot.config['d_model']
+                self.blenderbot.config['vocab_size'],
+                self.blenderbot.config['d_model']
             ],
             dtype=self.blenderbot.shared.weight.dtype,
             is_bias=False)
-        self.register_buffer("final_logits_bias",
-                             paddle.zeros((1, self.blenderbot.config['vocab_size']),
-                                          dtype=paddle.get_default_dtype()))
+        self.register_buffer(
+            "final_logits_bias",
+            paddle.zeros(
+                (1, self.blenderbot.config['vocab_size']),
+                dtype=paddle.get_default_dtype()))
         self.apply(self.init_weights)
 
     def forward(self,
@@ -395,7 +581,29 @@ class BlenderbotForConditionalGeneration(BlenderbotPretrainedModel):
                 encoder_output=None,
                 use_cache=False,
                 cache=None):
+        """
+        Please refer to :class:`~paddlenlp.transformers.Blenderbot.BlenderbotModel` for more
+        information regarding parameters.
+        Return:
+            Tensor|tuple: If ``use_cache=False``, the return will be a tensor with shape of
+                [batch_size, seq_lens, hidden_size]. Otherwise, the return will be a tuple
+                of ``(decoder_output, cache)``.
+        Example:
+            .. code-block::
 
+                import paddle
+                from paddlenlp.transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
+
+                pretrained_model_name = "blenderbot-400M-distill"
+                tokenizer = BlenderbotTokenizer.from_pretrained(pretrained_model_name)
+                model = BlenderbotForConditionalGeneration.from_pretrained(pretrained_model_name)
+
+                sample_text = "My friends are cool but they eat too many carbs."
+                inputs = tokenizer(sample_text, return_attention_mask=True, return_token_type_ids=False)
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs, use_cache=True)
+                # outputs is a tuple of (lm_logits, cache) if ``use_cache=True``.
+        """
         decoder_outputs, encoder_output = self.blenderbot(
             input_ids, attention_mask, decoder_input_ids,
             decoder_attention_mask, encoder_output, use_cache, cache)
@@ -417,11 +625,17 @@ class BlenderbotForConditionalGeneration(BlenderbotPretrainedModel):
                                       use_cache=True,
                                       cache=None,
                                       **kwargs):
+        """
+        Prepare inputs for decoder to generate sentences.
+        Return:
+            dict: A dictionary containing necessary inputs for generating next token.
+        """
         if cache is not None:
             decoder_input_ids = decoder_input_ids[:, -1:].unsqueeze(-1)
 
         return {
-            "input_ids": None,  # during prediction, Encoder_output is provided, do not need input_ids.
+            "input_ids":
+            None,  # during prediction, Encoder_output is provided, do not need input_ids.
             "decoder_input_ids": decoder_input_ids,
             "encoder_output": encoder_output,
             "attention_mask": attention_mask,
