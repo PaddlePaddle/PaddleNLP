@@ -21,8 +21,7 @@ template <typename T>
 void topK_softMax_update(
     const T* log_probs,
     const float* bias,  // NOTE: bias is float in V3.1
-    bool* finished,     // TODO(guosheng): remove this, senseless when keeping
-                        // alive beam size
+    bool* finished,
     int* sequence_length,
     int* word_ids,
     int* parent_ids,  // for update cache, only include alive beams
