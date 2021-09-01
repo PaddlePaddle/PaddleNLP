@@ -173,7 +173,7 @@ def build_training_sample(sample, target_seq_length, max_seq_length,
          np_rng,
          vocab_token_to_id_dict=vocab_token_to_id_dict,
          to_chinese_char=True,
-         inplace_random_mask=True, )
+         inplace_random_mask=False, )
 
     # Padding.
     tokens_np, tokentypes_np, labels_np, padding_mask_np, loss_mask_np \
