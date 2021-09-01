@@ -36,8 +36,8 @@ from utils import convert_example, create_dataloader
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--model_type", type=str, default="ernie_gram", choices=["ernie_gram", "ernie"], help="Pretraining model type")
-parser.add_argument("--model_name_or_path", type=str, default="ernie-gram-zh", help="Pretraining model name or path")
+parser.add_argument("--model_type", type=str, default="ernie", choices=["ernie_gram", "ernie"], help="Pretraining model type")
+parser.add_argument("--model_name_or_path", type=str, default="ernie-1.0", help="Pretraining model name or path")
 parser.add_argument("--max_seq_length", type=int, default=128, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--learning_rate", type=float, default=5e-5, help="Learning rate used to train.")
 parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
