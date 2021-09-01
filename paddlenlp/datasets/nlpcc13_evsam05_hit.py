@@ -44,7 +44,7 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
         '''
     """
 
-    URL = 'http://paddlenlp.bj.bcebos.com/datasets/nlpcc13_evsam05_hit.tar.gz'
+    URL = 'https://paddlenlp.bj.bcebos.com/datasets/nlpcc13_evsam05_hit.tar.gz'
     MD5 = '5988ede79690dc87aa6e4343b5299944'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
@@ -62,11 +62,11 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
     def _get_data(self, mode, **kwargs):
         """Downloads dataset."""
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
-        filename, data_hash, URL = self.SPLITS[mode]
+        filename, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-            get_path_from_url(URL, default_root, self.MD5)
+            get_path_from_url(self.URL, default_root, self.MD5)
 
         return fullname
 
@@ -98,4 +98,6 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
                         "PHEAD": PHEAD,
                         "PDEPREL": PDEPREL,
                     }
-                start = i + 1 
+                start = i + 1
+
+        
