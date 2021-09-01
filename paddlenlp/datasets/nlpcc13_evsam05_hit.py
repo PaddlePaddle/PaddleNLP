@@ -98,6 +98,4 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
                         "PHEAD": PHEAD,
                         "PDEPREL": PDEPREL,
                     }
-                start = i + 1
-
-        
+                start = i + 1 
