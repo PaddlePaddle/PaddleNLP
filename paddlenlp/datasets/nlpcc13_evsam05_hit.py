@@ -24,24 +24,39 @@ __all__ = ['NLPCC13EVSAM05HIT']
 
 
 class NLPCC13EVSAM05HIT(DatasetBuilder):
+    """
+    NLPCC13_EVSAM05_HIT is the dataset for dependency parsing.
+    The format of this dataset is based on the CoNLL-X style:
 
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
+        '''
+        raw name        definition 
+
+        ID              Token counter, starting at 1 for each new sentence.
+        FORM            Word form or punctuation symbol.
+        LEMMA           Lemma or stem (depending on the particular treebank) of word form, or an underscore if not available.
+        CPOSTAG         Coarse-grained part-of-speech tag, where the tagset depends on the treebank.
+        POSTAG          Fine-grained part-of-speech tag, where the tagset depends on the treebank.
+        FEATS           Unordered set of syntactic and/or morphological features (depending on the particular treebank), or an underscore if not available.
+        HEAD            Head of the current token, which is either a value of ID, or zero (’0’) if the token links to the virtual root node of the sentence.
+        DEPREL          Dependency relation to the HEAD.
+        PHEAD           Projective head of current token, which is either a value of ID or zero (’0’), or an underscore if not available.
+        PDEPREL         Dependency relation to the PHEAD, or an underscore if not available.
+        '''
+    """
+
+    URL = 'http://paddlenlp.bj.bcebos.com/datasets/nlpcc13_evsam05_hit.tar.gz'
+    MD5 = '5988ede79690dc87aa6e4343b5299944'
+    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
         'train': META_INFO(
-            os.path.join('evsam05', '╥└┤µ╖╓╬÷╤╡┴╖╩²╛▌', 'HIT', 'train.conll'),
-            'c7779f981203b4ecbe5b04c65aaaffce',
-            'http://tcci.ccf.org.cn/conference/2013/dldoc/evsam05.zip',
-        ),
+            os.path.join('nlpcc13_evsam05_hit', 'train.conll'),
+            'd82e667950a5e22b18baf595b9feb30f'),
         'dev': META_INFO(
-            os.path.join('evsam05', '╥└┤µ╖╓╬÷╤╡┴╖╩²╛▌', 'HIT', 'dev.conll'),
-            '59c2de72c7be39977f766e8290336dac',
-            'http://tcci.ccf.org.cn/conference/2013/dldoc/evsam05.zip',
-        ),
+            os.path.join('nlpcc13_evsam05_hit', 'dev.conll'),
+            'b71b08dc85e652769bfbda30b1e352a9'),
         'test': META_INFO(
-            os.path.join('▓Γ╩╘┤≡░╕', 'HIT', 'golden.conll'),
-            '91ae33dc21adace18788885298a3155a',
-            'http://tcci.ccf.org.cn/conference/2013/dldoc/evans05.zip',
-        ),
+            os.path.join('nlpcc13_evsam05_hit', 'test.conll'),
+            '784fb9d966a286df5370f7eee4013cf0'),
     }
 
     def _get_data(self, mode, **kwargs):
@@ -51,7 +66,7 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-            get_path_from_url(URL, default_root)
+            get_path_from_url(URL, default_root， self.MD5)
 
         return fullname
 
@@ -69,7 +84,20 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
         for i, line in enumerate(lines):
             if not line:
                 values = list(zip(*[j.split('\t') for j in lines[start:i]]))
-                _, FORM, _, CPOS, _, _, HEAD, DEPREL, _, _ = values
+                ID, FORM, LEMMA, CPOS, POS, FEATS, HEAD, DEPREL, PHEAD, PDEPREL = values
                 if values:
-                    yield {"FORM": FORM, "CPOS": CPOS, "HEAD": HEAD, "DEPREL": DEPREL}
-                start = i + 1 
+                    yield {
+                        "ID": ID,
+                        "FORM": FORM,
+                        "LEMMA": LEMMA,
+                        "CPOS": CPOS, 
+                        "POS": POS,
+                        "FEATS": FEATS,
+                        "HEAD": HEAD, 
+                        "DEPREL": DEPREL,
+                        "PHEAD": PHEAD,
+                        "PDEPREL": PDEPREL,
+                    }
+                start = i + 1
+
+        
