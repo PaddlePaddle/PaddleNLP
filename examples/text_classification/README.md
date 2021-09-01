@@ -1,6 +1,6 @@
 # 文本分类
 
-该项目示例使用PaddleNLP如何完成文本分类任务。该项目展示了使用传统的[Recurrent Neural Networks](./rnn) 和 预训练模型[Pretrained Models](./pretrained_models)两种方法完成文本分类任务。
+提供了多个文本分类任务示例，基于传统序列模型的二分类，基于预训练模型的二分类和基于预训练模型的多标签文本分类。
 
 ## RNN Models
 
