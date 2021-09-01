@@ -1,11 +1,5 @@
 # Batch size during inference. 
 batch_size: 32
-# Hyparams for generation:
-# The parameters for beam search.
-# The parameters for topk sampling. 
-# The parameters for topp sampling. 
-# The number of decoded sentences to output.
-n_best: 1
 
 # Hyparams for model:
 # These following five vocabularies related configurations will be set

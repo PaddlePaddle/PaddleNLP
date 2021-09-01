@@ -66,7 +66,7 @@ def do_predict(args):
         use_trt_kernel=args.use_trt_kernel,
         remove_padding=args.remove_padding,
         encoder_lib=args.encoder_lib,
-        use_fp16_encoder=False)
+        use_fp16_encoder=args.use_fp16_encoder)
     encoder.load('base_trained_models/step_final/transformer.pdparams')
     seq_len = args.seq_len
     batch_size = args.batch_size
@@ -110,7 +110,8 @@ def do_predict(args):
     src_slf_attn_bias = (1 - src_mask) * -1e4
     src_slf_attn_bias.stop_gradient = True
 
-    custom_enc_output = encoder.encoder(enc_input, src_mask, mem_seq_lens)
+    custom_enc_output = encoder(enc_input, src_mask, mem_seq_lens)
+    # '''
     encoder.transformer.encoder.eval()
     enc_output = encoder.transformer.encoder(enc_input, src_slf_attn_bias)
 
@@ -137,6 +138,7 @@ def do_predict(args):
             encoder_out = encoder(src_word=src_word, seq_len=seq_len)
         logger.info("Average test time for decoder is %f ms" % (
             (time.time() - start) / 50 * 1000))
+    # '''
 
 
 if __name__ == "__main__":

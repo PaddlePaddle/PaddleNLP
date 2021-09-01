@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import numpy as np
 
 import paddle
 import paddle.nn as nn
@@ -121,7 +122,7 @@ class InferTransformerEncoder(nn.Layer):
         self.size_per_head = size_per_head
         self.remove_padding = remove_padding
         if use_fp16_encoder:
-            for idx, mod in enuemerate(encoder.layers):
+            for idx, mod in enumerate(encoder.layers):
                 mod.self_attn.q_proj.weight = transfer_param(
                     mod.self_attn.q_proj.weight)
                 mod.self_attn.q_proj.bias = transfer_param(
@@ -263,7 +264,6 @@ class FasterEncoder(nn.Layer):
         self.use_fp16_encoder = use_fp16_encoder
         self.max_seq_length = max_seq_length
         self.d_model = d_model
-        self.use_fp16_encoder = use_fp16_encoder
 
         self.src_word_embedding = WordEmbedding(
             vocab_size=src_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
@@ -289,12 +289,7 @@ class FasterEncoder(nn.Layer):
             custom_encoder=custom_encoder,
             activation="gelu",
             normalize_before=False)
-        # state_dict = paddle.load(
-        #     '')
 
-        # state_dict["encoder.pos_encoder.weight"] = position_encoding_init(
-        #     max_seq_length, d_model)
-        # self.set_state_dict(state_dict)
         self.encoder = InferTransformerEncoder(
             encoder=self.transformer.encoder,
             n_layer=n_layer,
@@ -308,16 +303,18 @@ class FasterEncoder(nn.Layer):
             encoder_lib=encoder_lib,
             use_fp16_encoder=use_fp16_encoder)
 
-    def forward(self, src_input, src_mask, mem_seq_lens):
+    def forward(self, enc_input, src_mask, mem_seq_lens):
         self.encoder.eval()
         dtype = "float32"
-        if args.use_fp16_encoder:
+        if self.use_fp16_encoder:
             dtype = "float16"
             enc_input = paddle.cast(enc_input, dtype)
             src_mask = paddle.cast(src_mask, dtype)
-            mem_seq_lens = paddle.cast(mem_seq_lens, dtype)
+        enc_out = self.encoder(enc_input, src_mask, mem_seq_lens)
 
-        return self.encoder(src_input, src_mask, mem_seq_lens)
+        if self.use_fp16_encoder:
+            enc_out = paddle.cast(enc_out, "float32")
+        return enc_out
 
     def load(self, init_from_params):
         # Load the trained model
@@ -328,7 +325,6 @@ class FasterEncoder(nn.Layer):
         model_dict = paddle.load(init_from_params, return_numpy=True)
         model_dict["encoder.pos_encoder.weight"] = position_encoding_init(
             self.max_seq_length, self.d_model)
-
         if self.use_fp16_encoder:
             for item in self.state_dict():
                 if "encoder.layers" in item:
