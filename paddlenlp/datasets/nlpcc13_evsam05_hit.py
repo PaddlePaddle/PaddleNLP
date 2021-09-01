@@ -66,7 +66,7 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-            get_path_from_url(URL, default_root， self.MD5)
+            get_path_from_url(URL, default_root, self.MD5)
 
         return fullname
 
