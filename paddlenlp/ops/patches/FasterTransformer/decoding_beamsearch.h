@@ -476,13 +476,13 @@ public:
 
       } else {
         if (keep_alive_beam_ == true) {
-          update_logits<true>(logits_buf_,
-                              decoding_params.embedding_bias,
-                              args_.end_id_,
-                              finished_buf_,
-                              m,
-                              n,
-                              decoding_params.stream);
+          update_logits_v2(logits_buf_,
+                           decoding_params.embedding_bias,
+                           args_.end_id_,
+                           finished_buf_,
+                           m,
+                           n,
+                           decoding_params.stream);
 
           // Use separated alive and finish beam queues to avoid the decrease of
           // alive beams.

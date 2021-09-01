@@ -27,5 +27,11 @@ void init_kernelLauncher_v2(bool* finished,
                             const int beam_width,
                             cudaStream_t stream);
 
-
+void update_logits_v2(float* logits,
+                      const float* bias,
+                      const int end_id,
+                      const bool* finished,
+                      const int m,
+                      const int n,
+                      cudaStream_t stream);
 }  // namespace fastertransformer

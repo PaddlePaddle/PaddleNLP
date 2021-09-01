@@ -58,35 +58,19 @@ __global__ void update_logits_kernel(T* logits,
   }
 }
 
-template <bool ALIVE = false>
-void update_logits(float* logits,
-                   const float* bias,
-                   const int end_id,
-                   const bool* finished,
-                   const int m,
-                   const int n,
-                   cudaStream_t stream) {
+void update_logits_v2(float* logits,
+                      const float* bias,
+                      const int end_id,
+                      const bool* finished,
+                      const int m,
+                      const int n,
+                      cudaStream_t stream) {
   dim3 grid(m);
   dim3 block(min(n, 1024));
   /*n is the vocab_size, e.g., 30000, 7000.... vocab_size is usually very big.
    */
-  update_logits_kernel<float, ALIVE><<<grid, block, 0, stream>>>(
+  update_logits_kernel<float, true><<<grid, block, 0, stream>>>(
       logits, bias, end_id, finished, n);
 }
-
-template void update_logits<false>(float* logits,
-                                   const float* bias,
-                                   const int end_id,
-                                   const bool* finished,
-                                   const int m,
-                                   const int n,
-                                   cudaStream_t stream);
-template void update_logits<true>(float* logits,
-                                  const float* bias,
-                                  const int end_id,
-                                  const bool* finished,
-                                  const int m,
-                                  const int n,
-                                  cudaStream_t stream);
 
 }  // namespace fastertransformer
