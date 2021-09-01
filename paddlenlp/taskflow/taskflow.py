@@ -18,7 +18,9 @@ import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
 from .text2knowledge import WordTagTask
-from .sentiment_analysis import SentaTask
+from .sentiment_analysis import SentaTask, SkepTask
+from .lexical_analysis import LacTask
+from .text_generation import TextGenerationTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -33,14 +35,40 @@ TASKS = {
             "model": "wordtag"
         }
     },
-    'sentiment_analysis': {
+    "text_generation": {
         "models": {
-            "senta": {
-                "task_class": SentaTask
+            "gpt-cpm-large-cn": {
+                "task_class": TextGenerationTask,
             },
         },
         "default": {
-            "model": "senta"
+            "model": "gpt-cpm-large-cn",
+        }
+    },
+    "lexical_analysis": {
+        "models": {
+            "lac": {
+                "task_class": LacTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "max_seq_len": 64
+            }
+        },
+        "default": {
+            "model": "lac"
+        }
+    },
+    'sentiment_analysis': {
+        "models": {
+            "bilstm": {
+                "task_class": SentaTask
+            },
+            "skep_ernie_1.0_large_ch": {
+                "task_class": SkepTask
+            }
+        },
+        "default": {
+            "model": "bilstm"
         }
     }
 }
@@ -60,7 +88,12 @@ class TaskFlow(object):
 
     """
 
-    def __init__(self, task, model=None, device_id=0, **kwargs):
+    def __init__(self,
+                 task,
+                 model=None,
+                 device_id=0,
+                 static_mode=False,
+                 **kwargs):
         assert task in TASKS, "The task name:{} is not in TaskFlow list, please check your task name.".format(
             task)
         self.task = task
@@ -77,13 +110,17 @@ class TaskFlow(object):
             paddle.set_device(device + ":" + str(device_id))
 
         self.model = model
+        self.static_mode = static_mode
         # Update the task config to kwargs
         config_kwargs = TASKS[self.task]['models'][self.model]
         kwargs.update(config_kwargs)
         self.kwargs = kwargs
         task_class = TASKS[self.task]['models'][self.model]['task_class']
         self.task_instance = task_class(
-            model=self.model, task=self.task, **self.kwargs)
+            model=self.model,
+            task=self.task,
+            static_mode=self.static_mode,
+            **self.kwargs)
         task_list = TASKS.keys()
         TaskFlow.task_list = task_list
 
