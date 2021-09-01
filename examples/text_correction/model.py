@@ -14,8 +14,6 @@
 
 import paddle
 import paddle.nn as nn
-from paddlenlp.transformers import register_base_model
-from paddlenlp.transformers.ernie_gram.modeling import ErnieGramPretrainedModel, ErniePooler, ErnieGramEmbeddings
 
 
 class PretrainedModelForCSC(nn.Layer):

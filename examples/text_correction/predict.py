@@ -25,14 +25,16 @@ import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad, Vocab
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import ErnieGramTokenizer
+from paddlenlp.transformers import ErnieGramModel, ErnieGramTokenizer
+from paddlenlp.transformers import ErnieModel, ErnieTokenizer
 from paddlenlp.utils.log import logger
 
-from model import ErnieGramForCSC
+from model import PretrainedModelForCSC
 from utils import read_test_ds, convert_example, is_chinese_char, parse_decode
 
 # yapf: disable
 parser = argparse.ArgumentParser()
+parser.add_argument("--model_type", type=str, default="ernie_gram", choices=["ernie_gram", "ernie"], help="Pretraining model type")
 parser.add_argument("--model_name_or_path", default='ernie-gram-zh', type=str, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(list(ErnieGramTokenizer.pretrained_init_configuration.keys())))
 parser.add_argument("--init_checkpoint_path", default=None, type=str, help="The model checkpoint path.", )
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer " "than this will be truncated, sequences shorter will be padded.", )
@@ -42,6 +44,11 @@ parser.add_argument("--pinyin_vocab_file_path", type=str, default="pinyin_vocab.
 # yapf: enable
 args = parser.parse_args()
 
+MODEL_CLASSES = {
+    "ernie_gram": (ErnieGramModel, ErnieGramTokenizer),
+    "ernie": (ErnieModel, ErnieTokenizer)
+}
+
 
 @paddle.no_grad()
 def do_predict(args):
@@ -49,10 +56,13 @@ def do_predict(args):
 
     pinyin_vocab = Vocab.load_vocabulary(
         args.pinyin_vocab_file_path, unk_token='[UNK]', pad_token='[PAD]')
-    tokenizer = ErnieGramTokenizer.from_pretrained(args.model_name_or_path)
 
-    model = ErnieGramForCSC.from_pretrained(
-        args.model_name_or_path,
+    MODEL_CLASS, TOKENIZER_CLASS = MODEL_CLASSES[args.model_type]
+    tokenizer = TOKENIZER_CLASS.from_pretrained(args.model_name_or_path)
+    pretrained_model = MODEL_CLASS.from_pretrained(args.model_name_or_path)
+
+    model = PretrainedModelForCSC(
+        pretrained_model,
         pinyin_vocab_size=len(pinyin_vocab),
         pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
 

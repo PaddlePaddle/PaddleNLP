@@ -26,7 +26,7 @@ import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad, Vocab
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import ErnieGramTokenizer, ErnieGramModel
+from paddlenlp.transformers import ErnieGramModel, ErnieGramTokenizer
 from paddlenlp.transformers import ErnieModel, ErnieTokenizer
 from paddlenlp.utils.log import logger
 from paddlenlp.metrics.sighan import DetectionF1, CorrectionF1
@@ -200,6 +200,7 @@ def do_train(args):
                     logger.info("Eval:")
                     det_f1, corr_f1 = evaluate(model, eval_data_loader)
                     f1 = (det_f1 + corr_f1) / 2
+                    model_file = "model_%d" % global_steps
                     if f1 > best_f1:
                         # save best model
                         paddle.save(model.state_dict(),
@@ -208,10 +209,9 @@ def do_train(args):
                         logger.info("Save best model at {} step.".format(
                             global_steps))
                         best_f1 = f1
-                    paddle.save(
-                        model.state_dict(),
-                        os.path.join(args.output_dir,
-                                     "model_%d.pdparams" % global_steps))
+                        model_file = model_file + "_best"
+                    paddle.save(model.state_dict(),
+                                os.path.join(args.output_dir, model_file))
                     logger.info("Save model at {} step.".format(global_steps))
             if args.max_steps > 0 and global_steps >= args.max_steps:
                 return
