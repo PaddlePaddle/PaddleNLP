@@ -59,9 +59,10 @@ def build_vocab(corpus, tokenizer, encoding_model, feat):
     # Construct relation vocab
     rel_vocab = Vocab.build_vocab(
         rel_examples,
-        token_to_idx={"[BOS]": 0, "[EOS]": 1},
+        token_to_idx={"[BOS]": 0, "[EOS]": 1, "[UNK]": 2},
         bos_token="[BOS]",
         eos_token="[EOS]",
+        unk_token="[UNK]",
     )
     return word_vocab, feat_vocab, rel_vocab
 
@@ -188,7 +189,7 @@ def create_dataloader(dataset,
         capacity=10, 
         return_list=True, 
         use_multiprocess=True,
-    )
+    )       
 
     data_loader.set_batch_generator(
         generator_creator(dataset, batch_sampler))
