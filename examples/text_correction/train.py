@@ -26,15 +26,17 @@ import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad, Vocab
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import ErnieGramTokenizer
+from paddlenlp.transformers import ErnieGramTokenizer, ErnieGramModel
+from paddlenlp.transformers import ErnieModel, ErnieTokenizer
 from paddlenlp.utils.log import logger
 from paddlenlp.metrics.sighan import DetectionF1, CorrectionF1
-from model import ErnieGramForCSC
+from model import PretrainedModelForCSC
 from utils import convert_example, create_dataloader
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--model_type", type=str, default="ernie_gram", choices=["ernie_gram", "ernie"], help="Pretraining model type")
 parser.add_argument("--model_name_or_path", type=str, default="ernie-gram-zh", help="Pretraining model name or path")
 parser.add_argument("--max_seq_length", type=int, default=128, help="The maximum total input sequence length after SentencePiece tokenization.")
 parser.add_argument("--learning_rate", type=float, default=5e-5, help="Learning rate used to train.")
@@ -54,6 +56,10 @@ parser.add_argument("--detection_prob", default=0.5, type=float, help="The fixed
 
 # yapf: enable
 args = parser.parse_args()
+MODEL_CLASSES = {
+    "ernie_gram": (ErnieGramModel, ErnieGramTokenizer),
+    "ernie": (ErnieModel, ErnieTokenizer)
+}
 
 
 def set_seed(args):
@@ -97,9 +103,12 @@ def do_train(args):
     pinyin_vocab = Vocab.load_vocabulary(
         args.pinyin_vocab_file_path, unk_token='[UNK]', pad_token='[PAD]')
 
-    tokenizer = ErnieGramTokenizer.from_pretrained(args.model_name_or_path)
-    model = ErnieGramForCSC.from_pretrained(
-        args.model_name_or_path,
+    MODEL_CLASS, TOKENIZER_CLASS = MODEL_CLASSES[args.model_type]
+    tokenizer = TOKENIZER_CLASS.from_pretrained(args.model_name_or_path)
+    pretrained_model = MODEL_CLASS.from_pretrained(args.model_name_or_path)
+
+    model = PretrainedModelForCSC(
+        pretrained_model,
         pinyin_vocab_size=len(pinyin_vocab),
         pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
 
