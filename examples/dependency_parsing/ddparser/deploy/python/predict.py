@@ -246,4 +246,3 @@ if __name__ == "__main__":
             out_file.write("{}\n".format(res)) 
     out_file.close()
     print("Results saved!")
-
