@@ -26,7 +26,8 @@ import paddle.nn as nn
 from ..datasets import MapDataset, load_dataset
 from ..data import Stack, Pad, Tuple
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .utils import download_file, add_docstrings
+from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
+from .utils import TermTree
 from .task import Task
 
 LABEL_TO_SCHEMA = {
@@ -141,43 +142,38 @@ class WordTagTask(Task):
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
+        static_mode(bool): The flag to control in the static/dygraph mode.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
 
     """
 
-    def __init__(self, model, task, **kwargs):
-        super().__init__(model=model, task=task, **kwargs)
+    def __init__(self, model, task, static_mode, **kwargs):
+        super().__init__(
+            model=model, task=task, static_mode=static_mode, **kwargs)
         term_schema_path = download_file(
-            self.model, "termtree_type.csv", URLS['termtree_type'][0],
+            self._task_path, "termtree_type.csv", URLS['termtree_type'][0],
             URLS['termtree_type'][1], "text2knowledge")
-        term_data_path = download_file(self.model, "TermTree.V1.0",
+        term_data_path = download_file(self._task_path, "TermTree.V1.0",
                                        URLS['TermTree.V1.0'][0],
                                        URLS['TermTree.V1.0'][1])
-        tag_path = download_file(self.model, "termtree_tags_pos.txt",
+        tag_path = download_file(self._task_path, "termtree_tags_pos.txt",
                                  URLS['termtree_tags_pos'][0],
                                  URLS['termtree_tags_pos'][1])
+        #if term_schema_path is not None:
+        #    self._term_schema = self._load_schema(term_schema_path)
+        #if term_data_path is not None:
+        #    self._term_dict = self._load_term_tree_data(term_data_path)
         self._tags_to_index, self._index_to_tags = self._load_labels(tag_path)
 
-        if term_schema_path is not None:
-            self._term_schema = self._load_schema(term_schema_path)
-        if term_data_path is not None:
-            self._term_dict = self._load_term_tree_data(term_data_path)
-        if term_data_path is not None and term_schema_path is not None:
-            self._linking = True
-        else:
-            self._linking = False
-        self._tokenizer = self._construct_tokenizer(model)
-        self._model = self._construct_model(model)
-        self._summary_num = self._model.ernie_ctm.content_summary_index + 1
+        self._termtree = TermTree.from_dir(term_schema_path, term_data_path)
+        self._linking = True
+        self._construct_tokenizer(model)
         self._usage = usage
-
-    def _download_termtree(self, filename):
-        default_root = os.path.join(MODEL_HOME, 'ernie-ctm')
-        fullname = os.path.join(default_root, filename)
-        url = URLS[filename]
-        if not os.path.exists(fullname):
-            get_path_from_url(url, default_root)
-        return fullname
+        self._summary_num = 2
+        if self.static_mode:
+            self._get_inference_model()
+        else:
+            self._construct_model(model)
 
     @property
     def summary_num(self):
@@ -204,56 +200,6 @@ class WordTagTask(Task):
                 i += 1
         idx_to_tags = dict(zip(*(tags_to_idx.values(), tags_to_idx.keys())))
         return tags_to_idx, idx_to_tags
-
-    @staticmethod
-    def _load_schema(schema_path):
-        schema = {}
-        with open(schema_path, encoding="utf8") as f:
-            reader = csv.reader(f)
-            first_line = True
-            for line in reader:
-                if first_line:
-                    first_line = False
-                    continue
-                items = line[0].split("\t")
-                if len(items[0]):
-                    schema[items[0]] = "root"
-                if len(items[1]):
-                    schema[items[1]] = items[0]
-                if len(items[2]):
-                    schema[items[2]] = items[1]
-        return schema
-
-    @staticmethod
-    def _load_term_tree_data(term_tree_name_or_path):
-        if os.path.isdir(term_tree_name_or_path):
-            fn_list = glob.glob(f"{term_tree_name_or_path}/*", recursive=True)
-        else:
-            fn_list = [term_tree_name_or_path]
-        term_dict = {}
-        for fn in fn_list:
-            with open(fn, encoding="utf-8") as fp:
-                for line in fp:
-                    data = json.loads(line)
-                    if data["term"] not in term_dict:
-                        term_dict[data["term"]] = {}
-                    if data["termtype"] not in term_dict[data["term"]]:
-                        term_dict[data["term"]][data["termtype"]] = []
-                    term_dict[data["term"]][data["termtype"]].append(data[
-                        "termid"])
-                    for alia in data["alias"]:
-                        if alia not in term_dict:
-                            term_dict[alia] = {}
-                        if data["termtype"] not in term_dict[alia]:
-                            term_dict[alia][data["termtype"]] = []
-                        term_dict[alia][data["termtype"]].append(data["termid"])
-                    for alia in data["alias_ext"]:
-                        if alia not in term_dict:
-                            term_dict[alia] = {}
-                        if data["termtype"] not in term_dict[alia]:
-                            term_dict[alia][data["termtype"]] = []
-                        term_dict[alia][data["termtype"]].append(data["termid"])
-        return term_dict
 
     def _split_long_text_input(self, input_texts, max_text_len):
         """
@@ -437,58 +383,51 @@ class WordTagTask(Task):
         for item in wordtag_res["items"]:
             if item["wordtag_label"] not in LABEL_TO_SCHEMA:
                 continue
-            if item["item"] not in self._term_dict:
+            flag, _ = self._termtree.find_term(item["item"])
+            if flag is False:
                 continue
-            target_type = LABEL_TO_SCHEMA[item["wordtag_label"]]
-            matched_type = list(self._term_dict[item["item"]].keys())
-            matched = False
-            term_id = None
-            target_idx = math.inf
-            for mt in matched_type:
-                tmp_type = mt
-                while tmp_type != "root":
-                    if tmp_type not in self._term_schema:
-                        break
-                    for i, target in enumerate(target_type):
-                        if target.startswith(tmp_type):
-                            target_src = target.split("|")
-                            for can_term_id in self._term_dict[item["item"]][
-                                    mt]:
-                                tmp_term_id = can_term_id
-                                if len(target_src) == 1:
-                                    matched = True
-                                    if target.startswith(mt):
-                                        target_idx = -1
-                                        term_id = tmp_term_id
-                                    if i < target_idx:
-                                        target_idx = i
-                                        term_id = tmp_term_id
-                                else:
-                                    if target_src[
-                                            1] == "C" and "_cb_" in tmp_term_id:
-                                        matched = True
-                                        if target.startswith(mt):
-                                            target_idx = -1
-                                            term_id = tmp_term_id
-                                        if i < target_idx:
-                                            target_idx = i
-                                            term_id = tmp_term_id
-                                    if target_src[
-                                            1] == "E" and "_eb_" in tmp_term_id:
-                                        matched = True
-                                        if target.startswith(mt):
-                                            target_idx = -1
-                                            term_id = tmp_term_id
-                                        if i < target_idx:
-                                            target_idx = i
-                                            term_id = tmp_term_id
-                    tmp_type = self._term_schema[tmp_type]
-                    if matched is True:
-                        break
+            target_type_can = LABEL_TO_SCHEMA[item["wordtag_label"]]
+            for target_type_raw in target_type_can:
+                target_type_ = target_type_raw.split("|")
+                target_src = None
+                if len(target_type_) == 2:
+                    target_src = target_type_[1]
+                target_type = target_type_[0]
+                flag, term_id = self._termtree.find_term(item["item"],
+                                                         target_type)
+                if flag is False:
+                    continue
+                term_id = list(
+                    filter(lambda d: self._termtree[d].node_type == "term",
+                           term_id))
+                if len(term_id) == 0:
+                    continue
+                if target_src is not None:
+                    term_id = list(
+                        filter(
+                            lambda d: self._termtree[d].base.startswith(target_src.lower()),
+                            term_id))
+                    if len(term_id) == 0:
+                        continue
+                term_id.sort(
+                    key=lambda d: (self._termtree[d].termtype == target_type or target_type in self._termtree[d].subtype, self._termtree[d].term == item["item"]),
+                    reverse=True)
+                item["termid"] = term_id[0]
 
-            if matched is True:
-                item["termid"] = term_id
-        pass
+    def _construct_input_spec(self):
+        """
+        Construct the input spec for the convert dygraph model to static model.
+        """
+        self._input_spec = [
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64",
+                name="input_ids"),  # input_ids
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64",
+                name="token_type_ids"),  # segment_ids
+            paddle.static.InputSpec(
+                shape=[None], dtype="int64", name="lengths")
+        ]  # seq_len 
 
     def _construct_model(self, model):
         """
@@ -503,14 +442,14 @@ class WordTagTask(Task):
             self.model]
         self.kwargs.update(config_keys)
         model_instance.eval()
-        return model_instance
+        self._model = model_instance
 
     def _construct_tokenizer(self, model):
         """
         Construct the tokenizer for the predictor.
         """
         tokenizer_instance = ErnieCtmTokenizer.from_pretrained(model)
-        return tokenizer_instance
+        self._tokenizer = tokenizer_instance
 
     def _preprocess(self, inputs, padding=True, add_special_tokens=True):
         """
@@ -535,15 +474,27 @@ class WordTagTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         all_pred_tags = []
-        with paddle.no_grad():
-            for batch in inputs['data_loader']:
-                input_ids, token_type_ids, seq_len = batch
-                seq_logits, cls_logits = self._model(
-                    input_ids, token_type_ids, lengths=seq_len)
-                score, pred_tags = self._model.viterbi_decoder(seq_logits,
-                                                               seq_len)
-                all_pred_tags.extend(pred_tags.numpy().tolist())
-
+        if not self.static_mode:
+            with dygraph_mode_guard():
+                with paddle.no_grad():
+                    for batch in inputs['data_loader']:
+                        input_ids, token_type_ids, seq_len = batch
+                        score, pred_tags = self._model(
+                            input_ids, token_type_ids, lengths=seq_len)
+                        print(pred_tags)
+                        all_pred_tags.extend(pred_tags.numpy().tolist())
+        else:
+            with static_mode_guard():
+                for batch in inputs['data_loader']:
+                    data_dict = dict()
+                    for name, value in zip(self._static_feed_names, batch):
+                        data_dict[name] = value
+                    results = self._exe.run(
+                        self._static_program,
+                        feed=data_dict,
+                        fetch_list=self._static_fetch_targets)
+                    print("the results:{}".format(results[1]))
+                    all_pred_tags.extend(results[1].tolist())
         inputs['all_pred_tags'] = all_pred_tags
         return inputs
 
