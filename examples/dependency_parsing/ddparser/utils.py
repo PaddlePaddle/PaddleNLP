@@ -427,14 +427,7 @@ class DepTree:
 
         return lf_list + [node.id] + rf_list
 
-def ispunct(token):
-    """Is the token a punctuation"""
-    return all(unicodedata.category(char).startswith('P') for char in token)
 
 def istree(sequence):
     """Is the sequence a project tree"""
     return DepTree(sequence).judge_legal()
-
-def numericalize(sequence):
-    """Convert the dtype of sequence to int"""
-    return [int(i) for i in sequence]

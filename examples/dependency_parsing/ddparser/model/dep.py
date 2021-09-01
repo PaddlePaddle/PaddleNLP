@@ -139,5 +139,4 @@ class BiAffine(nn.Layer):
         # remove dim 1 if n_out == 1
         if s.shape[1] == 1:
             s = paddle.squeeze(s, axis=1)
-        return s
-        
+        return s 
