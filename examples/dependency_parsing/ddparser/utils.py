@@ -238,6 +238,7 @@ def mask_fill(input, mask, value):
     """
     return input * paddle.logical_not(mask) + paddle.cast(mask, input.dtype) * value
 
+
 def kmeans(x, k):
     """kmeans algorithm, put sentence id into k buckets according to sentence length
     
@@ -289,6 +290,7 @@ def kmeans(x, k):
     clusters = [np.equal(y, i).nonzero()[0].tolist() for i in assigned]
 
     return centroids, clusters
+
 
 def eisner(scores, mask):
     """Eisner algorithm is a general dynamic programming decoding algorithm for bilexical grammar.

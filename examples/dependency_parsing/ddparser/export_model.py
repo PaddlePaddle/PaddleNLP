@@ -23,8 +23,7 @@ from data import load_vocab
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--encoding_model", type=str, default='ernie-1.0')
-parser.add_argument("--feat", choices=["char", "pos"], type=str, default=None, help="The feature representation to use.")
+parser.add_argument("--encoding_model", choices=["lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
 parser.add_argument("--params_path", type=str, required=True, default='./model_file/best.pdparams', help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./output', help="The path of model parameter in static graph to be saved.")
 args = parser.parse_args()
@@ -42,7 +41,7 @@ if __name__ == "__main__":
 
     # Load vocabs from model file path
     vocab_dir = os.path.split(args.params_path)[0]
-    word_vocab, feat_vocab, rel_vocab = load_vocab(vocab_dir)
+    word_vocab, _, rel_vocab = load_vocab(vocab_dir)
 
     if not os.path.exists(args.output_path):
         os.makedirs(args.output_path)
@@ -50,25 +49,17 @@ if __name__ == "__main__":
     # Save vocabs to output path
     word_vocab.to_json(path=os.path.join(args.output_path, "word_vocab.json"))
     rel_vocab.to_json(path=os.path.join(args.output_path, "rel_vocab.json"))
-    if feat_vocab:
-        feat_vocab.to_json(path=os.path.join(args.output_path, "feat_vocab.json"))
 
-    n_rels, n_words = len(rel_vocab), len(word_vocab)
-    if feat_vocab:
-        n_feats = len(feat_vocab)
-        word_pad_index = word_vocab.to_indices("[PAD]")
-        word_bos_index = word_vocab.to_indices("[BOS]")
-        word_eos_index = word_vocab.to_indices("[EOS]")
-    else:
-        n_feats = None
-        word_pad_index = word_vocab.to_indices("[PAD]")
-        word_bos_index = word_vocab.to_indices("[CLS]")
-        word_eos_index = word_vocab.to_indices("[SEP]")
+    n_rels, n_words, n_feats = len(rel_vocab), len(word_vocab), None
+
+    word_pad_index = word_vocab.to_indices("[PAD]")
+    word_bos_index = word_vocab.to_indices("[CLS]")
+    word_eos_index = word_vocab.to_indices("[SEP]")
 
     # Load ddparser model
     model = BiAffineParser(
         encoding_model=args.encoding_model,
-        feat=args.feat,
+        feat=None,
         n_rels=n_rels,
         n_feats=n_feats,
         n_words=n_words,

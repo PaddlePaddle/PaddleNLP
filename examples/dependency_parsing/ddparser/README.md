@@ -192,7 +192,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --task_name=nlpcc13_evsam05_hit \
     --encoding_model=lstm-pe \
     --save_dir=./model_file \
-    --ernie_lr=0.002 
+    --lstm_lr=0.002 
 ```
 
 ##### 基于动态图的预测
@@ -212,15 +212,14 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
 使用动态图训练结束后，可以将动态图参数导出成静态图参数， 从而获得较优的预测部署性能，执行如下命令完成动态图转换静态图的功能：
 
 ```shell
-python export_model.py --params_path=./model_file/best.pdparams --output_path=./output 
-
+python export_model.py --encoding_model=lstm-pe \
+    --params_path=./model_file/best.pdparams \
+    --output_path=./output 
 ```
 
 导出静态图模型之后，可以用于部署，`deploy/python/predict.py`脚本提供了python部署预测示例。运行方式：
 ```shell
-python deploy/python/predict.py --encoding_model=lstm-pe \
-                                --model_dir=./output \
-                                --task_name=nlpcc13_evsam05_hit
+python deploy/python/predict.py --model_dir=./output --task_name=nlpcc13_evsam05_hit
 ```
 
 #### ErnieEncoder+MLP+BiAffine
@@ -237,9 +236,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --task_name=nlpcc13_evsam05_hit \
     --encoding_model=ernie-gram-zh \
     --save_dir=./model_file \
-    --ernie_lr=5e-5 \
-    --warmup_propotion=0.02 \
-    --weight_decay=0.01
+    --ernie_lr=5e-5 
 ```
 
 ##### 基于动态图的预测
@@ -259,15 +256,14 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
 使用动态图训练结束后，可以将动态图参数导出成静态图参数， 从而获得较优的预测部署性能，执行如下命令完成动态图转换静态图的功能：
 
 ```shell
-python export_model.py --params_path=./model_file/best.pdparams --output_path=./output 
-
+python export_model.py --encoding_model=ernie-gram-zh \
+    --params_path=./model_file/best.pdparams \
+    --output_path=./output 
 ```
 
 导出静态图模型之后，可以用于部署，`deploy/python/predict.py`脚本提供了python部署预测示例。运行方式：
 ```shell
-python deploy/python/predict.py --encoding_model=ernie-gram-zh \
-                                --model_dir=./output \
-                                --task_name=nlpcc13_evsam05_hit
+python deploy/python/predict.py --model_dir=./output --task_name=nlpcc13_evsam05_hit
 ```
 
 #### 参数释义
@@ -329,14 +325,14 @@ ddp("百度是一家高科技公司")
 #   'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
 
 # 使用ddparser-ernie-1.0进行预测
-ddp = TaskFlow("dependency_parsing", encoding_model="ernie-1.0")
+ddp = TaskFlow("dependency_parsing", model="ddparser-ernie-1.0")
 ddp("百度是一家高科技公司")
 # [{'word': ['百度', '是', '一家', '高科技', '公司'], 
 #   'head': ['2', '0', '5', '5', '2'], 
 #   'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
 
 # 使用ddparser-ernie-gram-zh进行预测
-ddp = TaskFlow("dependency_parsing", encoding_model="ernie-gram-zh")
+ddp = TaskFlow("dependency_parsing", model="ddparser-ernie-gram-zh")
 ddp("百度是一家高科技公司")
 # [{'word': ['百度', '是', '一家', '高科技', '公司'], 
 #   'head': ['2', '0', '5', '5', '2'], 
@@ -349,9 +345,9 @@ ddp("百度是一家高科技公司")
 from paddlenlp.taskflow import TaskFlow
 
 ddp = TaskFlow("dependency_parsing", return_visual=True)
-resuslt = ddp("百度是一家高科技公司")[0]['visual']
+result = ddp("百度是一家高科技公司")[0]['visual']
 import cv2
-cv2.imwrite('test.jpg', result)
+cv2.imwrite('test.png', result)
 ```
 
 ### 标注关系说明

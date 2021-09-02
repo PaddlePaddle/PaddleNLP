@@ -84,7 +84,10 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
         for i, line in enumerate(lines):
             if not line:
                 values = list(zip(*[j.split('\t') for j in lines[start:i]]))
-                ID, FORM, LEMMA, CPOS, POS, FEATS, HEAD, DEPREL, PHEAD, PDEPREL = values
+                if split == "test":
+                    ID, FORM, LEMMA, CPOS, POS, FEATS, HEAD, DEPREL = values
+                else:
+                    ID, FORM, LEMMA, CPOS, POS, FEATS, HEAD, DEPREL, _, _ = values
                 if values:
                     yield {
                         "ID": ID,
@@ -95,8 +98,6 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
                         "FEATS": FEATS,
                         "HEAD": HEAD, 
                         "DEPREL": DEPREL,
-                        "PHEAD": PHEAD,
-                        "PDEPREL": PDEPREL,
                     }
                 start = i + 1
 
