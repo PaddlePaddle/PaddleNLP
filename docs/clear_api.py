@@ -25,7 +25,13 @@ def modify_doc_title_dir(abspath_rstfiles_dir):
     #需要call方法
     add_call_files = [
         'data.collate', 'data.iterator', 'data.sampler', 'data.tokenizer',
-        'data.vocab', 'tokenizer_utils'
+        'data.vocab', 'tokenizer\_utils'
+    ]
+    #删除inheritance
+    del_inheritance = [
+        'crf', 'tcn', 'distributed', 'dataset', 'paraller', 'decoder',
+        'decoding', 'fast\_transformer', 'AdamwOptimizer', 'attention\_utils',
+        'model\_utils', 'batch\_sampler'
     ]
     for rst_file in rst_files:
         f = open(os.path.join(abspath_rstfiles_dir, rst_file), 'r')
@@ -44,10 +50,16 @@ def modify_doc_title_dir(abspath_rstfiles_dir):
                     path = os.path.join(abspath_rstfiles_dir, rst_file)
                     os.remove(path)
                     continue
+        #是否加入call
         add_call_files_flag = 0
         for i in add_call_files:
             if i in first_line:
                 add_call_files_flag = 1
+        #是否删除inheritance
+        del_inheritance_flag = 0
+        for j in del_inheritance:
+            if j in first_line:
+                del_inheritance_flag = 1
         for file_line in file_lines:
             if file_line.strip() in del_nodes:
                 flag = 1
@@ -82,9 +94,13 @@ def modify_doc_title_dir(abspath_rstfiles_dir):
                 last_name = file_line.split('.')[-1]
                 if last_name.strip() not in dataset_list:
                     continue
-            write_con.append(file_line)
+            if 'show-inheritance' in file_line:
+                if del_inheritance_flag == 0:
+                    write_con.append(file_line)
+            else:
+                write_con.append(file_line)
         if add_call_files_flag == 1:
-            write_con.append("   :special-members: __call__")
+            write_con.append("   :special-members: __call__\n")
         f = open(os.path.join(abspath_rstfiles_dir, rst_file), 'w')
         f.writelines(write_con)
         f.close()
