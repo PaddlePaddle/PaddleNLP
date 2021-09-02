@@ -531,7 +531,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
         ernie (`ErnieModel`): 
             An instance of `ErnieModel`.
         num_classes (int, optional): 
-            The number of classes. Default to `2`.
+            The number of classes. Defaults to `2`.
         dropout (float, optional): 
             The dropout probability for output of ERNIE. 
             If None, use the same value as `hidden_dropout_prob` 
