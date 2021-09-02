@@ -54,7 +54,7 @@ parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight dec
 parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
 parser.add_argument("--dataset", default="imdb", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str, help="The training dataset")
 parser.add_argument("--layerwise_decay", default=1.0, type=float, help="Layerwise decay ratio")
-
+parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
 # yapf: enable
 args = parser.parse_args()
 
@@ -317,6 +317,8 @@ def do_train(args):
                         model_to_save.save_pretrained(best_model_dir)
                         tokenizer.save_pretrained(best_model_dir)
 
+            if args.max_steps > 0 and global_steps >= args.max_steps:
+                return
     logger.info("Final test result:")
     eval_acc = evaluate(model, eval_metric, test_dataloader, create_memory())
 
