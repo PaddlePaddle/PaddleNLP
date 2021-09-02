@@ -32,14 +32,14 @@ from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mod
 from .task import Task
 
 usage = r"""
-           from paddlenlp.taskflow import TaskFlow 
+           from paddlenlp.taskflow import Taskflow 
 
-           question = TaskFlow("text_generation")
+           question = Taskflow("text_generation")
            question("中国的国土面积有多大？")
            '''
            [{'text': '中国的国土面积有多大？', 'answer': '960万平方公里。'}]
            '''
-           poetry  = TaskFlow("text_generation",  generation_task="poetry")
+           poetry  = Taskflow("text_generation",  generation_task="poetry")
            poetry("林密不见人")
            '''
            [{'text': '林密不见人', 'answer': ',但闻人语响。'}]

@@ -24,7 +24,7 @@ from .utils import static_mode_guard, dygraph_mode_guard
 
 class Task(metaclass=abc.ABCMeta):
     """
-    The meta classs of task in TaskFlow. The meta class has the five abstract function,
+    The meta classs of task in Taskflow. The meta class has the five abstract function,
         the subclass need to inherit from the meta class.
     Args:
         task(string): The name of task.

@@ -16,7 +16,7 @@ import os
 import argparse
 
 import paddle
-from paddlenlp.taskflow import TaskFlow
+from paddlenlp import Taskflow
 
 
 def parse_args():
@@ -34,7 +34,7 @@ def parse_args():
 
 def do_predict(args):
     paddle.set_device(args.device)
-    wordtag = TaskFlow(
+    wordtag = Taskflow(
         "text2knowledge",
         model="wordtag",
         batch_size=args.batch_size,

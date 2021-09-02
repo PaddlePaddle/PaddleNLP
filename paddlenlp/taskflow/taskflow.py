@@ -74,14 +74,14 @@ TASKS = {
 }
 
 
-class TaskFlow(object):
+class Taskflow(object):
     """
-    The TaskFlow is the end2end inferface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
+    The Taskflow is the end2end inferface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
         1) Convert the raw text to task result.
         2) Convert the model to the inference model.
         3) Offer the usage and help message.
     Args:
-        task (str): The task name for the TaskFlow, and get the task class from the name.
+        task (str): The task name for the Taskflow, and get the task class from the name.
         model (str, optional): The model name in the task, if set None, will use the default model.  
         device_id (int, optional): The device id for the gpu, xpu and other devices, the defalut value is 0.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
@@ -89,12 +89,12 @@ class TaskFlow(object):
     """
 
     def __init__(self, task, model=None, device_id=0, **kwargs):
-        assert task in TASKS, "The task name:{} is not in TaskFlow list, please check your task name.".format(
+        assert task in TASKS, "The task name:{} is not in Taskflow list, please check your task name.".format(
             task)
         self.task = task
         if model is not None:
             assert model in set(TASKS[task]['models'].keys(
-            )), "The model name:{} is not in task:[{}]".format(model)
+            )), "The model name:{} is not in task:[{}]".format(model, task)
         else:
             model = TASKS[task]['default']['model']
         # Set the device for the task
@@ -113,7 +113,7 @@ class TaskFlow(object):
         self.task_instance = task_class(
             model=self.model, task=self.task, **self.kwargs)
         task_list = TASKS.keys()
-        TaskFlow.task_list = task_list
+        Taskflow.task_list = task_list
 
     def __call__(self, *inputs):
         """
