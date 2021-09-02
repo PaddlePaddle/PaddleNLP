@@ -29,9 +29,9 @@ def modify_doc_title_dir(abspath_rstfiles_dir):
     ]
     #删除inheritance
     del_inheritance = [
-        'crf', 'tcn', 'distributed', 'dataset', 'paraller', 'decoder',
-        'decoding', 'fast\_transformer', 'AdamwOptimizer', 'attention\_utils',
-        'model\_utils', 'batch\_sampler'
+        'crf', 'tcn', 'distributed', 'dataset', 'paraller', 'decoder', 'rdrop',
+        'decoding', 'fast\_transformer', 'Adamoptimizer', 'attention\_utils',
+        'model\_utils', 'batch\_sampler', 'model'
     ]
     for rst_file in rst_files:
         f = open(os.path.join(abspath_rstfiles_dir, rst_file), 'r')
@@ -60,6 +60,8 @@ def modify_doc_title_dir(abspath_rstfiles_dir):
         for j in del_inheritance:
             if j in first_line:
                 del_inheritance_flag = 1
+        if 'modeling' in first_line:
+            del_inheritance_flag = 0
         for file_line in file_lines:
             if file_line.strip() in del_nodes:
                 flag = 1
