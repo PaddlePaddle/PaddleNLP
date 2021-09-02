@@ -21,6 +21,7 @@ from .text2knowledge import WordTagTask
 from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
 from .text_generation import TextGenerationTask
+from .dependency_parsing import DDParserTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -70,7 +71,23 @@ TASKS = {
         "default": {
             "model": "bilstm"
         }
-    }
+    },
+    'dependency_parsing': {
+        "models": {
+            "ddparser": {
+                "task_class": DDParserTask
+            },
+            "ddparser-ernie-1.0": {
+                "task_class": DDParserTask
+            },
+            "ddparser-ernie-gram-zh": {
+                "task_class": DDParserTask
+            },
+        },
+        "default": {
+            "model": "ddparser"
+        }
+    }, 
 }
 
 
