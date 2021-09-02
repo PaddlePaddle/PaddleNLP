@@ -54,8 +54,8 @@
 
 指标释义：
 ```text
-UAS（Unlabeled Attachment Score）: 依存准确率
-LAS (Labeled Attachment Score): 依存标注准备率
+UAS (依存准确率) = number of words assigned correct head / total words
+LAS (依存标注准备率) = number of words assigned correct head and relation / total words
 ```
 
 ### 数据格式
