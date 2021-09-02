@@ -84,9 +84,11 @@
    paddlenlp.datasets <source/paddlenlp.datasets>
    paddlenlp.embeddings <source/paddlenlp.embeddings>
    paddlenlp.layers <source/paddlenlp.layers>
+   paddlenlp.losses <source/paddlenlp.losses>
    paddlenlp.metrics <source/paddlenlp.metrics>
    paddlenlp.ops <source/paddlenlp.ops>
    paddlenlp.seq2vec <source/paddlenlp.seq2vec>
+   paddlenlp.taskflow <source/paddlenlp.taskflow>
    paddlenlp.transformers <source/paddlenlp.transformers>
    paddlenlp.utils <source/paddlenlp.utils>
 

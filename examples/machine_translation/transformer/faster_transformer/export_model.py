@@ -55,6 +55,11 @@ def parse_args():
         type=float,
         help="The probability threshold for topp_sampling. Default is 0.0 which means it won't go through topp_sampling. "
     )
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+    )
     args = parser.parse_args()
     return args
 
@@ -63,6 +68,7 @@ def do_predict(args):
     paddle.enable_static()
     place = "gpu"
     place = paddle.set_device(place)
+    reader.adapt_vocab_size(args)
 
     test_program = paddle.static.Program()
     startup_program = paddle.static.Program()
@@ -116,12 +122,13 @@ if __name__ == "__main__":
     yaml_file = ARGS.config
     with open(yaml_file, 'rt') as f:
         args = AttrDict(yaml.safe_load(f))
-        pprint(args)
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
     args.decoding_strategy = ARGS.decoding_strategy
     args.beam_size = ARGS.beam_size
     args.topk = ARGS.topk
     args.topp = ARGS.topp
+    args.benchmark = ARGS.benchmark
+    pprint(args)
 
     do_predict(args)
