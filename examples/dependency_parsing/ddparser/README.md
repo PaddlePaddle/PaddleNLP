@@ -290,7 +290,7 @@ python deploy/python/predict.py --model_dir=./output --task_name=nlpcc13_evsam05
 
 ## Taskflow一键预测
 
-TaskFlow向用户提供了一个百度基于大规模标注数据集[DuCTB1.0](#数据来源)训练的依存句法分析工具ddparser。用户可以方便地使用该工具完成[一键预测](#一键预测)。
+Taskflow向用户提供了一个百度基于大规模标注数据集[DuCTB1.0](#数据来源)训练的依存句法分析工具ddparser。用户可以方便地使用该工具完成[一键预测](#一键预测)。
 
 ### 环境依赖
 
@@ -342,9 +342,9 @@ ddp("百度是一家高科技公司")
 ### 依存关系可视化
 
 ```python
-from paddlenlp.taskflow import TaskFlow
+from paddlenlp import Taskflow
 
-ddp = TaskFlow("dependency_parsing", return_visual=True)
+ddp = Taskflow("dependency_parsing", return_visual=True)
 result = ddp("百度是一家高科技公司")[0]['visual']
 import cv2
 cv2.imwrite('test.png', result)
@@ -373,7 +373,7 @@ DuCTB1.0数据集含14种标注关系，具体含义见下表：
 
 ### 数据来源
 
-**DuCTB1.0**: `Baidu Chinese Treebank1.0`是百度构建的中文句法树库，即TaskFlow所提供的依存句法分析工具-DDParser的训练数据来源。
+**DuCTB1.0**: `Baidu Chinese Treebank1.0`是百度构建的中文句法树库，即Taskflow所提供的依存句法分析工具-DDParser的训练数据来源。
 
 ## Reference
 
