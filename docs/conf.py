@@ -95,6 +95,7 @@ html_theme_options = {
     'display_version': True,
     'navigation_depth': 5,
     'navigation_with_keys': True,
+    'body_max_width': '80%',
 }
 
 html_css_files = [
