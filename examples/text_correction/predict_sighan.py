@@ -27,6 +27,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import ErnieGramModel, ErnieGramTokenizer
 from paddlenlp.transformers import ErnieModel, ErnieTokenizer
+from paddlenlp.transformers import RobertaModel, RobertaTokenizer
 from paddlenlp.utils.log import logger
 
 from model import PretrainedModelForCSC
@@ -34,8 +35,8 @@ from utils import read_test_ds, convert_example, create_dataloader, is_chinese_c
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_type", type=str, default="ernie", choices=["ernie_gram", "ernie"], help="Pretraining model type")
-parser.add_argument("--model_name_or_path", default='ernie-1.0', type=str, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(list(ErnieGramTokenizer.pretrained_init_configuration.keys())))
+parser.add_argument("--model_type", type=str, default="ernie", choices=["ernie_gram", "ernie", "roberta"], help="Pretraining model type")
+parser.add_argument("--model_name_or_path", type=str, default="ernie-1.0", choices=["ernie-gram-zh", "ernie-1.0", "roberta-wwm-ext"], help="Pretraining model name or path")
 parser.add_argument("--init_checkpoint_path", default=None, type=str, help="The model checkpoint path.", )
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer " "than this will be truncated, sequences shorter will be padded.", )
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.", )
@@ -48,7 +49,8 @@ parser.add_argument("--predict_file", type=str, default="predict.txt", help="pre
 args = parser.parse_args()
 MODEL_CLASSES = {
     "ernie_gram": (ErnieGramModel, ErnieGramTokenizer),
-    "ernie": (ErnieModel, ErnieTokenizer)
+    "ernie": (ErnieModel, ErnieTokenizer),
+    "roberta": (RobertaModel, RobertaTokenizer)
 }
 
 

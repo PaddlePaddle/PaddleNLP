@@ -34,8 +34,8 @@ from utils import read_test_ds, convert_example, is_chinese_char, parse_decode
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_type", type=str, default="ernie", choices=["ernie_gram", "ernie"], help="Pretraining model type")
-parser.add_argument("--model_name_or_path", default='ernie-1.0', type=str, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(list(ErnieGramTokenizer.pretrained_init_configuration.keys())))
+parser.add_argument("--model_type", type=str, default="ernie", choices=["ernie_gram", "ernie", "roberta"], help="Pretraining model type")
+parser.add_argument("--model_name_or_path", type=str, default="ernie-1.0", choices=["ernie-gram-zh", "ernie-1.0", "roberta-wwm-ext"], help="Pretraining model name or path")
 parser.add_argument("--init_checkpoint_path", default=None, type=str, help="The model checkpoint path.", )
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer " "than this will be truncated, sequences shorter will be padded.", )
 parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
