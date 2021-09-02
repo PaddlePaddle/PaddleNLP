@@ -29,14 +29,12 @@ class Task(metaclass=abc.ABCMeta):
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        static_mode(bool): The flag to control in the static/dygraph mode.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    def __init__(self, model, task, static_mode, **kwargs):
+    def __init__(self, model, task, **kwargs):
         self.model = model
         self.task = task
-        self.static_mode = static_mode
         self.kwargs = kwargs
         self._usage = ""
         # The dygraph model instantce 

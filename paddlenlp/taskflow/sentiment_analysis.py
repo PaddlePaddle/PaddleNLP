@@ -67,16 +67,15 @@ class SentaTask(Task):
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        static_mode(bool): The flag to control in the static/dygraph mode.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    def __init__(self, task, model, static_mode, **kwargs):
-        super().__init__(
-            task=task, model=model, static_mode=static_mode, **kwargs)
+    def __init__(self, task, model, **kwargs):
+        super().__init__(task=task, model=model, **kwargs)
+        self._static_mode = True
         self._label_map = {0: 'negative', 1: 'positive'}
         self._construct_tokenizer(model)
-        if self.static_mode:
+        if self._static_mode:
             self._get_inference_model()
         else:
             self._construct_model(model)
@@ -184,7 +183,7 @@ class SentaTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         results = []
-        if not self.static_mode:
+        if not self._static_mode:
             with dygraph_mode_guard():
                 with paddle.no_grad():
                     for batch in inputs['data_loader']:
@@ -228,17 +227,15 @@ class SkepTask(Task):
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        static_mode(bool): The flag to control in the static/dygraph mode.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    def __init__(self, task, model, static_mode, **kwargs):
-        super().__init__(
-            task=task, model=model, static_mode=static_mode, **kwargs)
+    def __init__(self, task, model, **kwargs):
+        super().__init__(task=task, model=model, **kwargs)
+        self._static_mode = True
         self._label_map = {0: 'negative', 1: 'positive'}
         self._construct_tokenizer(model)
-        self.static_mode = True
-        if self.static_mode:
+        if self._static_mode:
             self._get_inference_model()
         else:
             self._construct_model(model)
@@ -327,7 +324,7 @@ class SkepTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         results = []
-        if not self.static_mode:
+        if not self._static_mode:
             with dygraph_mode_guard():
                 with paddle.no_grad():
                     for batch in inputs['data_loader']:
