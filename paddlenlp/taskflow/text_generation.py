@@ -64,16 +64,14 @@ class TextGenerationTask(Task):
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        static_mode(bool): The flag to control in the static/dygraph mode.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    def __init__(self, task, model, static_mode, **kwargs):
-        super().__init__(
-            task=task, model=model, static_mode=static_mode, **kwargs)
-        self.static_mode = True
+    def __init__(self, task, model, **kwargs):
+        super().__init__(task=task, model=model, **kwargs)
+        self._static_mode = True
         self._usage = usage
-        if self.static_mode:
+        if self._static_mode:
             download_file(self._task_path,
                           "static" + os.path.sep + "inference.pdiparams",
                           URLS[self.model][0], URLS[self.model][1])
@@ -182,7 +180,7 @@ class TextGenerationTask(Task):
         """
         results = []
         lens = []
-        if not self.static_mode:
+        if not self._static_mode:
             with dygraph_mode_guard():
                 for batch in inputs['data_loader']:
                     input_ids, seq_len = batch

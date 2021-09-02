@@ -142,14 +142,13 @@ class WordTagTask(Task):
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        static_mode(bool): The flag to control in the static/dygraph mode.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
 
     """
 
-    def __init__(self, model, task, static_mode, **kwargs):
-        super().__init__(
-            model=model, task=task, static_mode=static_mode, **kwargs)
+    def __init__(self, model, task, **kwargs):
+        super().__init__(model=model, task=task, **kwargs)
+        self._static_mode = False
         term_schema_path = download_file(
             self._task_path, "termtree_type.csv", URLS['termtree_type'][0],
             URLS['termtree_type'][1], "text2knowledge")
@@ -170,7 +169,7 @@ class WordTagTask(Task):
         self._construct_tokenizer(model)
         self._usage = usage
         self._summary_num = 2
-        if self.static_mode:
+        if self._static_mode:
             self._get_inference_model()
         else:
             self._construct_model(model)
@@ -300,8 +299,8 @@ class WordTagTask(Task):
             'lazy_load'] if 'lazy_load' in self.kwargs else False
 
         max_seq_length = 512
-        if 'max_position_embedding' in self.kwargs:
-            max_seq_length = self.kwargs['max_position_embedding']
+        if 'max_seq_length' in self.kwargs:
+            max_seq_length = self.kwargs['max_seq_length']
         infer_data = []
         max_predict_len = max_seq_length - self.summary_num - 1
         short_input_texts = self._split_long_text_input(input_texts,
@@ -474,14 +473,15 @@ class WordTagTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         all_pred_tags = []
-        if not self.static_mode:
+        if not self._static_mode:
             with dygraph_mode_guard():
                 with paddle.no_grad():
                     for batch in inputs['data_loader']:
                         input_ids, token_type_ids, seq_len = batch
-                        score, pred_tags = self._model(
+                        seq_logits, cls_logits = self._model(
                             input_ids, token_type_ids, lengths=seq_len)
-                        print(pred_tags)
+                        score, pred_tags = self._model.viterbi_decoder(
+                            seq_logits, seq_len)
                         all_pred_tags.extend(pred_tags.numpy().tolist())
         else:
             with static_mode_guard():
@@ -493,7 +493,6 @@ class WordTagTask(Task):
                         self._static_program,
                         feed=data_dict,
                         fetch_list=self._static_fetch_targets)
-                    print("the results:{}".format(results[1]))
                     all_pred_tags.extend(results[1].tolist())
         inputs['all_pred_tags'] = all_pred_tags
         return inputs

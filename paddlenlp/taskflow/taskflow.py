@@ -88,12 +88,7 @@ class TaskFlow(object):
 
     """
 
-    def __init__(self,
-                 task,
-                 model=None,
-                 device_id=0,
-                 static_mode=False,
-                 **kwargs):
+    def __init__(self, task, model=None, device_id=0, **kwargs):
         assert task in TASKS, "The task name:{} is not in TaskFlow list, please check your task name.".format(
             task)
         self.task = task
@@ -110,17 +105,13 @@ class TaskFlow(object):
             paddle.set_device(device + ":" + str(device_id))
 
         self.model = model
-        self.static_mode = static_mode
         # Update the task config to kwargs
         config_kwargs = TASKS[self.task]['models'][self.model]
         kwargs.update(config_kwargs)
         self.kwargs = kwargs
         task_class = TASKS[self.task]['models'][self.model]['task_class']
         self.task_instance = task_class(
-            model=self.model,
-            task=self.task,
-            static_mode=self.static_mode,
-            **self.kwargs)
+            model=self.model, task=self.task, **self.kwargs)
         task_list = TASKS.keys()
         TaskFlow.task_list = task_list
 
