@@ -7,7 +7,7 @@
     - [数据准备](#数据准备)
     - [文件结构](#文件结构)
     - [模型训练、预测与部署](#模型训练、预测与部署)
- - [TaskFlow-DDParser](#TaskFlow-DDParser)
+ - [Taskflow一键预测](#Taskflow一键预测)
  - [Reference](#Reference)
 
 ## 模型简介
@@ -288,7 +288,7 @@ python deploy/python/predict.py --model_dir=./output --task_name=nlpcc13_evsam05
 * `warmup_proportion`: 学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.0。
 * `weight_decay`: 控制正则项力度的参数，用于防止过拟合，默认为0.0。
 
-## TaskFlow-DDParser
+## Taskflow一键预测
 
 TaskFlow向用户提供了一个百度基于大规模标注数据集[DuCTB1.0](#数据来源)训练的依存句法分析工具ddparser。用户可以方便地使用该工具完成[一键预测](#一键预测)。
 
