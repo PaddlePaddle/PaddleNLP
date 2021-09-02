@@ -1,5 +1,5 @@
 modeling
-==============================================
+=================================================
 
 .. automodule:: paddlenlp.transformers.ernie_doc.modeling
    :members:
