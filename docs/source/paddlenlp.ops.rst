@@ -11,8 +11,8 @@ paddlenlp.ops
    :maxdepth: 4
 
    paddlenlp.ops.distributed
+   paddlenlp.ops.faster_transformer
    paddlenlp.ops.optimizer
-   paddlenlp.ops.transformer
 
 
 .. toctree::
@@ -20,3 +20,4 @@ paddlenlp.ops
 
    paddlenlp.ops.einsum
    paddlenlp.ops.ext_utils
+   paddlenlp.ops.strings
