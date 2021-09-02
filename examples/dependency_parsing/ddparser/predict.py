@@ -117,7 +117,6 @@ def do_predict(args):
 
     trans_fn = partial(
         convert_example,
-        tokenizer=tokenizer,
         vocabs=[word_vocab, feat_vocab, rel_vocab],
         encoding_model=args.encoding_model,
         feat=args.feat,

@@ -39,4 +39,4 @@ class ParserCriterion(nn.Layer):
         rel_cost = F.cross_entropy(s_rel, rels)
 
         avg_cost = paddle.mean(arc_cost + rel_cost)
-        return avg_cost 
+        return avg_cost

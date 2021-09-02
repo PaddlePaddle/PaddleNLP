@@ -45,7 +45,6 @@ parser.add_argument("--lstm_lr", type=float, default=0.002, help="The Learning r
 parser.add_argument("--ernie_lr", type=float, default=5e-05, help="The Learning rate of ernie encoding model.")
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
 # Preprocess
-parser.add_argument("--min_freq", type=int, default=2, help="The minimum frequency of word when construct the vocabulary.")
 parser.add_argument("--n_buckets", type=int, default=15, help="Number of buckets to devide the dataset.")
 parser.add_argument("--fix_len", type=int, default=20, help="The fixed length to pad the sequence")
 # Postprocess
@@ -164,7 +163,6 @@ def do_train(args):
     n_rels, n_words = len(rel_vocab), len(word_vocab)
     trans_fn = partial(
         convert_example, 
-        tokenizer=tokenizer,
         vocabs=vocabs, 
         encoding_model=args.encoding_model,
         feat=args.feat,

@@ -23,10 +23,33 @@ from utils import kmeans, pad_sequence
 
 
 def build_vocab(corpus, tokenizer, encoding_model, feat):
+    """
+    Build vocabs use the api of paddlenlp.data.Vocab.build_vocab(), 
+    Using token_to_idx to specifies the mapping relationship between 
+    tokens and indices to be used.
+
+    Args:
+        Corpus(obj:`list[list[str]]`): The training corpus which contains 
+            list of input words, features and relations.
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from 
+            :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+            which contains most of the methods. If the encoding model is lstm,
+            tokenizer is None.
+        encoding_model(obj:`str`): The encoder used for embedding.
+        feat(obj:`str`): The features used for model inputs. If the encoding
+            model is lstm, feat can be `pos` or `char`, otherwise the feat is None.
+
+    Returns:
+        word_vocab(obj:`Vocab`): Word vocab.
+        feat_vocab(obj:`Vocab`): Feature vocab.
+        rel_vocab(obj:`Vocab`): Relation vocab.
+    """
     word_examples, feat_examples, rel_examples = corpus
 
-    # Construct word vocab and feature vocab
+    # Build word vocab and feature vocab
     if encoding_model == "lstm":
+        # Using token_to_idx to specifies the mapping 
+        # relationship between tokens and 
         word_vocab = Vocab.build_vocab(
             word_examples, 
             min_freq=2, 
@@ -56,7 +79,7 @@ def build_vocab(corpus, tokenizer, encoding_model, feat):
         word_vocab = tokenizer.vocab
         feat_vocab = None
 
-    # Construct relation vocab
+    # Build relation vocab
     rel_vocab = Vocab.build_vocab(
         rel_examples,
         token_to_idx={"[BOS]": 0, "[EOS]": 1, "[UNK]": 2},
@@ -68,6 +91,7 @@ def build_vocab(corpus, tokenizer, encoding_model, feat):
 
 
 def load_vocab(vocab_dir):
+    """load vocabs"""
     word_vocab = Vocab.from_json(os.path.join(vocab_dir, "word_vocab.json"))
     rel_vocab = Vocab.from_json(os.path.join(vocab_dir, "rel_vocab.json"))
     feat_vocab_path = os.path.join(vocab_dir, "feat_vocab.json")
@@ -78,13 +102,13 @@ def load_vocab(vocab_dir):
     return word_vocab, feat_vocab, rel_vocab
 
 
-def convert_example(example, 
-                    tokenizer, 
+def convert_example(example,
                     vocabs, 
-                    encoding_model, 
-                    feat, 
-                    mode=None, 
+                    encoding_model='ernie-1.0', 
+                    feat=None, 
+                    mode='train', 
                     fix_len=20):
+    """Builds model inputs for dependency parsing task."""
     word_vocab, feat_vocab, rel_vocab = vocabs
     if encoding_model == "lstm":
         word_bos_index = word_vocab.to_indices("[BOS]")
@@ -130,7 +154,7 @@ def convert_example(example,
             return words, feats
         return words, feats, arcs, rels
     else:
-        words = [tokenizer(word)["input_ids"][1:-1] for word in example["FORM"]]
+        words = [[word_vocab.to_indices(char) for char in word] for word in example["FORM"]]
         words = [[word_bos_index]] + words + [[word_eos_index]]
         words = pad_sequence([np.array(ids[:fix_len], dtype=int) 
             for ids in words], fix_len=fix_len)
