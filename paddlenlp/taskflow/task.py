@@ -41,9 +41,7 @@ class Task(metaclass=abc.ABCMeta):
         self._model = None
         # The static model instantce
         self._input_spec = None
-        self._static_program = None
-        self._static_feed_names = None
-        self._static_fetch_targets = None
+        self._config = None
         self._task_path = os.path.join(PPNLP_HOME, "taskflow", self.task,
                                        self.model)
 
@@ -90,7 +88,20 @@ class Task(metaclass=abc.ABCMeta):
         Construct the input data and executor in the PaddlePaddele static mode. 
         """
         place = paddle.get_device()
-        self._exe = paddle.static.Executor(place)
+        if place == 'cpu':
+            self._config.disable_gpu()
+        else:
+            self._config.enable_use_gpu(100, 0)
+        self._config.switch_use_feed_fetch_ops(False)
+        self.predictor = paddle.inference.create_predictor(self._config)
+        self.input_handles = [
+            self.predictor.get_input_handle(name)
+            for name in self.predictor.get_input_names()
+        ]
+        self.output_handle = [
+            self.predictor.get_output_handle(name)
+            for name in self.predictor.get_output_names()
+        ]
 
     def _get_inference_model(self):
         """
@@ -103,10 +114,11 @@ class Task(metaclass=abc.ABCMeta):
                 self._construct_model(self.model)
                 self._construct_input_spec()
                 self._convert_dygraph_to_static()
-        with static_mode_guard():
-            self._prepare_static_mode()
-            self._static_program, self._static_feed_names, self._static_fetch_targets \
-                 = paddle.static.load_inference_model(inference_model_path, self._exe)
+
+        model_file = inference_model_path + ".pdmodel"
+        params_file = inference_model_path + ".pdiparams"
+        self._config = paddle.inference.Config(model_file, params_file)
+        self._prepare_static_mode()
 
     def _convert_dygraph_to_static(self):
         """
