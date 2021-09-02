@@ -300,9 +300,9 @@ TaskFlow向用户提供了一个百度基于大规模标注数据集[DuCTB1.0](#
 ### 一键预测
 
 ```python
-from paddlenlp.taskflow import TaskFlow
+from paddlenlp import Taskflow
 
-ddp = TaskFlow("dependency_parsing")
+ddp = Taskflow("dependency_parsing")
 ddp("百度是一家高科技公司")
 # [{'word': ['百度', '是', '一家', '高科技', '公司'], 
 #   'head': ['2', '0', '5', '5', '2'], 
@@ -316,7 +316,7 @@ ddp(["百度是一家高科技公司", "他送了一本书"])
 #   'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
 
 # 输出概率和词性标签
-ddp = TaskFlow("dependency_parsing", prob=True, use_pos=True)
+ddp = Taskflow("dependency_parsing", prob=True, use_pos=True)
 ddp("百度是一家高科技公司")
 # [{'word': ['百度', '是', '一家', '高科技', '公司'], 
 #   'postag': ['ORG', 'v', 'm', 'n', 'n'], 
@@ -325,14 +325,14 @@ ddp("百度是一家高科技公司")
 #   'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
 
 # 使用ddparser-ernie-1.0进行预测
-ddp = TaskFlow("dependency_parsing", model="ddparser-ernie-1.0")
+ddp = Taskflow("dependency_parsing", model="ddparser-ernie-1.0")
 ddp("百度是一家高科技公司")
 # [{'word': ['百度', '是', '一家', '高科技', '公司'], 
 #   'head': ['2', '0', '5', '5', '2'], 
 #   'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
 
 # 使用ddparser-ernie-gram-zh进行预测
-ddp = TaskFlow("dependency_parsing", model="ddparser-ernie-gram-zh")
+ddp = Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")
 ddp("百度是一家高科技公司")
 # [{'word': ['百度', '是', '一家', '高科技', '公司'], 
 #   'head': ['2', '0', '5', '5', '2'], 
