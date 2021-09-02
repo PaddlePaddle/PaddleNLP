@@ -44,7 +44,7 @@ URLS = {
 }
 
 usage = r"""
-           from paddlenlp.taskflow import Taskflow 
+           from paddlenlp import Taskflow 
 
            task = Taskflow("sentiment_analysis")
            task("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")

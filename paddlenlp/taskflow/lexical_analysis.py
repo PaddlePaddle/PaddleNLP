@@ -38,7 +38,7 @@ URLS = {
 }
 
 usage = r"""
-           from paddlenlp.taskflow import Taskflow 
+           from paddlenlp import Taskflow 
 
            lac = Taskflow("lexical_analysis")
            lac("LAC是个优秀的分词工具")

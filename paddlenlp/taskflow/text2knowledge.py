@@ -109,7 +109,7 @@ URLS = {
 }
 
 usage = r"""
-          from paddlenlp.taskflow import Taskflow 
+          from paddlenlp import Taskflow 
 
           task = Taskflow("text2knowledge")
           task("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
