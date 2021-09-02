@@ -44,15 +44,15 @@ URLS = {
 }
 
 usage = r"""
-           from paddlenlp.taskflow import TaskFlow 
+           from paddlenlp.taskflow import Taskflow 
 
-           task = TaskFlow("sentiment_analysis")
+           task = Taskflow("sentiment_analysis")
            task("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
            '''
            [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'}]
            '''
 
-           task = TaskFlow("sentiment_analysis", model="skep")
+           task = Taskflow("sentiment_analysis", model="skep")
            task("作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。")
            '''
            [{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive'}]

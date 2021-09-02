@@ -38,9 +38,9 @@ URLS = {
 }
 
 usage = r"""
-           from paddlenlp.taskflow import TaskFlow 
+           from paddlenlp.taskflow import Taskflow 
 
-           lac = TaskFlow("lexical_analysis")
+           lac = Taskflow("lexical_analysis")
            lac("LAC是个优秀的分词工具")
            '''
            [{'text': 'LAC是个优秀的分词工具', 'segs': ['LAC', '是', '个', '优秀', '的', '分词', '工具'], 'tags': ['nz', 'v', 'q', 'a', 'u', 'n', 'n']}]
