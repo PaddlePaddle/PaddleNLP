@@ -45,7 +45,6 @@ std::string data_dir = "";
 
 const int EOS_IDX = 1;
 const int PAD_IDX = 0;
-const int BEAM_SIZE = 5;
 const int MAX_LENGTH = 256;
 const int N_BEST = 1;
 
@@ -68,6 +67,7 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
                        std::unordered_map<int, std::string>& num2word_dict) {
   std::vector<int> output_shape = seq_ids->shape();
   int batch_size = output_shape[0];
+  int beam_num = output_shape[2];
   int out_num = std::accumulate(
       output_shape.begin(), output_shape.end(), 1, std::multiplies<int>());
   std::vector<int64_t> seq_ids_out;
@@ -77,18 +77,18 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
   dataresultvec.resize(batch_size * N_BEST);
   auto max_output_length = output_shape[1];
 
-  for (int bsz = 0; bsz < output_shape[0]; ++bsz) {
+  for (int bsz = 0; bsz < batch_size; ++bsz) {
     for (int k = 0; k < N_BEST; ++k) {
       dataresultvec[bsz * N_BEST + k].result_q = "";
       for (int len = 0; len < max_output_length; ++len) {
-        if (seq_ids_out[bsz * max_output_length * BEAM_SIZE + len * BEAM_SIZE +
+        if (seq_ids_out[bsz * max_output_length * beam_num + len * beam_num +
                         k] == EOS_IDX) {
           break;
         }
         dataresultvec[bsz * N_BEST + k].result_q =
             dataresultvec[bsz * N_BEST + k].result_q +
-            num2word_dict[seq_ids_out[bsz * max_output_length * BEAM_SIZE +
-                                      len * BEAM_SIZE + k]] +
+            num2word_dict[seq_ids_out[bsz * max_output_length * beam_num +
+                                      len * beam_num + k]] +
             " ";
       }
     }
@@ -234,6 +234,10 @@ void Main(
 
   config.SwitchUseFeedFetchOps(false);
   config.SwitchSpecifyInputNames(true);
+  // When using fp16, fc_elementwise_layernorm_fuse_pass causes a little
+  // different translation results with original dygraph prediction, maybe you
+  // can turn off the IR optimization for same results as following:
+  // config.SwitchIrOptim(false);
   auto predictor = CreatePredictor(config);
   DataReader reader(data_dir);
   reader.GetWordDict();

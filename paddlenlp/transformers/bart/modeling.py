@@ -310,6 +310,12 @@ class BartModel(BartPretrainedModel):
             max_position_embeddings, init_std)
         self.apply(self.init_weights)
 
+    def get_encoder(self):
+        return self.encoder
+
+    def get_decoder(self):
+        return self.decoder
+
     def forward(self,
                 input_ids,
                 attention_mask=None,
@@ -323,7 +329,6 @@ class BartModel(BartPretrainedModel):
         if input_ids is None and encoder_output is None:
             raise ValueError(
                 "You have to specify either input_ids or encoder_output")
-
         if decoder_input_ids is None:
             assert input_ids is not None, "input_ids should be " \
                                           "specified when generating decoder_input_ids"
@@ -450,6 +455,12 @@ class BartForConditionalGeneration(BartPretrainedModel):
                              paddle.zeros((1, self.bart.config['vocab_size'])))
         self.apply(self.init_weights)
 
+    def get_encoder(self):
+        return self.bart.get_encoder()
+
+    def get_decoder(self):
+        return self.bart.get_decoder()
+
     def forward(self,
                 input_ids,
                 attention_mask=None,
@@ -465,5 +476,46 @@ class BartForConditionalGeneration(BartPretrainedModel):
             output[0] if use_cache else output,
             self.lm_head_weight,
             transpose_y=True) + self.final_logits_bias
+        if use_cache:
+            cache = output[1]
+            return lm_logits, cache
+        else:
+            return lm_logits
 
-        return lm_logits
+    def prepare_inputs_for_generation(self,
+                                      decoder_input_ids,
+                                      attention_mask=None,
+                                      decoder_attention_mask=None,
+                                      cache=None,
+                                      use_cache=False,
+                                      encoder_output=None,
+                                      **kwargs):
+        # cut decoder_input_ids if past is used
+        if cache is not None:
+            decoder_input_ids = decoder_input_ids[:, -1].unsqueeze(-1)
+            if decoder_attention_mask is not None:
+                decoder_attention_mask = decoder_attention_mask[:, :,
+                                                                -1, :].unsqueeze(
+                                                                    2)
+
+        return {
+            "input_ids": None,
+            "decoder_input_ids": decoder_input_ids,
+            "encoder_output": encoder_output,
+            "decoder_attention_mask": decoder_attention_mask,
+            "attention_mask": attention_mask,
+            "use_cache": use_cache,
+            "cache": cache
+        }
+
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError as e:
+            try:
+                return getattr(getattr(self, self.base_model_prefix), name)
+            except AttributeError:
+                try:
+                    return getattr(self, self.base_model_prefix).config[name]
+                except KeyError:
+                    raise e
