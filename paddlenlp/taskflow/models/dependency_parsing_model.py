@@ -61,12 +61,12 @@ class BiAffineParser(nn.Layer):
         rel_h = self.mlp_rel_h(x)
         rel_d = self.mlp_rel_d(x)
 
-        # get arc and rel scores from the bilinear attention
-        # [batch_size, seq_len, seq_len]
+        # Get arc and rel scores from the bilinear attention
+        # Shape: (batch_size, seq_len, seq_len)
         s_arc = self.arc_attn(arc_d, arc_h)
-        # [batch_size, seq_len, seq_len, n_rels]
+        # Shape: (batch_size, seq_len, seq_len, n_rels)
         s_rel = paddle.transpose(self.rel_attn(rel_d, rel_h), perm=[0, 2, 3, 1])
-        # set the scores that exceed the length of each sentence to -1e5
+        # Set the scores that exceed the length of each sentence to -1e5
         s_arc_mask = paddle.unsqueeze(mask, 1)
         s_arc = s_arc * s_arc_mask + paddle.scale(
             paddle.cast(s_arc_mask, 'int32'), scale=1e5, bias=-1, bias_after_scale=False)
@@ -130,7 +130,7 @@ class BiAffine(nn.Layer):
         
         # Shape: (batch_size, output_size, num_tokens, num_tokens)
         s = paddle.matmul(paddle.matmul(x, weight), paddle.transpose(y, perm=[0, 1, 3, 2]))
-        # remove dim 1 if n_out == 1
+        # Remove dim 1 if n_out == 1
         if s.shape[1] == 1:
             s = paddle.squeeze(s, axis=1)
         return s
@@ -218,23 +218,20 @@ def index_sample(x, index):
     x_s = x.shape
     dim = len(index.shape) - 1 
     assert x_s[:dim] == index.shape[:dim]
-
     if len(x_s) == 3 and dim == 1:
         r_x = paddle.reshape(x, shape=[-1, x_s[1], x_s[-1]])
     else:
         r_x = paddle.reshape(x, shape=[-1, x_s[-1]])
-
     index = paddle.reshape(index, shape=[len(r_x), -1, 1])
-    # generate arange index, shape like index
+    # Generate arange index, shape like index
     arr_index = paddle.arange(start=0, end=len(index), dtype=index.dtype)
     arr_index = paddle.unsqueeze(arr_index, axis=[1, 2])
     arr_index = paddle.expand(arr_index, index.shape)
-    #  genrate new index
+    # Genrate new index
     new_index = paddle.concat((arr_index, index), -1)
     new_index = paddle.reshape(new_index, (-1, 2))
-    # get output
+    # Get output
     out = paddle.gather_nd(r_x, new_index)
-    #out = paddle.reshape(out, x_s[:dim] + [-1])
     if len(x_s) == 3 and dim == 2:
         out = paddle.reshape(out, shape=[x_s[0], x_s[1], -1])
     else:
