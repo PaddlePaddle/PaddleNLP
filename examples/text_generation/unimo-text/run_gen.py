@@ -14,7 +14,6 @@ from paddle.optimizer import AdamW
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer, BasicTokenizer
 from paddlenlp.metrics import BLEU
-from paddlenlp.ops import FasterUnimo
 
 from gen_utils import print_args, set_seed, create_data_loader, select_sum
 

@@ -183,5 +183,4 @@ def select_sum(ids, scores, tokenizer, max_dec_len=None,
     for preds in group:
         preds = sorted(preds, key=lambda x: -x[1])
         results.append(preds[0][0])
-
     return results
