@@ -27,6 +27,8 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import ErnieGramModel, ErnieGramTokenizer
 from paddlenlp.transformers import ErnieModel, ErnieTokenizer
+from paddlenlp.transformers import RobertaModel, RobertaTokenizer
+
 from paddlenlp.utils.log import logger
 
 from model import PretrainedModelForCSC
@@ -46,7 +48,8 @@ args = parser.parse_args()
 
 MODEL_CLASSES = {
     "ernie_gram": (ErnieGramModel, ErnieGramTokenizer),
-    "ernie": (ErnieModel, ErnieTokenizer)
+    "ernie": (ErnieModel, ErnieTokenizer),
+    "roberta": (RobertaModel, RobertaTokenizer)
 }
 
 
