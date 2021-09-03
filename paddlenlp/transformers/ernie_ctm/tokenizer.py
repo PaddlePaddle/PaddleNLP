@@ -140,7 +140,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
             .. code-block::
 
                 from paddlenlp.transformers import ErnieCtmTokenizer
-                tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-1.0')
+                tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-ctm')
 
                 tokens = tokenizer.tokenize('He was a puppeteer')
                 strings = tokenizer.convert_tokens_to_string(tokens)
@@ -151,20 +151,23 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         return out_string
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
-        """Build model inputs from a sequence or a pair of sequences for sequence classification tasks by
-        concatenating and add special tokens. A ERNIE-CTM sequence has the following format:
+        """
+        Build model inputs from a sequence or a pair of sequences for sequence classification tasks by
+        concatenating and add special tokens.
 
-        - single sequence: [CLS0][CLS1]... X [SEP]
-        - pair of sequences: [CLS0][CLS1]... X [SEP] X [SEP]
+        A ERNIE-CTM sequence has the following format:
+
+        - single sequence:      [CLS0][CLS1]... X [SEP]
+        - pair of sequences:        [CLS0][CLS1]... X [SEP] X [SEP]
 
         Args:
-            token_ids_0 (`List`):
+            token_ids_0 (List):
                 List of IDs to which the special tokens will be added.
-            token_ids_1 (`List`, optional):
-                second list of IDs for sequence pairs. Defaults to ``None``.
+            token_ids_1 (List, optional):
+                Optional second list of IDs for sequence pairs. Defaults to ``None``.
 
         Returns:
-            List: The input IDs with the appropriate special tokens.
+            List[int]: The input_id with the appropriate special tokens.
         """
         cls_token_ids = [
             self.convert_tokens_to_ids(self.cls_token_template.format(sid))
@@ -217,6 +220,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                                              token_ids_1=None):
         """
         Creates a token_type mask from the input sequences.
+
         If `token_ids_1` is not `None`, then a sequence pair
         token_type mask has the following format:
 
@@ -302,5 +306,13 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
 
         Returns:
             List(str): A list of string representing converted tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import ErnieCtmTokenizer
+                tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-ctm')
+                tokens = tokenizer.tokenize('He was a puppeteer')
+
         """
         return self._tokenize(text, kwargs)
