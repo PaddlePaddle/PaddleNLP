@@ -840,9 +840,10 @@ class InferTransformerModel(TransformerModel):
         kwargs:
             The key word arguments can be `rel_len` and `alpha`:
 
-            - `rel_len(bool, optional)`: Indicating whether max_out_len in is
-            the length relative to that of source text. Only works in `v2` temporarily.
-            Default to False if not set.
+            - `rel_len(bool, optional)`: Indicating whether `max_out_len` in
+            is the length relative to that of source text. Only works in `v2`
+            temporarily. It is suggest to set a small `max_out_len` and use
+            `rel_len=True`. Default to False if not set.
 
             - `alpha(float, optional)`: The power number in length penalty
             calculation. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.

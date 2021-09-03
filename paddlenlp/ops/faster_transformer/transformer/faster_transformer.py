@@ -92,9 +92,10 @@ class FasterTransformer(TransformerModel):
             The maximum output length. Defaults to 256.
         use_fp16_decoding(bool, optional): Whether to use fp16 for decoding. 
         rel_len(bool, optional):
-            Indicating whether max_out_len in is the length relative to that of
-            source text. Only works in `beam_search_v2` temporarily. Default to
-            False if not set.
+            Indicating whether `max_out_len` in is the length relative to that
+            of source text. Only works in `v2` temporarily. It is suggest to set
+            a small `max_out_len` and use `rel_len=True`. Default to False if
+            not set.
         alpha(float, optional):
             The power number in length penalty calculation. Only works in `v2`
             temporarily. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
@@ -378,8 +379,9 @@ class TransformerGenerator(paddle.nn.Layer):
             decrease when meeting the end token. However, 'v2' always generates
             longer results thus might do more calculation and be slower.
 
-            - `rel_len(bool, optional)`: Indicating whether max_out_len in is
+            - `rel_len(bool, optional)`: Indicating whether `max_out_len` in is
             the length relative to that of source text. Only works in `v2` temporarily.
+            It is suggest to set a small `max_out_len` and use `rel_len=True`.
             Default to False if not set.
 
             - `alpha(float, optional)`: The power number in length penalty
@@ -414,13 +416,13 @@ class TransformerGenerator(paddle.nn.Layer):
         self.output_time_major = kwargs.pop("output_time_major", True)
         use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
         use_ft = kwargs.pop("use_ft", True)
+        beam_search_version = kwargs.pop("beam_search_version", "v1")
+        rel_len = kwargs.pop("rel_len", False)
+        alpha = kwargs.pop("alpha", 0.6)
 
         if use_ft:
             try:
                 load("FasterTransformer", verbose=True)
-                beam_search_version = kwargs.pop("beam_search_version", "v1")
-                rel_len = kwargs.pop("rel_len", True)
-                alpha = kwargs.pop("alpha", 0.6)
                 decoding_strategy = ("beam_search_v2"
                                      if beam_search_version == "v2" else
                                      "beam_search")
@@ -463,7 +465,9 @@ class TransformerGenerator(paddle.nn.Layer):
                     beam_size=beam_size,
                     max_out_len=max_out_len,
                     output_time_major=self.output_time_major,
-                    **kwargs)
+                    beam_search_version=beam_search_version,
+                    rel_len=rel_len,
+                    alpha=alpha)
         else:
             self.transformer = InferTransformerModel(
                 src_vocab_size=src_vocab_size,
@@ -481,7 +485,9 @@ class TransformerGenerator(paddle.nn.Layer):
                 beam_size=beam_size,
                 max_out_len=max_out_len,
                 output_time_major=self.output_time_major,
-                **kwargs)
+                beam_search_version=beam_search_version,
+                rel_len=rel_len,
+                alpha=alpha)
 
     def forward(self, src_word):
         r"""
@@ -497,11 +503,10 @@ class TransformerGenerator(paddle.nn.Layer):
             Tensor:
                 An int64 tensor shaped indicating the predicted ids. Its shape is
                 `[batch_size, seq_len, beam_size]` or `[seq_len, batch_size, beam_size]`
-                according to `output_time_major` when using beam search v1.
-                When using beam search v2, the beam dimension would be doubled
-                to include both the top `beam_size` alive and finish beams, thus
-                the tensor shape is `[batch_size, seq_len, beam_size * 2]` or
-                `[seq_len, batch_size, beam_size * 2]`
+                according to `output_time_major`. While, when using FasterTransformer
+                and beam search v2, the beam dimension would be doubled to include
+                both the top `beam_size` alive and finish beams, thus the tensor
+                shape is `[batch_size, seq_len, beam_size * 2]` or `[seq_len, batch_size, beam_size * 2]`.
         
         Example:
             .. code-block::
