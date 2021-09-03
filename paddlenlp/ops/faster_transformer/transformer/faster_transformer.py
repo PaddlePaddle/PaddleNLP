@@ -360,10 +360,13 @@ class TransformerGenerator(paddle.nn.Layer):
             `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
             to `False`. 
+
             - `use_ft(bool, optional)`: Whether to use Faster Transformer
             for decoding. Default to True if not set.
+
             - `use_fp16_decoding(bool, optional)`: Whether to use fp16
             for decoding.  Only works when using Faster Transformer.
+
             - `beam_search_version(str, optional)`: Indicating the strategy of
             beam search. It can be 'v1' or 'v2'. 'v2' would select the top
             `beam_size * 2` beams and process the top `beam_size` alive and
@@ -373,9 +376,11 @@ class TransformerGenerator(paddle.nn.Layer):
             always be `beam_size` while the number of alive beams in `v1` might
             decrease when meeting the end token. However, 'v2' always generates
             longer results thus might do more calculation and be slower.
+
             - `rel_len(bool, optional)`: Indicating whether max_out_len in is
             the length relative to that of source text. Only works in `v2` temporarily.
             Default to False if not set.
+
             - `alpha(float, optional)`: The power number in length penalty
             calculation. Only works in `v2` temporarily. Default to 0.6 if not set.
     """
@@ -490,7 +495,11 @@ class TransformerGenerator(paddle.nn.Layer):
             Tensor:
                 An int64 tensor shaped indicating the predicted ids. Its shape is
                 `[batch_size, seq_len, beam_size]` or `[seq_len, batch_size, beam_size]`
-                according to `output_time_major`.
+                according to `output_time_major` when using beam search v1.
+                When using beam search v2, the beam dimension would be doubled
+                to include both the top `beam_size` alive and finish beams, thus
+                the tensor shape is `[batch_size, seq_len, beam_size * 2]` or
+                `[seq_len, batch_size, beam_size * 2]`
         
         Example:
             .. code-block::

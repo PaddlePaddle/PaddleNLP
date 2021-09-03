@@ -837,6 +837,15 @@ class InferTransformerModel(TransformerModel):
             Specify beam search version. It should be in one
             of [`v1`, `v2`]. If `v2`, need to set `alpha`(default to 0.6) for length
             penalty. Default to `v1`.
+        kwargs:
+            The key word arguments can be `rel_len` and `alpha`:
+
+            - `rel_len(bool, optional)`: Indicating whether max_out_len in is
+            the length relative to that of source text. Only works in `v2` temporarily.
+            Default to False if not set.
+
+            - `alpha(float, optional)`: The power number in length penalty
+            calculation. Only works in `v2` temporarily. Default to 0.6 if not set.
     """
 
     def __init__(self,
