@@ -444,29 +444,30 @@ class ErnieDocModel(ErnieDocPretrainedModel):
 
     Args:
         num_hidden_layers (int):
-            The number of hidden layers in the encoder.
+            The number of hidden layers in the Transformer encoder.
         num_attention_heads (int):
-            Number of attention heads in each attention layer.
+            Number of attention heads for each attention layer in the Transformer encoder.
         hidden_size (int):
             Dimensionality of the embedding layers, encoder layers and pooler layer.
         hidden_dropout_prob (int):
-            The dropout probability of encoder layer.
+            The dropout probability for all fully connected layers in the embeddings and encoder.
         attention_dropout_prob (int):
-            The dropout probability of attention output.
+            The dropout probability for all fully connected layers in the pooler.
         relu_dropout (int):
             The dropout probability of FFN.
         hidden_act (str):
-            The activation function of FFN.
+            The non-linear activation function of FFN.
         memory_len (int):
             The number of tokens to cache. If not 0, the last `memory_len` hidden states
             in each layer will be cached into memory.
         vocab_size (int):
-            Vocabulary size of `inputs_ids` in `ErnieDocModel`.
-            Also is the vocab size of token embedding matrix.
+            Vocabulary size of `inputs_ids` in `ErnieDocModel`. Also is the vocab size of token embedding matrix.
+            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `ErnieDocModel`.
         max_position_embeddings (int):
-            The maximum of positions embedding. 
+            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
+            sequence. Defaults to `512`.
         task_type_vocab_size (int, optional):
-            The size of segment embedding. Defaults to 3.
+            The vocabulary size of the `token_type_ids`. Defaults to `3`.
         normalize_before (bool, optional):
             Indicate whether to put layer normalization into preprocessing of MHA and FFN sub-layers. 
             If True, pre-process is layer normalization and post-precess includes dropout, 
@@ -474,17 +475,17 @@ class ErnieDocModel(ErnieDocPretrainedModel):
             residual connection, layer normalization. Defaults to False.
         epsilon (float, optional):
             The `epsilon` parameter used in :class:`paddle.nn.LayerNorm` for
-            initializing layer normalization layers. Defaults to 1e-5.
+            initializing layer normalization layers. Defaults to `1e-5`.
         rel_pos_params_sharing (bool, optional):
-            Defaults to False.
+            Defaults to `False`.
         initializer_range (float, optional):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-            Defaults to 0.02.
+            The standard deviation of the normal initializer for initializing all weight matrices.
+            Defaults to `0.02`.
         pad_token_id (int, optional):
             The token id of [PAD] token whose parameters won't be updated when training.
             Defaults to 0.
         cls_token_idx (int, optional):
-            The token id of [CLS] token. Defaults to -1.
+            The token id of [CLS] token. Defaults to `-1`.
     """
 
     def __init__(self,
@@ -599,18 +600,22 @@ class ErnieDocModel(ErnieDocPretrainedModel):
                 It's data type should be `float32` and has a shape of [batch_size, sequence_length].
 
         Returns:
-            Tuple : Returns tuple with 3 field:
+            tuple : Returns tuple (``encoder_output``, ``pooled_output``, ``new_mem``).
+
+            With the fields:
+
             - `encoder_output` (Tensor):
-                A tensor containing hidden-states of the model at the output of last layer.
-                Each Tensor has a data type of `float32` and has a shape of
-                [batch_size, sequence_length, hidden_size]. 
+                Sequence of hidden-states at the last layer of the model.
+                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+
             - `pooled_output` (Tensor):
-                A tensor containing the [CLS] of hidden-states of the model at the output of last layer.
-                Each Tensor has a data type of `float32` and has a shape of [batch_size, hidden_size]. 
+                The output of first token (`[CLS]`) in sequence.
+                We "pool" the model by simply taking the hidden state corresponding to the first token.
+                Its data type should be float32 and its shape is [batch_size, hidden_size].
+
             - `new_mem` (List[Tensor]):
                 A list of pre-computed hidden-states. The length of the list is `n_layers`.
-                Each element in the list is a Tensor with dtype `float32` and has a shape of
-                [batch_size, memory_length, hidden_size].
+                Each element in the list is a Tensor with dtype `float32` and shape as [batch_size, memory_length, hidden_size].
 
         Example:
             .. code-block::
@@ -692,40 +697,25 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
 
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
+                See :class:`ErnieDocModel`.
             memories (List[Tensor]):
-                A list of length `n_layers` with each Tensor being a pre-computed hidden-state for each layer.
-                Each Tensor has a dtype `float32` and a shape of [batch_size, sequence_length, hidden_size].
+                See :class:`ErnieDocModel`.
             token_type_ids (Tensor):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
-
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
-
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
-                Defaults to None, which means no segment embeddings is added to token embeddings.
+                See :class:`ErnieDocModel`.
             position_ids (Tensor):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                See :class:`ErnieDocModel`.
             attn_mask (Tensor):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+                See :class:`ErnieDocModel`.
 
         Returns:
-            Tuple : Returns tuple with 3 field:
+            tuple : Returns tuple (`logits`, `new_mem`).
+
+            With the fields:
+
             - `logits` (Tensor):
                 A tensor containing the [CLS] of hidden-states of the model at the output of last layer.
-                Each Tensor has a data type of `float32` and has a shape of [batch_size, num_classes]. 
+                Each Tensor has a data type of `float32` and has a shape of [batch_size, num_classes].
+
             - `mem` (List[Tensor]):
                 A list of pre-computed hidden-states. The length of the list is `n_layers`.
                 Each element in the list is a Tensor with dtype `float32` and has a shape of
@@ -801,40 +791,26 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
 
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
+                See :class:`ErnieDocModel`.
             memories (List[Tensor]):
-                A list of length `n_layers` with each Tensor being a pre-computed hidden-state for each layer.
-                Each Tensor has a dtype `float32` and a shape of [batch_size, sequence_length, hidden_size].
+                See :class:`ErnieDocModel`.
             token_type_ids (Tensor):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
-
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
-
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
+                See :class:`ErnieDocModel`.
                 Defaults to None, which means no segment embeddings is added to token embeddings.
             position_ids (Tensor):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                See :class:`ErnieDocModel`.
             attn_mask (Tensor):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+                See :class:`ErnieDocModel`.
 
         Returns:
-            Tuple : Returns tuple with 3 field:
+            tuple : Returns tuple (`logits`, `mem`).
+
+            With the fields:
+
             - `logits` (Tensor):
                 A tensor containing the hidden-states of the model at the output of last layer.
-                Each Tensor has a data type of `float32` and has a shape of [batch_size, sequence_length, num_classes]. 
+                Each Tensor has a data type of `float32` and has a shape of [batch_size, sequence_length, num_classes].
+
             - `mem` (List[Tensor]):
                 A list of pre-computed hidden-states. The length of the list is `n_layers`.
                 Each element in the list is a Tensor with dtype `float32` and has a shape of
@@ -906,37 +882,21 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
 
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
+                See :class:`ErnieDocModel`.
             memories (List[Tensor]):
-                A list of length `n_layers` with each Tensor being a pre-computed hidden-state for each layer.
-                Each Tensor has a dtype `float32` and a shape of [batch_size, sequence_length, hidden_size].
+                See :class:`ErnieDocModel`.
             token_type_ids (Tensor):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
-
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
-
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
-                Defaults to None, which means no segment embeddings is added to token embeddings.
+                See :class:`ErnieDocModel`.
             position_ids (Tensor):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                See :class:`ErnieDocModel`.
             attn_mask (Tensor):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+                See :class:`ErnieDocModel`.
 
         Returns:
-            Tuple : Returns tuple with 3 field:
+            tuple : Returns tuple (`start_logits`, `end_logits`, `mem`).
+
+            With the fields:
+
             - `start_logits` (Tensor):
                 A tensor containing the [CLS] of hidden-states of the model at the output of last layer.
                 Each Tensor has a data type of `float32` and has a shape of [batch_size, sequence_length]. 

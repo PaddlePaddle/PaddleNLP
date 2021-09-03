@@ -206,25 +206,25 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
         attention_probs_dropout_prob (float, optional):
             The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
             Defaults to `0.1`.
-        max_position_embeddings (`int`, optional):
+        max_position_embeddings (int, optional):
             The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
             sequence. Defaults to `512`.
-        type_vocab_size (`int`, optional):
+        type_vocab_size (int, optional):
             The vocabulary size of the `token_type_ids`. 
             Defaults to `16`.
-        initializer_range (`float`, optional):
+        initializer_range (float, optional):
             The standard deviation of the normal initializer for initializing all weight matrices.
             Defaults to `0.02`.
-        pad_token_id (`int`, optional):
+        pad_token_id (int, optional):
             The index of padding token in the token vocabulary.
             Defaults to `0`.
         use_content_summary (`bool`, optional):
-            Whether to add content summary tokens.
+            Whether or not to add content summary tokens.
             Defaults to `True`.
-        content_summary_index (`int`, optional):
+        content_summary_index (int, optional):
             The number of the content summary tokens. Only valid when use_content_summary is True.
             Defaults to `1`.
-        cls_num (`int`, optional):
+        cls_num (int, optional):
             The number of the CLS tokens. Only valid when use_content_summary is True.
             Defaults to `2`.
     """

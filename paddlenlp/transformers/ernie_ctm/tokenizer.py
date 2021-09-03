@@ -51,7 +51,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
             The template of summary token for multiple summary placeholders. Defaults to `"[CLS{}]"`
         cls_num (int, optional):
             Summary placeholder used in ernie-ctm model. For catching a sentence global feature from multiple aware.
-            Defaults to 1.
+            Defaults to `1`.
         mask_token (str, optional):
             A special token representing a masked token. This is the token used in the masked
             language modeling task. This is the token which the model will try to predict the original unmasked ones.
