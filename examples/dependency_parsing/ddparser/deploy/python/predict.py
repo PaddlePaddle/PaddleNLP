@@ -32,16 +32,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True, help="The path to static model.")
 parser.add_argument("--task_name", choices=["nlpcc13_evsam05_thu", "nlpcc13_evsam05_hit"], type=str, default="nlpcc13_evsam05_thu", help="Select the task.")
 parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
-parser.add_argument("--batch_size", type=int, default=16, help="Numbers of examples a batch for training.")
+parser.add_argument("--batch_size", type=int, default=64, help="Numbers of examples a batch for training.")
 parser.add_argument("--infer_output_file", type=str, default='infer_output.conll', help="The path to save infer results.")
-# Preprocess
-parser.add_argument("--n_buckets", type=int, default=15, help="Number of buckets to devide the dataset.")
-parser.add_argument("--fix_len", type=int, default=20, help="The fixed length to pad the sequence")
-# Postprocess
 parser.add_argument("--tree", type=bool, default=True, help="Ensure the output conforms to the tree structure.")
-# Lstm
-parser.add_argument("--feat", choices=["char", "pos"], type=str, default=None, help="The feature representation to use.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -53,7 +46,7 @@ def batchify_fn(batch):
 
 
 def flat_words(words, pad_index=0):
-    mask = words != word_pad_index
+    mask = words != pad_index
     lens = np.sum(mask.astype(int), axis=-1)
     position = np.cumsum(lens + (lens == 0).astype(int), axis=1) - 1
     lens = np.sum(lens, -1)
@@ -64,7 +57,7 @@ def flat_words(words, pad_index=0):
     for l in lens:
         sequences.append(words[idx:idx+l])
         idx += l
-    words = Pad(pad_val=word_pad_index)(sequences)
+    words = Pad(pad_val=pad_index)(sequences)
 
     max_len = words.shape[1]
 
@@ -123,29 +116,11 @@ class Predictor(object):
             for name in self.predictor.get_output_names()
         ]
 
-    def predict(self, 
-                data, 
-                rel_vocab,
-                word_pad_index,
-                word_bos_index,
-                word_eos_index,
-        ):
-        """
-        Predicts the data labels.
-
-        Args:
-            model (obj:`paddle.nn.Layer`): A model to classify texts.
-            data (obj:`List(Example)`): The processed data whose each element is a Example (numedtuple) object.
-                A Example object contains `text`(word_ids) and `se_len`(sequence length).
-            tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
-                which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-            label_map(obj:`dict`): The label id (key) to label str (value) map.
-            batch_size(obj:`int`, defaults to 1): The number of batch.
-
-        Returns:
-            results(obj:`dict`): All the predictions labels.
-        """
-
+    def predict(self, data, vocabs):
+        word_vocab, _, rel_vocab = vocabs
+        word_pad_index = word_vocab.to_indices("[PAD]")
+        word_bos_index = word_vocab.to_indices("[CLS]")
+        word_eos_index = word_vocab.to_indices("[SEP]")
         examples = []
         for text in data:
             example = {
@@ -154,18 +129,10 @@ class Predictor(object):
             }
             example = convert_example(
                 example,
-                tokenizer,
-                vocabs=[word_vocab, feat_vocab, rel_vocab],
-                encoding_model=args.encoding_model,
-                feat=args.feat,
+                vocabs=vocabs,
                 mode="test",
             )
-
-            if args.encoding_model == "lstm":
-                words, feats = example
-                examples.append((words, feats))
-            else:
-                examples.append(example)
+            examples.append(example)
 
         batches = [
             examples[idx:idx + args.batch_size]
@@ -174,23 +141,14 @@ class Predictor(object):
 
         arcs, rels = [], []
         for batch in batches:
-            if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
-                words = batchify_fn(batch)[0]
-                words, position = flat_words(words, word_pad_index)
-                self.input_handles[0].copy_from_cpu(words)
-                self.input_handles[1].copy_from_cpu(position)
-                self.predictor.run()
-                s_arc = self.output_handle[0].copy_to_cpu()
-                s_rel = self.output_handle[1].copy_to_cpu()
-                words = self.output_handle[2].copy_to_cpu()
-            else:
-                words, feats = batchify_fn(batch)
-                self.input_handles[0].copy_from_cpu(words)
-                self.input_handles[1].copy_from_cpu(feats)                
-                self.predictor.run()
-                s_arc = self.output_handle[0].copy_to_cpu()
-                s_rel = self.output_handle[1].copy_to_cpu()
-                words = self.output_handle[2].copy_to_cpu()  
+            words = batchify_fn(batch)[0]
+            words, position = flat_words(words, word_pad_index)
+            self.input_handles[0].copy_from_cpu(words)
+            self.input_handles[1].copy_from_cpu(position)
+            self.predictor.run()
+            s_arc = self.output_handle[0].copy_to_cpu()
+            s_rel = self.output_handle[1].copy_to_cpu()
+            words = self.output_handle[2].copy_to_cpu()
 
             mask = np.logical_and(
                 np.logical_and(words != word_pad_index, words != word_bos_index),
@@ -211,32 +169,13 @@ if __name__ == "__main__":
     # Define predictor to do prediction.
     predictor = Predictor(args.model_dir, args.device)
 
-    if args.encoding_model == "ernie-gram-zh":
-        tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(args.encoding_model)
-    elif args.encoding_model.startswith("ernie"):
-        tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(args.encoding_model)
-    elif args.encoding_model == "lstm-pe":
-        tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained("ernie-1.0")
-    else:
-        tokenizer = None
-
     # Load vocabs from model file path
-    word_vocab, feat_vocab, rel_vocab = load_vocab(args.model_dir)
-
-    if args.encoding_model == "lstm":
-        word_pad_index = word_vocab.to_indices("[PAD]")
-        word_bos_index = word_vocab.to_indices("[BOS]")
-        word_eos_index = word_vocab.to_indices("[EOS]")
-    else:
-        word_pad_index = word_vocab.to_indices("[PAD]")
-        word_bos_index = word_vocab.to_indices("[CLS]")
-        word_eos_index = word_vocab.to_indices("[SEP]")
+    vocabs = load_vocab(args.model_dir)
 
     test_ds = load_dataset(args.task_name, splits=["test"])
     test_ds_copy = copy.deepcopy(test_ds)
 
-    pred_arcs, pred_rels = predictor.predict(
-        test_ds, rel_vocab, word_pad_index, word_bos_index, word_eos_index)
+    pred_arcs, pred_rels = predictor.predict(test_ds, vocabs)
 
     with open(args.infer_output_file, 'w', encoding='utf-8') as out_file:
         for res, head, rel in zip(test_ds_copy, pred_arcs, pred_rels):

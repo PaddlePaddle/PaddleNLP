@@ -25,7 +25,7 @@ def decode(s_arc, s_rel, mask, tree=True):
     """Decode function"""
     mask = mask.numpy()
     lens = np.sum(mask, -1)
-    # prevent self-loops
+    # Prevent self-loops
     arc_preds = paddle.argmax(s_arc, axis=-1).numpy()
     bad = [not istree(seq[:i + 1]) for i, seq in zip(lens, arc_preds)]
     if tree and any(bad):
@@ -105,7 +105,8 @@ def backtrack(p_i, p_c, heads, i, j, complete):
 
 
 def stripe(x, n, w, offset=(0, 0), dim=1):
-    r'''Returns a diagonal stripe of the tensor.
+    """
+    Returns a diagonal stripe of the tensor.
 
     Args:
         x (Tensor): the input tensor with 2 or more dims.
@@ -128,7 +129,7 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
     >>> stripe(x, 2, 3, dim=0)
     tensor([[ 0,  5, 10],
             [ 6, 11, 16]])
-    '''
+    """
     if not x.flags['C_CONTIGUOUS']:
         x = np.ascontiguousarray(x)
     strides = x.strides
@@ -141,25 +142,20 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
 
 def flat_words(words, pad_index=0):
     mask = words != pad_index
-
     lens = paddle.sum(paddle.cast(mask, "int64"), axis=-1)
-
     position = paddle.cumsum(lens + paddle.cast((lens == 0), "int64"), axis=1) - 1
-
     select = paddle.nonzero(mask)
     words = paddle.gather_nd(words, select)
-
     lens = paddle.sum(lens, axis=-1)
-
     words = pad_sequence_paddle(words, lens, pad_index)
-
     max_len = words.shape[1]
     position = mask_fill(position, position >= max_len, max_len - 1)
     return words, position
 
 
 def index_sample(x, index):
-    """Select input value according to index
+    """
+    Select input value according to index
     
     Arags：
         input: input matrix
@@ -192,16 +188,15 @@ def index_sample(x, index):
         r_x = paddle.reshape(x, shape=[-1, x_s[-1]])
 
     index = paddle.reshape(index, shape=[len(r_x), -1, 1])
-    # generate arange index, shape like index
+    # Generate arange index, shape like index
     arr_index = paddle.arange(start=0, end=len(index), dtype=index.dtype)
     arr_index = paddle.unsqueeze(arr_index, axis=[1, 2])
     arr_index = paddle.expand(arr_index, index.shape)
-    #  genrate new index
+    # Genrate new index
     new_index = paddle.concat((arr_index, index), -1)
     new_index = paddle.reshape(new_index, (-1, 2))
-    # get output
+    # Get output
     out = paddle.gather_nd(r_x, new_index)
-    #out = paddle.reshape(out, x_s[:dim] + [-1])
     if len(x_s) == 3 and dim == 2:
         out = paddle.reshape(out, shape=[x_s[0], x_s[1], -1])
     else:
@@ -210,7 +205,8 @@ def index_sample(x, index):
 
 
 def mask_fill(input, mask, value):
-    """Fill value to input according to mask
+    """
+    Fill value to input according to mask
     
     Args:
         input: input matrix
@@ -240,7 +236,8 @@ def mask_fill(input, mask, value):
 
 
 def kmeans(x, k):
-    """kmeans algorithm, put sentence id into k buckets according to sentence length
+    """
+    kmeans algorithm, put sentence id into k buckets according to sentence length
     
     Args:
         x: list, sentence length
@@ -251,20 +248,20 @@ def kmeans(x, k):
         clusters: list(tuple), k clusters
     """
     x = np.array(x, dtype=np.float32)
-    # count the frequency of each datapoint
+    # Count the frequency of each datapoint
     d, indices, f = np.unique(x, return_inverse=True, return_counts=True)
-    # calculate the sum of the values of the same datapoints
+    # Calculate the sum of the values of the same datapoints
     total = d * f
-    # initialize k centroids randomly
+    # Initialize k centroids randomly
     c, old = d[np.random.permutation(len(d))[:k]], None
-    # assign labels to each datapoint based on centroids
+    # Assign labels to each datapoint based on centroids
     dists_abs = np.absolute(d[..., np.newaxis] - c)
     dists, y = dists_abs.min(axis=-1), dists_abs.argmin(axis=-1)
-    # the number of clusters must not be greater than that of datapoints
+    # The number of clusters must not be greater than that of datapoints
     k = min(len(d), k)
 
     while old is None or not np.equal(c, old).all():
-        # if an empty cluster is encountered,
+        # If an empty cluster is encountered,
         # choose the farthest datapoint from the biggest cluster
         # and move that the empty one
         for i in range(k):
@@ -276,17 +273,16 @@ def kmeans(x, k):
                 farthest = dists[biggest].argmax()
                 y[biggest[farthest]] = i
         mask = y == np.arange(k)[..., np.newaxis]
-        # update the centroids
+        # Update the centroids
         c, old = (total * mask).sum(-1) / (f * mask).sum(-1), c
-        # re-assign all datapoints to clusters
+        # Re-assign all datapoints to clusters
         dists_abs = np.absolute(d[..., np.newaxis] - c)
         dists, y = dists_abs.min(axis=-1), dists_abs.argmin(axis=-1)
-    # assign all datapoints to the new-generated clusters
-    # without considering the empty ones
+    # Assign all datapoints to the new-generated clusters without considering the empty ones
     y, assigned = y[indices], np.unique(y).tolist()
-    # get the centroids of the assigned clusters
+    # Get the centroids of the assigned clusters
     centroids = c[assigned].tolist()
-    # map all values of datapoints to buckets
+    # Map all values of datapoints to buckets
     clusters = [np.equal(y, i).nonzero()[0].tolist() for i in assigned]
 
     return centroids, clusters
@@ -306,17 +302,17 @@ def eisner(scores, mask):
     lens = mask.sum(1)
     batch_size, seq_len, _ = scores.shape
     scores = scores.transpose(2, 1, 0)
-    # score for incomplete span
+    # Score for incomplete span
     s_i = np.full_like(scores, float('-inf'))
-    # score for complete span
+    # Score for complete span
     s_c = np.full_like(scores, float('-inf'))
-    # incompelte span position for backtrack
+    # Incompelte span position for backtrack
     p_i = np.zeros((seq_len, seq_len, batch_size), dtype=np.int64)
-    # compelte span position for backtrack
+    # Compelte span position for backtrack
     p_c = np.zeros((seq_len, seq_len, batch_size), dtype=np.int64)
-    # set 0 to s_c.diagonal
+    # Set 0 to s_c.diagonal
     s_c = fill_diagonal(s_c, 0)
-    # contiguous
+    # Contiguous
     s_c = np.ascontiguousarray(s_c)
     s_i = np.ascontiguousarray(s_i)
     for w in range(1, seq_len):
@@ -324,7 +320,7 @@ def eisner(scores, mask):
         starts = np.arange(n, dtype=np.int64)[np.newaxis, :]
         # ilr = C(i->r) + C(j->r+1)
         ilr = stripe(s_c, n, w) + stripe(s_c, n, w, (w, 1))
-        # [batch_size, n, w]
+        # Shape: (batch_size, n, w)
         ilr = ilr.transpose(2, 0, 1)
         # scores.diagonal(-w).shape:[batch, n]
         il = ilr + scores.diagonal(-w)[..., np.newaxis]
@@ -365,8 +361,8 @@ def eisner(scores, mask):
     return pad_sequence(predicts, fix_len=seq_len)
 
 
-class NODE:
-    """NODE class"""
+class Node:
+    """Node class"""
     def __init__(self, id=None, parent=None):
         self.lefts = []
         self.rights = []
@@ -389,7 +385,7 @@ class DepTree:
 
     def build_tree(self):
         """Build the tree"""
-        self.nodes = [NODE(index, p_index) for index, p_index in enumerate(self.sentence)]
+        self.nodes = [Node(index, p_index) for index, p_index in enumerate(self.sentence)]
         # set root
         self.root = self.nodes[0]
         for node in self.nodes[1:]:

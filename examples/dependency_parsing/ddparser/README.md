@@ -32,7 +32,7 @@
 | ------------------------- | :-----: | :------:| :-------:| :-------:|
 | `baseline`                |  81.49  |  72.17  |  84.68   |  76.02   |
 | `biaffine-dep(+char)`     |  84.11  |  75.16  |  85.31   |  76.73   |
-| `biaffine-dep(+pos-tag)`  |  83.28  |  74.20  |  84.54   |  75.33   |
+| `biaffine-dep(+pos)`      |  83.28  |  74.20  |  84.54   |  75.33   |
 | `biaffine-dep-lstm-pe`    |  81.02  |  71.20  |  82.86   |  73.86   |
 | `biaffine-dep-ernie-tiny` |  89.02  |  81.39  |  89.31   |  81.51   |
 | `biaffine-dep-ernie-1.0`  |  92.25  |  84.77  |  92.12   |  84.62   |
@@ -44,7 +44,7 @@
 | ------------------------- | :-----: | :------:| :-------:| :-------:|
 | `baseline`                |  82.96  |  65.45  |  82.65   |  65.25   |
 | `biaffine-dep(+char)`     |  80.90  |  65.29  |  80.77   |  65.43   |
-| `biaffine-dep(+pos-tag)`  |  83.85  |  68.27  |  83.75   |  68.04   |
+| `biaffine-dep(+pos)`      |  83.85  |  68.27  |  83.75   |  68.04   |
 | `biaffine-dep-lstm-pe`    |  77.48  |  61.34  |  76.41   |  60.32   |
 | `biaffine-dep-ernie-tiny` |  84.21  |  68.89  |  83.98   |  68.67   |
 | `biaffine-dep-ernie-1.0`  |  89.24  |  74.12  |  88.64   |  74.09   |
@@ -177,6 +177,8 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
     --params_path=./model_file/best.pdparams \
     --infer_output_file=infer_output.conll 
 ```
+
+**NOTE**: 预测时的`encoding_model`和`feat`需要与训练时的参数保持一致。
 
 #### LSTMByWPEncoder+MLP+BiAffine
 

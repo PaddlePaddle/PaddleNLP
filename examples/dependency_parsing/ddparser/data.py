@@ -17,6 +17,7 @@ import math
 import numpy as np
 
 import paddle
+from paddle.io import Dataset
 import paddlenlp as ppnlp
 from paddlenlp.data import Vocab
 from utils import kmeans, pad_sequence
@@ -49,7 +50,7 @@ def build_vocab(corpus, tokenizer, encoding_model, feat):
     # Build word vocab and feature vocab
     if encoding_model == "lstm":
         # Using token_to_idx to specifies the mapping 
-        # relationship between tokens and 
+        # relationship between tokens and indices
         word_vocab = Vocab.build_vocab(
             word_examples, 
             min_freq=2, 
@@ -209,32 +210,42 @@ def create_dataloader(dataset,
             corpus_length=len(dataset),
         )
 
-    data_loader = paddle.io.DataLoader.from_generator(
-        capacity=10, 
-        return_list=True, 
-        use_multiprocess=True,
-    )       
+    # Subclass of `paddle.io.Dataset`
+    dataset = Batchify(dataset, batch_sampler)
 
-    data_loader.set_batch_generator(
-        generator_creator(dataset, batch_sampler))
-
+    # According to the api of `paddle.io.DataLoader` set `batch_size`
+    # and `batch_sampler` to `None` to disable batchify dataset automatically
+    data_loader = paddle.io.DataLoader(
+        dataset=dataset,
+        batch_sampler=None,
+        batch_size=None,
+        return_list=True
+        )
     return data_loader, buckets
 
 
-def generator_creator(dataset, batch_sampler):
-    def _collate_fn(batch):
-        """Return batch samples"""
-        return (raw for raw in zip(*batch))
-    def __reader():
+class Batchify(Dataset):
+    def __init__(self, dataset, batch_sampler):
+
+        self.batches = []
         for batch_sample_id in batch_sampler:
             batch = []
-            raw_batch = _collate_fn([dataset[sample_id] for sample_id in batch_sample_id])
+            raw_batch = self._collate_fn([dataset[sample_id] for sample_id in batch_sample_id])
             for data in raw_batch:
                 if isinstance(data[0], np.ndarray):
                     data = pad_sequence(data)
                 batch.append(data)
-            yield batch
-    return __reader
+            self.batches.append(batch)
+        
+    def __getitem__(self, idx):
+        return self.batches[idx]
+
+    def __len__(self):
+        return len(self.batches)
+
+    def _collate_fn(self, batch):
+        """Return batch samples"""
+        return (raw for raw in zip(*batch))   
 
 
 class BucketsSampler(object):
@@ -243,7 +254,7 @@ class BucketsSampler(object):
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.sizes, self.buckets = zip(*[(size, bucket) for size, bucket in buckets.items()])
-        # the number of chunks in each bucket, which is clipped by range [1, len(bucket)]
+        # The number of chunks in each bucket, which is clipped by range [1, len(bucket)]
         self.chunks = []
         for size, bucket in zip(self.sizes, self.buckets):
             max_ch = max(math.ceil(size * len(bucket) / batch_size), 1)
