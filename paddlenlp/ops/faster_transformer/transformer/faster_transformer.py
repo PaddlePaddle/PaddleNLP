@@ -504,12 +504,12 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             0]._config["nhead"]
         self._hidden_dims = self._model.unified_transformer.encoder.layers[
             0]._config["d_model"]
-        self.normalize_before = self._model.unified_transformer.encoder.layers[
+        self._normalize_before = self._model.unified_transformer.encoder.layers[
             0].normalize_before
         self._size_per_head = self._hidden_dims // self._n_head
         self._n_layer = self._model.unified_transformer.encoder.num_layers
         self._mask_id = self._model.unified_transformer.mask_token_id
-        self._hidden_act = self._model.unimo.config["hidden_act"]
+        self._hidden_act = self._model.unified_transformer.config["hidden_act"]
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
