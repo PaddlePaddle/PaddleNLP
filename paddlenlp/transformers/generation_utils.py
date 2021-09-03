@@ -334,6 +334,10 @@ class GenerationMixin(object):
             model_kwargs["position_ids"] = paddle.index_select(position_ids,
                                                                index)
 
+        if "seq_len" in model_kwargs:
+            seq_len = model_kwargs["seq_len"]
+            model_kwargs["seq_len"] = paddle.index_select(seq_len, index)
+
         return input_ids, model_kwargs
 
     @staticmethod

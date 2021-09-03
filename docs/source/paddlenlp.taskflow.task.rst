@@ -1,8 +1,7 @@
-iterator
+task
 ==============================
 
-.. automodule:: paddlenlp.data.iterator
+.. automodule:: paddlenlp.taskflow.task
    :members:
    :no-undoc-members:
    :show-inheritance:
-   :special-members: __call__

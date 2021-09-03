@@ -251,8 +251,10 @@ class BartDecoder(BartPretrainedModel):
                     dtype=paddle.get_default_dtype())),
                 1)
         decoder_inputs_embeds = self.embed_tokens(decoder_input_ids)
+        past_key_values_length = paddle.shape(cache[0][0].k)[
+            2] if cache is not None else 0
         decoder_inputs_embed_pos = self.decoder_embed_positions(
-            decoder_input_ids.shape)
+            decoder_input_ids.shape, past_key_values_length)
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         hidden_states = self.decoder_layernorm_embedding(hidden_states)
         decoder_input = self.decoder_dropout(hidden_states)
@@ -314,22 +316,37 @@ class BartModel(BartPretrainedModel):
                 decoder_input_ids=None,
                 decoder_attention_mask=None,
                 encoder_output=None,
+                use_cache=False,
                 cache=None):
         # different to other models, Bart automatically creates decoder_input_ids from
         # inputBartForSequenceClassification_ids if no decoder_input_ids are provided
+        if input_ids is None and encoder_output is None:
+            raise ValueError(
+                "You have to specify either input_ids or encoder_output")
+
         if decoder_input_ids is None:
+            assert input_ids is not None, "input_ids should be " \
+                                          "specified when generating decoder_input_ids"
             decoder_input_ids = shift_tokens_right(input_ids,
                                                    self.decoder_start_token_id)
         if encoder_output is None:
             encoder_output = self.encoder(input_ids, attention_mask)
 
-        memory_mask = paddle.cast(
-            input_ids == self.pad_token_id,
-            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
-        memory_mask.stop_gradient = True
+        if attention_mask is None:
+            assert input_ids is not None, "input_ids should be " \
+                                          "specified when generating attention_mask"
+            attention_mask = paddle.cast(
+                input_ids == self.pad_token_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+            attention_mask.stop_gradient = True
 
+        if use_cache:
+            if cache is None:
+                cache = self.decoder.decoder.gen_cache(encoder_output)
+        else:
+            cache = None
         decoder_output = self.decoder(decoder_input_ids, decoder_attention_mask,
-                                      encoder_output, memory_mask, cache)
+                                      encoder_output, attention_mask, cache)
 
         return decoder_output
 
@@ -371,16 +388,20 @@ class BartForSequenceClassification(BartPretrainedModel):
                 decoder_input_ids=None,
                 decoder_attention_mask=None,
                 encoder_output=None,
+                use_cache=False,
                 cache=None):
         output = self.bart(input_ids, attention_mask, decoder_input_ids,
-                           decoder_attention_mask, encoder_output, cache)
+                           decoder_attention_mask, encoder_output, use_cache,
+                           cache)
+        if use_cache:
+            output = output[0]
         eos_mask = paddle.cast(
             input_ids == self.bart.config['eos_token_id'], dtype='int64')
         if len(paddle.unique(paddle.sum(eos_mask, axis=1))) > 1:
             raise ValueError(
                 'All examples must have the same number of <eos> tokens.')
 
-        output_shape = paddle.shape(output if cache is None else output[0])
+        output_shape = paddle.shape(output)
         # TODO(gongenlei): support bool tensor index
         output = output.masked_select(
             eos_mask.unsqueeze(-1).astype('bool').tile(
@@ -404,10 +425,12 @@ class BartForQuestionAnswering(BartPretrainedModel):
                 decoder_input_ids=None,
                 decoder_attention_mask=None,
                 encoder_output=None,
+                use_cache=False,
                 cache=None):
         output = self.bart(input_ids, attention_mask, decoder_input_ids,
-                           decoder_attention_mask, encoder_output, cache)
-        logits = self.classifier(output if cache is None else output[0])
+                           decoder_attention_mask, encoder_output, use_cache,
+                           cache)
+        logits = self.classifier(output[0] if use_cache else output, )
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
         return start_logits, end_logits
@@ -433,11 +456,13 @@ class BartForConditionalGeneration(BartPretrainedModel):
                 decoder_input_ids=None,
                 decoder_attention_mask=None,
                 encoder_output=None,
+                use_cache=False,
                 cache=None):
         output = self.bart(input_ids, attention_mask, decoder_input_ids,
-                           decoder_attention_mask, encoder_output, cache)
+                           decoder_attention_mask, encoder_output, use_cache,
+                           cache)
         lm_logits = paddle.tensor.matmul(
-            output if cache is None else output[0],
+            output[0] if use_cache else output,
             self.lm_head_weight,
             transpose_y=True) + self.final_logits_bias
 
