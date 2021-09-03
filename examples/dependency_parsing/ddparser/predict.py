@@ -38,7 +38,6 @@ parser.add_argument("--batch_size", type=int, default=1000, help="Numbers of exa
 parser.add_argument("--infer_output_file", type=str, default='infer_output.conll', help="The path to save infer results.")
 # Preprocess
 parser.add_argument("--n_buckets", type=int, default=15, help="Number of buckets to devide the dataset.")
-parser.add_argument("--fix_len", type=int, default=20, help="The fixed length to pad the sequence")
 # Postprocess
 parser.add_argument("--tree", type=bool, default=True, help="Ensure the output conforms to the tree structure.")
 # Lstm

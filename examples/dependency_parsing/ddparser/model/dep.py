@@ -64,12 +64,12 @@ class BiAffineParser(nn.Layer):
         rel_h = self.mlp_rel_h(x)
         rel_d = self.mlp_rel_d(x)
 
-        # get arc and rel scores from the bilinear attention
-        # [batch_size, seq_len, seq_len]
+        # Get arc and rel scores from the bilinear attention
+        # Shape: (batch_size, seq_len, seq_len)
         s_arc = self.arc_attn(arc_d, arc_h)
-        # [batch_size, seq_len, seq_len, n_rels]
+        # Shape: (batch_size, seq_len, seq_len, n_rels)
         s_rel = paddle.transpose(self.rel_attn(rel_d, rel_h), perm=[0, 2, 3, 1])
-        # set the scores that exceed the length of each sentence to -1e5
+        # Set the scores that exceed the length of each sentence to -1e5
         s_arc_mask = paddle.unsqueeze(mask, 1)
         s_arc = s_arc * s_arc_mask + paddle.scale(
             paddle.cast(s_arc_mask, 'int32'), scale=1e5, bias=-1, bias_after_scale=False)
@@ -136,7 +136,7 @@ class BiAffine(nn.Layer):
         
         # Shape: (batch_size, output_size, num_tokens, num_tokens)
         s = paddle.matmul(paddle.matmul(x, weight), paddle.transpose(y, perm=[0, 1, 3, 2]))
-        # remove dim 1 if n_out == 1
+        # Remove dim 1 if n_out == 1
         if s.shape[1] == 1:
             s = paddle.squeeze(s, axis=1)
-        return s 
+        return s     

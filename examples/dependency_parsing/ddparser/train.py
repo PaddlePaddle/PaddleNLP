@@ -46,7 +46,6 @@ parser.add_argument("--ernie_lr", type=float, default=5e-05, help="The Learning 
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
 # Preprocess
 parser.add_argument("--n_buckets", type=int, default=15, help="Number of buckets to devide the dataset.")
-parser.add_argument("--fix_len", type=int, default=20, help="The fixed length to pad the sequence")
 # Postprocess
 parser.add_argument("--tree", type=bool, default=True, help="Ensure the output conforms to the tree structure.")
 # Lstm
@@ -161,13 +160,15 @@ def do_train(args):
         word_eos_index = word_vocab.to_indices("[SEP]")
 
     n_rels, n_words = len(rel_vocab), len(word_vocab)
+    
     trans_fn = partial(
         convert_example, 
         vocabs=vocabs, 
         encoding_model=args.encoding_model,
         feat=args.feat,
     )
-    train_data_loader, buckets = create_dataloader(
+
+    train_data_loader, _ = create_dataloader(
         train_ds,
         batch_size=args.batch_size,
         mode="train",
