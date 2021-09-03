@@ -17,13 +17,10 @@ import copy
 import os
 import itertools
 
-import LAC
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.font_manager as font_manager
 import paddle
 from ..data import Vocab, Pad
-from .utils import download_file, static_mode_guard, dygraph_mode_guard
+from .utils import download_file, dygraph_mode_guard
 from .task import Task
 from .models import BiAffineParser
 
@@ -135,9 +132,13 @@ class DDParserTask(Task):
         self.use_pos = use_pos
         self.batch_size = batch_size
         self.return_visual = return_visual
+        from LAC import LAC
+        import matplotlib.pyplot as plt
+        import matplotlib.font_manager as font_manager
+        self.plt = plt
         self.font = font_manager.FontProperties(fname=font_file_path)
         self.use_cuda = use_cuda
-        self.lac = LAC.LAC(mode="lac" if self.use_pos else "seg", use_cuda=self.use_cuda)
+        self.lac = LAC(mode="lac" if self.use_pos else "seg", use_cuda=self.use_cuda)
         if self.static_mode:
             self._get_inference_model()
         else:
@@ -339,12 +340,12 @@ class DDParserTask(Task):
         nodes = ['ROOT'] + word
         x = list(range(len(nodes)))
         y = [0] * (len(nodes))
-        fig, ax = plt.subplots()
+        fig, ax = self.plt.subplots()
         # Control the picture size
         max_span = max([abs(i + 1 - j) for i, j in enumerate(head)])
         fig.set_size_inches((len(nodes), max_span / 2))
         # Set the points
-        plt.scatter(x, y, c='w')
+        self.plt.scatter(x, y, c='w')
 
         for i in range(len(nodes)):
             txt = nodes[i]
@@ -395,8 +396,8 @@ class DDParserTask(Task):
                     textcoords='data')
 
         # Control the axis
-        plt.axis('equal')
-        plt.axis('off')
+        self.plt.axis('equal')
+        self.plt.axis('off')
 
         # Save to numpy array
         fig.canvas.draw()
