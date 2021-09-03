@@ -20,11 +20,12 @@ import paddle.nn as nn
 import paddle.tensor as tensor
 from paddle.nn import Embedding
 from .. import PretrainedModel, register_base_model
+from paddle.nn.layer.transformer import _convert_attention_mask
 
 __all__ = [
     'BlenderbotSmallModel', 'BlenderbotSmallPretrainedModel',
     'BlenderbotSmallEncoder', 'BlenderbotSmallDecoder',
-    'BlenderbotSmallForConditionalGeneration'
+    'BlenderbotSmallForConditionalGeneration', 'BlenderbotSmallForCausalLM'
 ]
 
 
@@ -128,11 +129,147 @@ class BlenderbotSmallPretrainedModel(PretrainedModel):
                         shape=layer.weight.shape))
 
 
+class BlenderbotSmallDecoderLayer(nn.TransformerDecoderLayer):
+    """
+    Construct decoder layer for BlenderbotSmallDecoder.
+    Please refer to :class:`~paddlenlp.nn.TransformerDecoderLayer` for more details.
+    """
+
+    def __init__(self,
+                 d_model,
+                 nhead,
+                 dim_feedforward,
+                 dropout=0.1,
+                 activation="gelu",
+                 attn_dropout=None,
+                 act_dropout=None,
+                 normalize_before=True,
+                 weight_attr=None,
+                 bias_attr=None):
+        super(BlenderbotSmallDecoderLayer, self).__init__(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            activation=activation,
+            attn_dropout=attn_dropout,
+            act_dropout=act_dropout,
+            normalize_before=normalize_before,
+            weight_attr=weight_attr,
+            bias_attr=bias_attr)
+
+    def forward(self,
+                tgt,
+                memory=None,
+                tgt_mask=None,
+                memory_mask=None,
+                cache=None):
+        """
+        Please refer to  :class:`~paddlenlp.nn.TransformerDecoderLayer`
+        for more information regarding arguments.
+        """
+        tgt_mask = _convert_attention_mask(tgt_mask, tgt.dtype)
+        residual = tgt
+        if self.normalize_before:
+            tgt = self.norm1(tgt)
+        if cache is None:
+            tgt = self.self_attn(
+                query=tgt, key=tgt, value=tgt, attn_mask=tgt_mask, cache=None)
+        else:
+            tgt, incremental_cache = self.self_attn(
+                query=tgt,
+                key=tgt,
+                value=tgt,
+                attn_mask=tgt_mask,
+                cache=cache[0])
+        tgt = residual + self.dropout1(tgt)
+        if not self.normalize_before:
+            tgt = self.norm1(tgt)
+
+        # Cross-attention will not be applied for BlenderbotSmallForCausalLM
+        if memory is not None:
+            residual = tgt
+            if self.normalize_before:
+                tgt = self.norm2(tgt)
+            memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
+            if cache is None:
+                tgt = self.cross_attn(
+                    query=tgt,
+                    key=memory,
+                    value=memory,
+                    attn_mask=memory_mask,
+                    cache=None)
+            else:
+                tgt, static_cache = self.cross_attn(
+                    query=tgt,
+                    key=memory,
+                    value=memory,
+                    attn_mask=memory_mask,
+                    cache=cache[1])
+            tgt = residual + self.dropout2(tgt)
+            if not self.normalize_before:
+                tgt = self.norm2(tgt)
+        else:
+            static_cache = cache[1] if cache is not None else None
+
+        residual = tgt
+        if self.normalize_before:
+            tgt = self.norm3(tgt)
+        tgt = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
+        tgt = residual + self.dropout3(tgt)
+        if not self.normalize_before:
+            tgt = self.norm3(tgt)
+        return tgt if cache is None else (tgt, (incremental_cache,
+                                                static_cache))
+
+
+class TransformerDecoder(nn.TransformerDecoder):
+    """
+    Construct Transformer decoder for BlenderbotSmallDecoder.
+    """
+
+    def __init__(self, decoder_layer, num_layers, norm=None):
+        super(TransformerDecoder, self).__init__(
+            decoder_layer=decoder_layer, num_layers=num_layers, norm=norm)
+
+    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, cache=None):
+        """
+        Please refer to  :class:`~paddlenlp.nn.TransformerDecoder`
+        for more information regarding arguments and methods.
+        """
+
+        tgt_mask = _convert_attention_mask(tgt_mask, tgt.dtype)
+        if memory is not None:
+            memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
+
+        output = tgt
+        new_caches = []
+        for i, mod in enumerate(self.layers):
+            if cache is None:
+                output = mod(output,
+                             memory,
+                             tgt_mask=tgt_mask,
+                             memory_mask=memory_mask,
+                             cache=None)
+            else:
+                output, new_cache = mod(output,
+                                        memory,
+                                        tgt_mask=tgt_mask,
+                                        memory_mask=memory_mask,
+                                        cache=cache[i])
+                new_caches.append(new_cache)
+
+        if self.norm is not None:
+            output = self.norm(output)
+
+        return output if cache is None else (output, new_caches)
+
+
 class BlenderbotSmallEncoder(BlenderbotSmallPretrainedModel):
     """
     The encoder of BlenderbotSmall Model.
     Please refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` or
-    :class:`~paddlenlp.transformers.Blenderbot.BlenderbotSmallModel` for more information
+    :class:`~paddlenlp.transformers.Blenderbot.BlenderbotSmallModel` for more details
     regarding methods and arguments.
     """
 
@@ -246,7 +383,7 @@ class BlenderbotSmallDecoder(BlenderbotSmallPretrainedModel):
             normalized_shape=d_model)
         self.embed_scale = math.sqrt(d_model) if scale_embedding else 1.0
 
-        decoder_layer = nn.TransformerDecoderLayer(
+        decoder_layer = BlenderbotSmallDecoderLayer(
             d_model=d_model,
             nhead=decoder_attention_heads,
             dim_feedforward=decoder_ffn_dim,
@@ -255,7 +392,7 @@ class BlenderbotSmallDecoder(BlenderbotSmallPretrainedModel):
             attn_dropout=attention_dropout,
             act_dropout=activation_dropout,
             normalize_before=normalize_before)
-        self.decoder = nn.TransformerDecoder(
+        self.decoder = TransformerDecoder(
             decoder_layer=decoder_layer, num_layers=num_decoder_layers)
         self.apply(self.init_weights)
 
@@ -289,7 +426,7 @@ class BlenderbotSmallDecoder(BlenderbotSmallPretrainedModel):
         decoder_inputs_embeds = self.embed_tokens(
             decoder_input_ids) * self.embed_scale
         # cache[num_layer][0] is an instance of `MultiHeadAttention.Cache` containing
-        # k and v with shape of `[batch_size, num_heads, len_seq, embed_dim // num_heads]`
+        # tensor k and v with shape of `[batch_size, num_heads, len_seq, embed_dim // num_heads]`
         # ``len_seq`` refer to the length of ``decoder_input_ids``
         # Refer to paddle.nn.MultiHeadAttention.gen_cache for more details regarding cache.
         past_key_values_length = cache[0][0].k.shape[
@@ -318,7 +455,7 @@ class BlenderbotSmallDecoder(BlenderbotSmallPretrainedModel):
 @register_base_model
 class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
     r"""
-     Construct a bare Blenderbot Model.
+     Construct a bare BlenderbotSmall Model.
 
      This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
      Check the superclass documentation for the generic methods and the library implements for all its model.
@@ -486,7 +623,7 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
 
             encoder_output (Tensor, optional):
                 The output of encoder. If not provided, a new ``encoder_output`` will be generated
-                from BlenderbotEncoder. Defaults to ``None``.
+                from BlenderbotSmallEncoder. Defaults to ``None``.
 
             use_cache (bool, optional):
                 Indicates whether to use cache to speed up decoding. Defaults to ``False``
@@ -523,7 +660,7 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
         if encoder_output is None:
             encoder_output = self.encoder(
                 input_ids=input_ids, attention_mask=attention_mask)
-            # initialize cache based on encoder output for decoding at 1st time step.
+            # initialize cache for decoding ONLY at 1st time step.
             if use_cache and cache is None:
                 cache = self.decoder.decoder.gen_cache(memory=encoder_output)
 
@@ -548,8 +685,8 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
 
 class BlenderbotSmallForConditionalGeneration(BlenderbotSmallPretrainedModel):
     """
-    Please refer to :class:`~paddlenlp.transformers.Blenderbot.BlenderbotModel` for more
-    information regarding arguments.
+    Please refer to :class:`~paddlenlp.transformers.BlenderbotSmall.BlenderbotSmallModel`
+    for more information regarding arguments.
     Return:
         Tensor|tuple: If ``use_cache=False``, the return will be a tensor with shape of
             [batch_size, seq_lens, hidden_size]. Otherwise, the return will be a tuple
@@ -568,11 +705,11 @@ class BlenderbotSmallForConditionalGeneration(BlenderbotSmallPretrainedModel):
             inputs = tokenizer(sample_text, return_attention_mask=True, return_token_type_ids=False)
             inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
             outputs = model(**inputs, use_cache=True)
-            # outputs is a tuple of (lm_logits, cache) if ``use_cache=True``.
+            # outputs will be a tuple of (lm_logits, cache) if ``use_cache=True``.
     """
 
     def __init__(self, blenderbot_small):
-        super().__init__()
+        super(BlenderbotSmallForConditionalGeneration, self).__init__()
         self.eos_token_id = blenderbot_small.eos_token_id
         self.bos_token_id = blenderbot_small.bos_token_id
         self.pad_token_id = blenderbot_small.pad_token_id
@@ -632,6 +769,132 @@ class BlenderbotSmallForConditionalGeneration(BlenderbotSmallPretrainedModel):
             None,  # during prediction, Encoder_output is provided, do not need input_ids.
             "decoder_input_ids": decoder_input_ids,
             "encoder_output": encoder_output,
+            "attention_mask": attention_mask,
+            "use_cache": use_cache,
+            "cache": cache
+        }
+
+
+class BlenderbotSmallForCausalLM(BlenderbotSmallPretrainedModel):
+    """
+    Constructs BLenderbotSmall For Causal Language Model. This model is equivalent to the
+    blenderbotSmall decoder without cross-attention.
+    """
+
+    def __init__(self, blenderbot_small):
+        super().__init__()
+        self.blenderbot_small = blenderbot_small
+        self.decoder = blenderbot_small.decoder
+
+        self.lm_head_weight = self.create_parameter(
+            shape=[
+                blenderbot_small.config['vocab_size'],
+                blenderbot_small.config['d_model']
+            ],
+            dtype=blenderbot_small.shared.weight.dtype,
+            is_bias=False)
+        self.register_buffer(
+            "final_logits_bias",
+            paddle.zeros(
+                (1, blenderbot_small.config['vocab_size']),
+                dtype=paddle.get_default_dtype()))
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids=None,
+                attention_mask=None,
+                use_cache=False,
+                cache=None,
+                **kwargs):
+        """
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+
+            attention_mask (Tensor, optional):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set
+                to **-infinity** for any positions in the mask that are **0**, and will be
+                **unchanged** for positions that are **1**.
+
+                - **1** for tokens that are **not masked**,
+                - **0** for tokens that are **masked**.
+
+                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+                Defaults to `None`.
+
+            use_cache (bool, optional):
+                Indicates whether to use cache to speed up decoding. Defaults to ``False``
+
+            cache (list, optional): It is a list, and each element in the list
+                is a tuple( :code:`(incremental_cache, static_cache)` ). See
+                `paddle.nn.TransformerDecoder.gen_cache` for more details. It is only
+                used for inference and should be None for training. Default None.
+        Return:
+            Tensor|tuple: If ``use_cache=False``, the return will be a tensor with shape of
+                [batch_size, seq_lens, hidden_size]. Otherwise, the return will be a tuple
+                of ``(lm_logits, cache)``.
+        Example:
+            .. code-block::
+
+            import paddle
+            from paddlenlp.transformers import BlenderbotSmallTokenizer, BlenderbotSmallForCausalLM
+            use_cache = False
+            text = "My friends are cool but they eat too many carbs."
+            model_name = "blenderbot_small-90M"
+            tokenizer = BlenderbotSmallTokenizer.from_pretrained(model_name)
+            model = BlenderbotSmallForCausalLM.from_pretrained(model_name)
+            model.eval()
+            inputs = tokenizer(text, return_attention_mask=True, return_token_type_ids=False)
+            inputs = {k: paddle.to_tensor([v]) for (k, v) in inputs.items()}
+
+            with paddle.no_grad():
+                outputs = model(**inputs, use_cache=use_cache)
+                # outputs is a tuple of (lm_logits, cache) if ``use_cache=True``.
+
+        """
+        if use_cache and cache is None:
+            # Generating incremental cache. A random tensor with shape of
+            # (batch_size, len_seq, hidden_size) is passed for memory argument.
+            # since the `static_cache` will not be used in BlenderbotSmallForCausalLM
+            batch_size, len_seq = input_ids.shape
+            cache = self.decoder.decoder.gen_cache(memory=paddle.zeros(
+                (batch_size, len_seq, self.blenderbot_small.config['d_model'])))
+        decoder_outputs = self.decoder(
+            decoder_input_ids=input_ids,
+            encoder_output=None,
+            memory_mask=None,
+            use_cache=use_cache,
+            cache=cache)
+
+        lm_logits = paddle.tensor.matmul(
+            decoder_outputs[0] if use_cache else decoder_outputs,
+            self.lm_head_weight,
+            transpose_y=True) + self.final_logits_bias
+
+        if use_cache:
+            cache = decoder_outputs[1]
+            return lm_logits, cache
+        return lm_logits
+
+    def prepare_inputs_for_generation(self,
+                                      input_ids,
+                                      attention_mask=None,
+                                      use_cache=True,
+                                      cache=None,
+                                      **kwargs):
+        """
+        Prepare inputs for decoder to generate sentences.
+        Return:
+            dict: A dictionary containing necessary inputs for generating next token.
+        """
+        if cache is not None:
+            input_ids = input_ids[:, -1:].unsqueeze(-1)
+
+        return {
+            "input_ids": input_ids,
             "attention_mask": attention_mask,
             "use_cache": use_cache,
             "cache": cache
