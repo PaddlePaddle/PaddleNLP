@@ -194,7 +194,7 @@ def evaluation(model, data_loader, args, tokenizer):
     start_time = time.time()
     for step, inputs in enumerate(data_loader, 1):
         input_ids, token_type_ids, position_ids, attention_mask = inputs
-        output = model.generate(
+        ids, scores = model.generate(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
@@ -219,7 +219,6 @@ def evaluation(model, data_loader, args, tokenizer):
 
         results = select_sum(ids, scores, tokenizer, args.max_dec_len,
                              args.num_return_sequences)
-
         pred_ref.extend(results)
         start_time = time.time()
 
