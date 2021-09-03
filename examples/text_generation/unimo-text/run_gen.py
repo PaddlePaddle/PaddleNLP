@@ -55,9 +55,6 @@ def parse_args():
     parser.add_argument('--output_path', type=str, default='./predict.txt', help='The file path where the infer result will be saved.')
     parser.add_argument("--do_train", action='store_true', help="Whether to train the model.")
     parser.add_argument("--do_predict", action='store_true', help="Whether to eval and predict.")
-    parser.add_argument('--faster', action='store_true', help='Whether to process inference using faster transformer. ')
-    parser.add_argument('--use_fp16_decoding', action='store_true', help='Whether to use fp16 when using faster transformer. Only works when using faster transformer. ')
-    parser.add_argument('--decoding_lib', type=str, default='../../../paddlenlp/ops/build/lib/libdecoding_op.so', help='The decoding lib of faster transformer. ')
 
     args = parser.parse_args()
     return args
@@ -117,10 +114,6 @@ def run(args):
                                                      'train')
     dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args,
                                                  'test')
-
-    if not args.do_predict and args.faster:
-        raise ValueError(
-            "FasterTransformer only works when do_predict is set. ")
 
     if args.do_train:
         num_training_steps = args.epochs * len(train_data_loader)
@@ -194,26 +187,18 @@ def run(args):
 
 @paddle.no_grad()
 def evaluation(model, data_loader, args, tokenizer):
-    if args.faster:
-        model = FasterUnimo(
-            model,
-            decoding_strategy=args.decode_strategy,
-            decoding_lib=args.decoding_lib,
-            use_fp16_decoding=args.use_fp16_decoding)
-
     print('\nEval begin...')
     model.eval()
     pred_ref = []
     total_time = 0.0
     start_time = time.time()
     for step, inputs in enumerate(data_loader, 1):
-        input_ids, token_type_ids, position_ids, attention_mask, seq_len = inputs
+        input_ids, token_type_ids, position_ids, attention_mask = inputs
         output = model.generate(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
-            seq_len=seq_len,
             max_length=args.max_dec_len,
             min_length=args.min_dec_len,
             decode_strategy=args.decode_strategy,
@@ -232,13 +217,8 @@ def evaluation(model, data_loader, args, tokenizer):
                   (step, total_time / args.logging_steps))
             total_time = 0.0
 
-        if args.faster:
-            ids = output
-            results = select_sum(ids, None, tokenizer)
-        else:
-            ids, scores = output
-            results = select_sum(ids, scores, tokenizer, args.max_dec_len,
-                                 args.num_return_sequences)
+        results = select_sum(ids, scores, tokenizer, args.max_dec_len,
+                             args.num_return_sequences)
 
         pred_ref.extend(results)
         start_time = time.time()
