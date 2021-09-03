@@ -33,29 +33,30 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
     tokenize as subwords.
     
     Args:
-        vocab_file (`str`):
+        vocab_file (str):
             File containing the vocabulary.
-        do_lower_case (`bool`, optional):
+        do_lower_case (bool, optional):
             Whether or not to lowercase the input when tokenizing. Defaults to `True`
-        do_basic_tokenize (`bool`, optional):
+        do_basic_tokenize (bool, optional):
             Whether or not to do basic tokenization before WordPiece. Defaults to `True`
-        unk_token (`str`, optional):
+        unk_token (str, optional):
             The unknown token. A token that is not in the vocabulary cannot be converted to an ID and is set to be this
             token instead. Defaults to `"[UNK]"`
-        sep_token (`str`, optional):
+        sep_token (str, optional):
             The separator token, which is used when building a sequence from multiple sequences, e.g. two sequences for
             sequence classification or for a text and a question for question answering. It is also used as the last
             token of a sequence built with special tokens. Defaults to `"[SEP]"`
-        pad_token (`str`, optional):
+        pad_token (str, optional):
             The token used for padding, for example when batching sequences of different lengths. Defaults to `"[PAD]"`
-        cls_token_template (`str`, optional)
-            The template of summary token for multiple summary placeholders. Defauts to `"[CLS{}]"`
-        cls_num (`int`, optional):
+        cls_token_template (str, optional)
+            The template of summary token for multiple summary placeholders. Defaults to `"[CLS{}]"`
+        cls_num (int, optional):
             Summary placeholder used in ernie-ctm model. For catching a sentence global feature from multiple aware.
-            Defaults to 1
+            Defaults to 1.
         mask_token (`str`, optional):
-            The token used for masking values. This is the token used when training this model with masked language
-            modeling. This is the token which the model will try to predict. Defaults to `"[MASK]"`
+            A special token representing a masked token. This is the token used in the masked
+            language modeling task. This is the token which the model will try to predict the original unmasked ones.
+            Defaults to `"[MASK]"`.
         strip_accents: (`bool`, optional):
             Whether or not to strip all accents. If this option is not specified, then it will be determined by the
             value for `lowercase` (as in the original BERT).
@@ -260,6 +261,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         Args:
             text (str):
                 The text to be tokenized.
+
         Returns:
             List(str): A list of string representing converted tokens.
         """

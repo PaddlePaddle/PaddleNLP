@@ -216,7 +216,6 @@ class ErnieModel(ErniePretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-
         vocab_size (int):
             Vocabulary size of `inputs_ids` in `ErnieModel`. Also is the vocab size of token embedding matrix.
             Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `ErnieModel`.
