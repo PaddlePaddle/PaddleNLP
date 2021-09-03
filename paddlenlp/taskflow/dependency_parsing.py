@@ -97,6 +97,7 @@ class DDParserTask(Task):
                  tree=True,
                  prob=False,
                  use_pos=False,
+                 use_cuda=False,
                  batch_size=1,
                  return_visual=False,
                  **kwargs):
@@ -135,7 +136,8 @@ class DDParserTask(Task):
         self.batch_size = batch_size
         self.return_visual = return_visual
         self.font = font_manager.FontProperties(fname=font_file_path)
-        self.lac = LAC.LAC(mode="lac" if self.use_pos else "seg", use_cuda=False)
+        self.use_cuda = use_cuda
+        self.lac = LAC.LAC(mode="lac" if self.use_pos else "seg", use_cuda=self.use_cuda)
         if self.static_mode:
             self._get_inference_model()
         else:
