@@ -281,7 +281,7 @@ class GenerationMixin(object):
         if bos_token_id is None:
             raise ValueError("`bos_token_id` should be defined when no "
                              "`input_ids` are provided.")
-        return paddle.ones([1, 1]) * bos_token_id
+        return paddle.ones([1, 1], dtype="int64") * bos_token_id
 
     @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id,
@@ -341,7 +341,9 @@ class GenerationMixin(object):
         return input_ids, model_kwargs
 
     @staticmethod
-    def update_model_kwargs_for_generation(outputs, model_kwargs):
+    def update_model_kwargs_for_generation(outputs,
+                                           model_kwargs,
+                                           is_encoder_decoder=False):
         # Update the model inputs during generation. 
         # Note that If `token_type_ids` and `attention_mask` in `model_kwargs` 
         # and they contain pad value, the result vectors updated by this method 
@@ -366,7 +368,7 @@ class GenerationMixin(object):
                 axis=-1)
 
         # update attention_mask
-        if "attention_mask" in model_kwargs:
+        if not is_encoder_decoder and "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
             # nn.Pad2D don't support the data type `bool`
             if convert_dtype(attention_mask.dtype) == 'bool':
@@ -394,6 +396,22 @@ class GenerationMixin(object):
         unfinished_scores = (scores * length + next_scores) / (length + 1)
         scores = paddle.where(unfinished_flag, unfinished_scores, scores)
         return scores
+
+    def prepare_encoder_decoder_kwargs_for_generation(self, input_ids,
+                                                      model_kwargs):
+        if "encoder_output" not in model_kwargs:
+            # retrieve encoder hidden states
+            encoder = self.get_encoder()
+            encoder_kwargs = {
+                argument: value
+                for argument, value in model_kwargs.items()
+                if not (argument.startswith("decoder_") or argument.startswith(
+                    "cross_attn"))
+            }
+
+            model_kwargs["encoder_output"] = encoder(input_ids,
+                                                     **encoder_kwargs)
+        return model_kwargs
 
     def prepare_inputs_for_generation(self, input_ids, **kwargs):
         # Implement in subclasses for custom behavior to prepare inputs in the
@@ -590,13 +608,21 @@ class GenerationMixin(object):
             model_kwargs[
                 "attention_mask"] = self.prepare_attention_mask_for_generation(
                     input_ids, pad_token_id, eos_token_id)
+        self.is_encoder_decoder = hasattr(self, 'encoder') and hasattr(
+            self, 'decoder')
+        if self.is_encoder_decoder:
+            model_kwargs = self.prepare_encoder_decoder_kwargs_for_generation(
+                input_ids, model_kwargs)
+            # set input_ids as decoder_input_ids
+            if "decoder_input_ids" in model_kwargs:
+                input_ids = model_kwargs.pop("decoder_input_ids")
+            else:
+                input_ids = self.prepare_input_ids_for_generation(bos_token_id)
 
         if pad_token_id is None and eos_token_id is not None:
             print("Setting `pad_token_id` to `eos_token_id`:{} for "
                   "open-end generation.".format(eos_token_id))
             pad_token_id = eos_token_id
-
-        # TODO Add relevant processing for encoder_decoder model.
 
         model_kwargs["use_cache"] = use_cache
         max_length += input_ids.shape[-1]
@@ -671,7 +697,6 @@ class GenerationMixin(object):
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
-
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
             logits = logits_processors(input_ids, logits)
@@ -700,8 +725,10 @@ class GenerationMixin(object):
             if not paddle.any(unfinished_flag):
                 break
 
-            model_kwargs = self.update_model_kwargs_for_generation(outputs,
-                                                                   model_kwargs)
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs,
+                model_kwargs,
+                is_encoder_decoder=self.is_encoder_decoder)
         return input_ids[:, origin_len:], scores
 
     def sample(self,
@@ -801,8 +828,10 @@ class GenerationMixin(object):
             # Stop when there is a </s> in all sentences
             if not paddle.any(unfinished_flag):
                 break
-            model_kwargs = self.update_model_kwargs_for_generation(outputs,
-                                                                   model_kwargs)
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs,
+                model_kwargs,
+                is_encoder_decoder=self.is_encoder_decoder)
         return input_ids[:, origin_len:], scores
 
     def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
@@ -876,8 +905,10 @@ class GenerationMixin(object):
 
             if beam_scorer.is_done:
                 break
-            model_kwargs = self.update_model_kwargs_for_generation(outputs,
-                                                                   model_kwargs)
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs,
+                model_kwargs,
+                is_encoder_decoder=self.is_encoder_decoder)
             if model_kwargs["cache"] is not None:
                 # reorder the cache
                 model_kwargs["cache"] = map_structure(
