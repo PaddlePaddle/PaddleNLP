@@ -132,9 +132,14 @@ class DDParserTask(Task):
         self.use_pos = use_pos
         self.batch_size = batch_size
         self.return_visual = return_visual
-        from LAC import LAC
-        import matplotlib.pyplot as plt
-        import matplotlib.font_manager as font_manager
+
+        try:
+            from LAC import LAC
+            import matplotlib.pyplot as plt
+            import matplotlib.font_manager as font_manager
+        except:
+            raise ImportError("Please install the dependent modules first!")
+
         self.plt = plt
         self.font = font_manager.FontProperties(fname=font_file_path)
         self.use_cuda = use_cuda
