@@ -845,7 +845,8 @@ class InferTransformerModel(TransformerModel):
             Default to False if not set.
 
             - `alpha(float, optional)`: The power number in length penalty
-            calculation. Only works in `v2` temporarily. Default to 0.6 if not set.
+            calculation. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
+            Only works in `v2` temporarily. Default to 0.6 if not set.
     """
 
     def __init__(self,

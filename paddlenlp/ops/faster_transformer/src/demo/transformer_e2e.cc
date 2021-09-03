@@ -214,6 +214,10 @@ void Main(int batch_size, int gpu_id) {
 
   config.SwitchUseFeedFetchOps(false);
   config.SwitchSpecifyInputNames(true);
+  // When using fp16, fc_elementwise_layernorm_fuse_pass causes a little
+  // different translation results with original dygraph prediction, maybe you
+  // can turn off the IR optimization for same results as following:
+  // config.SwitchIrOptim(false);
   auto predictor = CreatePredictor(config);
   DataReader reader(data_dir);
   reader.GetWordDict();
