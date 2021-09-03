@@ -146,7 +146,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
 
     def _convert_id_to_token(self, index):
         """Converts an index (integer) to a token (str) using the vocab."""
-        return self.sp_model.IdToPiece(index)
+        return self.sp.IdToPiece(index)
 
     def convert_tokens_to_ids(self, tokens):
         if not isinstance(tokens, (list, tuple)):
@@ -269,6 +269,10 @@ class GPTTokenizer(PretrainedTokenizer):
         self.set_special_tokens(special_tokens)
 
     def __len__(self):
+        return len(self.encoder) + len(self.special_tokens)
+
+    @property
+    def vocab_size(self):
         return len(self.encoder) + len(self.special_tokens)
 
     def set_special_tokens(self, special_tokens):

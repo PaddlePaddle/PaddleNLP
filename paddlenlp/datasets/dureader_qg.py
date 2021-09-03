@@ -62,7 +62,7 @@ class DuReaderQG(DatasetBuilder):
 
                 yield {
                     'source': json_data["context"],
-                    'target': json_data["question"],
+                    'target': json_data.get("question", ''),
                     'title': title,
                     'id': json_data['id']
                 }
