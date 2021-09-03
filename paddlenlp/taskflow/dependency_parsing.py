@@ -138,7 +138,7 @@ class DDParserTask(Task):
             import matplotlib.pyplot as plt
             import matplotlib.font_manager as font_manager
         except:
-            raise ImportError("Please install the dependent modules first!")
+            raise ImportError("Please install the dependencies first!")
 
         self.plt = plt
         self.font = font_manager.FontProperties(fname=font_file_path)
