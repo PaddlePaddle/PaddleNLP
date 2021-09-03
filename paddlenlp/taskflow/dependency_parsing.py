@@ -30,20 +30,20 @@ from .models import BiAffineParser
 URLS = {
     "ddparser": [
         "https://paddlenlp.bj.bcebos.com/taskflow/dependency_parsing/ddparser/ddparser.tar.gz", 
-        None
+        "bcb79081d9e6f46c3dbc0dbfcce445ec",
     ], 
     "ddparser-ernie-1.0":[
         "https://paddlenlp.bj.bcebos.com/taskflow/dependency_parsing/ddparser/ddparser-ernie-1.0.tar.gz", 
-        None
+        "77640972889c68fcb0459611e932530b",
     ],  
     "ddparser-ernie-gram-zh":[
         "https://paddlenlp.bj.bcebos.com/taskflow/dependency_parsing/ddparser/ddparser-ernie-gram-zh.tar.gz", 
-        None
+        "7f8326ccdf64d31f0482ad23fa3caacc",
     ],
 }
 
 usage = r"""
-           from paddlenlpimport Taskflow 
+           from paddlenlp import Taskflow 
 
            ddp = Taskflow("dependency_parsing")
            ddp("百度是一家高科技公司")
@@ -61,13 +61,13 @@ usage = r"""
            [{'word': ['百度', '是', '一家', '高科技', '公司'], 'postag': ['ORG', 'v', 'm', 'n', 'n'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
            '''
 
-           ddp-ernie-1.0 = Taskflow("dependency_parsing", model="ddparser-ernie-1.0")
-           ddp-ernie-1.0("百度是一家高科技公司")
+           ddp = Taskflow("dependency_parsing", model="ddparser-ernie-1.0")
+           ddp("百度是一家高科技公司")
            '''
            [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
            '''
-           ddp-ernie-1.0 = Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")
-           ddp-ernie-1.0("百度是一家高科技公司")
+           ddp = Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")
+           ddp("百度是一家高科技公司")
            '''
            [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
            '''
@@ -115,7 +115,6 @@ class DDParserTask(Task):
         else:
             raise ValueError("The encoding model should be one of \
                 ddparser, ddparser-ernie-1.0 and ddoarser-ernie-gram-zh")
-
         word_vocab_path = download_file(
             self._task_path, self.model + os.path.sep + "word_vocab.json",
             URLS[self.model][0], URLS[self.model][1])
@@ -339,17 +338,17 @@ class DDParserTask(Task):
         x = list(range(len(nodes)))
         y = [0] * (len(nodes))
         fig, ax = plt.subplots()
-        # control the picture size
+        # Control the picture size
         max_span = max([abs(i + 1 - j) for i, j in enumerate(head)])
         fig.set_size_inches((len(nodes), max_span / 2))
-        # set the points
+        # Set the points
         plt.scatter(x, y, c='w')
 
         for i in range(len(nodes)):
             txt = nodes[i]
             xytext = (i, 0)
             if i == 0:
-                # set 'ROOT'
+                # Set 'ROOT'
                 ax.annotate(
                     txt,
                     xy=xytext,
@@ -360,7 +359,7 @@ class DDParserTask(Task):
             else:
                 xy = (head[i - 1], 0)
                 rad = 0.5 if head[i - 1] < i else -0.5
-                # set the word
+                # Set the word
                 ax.annotate(
                     txt,
                     xy=xy,
@@ -368,7 +367,7 @@ class DDParserTask(Task):
                     xytext=(xytext[0] - 0.1, xytext[1]),
                     textcoords='data',
                     fontproperties=self.font)
-                # draw the curve
+                # Draw the curve
                 ax.annotate(
                     "",
                     xy=xy,
@@ -383,7 +382,7 @@ class DDParserTask(Task):
                         connectionstyle="arc3,rad=%s" % rad,
                     ),
                 )
-                # set the deprel label. Calculate its position by the radius
+                # Set the deprel label. Calculate its position by the radius
                 text_x = min(i, head[i - 1]) + abs((i - head[i - 1])) / 2 - 0.2
                 text_y = abs((i - head[i - 1])) / 4
                 ax.annotate(
@@ -393,11 +392,11 @@ class DDParserTask(Task):
                     xytext=[text_x, text_y],
                     textcoords='data')
 
-        # control the axis
+        # Control the axis
         plt.axis('equal')
         plt.axis('off')
 
-        # save to numpy array
+        # Save to numpy array
         fig.canvas.draw()
         data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
         data = data.reshape(fig.canvas.get_width_height()[::-1] +
@@ -487,7 +486,8 @@ def decode(s_arc, s_rel, mask, tree=True):
 
 
 def eisner(scores, mask):
-    """Eisner algorithm is a general dynamic programming decoding algorithm for bilexical grammar.
+    """
+    Eisner algorithm is a general dynamic programming decoding algorithm for bilexical grammar.
 
     Args：
         scores: Adjacency matrix，shape=(batch, seq_len, seq_len)
@@ -500,17 +500,17 @@ def eisner(scores, mask):
     lens = mask.sum(1)
     batch_size, seq_len, _ = scores.shape
     scores = scores.transpose(2, 1, 0)
-    # score for incomplete span
+    # Score for incomplete span
     s_i = np.full_like(scores, float('-inf'))
-    # score for complete span
+    # Score for complete span
     s_c = np.full_like(scores, float('-inf'))
-    # incompelte span position for backtrack
+    # Incompelte span position for backtrack
     p_i = np.zeros((seq_len, seq_len, batch_size), dtype=np.int64)
-    # compelte span position for backtrack
+    # Compelte span position for backtrack
     p_c = np.zeros((seq_len, seq_len, batch_size), dtype=np.int64)
-    # set 0 to s_c.diagonal
+    # Set 0 to s_c.diagonal
     s_c = fill_diagonal(s_c, 0)
-    # contiguous
+    # Contiguous
     s_c = np.ascontiguousarray(s_c)
     s_i = np.ascontiguousarray(s_i)
     for w in range(1, seq_len):
@@ -518,7 +518,7 @@ def eisner(scores, mask):
         starts = np.arange(n, dtype=np.int64)[np.newaxis, :]
         # ilr = C(i->r) + C(j->r+1)
         ilr = stripe(s_c, n, w) + stripe(s_c, n, w, (w, 1))
-        # [batch_size, n, w]
+        # Shape: [batch_size, n, w]
         ilr = ilr.transpose(2, 0, 1)
         # scores.diagonal(-w).shape:[batch, n]
         il = ilr + scores.diagonal(-w)[..., np.newaxis]
@@ -560,7 +560,10 @@ def eisner(scores, mask):
 
 
 def fill_diagonal(x, value, offset=0, dim1=0, dim2=1):
-    """Fill value into the diagoanl of x that offset is ${offset} and the coordinate system is (dim1, dim2)."""
+    """
+    Fill value into the diagoanl of x that offset is ${offset} 
+    and the coordinate system is (dim1, dim2).
+    """
     strides = x.strides
     shape = x.shape
     if dim1 > dim2:
@@ -584,7 +587,9 @@ def fill_diagonal(x, value, offset=0, dim1=0, dim2=1):
     return x
 
 def backtrack(p_i, p_c, heads, i, j, complete):
-    """Backtrack the position matrix of eisner to generate the tree"""
+    """
+    Backtrack the position matrix of eisner to generate the tree
+    """
     if i == j:
         return
     if complete:
@@ -599,7 +604,8 @@ def backtrack(p_i, p_c, heads, i, j, complete):
 
 
 def stripe(x, n, w, offset=(0, 0), dim=1):
-    r'''Returns a diagonal stripe of the tensor.
+    """
+    Returns a diagonal stripe of the tensor.
 
     Args:
         x (Tensor): the input tensor with 2 or more dims.
@@ -622,7 +628,7 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
     >>> stripe(x, 2, 3, dim=0)
     tensor([[ 0,  5, 10],
             [ 6, 11, 16]])
-    '''
+    """
     if not x.flags['C_CONTIGUOUS']:
         x = np.ascontiguousarray(x)
     strides = x.strides
@@ -633,8 +639,8 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
                                            strides=[m, k] + list(strides[2:]))
 
 
-class NODE:
-    """NODE class"""
+class Node:
+    """Node class"""
     def __init__(self, id=None, parent=None):
         self.lefts = []
         self.rights = []
@@ -657,7 +663,7 @@ class DepTree:
 
     def build_tree(self):
         """Build the tree"""
-        self.nodes = [NODE(index, p_index) for index, p_index in enumerate(self.sentence)]
+        self.nodes = [Node(index, p_index) for index, p_index in enumerate(self.sentence)]
         # set root
         self.root = self.nodes[0]
         for node in self.nodes[1:]:
