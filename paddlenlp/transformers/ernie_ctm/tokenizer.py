@@ -28,38 +28,49 @@ __all__ = ['ErnieCtmTokenizer']
 
 class ErnieCtmTokenizer(PretrainedTokenizer):
     r"""
-    Construct a ERNIE-CTM tokenizer. It uses a basic tokenizer to do punctuation
-    splitting, lower casing and so on, and follows a WordPiece tokenizer to
-    tokenize as subwords.
+    Construct a ERNIE-CTM tokenizer.
     
     Args:
         vocab_file (str):
-            File containing the vocabulary.
+            File path of the vocabulary.
         do_lower_case (bool, optional):
             Whether or not to lowercase the input when tokenizing. Defaults to `True`
         do_basic_tokenize (bool, optional):
             Whether or not to do basic tokenization before WordPiece. Defaults to `True`
         unk_token (str, optional):
-            The unknown token. A token that is not in the vocabulary cannot be converted to an ID and is set to be this
-            token instead. Defaults to `"[UNK]"`
+            A special token representing the *unknown (out-of-vocabulary)* token.
+            An unknown token is set to be `unk_token` inorder to be converted to an ID.
+            Defaults to "[UNK]".
         sep_token (str, optional):
-            The separator token, which is used when building a sequence from multiple sequences, e.g. two sequences for
-            sequence classification or for a text and a question for question answering. It is also used as the last
-            token of a sequence built with special tokens. Defaults to `"[SEP]"`
+            A special token separating two different sentences in the same input.
+            Defaults to "[SEP]".
         pad_token (str, optional):
-            The token used for padding, for example when batching sequences of different lengths. Defaults to `"[PAD]"`
+            A special token used to make arrays of tokens the same size for batching purposes.
+            Defaults to "[PAD]".
         cls_token_template (str, optional)
             The template of summary token for multiple summary placeholders. Defaults to `"[CLS{}]"`
         cls_num (int, optional):
             Summary placeholder used in ernie-ctm model. For catching a sentence global feature from multiple aware.
             Defaults to 1.
-        mask_token (`str`, optional):
+        mask_token (str, optional):
             A special token representing a masked token. This is the token used in the masked
             language modeling task. This is the token which the model will try to predict the original unmasked ones.
             Defaults to `"[MASK]"`.
-        strip_accents: (`bool`, optional):
+        strip_accents: (bool, optional):
             Whether or not to strip all accents. If this option is not specified, then it will be determined by the
             value for `lowercase` (as in the original BERT).
+
+    Examples:
+        .. code-block::
+
+            from paddlenlp.transformers import ErnieCtmTokenizer
+            tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-ctm')
+
+            encoded_inputs = tokenizer('He was a puppeteer')
+            # encoded_inputs:
+            # {'input_ids': [101, 98, 153, 150, 99, 168, 146, 164, 99, 146, 99, 161, 166, 161,
+            #  161, 150, 165, 150, 150, 163, 102],
+            # 'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
@@ -105,10 +116,37 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
 
     @property
     def vocab_size(self):
+        """
+        Return the size of vocabulary.
+
+        Returns:
+            int: The size of vocabulary.
+        """
         return len(self.vocab)
 
     def convert_tokens_to_string(self, tokens):
-        # Converts a sequence of tokens (strings for sub-words) in a single string.
+        r"""
+        Converts a sequence of tokens (list of string) in a single string. Since
+        the usage of WordPiece introducing `##` to concat subwords, also remove
+        `##` when converting.
+
+        Args:
+            tokens (List[str]): A list of string representing tokens to be converted.
+
+        Returns:
+            str: Converted string from tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import ErnieCtmTokenizer
+                tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-1.0')
+
+                tokens = tokenizer.tokenize('He was a puppeteer')
+                strings = tokenizer.convert_tokens_to_string(tokens)
+                #he was a puppeteer
+
+        """
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
 
