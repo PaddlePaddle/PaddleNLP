@@ -1284,6 +1284,9 @@ class InferTransformerModel(TransformerModel):
                 finished_seq, finished_scores, finished_flags, caches
             ])
 
+        # (gongenlei) `paddle.where` doesn't support broadcast, so we need to use `paddle.unsqueeze`
+        # and `paddle.tile` to make condition.shape same as X.shape. But when converting dygraph
+        # to static  graph, `paddle.tile` will raise error.
         finished_flags = paddle.cast(finished_flags, dtype=finished_seq.dtype)
         neg_finished_flags = 1 - finished_flags
         finished_seq = paddle.multiply(
