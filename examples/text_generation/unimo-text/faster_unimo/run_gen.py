@@ -116,13 +116,8 @@ def evaluation(model, data_loader, args, tokenizer):
                   (step, total_time / args.logging_steps))
             total_time = 0.0
 
-        if args.faster:
-            ids = output
-            results = select_sum(ids, None, tokenizer)
-        else:
-            ids, scores = output
-            results = select_sum(ids, scores, tokenizer, args.max_dec_len,
-                                 args.num_return_sequences)
+        ids = output
+        results = select_sum(ids, None, tokenizer)
 
         pred_ref.extend(results)
         start_time = time.time()

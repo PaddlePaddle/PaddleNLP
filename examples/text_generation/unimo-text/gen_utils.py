@@ -64,8 +64,7 @@ def convert_example(example,
             max_seq_len=max_seq_len,
             max_title_len=max_title_len,
             add_start_token_for_decoding=True,
-            return_position_ids=True,
-            return_length=True)
+            return_position_ids=True)
 
         if 'target' in example and example['target']:
             tokenized_example['target'] = example['target']
@@ -111,9 +110,7 @@ def batchify_fn(batch_examples, pad_val, mode):
         ])
         return input_ids, token_type_ids, position_ids, attention_mask, masked_positions, labels
     else:
-        seq_len = np.asarray(
-            [example['seq_len'] for example in batch_examples]).astype("int32")
-        return input_ids, token_type_ids, position_ids, attention_mask, seq_len
+        return input_ids, token_type_ids, position_ids, attention_mask
 
 
 def create_data_loader(dataset, tokenizer, args, mode):
@@ -130,7 +127,7 @@ def create_data_loader(dataset, tokenizer, args, mode):
             dataset, batch_size=args.batch_size, shuffle=True)
     else:
         batch_sampler = BatchSampler(
-            dataset, batch_size=args.batch_size, shuffle=False)
+            dataset, batch_size=args.batch_size // 2, shuffle=False)
     collate_fn = partial(batchify_fn, pad_val=tokenizer.pad_token_id, mode=mode)
     data_loader = DataLoader(
         dataset,
@@ -157,46 +154,34 @@ def post_process_sum(token_ids, tokenizer):
 
 def select_sum(ids, scores, tokenizer, max_dec_len=None,
                num_return_sequences=1):
+    ids = ids.numpy()
+    scores = scores.numpy()
+
+    if len(ids) != len(scores) or (len(ids) % num_return_sequences) != 0:
+        raise ValueError(
+            "the length of `ids` is {}, but the `num_return_sequences` is {}".
+            format(len(ids), num_return_sequences))
+
+    group = []
+    tmp = []
+    for pred, score in zip(ids, scores):
+        pred_token_ids, pred_tokens = post_process_sum(pred, tokenizer)
+        num_token = len(pred_token_ids)
+
+        target = "".join(pred_tokens)
+
+        # not ending
+        if max_dec_len is not None and num_token >= max_dec_len:
+            score -= 1e3
+
+        tmp.append([target, score])
+        if len(tmp) == num_return_sequences:
+            group.append(tmp)
+            tmp = []
+
     results = []
-    if scores is not None:
-        ids = ids.numpy()
-        scores = scores.numpy()
-
-        if len(ids) != len(scores) or (len(ids) % num_return_sequences) != 0:
-            raise ValueError(
-                "the length of `ids` is {}, but the `num_return_sequences` is {}".
-                format(len(ids), num_return_sequences))
-
-        group = []
-        tmp = []
-        for pred, score in zip(ids, scores):
-            pred_token_ids, pred_tokens = post_process_sum(pred, tokenizer)
-            num_token = len(pred_token_ids)
-
-            target = "".join(pred_tokens)
-
-            # not ending
-            if max_dec_len is not None and num_token >= max_dec_len:
-                score -= 1e3
-
-            tmp.append([target, score])
-            if len(tmp) == num_return_sequences:
-                group.append(tmp)
-                tmp = []
-
-        for preds in group:
-            preds = sorted(preds, key=lambda x: -x[1])
-            results.append(preds[0][0])
-    else:
-        if len(ids.shape) > 2:
-            ids = ids[:, :, 0]
-        ids = ids.numpy().transpose()
-
-        for pred in ids:
-            pred_token_ids, pred_tokens = post_process_sum(pred, tokenizer)
-            num_token = len(pred_token_ids)
-            response = "".join(pred_tokens)
-
-            results.append(response)
+    for preds in group:
+        preds = sorted(preds, key=lambda x: -x[1])
+        results.append(preds[0][0])
 
     return results
