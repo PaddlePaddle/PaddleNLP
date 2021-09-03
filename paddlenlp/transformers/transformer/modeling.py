@@ -837,6 +837,17 @@ class InferTransformerModel(TransformerModel):
             Specify beam search version. It should be in one
             of [`v1`, `v2`]. If `v2`, need to set `alpha`(default to 0.6) for length
             penalty. Default to `v1`.
+        kwargs:
+            The key word arguments can be `rel_len` and `alpha`:
+
+            - `rel_len(bool, optional)`: Indicating whether `max_out_len` in
+            is the length relative to that of source text. Only works in `v2`
+            temporarily. It is suggest to set a small `max_out_len` and use
+            `rel_len=True`. Default to False if not set.
+
+            - `alpha(float, optional)`: The power number in length penalty
+            calculation. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
+            Only works in `v2` temporarily. Default to 0.6 if not set.
     """
 
     def __init__(self,
@@ -869,10 +880,8 @@ class InferTransformerModel(TransformerModel):
         self.beam_search_version = args.pop('beam_search_version')
         kwargs = args.pop("kwargs")
         if self.beam_search_version == 'v2':
-            if 'alpha' in kwargs:
-                self.alpha = kwargs['alpha']
-            else:
-                self.alpha = 0.6
+            self.alpha = kwargs.get("alpha", 0.6)
+            self.rel_len = kwargs.get("rel_len", False)
         super(InferTransformerModel, self).__init__(**args)
 
         cell = TransformerDecodeCell(
@@ -1031,7 +1040,8 @@ class InferTransformerModel(TransformerModel):
         # constant number
         inf = float(1. * 1e7)
         batch_size = enc_output.shape[0]
-        max_len = (enc_output.shape[1] + 20) if max_len is None else max_len
+        max_len = (enc_output.shape[1] + 20) if max_len is None else (
+            enc_output.shape[1] + max_len if self.rel_len else max_len)
 
         ### initialize states of beam search ###
         ## init for the alive ##

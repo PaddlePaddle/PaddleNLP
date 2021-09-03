@@ -40,8 +40,10 @@ def parse_args():
         "--decoding_strategy",
         default="beam_search",
         type=str,
-        choices=["beam_search", "topk_sampling", "topp_sampling"],
-        help="Decoding strategy. Can be one of ['beam_search', 'topk_sampling', 'topp_sampling']. "
+        choices=[
+            "beam_search", "topk_sampling", "topp_sampling", "beam_search_v2"
+        ],
+        help="Decoding strategy. Can be one of ['beam_search', 'topk_sampling', 'topp_sampling', 'beam_search_v2']. "
     )
     parser.add_argument("--beam_size", default=5, type=int, help="Beam size. ")
     parser.add_argument(
@@ -94,7 +96,9 @@ def do_predict(args):
             beam_size=args.beam_size,
             max_out_len=args.max_out_len,
             decoding_lib=args.decoding_lib,
-            use_fp16_decoding=args.use_fp16_decoding)
+            use_fp16_decoding=args.use_fp16_decoding,
+            rel_len=args.use_rel_len,
+            alpha=args.alpha)
 
         finished_seq = transformer(src_word=src_word)
 
