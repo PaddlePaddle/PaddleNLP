@@ -17,9 +17,9 @@
 | machine_translation       | 机器翻译    | 提供了一个带Attention机制的，基于LSTM的多层RNN Seq2Seq翻译模型，以及一个基于Transformer的翻译模型 |
 | model_compression       | 模型压缩    | 提供了一些大模型压缩，知识蒸馏的工具包。比如将Bert蒸馏到双向LSTM，对Bert网络进行压缩和蒸馏等。 |
 | semantic_indexing       | 语义索引    | 语义索引技术是搜索引擎、推荐系统、广告系统在召回阶段的核心技术之一，语义索引库提供了前沿语义索引策略的训练、语义索引模型的效果评估方案、支持用户基于我们开源的语义索引模型进行文本 Pair 的相似度计算或者 Embedding 语义表示抽取。 |
-| sentiment_analysis/skep/       | 情感分析    | 情感预训练模型SKEP。 |
+| sentiment_analysis       | 情感分析    | 提供了两个情感分析任务实现示例，分别使用传统的TextCNN模型和情感预训练模型SKEP。 |
 | simultaneous_translation/stacl/ | 同声传译    | 基于机器翻译领域主流模型 Transformer网络结构的同传模型STACL的PaddlePaddle 实现，包含模型训练，预测以及使用自定义数据等内容 |
-| text_classification       | 文本分类    | 该项目示例使用PaddleNLP如何完成文本分类任务。该项目展示了使用传统的Recurrent Neural Networks 和 预训练模型Pretrained Models两种方法完成文本分类任务。 |
+| text_classification       | 文本分类    | 提供了多个文本分类任务示例，基于传统序列模型的二分类，基于预训练模型的二分类和基于预训练模型的多标签文本分类。 |
 | text_generation       | 文本生成    | 包含ERNIE-Gen面向生成任务的预训练+微调模型框架，以及一个使用传统Seq2Seq模型的对对联应用，以及文本的基于变分自动编码器的生成模型 |
 | text_graph/erniesage       | 文本图模型    | 基于PaddleNLP的ErnieSage模型，可以同时建模文本语义与图结构信息。 |
 | text_matching      | 文本匹配    | 提供了多个不同算法的文本匹配算法实现。可以应用于搜索，推荐系统排序，召回等场景。 |

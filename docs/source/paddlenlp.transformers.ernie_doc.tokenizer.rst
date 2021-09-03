@@ -1,5 +1,5 @@
 tokenizer
-===============================================
+==================================================
 
 .. automodule:: paddlenlp.transformers.ernie_doc.tokenizer
    :members:
