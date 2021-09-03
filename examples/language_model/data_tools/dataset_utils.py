@@ -494,7 +494,7 @@ def pad_and_convert_to_numpy(tokens, tokentypes, masked_positions,
 
 
 def build_train_valid_test_datasets(data_prefix,
-                                    data_impl,
+                                    args,
                                     tokenizer,
                                     splits_string,
                                     train_valid_test_num_samples,
@@ -510,7 +510,7 @@ def build_train_valid_test_datasets(data_prefix,
     if len(data_prefix) == 1:
         return _build_train_valid_test_datasets(
             data_prefix[0],
-            data_impl,
+            args,
             tokenizer,
             splits_string,
             train_valid_test_num_samples,
@@ -525,7 +525,7 @@ def build_train_valid_test_datasets(data_prefix,
 
 
 def _build_train_valid_test_datasets(data_prefix,
-                                     data_impl,
+                                     args,
                                      tokenizer,
                                      splits_string,
                                      train_valid_test_num_samples,
@@ -542,7 +542,7 @@ def _build_train_valid_test_datasets(data_prefix,
         raise ValueError("Invalid dataset_type: ", dataset_type)
 
     # Indexed dataset.
-    indexed_dataset = get_indexed_dataset_(data_prefix, data_impl, skip_warmup)
+    indexed_dataset = get_indexed_dataset_(data_prefix, None, skip_warmup)
 
     # Get start and end indices of train/valid/train into doc-idx
     # Note that doc-idx is desinged to be num-docs + 1 so we can
@@ -589,7 +589,8 @@ def _build_train_valid_test_datasets(data_prefix,
                 num_epochs=None,
                 max_num_samples=train_valid_test_num_samples[index],
                 max_seq_length=max_seq_length,
-                seed=seed, )
+                seed=seed,
+                share_folder=args.share_folder, )
             if dataset_type == DSET_TYPE_T5:
                 dataset = T5Dataset(
                     indexed_dataset=indexed_dataset,
@@ -681,7 +682,7 @@ def get_train_valid_test_split_(splits_string, size):
 
 def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
                         max_num_samples, max_seq_length, short_seq_prob, seed,
-                        name, binary_head):
+                        name, binary_head, share_folder):
     """Get a list that maps a sample index to a starting sentence index, end sentence index, and length"""
 
     if not num_epochs:
@@ -705,6 +706,8 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
     indexmap_filename += '.npy'
 
     local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank())
+    if share_folder:
+        local_rank = fleet.worker_index()
     # Build the indexed mapping if not exist.
 
     if local_rank == 0 and \

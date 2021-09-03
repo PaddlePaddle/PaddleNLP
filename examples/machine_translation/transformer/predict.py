@@ -84,7 +84,11 @@ def do_predict(args):
         eos_id=args.eos_idx,
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
-        use_ft=not args.without_ft)
+        use_ft=not args.without_ft,
+        beam_search_version=args.beam_search_version,
+        rel_len=args.use_rel_len,  # only works when using FT or beam search v2
+        alpha=args.alpha,  # only works when using beam search v2
+        use_fp16_decoding=False)  # only works when using FT
 
     # Load the trained model
     assert args.init_from_params, (
@@ -99,8 +103,10 @@ def do_predict(args):
     f = open(args.output_file, "w", encoding="utf-8")
     with paddle.no_grad():
         for (src_word, ) in test_loader:
-            # The shape of finished_seq is `[seq_len, batch_size, beam_size]`
-            # when `output_time_major` argument is `True` for TransformerGenerator.
+            # When `output_time_major` argument is `True` for TransformerGenerator,
+            # the shape of finished_seq is `[seq_len, batch_size, beam_size]`
+            # for beam search v1 or `[seq_len, batch_size, beam_size * 2]` for
+            # beam search v2.
             finished_seq = transformer(src_word=src_word)
             finished_seq = finished_seq.numpy().transpose([1, 2, 0])
             for ins in finished_seq:
