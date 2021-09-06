@@ -16,7 +16,6 @@ import argparse
 
 import numpy as np
 import paddle
-from paddle import inference
 from paddlenlp.data import JiebaTokenizer, Stack, Tuple, Pad, Vocab
 from scipy.special import softmax
 
