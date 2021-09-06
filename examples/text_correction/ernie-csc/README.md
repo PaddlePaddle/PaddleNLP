@@ -1,8 +1,8 @@
-# 中文文本纠错
+# ERNIE for Chinese Spelling Correction
 
 ## 简介
 
-中文文本纠错任务是一项NLP基础任务，其输入是一个可能含有语法错误的中文句子，输出是一个正确的中文句子。语法错误类型很多，有多字、少字、错别字等，目前最常见的错误类型是`错别字`。大部分研究工作围绕错别字这一类型进行研究。百度NLP部门在最新的`ACL 2021`上提出结合拼音特征的Softmask策略的中文错别字纠错模型。PaddleNLP将基于该纠错模型提供中文错别字纠错能力。模型结构如下：
+中文文本纠错任务是一项NLP基础任务，其输入是一个可能含有语法错误的中文句子，输出是一个正确的中文句子。语法错误类型很多，有多字、少字、错别字等，目前最常见的错误类型是`错别字`。大部分研究工作围绕错别字这一类型进行研究。百度NLP部门在最新的`ACL 2021`上提出以ERNIE为基础，结合中文字语义特征、拼音特征的Softmask策略的中文错别字纠错模型。PaddleNLP将基于该纠错模型提供中文错别字纠错能力。模型结构如下：
 
 ![image](https://user-images.githubusercontent.com/10826371/131974040-fc84ec04-566f-4310-9839-862bfb27172e.png)
 
@@ -33,8 +33,7 @@ pip install -r requirements.txt
 ### 模型训练
 
 #### 参数
-- `model_type` 指示模型使用的预训练模型类型。目前支持的类型有："ernie", "ernie_gram","roberta"。
-- `model_name_or_path` 指示了Fine-tuning使用的具体预训练模型以及预训练时使用的tokenizer，目前支持的预训练模型有："ernie-1.0", "ernie-gram-zh", "roberta-wwm-ext"。预训练模型需要与模型类型对应。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"。
+- `model_name_or_path` 指示了Fine-tuning使用的具体预训练模型以及预训练时使用的tokenizer，目前支持的预训练模型有："ernie-1.0"。预训练模型需要与模型类型对应。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"。
 - `max_seq_length` 表示最大句子长度，超过该长度的部分将被切分成下一个样本。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
@@ -52,13 +51,13 @@ pip install -r requirements.txt
 #### 单卡训练
 
 ```python
-python train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_type ernie --model_name_or_path ernie-1.0 --output_dir ernie_log/checkpoints5e-5
+python train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir checkpoints5e-5
 ```
 
 #### 多卡训练
 
 ```python
-python -m paddle.distributed.launch --gpus "0,1"  train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_type ernie --model_name_or_path ernie-1.0 --output_dir ernie_log/checkpoints5e-5
+python -m paddle.distributed.launch --gpus "0,1"  train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir checkpoints5e-5
 ```
 
 ### 模型预测

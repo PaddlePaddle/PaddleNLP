@@ -25,9 +25,7 @@ import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad, Vocab
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import ErnieGramModel, ErnieGramTokenizer
 from paddlenlp.transformers import ErnieModel, ErnieTokenizer
-from paddlenlp.transformers import RobertaModel, RobertaTokenizer
 from paddlenlp.utils.log import logger
 
 from model import PretrainedModelForCSC
@@ -35,8 +33,7 @@ from utils import read_test_ds, convert_example, create_dataloader, is_chinese_c
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_type", type=str, default="ernie", choices=["ernie_gram", "ernie", "roberta"], help="Pretraining model type")
-parser.add_argument("--model_name_or_path", type=str, default="ernie-1.0", choices=["ernie-gram-zh", "ernie-1.0", "roberta-wwm-ext"], help="Pretraining model name or path")
+parser.add_argument("--model_name_or_path", type=str, default="ernie-1.0", choices=["ernie-1.0"], help="Pretraining model name or path")
 parser.add_argument("--init_checkpoint_path", default=None, type=str, help="The model checkpoint path.", )
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer " "than this will be truncated, sequences shorter will be padded.", )
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.", )
@@ -47,11 +44,6 @@ parser.add_argument("--predict_file", type=str, default="predict.txt", help="pre
 
 # yapf: enable
 args = parser.parse_args()
-MODEL_CLASSES = {
-    "ernie_gram": (ErnieGramModel, ErnieGramTokenizer),
-    "ernie": (ErnieModel, ErnieTokenizer),
-    "roberta": (RobertaModel, RobertaTokenizer)
-}
 
 
 def write_sighan_result_to_file(args, corr_preds, det_preds, lengths,
@@ -90,9 +82,8 @@ def do_predict(args):
     pinyin_vocab = Vocab.load_vocabulary(
         args.pinyin_vocab_file_path, unk_token='[UNK]', pad_token='[PAD]')
 
-    MODEL_CLASS, TOKENIZER_CLASS = MODEL_CLASSES[args.model_type]
-    tokenizer = TOKENIZER_CLASS.from_pretrained(args.model_name_or_path)
-    pretrained_model = MODEL_CLASS.from_pretrained(args.model_name_or_path)
+    tokenizer = ErnieTokenizer.from_pretrained(args.model_name_or_path)
+    pretrained_model = ErnieModel.from_pretrained(args.model_name_or_path)
 
     model = PretrainedModelForCSC(
         pretrained_model,

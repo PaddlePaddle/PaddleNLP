@@ -38,12 +38,12 @@ def convert_example(example,
     input_ids = tokenizer.convert_tokens_to_ids(words)
     token_type_ids = [0] * len(input_ids)
 
-    # use pad token in pinyin emb to map word emb [CLS], [SEP]
+    # Use pad token in pinyin emb to map word emb [CLS], [SEP]
     pinyins = lazy_pinyin(
         source, style=Style.TONE3, neutral_tone_with_five=True)
 
     pinyin_ids = [0]
-    # align pinyin and chinese char
+    # Align pinyin and chinese char
     pinyin_offset = 0
     for i, word in enumerate(words[1:-1]):
         pinyin = '[UNK]' if word != '[PAD]' else '[PAD]'
@@ -143,18 +143,15 @@ def parse_decode(words, corr_preds, det_preds, lengths, tokenizer,
         len(tokens), len(corr_pred), tokens)
     pred_result = ""
 
-    # need to be aligned
     align_offset = 0
-
-    # print("tokens:", tokens)
-    # print("words: ", words)
+    # Need to be aligned
     if len(words) != len(tokens):
         first_unk_flag = True
         for j, word in enumerate(words):
             if word.isspace():
                 tokens.insert(j + 1, word)
                 corr_pred.insert(j + 1, UNK_id)
-                det_pred.insert(j + 1, 0)  # no error
+                det_pred.insert(j + 1, 0)  # No error
             elif tokens[j] != word:
                 if tokenizer.convert_tokens_to_ids(word) == UNK_id:
                     if first_unk_flag:
@@ -164,19 +161,19 @@ def parse_decode(words, corr_preds, det_preds, lengths, tokenizer,
                     else:
                         tokens.insert(j, UNK)
                         corr_pred.insert(j, UNK_id)
-                        det_pred.insert(j, 0)  # no error
+                        det_pred.insert(j, 0)  # No error
                     continue
                 elif tokens[j] == UNK:
-                    # remove rest unk
+                    # Remove rest unk
                     k = 0
                     while k + j < len(tokens) and tokens[k + j] == UNK:
                         k += 1
                     tokens = tokens[:j] + tokens[j + k:]
                     corr_pred = corr_pred[:j] + corr_pred[j + k:]
                     det_pred = det_pred[:j] + det_pred[j + k:]
-                else:  # maybe English, number, or suffix
+                else:
+                    # Maybe English, number, or suffix
                     token = tokens[j].lstrip("##")
-                    # if tokens[j].isalnum():
                     corr_pred = corr_pred[:j] + [UNK_id] * len(
                         token) + corr_pred[j + 1:]
                     det_pred = det_pred[:j] + [0] * len(token) + det_pred[j +
