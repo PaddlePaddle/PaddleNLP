@@ -30,7 +30,7 @@ from paddlenlp.transformers import ErnieModel, ErnieTokenizer
 from paddlenlp.utils.log import logger
 
 from model import PretrainedModelForCSC
-from utils import read_test_ds, convert_example, is_chinese_char, parse_decode
+from utils import convert_example, parse_decode
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -43,12 +43,6 @@ parser.add_argument("--pinyin_vocab_file_path", type=str, default="pinyin_vocab.
 # yapf: enable
 args = parser.parse_args()
 
-MODEL_CLASSES = {
-    "ernie_gram": (ErnieGramModel, ErnieGramTokenizer),
-    "ernie": (ErnieModel, ErnieTokenizer),
-    "roberta": (RobertaModel, RobertaTokenizer)
-}
-
 
 @paddle.no_grad()
 def do_predict(args):
@@ -57,9 +51,8 @@ def do_predict(args):
     pinyin_vocab = Vocab.load_vocabulary(
         args.pinyin_vocab_file_path, unk_token='[UNK]', pad_token='[PAD]')
 
-    MODEL_CLASS, TOKENIZER_CLASS = MODEL_CLASSES[args.model_type]
-    tokenizer = TOKENIZER_CLASS.from_pretrained(args.model_name_or_path)
-    pretrained_model = MODEL_CLASS.from_pretrained(args.model_name_or_path)
+    tokenizer = ErnieTokenizer.from_pretrained(args.model_name_or_path)
+    pretrained_model = ErnieModel.from_pretrained(args.model_name_or_path)
 
     model = PretrainedModelForCSC(
         pretrained_model,

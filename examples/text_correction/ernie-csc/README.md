@@ -66,14 +66,8 @@ python -m paddle.distributed.launch --gpus "0,1"  train.py --batch_size 32 --log
 
  Sighan13，Sighan 14，Sighan15是目前中文错别字纠错任务常用的benchmark数据。由于Sighan官方提供的是繁体字数据集，PaddleNLP将提供简体版本的Sighan测试数据。
 
- 1. 下载数据
-
-    ```python
-    python download.py
-    ```
-
- 2. 运行Sighan预测脚本
-    该脚本会加载checkpoint的模型参数运行模型，输出Sighan测试集的预测结果到predict文件，并输出预测效果。
+    运行Sighan预测脚本
+    该脚本会下载Sighan数据集，加载checkpoint的模型参数运行模型，输出Sighan测试集的预测结果到predict文件，并输出预测效果。
     ```shell
     sh run_sighan_predict.sh
     ```
