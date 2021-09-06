@@ -142,6 +142,12 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/transformer_decoder.cu trans_decoder_cu_src)
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/transformer_decoder.h trans_decoder_h_src)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/cuda_encoder_kernels.h cuda_encoder_kernels_h_src)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/cuda_encoder_kernels.cu cuda_encoder_kernels_cu_src)
+
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/bert_encoder_transformer.h bert_encoder_transformer_h_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_dst)
+
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/transformer_cuda_kernels.h trans_cuda_kernels_h_src)
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/transformer_decoding_kernels.cu trans_decoding_kernels_cu_src)
 
@@ -174,8 +180,11 @@ set(FT_PATCH_COMMAND
   && cp ${beamsearch_h_src} ${trans_dst}
   && cp ${sampling_h_src} ${trans_dst}
   && cp ${arguments_h_src} ${trans_dst}
+  && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
   && cat ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
+  && cat ${cuda_encoder_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
+  && cat ${cuda_encoder_kernels_cu_src} >> ${cuda_kernels_cu_dst}
   && cat ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
   && cat ${topk_kernels_cuh_src} >> ${topk_kernels_cuh_dst}
   && cat ${trans_decoder_cu_src} >> ${open_decoder_cu_dst}
