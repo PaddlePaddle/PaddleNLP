@@ -2,7 +2,7 @@
 
 ## 简介
 
-中文文本纠错任务是一项NLP基础任务，其输入是一个可能含有语法错误的中文句子，输出是一个正确的中文句子。语法错误类型很多，有多字、少字、错别字等，目前最常见的错误类型是`错别字`。大部分研究工作围绕错别字这一类型进行研究。百度NLP部门在最新的`ACL 2021`上提出以ERNIE为基础，结合中文字语义特征、拼音特征的Softmask策略的中文错别字纠错模型。PaddleNLP将基于该纠错模型提供中文错别字纠错能力。模型结构如下：
+中文文本纠错任务是一项NLP基础任务，其输入是一个可能含有语法错误的中文句子，输出是一个正确的中文句子。语法错误类型很多，有多字、少字、错别字等，目前最常见的错误类型是`错别字`。大部分研究工作围绕错别字这一类型进行研究。百度NLP部门在最新的`ACL 2021`上提出以ERNIE为基础、结合语义特征、拼音特征的中文错别字纠错模型。PaddleNLP将基于该纠错模型提供中文错别字纠错能力。模型结构如下：
 
 ![image](https://user-images.githubusercontent.com/10826371/131974040-fc84ec04-566f-4310-9839-862bfb27172e.png)
 
@@ -43,32 +43,50 @@ pip install -r requirements.txt
 - `seed` 表示随机数种子。
 - `weight_decay` 表示AdamW的权重衰减系数。
 - `warmup_proportion` 表示学习率warmup系数。
-- `detection_prob` 表示检测loss的比例。
 - `pinyin_vocab_file_path` 拼音字表路径。默认为当前目录下的`pinyin_vocab.txt`文件。
+- `extra_train_ds_dir` 额外纠错训练集目录。用户可在该目录下提供文件名以`txt`为后缀的纠错数据集文件，以增大训练样本。默认为None。
+
+### 训练数据
+
+该模型在SIGHAN简体版数据集以及[Automatic Corpus Generation生成的中文纠错数据集](https://github.com/wdimmy/Automatic-Corpus-Generation/blob/master/corpus/train.sgml)上进行Finetune训练。PaddleNLP已经集成SIGHAN简体版数据集，以下将介绍如何使用Automatic Corpus Generation生成的中文纠错数据集。
+
+#### 下载数据集
+
+```
+python download.py --data_dir extra_train_ds --url https://github.com/wdimmy/Automatic-Corpus-Generation/blob/master/corpus/train.sgml
+```
+
+#### 预处理数据集
+
+由于Automatic Corpus Generation提供的数据集是以XML形式提供，不满足训练脚本中的数据流处理，这里提供一个数据转换脚本，运行以下命令：
+
+```
+python change_sgml_to_txt.py -i extra_train_ds/train.sgml -o extra_train_ds/train.txt
+```
 
 ### 单卡训练
 
 ```python
-python train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir checkpoints5e-5
+python train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir checkpoints5e-5 --extra_train_ds_dir extra_train_ds
 ```
 
 ### 多卡训练
 
 ```python
-python -m paddle.distributed.launch --gpus "0,1"  train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir checkpoints5e-5
+python -m paddle.distributed.launch --gpus "0,1"  train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir checkpoints5e-5 --extra_train_ds_dir extra_train_ds
 ```
 
 ## 模型预测
 
 ### 预测Sighan测试集
 
-Sighan13，Sighan 14，Sighan15是目前中文错别字纠错任务常用的benchmark数据。由于Sighan官方提供的是繁体字数据集，PaddleNLP将提供简体版本的Sighan测试数据。以下运行Sighan预测脚本：
+SIGHAN 13，SIGHAN 14，SIGHAN 15是目前中文错别字纠错任务常用的benchmark数据。由于SIGHAN官方提供的是繁体字数据集，PaddleNLP将提供简体版本的SIGHAN测试数据。以下运行SIGHAN预测脚本：
 
 ```shell
 sh run_sighan_predict.sh
 ```
 
-该脚本会下载Sighan数据集，加载checkpoint的模型参数运行模型，输出Sighan测试集的预测结果到predict文件，并输出预测效果。
+该脚本会下载Sighan数据集，加载checkpoint的模型参数运行模型，输出SIGHAN测试集的预测结果到predict文件，并输出预测效果。
 
 ### 预测部署
 
@@ -101,3 +119,4 @@ python predict.py --model_file infer_model/static_graph_params.pdmodel --params_
 
 ## 参考文献
 * Ruiqing Zhang, Chao Pang et al. "Correcting Chinese Spelling Errors with Phonetic Pre-training", ACL, 2021
+* DingminWang et al. "A Hybrid Approach to Automatic Corpus Generation for Chinese Spelling Check", EMNLP, 2018

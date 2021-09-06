@@ -24,13 +24,13 @@ import paddle.nn.functional as F
 
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad, Vocab
-from paddlenlp.datasets import load_dataset
+from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import ErnieModel, ErnieTokenizer
 from paddlenlp.utils.log import logger
 from paddlenlp.metrics.sighan import DetectionF1, CorrectionF1
 from model import PretrainedModelForCSC
-from utils import convert_example, create_dataloader
+from utils import convert_example, create_dataloader, read_train_ds
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -50,7 +50,7 @@ parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total
 parser.add_argument("--pinyin_vocab_file_path", type=str, default="pinyin_vocab.txt", help="pinyin vocab file path")
 parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
 parser.add_argument("--ignore_label", default=-1, type=int, help="Ignore label for CrossEntropyLoss")
-parser.add_argument("--detection_prob", default=0.5, type=float, help="The fixed parameter to balance the detection and correction loss")
+parser.add_argument("--extra_train_ds_dir", default=None, type=str, help="The directory of extra train dataset.")
 
 # yapf: enable
 args = parser.parse_args()
@@ -105,7 +105,24 @@ def do_train(args):
         pinyin_vocab_size=len(pinyin_vocab),
         pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
 
-    train_ds, eval_ds = load_dataset('csc', splits=['train', 'dev'])
+    train_ds, eval_ds = load_dataset('sighan-cn', splits=['train', 'dev'])
+
+    if args.extra_train_ds_dir is not None and os.path.exists(
+            args.extra_train_ds_dir):
+        data = train_ds.data
+        data_files = [
+            os.path.join(args.extra_train_ds_dir, data_file)
+            for data_file in os.listdir(args.extra_train_ds_dir)
+            if data_file.endswith(".txt")
+        ]
+        for data_file in data_files:
+            ds = load_dataset(
+                read_train_ds,
+                data_path=data_file,
+                splits=["train"],
+                lazy=False)
+            data += ds.data
+        train_ds = MapDataset(data)
 
     det_loss_act = paddle.nn.CrossEntropyLoss(
         ignore_index=args.ignore_label, use_softmax=False)
@@ -174,9 +191,7 @@ def do_train(args):
 
             init_corr_loss = corr_loss_act(corr_logits, corr_labels)
             corr_loss = init_corr_loss * det_error_probs.max(axis=-1)
-
-            loss = (args.detection_prob * det_loss +
-                    (1 - args.detection_prob) * corr_loss).mean()
+            loss = (det_loss + corr_loss).mean()
             loss.backward()
             optimizer.step()
             lr_scheduler.step()

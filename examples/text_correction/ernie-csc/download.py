@@ -18,19 +18,24 @@ import argparse
 
 from paddle.utils.download import get_path_from_url
 
-URL = "https://paddlenlp.bj.bcebos.com/datasets/sighan_test.zip"
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '-d',
+    '--data_dir',
+    help='directory to save data to',
+    type=str,
+    default='./')
+parser.add_argument(
+    '-u',
+    '--url',
+    help='URL of target',
+    type=str,
+    default="https://paddlenlp.bj.bcebos.com/datasets/sighan_test.zip")
+args = parser.parse_args(arguments)
 
 
 def main(arguments):
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-d',
-        '--data_dir',
-        help='directory to save data to',
-        type=str,
-        default='./')
-    args = parser.parse_args(arguments)
-    get_path_from_url(URL, args.data_dir)
+    get_path_from_url(args.url, args.data_dir)
 
 
 if __name__ == '__main__':
