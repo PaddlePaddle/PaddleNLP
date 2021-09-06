@@ -112,15 +112,13 @@ class BertEncoderTransformer {
   DataType_ *attr_out_buf_;
   DataType_ *attr_matmul_buf_;
   DataType_ *inter_matmul_buf_;
-  DataType_ *attr_out_tmp_buf_;
-
-  DataType_ *out_tmp_buf_;
-  DataType_ *from_tensor_tmp_buf_;
 
   // For pre-normalizaiton
   DataType_ *norm_from_tensor_buf_;
   DataType_ *bias_and_input;
-  DataType_ *ffn_out_buf_;
+
+  // Unused buf
+  DataType_ *from_tensor_tmp_buf_;
 
   int batch_size_;
   int from_seq_len_;
@@ -611,9 +609,9 @@ public:
           inter_matmul_buf_ = attr_matmul_buf_ + buf_size;
 
           // unused buf
-          attr_out_tmp_buf_ = inter_matmul_buf_ + 4 * buf_size;
-          out_tmp_buf_ = attr_out_tmp_buf_ + buf_size;
-          from_tensor_tmp_buf_ = out_tmp_buf_ + buf_size;
+          norm_from_tensor_buf_ = inter_matmul_buf_ + 4 * buf_size;
+          bias_and_input = norm_from_tensor_buf_ + buf_size;
+          from_tensor_tmp_buf_ = bias_and_input + buf_size;
         }
       }
 
@@ -1451,7 +1449,8 @@ public:
           check_cuda_error(cudaGetLastError());
 #endif
         } else {
-          // FP32 or FP16
+          // Support fp32
+          // Todo(tianxin04): support fp16
           layernorm_kernelLauncher(norm_from_tensor_buf_,
                                    param_.from_tensor,
                                    param_.self_layernorm.gamma,
@@ -1473,7 +1472,7 @@ public:
           multi_head_init_param.sequence_id_offset = param_.sequence_id_offset;
           multi_head_init_param.trt_seqlen_offset = param_.trt_seqlen_offset;
           multi_head_init_param.trt_seqlen_size = param_.trt_seqlen_size;
-          // initialize MultiHeadInitParam
+          // re-initialize MultiHeadInitParam
           attention_->initialize(multi_head_init_param);
           attention_->forward();
 
