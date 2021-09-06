@@ -13,7 +13,11 @@ args = parser.parse_args()
 
 def main():
     with open(args.output, "w", encoding="utf-8") as fw:
-        dom = xml.dom.minidom.parse(args.input)
+        with open(args.input, 'r', encoding='utf-8') as f:
+            input_str = f.read()
+        # Add fake root node <SENTENCES>
+        input_str = '<SENTENCES>' + input_str + '</SENTENCES>'
+        dom = xml.dom.minidom.parseString(input_str)
         example_nodes = dom.documentElement.getElementsByTagName('SENTENCE')
         for example in example_nodes:
             raw_text = example.getElementsByTagName('TEXT')[0].childNodes[

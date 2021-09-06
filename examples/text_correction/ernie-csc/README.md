@@ -53,12 +53,12 @@ pip install -r requirements.txt
 #### 下载数据集
 
 ```
-python download.py --data_dir extra_train_ds --url https://github.com/wdimmy/Automatic-Corpus-Generation/blob/master/corpus/train.sgml
+python download.py --data_dir extra_train_ds --url https://github.com/wdimmy/Automatic-Corpus-Generation/raw/master/corpus/train.sgml
 ```
 
 #### 预处理数据集
 
-由于Automatic Corpus Generation提供的数据集是以XML形式提供，不满足训练脚本中的数据流处理，这里提供一个数据转换脚本，运行以下命令：
+由于Automatic Corpus Generation提供的数据集是以XML形式提供，不满足训练脚本中的对训练数据的要求（输入的文件内容为句子对形式），这里提供一个数据转换脚本，运行以下命令：
 
 ```
 python change_sgml_to_txt.py -i extra_train_ds/train.sgml -o extra_train_ds/train.txt

@@ -31,12 +31,12 @@ parser.add_argument(
     help='URL of target',
     type=str,
     default="https://paddlenlp.bj.bcebos.com/datasets/sighan_test.zip")
-args = parser.parse_args(arguments)
+args = parser.parse_args()
 
 
-def main(arguments):
+def main():
     get_path_from_url(args.url, args.data_dir)
 
 
 if __name__ == '__main__':
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())
