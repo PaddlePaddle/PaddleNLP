@@ -95,9 +95,9 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             from paddlenlp.transformers import GPTChineseTokenizer
 
             tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
-            print(tokenizer('欢迎使用百度飞浆！'))
+            print(tokenizer('欢迎使用百度飞桨！'))
             '''
-            {'input_ids': [2092, 260, 1014, 1596, 5331, 45], 'token_type_ids': [0, 0, 0, 0, 0, 0]}
+            {'input_ids': [2092, 260, 1014, 1596, 17620, 45], 'token_type_ids': [0, 0, 0, 0, 0, 0]}
             '''
     """
 
@@ -154,8 +154,8 @@ class GPTChineseTokenizer(PretrainedTokenizer):
                 from paddlenlp.transformers import GPTChineseTokenizer
 
                 tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
-                print(tokenizer.tokenize('欢迎使用百度飞浆！'))
-                # ['▁欢迎', '▁使用', '▁百度', '▁飞', '浆', '▁!']
+                print(tokenizer.tokenize('欢迎使用百度飞桨！'))
+                # ['▁欢迎', '▁使用', '▁百度', '▁飞', '桨', '▁!']
         """
 
         return self._tokenize(text)
@@ -195,7 +195,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
 
                 tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
                 print(tokenizer.convert_tokens_to_ids(['▁欢迎', '▁使用', '▁百度', '▁飞', '浆', '▁!']))
-                # [2092, 260, 1014, 1596, 5331, 45]
+                # [2092, 260, 1014, 1596, 17620, 45]
         """
 
         if not isinstance(tokens, (list, tuple)):
@@ -221,8 +221,8 @@ class GPTChineseTokenizer(PretrainedTokenizer):
                 from paddlenlp.transformers import GPTChineseTokenizer
 
                 tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
-                print(tokenizer.convert_ids_to_tokens([2092, 260, 1014, 1596, 5331, 45]))
-                #['▁欢迎', '▁使用', '▁百度', '▁飞', '浆', '▁!']
+                print(tokenizer.convert_ids_to_tokens([2092, 260, 1014, 1596, 17620, 45]))
+                #['▁欢迎', '▁使用', '▁百度', '▁飞', '桨', '▁!']
 
         """
 
@@ -266,8 +266,8 @@ class GPTChineseTokenizer(PretrainedTokenizer):
 
                 from paddlenlp.transformers import GPTChineseTokenizer
                 tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
-                print(tokenizer.convert_ids_to_string([2092, 260, 1014, 1596, 5331, 45]))
-                # '欢迎使用百度飞浆!'
+                print(tokenizer.convert_ids_to_string([2092, 260, 1014, 1596, 17620, 45]))
+                # '欢迎使用百度飞桨!'
 
         """
 
@@ -316,12 +316,12 @@ class GPTTokenizer(PretrainedTokenizer):
             from paddlenlp.transformers import GPTTokenizer
 
             tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
-            print(tokenizer('欢迎使用百度飞浆！'))
+            print(tokenizer('欢迎使用百度飞桨！'))
 
             '''
             {'input_ids': [162, 105, 95, 32573, 236, 45635, 18796, 101,
-            163, 247, 122, 41753, 99, 45617, 252, 38184, 228, 171, 120, 223],
-            'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
+            163, 247, 122, 41753, 99, 45617, 252, 162, 94, 101, 171, 120, 223],
+            'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
             '''
 
     """

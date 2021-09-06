@@ -624,8 +624,11 @@ class GPTModel(GPTPretrainedModel):
             The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
             sequence. Defaults to `512`.
         type_vocab_size (int, optional):
-            The vocabulary size of the `token_type_ids`.
-            Defaults to `16`.
+            The vocabulary size of the `token_type_ids`. Defaults to `16`.
+
+            .. note::
+                Please NOT using `type_vocab_size`, for it will be obsolete in the future..
+
         initializer_range (float, optional):
             The standard deviation of the normal initializer. Default to `0.02`.
 
@@ -717,13 +720,9 @@ class GPTModel(GPTPretrainedModel):
             attention_mask (Tensor, optional):
                 Mask used in self attention to avoid performing attention on to some unwanted positions,
                 usually the subsequent positions.
-                Its data type can be int, float and bool.
-                If its data type is int, the values should be either 0 or 1.
-
-                - **1** for tokens that **not masked**,
-                - **0** for tokens that **masked**.
-
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                Its data type should be float32.
+                The `masked` tokens have `-INF` values, and the others have `0` values.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
             use_cache (bool, optional):
                 Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
