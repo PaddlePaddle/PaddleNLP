@@ -239,8 +239,8 @@ class ErnieModel(ErniePretrainedModel):
             The dropout probability for all fully connected layers in the embeddings and encoder.
             Defaults to `0.1`.
         attention_probs_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the pooler.
-            Defaults to `0.1`.
+            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
+            Defaults to `0.1`
         max_position_embeddings (int, optional):
             The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
             sequence. Defaults to `512`.
@@ -248,7 +248,8 @@ class ErnieModel(ErniePretrainedModel):
             The vocabulary size of the `token_type_ids`.
             Defaults to `2`.
         initializer_range (float, optional):
-            The standard deviation of the normal initializer. Defaults to 0.02.
+            The standard deviation of the normal initializer for initializing all weight matrices.
+            Defaults to `0.02`.
             
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.

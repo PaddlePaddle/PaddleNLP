@@ -452,7 +452,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
         hidden_dropout_prob (int):
             The dropout probability for all fully connected layers in the embeddings and encoder.
         attention_dropout_prob (int):
-            The dropout probability for all fully connected layers in the pooler.
+            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
         relu_dropout (int):
             The dropout probability of FFN.
         hidden_act (str):
@@ -472,18 +472,19 @@ class ErnieDocModel(ErnieDocPretrainedModel):
             Indicate whether to put layer normalization into preprocessing of MHA and FFN sub-layers. 
             If True, pre-process is layer normalization and post-precess includes dropout, 
             residual connection. Otherwise, no pre-process and post-precess includes dropout, 
-            residual connection, layer normalization. Defaults to False.
+            residual connection, layer normalization. Defaults to `False`.
         epsilon (float, optional):
             The `epsilon` parameter used in :class:`paddle.nn.LayerNorm` for
             initializing layer normalization layers. Defaults to `1e-5`.
         rel_pos_params_sharing (bool, optional):
+            Whether to share the relative position parameters.
             Defaults to `False`.
         initializer_range (float, optional):
             The standard deviation of the normal initializer for initializing all weight matrices.
             Defaults to `0.02`.
         pad_token_id (int, optional):
             The token id of [PAD] token whose parameters won't be updated when training.
-            Defaults to 0.
+            Defaults to `0`.
         cls_token_idx (int, optional):
             The token id of [CLS] token. Defaults to `-1`.
     """
@@ -634,7 +635,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
                 model = ErnieDocModel.from_pretrained('ernie-doc-base-zh')
 
-                inputs = tokenizer("这是一个示例")
+                inputs = tokenizer("欢迎使用百度飞浆！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
                 
                 memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
@@ -647,7 +648,9 @@ class ErnieDocModel(ErnieDocPretrainedModel):
 
                 outputs = model(**inputs)
 
-                last_hidden_states = outputs[0]
+                encoder_output = outputs[0]
+                pooled_output = outputs[1]
+                new_mem = outputs[2]
 
         """
         input_embeddings, position_embeddings, token_embeddings = \
@@ -679,7 +682,7 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
         num_classes (int):
             The number of classes.
         dropout (float, optional)
-            The dropout ratio of last output. Default to 0.1.
+            The dropout ratio of last output. Default to `0.1`.
     """
 
     def __init__(self, ernie_doc, num_classes, dropout=0.1):
@@ -708,7 +711,7 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                 See :class:`ErnieDocModel`.
 
         Returns:
-            tuple : Returns tuple (`logits`, `new_mem`).
+            tuple : Returns tuple (`logits`, `mem`).
 
             With the fields:
 
@@ -738,7 +741,7 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
                 model = ErnieDocForSequenceClassification.from_pretrained('ernie-doc-base-zh', num_classes=2)
 
-                inputs = tokenizer("这是一个示例")
+                inputs = tokenizer("欢迎使用百度飞浆！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
                 
                 memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
@@ -751,7 +754,8 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
 
                 outputs = model(**inputs)
 
-                last_hidden_states = outputs[0]
+                logits = outputs[0]
+                mem = outputs[1]
 
         """
         _, pooled_output, mem = self.ernie_doc(
@@ -833,7 +837,7 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
                 model = ErnieDocForTokenClassification.from_pretrained('ernie-doc-base-zh', num_classes=2)
 
-                inputs = tokenizer("这是一个示例")
+                inputs = tokenizer("欢迎使用百度飞浆！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
                 
                 memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
@@ -846,7 +850,8 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
 
                 outputs = model(**inputs)
 
-                last_hidden_states = outputs[0]
+                logits = outputs[0]
+                mem = outputs[1]
 
         """
         sequence_output, _, mem = self.ernie_doc(
@@ -898,11 +903,13 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
             With the fields:
 
             - `start_logits` (Tensor):
-                A tensor containing the [CLS] of hidden-states of the model at the output of last layer.
-                Each Tensor has a data type of `float32` and has a shape of [batch_size, sequence_length]. 
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
             - `end_logits` (Tensor):
-                A tensor containing the [CLS] of hidden-states of the model at the output of last layer.
-                Each Tensor has a data type of `float32` and has a shape of [batch_size, sequence_length]. 
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
             - `mem` (List[Tensor]):
                 A list of pre-computed hidden-states. The length of the list is `n_layers`.
                 Each element in the list is a Tensor with dtype `float32` and has a shape of
@@ -925,7 +932,7 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
                 model = ErnieDocForQuestionAnswering.from_pretrained('ernie-doc-base-zh')
 
-                inputs = tokenizer("这是一个示例")
+                inputs = tokenizer("欢迎使用百度飞浆！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
                 
                 memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
@@ -938,7 +945,9 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
 
                 outputs = model(**inputs)
 
-                last_hidden_states = outputs[0]
+                start_logits = outputs[0]
+                end_logits = outputs[1]
+                mem = outputs[2]
 
         """
         sequence_output, _, mem = self.ernie_doc(
