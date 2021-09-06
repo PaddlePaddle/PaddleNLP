@@ -130,7 +130,7 @@ class BertEncoderTransformer {
 
   bool allow_gemm_test_ = false;
   bool use_ORDER_COL32_2R_4R4_ = false;
-
+  bool normalize_before_ = false;
 
   // for int8 quantization
   const float *FC0_weight_amax_list, *FC1_weight_amax_list,
@@ -654,8 +654,12 @@ public:
   }
 
 
-  BertEncoderTransformer(int int8_mode = 0, bool allow_gemm_test = false)
-      : int8_mode_(int8_mode), allow_gemm_test_(allow_gemm_test) {
+  BertEncoderTransformer(int int8_mode = 0,
+                         bool allow_gemm_test = false,
+                         int normalize_before = false)
+      : int8_mode_(int8_mode),
+        allow_gemm_test_(allow_gemm_test),
+        normalize_before_(normalize_before) {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -825,7 +829,7 @@ public:
     PRINT_FUNC_NAME_();
 #endif
     try {
-      if (normlaize_before_ == fasle) {
+      if (normalize_before_ == false) {
         // post-norm
         attention_->forward();
 
@@ -1456,10 +1460,21 @@ public:
                                    n,
                                    param_.stream);
 
-          // self-attention
-          // attention_->param_: MultiHeadInitParam
-          attention_->param_.from_tensor = norm_from_tensor_buf_;
-          attention_->param_.to_tensor = norm_from_tensor_buf_;
+          cuda::MultiHeadInitParam<DataType_> multi_head_init_param;
+
+          multi_head_init_param.from_tensor = norm_from_tensor_buf_;
+          multi_head_init_param.to_tensor = norm_from_tensor_buf_;
+          multi_head_init_param.self_attention = param_.self_attention;
+          multi_head_init_param.attr_mask = param_.attr_mask;
+          multi_head_init_param.stream = param_.stream;
+          multi_head_init_param.cublas_handle = param_.cublas_handle;
+          multi_head_init_param.attr_out = attr_out_buf_;
+          multi_head_init_param.valid_word_num = param_.valid_word_num;
+          multi_head_init_param.sequence_id_offset = param_.sequence_id_offset;
+          multi_head_init_param.trt_seqlen_offset = param_.trt_seqlen_offset;
+          multi_head_init_param.trt_seqlen_size = param_.trt_seqlen_size;
+          // initialize MultiHeadInitParam
+          attention_->initialize(multi_head_init_param);
           attention_->forward();
 
 #ifndef NDEBUG
@@ -1567,6 +1582,7 @@ public:
               param_.transformer_out,
               bias_and_input,
               param_.ffn.output_weight.bias,
+              m,
               n,
               param_.stream);
 
