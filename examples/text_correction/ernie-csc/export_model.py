@@ -25,27 +25,19 @@ from model import PretrainedModelForCSC
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
-parser.add_argument("--model_type", type=str, default="ernie", choices=["ernie_gram", "ernie", "roberta"], help="Pretraining model type")
 parser.add_argument("--params_path", type=str, default='./checkpoints/final.pdparams', help="The path of model parameter to be loaded.")
 parser.add_argument("--output_path", type=str, default='./infer_model/static_graph_params', help="The path of model parameter in static graph to be saved.")
-parser.add_argument("--model_name_or_path", type=str, default="ernie-1.0", choices=["ernie-gram-zh", "ernie-1.0", "roberta-wwm-ext"], help="Pretraining model name or path")
+parser.add_argument("--model_name_or_path", type=str, default="ernie-1.0", choices=["ernie-1.0"], help="Pretraining model name or path")
 parser.add_argument("--pinyin_vocab_file_path", type=str, default="pinyin_vocab.txt", help="pinyin vocab file path")
 args = parser.parse_args()
 # yapf: enable
-
-MODEL_CLASSES = {
-    "ernie_gram": (ErnieGramModel, ),
-    "ernie": (ErnieModel, ),
-    "roberta": (RobertaModel, )
-}
 
 
 def main():
     pinyin_vocab = Vocab.load_vocabulary(
         args.pinyin_vocab_file_path, unk_token='[UNK]', pad_token='[PAD]')
 
-    MODEL_CLASS, = MODEL_CLASSES[args.model_type]
-    pretrained_model = MODEL_CLASS.from_pretrained(args.model_name_or_path)
+    pretrained_model = ErnieModel.from_pretrained(args.model_name_or_path)
 
     model = PretrainedModelForCSC(
         pretrained_model,
