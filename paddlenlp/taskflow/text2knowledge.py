@@ -158,10 +158,6 @@ class WordTagTask(Task):
         tag_path = download_file(self._task_path, "termtree_tags_pos.txt",
                                  URLS['termtree_tags_pos'][0],
                                  URLS['termtree_tags_pos'][1])
-        #if term_schema_path is not None:
-        #    self._term_schema = self._load_schema(term_schema_path)
-        #if term_data_path is not None:
-        #    self._term_dict = self._load_term_tree_data(term_data_path)
         self._tags_to_index, self._index_to_tags = self._load_labels(tag_path)
 
         self._termtree = TermTree.from_dir(term_schema_path, term_data_path)

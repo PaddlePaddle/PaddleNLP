@@ -129,8 +129,6 @@ class TextGenerationTask(Task):
             'batch_size'] if 'batch_size' in self.kwargs else 1
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
-        lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
         generation_task = self.kwargs[
             'generation_task'] if 'generation_task' in self.kwargs else 'question'
         max_seq_len = 32
@@ -151,27 +149,25 @@ class TextGenerationTask(Task):
 
         infer_data = []
 
-        def read(inputs):
-            for input_text in inputs:
-                few_shot_input = pre_input.format(input_text)
-                ids = self._tokenizer(few_shot_input)["input_ids"]
-                yield ids, len(ids)
+        examples = []
+        for input_text in inputs:
+            few_shot_input = pre_input.format(input_text)
+            ids = self._tokenizer(few_shot_input)["input_ids"]
+            examples.append((ids, len(ids)))
 
-        infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=0, dtype="int64"),
             Stack(dtype='int64'),  # seq_len
         ): fn(samples)
-        infer_data_loader = paddle.io.DataLoader(
-            infer_ds,
-            collate_fn=batchify_fn,
-            num_workers=num_workers,
-            batch_size=batch_size,
-            shuffle=False,
-            return_list=True)
+
+        batches = [
+            examples[idx:idx + batch_size]
+            for idx in range(0, len(examples), batch_size)
+        ]
         outputs = {}
         outputs['text'] = inputs
-        outputs['data_loader'] = infer_data_loader
+        outputs['data_loader'] = batches
+        self._batchify_fn = batchify_fn
         return outputs
 
     def _run_model(self, inputs):
@@ -180,27 +176,14 @@ class TextGenerationTask(Task):
         """
         results = []
         lens = []
-        if not self._static_mode:
-            with dygraph_mode_guard():
-                for batch in inputs['data_loader']:
-                    input_ids, seq_len = batch
-                    out = self._model(input_ids)
-                    out = [int(x) for x in out.numpy().reshape([-1])]
-                    results.append(out)
-                    lens.extend(seq_len.numpy().tolist())
-        else:
-            with static_mode_guard():
-                for batch in inputs['data_loader']:
-                    data_dict = {}
-                    for name, value in zip(self._static_feed_names, batch):
-                        data_dict[name] = value
-                    tags_ids = self._exe.run(
-                        self._static_program,
-                        feed=data_dict,
-                        fetch_list=self._static_fetch_targets)
-                    result = tags_ids[0].tolist()
-                    results.extend(result)
-                    lens.extend(np.array(batch[1]).tolist())
+        with static_mode_guard():
+            for batch in inputs['data_loader']:
+                ids, seq_len = self._batchify_fn(batch)
+                self.input_handles[0].copy_from_cpu(ids)
+                self.predictor.run()
+                result = self.output_handle[0].copy_to_cpu().tolist()
+                results.extend(result)
+                lens.extend(seq_len.tolist())
         inputs['results'] = results
         inputs['lens'] = lens
         return inputs

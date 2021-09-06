@@ -153,29 +153,24 @@ class SentaTask(Task):
             'num_workers'] if 'num_workers' in self.kwargs else 0
         lazy_load = self.kwargs[
             'lazy_load'] if 'lazy_load' in self.kwargs else False
-        infer_data = []
+        examples = []
+        for input_data in inputs:
+            ids = self._tokenizer.encode(input_data)
+            lens = len(ids)
+            examples.append((ids, lens))
 
-        def read(inputs):
-            for input_data in inputs:
-                ids = self._tokenizer.encode(input_data)
-                lens = len(ids)
-                yield ids, lens
-
-        infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self._tokenizer.vocab.token_to_idx.get('[PAD]', 0)),  # input_ids
             Stack(dtype='int64'),  # seq_len
         ): fn(samples)
-        infer_data_loader = paddle.io.DataLoader(
-            infer_ds,
-            collate_fn=batchify_fn,
-            num_workers=num_workers,
-            batch_size=batch_size,
-            shuffle=False,
-            return_list=True)
+        batches = [
+            examples[idx:idx + batch_size]
+            for idx in range(0, len(examples), batch_size)
+        ]
         outputs = {}
+        outputs['data_loader'] = batches
         outputs['text'] = inputs
-        outputs['data_loader'] = infer_data_loader
+        self.batchify_fn = batchify_fn
         return outputs
 
     def _run_model(self, inputs):
@@ -183,27 +178,15 @@ class SentaTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         results = []
-        if not self._static_mode:
-            with dygraph_mode_guard():
-                with paddle.no_grad():
-                    for batch in inputs['data_loader']:
-                        input_ids, seq_len = batch
-                        idx = self._model(input_ids, seq_len)
-                        idx = idx.tolist()
-                        labels = [self._label_map[i] for i in idx]
-                        results.extend(labels)
-        else:
-            with static_mode_guard():
-                for batch in inputs['data_loader']:
-                    data_dict = {}
-                    for name, value in zip(self._static_feed_names, batch):
-                        data_dict[name] = value
-                    idx = self._exe.run(self._static_program,
-                                        feed=data_dict,
-                                        fetch_list=self._static_fetch_targets)
-                    idx = idx[0].tolist()
-                    labels = [self._label_map[i] for i in idx]
-                    results.extend(labels)
+        with static_mode_guard():
+            for batch in inputs['data_loader']:
+                ids, lens = self.batchify_fn(batch)
+                self.input_handles[0].copy_from_cpu(ids)
+                self.input_handles[1].copy_from_cpu(lens)
+                self.predictor.run()
+                idx = self.output_handle[0].copy_to_cpu().tolist()
+                labels = [self._label_map[i] for i in idx]
+                results.extend(labels)
 
         inputs['result'] = results
         return inputs
@@ -293,30 +276,25 @@ class SkepTask(Task):
             'lazy_load'] if 'lazy_load' in self.kwargs else False
         infer_data = []
 
-        def read(inputs):
-            for input_data in inputs:
-                encoded_inputs = self._tokenizer(
-                    text=input_data, max_seq_len=128)
-                ids = encoded_inputs["input_ids"]
-                segment_ids = encoded_inputs["token_type_ids"]
-                yield ids, segment_ids
+        examples = []
+        for input_data in inputs:
+            encoded_inputs = self._tokenizer(text=input_data, max_seq_len=128)
+            ids = encoded_inputs["input_ids"]
+            segment_ids = encoded_inputs["token_type_ids"]
+            examples.append((ids, segment_ids))
 
-        infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input ids
             Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # token type ids
         ): [data for data in fn(samples)]
-
-        infer_data_loader = paddle.io.DataLoader(
-            infer_ds,
-            collate_fn=batchify_fn,
-            num_workers=num_workers,
-            batch_size=batch_size,
-            shuffle=False,
-            return_list=True)
+        batches = [
+            examples[idx:idx + batch_size]
+            for idx in range(0, len(examples), batch_size)
+        ]
         outputs = {}
         outputs['text'] = inputs
-        outputs['data_loader'] = infer_data_loader
+        outputs['data_loader'] = batches
+        self._batchify_fn = batchify_fn
         return outputs
 
     def _run_model(self, inputs):
@@ -324,27 +302,15 @@ class SkepTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         results = []
-        if not self._static_mode:
-            with dygraph_mode_guard():
-                with paddle.no_grad():
-                    for batch in inputs['data_loader']:
-                        input_ids, segment_ids = batch
-                        idx = self._model(input_ids, segment_ids)
-                        idx = idx.tolist()
-                        labels = [self._label_map[i] for i in idx]
-                        results.extend(labels)
-        else:
-            with static_mode_guard():
-                for batch in inputs['data_loader']:
-                    data_dict = {}
-                    for name, value in zip(self._static_feed_names, batch):
-                        data_dict[name] = value
-                    idx = self._exe.run(self._static_program,
-                                        feed=data_dict,
-                                        fetch_list=self._static_fetch_targets)
-                    idx = idx[0].tolist()
-                    labels = [self._label_map[i] for i in idx]
-                    results.extend(labels)
+        with static_mode_guard():
+            for batch in inputs['data_loader']:
+                ids, segment_ids = self._batchify_fn(batch)
+                self.input_handles[0].copy_from_cpu(ids)
+                self.input_handles[1].copy_from_cpu(segment_ids)
+                self.predictor.run()
+                idx = self.output_handle[0].copy_to_cpu().tolist()
+                labels = [self._label_map[i] for i in idx]
+                results.extend(labels)
 
         inputs['result'] = results
         return inputs
