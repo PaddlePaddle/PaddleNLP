@@ -20,8 +20,11 @@ def parse_args():
     parser.add_argument("--predict_file", type=str, required=False, default=None, help="Predict data path.")
     parser.add_argument('--logging_steps', type=int, default=100, help='Log every X updates steps.')
     parser.add_argument('--batch_size', type=int, default=16, help='Batch size per GPU/CPU for training.')
+    parser.add_argument('--max_seq_len', type=int, default=512, help='The maximum sequence length of training.')
     parser.add_argument('--max_dec_len', type=int, default=20, help='The maximum sequence length of decoding.')
     parser.add_argument('--min_dec_len', type=int, default=3, help='The minimal sequence length of decoding.')
+    parser.add_argument('--max_target_len', type=int, default=30, help='The maximum target sequence length of training.')
+    parser.add_argument('--max_title_len', type=int, default=30, help='The maximum title sequence length of training.')
     parser.add_argument('--num_return_sequences', type=int, default=1, help='The numbers of returned sequences for one input in generation.')
     parser.add_argument('--decode_strategy', type=str, default='beam_search', help='The decode strategy in generation.')
     parser.add_argument('--top_k', type=int, default=0, help='The number of highest probability vocabulary tokens to keep for top-k sampling.')
@@ -32,7 +35,7 @@ def parse_args():
     parser.add_argument('--device', type=str, default='gpu', help='The device to select for training the model.')
     parser.add_argument('--output_path', type=str, default='./predict.txt', help='The file path where the infer result will be saved.')
     parser.add_argument('--use_fp16_decoding', action='store_true', help='Whether to use fp16 when using faster transformer. Only works when using faster transformer. ')
-    parser.add_argument('--decoding_lib', type=str, default='../../../paddlenlp/ops/build/lib/libdecoding_op.so', help='The decoding lib of faster transformer. ')
+    parser.add_argument('--decoding_lib', type=str, default='../../../../paddlenlp/ops/build/lib/libdecoding_op.so', help='The decoding lib of faster transformer. ')
 
     args = parser.parse_args()
     return args
@@ -70,10 +73,6 @@ def run(args):
     dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args,
                                                  'test')
 
-    if not args.do_predict and args.faster:
-        raise ValueError(
-            "FasterTransformer only works when do_predict is set. ")
-
     evaluation(model, dev_data_loader, args, tokenizer)
 
 
@@ -92,7 +91,7 @@ def evaluation(model, data_loader, args, tokenizer):
     start_time = time.time()
     for step, inputs in enumerate(data_loader, 1):
         input_ids, token_type_ids, position_ids, attention_mask, seq_len = inputs
-        output = model.generate(
+        ids = model.generate(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
@@ -116,7 +115,6 @@ def evaluation(model, data_loader, args, tokenizer):
                   (step, total_time / args.logging_steps))
             total_time = 0.0
 
-        ids = output
         results = select_sum(ids, None, tokenizer)
 
         pred_ref.extend(results)
