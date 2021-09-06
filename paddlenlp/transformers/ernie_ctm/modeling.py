@@ -330,6 +330,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             content_clone (bool, optional):
                 Whether the `content_output` is clone from `sequence_output`. If set to `True`, the content_output is
                 clone from sequence_output, which may cause the classification task impact on the sequence labeling task.
+                Defaults to `False`.
 
         Returns:
             tuple: Returns tuple (``sequence_output``, ``pooled_output``, ``content_output``).
@@ -360,7 +361,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                sequence_output, pooled_output = model(**inputs)
+                sequence_output, pooled_output, content_output = model(**inputs)
 
         """
         if attention_mask is None:
@@ -410,12 +411,12 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
     Args:
         ernie_ctm (:clss:`ErnieCtmModel`):
             An instance of :class:`ErnieCtmModel`.
-        num_tag (`int`):
-            The number of tags.
-        num_cls_label (`int`):
-            The number of sentence classification label.
-        crf_lr (`float`):
-            The learning rate of the crf.
+        num_tag (int):
+            The number of different tags.
+        num_cls_label (int):
+            The number of sentence classification labels.
+        crf_lr (float):
+            The learning rate of the crf. Defaults to `100`.
         ignore_index (`index`):
             The ignore prediction index when calculating the cross entropy loss.
     """
@@ -451,6 +452,56 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
                 lengths=None,
                 tag_labels=None,
                 cls_label=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieCtmModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            position_ids (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            lengths (Tensor, optional):
+                The input length. Its dtype is int64 and has a shape of `[batch_size]`.
+                Defaults to `None`.
+            tag_labels (Tensor, optional):
+                The input predicted tensor.
+                Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_tags]`.
+                Defaults to `None`.
+            cls_labels (Tensor, optional):
+                The input predicted tensor.
+                Its dtype is float32 and has a shape of `[batch_size, sequence_length, num_cls_labels]`.
+                Defaults to `None`.
+
+        Returns:
+            tuple: Returns tuple (`seq_logits`, `cls_logits`).
+
+            With the fields:
+
+            - `seq_logits` (Tensor):
+                A tensor of next sentence prediction logits.
+                Its data type should be float32 and its shape is [batch_size, sequence_length, num_tag].
+
+            - `cls_logits` (Tensor):
+                A tensor of the sentence classification logits.
+                Its data type should be float32 and its shape is [batch_size, num_cls_labels].
+
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
+
+                tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-ctm')
+                model = ErnieCtmWordtagModel.from_pretrained('ernie-ctm', num_tag=2, num_cls_label=2)
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+
+        """
         outputs = self.ernie_ctm(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -477,6 +528,22 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
 
 
 class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
+    r"""
+    ERNIECtm Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+
+
+    Args:
+        ernie (`ErnieModel`):
+            An instance of `ErnieModel`.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of ERNIE.
+            If None, use the same value as `hidden_dropout_prob`
+            of `ErnieCtmModel` instance `ernie`. Defaults to `None`.
+    """
+
     def __init__(self, ernie_ctm, num_classes=2, dropout=None):
         super(ErnieCtmForTokenClassification, self).__init__()
         self.num_classes = num_classes
@@ -492,6 +559,36 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieCtmModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            position_ids (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ErnieCtmModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            Shape as `[sequence_length, num_classes]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ErnieCtmForTokenClassification, ErnieCtmTokenizer
+
+                tokenizer = ErnieCtmTokenizer.from_pretrained('ernie-ctm')
+                model = ErnieCtmForTokenClassification.from_pretrained('ernie-ctm')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+
+        """
+
         sequence_output, _, _ = self.ernie_ctm(
             input_ids,
             token_type_ids=token_type_ids,

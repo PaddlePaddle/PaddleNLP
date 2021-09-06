@@ -565,9 +565,8 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 See :class:`ErnieModel`.
 
         Returns:
-            Tensor: logits (Tensor):
-                A Tensor of the input text classification logits, shape as (batch_size, seq_lens, `num_classes`).
-                seq_lens mean the number of tokens of the input sequence.
+            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
 
         Example:
             .. code-block::
@@ -578,7 +577,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!例")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
