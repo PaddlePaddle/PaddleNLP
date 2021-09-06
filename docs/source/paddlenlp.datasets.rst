@@ -4,7 +4,6 @@ paddlenlp.datasets
 .. automodule:: paddlenlp.datasets
    :members:
    :no-undoc-members:
-   :show-inheritance:
 
 
 .. toctree::
