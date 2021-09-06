@@ -83,13 +83,6 @@ def parse_args():
                 for classes in MODEL_CLASSES.values()
             ], [])), )
     parser.add_argument(
-        "--output_dir",
-        default=None,
-        type=str,
-        required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
-    )
-    parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
