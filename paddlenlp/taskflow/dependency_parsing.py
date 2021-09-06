@@ -26,15 +26,15 @@ from .models import BiAffineParser
 
 URLS = {
     "ddparser": [
-        "https://paddlenlp.bj.bcebos.com/taskflow/dependency_parsing/ddparser/ddparser.tar.gz", 
+        "https://paddlenlp.bj.bcebos.com/taskflow/dependency_parsing/ddparser/ddparser.tar.gz",
         "bcb79081d9e6f46c3dbc0dbfcce445ec",
-    ], 
-    "ddparser-ernie-1.0":[
-        "https://paddlenlp.bj.bcebos.com/taskflow/dependency_parsing/ddparser/ddparser-ernie-1.0.tar.gz", 
+    ],
+    "ddparser-ernie-1.0": [
+        "https://paddlenlp.bj.bcebos.com/taskflow/dependency_parsing/ddparser/ddparser-ernie-1.0.tar.gz",
         "77640972889c68fcb0459611e932530b",
-    ],  
-    "ddparser-ernie-gram-zh":[
-        "https://paddlenlp.bj.bcebos.com/taskflow/dependency_parsing/ddparser/ddparser-ernie-gram-zh.tar.gz", 
+    ],
+    "ddparser-ernie-gram-zh": [
+        "https://paddlenlp.bj.bcebos.com/taskflow/dependency_parsing/ddparser/ddparser-ernie-gram-zh.tar.gz",
         "7f8326ccdf64d31f0482ad23fa3caacc",
     ],
 }
@@ -87,10 +87,9 @@ class DDParserTask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    def __init__(self, 
-                 task, 
-                 model, 
-                 static_mode=False, 
+    def __init__(self,
+                 task,
+                 model,
                  tree=True,
                  prob=False,
                  use_pos=False,
@@ -98,10 +97,9 @@ class DDParserTask(Task):
                  batch_size=1,
                  return_visual=False,
                  **kwargs):
-        super().__init__(
-            task=task, model=model, **kwargs)
+        super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
-        self.static_mode = static_mode
+        self.static_mode = True
         self.model = model
 
         if self.model == "ddparser":
@@ -120,7 +118,8 @@ class DDParserTask(Task):
             self._task_path, self.model + os.path.sep + "rel_vocab.json",
             URLS[self.model][0], URLS[self.model][1])
         font_file_path = download_file(
-            self._task_path, self.model + os.path.sep + "SourceHanSansCN-Regular.ttf",
+            self._task_path,
+            self.model + os.path.sep + "SourceHanSansCN-Regular.ttf",
             URLS[self.model][0], URLS[self.model][1])
         self.word_vocab = Vocab.from_json(word_vocab_path)
         self.rel_vocab = Vocab.from_json(rel_vocab_path)
@@ -135,15 +134,14 @@ class DDParserTask(Task):
 
         try:
             from LAC import LAC
-            import matplotlib.pyplot as plt
-            import matplotlib.font_manager as font_manager
         except:
-            raise ImportError("Please install the dependencies first!")
+            raise ImportError(
+                "Please install the dependencies first, pip install LAC --upgrade"
+            )
 
-        self.plt = plt
-        self.font = font_manager.FontProperties(fname=font_file_path)
         self.use_cuda = use_cuda
-        self.lac = LAC(mode="lac" if self.use_pos else "seg", use_cuda=self.use_cuda)
+        self.lac = LAC(mode="lac" if self.use_pos else "seg",
+                       use_cuda=self.use_cuda)
         if self.static_mode:
             self._get_inference_model()
         else:
@@ -157,7 +155,7 @@ class DDParserTask(Task):
             paddle.static.InputSpec(
                 shape=[None, None], dtype="int64"),
             paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),                         
+                shape=[None, None], dtype="int64"),
         ]
 
     def _construct_model(self, model):
@@ -169,8 +167,7 @@ class DDParserTask(Task):
             n_rels=len(self.rel_vocab),
             n_words=len(self.word_vocab),
             pad_index=self.word_pad_index,
-            eos_index=self.word_eos_index,
-        )
+            eos_index=self.word_eos_index, )
         # Load the model parameter for the predict
         state_dict = paddle.load(
             os.path.join(self._task_path, self.model, "model.pdparams"))
@@ -201,42 +198,41 @@ class DDParserTask(Task):
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
         lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False    
+            'lazy_load'] if 'lazy_load' in self.kwargs else False
 
         lac_results = []
         position = 0
 
         while position < len(inputs):
-            lac_results += self.lac.run(inputs[position:position + self.batch_size])
-            position += self.batch_size   
+            lac_results += self.lac.run(inputs[position:position +
+                                               self.batch_size])
+            position += self.batch_size
 
         outputs = {}
         if not self.use_pos:
             outputs['words'] = lac_results
         else:
-            outputs['words'], outputs['postags'] = [raw for raw in zip(*lac_results)]
+            outputs['words'], outputs[
+                'postags'] = [raw for raw in zip(*lac_results)]
 
         examples = []
         for text in outputs['words']:
-            example = {
-                "FORM": text, 
-            }
+            example = {"FORM": text, }
             example = convert_example(
                 example,
-                vocabs=[self.word_vocab, self.rel_vocab],
-            )
+                vocabs=[self.word_vocab, self.rel_vocab], )
             examples.append(example)
 
         batches = [
             examples[idx:idx + self.batch_size]
             for idx in range(0, len(examples), self.batch_size)
-        ]  
+        ]
 
         def batchify_fn(batch):
             raw_batch = [raw for raw in zip(*batch)]
             batch = [pad_sequence(data) for data in raw_batch]
             return batch
-        
+
         batches = [flat_words(batchify_fn(batch)[0]) for batch in batches]
 
         outputs['data_loader'] = batches
@@ -248,49 +244,27 @@ class DDParserTask(Task):
         """
 
         arcs, rels, probs = [], [], []
-        if not self.static_mode:
-            with dygraph_mode_guard():
-                for batch in inputs['data_loader']:
-                    words, wp = batch
-                    words = paddle.to_tensor(words)
-                    wp = paddle.to_tensor(wp)
+        for batch in inputs['data_loader']:
+            words, wp = batch
+            self.input_handles[0].copy_from_cpu(words)
+            self.input_handles[1].copy_from_cpu(wp)
+            self.predictor.run()
+            s_arc = self.output_handle[0].copy_to_cpu()
+            s_rel = self.output_handle[1].copy_to_cpu()
+            words = self.output_handle[2].copy_to_cpu()
 
-                    s_arc, s_rel, words = self._model(words, wp)
-                    
-                    words = words.numpy()
-                    mask = np.logical_and(
-                        np.logical_and(words != self.word_pad_index, words != self.word_bos_index),
-                        words != self.word_eos_index, 
-                    )
-                    arc_preds, rel_preds = decode(s_arc.numpy(), s_rel.numpy(), mask, self.tree)
+            mask = np.logical_and(
+                np.logical_and(words != self.word_pad_index,
+                               words != self.word_bos_index),
+                words != self.word_eos_index, )
+            arc_preds, rel_preds = decode(s_arc, s_rel, mask, self.tree)
 
-                    arcs.extend([arc_pred[m] for arc_pred, m in zip(arc_preds, mask)])
-                    rels.extend([rel_pred[m] for rel_pred, m in zip(rel_preds, mask)])  
-
-                    if self.prob:
-                        arc_probs = probability(s_arc.numpy(), arc_preds)   
-                        probs.extend([arc_prob[m] for arc_prob, m in zip(arc_probs, mask)])                
-        else:
-            for batch in inputs['data_loader']:
-                words, wp = batch
-                self.input_handles[0].copy_from_cpu(words)
-                self.input_handles[1].copy_from_cpu(wp)
-                self.predictor.run()
-                s_arc = self.output_handle[0].copy_to_cpu()
-                s_rel = self.output_handle[1].copy_to_cpu()
-                words = self.output_handle[2].copy_to_cpu()                
-
-                mask = np.logical_and(
-                    np.logical_and(words != self.word_pad_index, words != self.word_bos_index),
-                    words != self.word_eos_index, 
-                )
-                arc_preds, rel_preds = decode(s_arc, s_rel, mask, self.tree)
-
-                arcs.extend([arc_pred[m] for arc_pred, m in zip(arc_preds, mask)])
-                rels.extend([rel_pred[m] for rel_pred, m in zip(rel_preds, mask)])
-                if self.prob:
-                    arc_probs = probability(s_arc, arc_preds)  
-                    probs.extend([arc_prob[m] for arc_prob, m in zip(arc_probs, mask)])     
+            arcs.extend([arc_pred[m] for arc_pred, m in zip(arc_preds, mask)])
+            rels.extend([rel_pred[m] for rel_pred, m in zip(rel_preds, mask)])
+            if self.prob:
+                arc_probs = probability(s_arc, arc_preds)
+                probs.extend(
+                    [arc_prob[m] for arc_prob, m in zip(arc_probs, mask)])
         inputs['arcs'] = arcs
         inputs['rels'] = rels
         inputs['probs'] = probs
@@ -302,7 +276,7 @@ class DDParserTask(Task):
         rels = inputs['rels']
         words = inputs['words']
         arcs = [[s for s in seq] for seq in arcs]
-        rels = [self.rel_vocab.to_tokens(seq) for seq in rels]   
+        rels = [self.rel_vocab.to_tokens(seq) for seq in rels]
 
         results = []
 
@@ -312,12 +286,12 @@ class DDParserTask(Task):
                 'head': arc,
                 'deprel': rel,
             }
-            results.append(result)   
+            results.append(result)
 
         if self.use_pos:
             postags = inputs['postags']
             for result, postag in zip(results, postags):
-                result['postag'] = postag  
+                result['postag'] = postag
 
         if self.prob:
             probs = inputs['probs']
@@ -339,7 +313,16 @@ class DDParserTask(Task):
          Returns:
             data: a numpy array, use cv2.imshow to show it or cv2.imwrite to save it.
         """
+        try:
+            import matplotlib.pyplot as plt
+            import matplotlib.font_manager as font_manager
+        except:
+            raise ImportError(
+                "Please install the dependencies first, pip install matplotlib --upgrade"
+            )
 
+        self.plt = plt
+        self.font = font_manager.FontProperties(fname=font_file_path)
         word, head, deprel = data['word'], data['head'], data['deprel']
 
         nodes = ['ROOT'] + word
@@ -362,8 +345,7 @@ class DDParserTask(Task):
                     xy=xytext,
                     xycoords='data',
                     xytext=xytext,
-                    textcoords='data',
-                )
+                    textcoords='data', )
             else:
                 xy = (head[i - 1], 0)
                 rad = 0.5 if head[i - 1] < i else -0.5
@@ -387,9 +369,7 @@ class DDParserTask(Task):
                         shrinkA=12,
                         shrinkB=12,
                         color='blue',
-                        connectionstyle="arc3,rad=%s" % rad,
-                    ),
-                )
+                        connectionstyle="arc3,rad=%s" % rad, ), )
                 # Set the deprel label. Calculate its position by the radius
                 text_x = min(i, head[i - 1]) + abs((i - head[i - 1])) / 2 - 0.2
                 text_y = abs((i - head[i - 1])) / 4
@@ -407,9 +387,9 @@ class DDParserTask(Task):
         # Save to numpy array
         fig.canvas.draw()
         data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-        data = data.reshape(fig.canvas.get_width_height()[::-1] +
-                            (3, ))[:, :, ::-1]
-        return data        
+        data = data.reshape(fig.canvas.get_width_height()[::-1] + (
+            3, ))[:, :, ::-1]
+        return data
 
 
 def pad_sequence(sequences, padding_value=0, fix_len=None):
@@ -428,19 +408,20 @@ def pad_sequence(sequences, padding_value=0, fix_len=None):
     return out_tensor
 
 
-def convert_example(example,
-                    vocabs, 
-                    fix_len=20):
+def convert_example(example, vocabs, fix_len=20):
     word_vocab, rel_vocab = vocabs
 
     word_bos_index = word_vocab.to_indices("[CLS]")
-    word_eos_index = word_vocab.to_indices("[SEP]") 
+    word_eos_index = word_vocab.to_indices("[SEP]")
 
-    words = [[word_vocab.to_indices(char) for char in word] for word in example["FORM"]]
+    words = [[word_vocab.to_indices(char) for char in word]
+             for word in example["FORM"]]
     words = [[word_bos_index]] + words + [[word_eos_index]]
     return [
-        pad_sequence([np.array(ids[:fix_len], dtype=int) 
-        for ids in words], fix_len=fix_len)
+        pad_sequence(
+            [np.array(
+                ids[:fix_len], dtype=int) for ids in words],
+            fix_len=fix_len)
     ]
 
 
@@ -454,7 +435,7 @@ def flat_words(words, pad_index=0):
     sequences = []
     idx = 0
     for l in lens:
-        sequences.append(words[idx:idx+l])
+        sequences.append(words[idx:idx + l])
         idx += l
     words = Pad(pad_val=pad_index)(sequences)
 
@@ -466,8 +447,9 @@ def flat_words(words, pad_index=0):
 
 
 def probability(s_arc, arc_preds):
-    s_arc = s_arc - s_arc.max(axis=-1).reshape(list(s_arc.shape)[:-1]+[1])
-    s_arc = np.exp(s_arc) / np.exp(s_arc).sum(axis=-1).reshape(list(s_arc.shape)[:-1]+[1])
+    s_arc = s_arc - s_arc.max(axis=-1).reshape(list(s_arc.shape)[:-1] + [1])
+    s_arc = np.exp(s_arc) / np.exp(s_arc).sum(
+        axis=-1).reshape(list(s_arc.shape)[:-1] + [1])
 
     arc_probs = [
         s[np.arange(len(arc_pred)), arc_pred]
@@ -484,7 +466,7 @@ def decode(s_arc, s_rel, mask, tree=True):
     bad = [not istree(seq[:i + 1]) for i, seq in zip(lens, arc_preds)]
     if tree and any(bad):
         arc_preds[bad] = eisner(s_arc[bad], mask[bad])
-    
+
     rel_preds = np.argmax(s_rel, axis=-1)
     rel_preds = [
         rel_pred[np.arange(len(arc_pred)), arc_pred]
@@ -583,16 +565,19 @@ def fill_diagonal(x, value, offset=0, dim1=0, dim2=1):
     dim_sum = dim1 + dim2
     dim3 = 3 - dim_sum
     if offset >= 0:
-        diagonal = np.lib.stride_tricks.as_strided(x[:, offset:] if dim_sum == 1 else x[:, :, offset:],
-                                                   shape=(shape[dim3], shape[dim1] - offset),
-                                                   strides=(strides[dim3], strides[dim1] + strides[dim2]))
+        diagonal = np.lib.stride_tricks.as_strided(
+            x[:, offset:] if dim_sum == 1 else x[:, :, offset:],
+            shape=(shape[dim3], shape[dim1] - offset),
+            strides=(strides[dim3], strides[dim1] + strides[dim2]))
     else:
-        diagonal = np.lib.stride_tricks.as_strided(x[-offset:, :] if dim_sum in [1, 2] else x[:, -offset:],
-                                                   shape=(shape[dim3], shape[dim1] + offset),
-                                                   strides=(strides[dim3], strides[dim1] + strides[dim2]))
+        diagonal = np.lib.stride_tricks.as_strided(
+            x[-offset:, :] if dim_sum in [1, 2] else x[:, -offset:],
+            shape=(shape[dim3], shape[dim1] + offset),
+            strides=(strides[dim3], strides[dim1] + strides[dim2]))
 
     diagonal[...] = value
     return x
+
 
 def backtrack(p_i, p_c, heads, i, j, complete):
     """
@@ -642,13 +627,15 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
     strides = x.strides
     m = strides[0] + strides[1]
     k = strides[1] if dim == 1 else strides[0]
-    return np.lib.stride_tricks.as_strided(x[offset[0]:, offset[1]:],
-                                           shape=[n, w] + list(x.shape[2:]),
-                                           strides=[m, k] + list(strides[2:]))
+    return np.lib.stride_tricks.as_strided(
+        x[offset[0]:, offset[1]:],
+        shape=[n, w] + list(x.shape[2:]),
+        strides=[m, k] + list(strides[2:]))
 
 
 class Node:
     """Node class"""
+
     def __init__(self, id=None, parent=None):
         self.lefts = []
         self.rights = []
@@ -661,6 +648,7 @@ class DepTree:
     DepTree class, used to check whether the prediction result is a project Tree.
     A projective tree means that you can project the tree without crossing arcs.
     """
+
     def __init__(self, sentence):
         # set root head to -1
         sentence = copy.deepcopy(sentence)
@@ -671,7 +659,9 @@ class DepTree:
 
     def build_tree(self):
         """Build the tree"""
-        self.nodes = [Node(index, p_index) for index, p_index in enumerate(self.sentence)]
+        self.nodes = [
+            Node(index, p_index) for index, p_index in enumerate(self.sentence)
+        ]
         # set root
         self.root = self.nodes[0]
         for node in self.nodes[1:]:

@@ -212,15 +212,13 @@ class LacTask(Task):
         else:
             with static_mode_guard():
                 for batch in inputs['data_loader']:
-                    data_dict = {}
-                    for name, value in zip(self._static_feed_names, batch):
-                        data_dict[name] = value
-                    tags_ids = self._exe.run(
-                        self._static_program,
-                        feed=data_dict,
-                        fetch_list=self._static_fetch_targets)
-                    results.extend(tags_ids[0].tolist())
-                    lens.extend(np.array(data_dict['length']).tolist())
+                    input_ids, seq_len = batch
+                    self.input_handles[0].copy_from_cpu(input_ids)
+                    self.input_handles[1].copy_from_cpu(seq_len)
+                    self.predictor.run()
+                    tags_ids = self.output_handle[0].copy_to_cpu()
+                    results.extend(tags_ids.tolist())
+                    lens.extend(seq_len.tolist())
         inputs['result'] = results
         inputs['lens'] = lens
         return inputs
