@@ -121,8 +121,7 @@ python run_glue_torch.py \
   --num_train_epochs 5 \
   --output_dir /tmp/QQP2/
 ```
-**由于网络问题，无法跑pytorch版本。pytorch版本的是在colab上K80跑的，推理时间仅供参考**
 | - |squeeze|bert|加速比|
 | :----:| :----:| :----:| :----:|
-|paddle|163s|209s|1.28|
+|paddle|146s|200s|1.28|
 |pytorch|463s|598s|1.29|

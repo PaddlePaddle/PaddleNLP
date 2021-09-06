@@ -312,7 +312,7 @@ def do_train(args):
             return_list=True)
     else:
         dev_ds = load_dataset('glue', args.task_name, splits='dev')
-        dev_ds = dev_ds.map(trans_func, lazy=True)
+        dev_ds = dev_ds.map(trans_func, lazy=False)
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.batch_size, shuffle=False)
         dev_data_loader = DataLoader(
