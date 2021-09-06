@@ -14,10 +14,8 @@
 
 import argparse
 
-import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddle import inference
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.transformers import BertTokenizer
 
@@ -27,7 +25,6 @@ from data import convert_example
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_file", type=str, required=True, default='./static_graph_params.pdmodel', help="The path to model info in static graph.")
 parser.add_argument("--params_file", type=str, required=True, default='./static_graph_params.pdiparams', help="The path to parameters in static graph.")
-
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--threshold", default=0.5, type=float, help="The threshold for converting probabilities to labels")
@@ -35,6 +32,7 @@ parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GP
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
+
 
 class Predictor(object):
     def __init__(self, model_file, params_file, device, max_seq_length):
@@ -131,4 +129,3 @@ if __name__ == "__main__":
         print('Data: \t {}'.format(text))
         for i, k in enumerate(label_info):
             print('{}: \t {}'.format(k, results[idx][i]))
-
