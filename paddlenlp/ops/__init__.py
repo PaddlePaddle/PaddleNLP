@@ -15,6 +15,7 @@
 from .faster_transformer.transformer.decoding import *
 from .faster_transformer.transformer.faster_transformer import *
 from .faster_transformer.transformer.decoder import *
+from .faster_transformer.transformer.encoder import *
 from .einsum import *
 from .distributed import *
 from . import optimizer

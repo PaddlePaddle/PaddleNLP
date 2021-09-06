@@ -44,11 +44,15 @@ if(WITH_UNIFIED)
   list(APPEND decoding_op_files fusion_unified_decoding_op.cc fusion_unified_decoding_op.cu)
 endif()
 
+if(WITH_ENCODER)
+  list(APPEND encoder_op_files fusion_encoder_op.cc fusion_encoder_op.cu)
+endif()
+
 if(WITH_DECODER)
   list(APPEND decoder_op_files fusion_decoder_op.cc fusion_decoder_op.cu)
 endif()
 
-if(NOT WITH_TRANSFORMER AND NOT WITH_GPT AND NOT WITH_DECODER)
+if(NOT WITH_TRANSFORMER AND NOT WITH_GPT AND NOT WITH_DECODER AND NOT WITH_ENCODER)
   message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON or/and -DWITH_DECODER=ON must be set to use FasterTransformer. ")
 endif()
 
@@ -291,3 +295,5 @@ if(ON_INFER AND WITH_GPT)
 endif()
 
 add_subdirectory(faster_transformer)
+
+
