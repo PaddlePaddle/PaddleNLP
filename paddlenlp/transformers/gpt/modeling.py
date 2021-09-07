@@ -729,7 +729,7 @@ class GPTModel(GPTPretrainedModel):
                 can be used to speed up decoding.
             cache (list, optional):
                 It is a list, and each element in the list is a tuple `(incremental_cache, static_cache)`.
-                See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__for more details.
+                See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
                 It is only used for inference and should be None for training.
                 Default to `None`.
 
@@ -891,7 +891,7 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
                 is equal to `prediction_scores`. Its data type should be int64 and
                 its shape is [batch_size, sequence_length, 1].
             loss_mask(Tensor):
-                Weights used to calculate the loss of masked token prediction.
+                Weights of the tokens used for calculating the loss of the masked language modeling.
                 Its data type should be float32 and its shape is [batch_size, sequence_length, 1].
 
         Returns:
