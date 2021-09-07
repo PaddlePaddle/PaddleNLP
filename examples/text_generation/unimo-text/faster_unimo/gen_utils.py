@@ -29,50 +29,28 @@ def convert_example(example,
                     tokenizer,
                     max_seq_len=512,
                     max_target_len=128,
-                    max_title_len=256,
-                    mode='train'):
+                    max_title_len=256):
     """Convert all examples into necessary features."""
     source = example['source']
     title = None
     if 'title' in example.keys():
         title = example['title']
 
-    if mode != 'test':
-        tokenized_example = tokenizer.gen_encode(
-            source,
-            title=title,
-            target=example['target'],
-            max_seq_len=max_seq_len,
-            max_target_len=max_target_len,
-            max_title_len=max_title_len,
-            return_position_ids=True,
-            return_length=True)
-        target_start = tokenized_example['input_ids'].index(
-            tokenizer.cls_token_id, 1)
-        target_end = tokenized_example['seq_len']
-        # Use to gather the logits corresponding to the labels during training
-        tokenized_example['masked_positions'] = list(
-            range(target_start, target_end - 1))
-        tokenized_example['labels'] = tokenized_example['input_ids'][
-            target_start + 1:target_end]
+    tokenized_example = tokenizer.gen_encode(
+        source,
+        title=title,
+        max_seq_len=max_seq_len,
+        max_title_len=max_title_len,
+        add_start_token_for_decoding=True,
+        return_position_ids=True,
+        return_length=True)
 
-        return tokenized_example
-    else:
-        tokenized_example = tokenizer.gen_encode(
-            source,
-            title=title,
-            max_seq_len=max_seq_len,
-            max_title_len=max_title_len,
-            add_start_token_for_decoding=True,
-            return_position_ids=True,
-            return_length=True)
-
-        if 'target' in example and example['target']:
-            tokenized_example['target'] = example['target']
-        return tokenized_example
+    if 'target' in example and example['target']:
+        tokenized_example['target'] = example['target']
+    return tokenized_example
 
 
-def batchify_fn(batch_examples, pad_val, mode):
+def batchify_fn(batch_examples, pad_val):
     def pad_mask(batch_attention_mask):
         batch_size = len(batch_attention_mask)
         max_len = max(map(len, batch_attention_mask))
@@ -98,40 +76,22 @@ def batchify_fn(batch_examples, pad_val, mode):
     attention_mask = pad_mask(
         [example['attention_mask'] for example in batch_examples])
 
-    if mode != 'test':
-        max_len = max([example['seq_len'] for example in batch_examples])
-        masked_positions = np.concatenate([
-            np.array(example['masked_positions']) +
-            (max_len - example['seq_len']) + i * max_len
-            for i, example in enumerate(batch_examples)
-        ])
-        labels = np.concatenate([
-            np.array(
-                example['labels'], dtype='int64') for example in batch_examples
-        ])
-        return input_ids, token_type_ids, position_ids, attention_mask, masked_positions, labels
-    else:
-        seq_len = np.asarray(
-            [example['seq_len'] for example in batch_examples]).astype("int32")
-        return input_ids, token_type_ids, position_ids, attention_mask, seq_len
+    seq_len = np.asarray(
+        [example['seq_len'] for example in batch_examples]).astype("int32")
+    return input_ids, token_type_ids, position_ids, attention_mask, seq_len
 
 
-def create_data_loader(dataset, tokenizer, args, mode):
+def create_data_loader(dataset, tokenizer, args):
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
         max_seq_len=args.max_seq_len,
         max_target_len=args.max_target_len,
-        max_title_len=args.max_title_len,
-        mode=mode)
+        max_title_len=args.max_title_len)
     dataset = dataset.map(trans_func, lazy=True)
-    if mode == 'train':
-        batch_sampler = DistributedBatchSampler(
-            dataset, batch_size=args.batch_size, shuffle=True)
-    else:
-        batch_sampler = BatchSampler(
-            dataset, batch_size=args.batch_size, shuffle=False)
-    collate_fn = partial(batchify_fn, pad_val=tokenizer.pad_token_id, mode=mode)
+    batch_sampler = BatchSampler(
+        dataset, batch_size=args.batch_size, shuffle=False)
+    collate_fn = partial(batchify_fn, pad_val=tokenizer.pad_token_id)
     data_loader = DataLoader(
         dataset,
         batch_sampler=batch_sampler,

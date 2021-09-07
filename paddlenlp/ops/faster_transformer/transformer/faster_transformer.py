@@ -624,16 +624,13 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         self.vocab_size = model.lm_head.decoder_bias.shape[0]
         self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
 
-        self._n_head = self._model.unified_transformer.encoder.layers[
-            0]._config["nhead"]
-        self._hidden_dims = self._model.unified_transformer.encoder.layers[
-            0]._config["d_model"]
-        self._normalize_before = self._model.unified_transformer.encoder.layers[
-            0].normalize_before
+        self._n_head = self._model.num_attention_heads
+        self._hidden_dims = self._model.hidden_size
+        self._normalize_before = self._model.normalize_before
         self._size_per_head = self._hidden_dims // self._n_head
-        self._n_layer = self._model.unified_transformer.encoder.num_layers
-        self._mask_id = self._model.unified_transformer.mask_token_id
-        self._hidden_act = self._model.unified_transformer.config["hidden_act"]
+        self._n_layer = self._model.num_hidden_layers
+        self._mask_id = self._model.mask_token_id
+        self._hidden_act = self._model.hidden_act
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
@@ -786,15 +783,13 @@ class FasterUnimo(UNIMOPretrainedModel):
         self.vocab_size = model.lm_head.decoder_bias.shape[0]
         self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
 
-        self._n_head = self._model.unimo.encoder.layers[0]._config["nhead"]
-        self._hidden_dims = self._model.unimo.encoder.layers[0]._config[
-            "d_model"]
-        self._normalize_before = self._model.unimo.encoder.layers[
-            0].normalize_before
+        self._n_head = self._model.num_attention_heads
+        self._hidden_dims = self._model.hidden_size
+        self._normalize_before = self._model.normalize_before
         self._size_per_head = self._hidden_dims // self._n_head
-        self._n_layer = self._model.unimo.encoder.num_layers
-        self._mask_id = self._model.unimo.mask_token_id
-        self._hidden_act = self._model.unimo.config["hidden_act"]
+        self._n_layer = self._model.num_hidden_layers
+        self._mask_id = self._model.mask_token_id
+        self._hidden_act = self._model.hidden_act
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,

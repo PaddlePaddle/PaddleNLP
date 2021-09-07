@@ -70,8 +70,7 @@ def run(args):
     dev_ds = load_dataset(
         args.dataset_name, splits='dev', data_files=args.predict_file)
 
-    dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args,
-                                                 'test')
+    dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args)
 
     evaluation(model, dev_data_loader, args, tokenizer)
 
