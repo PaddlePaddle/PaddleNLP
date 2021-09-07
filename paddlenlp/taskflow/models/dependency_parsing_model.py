@@ -25,11 +25,13 @@ class BiAffineParser(nn.Layer):
                  n_rels,
                  n_words,
                  pad_index,
+                 bos_index,
                  eos_index,
                  n_mlp_arc=500,
                  n_mlp_rel=100):
         super(BiAffineParser, self).__init__()
         self.pad_index = pad_index
+        self.bos_index = bos_index
         self.eos_index = eos_index
 
         if encoding_model == "lstm-pe":
@@ -70,7 +72,14 @@ class BiAffineParser(nn.Layer):
         s_arc_mask = paddle.unsqueeze(mask, 1)
         s_arc = s_arc * s_arc_mask + paddle.scale(
             paddle.cast(s_arc_mask, 'int32'), scale=1e5, bias=-1, bias_after_scale=False)
-        return s_arc, s_rel, words
+
+        mask = paddle.cast(paddle.logical_and(
+            paddle.logical_and(words != self.pad_index, words != self.bos_index),
+            words != self.eos_index,
+            ), 'int32')
+        arc_preds = paddle.argmax(s_arc, axis=-1)
+        rel_preds = paddle.argmax(s_rel, axis=-1)    
+        return arc_preds, rel_preds, s_arc, mask
         
 
 class MLP(nn.Layer):
@@ -237,4 +246,3 @@ def index_sample(x, index):
     else:
         out = paddle.reshape(out, shape=[x_s[0], -1])
     return out
-
