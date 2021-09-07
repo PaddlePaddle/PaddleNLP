@@ -64,6 +64,28 @@ def parse_args():
         default="./output/",
         type=str,
         help="The path to save logs when profile is enabled. ")
+    parser.add_argument(
+        "--vocab_file",
+        default=None,
+        type=str,
+        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+    )
+    parser.add_argument(
+        "--unk_token",
+        default=None,
+        type=str,
+        help="The unknown token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--bos_token",
+        default=None,
+        type=str,
+        help="The bos token. It should be provided when use custom vocab_file. ")
+    parser.add_argument(
+        "--eos_token",
+        default=None,
+        type=str,
+        help="The eos token. It should be provided when use custom vocab_file. ")
     args = parser.parse_args()
     return args
 
@@ -222,6 +244,10 @@ if __name__ == "__main__":
         args.inference_model_dir = ARGS.model_dir
     args.test_file = ARGS.test_file
     args.save_log_path = ARGS.save_log_path
+    args.vocab_file = ARGS.vocab_file
+    args.unk_token = ARGS.unk_token
+    args.bos_token = ARGS.bos_token
+    args.eos_token = ARGS.eos_token
     pprint(args)
 
     if args.profile:
