@@ -14,8 +14,6 @@ limitations under the License. */
 #include <string>
 #include <vector>
 
-
-#include <iostream>
 #include "fusion_encoder_op.h"
 
 std::vector<paddle::Tensor> EncoderForward(
@@ -121,7 +119,7 @@ std::vector<std::vector<int64_t>> EncoderInferShape(
     const bool& allow_gemm_test,
     const bool& use_trt_kernel,
     const int64_t& max_seq_len) {
-  return {{input_shape[0], input_shape[1], input_shape[2]}};
+  return {input_shape};
 }
 
 
@@ -149,10 +147,10 @@ std::vector<paddle::DataType> EncoderInferDtype(
     const paddle::DataType& amax_list) {
   switch (input) {
     case paddle::DataType::FLOAT16: {
-      return {paddle::DataType::FLOAT16};
+      return {input};
     }
     case paddle::DataType::FLOAT32: {
-      return {paddle::DataType::FLOAT32};
+      return {input};
     }
     default: {
       PD_THROW(
@@ -187,7 +185,7 @@ PD_BUILD_OP(fusion_encoder)
         "TRTSeqLenOffset",
         "AmaxList",
     })
-    .Outputs({"encoder_out"})
+    .Outputs({"EncoderOut"})
     .Attrs({"head_num: int64_t",
             "size_per_head: int64_t",
             "remove_padding: bool",

@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-import numpy as np
 
 import paddle
-import paddle.nn as nn
 from paddle.fluid.layer_helper import LayerHelper
+import paddle.nn as nn
 
 from paddlenlp.ops import transfer_param
-from paddlenlp.transformers import WordEmbedding, PositionalEmbedding, position_encoding_init
 
 
 def infer_transformer_encoder(input,
@@ -88,7 +86,7 @@ def infer_transformer_encoder(input,
         'max_seq_len': max_seq_length
     }
     encoder_out = helper.create_variable(dtype=input.dtype)
-    outputs = {"encoder_out": encoder_out}
+    outputs = {"EncoderOut": encoder_out}
 
     helper.append_op(
         type='fusion_encoder', inputs=inputs, outputs=outputs, attrs=attrs)
@@ -122,7 +120,7 @@ class InferTransformerEncoder(nn.Layer):
         self.size_per_head = size_per_head
         self.remove_padding = remove_padding
         if use_fp16_encoder:
-            for idx, mod in enumerate(encoder.layers):
+            for mod in encoder.layers:
                 mod.self_attn.q_proj.weight = transfer_param(
                     mod.self_attn.q_proj.weight)
                 mod.self_attn.q_proj.bias = transfer_param(
@@ -151,7 +149,7 @@ class InferTransformerEncoder(nn.Layer):
                     mod.linear2.bias, is_bias=True)
 
         self.weights = []
-        for idx, mod in enumerate(encoder.layers):
+        for mod in encoder.layers:
             layer_weight = []
             layer_weight.append(mod.self_attn.q_proj.weight)
             layer_weight.append(mod.self_attn.q_proj.bias)
@@ -185,7 +183,7 @@ class InferTransformerEncoder(nn.Layer):
                 axis=0,
                 dtype="int32")
         else:
-            sequence_id_offset = paddle.to_tensor([], dtype="int32")  # 不需要
+            sequence_id_offset = paddle.to_tensor([], dtype="int32")
             batch_size = enc_input.shape[0]
             max_seq_len = enc_input.shape[1]
             padding_offset = paddle.arange(
@@ -194,16 +192,16 @@ class InferTransformerEncoder(nn.Layer):
             c = paddle.concat(
                 [padding_offset, squence_offset_with_padding], axis=0)
             c_r = paddle.reshape(c, [2, -1])
-            t = paddle.transpose(c_r, [1, 0])  # 一个batch内有效（非padding）区间
+            t = paddle.transpose(c_r, [1, 0])
             trt_seq_len = paddle.reshape(t, [-1])
             trt_seq_len = paddle.concat(
                 [
                     trt_seq_len, paddle.to_tensor(
                         [batch_size * max_seq_len], dtype=trt_seq_len.dtype)
                 ],
-                axis=0)  # 加上最大的那个index
-
+                axis=0)
         for idx in range(self.n_layer):
+
             weight = self.weights[idx]
             enc_out = infer_transformer_encoder(
                 input=enc_input,
@@ -239,95 +237,3 @@ class InferTransformerEncoder(nn.Layer):
             enc_input = enc_out
 
         return enc_out
-
-
-class FasterEncoder(nn.Layer):
-    def __init__(self,
-                 src_vocab_size,
-                 max_seq_length,
-                 n_layer,
-                 n_head,
-                 d_model,
-                 d_inner_hid,
-                 dropout,
-                 bos_id=0,
-                 int8_mode=0,
-                 allow_gemm_test=False,
-                 use_trt_kernel=False,
-                 remove_padding=False,
-                 encoder_lib=None,
-                 use_fp16_encoder=False):
-        super().__init__()
-        self.bos_id = bos_id
-        self.dropout = dropout
-        self.remove_padding = remove_padding
-        self.use_fp16_encoder = use_fp16_encoder
-        self.max_seq_length = max_seq_length
-        self.d_model = d_model
-
-        self.src_word_embedding = WordEmbedding(
-            vocab_size=src_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
-        self.src_pos_embedding = PositionalEmbedding(
-            emb_dim=d_model, max_length=max_seq_length)
-        encoder_layer = paddle.nn.TransformerEncoderLayer(
-            d_model,
-            n_head,
-            d_inner_hid,
-            dropout,
-            activation="gelu",
-            attn_dropout=dropout,
-            act_dropout=dropout,
-            normalize_before=False)
-        custom_encoder = paddle.nn.TransformerEncoder(encoder_layer, n_layer)
-        self.transformer = paddle.nn.Transformer(
-            d_model=d_model,
-            nhead=n_head,
-            num_encoder_layers=n_layer,
-            num_decoder_layers=n_layer,
-            dim_feedforward=d_inner_hid,
-            dropout=dropout,
-            custom_encoder=custom_encoder,
-            activation="gelu",
-            normalize_before=False)
-
-        self.encoder = InferTransformerEncoder(
-            encoder=self.transformer.encoder,
-            n_layer=n_layer,
-            n_head=n_head,
-            size_per_head=d_model // n_head,
-            max_seq_length=max_seq_length,
-            int8_mode=int8_mode,
-            allow_gemm_test=allow_gemm_test,
-            use_trt_kernel=use_trt_kernel,
-            remove_padding=remove_padding,
-            encoder_lib=encoder_lib,
-            use_fp16_encoder=use_fp16_encoder)
-
-    def forward(self, enc_input, src_mask, mem_seq_lens):
-        self.encoder.eval()
-        dtype = "float32"
-        if self.use_fp16_encoder:
-            dtype = "float16"
-            enc_input = paddle.cast(enc_input, dtype)
-            src_mask = paddle.cast(src_mask, dtype)
-        enc_out = self.encoder(enc_input, src_mask, mem_seq_lens)
-
-        if self.use_fp16_encoder:
-            enc_out = paddle.cast(enc_out, "float32")
-        return enc_out
-
-    def load(self, init_from_params):
-        # Load the trained model
-        assert init_from_params, (
-            "Please set init_from_params to load the infer model.")
-        # To avoid a longer length than training, reset the size of position
-        # encoding to max_length
-        model_dict = paddle.load(init_from_params, return_numpy=True)
-        model_dict["encoder.pos_encoder.weight"] = position_encoding_init(
-            self.max_seq_length, self.d_model)
-        if self.use_fp16_encoder:
-            for item in self.state_dict():
-                if "encoder.layers" in item:
-                    model_dict[item] = np.float16(model_dict[item])
-
-        self.load_dict(model_dict)

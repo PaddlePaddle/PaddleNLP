@@ -157,6 +157,7 @@ std::vector<paddle::Tensor> encoder_kernel(
   encoder->forward();
   encoder->freeBuffer();
   delete allocator_;
+  delete encoder;
   return {encoder_out};
 }
 
