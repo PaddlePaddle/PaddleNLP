@@ -90,12 +90,13 @@ class CorrectionF1(DetectionF1):
         corr_preds_labels = corr_preds.argmax(axis=-1)
 
         for i, label_length in enumerate(length):
+            # Ignore [CLS] token, so calculate from position 1.
             det_preds_label = det_preds_labels[i][1:1 + label_length]
             det_label = det_labels[i][1:1 + label_length]
             corr_preds_label = corr_preds_labels[i][1:1 + label_length]
             corr_label = corr_labels[i][1:1 + label_length]
 
-            # the sequence has errors
+            # The sequence has any errors.
             if (det_label == self.pos_label).any():
                 corr_pred_label = corr_preds_label * det_preds_label
                 corr_label = det_label * corr_label
