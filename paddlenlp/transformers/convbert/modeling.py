@@ -250,7 +250,9 @@ class TransformerEncoderLayerWithConv(nn.TransformerEncoderLayer):
 
 
 class ConvBertEmbeddings(nn.Layer):
-    """Construct the embeddings from word, position and token_type embeddings."""
+    """
+    Include embeddings from word, position and token_type embeddings
+    """
 
     def __init__(
             self,
@@ -290,7 +292,9 @@ class ConvBertEmbeddings(nn.Layer):
 
 
 class ConvBertDiscriminatorPredictions(nn.Layer):
-    """Prediction layer for the discriminator, made up of two dense layers."""
+    """
+    Prediction layer for the discriminator.
+    """
 
     def __init__(self, hidden_size, hidden_act):
         super(ConvBertDiscriminatorPredictions, self).__init__()
@@ -308,7 +312,9 @@ class ConvBertDiscriminatorPredictions(nn.Layer):
 
 
 class ConvBertGeneratorPredictions(nn.Layer):
-    """Prediction layer for the generator, made up of two dense layers."""
+    """
+    Prediction layer for the generator.
+    """
 
     def __init__(self, embedding_size, hidden_size, hidden_act):
         super(ConvBertGeneratorPredictions, self).__init__()
@@ -327,8 +333,10 @@ class ConvBertGeneratorPredictions(nn.Layer):
 
 class ConvBertPretrainedModel(PretrainedModel):
     """
-    An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
-    models.
+    An abstract class for pretrained ConvBert models. It provides ConvBert related
+    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
+    `pretrained_init_configuration`, `base_model_prefix` for downloading and
+    loading pretrained models. See `PretrainedModel` for more details.
     """
 
     base_model_prefix = "convbert"
@@ -431,7 +439,7 @@ class ConvBertPretrainedModel(PretrainedModel):
                                            self.get_input_embeddings())
 
     def _init_weights(self, layer):
-        """Initialize the weights"""
+        """ Initialize the weights """
         if isinstance(layer, (nn.Linear, nn.Embedding, GroupedLinear)):
             layer.weight.set_value(
                 paddle.tensor.normal(
@@ -465,7 +473,7 @@ class ConvBertPretrainedModel(PretrainedModel):
             layer.bias.set_value(paddle.zeros_like(layer.bias))
 
     def _tie_or_clone_weights(self, output_embeddings, input_embeddings):
-        """Tie or clone layer weights"""
+        """ Tie or clone layer weights """
         if output_embeddings.weight.shape == input_embeddings.weight.shape:
             output_embeddings.weight = input_embeddings.weight
         elif output_embeddings.weight.shape == input_embeddings.weight.t(
@@ -492,11 +500,94 @@ class ConvBertPretrainedModel(PretrainedModel):
 
 @register_base_model
 class ConvBertModel(ConvBertPretrainedModel):
-    def __init__(self, vocab_size, embedding_size, hidden_size,
-                 num_hidden_layers, num_attention_heads, intermediate_size,
-                 hidden_act, hidden_dropout_prob, attention_probs_dropout_prob,
-                 max_position_embeddings, type_vocab_size, initializer_range,
-                 pad_token_id, conv_kernel_size, head_ratio, num_groups):
+    """
+    The bare ConvBert Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in `ConvBertModel`. Also is the vocab size of token embedding matrix.
+            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `ConvBertModel`.
+        embedding_size (int, optional):
+            Dimensionality of the embedding layer. Defaults to `768`.
+        hidden_size (int, optional):
+            Dimensionality of the encoder layer and pooler layer. Defaults to `768`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in the Transformer encoder. Defaults to `12`.
+        num_attention_heads (int, optional):
+            Number of attention heads for each attention layer in the Transformer encoder.
+            Defaults to `12`.
+        intermediate_size (int, optional):
+            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
+            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
+            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
+            Defaults to `3072`.
+        hidden_act (str, optional):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported. Defaults to `"gelu"`.
+        hidden_dropout_prob (float, optional):
+            The dropout probability for all fully connected layers in the embeddings and encoder.
+            Defaults to `0.1`.
+        attention_probs_dropout_prob (float, optional):
+            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
+            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
+            sequence. Defaults to `512`.
+        type_vocab_size (int, optional):
+            The vocabulary size of `token_type_ids`.
+            Defaults to `2`.
+
+        initializer_range (float, optional):
+            The standard deviation of the normal initializer.
+            Defaults to 0.02.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`ConvBertPretrainedModel.init_weights()` for how weights are initialized in `ConvBertModel`.
+
+        pad_token_id (int, optional):
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
+
+        conv_kernel_size (int, optional):
+            The size of the convolutional kernel.
+            Defaults to `9`.
+
+        head_ratio (int, optional):
+            Ratio gamma to reduce the number of attention heads.
+            Defaults to `2`.
+
+        num_groups (int, optional):
+            The number of groups for grouped linear layers for ConvBert model.
+            Defaults to `1`.
+
+    """
+
+    def __init__(self,
+                 vocab_size,
+                 embedding_size=768,
+                 hidden_size=768,
+                 num_hidden_layers=12,
+                 num_attention_heads=12,
+                 intermediate_size=3072,
+                 hidden_act="gelu",
+                 hidden_dropout_prob=0.1,
+                 attention_probs_dropout_prob=0.1,
+                 max_position_embeddings=512,
+                 type_vocab_size=2,
+                 initializer_range=0.02,
+                 pad_token_id=0,
+                 conv_kernel_size=9,
+                 head_ratio=2,
+                 num_groups=1):
         super(ConvBertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -536,6 +627,58 @@ class ConvBertModel(ConvBertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r'''
+        The ConvBertModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                max_position_embeddings - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                If its data type is int, the values should be either 0 or 1.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+
+        Returns:
+            Tensor: Returns Tensor `sequence_output`, sequence of hidden-states at the last layer of the model.
+            Shape as `[batch_size, sequence_length, hidden_size]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ConvBertModel, ConvBertTokenizer
+
+                tokenizer = ConvBertTokenizer.from_pretrained('convbert-base')
+                model = ConvBertModel.from_pretrained('convbert-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        '''
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
@@ -550,12 +693,20 @@ class ConvBertModel(ConvBertPretrainedModel):
         if hasattr(self, "embeddings_project"):
             embedding_output = self.embeddings_project(embedding_output)
 
-        encoder_outputs = self.encoder(embedding_output, attention_mask)
+        sequence_output = self.encoder(embedding_output, attention_mask)
 
-        return encoder_outputs
+        return sequence_output
 
 
 class ConvBertDiscriminator(ConvBertPretrainedModel):
+    """
+    ConvBert Model with a discriminator prediction head on top.
+
+    Args:
+        convbert (:class:`ConvBertModel`):
+            An instance of ConvBertModel.
+    """
+
     def __init__(self, convbert):
         super(ConvBertDiscriminator, self).__init__()
 
@@ -570,6 +721,58 @@ class ConvBertDiscriminator(ConvBertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r'''
+        The ConvBertDiscriminator forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                max_position_embeddings - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                If its data type is int, the values should be either 0 or 1.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the discriminator prediction logits.
+            Shape as `[batch_size, sequence_length]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ConvBertDiscriminatorPredictions, ConvBertTokenizer
+
+                tokenizer = ConvBertTokenizer.from_pretrained('convbert-base')
+                model = ConvBertDiscriminatorPredictions.from_pretrained('convbert-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+        '''
 
         discriminator_sequence_output = self.convbert(
             input_ids, token_type_ids, position_ids, attention_mask)
@@ -580,6 +783,14 @@ class ConvBertDiscriminator(ConvBertPretrainedModel):
 
 
 class ConvBertGenerator(ConvBertPretrainedModel):
+    """
+    ConvBert Model with a generator prediction head on top.
+
+    Args:
+        convbert (:class:`ConvBertModel`):
+            An instance of ConvBertModel.
+    """
+
     def __init__(self, convbert):
         super(ConvBertGenerator, self).__init__()
 
@@ -609,6 +820,58 @@ class ConvBertGenerator(ConvBertPretrainedModel):
             token_type_ids=None,
             position_ids=None,
             attention_mask=None, ):
+        r'''
+        The ConvBertGenerator forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                max_position_embeddings - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                If its data type is int, the values should be either 0 or 1.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+
+        Returns:
+            Tensor: Returns tensor `prediction_scores`, a tensor of the generator prediction scores.
+            Shape as `[batch_size, sequence_length, vocab_size]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ConvBertGenerator, ConvBertTokenizer
+
+                tokenizer = ConvBertTokenizer.from_pretrained('convbert-base')
+                model = ConvBertGenerator.from_pretrained('convbert-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                prediction_scores = model(**inputs)
+        '''
 
         generator_sequence_output = self.convbert(input_ids, token_type_ids,
                                                   position_ids, attention_mask)
@@ -639,7 +902,7 @@ class ConvBertClassificationHead(nn.Layer):
         self.act = get_activation("gelu")
 
     def forward(self, features, **kwargs):
-        x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
+        x = features[:, 0, :]  # take [CLS] token
         x = self.dropout(x)
         x = self.dense(x)
         x = self.act(x)  # ConvBert paper used gelu here
@@ -649,14 +912,30 @@ class ConvBertClassificationHead(nn.Layer):
 
 
 class ConvBertForSequenceClassification(ConvBertPretrainedModel):
-    def __init__(self, convbert, num_classes):
+    """
+    ConvBert Model with a sequence classification/regression head on top (a linear layer on top of the hidden-states output) e.g.
+    for GLUE tasks.
+
+    Args:
+        convbert (:class:`ConvBertModel`):
+            An instance of ConvBertModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of ConvBert.
+            If None, use the same value as `hidden_dropout_prob` of `ConvBertModel`
+            instance `convbert`. Defaults to None.
+    """
+
+    def __init__(self, convbert, num_classes=2, dropout=None):
         super(ConvBertForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.convbert = convbert
         self.classifier = ConvBertClassificationHead(
-            self.convbert.config["hidden_size"],
+            hidden_size=self.convbert.config["hidden_size"],
+            hidden_dropout_prob=dropout if dropout is not None else
             self.convbert.config["hidden_dropout_prob"],
-            self.num_classes, )
+            num_classes=self.num_classes, )
 
         self.init_weights()
 
@@ -666,6 +945,36 @@ class ConvBertForSequenceClassification(ConvBertPretrainedModel):
             token_type_ids=None,
             position_ids=None,
             attention_mask=None, ):
+        r"""
+        The ConvBertForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ConvBertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ConvBertModel`.
+            position_ids(Tensor, optional):
+                See :class:`ConvBertModel`.
+            attention_mask (list, optional):
+                See :class:`ConvBertModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Shape as `[batch_size, num_classes]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ConvBertForSequenceClassification, ConvBertTokenizer
+
+                tokenizer = ConvBertTokenizer.from_pretrained('convbert-base')
+                model = ConvBertForSequenceClassification.from_pretrained('convbert-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+        """
 
         sequence_output = self.convbert(input_ids, token_type_ids, position_ids,
                                         attention_mask)
@@ -676,11 +985,27 @@ class ConvBertForSequenceClassification(ConvBertPretrainedModel):
 
 
 class ConvBertForTokenClassification(ConvBertPretrainedModel):
-    def __init__(self, convbert, num_classes):
+    """
+    ConvBert Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        convbert (:class:`ConvBertModel`):
+            An instance of ConvBertModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of ConvBert.
+            If None, use the same value as `hidden_dropout_prob` of `ConvBertModel`
+            instance `convbert`. Defaults to None.
+    """
+
+    def __init__(self, convbert, num_classes=2, dropout=None):
         super(ConvBertForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.convbert = convbert
-        self.dropout = nn.Dropout(self.convbert.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.convbert.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.convbert.config["hidden_size"],
                                     self.num_classes)
         self.init_weights()
@@ -691,6 +1016,36 @@ class ConvBertForTokenClassification(ConvBertPretrainedModel):
             token_type_ids=None,
             position_ids=None,
             attention_mask=None, ):
+        r"""
+        The ConvBertForTokenClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ConvBertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ConvBertModel`.
+            position_ids(Tensor, optional):
+                See :class:`ConvBertModel`.
+            attention_mask (list, optional):
+                See :class:`ConvBertModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ConvBertForTokenClassification, ConvBertTokenizer
+
+                tokenizer = ConvBertTokenizer.from_pretrained('convbert-base')
+                model = ConvBertForTokenClassification.from_pretrained('convbert-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+        """
 
         sequence_output = self.convbert(input_ids, token_type_ids, position_ids,
                                         attention_mask)
@@ -702,6 +1057,9 @@ class ConvBertForTokenClassification(ConvBertPretrainedModel):
 
 
 class ConvBertForTotalPretraining(ConvBertPretrainedModel):
+    """
+    Combine generator with discriminator for Replaced Token Detection (RTD) pretraining.
+    """
     pretrained_init_configuration = {
         "convbert-base-generator": {
             "attention_probs_dropout_prob": 0.1,
@@ -869,10 +1227,12 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
 
     def update_inputs(self, sequence, updates, positions):
         shape = sequence.shape
-        assert len(shape) == 2, "the dimension of inputs should be [B, L]"
+        assert len(
+            shape
+        ) == 2, "the dimension of inputs should be [batch_size, sequence_length]"
         B, L = shape
         N = positions.shape[1]
-        assert N == L, "the dimension of inputs and mask should be same as [B, L]"
+        assert N == L, "the dimension of inputs and mask should be same as [batch_size, sequence_length]"
 
         updated_sequence = ((paddle.ones_like(sequence) - positions) * sequence
                             ) + (positions * updates)
@@ -887,10 +1247,41 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
             attention_mask=None,
             raw_input_ids=None,
             gen_labels=None, ):
+        r"""
 
-        assert (
-            gen_labels is not None
-        ), "gen_labels should not be None, please check DataCollatorForLanguageModeling"
+        Args:
+            input_ids (Tensor):
+                See :class:`ConvBertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ConvBertModel`.
+            position_ids (Tensor, optional):
+                See :class:`ConvBertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ConvBertModel`.
+            raw_input_ids(Tensor, optional):
+                The raw input_ids. Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            gen_labels(Tensor, optional):
+                The generator labels. Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+
+        Returns:
+            tuple: Returns tuple (``gen_logits``, ``disc_logits``, ``disc_labels``, ``attention_mask``).
+
+            With the fields:
+
+            - `gen_logits` (Tensor):
+                a tensor of the generator prediction logits. Shape as `[batch_size, sequence_length, vocab_size]` and dtype as float32.
+
+            - `disc_logits` (Tensor):
+                a tensor of the discriminator prediction logits. Shape as `[batch_size, sequence_length]` and dtype as float32.
+
+            - `disc_labels` (Tensor):
+                a tensor of the discriminator prediction labels. Shape as `[batch_size, sequence_length]` and dtype as int64.
+
+            - `attention_mask` (Tensor):
+                See :class:`ConvBertModel`.
+        """
+
+        assert (gen_labels is not None), "gen_labels should not be None"
 
         gen_logits = self.generator(input_ids, token_type_ids, position_ids,
                                     attention_mask)
@@ -914,7 +1305,20 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
         return gen_logits, disc_logits, disc_labels, attention_mask
 
 
-class ConvBertPretrainingCriterion(paddle.nn.Layer):
+class ConvBertPretrainingCriterion(nn.Layer):
+    """
+
+    Args:
+        vocab_size(int):
+            Vocabulary size of `inputs_ids` in `ConvBertModel`. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling `ConvBertModel`.
+        gen_weight(float):
+            This is the generator weight.
+        disc_weight(float):
+            This is the discriminator weight.
+
+    """
+
     def __init__(self, vocab_size, gen_weight, disc_weight):
         super(ConvBertPretrainingCriterion, self).__init__()
 
@@ -987,8 +1391,23 @@ class ConvBertPooler(Layer):
 
 
 class ConvBertForMultipleChoice(ConvBertPretrainedModel):
+    """
+    ConvBert Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
+    softmax) e.g. for RocStories/SWAG tasks.
+
+    Args:
+        convbert (:class:`ConvBertModel`):
+            An instance of ConvBertModel.
+        num_choices (int, optional):
+            The number of choices. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of ConvBert.
+            If None, use the same value as `hidden_dropout_prob` of `ConvBertModel`
+            instance `convbert`. Defaults to None.
+    """
+
     def __init__(self, convbert, num_choices=2, dropout=None):
-        super(ConvBertPretrainedModel, self).__init__()
+        super(ConvBertForMultipleChoice, self).__init__()
         self.num_choices = num_choices
         self.convbert = convbert
         self.pooler = ConvBertPooler(self.convbert.config["hidden_size"])
@@ -1002,6 +1421,36 @@ class ConvBertForMultipleChoice(ConvBertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r"""
+        The ConvBertForMultipleChoice forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ConvBertModel` and shape as [batch_size,num_choice, sequence_length].
+            token_type_ids (Tensor, optional):
+                See :class:`ConvBertModel` and shape as [batch_size,num_choice, sequence_length].
+            position_ids(Tensor, optional):
+                See :class:`ConvBertModel` and shape as [batch_size,num_choice, sequence_length].
+            attention_mask (list, optional):
+                See :class:`ConvBertModel` and shape as [batch_size,num_choice, sequence_length].
+
+        Returns:
+            Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
+            Shape as `[batch_size, num_choice]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ConvBertForMultipleChoice, ConvBertTokenizer
+
+                tokenizer = ConvBertTokenizer.from_pretrained('convbert-base')
+                model = ConvBertForMultipleChoice.from_pretrained('convbert-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+        """
         input_ids = input_ids.reshape(
             (-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
@@ -1026,19 +1475,69 @@ class ConvBertForMultipleChoice(ConvBertPretrainedModel):
 
 
 class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
-    def __init__(self, convbert):
+    """
+    ConvBert Model with a span classification head on top for extractive question-answering tasks like
+    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
+    `span end logits`).
+
+    Args:
+        convbert (:class:`ConvBertModel`):
+            An instance of ConvBertModel.
+        dropout (float, optional):
+            The dropout probability for output of ConvBert.
+            If None, use the same value as `hidden_dropout_prob` of `ConvBertModel`
+            instance `convbert`. Defaults to `None`.
+    """
+
+    def __init__(self, convbert, dropout=None):
         super(ConvBertForQuestionAnswering, self).__init__()
         self.convbert = convbert
-        self.classifier = nn.Linear(self.convbert.config["hidden_size"], 2)
+        self.classifier = nn.Linear(dropout if dropout is not None else
+                                    self.convbert.config["hidden_size"], 2)
         self.init_weights()
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
-        sequence_output = self.convbert(input_ids, token_type_ids, position_ids,
-                                        attention_mask)
+    def forward(self, input_ids, token_type_ids=None):
+        r"""
+        The ConvBertForQuestionAnswering forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ConvBertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ConvBertModel`.
+
+        Returns:
+            tuple: Returns tuple (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ConvBertForQuestionAnswering, ConvBertTokenizer
+
+                tokenizer = ConvBertTokenizer.from_pretrained('convbert-base')
+                model = ConvBertForQuestionAnswering.from_pretrained('convbert-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                start_logits = outputs[0]
+                end_logits  = outputs[1]
+
+        """
+        sequence_output = self.convbert(
+            input_ids, token_type_ids, position_ids=None, attention_mask=None)
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
