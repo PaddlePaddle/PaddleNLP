@@ -16,9 +16,17 @@ def convert_pytorch_checkpoint_to_paddle(pytorch_checkpoint_path,
     paddle.save(paddle_state_dict, paddle_dump_path)
 
 
+def generate_config(config_file):
+    import json
+    fout = open(config_file.replace('config.json', 'model_config.json'), 'w+')
+    with open(config_file) as f:
+        config = json.load(f)
+        config.pop('model_type')
+        json.dump(config, fout, ensure_ascii=False)
+
+
 if __name__ == "__main__":
     import torch
-    import os
 
     convert_pytorch_checkpoint_to_paddle('./models/squeezebert-uncased/pytorch_model.bin',
                                          './models/squeezebert-uncased/model_state.pdparams')
@@ -28,6 +36,6 @@ if __name__ == "__main__":
     convert_pytorch_checkpoint_to_paddle('./models/squeezebert-mnli/pytorch_model.bin',
                                          './models/squeezebert-mnli/model_state.pdparams')
 
-    os.system('cp ./models/squeezebert-uncased/config.json ./models/squeezebert-uncased/model_config.json')
-    os.system('cp ./models/squeezebert-mnli-headless/config.json ./models/squeezebert-mnli-headless/model_config.json')
-    os.system('cp ./models/squeezebert-mnli//config.json ./models/squeezebert-mnli/model_config.json')
+    generate_config('./models/squeezebert-uncased/config.json')
+    generate_config('./models/squeezebert-mnli-headless/config.json')
+    generate_config('./models/squeezebert-mnli/config.json')

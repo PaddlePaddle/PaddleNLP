@@ -12,7 +12,7 @@ paddle2.0+复现论文：SqueezeBERT: What can computer vision teach NLP about e
 ```
 export CUDA_VISIBLE_DEVICES=0
 export TASK_NAME="QQP"
-nohup python -u ./run_glue.py \ 
+nohup python -u ./run_glue.py \
 --model_type squeezebert \
 --model_name_or_path ./models/squeezebert-mnli-headless \
 --task_name QQP --batch_size 16 \

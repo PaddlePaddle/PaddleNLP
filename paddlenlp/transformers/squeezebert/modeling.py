@@ -524,7 +524,8 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
     def __init__(self, vocab_size, embedding_size, hidden_size, num_hidden_layers, num_attention_heads,
                  intermediate_size, hidden_act, hidden_dropout_prob, attention_probs_dropout_prob,
                  max_position_embeddings, type_vocab_size, q_groups, k_groups, v_groups, output_groups,
-                 intermediate_groups, post_attention_groups, initializer_range=0.02, layer_norm_eps=1e-12):
+                 intermediate_groups, post_attention_groups, initializer_range=0.02, layer_norm_eps=1e-12,
+                 **kwargs):
         super().__init__()
         self.initializer_range = initializer_range
         self.embeddings = SqueezeBertEmbeddings(vocab_size,
