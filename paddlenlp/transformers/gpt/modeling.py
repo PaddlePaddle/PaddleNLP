@@ -721,6 +721,7 @@ class GPTModel(GPTPretrainedModel):
                 Mask used in self attention to avoid performing attention to some unwanted positions,
                 usually the subsequent positions.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For example, its shape can be [batch_size, sequence_length, sequence_length].
                 Its data type should be float32.
                 The `masked` tokens have `-1e-9` values, and the `unmasked` tokens have `0` values.
                 Defaults to `None`, which means nothing needed to be prevented attention to.

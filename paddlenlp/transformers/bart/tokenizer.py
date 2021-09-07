@@ -18,13 +18,19 @@ __all__ = ['BartTokenizer']
 
 class BartTokenizer(GPTTokenizer):
     r"""
-    Construct a BART tokenizer.
+    Construct a BART tokenizer based on byte-level Byte-Pair-Encoding.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.gpt.tokenizer.GPTTokenizer`.
+    For more information regarding those methods, please refer to this superclass.
 
     Args:
         vocab_file (str):
             Path to the vocabulary file.
+            The vocab file contains a mapping from vocabulary strings and indices.
         merges_file (str):
             Path to the merge file.
+            The merge file is used to split the input sentence into "subword" units.
+            The vocab file is then used to encode those units as intices.
         errors (str):
             Paradigm to follow when decoding bytes to UTF-8.
             Defaults to `'replace'`.

@@ -217,8 +217,10 @@ class TinyBertModel(TinyBertPretrainedModel):
             The index of padding token in the token vocabulary.
             Defaults to `0`.
         fit_size (int, optional):
-            Dimensionality of the output layer of `fit_dense(s)`.
+            Dimensionality of the output layer of `fit_dense(s)`, which is the hidden size of the teacher model.
             `fit_dense(s)` means a hidden states' transformation from student to teacher.
+            `fit_denses` is used in v2 models and it has `num_hidden_layers+1` layers.
+            `fit_dense` is used in other pretraining models and it has one linear layer.
             Defaults to `768`.
     """
 
@@ -291,6 +293,7 @@ class TinyBertModel(TinyBertPretrainedModel):
                 When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
                 When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For example, its shape can be [batch_size, sequence_length, sequence_length].
                 Defaults to `None`, which means nothing needed to be prevented attention to.
 
         Returns:
