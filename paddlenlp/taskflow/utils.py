@@ -21,6 +21,7 @@ import contextlib
 from typing import Any, Dict, List, Optional, Tuple, Union
 import paddle
 from paddle.dataset.common import md5file
+from ..utils.log import logger
 from ..utils.downloader import get_path_from_url, DownloaderCheck
 
 DOC_FORMAT = r"""
@@ -42,6 +43,7 @@ def download_file(save_dir, filename, url, md5=None, task=None):
         url(string): The url downling the file.
         md5(string, optional): The md5 value that checking the version downloaded. 
     """
+    logger.disable()
     global DOWNLOAD_CHECK
     if not DOWNLOAD_CHECK:
         DOWNLOAD_CHECK = True
@@ -54,6 +56,7 @@ def download_file(save_dir, filename, url, md5=None, task=None):
             get_path_from_url(url, save_dir, md5)
     else:
         get_path_from_url(url, save_dir, md5)
+    logger.enable()
     return fullname
 
 

@@ -53,7 +53,7 @@ usage = r"""
 URLS = {
     "gpt-cpm-large-cn": [
         "https://paddlenlp.bj.bcebos.com/taskflow/text_generation/gpt-cpm/gpt-cpm-large-cn_params.tar",
-        None
+        "5aad6f81053cfdbba4797f044fcf66d1"
     ],
 }
 

@@ -33,7 +33,7 @@ from .models import BiGruCrf
 URLS = {
     "lac_params": [
         "https://paddlenlp.bj.bcebos.com/taskflow/lexical_analysis/lac/lac_params.tar.gz",
-        None
+        'ee9a3eaba5f74105410410e3c5b28fbc'
     ],
 }
 
