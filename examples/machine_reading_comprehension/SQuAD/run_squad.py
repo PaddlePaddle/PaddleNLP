@@ -221,6 +221,17 @@ def run(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
+    if args.version_2_with_negative:
+        train_ds = load_dataset(
+            'squad', splits='train_v2', data_files=args.train_file)
+        dev_ds = load_dataset(
+            'squad', splits='dev_v2', data_files=args.predict_file)
+    else:
+        train_ds = load_dataset(
+            'squad', splits='train_v1', data_files=args.train_file)
+        dev_ds = load_dataset(
+            'squad', splits='dev_v1', data_files=args.predict_file)
+
     set_seed(args)
     if rank == 0:
         if os.path.exists(args.model_name_or_path):
@@ -232,12 +243,6 @@ def run(args):
         model = paddle.DataParallel(model)
 
     if args.do_train:
-        if args.train_file:
-            train_ds = load_dataset('squad', data_files=args.train_file)
-        elif args.version_2_with_negative:
-            train_ds = load_dataset('squad', splits='train_v2')
-        else:
-            train_ds = load_dataset('squad', splits='train_v1')
         train_ds.map(partial(
             prepare_train_features, tokenizer=tokenizer, args=args),
                      batched=True)
@@ -316,13 +321,6 @@ def run(args):
                         break
 
     if args.do_predict and rank == 0:
-        if args.predict_file:
-            dev_ds = load_dataset('squad', data_files=args.predict_file)
-        elif args.version_2_with_negative:
-            dev_ds = load_dataset('squad', splits='dev_v2')
-        else:
-            dev_ds = load_dataset('squad', splits='dev_v1')
-
         dev_ds.map(partial(
             prepare_validation_features, tokenizer=tokenizer, args=args),
                    batched=True)
