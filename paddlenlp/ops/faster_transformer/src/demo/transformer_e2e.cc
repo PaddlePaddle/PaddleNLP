@@ -34,7 +34,6 @@ limitations under the License. */
 using namespace paddle_infer;
 
 DEFINE_int32(batch_size, 1, "Batch size to do inference. ");
-DEFINE_int32(beam_size, 5, "Beam size to do inference. ");
 DEFINE_int32(gpu_id, 0, "The gpu id to do inference. ");
 DEFINE_string(model_dir,
               "./infer_model/",
@@ -57,7 +56,6 @@ const int N_BEST = 1;
 
 int batch_size = 1;
 int gpu_id = 0;
-int beam_size = 5;
 
 namespace paddle {
 namespace inference {
@@ -75,6 +73,7 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
                        std::unordered_map<int, std::string>& num2word_dict) {
   std::vector<int> output_shape = seq_ids->shape();
   int batch_size = output_shape[1];
+  int beam_num = output_shape[2];
   int out_num = std::accumulate(
       output_shape.begin(), output_shape.end(), 1, std::multiplies<int>());
   std::vector<int> seq_ids_out;
@@ -88,13 +87,13 @@ bool get_result_tensor(const std::unique_ptr<paddle_infer::Tensor>& seq_ids,
     for (int k = 0; k < N_BEST; ++k) {
       dataresultvec[bsz * N_BEST + k].result_q = "";
       for (int len = 0; len < max_output_length; ++len) {
-        if (seq_ids_out[len * batch_size * beam_size + bsz * beam_size + k] ==
+        if (seq_ids_out[len * batch_size * beam_num + bsz * beam_num + k] ==
             EOS_IDX)
           break;
         dataresultvec[bsz * N_BEST + k].result_q =
             dataresultvec[bsz * N_BEST + k].result_q +
-            num2word_dict[seq_ids_out[len * batch_size * beam_size +
-                                      bsz * beam_size + k]] +
+            num2word_dict[seq_ids_out[len * batch_size * beam_num +
+                                      bsz * beam_num + k]] +
             " ";
       }
     }
@@ -215,6 +214,10 @@ void Main(int batch_size, int gpu_id) {
 
   config.SwitchUseFeedFetchOps(false);
   config.SwitchSpecifyInputNames(true);
+  // When using fp16, fc_elementwise_layernorm_fuse_pass causes a little
+  // different translation results with original dygraph prediction, maybe you
+  // can turn off the IR optimization for same results as following:
+  // config.SwitchIrOptim(false);
   auto predictor = CreatePredictor(config);
   DataReader reader(data_dir);
   reader.GetWordDict();
@@ -258,7 +261,6 @@ int main(int argc, char** argv) {
 
   batch_size = FLAGS_batch_size;
   gpu_id = FLAGS_gpu_id;
-  beam_size = FLAGS_beam_size;
 
   model_dir = FLAGS_model_dir;
   vocab_dir = FLAGS_vocab_dir;

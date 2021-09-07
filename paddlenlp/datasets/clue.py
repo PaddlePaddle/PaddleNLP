@@ -193,7 +193,7 @@ class Clue(DatasetBuilder):
         'cluewsc2020': {
             'url':
             'https://storage.googleapis.com/cluebenchmark/tasks/cluewsc2020_public.zip',
-            'md5': '17abe1be3f7dd3bad5f114ba4c40ee9b',
+            'md5': '2e387e20e93eeab0ffaded5b0d2dfd3d',
             'splits': {
                 'train': [
                     os.path.join('cluewsc2020_public', 'train.json'),
@@ -204,6 +204,10 @@ class Clue(DatasetBuilder):
                     'bad8cd6fa0916fc37ac96b8ce316714a',
                 ],
                 'test': [
+                    os.path.join('cluewsc2020_public', 'test.json'),
+                    '27614454cc26be6fcab5bbd9a45967ff',
+                ],
+                'test1.0': [
                     os.path.join('cluewsc2020_public', 'test.json'),
                     '0e9e8ffd8ee90ddf1f58d6dc2e02de7b',
                 ]
