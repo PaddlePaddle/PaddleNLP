@@ -35,25 +35,25 @@ URLS = {
     ["https://paddlenlp.bj.bcebos.com/data/senta_word_dict.txt", None],
     "bilstm": [
         "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/bilstm/bilstm.pdparams",
-        None
+        "609fc068aa35339e20f8310b5c20887c"
     ],
     "skep_ernie_1.0_large_ch": [
         "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch/skep_ernie_1.0_large_ch.pdparams",
-        None
+        "cf7aa5f5ffa834b329bbcb1dca54e9fc"
     ]
 }
 
 usage = r"""
            from paddlenlp import Taskflow 
 
-           task = Taskflow("sentiment_analysis")
-           task("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
+           senta = Taskflow("sentiment_analysis")
+           senta("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
            '''
            [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'}]
            '''
 
-           task = Taskflow("sentiment_analysis", model="skep")
-           task("作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。")
+           senta = Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")
+           senta("作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。")
            '''
            [{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive'}]
            '''
