@@ -176,14 +176,16 @@ class TinyBertModel(TinyBertPretrainedModel):
             Vocabulary size of `inputs_ids` in `TinyBertModel`. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling `TinyBertModel`.
         hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layer and pooler layer. Defaults to `768`.
+            Dimensionality of the embedding layer, encoder layers and pooler layer. Defaults to `768`.
         num_hidden_layers (int, optional):
             Number of hidden layers in the Transformer encoder. Defaults to `12`.
         num_attention_heads (int, optional):
             Number of attention heads for each attention layer in the Transformer encoder.
             Defaults to `12`.
         intermediate_size (int, optional):
-            Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
+            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
+            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
+            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
             Defaults to `3072`.
         hidden_act (str, optional):
             The non-linear activation function in the feed-forward layer.
@@ -282,14 +284,12 @@ class TinyBertModel(TinyBertPretrainedModel):
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to `None`, which means we don't add segment embeddings.
             attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                Mask used in multi-head attention to avoid performing attention to some unwanted positions,
                 usually the paddings or the subsequent positions.
                 Its data type can be int, float and bool.
-                If its data type is int, the values should be either 0 or 1.
-
-                - **1** for tokens that **not masked**,
-                - **0** for tokens that **masked**.
-
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
 
@@ -335,7 +335,7 @@ class TinyBertModel(TinyBertPretrainedModel):
 
 class TinyBertForPretraining(TinyBertPretrainedModel):
     """
-    TinyBert Model for pretraining tasks on top.
+    TinyBert Model with pretraining tasks on top.
 
     Args:
         tinybert (:class:`TinyBertModel`):
@@ -363,6 +363,23 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
         Returns:
             Tensor: Returns tensor `sequence_output`, sequence of hidden-states at the last layer of the model.
             It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.tinybert.modeling import TinyBertForPretraining
+                from paddlenlp.transformers.tinybert.tokenizer import TinyBertTokenizer
+
+                tokenizer = TinyBertTokenizer.from_pretrained('tinybert-4l-312d')
+                model = TinyBertForPretraining.from_pretrained('tinybert-4l-312d')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP! ")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+
 
         """
         sequence_output, pooled_output = self.tinybert(

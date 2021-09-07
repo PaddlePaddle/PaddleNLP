@@ -73,9 +73,11 @@ def get_pairs(word):
 
 class GPTChineseTokenizer(PretrainedTokenizer):
     """
-    Constructs a GPT Chinese tokenizer. It uses a basic tokenizer to do punctuation
-    splitting, lower casing and so on, and follows a SentencePiece tokenizer to
-    tokenize as subwords.
+    Constructs a GPT Chinese tokenizerbased on `SentencePiece <https://github.com/google/sentencepiece>`__.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
 
     Args:
         vocab_file (str):
@@ -194,7 +196,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
                 from paddlenlp.transformers import GPTChineseTokenizer
 
                 tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
-                print(tokenizer.convert_tokens_to_ids(['▁欢迎', '▁使用', '▁百度', '▁飞', '浆', '▁!']))
+                print(tokenizer.convert_tokens_to_ids(['▁欢迎', '▁使用', '▁百度', '▁飞', '桨', '▁!']))
                 # [2092, 260, 1014, 1596, 17620, 45]
         """
 
@@ -206,7 +208,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
     def convert_ids_to_tokens(self, ids):
         """
         Converts a single index or a sequence of indices to a token or a
-        sequence of tokens
+        sequence of tokens.
 
         Args:
             ids (int|List[int]|tuple(int)):
@@ -290,24 +292,28 @@ class GPTChineseTokenizer(PretrainedTokenizer):
 
 class GPTTokenizer(PretrainedTokenizer):
     """
-    Constructs a GPT tokenizer. It uses a basic tokenizer to do punctuation
-    splitting, lower casing and so on, and follows a SentencePiece tokenizer to
-    tokenize as subwords.
+    Constructs a GPT tokenizer based on byte-level Byte-Pair-Encoding.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
 
     Args:
         vocab_file (str):
-            The vocabulary file required to instantiate
-            a `SentencePiece <https://github.com/google/sentencepiece>`__ tokenizer.
+            Path to the vocab file.
+            The vocab file contains a mapping from vocabulary strings and indices.
         merges_file (str):
             Path to the merge file.
+            The merge file is used to split the input sentence into "subword" units.
+            The vocab file is then used to encode those units as intices.
         errors (str):
             Paradigm to follow when decoding bytes to UTF-8.
             Defaults to `'replace'`.
         max_len (int, optional):
             The maximum value of the input sequence length.
             Defaults to `None`.
-        special_tokens (str, optional):
-            Special tokens not in the vocabulary.
+        special_tokens (list, optional):
+            A list of special tokens not in the vocabulary.
             Defaults to `None`.
 
     Examples:
@@ -316,12 +322,11 @@ class GPTTokenizer(PretrainedTokenizer):
             from paddlenlp.transformers import GPTTokenizer
 
             tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
-            print(tokenizer('欢迎使用百度飞桨！'))
+            print(tokenizer('Welcome to use PaddlePaddle and PaddleNLP'))
 
             '''
-            {'input_ids': [162, 105, 95, 32573, 236, 45635, 18796, 101,
-            163, 247, 122, 41753, 99, 45617, 252, 162, 94, 101, 171, 120, 223],
-            'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
+            {'input_ids': [14618, 284, 779, 350, 37382, 47, 37382, 290, 350, 37382, 45, 19930],
+            'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
             '''
 
     """
@@ -552,7 +557,8 @@ class GPTTokenizer(PretrainedTokenizer):
             ids (int|List[int]):
                 The token id (or token ids) to be converted to text.
             skip_special_tokens (bool, optional):
-                Whether or not to skip the special tokens. Defaults to `False`.
+                Whether or not to skip the special tokens.
+                Defaults to `False`, which means we don't skip the special tokens.
 
         Returns:
             str|List[str]: The converted token or the sequence of tokens.
@@ -605,7 +611,8 @@ class GPTTokenizer(PretrainedTokenizer):
 
     def save_resources(self, save_directory):
         """
-        Save tokenizer related resources to files under `save_directory`.
+        Saves `SentencePiece <https://github.com/google/sentencepiece>`__ file
+        (ends with '.spm') under `save_directory`.
 
         Args:
             save_directory (str): Directory to save files into.

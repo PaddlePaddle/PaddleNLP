@@ -718,19 +718,19 @@ class GPTModel(GPTPretrainedModel):
                 max_position_embeddings - 1]``.
                 Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
             attention_mask (Tensor, optional):
-                Mask used in self attention to avoid performing attention on to some unwanted positions,
+                Mask used in self attention to avoid performing attention to some unwanted positions,
                 usually the subsequent positions.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Its data type should be float32.
-                The `masked` tokens have `-INF` values, and the others have `0` values.
+                The `masked` tokens have `-1e-9` values, and the `unmasked` tokens have `0` values.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
             use_cache (bool, optional):
                 Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
                 can be used to speed up decoding.
             cache (list, optional):
                 It is a list, and each element in the list is a tuple `(incremental_cache, static_cache)`.
-                See `TransformerDecoder.gen_cache` for more details. It is only used for inference
-                and should be None for training.
+                See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__for more details.
+                It is only used for inference and should be None for training.
                 Default to `None`.
 
         Returns:
@@ -746,9 +746,7 @@ class GPTModel(GPTPretrainedModel):
                 tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
                 model = GPTModel.from_pretrained('gpt2-medium-en')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
-                if 'token_type_ids' in inputs:
-                    inputs.pop('token_type_ids')
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
@@ -830,8 +828,26 @@ class GPTForPretraining(GPTPretrainedModel):
                 See :class:`GPTModel`.
 
         Returns:
-            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. `logits` is the output of the gpt model.
+            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` is True,
+            tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor `logits` will be returned.
+            `logits` is the output of the gpt model.
             `cache_kvs` is the cache output of gpt model if `use_cache` is True.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import GPTForPretraining, GPTTokenizer
+
+                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
+                model = GPTForPretraining.from_pretrained('gpt2-medium-en')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs,use_cache=True)
+
+                logits = output[0]
+                cached_kvs = output[1]
 
         """
 
@@ -894,7 +910,7 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
 class GPTForGreedyGeneration(GPTPretrainedModel):
     """
     The generate model for GPT-2.
-    It use the greedy strategy and generate the next word with highest probability.
+    It use the greedy strategy and generate the next sequence with highest probability.
 
     Args:
         gpt (:class:`GPTModel`):
@@ -917,6 +933,28 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
               masked_positions=None,
               use_cache=False,
               cache=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`GPTModel`.
+            position_ids (Tensor, optional):
+                See :class:`GPTModel`.
+            attention_mask (Tensor, optional):
+                See :class:`GPTModel`.
+            use_cache (bool, optional):
+                See :class:`GPTModel`.
+            cache (Tensor, optional):
+                See :class:`GPTModel`.
+
+        Returns:
+            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` is True,
+            tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor `logits` will be returned.
+            `logits` is the output of the gpt model.
+            `cache_kvs` is the cache output of gpt model if `use_cache` is True.
+
+        """
+
         outputs = self.gpt(input_ids,
                            position_ids=position_ids,
                            attention_mask=attention_mask,
@@ -1022,7 +1060,9 @@ class GPTLMHeadModel(GPTPretrainedModel):
                 See :class:`GPTModel`.
 
         Returns:
-            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. `logits` is the output of the gpt model.
+            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` is True,
+            tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor `logits` will be returned.
+            `logits` is the output of the gpt model.
             `cache_kvs` is the cache output of gpt model if `use_cache` is True.
 
         """

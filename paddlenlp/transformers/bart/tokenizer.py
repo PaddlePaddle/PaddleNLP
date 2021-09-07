@@ -31,8 +31,8 @@ class BartTokenizer(GPTTokenizer):
         max_len (int, optional):
             The maximum value of the input sequence length.
             Defaults to `None`.
-        special_tokens (str, optional):
-            Special tokens not in the vocabulary.
+        special_tokens (list, optional):
+            A list of special tokens not in the vocabulary.
             Defaults to `None`.
         eos_token (str, optional):
             A special token representing the end of a sequence that was used during pretraining.
