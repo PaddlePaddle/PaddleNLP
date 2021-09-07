@@ -67,7 +67,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_dir 
 * `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 * `data_path`: 可选，数据集文件路径，默认数据集存放在当前目录data文件夹下。
 
-代码示例中使用的预训练模型是BERT，可以选择的`model`有`bert-base-uncased`，`bert-large-uncased`，`bert-base-cased`和`bert-large-cased`。
+代码示例中使用的预训练模型是BERT，如果想要使用其他预训练模型如ERNIE等，只需要更换`model`和`tokenizer`即可。
 
 程序运行时将会自动进行训练，评估。同时训练过程中会自动保存模型在指定的`save_dir`中。
 如：
