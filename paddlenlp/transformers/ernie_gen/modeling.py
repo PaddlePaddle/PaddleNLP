@@ -211,6 +211,14 @@ class ErnieEncoderStack(nn.Layer):
 
 @six.add_metaclass(InitTrackerMeta)
 class ErnieGenPretrainedModel(object):
+    r"""
+    An abstract class for pretrained ErnieGen models. It provides ErnieGen related
+    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
+    `pretrained_init_configuration`, `base_model_prefix` for downloading and
+    loading pretrained models.
+    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+
+    """
     model_config_file = "model_config.json"
     ernie_gen_pretrained_init_configuration = {
         "ernie-gen-base-en": {
@@ -544,6 +552,10 @@ class ErnieModel(nn.Layer, ErnieGenPretrainedModel):
 class ErnieForGeneration(ErnieModel):
     """
     Ernie Model for sequence to sequence generation.
+
+    This model inherits from :class:`~paddlenlp.transformers.ernie.modeling.ErnieModel`.
+    Refer to the superclass documentation for the generic methods.
+
     """
 
     def __init__(self, cfg, name=None):
@@ -578,12 +590,19 @@ class ErnieForGeneration(ErnieModel):
                 index of tgt_labels in `src_ids`, can be obtained from `fluid.layers.where(src_ids==mask_id)`
             encoder_only(Bool):
                 if set, will not return loss, logits_2d
+
         Returns:
-            loss(`Variable` of shape []):
+            tuple: Returns tuple (`loss`, `logits`, `info`).
+
+            With the fields:
+
+            - `loss`(`Variable` of shape []):
                 cross entropy loss mean over every target label. if `encode_only`, returns None.
-            logits(`Variable` of shape [n_targets, vocab_size]):
+
+            - `logits`(`Variable` of shape [n_targets, vocab_size]):
                 logits for every targets. if `encode_only`, returns None.
-            info(Dictionary): see `ErnieModel`
+
+            - `info`(Dict): see `ErnieModel`
         """
         tgt_labels = kwargs.pop('tgt_labels', None)
         tgt_pos = kwargs.pop('tgt_pos', None)
