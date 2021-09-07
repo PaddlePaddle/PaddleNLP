@@ -679,11 +679,14 @@ class ConvBertModel(ConvBertPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
-
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id).astype(dtype_float) * -1e9,
                 axis=[1, 2])
+        else:
+            attention_mask = paddle.unsqueeze(
+                attention_mask, axis=[1, 2]).astype(dtype_float)
+            attention_mask = (1.0 - attention_mask) * -1e9
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
@@ -1496,7 +1499,11 @@ class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
                                     self.convbert.config["hidden_size"], 2)
         self.init_weights()
 
-    def forward(self, input_ids, token_type_ids=None):
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
         r"""
         The ConvBertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -1505,7 +1512,10 @@ class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
                 See :class:`ConvBertModel`.
             token_type_ids (Tensor, optional):
                 See :class:`ConvBertModel`.
-
+            position_ids(Tensor, optional):
+                See :class:`ConvBertModel`.
+            attention_mask (list, optional):
+                See :class:`ConvBertModel`.
         Returns:
             tuple: Returns tuple (`start_logits`, `end_logits`).
 
@@ -1537,7 +1547,10 @@ class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
 
         """
         sequence_output = self.convbert(
-            input_ids, token_type_ids, position_ids=None, attention_mask=None)
+            input_ids,
+            token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
