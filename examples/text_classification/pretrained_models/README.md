@@ -85,42 +85,18 @@ $ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_di
 * `seed`：可选，随机种子，默认为1000.
 * `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 
-代码示例中使用的预训练模型是ERNIE，如果想要使用其他预训练模型如BERT，RoBERTa，Electra等，只需更换`model` 和 `tokenizer`即可。
+代码示例中使用的预训练模型是ERNIE，如果想要使用其他预训练模型如BERT等，只需更换`model` 和 `tokenizer`即可。
 
 ```python
 # 使用ernie预训练模型
-# ernie
-model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained('ernie',num_classes=2))
-tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie')
-
-# ernie-tiny
-# model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained('ernie-tiny',num_classes=2))
-# tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained('ernie-tiny')
-
+# ernie-1.0
+model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained('ernie-1.0',num_classes=2))
+tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
 # 使用bert预训练模型
 # bert-base-chinese
 model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_class=2)
 tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-chinese')
-
-# bert-wwm-chinese
-# model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-wwm-chinese', num_class=2)
-# tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-wwm-chinese')
-
-# bert-wwm-ext-chinese
-# model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-wwm-ext-chinese', num_class=2)
-# tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-wwm-ext-chinese')
-
-
-# 使用roberta预训练模型
-# roberta-wwm-ext
-# model = ppnlp.transformers.RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext', num_class=2)
-# tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext')
-
-# roberta-wwm-ext
-# model = ppnlp.transformers.RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext-large', num_class=2)
-# tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext-large')
-
 ```
 更多预训练模型，参考[transformers](../../../docs/model_zoo/transformers.rst)
 
