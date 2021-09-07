@@ -16,15 +16,15 @@ import paddle
 import paddle.nn as nn
 
 
-class PretrainedModelForCSC(nn.Layer):
-    def __init__(self, pretrained_model, pinyin_vocab_size, pad_pinyin_id=0):
-        super(PretrainedModelForCSC, self).__init__()
-        self.pretrained_model = pretrained_model
-        emb_size = self.pretrained_model.config["hidden_size"]
-        hidden_size = self.pretrained_model.config["hidden_size"]
-        vocab_size = self.pretrained_model.config["vocab_size"]
+class ErnieForCSC(nn.Layer):
+    def __init__(self, ernie, pinyin_vocab_size, pad_pinyin_id=0):
+        super(ErnieForCSC, self).__init__()
+        self.ernie = ernie
+        emb_size = self.ernie.config["hidden_size"]
+        hidden_size = self.ernie.config["hidden_size"]
+        vocab_size = self.ernie.config["vocab_size"]
 
-        self.pad_token_id = self.pretrained_model.config["pad_token_id"]
+        self.pad_token_id = self.ernie.config["pad_token_id"]
         self.pinyin_vocab_size = pinyin_vocab_size
         self.pad_pinyin_id = pad_pinyin_id
         self.pinyin_embeddings = nn.Embedding(
@@ -45,15 +45,14 @@ class PretrainedModelForCSC(nn.Layer):
                  ).astype(self.detection_layer.weight.dtype) * -1e9,
                 axis=[1, 2])
 
-        embedding_output = self.pretrained_model.embeddings(
+        embedding_output = self.ernie.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
         pinyin_embedding_output = self.pinyin_embeddings(pinyin_ids)
 
         # Detection module
-        detection_outputs = self.pretrained_model.encoder(embedding_output,
-                                                          attention_mask)
+        detection_outputs = self.ernie.encoder(embedding_output, attention_mask)
         # [B, T, 2]
         detection_error_probs = self.softmax(
             self.detection_layer(detection_outputs))
@@ -61,8 +60,8 @@ class PretrainedModelForCSC(nn.Layer):
         word_pinyin_embedding_output = detection_error_probs[:, :, 0:1] * embedding_output \
                     + detection_error_probs[:,:, 1:2] * pinyin_embedding_output
 
-        correction_outputs = self.pretrained_model.encoder(
-            word_pinyin_embedding_output, attention_mask)
+        correction_outputs = self.ernie.encoder(word_pinyin_embedding_output,
+                                                attention_mask)
         # [B, T, V]
         correction_logits = self.correction_layer(correction_outputs)
         return detection_error_probs, correction_logits

@@ -28,13 +28,13 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import ErnieModel, ErnieTokenizer
 from paddlenlp.utils.log import logger
 
-from model import PretrainedModelForCSC
+from model import ErnieForCSC
 from utils import read_test_ds, convert_example, create_dataloader, is_chinese_char, parse_decode
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_name_or_path", type=str, default="ernie-1.0", choices=["ernie-1.0"], help="Pretraining model name or path")
-parser.add_argument("--init_checkpoint_path", default=None, type=str, help="The model checkpoint path.", )
+parser.add_argument("--ckpt_path", default=None, type=str, help="The model checkpoint path.", )
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer " "than this will be truncated, sequences shorter will be padded.", )
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.", )
 parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu/xpu.")
@@ -83,10 +83,10 @@ def do_predict(args):
         args.pinyin_vocab_file_path, unk_token='[UNK]', pad_token='[PAD]')
 
     tokenizer = ErnieTokenizer.from_pretrained(args.model_name_or_path)
-    pretrained_model = ErnieModel.from_pretrained(args.model_name_or_path)
+    ernie = ErnieModel.from_pretrained(args.model_name_or_path)
 
-    model = PretrainedModelForCSC(
-        pretrained_model,
+    model = ErnieForCSC(
+        ernie,
         pinyin_vocab_size=len(pinyin_vocab),
         pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
 
@@ -111,11 +111,10 @@ def do_predict(args):
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
 
-    if args.init_checkpoint_path:
-        model_dict = paddle.load(args.init_checkpoint_path)
+    if args.ckpt_path:
+        model_dict = paddle.load(args.ckpt_path)
         model.set_dict(model_dict)
-        logger.info("Load model from checkpoints: {}".format(
-            args.init_checkpoint_path))
+        logger.info("Load model from checkpoints: {}".format(args.ckpt_path))
 
     model.eval()
     corr_preds = []

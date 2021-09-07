@@ -28,8 +28,8 @@ from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import ErnieModel, ErnieTokenizer
 from paddlenlp.utils.log import logger
-from paddlenlp.metrics.sighan import DetectionF1, CorrectionF1
-from model import PretrainedModelForCSC
+from paddlenlp.metrics import DetectionF1, CorrectionF1
+from model import ErnieForCSC
 from utils import convert_example, create_dataloader, read_train_ds
 
 # yapf: disable
@@ -98,15 +98,20 @@ def do_train(args):
         args.pinyin_vocab_file_path, unk_token='[UNK]', pad_token='[PAD]')
 
     tokenizer = ErnieTokenizer.from_pretrained(args.model_name_or_path)
-    pretrained_model = ErnieModel.from_pretrained(args.model_name_or_path)
+    ernie = ErnieModel.from_pretrained(args.model_name_or_path)
 
-    model = PretrainedModelForCSC(
-        pretrained_model,
+    model = ErnieForCSC(
+        ernie,
         pinyin_vocab_size=len(pinyin_vocab),
         pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
 
     train_ds, eval_ds = load_dataset('sighan-cn', splits=['train', 'dev'])
 
+    # Extend current training dataset by providing extra training 
+    # datasets directory. The suffix of dataset file name in extra 
+    # dataset directory has to be ".txt". The data format of
+    # dataset need to be a couple of senteces at every line, such as:
+    # "城府宫员表示，这是过去三十六小时内第三期强烈的余震。\t政府官员表示，这是过去三十六小时内第三起强烈的余震。\n"
     if args.extra_train_ds_dir is not None and os.path.exists(
             args.extra_train_ds_dir):
         data = train_ds.data
@@ -185,13 +190,16 @@ def do_train(args):
             input_ids, token_type_ids, pinyin_ids, det_labels, corr_labels, length = batch
             det_error_probs, corr_logits = model(input_ids, pinyin_ids,
                                                  token_type_ids)
-
-            # det_error_probs is producted by softmax
+            # Chinese Spelling Correction has 2 tasks: detection task and correction task.
+            # Detection task aims to detect whether each Chinese charater has spelling error.
+            # Correction task aims to correct each potential wrong charater to right charater.
+            # So we need to minimize detection loss and correction loss simultaneously.
+            # See more loss design details on https://aclanthology.org/2021.findings-acl.198.pdf
             det_loss = det_loss_act(det_error_probs, det_labels)
-
-            init_corr_loss = corr_loss_act(corr_logits, corr_labels)
-            corr_loss = init_corr_loss * det_error_probs.max(axis=-1)
+            corr_loss = corr_loss_act(
+                corr_logits, corr_labels) * det_error_probs.max(axis=-1)
             loss = (det_loss + corr_loss).mean()
+
             loss.backward()
             optimizer.step()
             lr_scheduler.step()

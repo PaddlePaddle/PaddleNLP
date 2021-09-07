@@ -18,10 +18,8 @@ import os
 import paddle
 from paddle.static import InputSpec
 from paddlenlp.data import Vocab
-from paddlenlp.transformers import ErnieGramModel
 from paddlenlp.transformers import ErnieModel
-from paddlenlp.transformers import RobertaModel
-from model import PretrainedModelForCSC
+from model import ErnieForCSC
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
@@ -37,10 +35,10 @@ def main():
     pinyin_vocab = Vocab.load_vocabulary(
         args.pinyin_vocab_file_path, unk_token='[UNK]', pad_token='[PAD]')
 
-    pretrained_model = ErnieModel.from_pretrained(args.model_name_or_path)
+    ernie = ErnieModel.from_pretrained(args.model_name_or_path)
 
-    model = PretrainedModelForCSC(
-        pretrained_model,
+    model = ErnieForCSC(
+        ernie,
         pinyin_vocab_size=len(pinyin_vocab),
         pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
 

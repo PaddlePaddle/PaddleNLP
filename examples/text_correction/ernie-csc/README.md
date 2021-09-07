@@ -2,7 +2,7 @@
 
 ## 简介
 
-中文文本纠错任务是一项NLP基础任务，其输入是一个可能含有语法错误的中文句子，输出是一个正确的中文句子。语法错误类型很多，有多字、少字、错别字等，目前最常见的错误类型是`错别字`。大部分研究工作围绕错别字这一类型进行研究。百度NLP部门在最新的`ACL 2021`上提出以ERNIE为基础、结合语义特征、拼音特征的中文错别字纠错模型。PaddleNLP将基于该纠错模型提供中文错别字纠错能力。模型结构如下：
+中文文本纠错任务是一项NLP基础任务，其输入是一个可能含有语法错误的中文句子，输出是一个正确的中文句子。语法错误类型很多，有多字、少字、错别字等，目前最常见的错误类型是`错别字`。大部分研究工作围绕错别字这一类型进行研究。本文实现了百度在ACL 2021上提出结合拼音特征的Softmask策略的中文错别字纠错的下游任务网络，并提供预训练模型，模型结构如下：
 
 ![image](https://user-images.githubusercontent.com/10826371/131974040-fc84ec04-566f-4310-9839-862bfb27172e.png)
 
@@ -11,14 +11,14 @@
 ```text
 .
 ├── README.md                   # 文档
-├── download.py                 # 下载Sighan测试集
+├── download.py                 # 下载SIGHAN测试集
 ├── pinyin_vocab.txt            # 拼音字表
 ├── predict.py                  # 预测标准输入的句子
-├── predict_sighan.py           # 生成Sighan测试集的预测结果
+├── predict_sighan.py           # 生成SIGHAN测试集的预测结果
 ├── model.py                    # 纠错模型实现
 ├── requirements.txt            # 本项目的Python依赖项
-├── run_sighan_predict.sh       # 生成模型在Sighan测试集的预测结果并输出预测效果
-├── sighan_evaluate.py          # 评估模型在Sighan测试集上预测效果
+├── run_sighan_predict.sh       # 生成训练后模型在SIGHAN测试集的预测结果并输出预测效果
+├── sighan_evaluate.py          # 评估模型在SIGHAN测试集上预测效果
 ├── train.py                    # 训练脚本
 └── utils.py                    # 通用函数工具
 ```
@@ -31,7 +31,7 @@ pip install -r requirements.txt
 ## 模型训练
 
 ### 参数
-- `model_name_or_path` 指示了Fine-tuning使用的具体预训练模型以及预训练时使用的tokenizer，目前支持的预训练模型有："ernie-1.0"。预训练模型需要与模型类型对应。若模型相关内容保存在本地，这里也可以提供相应目录地址，例如："./checkpoint/model_xx/"。
+- `model_name_or_path` 目前支持的预训练模型有："ernie-1.0"。
 - `max_seq_length` 表示最大句子长度，超过该长度的部分将被切分成下一个样本。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
@@ -53,12 +53,12 @@ pip install -r requirements.txt
 #### 下载数据集
 
 ```
-python download.py --data_dir extra_train_ds --url https://github.com/wdimmy/Automatic-Corpus-Generation/raw/master/corpus/train.sgml
+python download.py --data_dir ./extra_train_ds/ --url https://github.com/wdimmy/Automatic-Corpus-Generation/raw/master/corpus/train.sgml
 ```
 
 #### 预处理数据集
 
-由于Automatic Corpus Generation提供的数据集是以XML形式提供，不满足训练脚本中的对训练数据的要求（输入的文件内容为句子对形式），这里提供一个数据转换脚本，运行以下命令：
+训练脚本要求训练集文件内容以句子对形式呈现，这里提供一个转换脚本，将Automatic Corpus Generation提供的XML文件转换成句子对形式的文件，运行以下命令：
 
 ```
 python change_sgml_to_txt.py -i extra_train_ds/train.sgml -o extra_train_ds/train.txt
@@ -67,18 +67,18 @@ python change_sgml_to_txt.py -i extra_train_ds/train.sgml -o extra_train_ds/trai
 ### 单卡训练
 
 ```python
-python train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir checkpoints5e-5 --extra_train_ds_dir extra_train_ds
+python train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir ./checkpoints/ --extra_train_ds_dir ./extra_train_ds/
 ```
 
 ### 多卡训练
 
 ```python
-python -m paddle.distributed.launch --gpus "0,1"  train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir checkpoints5e-5 --extra_train_ds_dir extra_train_ds
+python -m paddle.distributed.launch --gpus "0,1"  train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir ./checkpoints/ --extra_train_ds_dir ./extra_train_ds/
 ```
 
 ## 模型预测
 
-### 预测Sighan测试集
+### 预测SIGHAN测试集
 
 SIGHAN 13，SIGHAN 14，SIGHAN 15是目前中文错别字纠错任务常用的benchmark数据。由于SIGHAN官方提供的是繁体字数据集，PaddleNLP将提供简体版本的SIGHAN测试数据。以下运行SIGHAN预测脚本：
 
@@ -86,36 +86,50 @@ SIGHAN 13，SIGHAN 14，SIGHAN 15是目前中文错别字纠错任务常用的be
 sh run_sighan_predict.sh
 ```
 
-该脚本会下载Sighan数据集，加载checkpoint的模型参数运行模型，输出SIGHAN测试集的预测结果到predict文件，并输出预测效果。
+该脚本会下载SIGHAN数据集，加载checkpoint的模型参数运行模型，输出SIGHAN测试集的预测结果到predict_sighan文件，并输出预测效果。
+
+**预测效果**
+
+| Metric       | SIGHAN 13 | SIGHAN 14 | SIGHAN 15 |
+| -------------| --------- | --------- |---------  |
+| Detection F1 | 0.8348    | 0.6534    | 0.7464    |
+| Correction F1| 0.8217    | 0.6302    | 0.7296    |
 
 ### 预测部署
 
 #### 模型导出
 
-使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见export_model.py。静态图参数保存在`output_path`指定路径中。
+使用动态图训练结束之后，预测部署需要导出静态图参数，具体做法需要运行模型导出脚本`export_model.py`。以下是脚本参数介绍以及运行方式：
 
-运行方式：
+**参数**
+- `params_path` 是指动态图训练保存的参数路径。
+- `output_path` 是指静态图参数导出路径。
+- `pinyin_vocab_file_path` 指拼音表路径。
+- `model_name_or_path` 目前支持的预训练模型有："ernie-1.0"。
+
+**运行方式**
 
 ```shell
-python export_model.py --params_path checkpoints5e-5/best_model.pdparams
+python export_model.py --params_path checkpoints/best_model.pdparams --output_path ./infer_model/static_graph_params
 ```
 
-其中`checkpoints5e-5/best_model.pdparams`是训练过程中保存的参数文件，请更换为实际得到的训练保存路径。
-
-* `params_path`是指动态图训练保存的参数路径
-* `output_path`是指静态图参数导出路径。
+其中`checkpoints/best_model.pdparams`是训练过程中保存的参数文件，请更换为实际得到的训练保存路径。
 
 #### 预测
 
-导出模型之后，可以用于部署，predict.py文件提供了python部署预测示例。运行方式：
+导出模型之后，可以用于预测部署，predict.py文件提供了python预测部署示例。运行方式：
 
 ```python
 python predict.py --model_file infer_model/static_graph_params.pdmodel --params_file infer_model/static_graph_params.pdiparams
 ```
 
-输出如下图：
-![image](https://user-images.githubusercontent.com/10826371/132180831-03b35b03-9eff-4abc-80c3-b43233edfc02.png)
-
+输出如下：
+```
+Source: 遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。
+Target: 遇到逆境时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。
+Source: 人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。
+Target: 人生就是如此，经过磨练才能让自己更加茁壮，才能使自己更加乐观。
+```
 
 ## 参考文献
 * Ruiqing Zhang, Chao Pang et al. "Correcting Chinese Spelling Errors with Phonetic Pre-training", ACL, 2021

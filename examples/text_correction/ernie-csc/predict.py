@@ -142,8 +142,6 @@ if __name__ == "__main__":
     samples = [
         '遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。',
         '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。',
-        '遇到错折不退缩',
-        '我已背上一身苦困后悔与唏虚',
     ]
 
     results = predictor.predict(samples, batch_size=args.batch_size)
