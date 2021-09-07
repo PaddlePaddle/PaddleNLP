@@ -78,7 +78,6 @@ class DDParserTask(Task):
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        static_mode(bool): The flag to control in the static/dygraph mode.
         tree(bool): Ensure the output conforms to the tree structure.
         prob(bool): Whether to return the probability of predicted heads.
         use_pos(bool): Whether to return the postag.
@@ -167,7 +166,8 @@ class DDParserTask(Task):
             n_rels=len(self.rel_vocab),
             n_words=len(self.word_vocab),
             pad_index=self.word_pad_index,
-            eos_index=self.word_eos_index, )
+            bos_index=self.word_bos_index,
+            eos_index=self.word_eos_index,)
         # Load the model parameter for the predict
         state_dict = paddle.load(
             os.path.join(self._task_path, self.model, "model.pdparams"))
@@ -249,15 +249,12 @@ class DDParserTask(Task):
             self.input_handles[0].copy_from_cpu(words)
             self.input_handles[1].copy_from_cpu(wp)
             self.predictor.run()
-            s_arc = self.output_handle[0].copy_to_cpu()
-            s_rel = self.output_handle[1].copy_to_cpu()
-            words = self.output_handle[2].copy_to_cpu()
+            arc_preds = self.output_handle[0].copy_to_cpu()
+            rel_preds = self.output_handle[1].copy_to_cpu()
+            s_arc = self.output_handle[2].copy_to_cpu()
+            mask = self.output_handle[3].copy_to_cpu().astype('bool')
 
-            mask = np.logical_and(
-                np.logical_and(words != self.word_pad_index,
-                               words != self.word_bos_index),
-                words != self.word_eos_index, )
-            arc_preds, rel_preds = decode(s_arc, s_rel, mask, self.tree)
+            arc_preds, rel_preds = decode(arc_preds, rel_preds, s_arc, mask, self.tree)
 
             arcs.extend([arc_pred[m] for arc_pred, m in zip(arc_preds, mask)])
             rels.extend([rel_pred[m] for rel_pred, m in zip(rel_preds, mask)])
@@ -458,16 +455,13 @@ def probability(s_arc, arc_preds):
     return arc_probs
 
 
-def decode(s_arc, s_rel, mask, tree=True):
-
-    lens = np.sum(mask.astype(int), axis=-1)
-    arc_preds = np.argmax(s_arc, axis=-1)
+def decode(arc_preds, rel_preds, s_arc, mask, tree):
+    """decode"""
+    lens = np.sum(mask, -1)
 
     bad = [not istree(seq[:i + 1]) for i, seq in zip(lens, arc_preds)]
     if tree and any(bad):
         arc_preds[bad] = eisner(s_arc[bad], mask[bad])
-
-    rel_preds = np.argmax(s_rel, axis=-1)
     rel_preds = [
         rel_pred[np.arange(len(arc_pred)), arc_pred]
         for arc_pred, rel_pred in zip(arc_preds, rel_preds)
