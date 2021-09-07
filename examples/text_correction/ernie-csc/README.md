@@ -52,6 +52,8 @@ pip install -r requirements.txt
 
 #### 下载数据集
 
+Automatic Corpus Generation生成的中文纠错数据集比较大，下载时间比较长，请耐心等候。运行以下命令完成数据集下载：
+
 ```
 python download.py --data_dir ./extra_train_ds/ --url https://github.com/wdimmy/Automatic-Corpus-Generation/raw/master/corpus/train.sgml
 ```
