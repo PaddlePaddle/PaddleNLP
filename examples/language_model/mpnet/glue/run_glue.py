@@ -339,7 +339,6 @@ def do_train(args):
         model = paddle.DataParallel(model)
 
     # layer_lr for base
-    ############################################################
     if args.layer_lr_decay != 1.0:
         layer_lr_radios_map = _get_layer_lr_radios(
             args.layer_lr_decay, n_layers=12)
@@ -350,7 +349,6 @@ def do_train(args):
                     layer_lr_radio = radio
                     break
             parameter.optimize_attr["learning_rate"] *= layer_lr_radio
-    ############################################################
 
     num_training_steps = (args.max_steps if args.max_steps > 0 else
                           (len(train_data_loader) * args.num_train_epochs))

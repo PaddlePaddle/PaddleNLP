@@ -39,13 +39,16 @@ def create_position_ids_from_input_ids(input_ids, padding_idx=1):
     Replace non-padding symbols with their position numbers. Position numbers begin at padding_idx+1. Padding symbols
     are ignored. This is modified from fairseq's `utils.make_positions`. :param paddle.Tensor x: :return paddle.Tensor:
     """
-    # The series of casts and type-conversions here are carefully balanced to both work with ONNX export and XLA.
     mask = (input_ids != padding_idx).astype(paddle.int64)
     incremental_indices = paddle.cumsum(mask, axis=1).astype(mask.dtype) * mask
     return incremental_indices.astype(paddle.int64) + padding_idx
 
 
 class MPNetEmbeddings(nn.Layer):
+    """
+    Include embeddings from word and position embeddings.
+    """
+
     def __init__(
             self,
             vocab_size,
@@ -273,6 +276,10 @@ class MPNetEncoder(nn.Layer):
 
 
 class MPNetPooler(nn.Layer):
+    """
+    Pool the result of MPNetEncoder.
+    """
+
     def __init__(self, hidden_size):
         super(MPNetPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -288,6 +295,13 @@ class MPNetPooler(nn.Layer):
 
 
 class MPNetPretrainedModel(PretrainedModel):
+    """
+    An abstract class for pretrained MPNet models. It provides MPNet related
+    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
+    `pretrained_init_configuration`, `base_model_prefix` for downloading and
+    loading pretrained models. See `PretrainedModel` for more details.
+    """
+
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "mpnet-base": {
@@ -332,6 +346,67 @@ class MPNetPretrainedModel(PretrainedModel):
 
 @register_base_model
 class MPNetModel(MPNetPretrainedModel):
+    """
+    The bare MPNet Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in `MPNetModel`. Also is the vocab size of token embedding matrix.
+            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `MPNetModel`.
+        hidden_size (int, optional):
+            Dimensionality of the embedding layer, encoder layer and pooler layer. Defaults to `768`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in the Transformer encoder. Defaults to `12`.
+        num_attention_heads (int, optional):
+            Number of attention heads for each attention layer in the Transformer encoder.
+            Defaults to `12`.
+        intermediate_size (int, optional):
+            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
+            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
+            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
+            Defaults to `3072`.
+        hidden_act (str, optional):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported. Defaults to `"gelu"`.
+        hidden_dropout_prob (float, optional):
+            The dropout probability for all fully connected layers in the embeddings and encoder.
+            Defaults to `0.1`.
+        attention_probs_dropout_prob (float, optional):
+            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
+            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
+            sequence. Defaults to `514`.
+        initializer_range (float, optional):
+            The standard deviation of the normal initializer.
+            Defaults to 0.02.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`MPNetPretrainedModel.init_weights()` for how weights are initialized in `MPNetModel`.
+
+        relative_attention_num_buckets (int, optional):
+            The number of buckets to use for each attention layer.
+            Defaults to `32`.
+
+        layer_norm_eps (float, optional):
+            The epsilon used by the layer normalization layers.
+            Defaults to `1e-5`.
+
+        pad_token_id (int, optional):
+            The index of padding token in the token vocabulary.
+            Defaults to `1`.
+
+    """
+
     def __init__(
             self,
             vocab_size,
@@ -371,6 +446,58 @@ class MPNetModel(MPNetPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None):
+        r'''
+        The MPNetModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                max_position_embeddings - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                If its data type is int, the values should be either 0 or 1.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+
+        Returns:
+            tuple: Returns tuple (`sequence_output`, `pooled_output`).
+
+            With the fields:
+
+            - `sequence_output` (Tensor):
+                Sequence of hidden-states at the last layer of the model.
+                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+
+            - `pooled_output` (Tensor):
+                The output of first token (`<s>`) in sequence.
+                We "pool" the model by simply taking the hidden state corresponding to the first token.
+                Its data type should be float32 and its shape is [batch_size, hidden_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import MPNetModel, MPNetTokenizer
+
+                tokenizer = MPNetTokenizer.from_pretrained('mpnet-base')
+                model = MPNetModel.from_pretrained('mpnet-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+        '''
+
         if attention_mask is None:
             attention_mask = (input_ids != self.embeddings.padding_idx
                               ).astype(input_ids.dtype)
@@ -391,6 +518,10 @@ class MPNetModel(MPNetPretrainedModel):
 
 
 class MPNetLMHead(nn.Layer):
+    """
+    MPNet Model with a `language modeling` head on top for CLM fine-tuning.
+    """
+
     def __init__(
             self,
             hidden_size,
@@ -420,6 +551,15 @@ class MPNetLMHead(nn.Layer):
 
 
 class MPNetForMaskedLM(MPNetPretrainedModel):
+    """
+    MPNet Model with pretraining tasks on top.
+
+    Args:
+        MPNet (:class:`MPNetModel`):
+            An instance of :class:`MPNetModel`.
+
+    """
+
     def __init__(self, mpnet):
         super(MPNetForMaskedLM, self).__init__()
         self.mpnet = mpnet
@@ -438,6 +578,34 @@ class MPNetForMaskedLM(MPNetPretrainedModel):
             position_ids=None,
             attention_mask=None,
             labels=None, ):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`MPNetModel`.
+            position_ids (Tensor, optional):
+                See :class:`MPNetModel`.
+            attention_mask (Tensor, optional):
+                See :class:`MPNetModel`.
+            labels (Tensor, optional):
+                The Labels for computing the masked language modeling loss. Indices should be in ``[-100, 0, ..., vocab_size]`` Tokens with indices set to ``-100`` are ignored (masked), the loss is only computed for the tokens with labels in ``[0, ..., vocab_size]`` Its shape is [batch_size, sequence_length].
+
+        Returns:
+            tuple: Returns tuple (`masked_lm_loss`, `prediction_scores`, ``sequence_output`).
+
+            With the fields:
+
+            - `masked_lm_loss` (Tensor):
+                The masked lm loss. Its data type should be float32 and its shape is [1].
+
+            - `prediction_scores` (Tensor):
+                The scores of masked token prediction. Its data type should be float32. Its shape is [batch_size, sequence_length, vocab_size].
+
+            - `sequence_output` (Tensor):
+                Sequence of hidden-states at the last layer of the model. Its data type should be float32. Its shape is `[batch_size, sequence_length, hidden_size]`.
+
+
+        """
         sequence_output, pooled_output = self.mpnet(
             input_ids, position_ids=position_ids, attention_mask=attention_mask)
         prediction_scores = self.lm_head(sequence_output)
@@ -456,6 +624,21 @@ class MPNetForMaskedLM(MPNetPretrainedModel):
 
 
 class MPNetForSequenceClassification(MPNetPretrainedModel):
+    """
+    MPNet Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
+
+    Args:
+        mpnet (:class:`MPNetModel`):
+            An instance of MPNetModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of MPNet.
+            If None, use the same value as `hidden_dropout_prob` of `MPNetModel`
+            instance `mpnet`. Defaults to None.
+    """
+
     def __init__(self, mpnet, num_classes=2, dropout=None):
         super(MPNetForSequenceClassification, self).__init__()
         self.num_classes = num_classes
@@ -467,6 +650,37 @@ class MPNetForSequenceClassification(MPNetPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None):
+        r"""
+        The MPNetForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`MPNetModel`.
+            position_ids(Tensor, optional):
+                See :class:`MPNetModel`.
+            attention_mask (list, optional):
+                See :class:`MPNetModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Shape as `[batch_size, num_classes]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import MPNetForSequenceClassification, MPNetTokenizer
+
+                tokenizer = MPNetTokenizer.from_pretrained('mpnet-base')
+                model = MPNetForSequenceClassification.from_pretrained('mpnet-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
+
         _, pooled_output = self.mpnet(
             input_ids, position_ids=position_ids, attention_mask=attention_mask)
         pooled_output = self.dropout(pooled_output)
@@ -477,6 +691,20 @@ class MPNetForSequenceClassification(MPNetPretrainedModel):
 
 
 class MPNetForMultipleChoice(MPNetPretrainedModel):
+    """
+    MPNet Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
+    softmax) e.g. for RocStories/SWAG tasks.
+    Args:
+        mpnet (:class:`MPNetModel`):
+            An instance of MPNetModel.
+        num_choices (int, optional):
+            The number of choices. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of MPNet.
+            If None, use the same value as `hidden_dropout_prob` of `MPNetModel`
+            instance `mpnet`. Defaults to None.
+    """
+
     def __init__(self, mpnet, num_choices=2, dropout=None):
         super(MPNetForMultipleChoice, self).__init__()
         self.num_choices = num_choices
@@ -487,6 +715,35 @@ class MPNetForMultipleChoice(MPNetPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None):
+        r"""
+        The MPNetForMultipleChoice forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`MPNetModel` and shape as [batch_size, num_choice, sequence_length].
+            position_ids(Tensor, optional):
+                See :class:`MPNetModel` and shape as [batch_size, num_choice, sequence_length].
+            attention_mask (list, optional):
+                See :class:`MPNetModel` and shape as [batch_size, num_choice, sequence_length].
+
+        Returns:
+            Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
+            Shape as `[batch_size, num_choice]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+                import paddle
+                from paddlenlp.transformers import MPNetForMultipleChoice, MPNetTokenizer
+
+                tokenizer = MPNetTokenizer.from_pretrained('mpnet-base')
+                model = MPNetForMultipleChoice.from_pretrained('mpnet-base')
+                
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                
+                logits = model(**inputs)
+
+        """
         # input_ids: [bs, num_choice, seq_l]
         input_ids = input_ids.reshape(shape=(
             -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
@@ -511,6 +768,21 @@ class MPNetForMultipleChoice(MPNetPretrainedModel):
 
 
 class MPNetForTokenClassification(MPNetPretrainedModel):
+    """
+    MPNet Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        mpnet (:class:`MPNetModel`):
+            An instance of MPNetModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of MPNet.
+            If None, use the same value as `hidden_dropout_prob` of `MPNetModel`
+            instance `mpnet`. Defaults to None.
+    """
+
     def __init__(self, mpnet, num_classes, dropout=None):
         super(MPNetForTokenClassification, self).__init__()
         self.num_classes = num_classes
@@ -522,6 +794,35 @@ class MPNetForTokenClassification(MPNetPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None):
+        r"""
+        The MPNetForTokenClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`MPNetModel`.
+            position_ids(Tensor, optional):
+                See :class:`MPNetModel`.
+            attention_mask (list, optional):
+                See :class:`MPNetModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import MPNetForTokenClassification, MPNetTokenizer
+
+                tokenizer = MPNetTokenizer.from_pretrained('mpnet-base')
+                model = MPNetForTokenClassification.from_pretrained('mpnet-base')
+                
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                
+                logits = model(**inputs)
+        """
         sequence_output, _ = self.mpnet(
             input_ids, position_ids=position_ids, attention_mask=attention_mask)
         sequence_output = self.dropout(sequence_output)
@@ -532,6 +833,17 @@ class MPNetForTokenClassification(MPNetPretrainedModel):
 
 
 class MPNetForQuestionAnswering(MPNetPretrainedModel):
+    """
+    MPNet Model with a span classification head on top for extractive question-answering tasks like
+    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
+    `span end logits`).
+
+    Args:
+        mpnet (:class:`MPNetModel`):
+            An instance of MPNetModel.
+
+    """
+
     def __init__(self, mpnet, num_classes=2):
         super(MPNetForQuestionAnswering, self).__init__()
         self.mpnet = mpnet
@@ -542,6 +854,46 @@ class MPNetForQuestionAnswering(MPNetPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None):
+        r"""
+        The MPNetForQuestionAnswering forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`MPNetModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`MPNetModel`.
+
+        Returns:
+            tuple: Returns tuple (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import MPNetForQuestionAnswering, MPNetTokenizer
+
+                tokenizer = MPNetTokenizer.from_pretrained('mpnet-base')
+                model = MPNetForQuestionAnswering.from_pretrained('mpnet-base')
+                
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                start_logits = outputs[0]
+                end_logits  = outputs[1]
+
+        """
+
         sequence_output, _ = self.mpnet(
             input_ids, position_ids=position_ids, attention_mask=attention_mask)
         logits = self.qa_outputs(sequence_output)

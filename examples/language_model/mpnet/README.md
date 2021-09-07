@@ -3,7 +3,7 @@
 [MPNet: Masked and Permuted Pre-training for Language Understanding - Microsoft Research](https://www.microsoft.com/en-us/research/publication/mpnet-masked-and-permuted-pre-training-for-language-understanding/)
 
 **摘要:**
-BERT adopts masked language modeling (MLM) for pre-training and is one of the most successful pre-training models. Since BERT neglects dependency among predicted tokens, XLNet introduces permuted language modeling (PLM) for pretraining to address this problem. However, XLNet does not leverage the full position information of a sentence and thus suffers from position discrepancy between pre-training and fine-tuning. In this paper, we propose MPNet, a novel pre-training method that inherits the advantages of BERT and XLNet and avoids their limitations. MPNet leverages the dependency among predicted tokens through permuted language modeling (vs. MLM in BERT), and takes auxiliary position information as input to make the model see a full sentence and thus reducing the position discrepancy (vs. PLM in XLNet). We pre-train MPNet on a large-scale dataset (over 160GB text corpora) and fine-tune on a variety of down-streaming tasks (GLUE, SQuAD, etc). Experimental results show that MPNet outperforms MLM and PLM by a large margin, and achieves better results on these tasks compared with previous state-of-the-art pre-trained methods (e.g., BERT, XLNet, RoBERTa) under the same model setting. The code and the pre-trained models are available at: https://github.com/microsoft/MPNet.
+BERT采用掩码语言建模（MLM）进行预训练，是最成功的预训练模型之一。由于BERT忽略了预测标记之间的依赖关系，XLNet引入了置换语言建模（PLM）进行预训练来解决这个问题。然而，XLNet没有利用句子的完整位置信息，因此会受到预训练和微调之间的位置差异的影响。在本文中，我们提出了MPNet，这是一种新的预训练方法，它继承了BERT和XLNet的优点并避免了它们的局限性。MPNet通过置换语言建模（相对于BERT中的MLM）利用预测标记之间的依赖性，并以辅助位置信息作为输入，使模型能够看到完整的句子，从而减少位置差异（相对于XLNet中的PLM）。我们在大规模数据集（超过160GB的文本语料库）上预训练了MPNet模型，并对各种下游任务（GLUE、SQuAD 等）进行微调。实验结果表明，在相同的模型设置下，MPNet大大优于MLM和PLM，并且与之前最先进的预训练方法（例如 BERT、XLNet、RoBERTa）相比，在这些任务上取得了更好的结果。原始代码和预训练模型可从 https://github.com/microsoft/MPNet 下载得到。
 
 本项目是 MPNet 在 Paddle 2.x上的开源实现。
 
@@ -16,14 +16,6 @@ BERT adopts masked language modeling (MLM) for pre-training and is one of the mo
 </p>
 
 ## 快速开始
-
-### 模型精度对齐
-运行`python compare.py`，对比huggingface与paddle之间的精度，我们可以发现精度的平均误差在10^-6量级，最大误差在10^-5量级（更换不同的输入，误差会发生变化）。
-```python
-python compare.py
-# meandif tensor(6.5154e-06)
-# maxdif tensor(4.1485e-05)
-```
 
 ### 下游任务微调
 
