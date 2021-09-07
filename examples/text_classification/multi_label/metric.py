@@ -15,14 +15,13 @@
 import numpy as np
 from sklearn.metrics import roc_auc_score, f1_score
 
-import paddle
 from paddle.metric import Metric
+
 
 class MultiLabelReport(Metric):
     """
     AUC and F1Score for multi-label text classification task.
     """
-
     def __init__(self, name='MultiLabelReport', average='micro'):
         super(MultiLabelReport, self).__init__()
         self.average = average
