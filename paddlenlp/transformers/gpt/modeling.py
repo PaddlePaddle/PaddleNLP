@@ -757,10 +757,11 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
     It use the greedy stategy and generate the next word with highest probablity.
     """
 
-    def __init__(self, gpt, max_predict_len):
+    def __init__(self, gpt, max_predict_len, eol_token_id=3):
         super(GPTForGreedyGeneration, self).__init__()
         self.gpt = gpt
         self.max_predict_len = max_predict_len
+        self.eol_token_id = eol_token_id
         self.apply(self.init_weights)
 
     def model(self,
@@ -789,7 +790,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         else:
             return logits
 
-    def forward(self, input_ids, end_id):
+    def forward(self, input_ids):
         output, cached_kvs = self.model(input_ids, use_cache=True, cache=None)
         src_ids = input_ids
         nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
@@ -802,7 +803,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
             nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
             src_ids = paddle.concat([src_ids, nid], axis=1)
             cur_len += 1
-            if paddle.max(nid) == end_id:
+            if paddle.max(nid) == self.eol_token_id:
                 break
         return src_ids
 
