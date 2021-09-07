@@ -137,7 +137,6 @@ class SkepSequenceModel(SkepPretrainedModel):
         super(SkepSequenceModel, self).__init__()
         self.num_classes = num_classes
         self.skep = skep  # allow skep to be config
-        print(self.skep)
         self.dropout = nn.Dropout(dropout if dropout is not None else
                                   self.skep.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.skep.config["hidden_size"],
