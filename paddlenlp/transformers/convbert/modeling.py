@@ -1486,17 +1486,13 @@ class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
     Args:
         convbert (:class:`ConvBertModel`):
             An instance of ConvBertModel.
-        dropout (float, optional):
-            The dropout probability for output of ConvBert.
-            If None, use the same value as `hidden_dropout_prob` of `ConvBertModel`
-            instance `convbert`. Defaults to `None`.
+            
     """
 
-    def __init__(self, convbert, dropout=None):
+    def __init__(self, convbert):
         super(ConvBertForQuestionAnswering, self).__init__()
         self.convbert = convbert
-        self.classifier = nn.Linear(dropout if dropout is not None else
-                                    self.convbert.config["hidden_size"], 2)
+        self.classifier = nn.Linear(self.convbert.config["hidden_size"], 2)
         self.init_weights()
 
     def forward(self,
