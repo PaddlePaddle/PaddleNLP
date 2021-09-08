@@ -363,6 +363,7 @@ class GPTDataset(paddle.io.Dataset):
 
         attention_mask = (attention_mask - 1.0) * 1e9
         attention_mask = attention_mask.astype("float32")
+        labels = np.array(labels, dtype="int64")
         return [tokens, loss_mask, attention_mask, position_ids, labels]
 
     def _get_single_sample_from_idx(self, doc_index_f, doc_index_l, offset_f,
