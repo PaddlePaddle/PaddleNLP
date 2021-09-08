@@ -988,8 +988,8 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         Returns:
             Tensor: Returns tensor `src_ids`, which means the indices of output sequence tokens in the vocabulary.
             They are numerical representations of tokens that build the output sequence.
-
         """
+
         output, cached_kvs = self.model(input_ids, use_cache=True, cache=None)
         src_ids = input_ids
         nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
