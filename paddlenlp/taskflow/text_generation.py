@@ -93,7 +93,6 @@ class TextGenerationTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        paddle.nn.initializer.set_global_initializer(None, None)
         model_instance = GPTForGreedyGeneration.from_pretrained(
             self.model, max_predict_len=32)
         # Load the model parameter for the predict
