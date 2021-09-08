@@ -253,6 +253,30 @@ Transformer预训练模型汇总
 |                    |``rbtl3``                            | Chinese      | 3-layer, 1024-hidden,                   |
 |                    |                                     |              | 16-heads, 61M parameters.               |
 +--------------------+-------------------------------------+--------------+-----------------------------------------+
+|RoFormer_           |``roformer-chinese-small``           | Chinese      | 6-layer, 384-hidden,                    |
+|                    |                                     |              | 6-heads, 30M parameters.                |
+|                    |                                     |              | Roformer Small Chinese model.           |
+|                    +-------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-chinese-base``            | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                     |              | 12-heads, 124M parameters.              |
+|                    |                                     |              | Roformer Base Chinese model.            |
+|                    +-------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-chinese-char-small``      | Chinese      | 6-layer, 384-hidden,                    |
+|                    |                                     |              | 6-heads, 15M parameters.                |
+|                    |                                     |              | Roformer Chinese Char Small model.      |
+|                    +-------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-chinese-char-base``       | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                     |              | 12-heads, 95M parameters.               |
+|                    |                                     |              | Roformer Chinese Char Base model.       |
+|                    +-------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-chinese-sim-char-small``  | Chinese      | 6-layer, 384-hidden,                    |
+|                    |                                     |              | 6-heads, 15M parameters.                |
+|                    |                                     |              | Roformer Chinese Sim Char Small model.  |
+|                    +-------------------------------------+--------------+-----------------------------------------+
+|                    |``roformer-chinese-sim-char-base``   | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                     |              | 12-heads, 95M parameters.               |
+|                    |                                     |              | Roformer Chinese Sim Char Base model.   |
++--------------------+-------------------------------------+--------------+-----------------------------------------+
 |SKEP_               |``skep_ernie_1.0_large_ch``          | Chinese      | 24-layer, 1024-hidden,                  |
 |                    |                                     |              | 16-heads, 336M parameters.              |
 |                    |                                     |              | Trained using the Erine model           |
@@ -382,6 +406,7 @@ Transformer预训练模型适用任务汇总
 +--------------------+-------------------------+----------------------+--------------------+-----------------+
 
 .. _ALBERT: https://arxiv.org/abs/1909.11942
+.. _BART: https://arxiv.org/abs/1910.13461
 .. _BERT: https://arxiv.org/abs/1810.04805
 .. _BigBird: https://arxiv.org/abs/2007.14062
 .. _DistilBert: https://arxiv.org/abs/1910.01108
@@ -396,6 +421,7 @@ Transformer预训练模型适用任务汇总
 .. _SKEP: https://arxiv.org/abs/2005.05635
 .. _TinyBert: https://arxiv.org/abs/1909.10351
 .. _UnifiedTransformer: https://arxiv.org/abs/2006.16779
+.. _UNIMO: https://arxiv.org/abs/2012.15409
 .. _XLNet: https://arxiv.org/abs/1906.08237
 
 ------------------------------------
