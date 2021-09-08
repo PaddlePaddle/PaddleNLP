@@ -63,19 +63,30 @@ std::vector<paddle::Tensor> DecodingForward(
     const int& bos_id,
     const int& eos_id,
     const int64_t& max_len,
-    const float& beam_search_diversity_rate) {
+    const float& beam_search_diversity_rate,
+    const bool& rel_len,
+    const float& alpha) {
   int batch_size = input.shape()[0];
+  int max_out_len = rel_len ? max_len + input.shape()[1] : max_len;
 
   std::vector<int64_t> output_dims;
   std::vector<int64_t> parent_ids_dims;
   std::vector<int64_t> sequence_length_dims({batch_size});
   if (decoding_strategy == "beam_search") {
     batch_size /= beam_size;
-    output_dims = {max_len, batch_size, beam_size};
+    output_dims = {max_out_len, batch_size, beam_size};
+    parent_ids_dims = output_dims;
+  } else if (decoding_strategy == "beam_search_v2") {
+    // Use separated alive and finish beam queues to avoid the decrease of alive
+    // beams. The outputs must include both the finish and alive to trace full
+    // path.
+    sequence_length_dims = {batch_size * 2};
+    batch_size /= beam_size;
+    output_dims = {max_out_len, batch_size, beam_size * 2};
     parent_ids_dims = output_dims;
   } else if (decoding_strategy == "topk_sampling" ||
              decoding_strategy == "topp_sampling") {
-    output_dims = {max_len, batch_size};
+    output_dims = {max_out_len, batch_size};
     parent_ids_dims = {1};
   } else {
     PD_THROW("Not supported decoding strategy. ");
@@ -141,8 +152,9 @@ std::vector<paddle::Tensor> DecodingForward(
                                num_layer,
                                bos_id,
                                eos_id,
-                               max_len,
-                               beam_search_diversity_rate);
+                               max_out_len,
+                               beam_search_diversity_rate,
+                               alpha);
   } else {
     PD_THROW("Not implemented place. Only GPU is supported. ");
   }
@@ -193,7 +205,9 @@ std::vector<std::vector<int64_t>> DecodingInferShape(
     const int& bos_id,
     const int& eos_id,
     const int64_t& max_len,
-    const float& beam_search_diversity_rate) {
+    const float& beam_search_diversity_rate,
+    const bool& rel_len,
+    const float& alpha) {
   int batch_size = input_shape[0];
 
   std::vector<int64_t> output_dims;
@@ -203,6 +217,16 @@ std::vector<std::vector<int64_t>> DecodingInferShape(
       batch_size /= beam_size;
     }
     output_dims = {max_len, batch_size, beam_size};
+    return {output_dims, output_dims, sequence_length_dims};
+  } else if (decoding_strategy == "beam_search_v2") {
+    // Use separated alive and finish beam queues to avoid the decrease of alive
+    // beams. The outputs must include both the finish and alive to trace full
+    // path.
+    sequence_length_dims = {batch_size * 2};
+    if (batch_size != -1) {
+      batch_size /= beam_size;
+    }
+    output_dims = {max_len, batch_size, beam_size * 2};
     return {output_dims, output_dims, sequence_length_dims};
   } else if (decoding_strategy == "topk_sampling" ||
              decoding_strategy == "topp_sampling") {
@@ -299,7 +323,9 @@ PD_BUILD_OP(fusion_decoding)
             "bos_id: int",
             "eos_id: int",
             "max_len: int64_t",
-            "beam_search_diversity_rate: float"})
+            "beam_search_diversity_rate: float",
+            "rel_len: bool",
+            "alpha: float"})
     .SetKernelFn(PD_KERNEL(DecodingForward))
     .SetInferShapeFn(PD_INFER_SHAPE(DecodingInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(DecodingInferDtype));

@@ -924,10 +924,11 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
 
     """
 
-    def __init__(self, gpt, max_predict_len):
+    def __init__(self, gpt, max_predict_len, eol_token_id=3):
         super(GPTForGreedyGeneration, self).__init__()
         self.gpt = gpt
         self.max_predict_len = max_predict_len
+        self.eol_token_id = eol_token_id
         self.apply(self.init_weights)
 
     def model(self,
@@ -989,7 +990,6 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
             Tensor: Returns tensor `src_ids`, which means the indices of output sequence tokens in the vocabulary.
             They are numerical representations of tokens that build the output sequence.
         """
-
         output, cached_kvs = self.model(input_ids, use_cache=True, cache=None)
         src_ids = input_ids
         nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])

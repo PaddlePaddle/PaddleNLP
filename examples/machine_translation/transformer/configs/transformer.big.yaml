@@ -60,8 +60,23 @@ label_smooth_eps: 0.1
 
 # Hyparams for generation:
 # The parameters for beam search.
+# Indicating the strategy of beam search. It can be 'v1' or 'v2'. 'v2' would
+# select the top `beam_size * 2` beams and process the top `beam_size` alive
+# and finish beams in them separately, while 'v1' would only select the top
+# `beam_size` beams and mix up the alive and finish beams. 'v2' always
+# searchs more and get better results, since the alive beams would
+# always be `beam_size` while the number of alive beams in `v1` might
+# decrease when meeting the end token. However, 'v2' always generates
+# longer results thus might do more calculation and be slower.
+beam_search_version: "v1"
 beam_size: 5
 max_out_len: 1024
+# Indicating whether max_out_len in configurations is the length relative to
+# that of source text. Only works in `v2` temporarily.
+use_rel_len: False
+# The power number in length penalty calculation. Only works in `v2` temporarily.
+# Please refer to GNMT <https://arxiv.org/pdf/1609.08144.pdf>.
+alpha: 0.6
 # The number of decoded sentences to output.
 n_best: 1
 
