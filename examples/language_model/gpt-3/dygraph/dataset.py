@@ -21,6 +21,7 @@ import paddle
 from paddle.io import DataLoader, Dataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 
 
 def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
@@ -272,7 +273,7 @@ def create_pretrained_dataset(args,
             eos_id=eos_id,
             seed=args.seed)
 
-        batch_sampler = paddle.io.DistributedBatchSampler(
+        batch_sampler = DistributedBatchSampler(
             dataset,
             batch_size=args.local_batch_size,
             num_replicas=data_world_size,
