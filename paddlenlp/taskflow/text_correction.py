@@ -50,9 +50,9 @@ usage = r"""
 
 URLS = {
     "csc-ernie-1.0": [
-        "http://10.12.121.132:8000/PaddleNLP/examples/text_correction/ernie-csc/checkpoints/csc-ernie-1.0.pdparams",  # model url
+        "https://paddlenlp.bj.bcebos.com/taskflow/text_correction/csc-ernie-1.0/csc-ernie-1.0.pdparams",  # model url
         None,  # md5
-        "https://raw.githubusercontent.com/PaddlePaddle/PaddleNLP/develop/examples/text_correction/ernie-csc/pinyin_vocab.txt",  # pinyin vocab
+        "https://paddlenlp.bj.bcebos.com/taskflow/text_correction/csc-ernie-1.0/pinyin_vocab.txt",  # pinyin vocab url
     ],
 }
 
