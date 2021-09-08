@@ -31,13 +31,10 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
     sizes: the length list of all docs.
     num_samples: total step*bs iterations of data.
     seq_length: the sequence length.
-
-
     sum(sizes) = tokens_per_epoch
-    data_nums = num_samples *  local_batch_size
+    data_nums = num_samples *  micro_batch_size
     num_epochs = (data_nums + 1) // sum(sizes)
     len(doc_idx) = num_epochs * sum(sizes)
-
     """
     # Number of tokens in each epoch and number of required epochs.
     tokens_per_epoch = _num_tokens(documents, sizes)
@@ -54,54 +51,68 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
     sample_idx_filename = _filename + '_sample_idx.npy'
     shuffle_idx_filename = _filename + '_shuffle_idx.npy'
 
-    # support multi-machines
-    if (not os.path.isfile(doc_idx_filename)) or \
-        (not os.path.isfile(sample_idx_filename)) or \
-        (not os.path.isfile(shuffle_idx_filename)):
-        if num_epochs == 1:
-            separate_last_epoch = False
-        else:
-            num_samples_from_epochs_minus_one = (
-                (num_epochs - 1) * tokens_per_epoch - 1) // seq_length
-            last_epoch_num_samples = num_samples - \
-                                        num_samples_from_epochs_minus_one
-            assert last_epoch_num_samples >= 0, \
-                'last epoch number of samples should be non-negative.'
-            num_samples_per_epoch = (tokens_per_epoch - 1) // seq_length
-            assert last_epoch_num_samples < (num_samples_per_epoch + 1), \
-                'last epoch number of samples exceeded max value.'
-            separate_last_epoch = (
-                last_epoch_num_samples < int(0.80 * num_samples_per_epoch))
-        doc_idx = _build_doc_idx(documents, num_epochs, np_rng,
-                                 separate_last_epoch)
-        # sample-idx.
-        assert doc_idx.dtype == np.int32
-        sample_idx = _build_sample_idx(sizes, doc_idx, seq_length, num_epochs,
-                                       tokens_per_epoch)
-        if separate_last_epoch:
-            num_samples_ = num_samples_from_epochs_minus_one
-        else:
-            num_samples_ = sample_idx.shape[0] - 1
-        shuffle_idx = _build_shuffle_idx(num_samples_, sample_idx.shape[0] - 1,
-                                         np_rng)
-        if paddle.distributed.get_rank() % 8 == 0:
+    # Sava random state
+    savedState = np_rng.get_state()
+    # Build the indexed mapping if not exist.
+    if build_data_file:
+        if (not os.path.isfile(doc_idx_filename)) or \
+           (not os.path.isfile(sample_idx_filename)) or \
+           (not os.path.isfile(shuffle_idx_filename)):
+            if num_epochs == 1:
+                separate_last_epoch = False
+            else:
+                num_samples_from_epochs_minus_one = (
+                    (num_epochs - 1) * tokens_per_epoch - 1) // seq_length
+                last_epoch_num_samples = num_samples - \
+                                         num_samples_from_epochs_minus_one
+                assert last_epoch_num_samples >= 0, \
+                    'last epoch number of samples should be non-negative.'
+                num_samples_per_epoch = (tokens_per_epoch - 1) // seq_length
+                assert last_epoch_num_samples < (num_samples_per_epoch + 1), \
+                    'last epoch number of samples exceeded max value.'
+                separate_last_epoch = (
+                    last_epoch_num_samples < int(0.80 * num_samples_per_epoch))
+            # Note. len(doc_idx) = num_epochs * len(doc)
+            doc_idx = _build_doc_idx(documents, num_epochs, np_rng,
+                                     separate_last_epoch)
             np.save(doc_idx_filename, doc_idx, allow_pickle=True)
+
+            # sample-idx. pos of each seq_len of data.
+            assert doc_idx.dtype == np.int32
+            sample_idx = _build_sample_idx(sizes, doc_idx, seq_length,
+                                           num_epochs, tokens_per_epoch)
             np.save(sample_idx_filename, sample_idx, allow_pickle=True)
+
+            if separate_last_epoch:
+                num_samples_ = num_samples_from_epochs_minus_one
+            else:
+                num_samples_ = sample_idx.shape[0] - 1
+
+            # Shuffle all seq len data.
+            shuffle_idx = _build_shuffle_idx(num_samples_,
+                                             sample_idx.shape[0] - 1, np_rng)
             np.save(shuffle_idx_filename, shuffle_idx, allow_pickle=True)
-        else:
-            while True:
-                if (not os.path.isfile(doc_idx_filename)) or \
-                    (not os.path.isfile(sample_idx_filename)) or \
-                    (not os.path.isfile(shuffle_idx_filename)):
-                    time.sleep(3)
-                else:
-                    break
+    else:
+        while True:
+            if (not os.path.isfile(doc_idx_filename)) or \
+               (not os.path.isfile(sample_idx_filename)) or \
+               (not os.path.isfile(shuffle_idx_filename)):
+                time.sleep(3)
+            else:
+                break
+
+    # Restore random state
+    np_rng.set_state(savedState)
+
+    if paddle.distributed.get_world_size() > 1:
+        if paddle.fluid.framework.in_dygraph_mode():
+            paddle.distributed.barrier()
 
     # Load mappings.
     doc_idx = np.load(doc_idx_filename, allow_pickle=True, mmap_mode='r')
     sample_idx = np.load(sample_idx_filename, allow_pickle=True, mmap_mode='r')
-    shuffle_idx = np.load(shuffle_idx_filename, allow_pickle=True)
-    np_rng.shuffle(shuffle_idx)
+    shuffle_idx = np.load(
+        shuffle_idx_filename, allow_pickle=True, mmap_mode='r')
     return doc_idx, sample_idx, shuffle_idx
 
 
@@ -221,6 +232,7 @@ def get_train_valid_test_split_(splits_string, size):
 
 def create_pretrained_dataset(args,
                               input_path,
+                              local_rank,
                               data_world_rank,
                               data_world_size,
                               eos_id,
@@ -250,7 +262,7 @@ def create_pretrained_dataset(args,
     def build_dataset(index, name, num_samples):
         dataset = GPTDataset(
             file_path=input_path,
-            build_data_file=device_world_rank == 0,
+            build_data_file=local_rank == 0,
             name="gpt_" + name,
             max_seq_len=max_seq_len,
             num_samples=num_samples,

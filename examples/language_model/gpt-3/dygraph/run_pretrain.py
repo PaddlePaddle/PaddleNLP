@@ -37,12 +37,19 @@ MODEL_CLASSES = {
 }
 
 
-def set_seed(args, idx):
-    if args.device == "cpu":
-        idx = 0
-    random.seed(args.seed + idx)
-    np.random.seed(args.seed + idx)
-    paddle.seed(args.seed + idx)
+def set_hyrbid_parallel_seed(basic_seed, dp_rank, mp_rank, pp_rank):
+    assert args.device != "cpu"
+
+    random.seed(basic_seed + dp_rank)
+    np.random.seed(basic_seed + dp_rank)
+    paddle.seed(basic_seed + dp_rank)
+
+    # local_seed/ global_seed is used to control dropout in ModelParallel
+    local_seed = basic_seed + 123 + mp_rank * 10 + pp_rank * 1000
+    global_seed = basic_seed + dp_rank
+    tracker = get_rng_state_tracker()
+    tracker.add('global_seed', global_seed)
+    tracker.add('local_seed', local_seed)
 
 
 @paddle.no_grad()
@@ -95,21 +102,17 @@ def do_train(args):
     }
 
     fleet.init(is_collective=True, strategy=strategy)
+
+    # obtain rank message of hybrid parallel
     hcg = fleet.get_hybrid_communicate_group()
+    global_rank = hcg.get_global_rank()
     mp_rank = hcg.get_model_parallel_rank()
-    dp_rank = hcg.get_data_parallel_rank()
     pp_rank = hcg.get_stage_id()
+    dp_rank = hcg.get_data_parallel_rank()
+    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
-    worker_index = dp_rank
-    worker_num = args.dp_degree
-    set_seed(args, dp_rank)
-
-    local_seed = args.seed + 123 + mp_rank * 10 + pp_rank * 1000
-    global_seed = args.seed + dp_rank
-
-    tracker = get_rng_state_tracker()
-    tracker.add('global_seed', global_seed)
-    tracker.add('local_seed', local_seed)
+    # seed control in hybrid parallel
+    set_hyrbid_parallel_seed(args.seed, dp_rank, mp_rank, pp_rank)
 
     default_global_batch_size = args.dp_degree * args.local_batch_size
     default_global_tokens_num = default_global_batch_size * args.max_seq_len
@@ -122,7 +125,7 @@ def do_train(args):
         args.output_dir, "train_log",
         "{}_globalbsz_{}_amp_{}_recompute_{}_card_{}".format(
             args.model_name_or_path, default_global_batch_size, args.use_amp,
-            False, worker_index).lower())
+            False, global_rank).lower())
 
     if os.path.exists(log_writer_path):
         import shutil
@@ -225,6 +228,7 @@ def do_train(args):
             train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
                 args,
                 data_file,
+                local_rank=local_rank,
                 data_world_size=args.dp_degree,
                 data_world_rank=dp_rank,
                 eos_id=tokenizer.eos_token_id)
@@ -306,26 +310,37 @@ def do_train(args):
                                  args.eval_iters, log_writer, global_step,
                                  epoch, "valid")
 
-                if global_step % args.save_steps == 0 or global_step >= args.max_steps:
-                    if worker_index == 0:
-                        output_dir = os.path.join(args.output_dir,
-                                                  "model_%d" % global_step)
-                        if not os.path.exists(output_dir):
-                            os.makedirs(output_dir)
+                # only dp_rank = 0 save model
+                if (global_step % args.save_steps == 0 or
+                        global_step >= args.max_steps) and dp_rank == 0:
 
-                        if args.dp_degree * args.mp_degree * args.pp_degree != 1:
-                            model_to_save = model._layers
-                        else:
-                            model_to_save = model
-                        logger.info("Save model to %s" % output_dir)
-                        if args.pp_degree == 1:
-                            model_to_save.save_pretrained(output_dir)
-                        else:
-                            model_to_save.save_state_dict(output_dir)
-                        tokenizer.save_pretrained(output_dir)
+                    model_to_save = model._layers if paddle.distributed.get_world_size(
+                    ) > 1 else model
+                    output_dir = os.path.join(args.output_dir,
+                                              "step_%d" % global_step)
+                    os.makedirs(output_dir, exist_ok=True)
+
+                    logger.info("Save model to %s" % output_dir)
+
+                    if args.pp_degree > 1:
+                        model_to_save.save_state_dict(output_dir)
+                        if mp_rank * pp_rank == 1:
+                            tokenizer.save_pretrained(output_dir)
                         paddle.save(
                             optimizer.state_dict(),
-                            os.path.join(output_dir, "model_state.pdopt"))
+                            os.path.join(
+                                output_dir,
+                                "model_state_mp_{:0>2d}_pp_{:0>2d}.pdopt".
+                                format(mp_rank, pp_rank)))
+                    else:
+                        path = os.path.join(output_dir,
+                                            'model_{:0>2d}'.format(mp_rank))
+                        os.makedirs(path, exist_ok=True)
+                        model_to_save.save_pretrained(path)
+
+                        paddle.save(optimizer.state_dict(),
+                                    os.path.join(path, "model_state.pdopt"))
+                        tokenizer.save_pretrained(path)
 
                 if global_step >= args.max_steps:
                     run_evaluate(args, test_data_loader, model, criterion,
