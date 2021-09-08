@@ -134,6 +134,25 @@ class Task(metaclass=abc.ABCMeta):
         paddle.jit.save(static_model, save_path)
         logger.info("The inference model save in the path:{}".format(save_path))
 
+    def _check_input_text(self, inputs):
+        inputs = inputs[0]
+        if isinstance(inputs, str):
+            if len(inputs) == 0:
+                raise ValueError(
+                    "Invalid inputs, input text should not be empty text, please check your input.".
+                    format(type(inputs)))
+            inputs = [inputs]
+        elif isinstance(inputs, list):
+            if not isinstance(inputs[0], str):
+                raise TypeError(
+                    "Invalid inputs, input text should be list of str, but list of {} found!".
+                    format(type(inputs[0])))
+        else:
+            raise TypeError(
+                "Invalid inputs, input text should be str or list of str, but type of {} found!".
+                format(type(inputs)))
+        return inputs
+
     def help(self):
         """
         Return the usage message of the current task.

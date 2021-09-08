@@ -149,13 +149,7 @@ class LacTask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        inputs = inputs[0]
-        if isinstance(inputs, str):
-            inputs = [inputs]
-        if not isinstance(inputs, str) and not isinstance(inputs, list):
-            raise TypeError(
-                "Invalid inputs, input text should be str or list of str, {type(inputs)} found!"
-            )
+        inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
         batch_size = self.kwargs[
             'batch_size'] if 'batch_size' in self.kwargs else 1
@@ -170,6 +164,9 @@ class LacTask(Task):
 
         def read(inputs):
             for input_tokens in inputs:
+                if not (isinstance(input_tokens, str) and
+                        len(input_tokens) > 0):
+                    continue
                 input_tokens = input_tokens[:max_seq_len]
                 ids = []
                 for token in input_tokens:

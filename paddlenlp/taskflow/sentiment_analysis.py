@@ -139,13 +139,7 @@ class SentaTask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        inputs = inputs[0]
-        if isinstance(inputs, str):
-            inputs = [inputs]
-        if not isinstance(inputs, str) and not isinstance(inputs, list):
-            raise TypeError(
-                "Invalid inputs, input text should be str or list of str, {type(inputs)} found!"
-            )
+        inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
         batch_size = self.kwargs[
             'batch_size'] if 'batch_size' in self.kwargs else 1
@@ -155,6 +149,8 @@ class SentaTask(Task):
             'lazy_load'] if 'lazy_load' in self.kwargs else False
         examples = []
         for input_data in inputs:
+            if not (isinstance(input_data, str) and len(input_data) > 0):
+                continue
             ids = self._tokenizer.encode(input_data)
             lens = len(ids)
             examples.append((ids, lens))
@@ -260,13 +256,7 @@ class SkepTask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        inputs = inputs[0]
-        if isinstance(inputs, str):
-            inputs = [inputs]
-        if not isinstance(inputs, str) and not isinstance(inputs, list):
-            raise TypeError(
-                "Invalid inputs, input text should be str or list of str, {type(inputs)} found!"
-            )
+        inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
         batch_size = self.kwargs[
             'batch_size'] if 'batch_size' in self.kwargs else 1
@@ -278,6 +268,8 @@ class SkepTask(Task):
 
         examples = []
         for input_data in inputs:
+            if not (isinstance(input_data, str) and len(input_data) > 0):
+                continue
             encoded_inputs = self._tokenizer(text=input_data, max_seq_len=128)
             ids = encoded_inputs["input_ids"]
             segment_ids = encoded_inputs["token_type_ids"]

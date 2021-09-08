@@ -295,6 +295,13 @@ class WordTagTask(Task):
             max_seq_length = self.kwargs['max_seq_length']
         infer_data = []
         max_predict_len = max_seq_length - self.summary_num - 1
+        filter_input_texts = []
+        for input_text in input_texts:
+            if not (isinstance(input_text, str) and len(input_text) > 0):
+                continue
+            filter_input_texts.append(input_text)
+        input_texts = filter_input_texts
+
         short_input_texts = self._split_long_text_input(input_texts,
                                                         max_predict_len)
 
@@ -326,6 +333,7 @@ class WordTagTask(Task):
         outputs = {}
         outputs['data_loader'] = infer_data_loader
         outputs['short_input_texts'] = short_input_texts
+        outputs['inputs'] = input_texts
         return outputs
 
     def _reset_offset(self, pred_words):
@@ -448,16 +456,8 @@ class WordTagTask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        inputs = inputs[0]
-
-        if isinstance(inputs, str):
-            inputs = [inputs]
-        if not isinstance(inputs, str) and not isinstance(inputs, list):
-            raise TypeError(
-                f"Bad inputs, input text should be str or list of str, {type(inputs)} found!"
-            )
+        inputs = self._check_input_text(inputs)
         outputs = self._preprocess_text(inputs)
-        outputs['inputs'] = inputs
         return outputs
 
     def _run_model(self, inputs):
