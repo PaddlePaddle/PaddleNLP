@@ -294,33 +294,18 @@ def do_train(args):
                 p.name for n, p in model.named_parameters()
                 if not any(nd in n for nd in ["bias", "norm"])
             ]
-            # TODO @ZHUI Use paddle.optimizer.AdamW
-            if ops.optimizer._jit_compile():
-                logger.info("Using paddlenlp custom AdamW optimizer.")
-                optimizer = ops.optimizer.AdamwOptimizer(
-                    learning_rate=lr_scheduler,
-                    beta1=args.adam_beta1,
-                    beta2=args.adam_beta2,
-                    epsilon=args.adam_epsilon,
-                    grad_clip=clip,
-                    weight_decay=args.weight_decay,
-                    apply_decay_param_fun=lambda x: x in decay_param)
-            else:
-                if args.sharding_degree > 1:
-                    raise ValueError(
-                        "The paddle.optimizer.AdamW not compatible with Sharding!"
-                    )
-                logger.info("Using paddle.optimizer.AdamW.")
-                optimizer = paddle.optimizer.AdamW(
-                    learning_rate=lr_scheduler,
-                    beta1=args.adam_beta1,
-                    beta2=args.adam_beta2,
-                    epsilon=args.adam_epsilon,
-                    grad_clip=clip,
-                    weight_decay=args.weight_decay,
-                    apply_decay_param_fun=lambda x: x in decay_param)
-                # alias
-                optimizer.apply_optimize = optimizer._apply_optimize
+
+            optimizer = paddle.optimizer.AdamW(
+                learning_rate=lr_scheduler,
+                beta1=args.adam_beta1,
+                beta2=args.adam_beta2,
+                epsilon=args.adam_epsilon,
+                grad_clip=clip,
+                weight_decay=args.weight_decay,
+                apply_decay_param_fun=lambda x: x in decay_param)
+
+            # alias
+            optimizer.apply_optimize = optimizer._apply_optimize
 
             if args.use_recompute:
                 dist_strategy.recompute = True
@@ -341,12 +326,12 @@ def do_train(args):
     if not os.path.isdir(program_desc_dir):
         os.mkdir(program_desc_dir)
 
-    with open(program_desc_dir + "/main_program.txt.%d" %
-              (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
+    with open(program_desc_dir + "/main_program.txt.%d" % worker_index,
+              'w') as f:
         f.write(str(main_program))
 
-    with open(program_desc_dir + "/startup_program.txt.%d" %
-              (int(os.environ.get('FLAGS_selected_gpus', 0))), 'w') as f:
+    with open(program_desc_dir + "/startup_program.txt.%d" % worker_index,
+              'w') as f:
         f.write(str(startup_program))
 
     # Define the Executor for running the static model
