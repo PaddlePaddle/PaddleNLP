@@ -185,15 +185,13 @@ class CSCTask(Task):
                 self.input_handles[0].copy_from_cpu(token_ids)
                 self.input_handles[1].copy_from_cpu(pinyin_ids)
                 self.predictor.run()
-                det_error_probs = self.output_handle[0].copy_to_cpu()
-                corr_logits = self.output_handle[1].copy_to_cpu()
+                det_preds = self.output_handle[0].copy_to_cpu()
+                char_preds = self.output_handle[1].copy_to_cpu()
 
-                det_pred = det_error_probs.argmax(axis=-1)
-                char_preds = corr_logits.argmax(axis=-1)
                 batch_result = []
                 for i in range(len(lengths)):
                     batch_result.append(
-                        (det_pred[i], char_preds[i], lengths[i]))
+                        (det_preds[i], char_preds[i], lengths[i]))
                 results.append(batch_result)
         inputs['batch_results'] = results
         return inputs

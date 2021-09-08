@@ -67,4 +67,7 @@ class ErnieForCSC(nn.Layer):
         # correction_logits shape: [B, T, V]. It indicates the correct score of each token in vocab 
         # according to each word in the sequence.
         correction_logits = self.correction_layer(correction_outputs)
-        return detection_error_probs, correction_logits
+
+        det_preds = detection_error_probs.argmax(axis=-1)
+        char_preds = correction_logits.argmax(axis=-1)
+        return det_preds, char_preds
