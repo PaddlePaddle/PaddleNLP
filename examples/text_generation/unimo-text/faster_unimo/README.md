@@ -25,7 +25,9 @@
 
 #### 克隆 PaddleNLP
 
-首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 Faster UNIMO 相关 lib，需要克隆一个 PaddleNLP，并重新编译:
+首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 Faster UNIMO 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译。
+
+以下以从 github 上 clone 一个新版 PaddleNLP 为例:
 
 ``` sh
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
@@ -78,7 +80,7 @@ model = FasterUnimo(
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 
-更详细的例子可以参考 `infer.py`，我们提供了更详细用例。
+更详细的例子可以参考 `infer.py`，我们提供了更详细用例。需要注意的是，当前 Faster UNIMO 只支持基础的策略，后续我们会进一步丰富像是 length penalty 等策略以提升生成式 API 推理性能。
 
 
 ### 数据准备
