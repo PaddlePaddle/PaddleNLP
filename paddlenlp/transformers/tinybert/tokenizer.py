@@ -18,6 +18,12 @@ __all__ = ['TinyBertTokenizer']
 
 
 class TinyBertTokenizer(BertTokenizer):
+    """
+    Constructs a TinyBert tokenizer.
+    The usage of TinyBertTokenizer is the same as
+    `BertTokenizer <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.bert.tokenizer.html>`__.
+    """
+
     pretrained_resource_files_map = {
         "vocab_file": {
             "tinybert-4l-312d":
