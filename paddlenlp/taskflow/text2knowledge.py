@@ -491,7 +491,7 @@ class WordTagTask(Task):
 
     def _postprocess(self, inputs):
         """
-        The model output is allways the logits and pros, this function will convert the model output to raw text.
+        The model output is the tag ids, this function will convert the model output to raw text.
         """
         results = self._decode(inputs['short_input_texts'],
                                inputs['all_pred_tags'])

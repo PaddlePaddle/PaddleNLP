@@ -74,7 +74,7 @@ class Task(metaclass=abc.ABCMeta):
     @abstractmethod
     def _postprocess(self, inputs):
         """
-        The model output is allways the logits and pros, this function will convert the model output to raw text.
+        The model output is the logits and pros, this function will convert the model output to raw text.
         """
 
     @abstractmethod

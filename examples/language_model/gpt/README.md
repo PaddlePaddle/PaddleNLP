@@ -220,7 +220,7 @@ python deploy/python/inference.py --model_type gpt \
 
 用户可以看到屏幕输出预测结果。
 
-## Taskflow中文一键预测
+## Taskflow一键预测
 可以使用PaddleNLP提供的Taskflow工具来进行知识问答和写诗，具体使用方法如下:
 
 ```python

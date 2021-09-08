@@ -131,7 +131,7 @@ python predict.py --data_dir ./lexical_analysis_dataset_tiny \
 (什么, r)(是, v)(司法, n)(鉴定人, vn)
 ```
 
-### Taskflow中文一键预测
+### Taskflow一键预测
 可以使用PaddleNLP提供的Taskflow工具来对输入的文本进行一键分词，具体使用方法如下:
 
 ```python

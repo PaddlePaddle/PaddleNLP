@@ -193,7 +193,7 @@ class SentaTask(Task):
 
     def _postprocess(self, inputs):
         """
-        The model output is allways the logits and pros, this function will convert the model output to raw text.
+        This function will convert the model output to raw text.
         """
         final_results = []
         for text, label in zip(inputs['text'], inputs['result']):
@@ -317,7 +317,7 @@ class SkepTask(Task):
 
     def _postprocess(self, inputs):
         """
-        The model output is allways the logits and pros, this function will convert the model output to raw text.
+        The model output is tag ids, this function will convert the model output to raw text.
         """
         final_results = []
         for text, label in zip(inputs['text'], inputs['result']):
