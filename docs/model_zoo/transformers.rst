@@ -310,6 +310,14 @@ Transformer预训练模型汇总
 |                    |                                     |              | 12-heads, 66M parameters.               |
 |                    |                                     |              | Trained on Chinese text.                |
 +--------------------+-------------------------------------+--------------+-----------------------------------------+
+|UNIMO_              |``unimo-text-1.0``                   | English      | 12-layer, 768-hidden,                   |
+|                    |                                     |              | 12-heads, 99M parameters.               |
+|                    |                                     |              | UNIMO-text-1.0 model.                   |
+|                    +-------------------------------------+--------------+-----------------------------------------+
+|                    |``unimo-text-1.0-large``             | English      | 24-layer, 768-hidden,                   |
+|                    |                                     |              | 16-heads, 316M parameters.              |
+|                    |                                     |              | UNIMO-text-1.0 large model.             |
++--------------------+-------------------------------------+--------------+-----------------------------------------+
 |XLNet_              |``xlnet-base-cased``                 | English      | 12-layer, 768-hidden,                   |
 |                    |                                     |              | 12-heads, 110M parameters.              |
 |                    |                                     |              | XLNet English model                     |
