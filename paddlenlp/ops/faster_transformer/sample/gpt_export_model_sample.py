@@ -45,7 +45,7 @@ def parse_args():
     )
     parser.add_argument(
         "--decoding_lib",
-        default="../build/lib/libdecoding_op.so",
+        default="../../build/lib/libdecoding_op.so",
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(
@@ -89,51 +89,44 @@ def parse_args():
 
 
 def do_predict(args):
-    paddle.enable_static()
     place = "gpu"
     place = paddle.set_device(place)
 
-    test_program = paddle.static.Program()
-    startup_program = paddle.static.Program()
-    with paddle.static.program_guard(test_program, startup_program):
-        model_class, tokenizer_class = MODEL_CLASSES[args.model_name_or_path]
-        tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-        logger.info('Loading the model parameters, please wait...')
-        model, state_to_load = model_class.from_pretrained(
-            args.model_name_or_path, max_predict_len=args.max_out_len)
+    model_class, tokenizer_class = MODEL_CLASSES[args.model_name_or_path]
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    logger.info('Loading the model parameters, please wait...')
+    model = model_class.from_pretrained(
+        args.model_name_or_path, max_predict_len=args.max_out_len)
 
-        bos_id = tokenizer.convert_tokens_to_ids(args.start_token)
-        eos_id = tokenizer.convert_tokens_to_ids(args.end_token)
+    bos_id = tokenizer.convert_tokens_to_ids(args.start_token)
+    eos_id = tokenizer.convert_tokens_to_ids(args.end_token)
 
-        input_ids = paddle.static.data(
-            name="ids", shape=[None, None], dtype="int32")
-        # Define model
-        gpt = FasterGPT(
-            model=model,
-            topk=args.topk,
-            topp=args.topp,
-            max_out_len=args.max_out_len,
-            bos_id=bos_id,
-            eos_id=eos_id,
-            temperature=args.temperature,
-            decoding_lib=args.decoding_lib,
-            use_fp16_decoding=args.use_fp16_decoding)
+    gpt = FasterGPT(
+        model=model,
+        topk=args.topk,
+        topp=args.topp,
+        max_out_len=args.max_out_len,
+        bos_id=bos_id,
+        eos_id=eos_id,
+        temperature=args.temperature,
+        decoding_lib=args.decoding_lib,
+        use_fp16_decoding=args.use_fp16_decoding)
 
-        finished_seq = gpt(input_ids)
+    # Set evaluate mode
+    gpt.eval()
 
-    test_program = test_program.clone(for_test=True)
+    # Convert dygraph model to static graph model 
+    gpt = paddle.jit.to_static(
+        gpt,
+        input_spec=[
+            # input_ids
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int32")
+        ])
 
-    exe = paddle.static.Executor(place)
-    exe.run(startup_program)
-
-    gpt.export_params(state_to_load=state_to_load, place=place)
-
-    paddle.static.save_inference_model(
-        os.path.join(args.inference_model_dir, "gpt"),
-        feed_vars=input_ids,
-        fetch_vars=finished_seq,
-        executor=exe,
-        program=test_program)
+    # Save converted static graph model
+    paddle.jit.save(gpt, os.path.join(args.inference_model_dir, "gpt"))
+    logger.info("GPT has been saved to {}".format(args.inference_model_dir))
 
     gpt.save_resources(tokenizer, args.inference_model_dir)
 

@@ -256,6 +256,71 @@ python export_model.py --config ../configs/transformer.base.yaml --decoding_lib 
   ```text
   └── infer_model/
     ├── transformer.pdiparams
+    ├── transformer.pdiparams.info
+    └── transformer.pdmodel
+  ```
+
+除了以上脚本提供的动转静的脚本外，我们也可以直接使用静态图来 load 动态图训好的 checkpoint 完成模型的导出，可以使用以下代码：
+
+``` python
+paddle.enable_static()
+place = "gpu"
+place = paddle.set_device(place)
+reader.adapt_vocab_size(args)
+
+test_program = paddle.static.Program()
+startup_program = paddle.static.Program()
+with paddle.static.program_guard(test_program, startup_program):
+    src_word = paddle.static.data(
+        name="src_word", shape=[None, None], dtype="int64")
+
+    # Define model
+    transformer = FasterTransformer(
+        src_vocab_size=args.src_vocab_size,
+        trg_vocab_size=args.trg_vocab_size,
+        max_length=args.max_length + 1,
+        num_encoder_layers=args.n_layer,
+        num_decoder_layers=args.n_layer,
+        n_head=args.n_head,
+        d_model=args.d_model,
+        d_inner_hid=args.d_inner_hid,
+        dropout=args.dropout,
+        weight_sharing=args.weight_sharing,
+        bos_id=args.bos_idx,
+        eos_id=args.eos_idx,
+        decoding_strategy=args.decoding_strategy,
+        beam_size=args.beam_size,
+        max_out_len=args.max_out_len,
+        decoding_lib=args.decoding_lib,
+        use_fp16_decoding=args.use_fp16_decoding,
+        rel_len=args.use_rel_len,
+        alpha=args.alpha)
+
+    finished_seq = transformer(src_word=src_word)
+
+test_program = test_program.clone(for_test=True)
+
+exe = paddle.static.Executor(place)
+exe.run(startup_program)
+
+# Load checkpoint.
+transformer.export_params(
+    init_from_params=os.path.join(args.init_from_params,
+                                  "transformer.pdparams"),
+    place=place)
+
+paddle.static.save_inference_model(
+    os.path.join(args.inference_model_dir, "transformer"),
+    feed_vars=src_word,
+    fetch_vars=finished_seq,
+    executor=exe,
+    program=test_program)
+```
+
+此时，也可以在当前路径的 `infer_model/` 下面看到导出的模型文件：
+  ```text
+  └── infer_model/
+    ├── transformer.pdiparams
     └── transformer.pdmodel
   ```
 
@@ -265,7 +330,7 @@ python export_model.py --config ../configs/transformer.base.yaml --decoding_lib 
 
 ``` sh
 cd bin/
-./transformer_e2e -batch_size <batch_size> -beam_size <beam_size> -gpu_id <gpu_id> -model_dir <model_directory> -vocab_dir <dict_directory> -data_dir <input_data>
+./transformer_e2e -batch_size <batch_size> -gpu_id <gpu_id> -model_dir <model_directory> -vocab_dir <dict_directory> -data_dir <input_data>
 ```
 
 这里的 `<model_directory>` 即是上文说到导出的 paddle inference 模型。
@@ -275,7 +340,7 @@ cd bin/
 ``` sh
 cd bin/
 ../third-party/build/bin/decoding_gemm 8 5 8 64 38512 256 512 0
-./transformer_e2e -batch_size 8 -beam_size 5 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
+./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
 其中：
