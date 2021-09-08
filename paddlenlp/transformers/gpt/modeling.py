@@ -978,21 +978,18 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         else:
             return logits
 
-    def forward(self, input_ids, end_id):
+    def forward(self, input_ids):
         """
 
         Args:
             input_ids(Tensor):
                 See :class:`GPTModel`.
-            end_id(Tensor):
-                End id of the GreedyGeneration model.
 
         Returns:
             Tensor: Returns tensor `src_ids`, which means the indices of output sequence tokens in the vocabulary.
             They are numerical representations of tokens that build the output sequence.
 
         """
-
         output, cached_kvs = self.model(input_ids, use_cache=True, cache=None)
         src_ids = input_ids
         nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
@@ -1005,7 +1002,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
             nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
             src_ids = paddle.concat([src_ids, nid], axis=1)
             cur_len += 1
-            if paddle.max(nid) == end_id:
+            if paddle.max(nid) == self.eol_token_id:
                 break
         return src_ids
 
