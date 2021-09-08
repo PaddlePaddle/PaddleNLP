@@ -1,6 +1,7 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# coding:utf-8
+# Copyright (c) 2021  PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License"
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
@@ -92,13 +93,13 @@ class ErnieForCSC(nn.Layer):
 
 
         Returns:
-            detection_error_probs (Tensor):
-                A Tensor of the detection probablity of each tokens.
-                Shape as `(batch_size, sequence_length, 2)` and dtype as `int`.
+            det_preds (Tensor):
+                A Tensor of the detection prediction of each tokens.
+                Shape as `(batch_size, sequence_length)` and dtype as `int`.
 
-            correction_logits (Tensor):
-                A Tensor of the correction logits of each tokens.
-                Shape as `(batch_size, sequence_length, vocab_size)` and dtype as `int`.
+            char_preds (Tensor):
+                A Tensor of the correction prediction of each tokens.
+                Shape as `(batch_size, sequence_length)` and dtype as `int`.
 
         """
         if attention_mask is None:
@@ -128,4 +129,7 @@ class ErnieForCSC(nn.Layer):
         # correction_logits shape: [B, T, V]. It indicates the correct score of each token in vocab 
         # according to each word in the sequence.
         correction_logits = self.correction_layer(correction_outputs)
-        return detection_error_probs, correction_logits
+
+        det_preds = detection_error_probs.argmax(axis=-1)
+        char_preds = correction_logits.argmax(axis=-1)
+        return det_preds, char_preds
