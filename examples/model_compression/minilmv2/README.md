@@ -34,6 +34,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" general_distill.py 
     --student_model_type tinybert \
     --num_relation_heads 48 \
     --student_model_name_or_path tinybert-6l-768d-zh \
+    --init_from_student False \
     --teacher_model_type bert \
     --teacher_model_name_or_path bert-base-chinese \
     --max_seq_length 128 \
@@ -51,6 +52,26 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" general_distill.py 
     --input_dir ${dataset} \
 
 ```
+
+其中参数释义如下：
+
+- `student_model_type` 学生模型的类型
+- `num_relation_heads` head重新组合之后的head数
+- `student_model_name_or_path` 学生模型的名字（需要与学生模型类型对应），或者是学生模型的路径
+- `init_from_student` 本次蒸馏的学生模型是否用`student_model_name_or_path`中的参数进行初始化，是个bool类型的参数。默认是False
+- `teacher_model_type bert` 教师模型的类型
+- `teacher_model_name_or_path`  教师模型的名字
+- `max_seq_length 128` 表示最大句子长度，超过该长度将被截断。
+- `warmup_steps` 学习率warmup up的步数
+- `save_steps` 保存模型的频率
+- `teacher_layer_index`表示学生模型从教师模型学习的教师层
+- `student_layer_index` 表示学生模型从教师模型学习的学生层
+- `output_dir` 模型输出的目录
+- `device gpu` 表示运行该程序的设备，默认是gpu
+- `input_dir` 预训练数据的存放地址
+
+
+
 ### 评价方法
 
 假设预训练完成后的模型存储在`${pretrained_models}`下，这里也提供了我们已经预训练完成的一版[模型](https://paddlenlp.bj.bcebos.com/models/general_distill/minilmv2_6l_768d_ch.tar.gz)可供参考，模型与`tinybert-6l-768d-zh`结构相同，因此可以使用`TinyBertForSequenceClassification.from_pretrained()`对模型直接进行加载。
@@ -79,6 +100,7 @@ python -u ./run_clue.py \
     --device gpu  \
 
 ```
+
 
 其中不同的任务下，`${learning_rate}`、`${num_train_epochs}`、`${max_seq_len}`，我们推荐不同的Fine-tuning的超参数，可以参考以下配置：
 
