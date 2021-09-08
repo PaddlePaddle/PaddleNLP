@@ -198,7 +198,7 @@ class CSCTask(Task):
 
     def _postprocess(self, inputs):
         """
-        The model output is allways the logits and pros, this function will convert the model output to raw text.
+        The model output is the logits and probs, this function will convert the model output to raw text.
         """
         final_results = []
 
