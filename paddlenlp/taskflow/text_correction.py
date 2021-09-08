@@ -212,6 +212,18 @@ class CSCTask(Task):
                                                  length)
                 result['source'] = texts[i]
                 result['target'] = ''.join(pred_result)
+                errors_result = []
+                for i, (
+                        source_token, target_token
+                ) in enumerate(zip(result['source'], result['target'])):
+                    if source_token != target_token:
+                        errors_result.append({
+                            'position': i,
+                            'correction': {
+                                source_token: target_token
+                            }
+                        })
+                result['errors'] = errors_result
                 final_results.append(result)
         return final_results
 
