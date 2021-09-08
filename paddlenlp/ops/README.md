@@ -265,10 +265,11 @@ python ./faster_transformer/sample/gpt_export_model_sample.py --model_name_or_pa
 
 ``` text
 .
-├── gpt.pdiparams   # 保存的参数文件
-├── gpt.pdmodel     # 保存的模型文件
-├── merges.txt      # bpe
-└── vocab.txt       # 词表
+├── gpt.pdiparams       # 保存的参数文件
+├── gpt.pdiparams.info  # 保存的一些变量描述信息，预测不会用到
+├── gpt.pdmodel         # 保存的模型文件
+├── merges.txt          # bpe
+└── vocab.txt           # 词表
 ```
 
 同理，完成编译后，可以在 `build/bin/` 路径下将会看到 `gpt` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
