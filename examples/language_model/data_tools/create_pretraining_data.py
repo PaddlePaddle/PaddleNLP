@@ -137,7 +137,6 @@ def chinese_segmentation_fn():
 
 def jieba_segmentation_fn():
     import jieba
-    jieba.initialize()  # 手动初始化（可选）
 
     def process(line):
         words = jieba.cut(line)
