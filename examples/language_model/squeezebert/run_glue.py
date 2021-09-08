@@ -313,6 +313,10 @@ def do_train(args):
     else:
         dev_ds = load_dataset('glue', args.task_name, splits='dev')
         dev_ds = dev_ds.map(trans_func, lazy=False)
+        if args.device == 'cpu':
+            dev_ds = dev_ds[:1000]
+            from paddlenlp.datasets.dataset import MapDataset
+            dev_ds = MapDataset(dev_ds)
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.batch_size, shuffle=False)
         dev_data_loader = DataLoader(
