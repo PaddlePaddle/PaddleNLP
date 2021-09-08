@@ -26,7 +26,7 @@ class BartTokenizer(GPTTokenizer):
     Args:
         vocab_file (str):
             Path to the vocabulary file.
-            The vocab file contains a mapping from vocabulary strings and indices.
+            The vocab file contains a mapping from vocabulary strings to indices.
         merges_file (str):
             Path to the merge file.
             The merge file is used to split the input sentence into "subword" units.

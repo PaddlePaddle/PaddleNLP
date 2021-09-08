@@ -721,7 +721,9 @@ class GPTModel(GPTPretrainedModel):
                 Mask used in self attention to avoid performing attention to some unwanted positions,
                 usually the subsequent positions.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
-                For example, its shape can be [batch_size, sequence_length, sequence_length].
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
+                [batch_size, num_attention_heads, sequence_length, sequence_length].
                 Its data type should be float32.
                 The `masked` tokens have `-1e-9` values, and the `unmasked` tokens have `0` values.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
@@ -892,7 +894,8 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
                 is equal to `prediction_scores`. Its data type should be int64 and
                 its shape is [batch_size, sequence_length, 1].
             loss_mask(Tensor):
-                Weights of the tokens used for calculating the loss of the masked language modeling.
+                Mask used for calculating the loss of the masked language modeling to avoid
+                calculating some unwanted tokens.
                 Its data type should be float32 and its shape is [batch_size, sequence_length, 1].
 
         Returns:
@@ -911,7 +914,7 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
 class GPTForGreedyGeneration(GPTPretrainedModel):
     """
     The generate model for GPT-2.
-    It use the greedy strategy and generate the next sequence with highest probability.
+    It use the greedy strategy and generate the output sequence with highest probability.
 
     Args:
         gpt (:class:`GPTModel`):
