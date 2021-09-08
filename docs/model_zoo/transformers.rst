@@ -16,60 +16,68 @@ Transformer预训练模型汇总
 | Model              | Pretrained Weight                   | Language     | Details of the model                    |
 +====================+=====================================+==============+=========================================+
 |ALBERT_             |``albert-base-v1``                   | English      | 12 repeating layers, 128 embedding,     |
-|                    |                                     |              | 768-hidden, 12-heads, 11M parameters    |
+|                    |                                     |              | 768-hidden, 12-heads, 11M parameters.   |
 |                    |                                     |              | ALBERT base model                       |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-large-v1``                  | English      | 24 repeating layers, 128 embedding,     |
-|                    |                                     |              | 1024-hidden, 16-heads, 17M parameters   |
+|                    |                                     |              | 1024-hidden, 16-heads, 17M parameters.  |
 |                    |                                     |              | ALBERT large model                      |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-xlarge-v1``                 | English      | 24 repeating layers, 128 embedding,     |
-|                    |                                     |              | 2048-hidden, 16-heads, 58M parameters   |
+|                    |                                     |              | 2048-hidden, 16-heads, 58M parameters.  |
 |                    |                                     |              | ALBERT xlarge model                     |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-xxlarge-v1``                | English      | 12 repeating layers, 128 embedding,     |
-|                    |                                     |              | 4096-hidden, 64-heads, 223M parameters  |
+|                    |                                     |              | 4096-hidden, 64-heads, 223M parameters. |
 |                    |                                     |              | ALBERT xxlarge model                    |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-base-v2``                   | English      | 12 repeating layers, 128 embedding,     |
-|                    |                                     |              | 768-hidden, 12-heads, 11M parameters    |
+|                    |                                     |              | 768-hidden, 12-heads, 11M parameters.   |
 |                    |                                     |              | ALBERT base model (version2)            |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-large-v2``                  | English      | 24 repeating layers, 128 embedding,     |
-|                    |                                     |              | 1024-hidden, 16-heads, 17M parameters   |
+|                    |                                     |              | 1024-hidden, 16-heads, 17M parameters.  |
 |                    |                                     |              | ALBERT large model (version2)           |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-xlarge-v2``                 | English      | 24 repeating layers, 128 embedding,     |
-|                    |                                     |              | 2048-hidden, 16-heads, 58M parameters   |
+|                    |                                     |              | 2048-hidden, 16-heads, 58M parameters.  |
 |                    |                                     |              | ALBERT xlarge model (version2)          |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-xxlarge-v2``                | English      | 12 repeating layers, 128 embedding,     |
-|                    |                                     |              | 4096-hidden, 64-heads, 223M parameters  |
+|                    |                                     |              | 4096-hidden, 64-heads, 223M parameters. |
 |                    |                                     |              | ALBERT xxlarge model (version2)         |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-chinese-tiny``              | Chinese      | 4 repeating layers, 128 embedding,      |
-|                    |                                     |              | 312-hidden, 12-heads, 4M parameters     |
+|                    |                                     |              | 312-hidden, 12-heads, 4M parameters.    |
 |                    |                                     |              | ALBERT tiny model (Chinese)             |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-chinese-small``             | Chinese      | 6 repeating layers, 128 embedding,      |
-|                    |                                     |              | 384-hidden, 12-heads, _M parameters     |
+|                    |                                     |              | 384-hidden, 12-heads, _M parameters.    |
 |                    |                                     |              | ALBERT small model (Chinese)            |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-chinese-base``              | Chinese      | 12 repeating layers, 128 embedding,     |
-|                    |                                     |              | 768-hidden, 12-heads, 12M parameters    |
+|                    |                                     |              | 768-hidden, 12-heads, 12M parameters.   |
 |                    |                                     |              | ALBERT base model (Chinese)             |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-chinese-large``             | Chinese      | 24 repeating layers, 128 embedding,     |
-|                    |                                     |              | 1024-hidden, 16-heads, 18M parameters   |
+|                    |                                     |              | 1024-hidden, 16-heads, 18M parameters.  |
 |                    |                                     |              | ALBERT large model (Chinese)            |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-chinese-xlarge``            | Chinese      | 24 repeating layers, 128 embedding,     |
-|                    |                                     |              | 2048-hidden, 16-heads, 60M parameters   |
+|                    |                                     |              | 2048-hidden, 16-heads, 60M parameters.  |
 |                    |                                     |              | ALBERT xlarge model (Chinese)           |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``albert-chinese-xxlarge``           | Chinese      | 12 repeating layers, 128 embedding,     |
-|                    |                                     |              | 4096-hidden, 16-heads, 235M parameters  |
+|                    |                                     |              | 4096-hidden, 16-heads, 235M parameters. |
 |                    |                                     |              | ALBERT xxlarge model (Chinese)          |
++--------------------+-------------------------------------+--------------+-----------------------------------------+
+|BART_               |``bart-base``                        | English      | 12-layer, 768-hidden,                   |
+|                    |                                     |              | 12-heads, 217M parameters.              |
+|                    |                                     |              | BART base model (English)               |
+|                    +-------------------------------------+--------------+-----------------------------------------+
+|                    |``bart-large``                       | English      | 24-layer, 768-hidden,                   |
+|                    |                                     |              | 16-heads, 509M parameters.              |
+|                    |                                     |              | BART large model (English).             |
 +--------------------+-------------------------------------+--------------+-----------------------------------------+
 |BERT_               |``bert-base-uncased``                | English      | 12-layer, 768-hidden,                   |
 |                    |                                     |              | 12-heads, 110M parameters.              |
@@ -166,6 +174,10 @@ Transformer预训练模型汇总
 |                    |``ernie-2.0-en``                     | English      | 12-layer, 768-hidden,                   |
 |                    |                                     |              | 12-heads, 103M parameters.              |
 |                    |                                     |              | Trained on lower-cased English text.    |
+|                    +-------------------------------------+--------------+-----------------------------------------+
+|                    |``ernie-2.0-en-finetuned-squad``     | English      | 12-layer, 768-hidden,                   |
+|                    |                                     |              | 12-heads, 110M parameters.              |
+|                    |                                     |              | Trained on finetuned squad text.        |
 |                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``ernie-2.0-large-en``               | English      | 24-layer, 1024-hidden,                  |
 |                    |                                     |              | 16-heads, 336M parameters.              |
