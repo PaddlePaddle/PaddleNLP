@@ -17,6 +17,7 @@ import os
 import random
 import time
 from functools import partial
+import distutils.util
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
@@ -67,6 +68,11 @@ def parse_args():
                 for classes in MODEL_CLASSES.values()
             ], [])), )
     parser.add_argument(
+        "--init_from_student",
+        type=distutils.util.strtobool,
+        default=False,
+        help="Whether to use the parameters of student model to initialize.")
+    parser.add_argument(
         "--teacher_model_name_or_path",
         default=None,
         type=str,
@@ -85,7 +91,6 @@ def parse_args():
         required=True,
         help="The output directory where the model predictions and checkpoints will be written.",
     )
-
     parser.add_argument(
         "--max_seq_length",
         default=128,
@@ -248,8 +253,11 @@ def do_train(args):
     # For student
     model_class, tokenizer_class = MODEL_CLASSES[args.student_model_type]
     tokenizer = tokenizer_class.from_pretrained(args.student_model_name_or_path)
-    tinybert = TinyBertModel(vocab_size=21128, num_hidden_layers=6)
-    student = model_class(tinybert)
+    if args.init_from_student:
+        student = model_class.from_pretrained(args.student_model_name_or_path)
+    else:
+        tinybert = TinyBertModel(vocab_size=21128, num_hidden_layers=6)
+        student = model_class(tinybert)
 
     # For teacher
     teacher_model_class, _ = MODEL_CLASSES[args.teacher_model_type]
