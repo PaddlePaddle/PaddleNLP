@@ -25,9 +25,10 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from ..transformers import ErnieTokenizer, ErnieModel
+from ..transformers import is_chinese_char
 from ..datasets import load_dataset
 from ..data import Stack, Pad, Tuple, Vocab
-from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard, is_chinese_char
+from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
 from .models import ErnieForCSC
 from .task import Task
 
