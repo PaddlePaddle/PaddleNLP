@@ -19,8 +19,8 @@ python -m paddle.distributed.launch --log_dir $log_dir --gpus "0,1,2,3,4,5,6,7" 
     --device gpu\
     --eval_freq 1000\
     --warmup_rate 0.01\
+    --global_batch_size 16\
     --micro_batch_size 2\
-    --local_batch_size 16\
     --dp_degree 2\
     --mp_degree 4\
     --pp_degree 1\

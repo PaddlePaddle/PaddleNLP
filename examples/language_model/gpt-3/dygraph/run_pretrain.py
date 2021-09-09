@@ -95,7 +95,6 @@ def do_train(args):
         "pp_degree": args.pp_degree
     }
 
-    assert args.local_batch_size % args.micro_batch_size == 0
     strategy.pipeline_configs = {
         "accumulate_steps": args.local_batch_size // args.micro_batch_size,
         "micro_batch_size": args.micro_batch_size
@@ -114,8 +113,7 @@ def do_train(args):
     # seed control in hybrid parallel
     set_hyrbid_parallel_seed(args.seed, dp_rank, mp_rank, pp_rank)
 
-    default_global_batch_size = args.dp_degree * args.local_batch_size
-    default_global_tokens_num = default_global_batch_size * args.max_seq_len
+    default_global_tokens_num = args.global_batch_size * args.max_seq_len
 
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
@@ -124,7 +122,7 @@ def do_train(args):
     log_writer_path = os.path.join(
         args.output_dir, "train_log",
         "{}_globalbsz_{}_amp_{}_recompute_{}_card_{}".format(
-            args.model_name_or_path, default_global_batch_size, args.use_amp,
+            args.model_name_or_path, args.global_batch_size, args.use_amp,
             False, global_rank).lower())
 
     if os.path.exists(log_writer_path):

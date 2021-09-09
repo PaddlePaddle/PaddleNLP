@@ -18,6 +18,20 @@ import paddle
 from paddlenlp.utils.log import logger
 
 
+def process_batch_size(args):
+    if args.global_batch_size is None and args.local_batch_size is None:
+        raise ValueError("global_batch_size or local_batch_size should be set.")
+    elif args.global_batch_size is not None and args.local_batch_size is not None:
+        assert args.global_batch_size // args.local_batch_size == args.dp_degree, \
+            "global_batch_size[{}] should be divided by local_batch_size[{}] when dp_degree is [{}]"\
+                .format(args.global_batch_size, args.local_batch_size, args.dp_degree)
+    elif args.global_batch_size is not None and args.local_batch_size is None:
+        args.local_batch_size = args.global_batch_size // args.dp_degree
+    else:
+        args.global_batch_size = args.local_batch_size * args.dp_degree
+    assert args.local_batch_size % args.micro_batch_size == 0
+
+
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
@@ -70,25 +84,26 @@ def parse_args(MODEL_CLASSES):
 
     parser.add_argument(
         "--max_seq_len", type=int, default=1024, help="Max sequence length.")
+
+    parser.add_argument(
+        "--global_batch_size",
+        default=None,
+        type=int,
+        help="Global batch size for all training process. None for not check the size is valid. If we only use data parallelism, it should be device_num * micro_batch_size."
+    )
+
+    parser.add_argument(
+        "--local_batch_size",
+        default=None,
+        type=int,
+        help="Global batch size for all training process. None for not check the size is valid. If we only use data parallelism, it should be device_num * micro_batch_size."
+    )
+
     parser.add_argument(
         "--micro_batch_size",
         default=8,
         type=int,
         help="Batch size per device for one step training.", )
-
-    # parser.add_argument(
-    #     "--global_batch_size",
-    #     default=None,
-    #     type=int,
-    #     help="Global batch size for all training process. None for not check the size is valid. If we only use data parallelism, it should be device_num * micro_batch_size."
-    # )
-
-    parser.add_argument(
-        "--local_batch_size",
-        default=8,
-        type=int,
-        help="Global batch size for all training process. None for not check the size is valid. If we only use data parallelism, it should be device_num * micro_batch_size."
-    )
 
     # Default training config
     parser.add_argument(
@@ -176,12 +191,6 @@ def parse_args(MODEL_CLASSES):
         help="Evaluate the model use X steps data.")
 
     # Config for 4D Parallelism
-    parser.add_argument(
-        "--use_sharding",
-        type=str2bool,
-        nargs='?',
-        const=False,
-        help="Use sharding Parallelism to training.")
 
     parser.add_argument(
         "--sharding_degree",
@@ -217,19 +226,14 @@ def parse_args(MODEL_CLASSES):
         nargs='?',
         const=False,
         help="Enable mixed precision training.")
-    parser.add_argument(
-        "--enable_addto",
-        type=str2bool,
-        nargs='?',
-        const=True,
-        help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training."
-    )
+
     parser.add_argument(
         "--scale_loss",
         type=float,
         default=128,
         help="The value of scale_loss for fp16. This is only used for AMP training."
     )
+
     parser.add_argument(
         "--hidden_dropout_prob",
         type=float,
@@ -240,6 +244,7 @@ def parse_args(MODEL_CLASSES):
         type=float,
         default=0.1,
         help="The attention probs dropout prob.")
+
     # Other config
     parser.add_argument(
         "--seed", type=int, default=1234, help="Random seed for initialization")
@@ -264,6 +269,9 @@ def parse_args(MODEL_CLASSES):
 
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10
+
+    # process batch size
+    process_batch_size(args)
 
     if args.check_accuracy:
         if args.hidden_dropout_prob != 0:
