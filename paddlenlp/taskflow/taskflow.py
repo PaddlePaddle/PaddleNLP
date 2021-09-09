@@ -22,6 +22,7 @@ from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
 from .text_generation import TextGenerationTask
 from .dependency_parsing import DDParserTask
+from .text_correction import CSCTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -87,7 +88,17 @@ TASKS = {
         "default": {
             "model": "ddparser"
         }
-    }, 
+    },
+    'text_correction': {
+        "models": {
+            "csc-ernie-1.0": {
+                "task_class": CSCTask
+            },
+        },
+        "default": {
+            "model": "csc-ernie-1.0"
+        }
+    }
 }
 
 
