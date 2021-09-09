@@ -133,6 +133,29 @@ Source: 人生就是如此，经过磨练才能让自己更加拙壮，才能使
 Target: 人生就是如此，经过磨练才能让自己更加茁壮，才能使自己更加乐观。
 ```
 
+### Taskflow一键预测
+可以使用PaddleNLP提供的Taskflow工具来对输入的文本进行一键纠错，具体使用方法如下:
+
+```python
+from paddlenlp import Taskflow
+text_correction = Taskflow("text_correction")
+text_correction('遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。')
+'''
+[{'source': '遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。',
+    'target': '遇到逆境时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。',
+    'errors': [{'position': 3, 'correction': {'竟': '境'}}]}]
+'''
+
+text_correction('人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。')
+'''
+[{'source': '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。',
+    'target': '人生就是如此，经过磨练才能让自己更加茁壮，才能使自己更加乐观。',
+    'errors': [{'position': 18, 'correction': {'拙': '茁'}}]}]
+'''
+
+```
+
+
 ## 参考文献
 * Ruiqing Zhang, Chao Pang et al. "Correcting Chinese Spelling Errors with Phonetic Pre-training", ACL, 2021
 * DingminWang et al. "A Hybrid Approach to Automatic Corpus Generation for Chinese Spelling Check", EMNLP, 2018
