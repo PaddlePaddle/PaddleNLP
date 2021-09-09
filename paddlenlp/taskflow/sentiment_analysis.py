@@ -52,13 +52,20 @@ usage = r"""
            [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'}]
            '''
 
+           senta(["怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片", 
+                  "作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间"])
+           '''
+           [{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'}, 
+            {'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间', 'label': 'positive'}
+           ]
+           '''
+
            senta = Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")
            senta("作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。")
            '''
            [{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive'}]
            '''
-
-           """
+         """
 
 
 class SentaTask(Task):
@@ -139,22 +146,18 @@ class SentaTask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        inputs = inputs[0]
-        if isinstance(inputs, str):
-            inputs = [inputs]
-        if not isinstance(inputs, str) and not isinstance(inputs, list):
-            raise TypeError(
-                "Invalid inputs, input text should be str or list of str, {type(inputs)} found!"
-            )
+        inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
         batch_size = self.kwargs[
             'batch_size'] if 'batch_size' in self.kwargs else 1
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
-        lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
         examples = []
+        filter_inputs = []
         for input_data in inputs:
+            if not (isinstance(input_data, str) and len(input_data) > 0):
+                continue
+            filter_inputs.append(input_data)
             ids = self._tokenizer.encode(input_data)
             lens = len(ids)
             examples.append((ids, lens))
@@ -169,7 +172,7 @@ class SentaTask(Task):
         ]
         outputs = {}
         outputs['data_loader'] = batches
-        outputs['text'] = inputs
+        outputs['text'] = filter_inputs
         self.batchify_fn = batchify_fn
         return outputs
 
@@ -193,7 +196,7 @@ class SentaTask(Task):
 
     def _postprocess(self, inputs):
         """
-        The model output is allways the logits and pros, this function will convert the model output to raw text.
+        This function will convert the model output to raw text.
         """
         final_results = []
         for text, label in zip(inputs['text'], inputs['result']):
@@ -260,24 +263,21 @@ class SkepTask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        inputs = inputs[0]
-        if isinstance(inputs, str):
-            inputs = [inputs]
-        if not isinstance(inputs, str) and not isinstance(inputs, list):
-            raise TypeError(
-                "Invalid inputs, input text should be str or list of str, {type(inputs)} found!"
-            )
+        inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
         batch_size = self.kwargs[
             'batch_size'] if 'batch_size' in self.kwargs else 1
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
-        lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
         infer_data = []
 
         examples = []
+        filter_inputs = []
         for input_data in inputs:
+            if not (isinstance(input_data, str) and
+                    len(input_data.strip()) > 0):
+                continue
+            filter_inputs.append(input_data)
             encoded_inputs = self._tokenizer(text=input_data, max_seq_len=128)
             ids = encoded_inputs["input_ids"]
             segment_ids = encoded_inputs["token_type_ids"]
@@ -292,7 +292,7 @@ class SkepTask(Task):
             for idx in range(0, len(examples), batch_size)
         ]
         outputs = {}
-        outputs['text'] = inputs
+        outputs['text'] = filter_inputs
         outputs['data_loader'] = batches
         self._batchify_fn = batchify_fn
         return outputs
@@ -317,7 +317,7 @@ class SkepTask(Task):
 
     def _postprocess(self, inputs):
         """
-        The model output is allways the logits and pros, this function will convert the model output to raw text.
+        The model output is tag ids, this function will convert the model output to raw text.
         """
         final_results = []
         for text, label in zip(inputs['text'], inputs['result']):
