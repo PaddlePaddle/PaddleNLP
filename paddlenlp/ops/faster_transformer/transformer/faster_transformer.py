@@ -767,13 +767,13 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             pos_bias=True)
 
 
-class FasterUnimo(UNIMOPretrainedModel):
+class FasterUNIMOText(UNIMOPretrainedModel):
     def __init__(self,
                  model,
                  decoding_strategy="sampling",
                  decoding_lib=None,
                  use_fp16_decoding=False):
-        super(FasterUnimo, self).__init__()
+        super(FasterUNIMOText, self).__init__()
         self._model = model
         self._decoding_strategy = decoding_strategy
         self.bos_token_id = model.bos_token_id

@@ -1,8 +1,8 @@
-# Faster UNIMO 预测
+# FasterUNIMOText 预测
 
-在这里我们集成并升级了 Nvidia [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。以下是使用 Faster UNIMO 的说明。
+在这里我们集成并升级了 NVIDIA [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。以下是使用 FasterUNIMOText 的说明。
 
-**需要注意的是：**这里的说明仅涉及使用 Faster UNIMO 进行预测，而预测所需的模型，需要经过上一级目录 `../run_gen.py` finetuning 获取。
+**需要注意的是：**这里的说明仅涉及使用 FasterUNIMOText 进行预测，而预测所需的模型，需要经过上一级目录 `../run_gen.py` finetuning 获取。
 
 ## 使用环境说明
 
@@ -15,7 +15,7 @@
 
 ## 快速开始
 
-我们实现了基于 GPU 的 Faster UNIMO 的自定义 op 的接入。接下来，我们将介绍基于 Python 动态图使用 Faster UNIMO 自定义 op 的方式，包括 op 的编译与使用。
+我们实现了基于 GPU 的 FasterUNIMOText 的自定义 op 的接入。接下来，我们将介绍基于 Python 动态图使用 FasterUNIMOText 自定义 op 的方式，包括 op 的编译与使用。
 
 ## Python 动态图使用自定义 op
 
@@ -25,7 +25,7 @@
 
 #### 克隆 PaddleNLP
 
-首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 Faster UNIMO 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译。
+首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterUNIMOText 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译。
 
 以下以从 github 上 clone 一个新版 PaddleNLP 为例:
 
@@ -57,30 +57,30 @@ cd ../
 其中，
 * `-DSM`: 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)。
 * `-DPY_CMD`: 是指编译所使用的 python，若未指定 `-DPY_CMD` 将会默认使用系统命令 `python` 对应的 Python 版本。
-* `-DWITH_UNIFIED`: 是指是否编译带有 Faster UNIMO 自定义 op 的动态库。
+* `-DWITH_UNIFIED`: 是指是否编译带有 FasterUNIMOText 自定义 op 的动态库。
 
-最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 Faster UNIMO decoding 执行的库。
+最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 FasterUNIMOText decoding 执行的库。
 
-## 使用 Faster UNIMO 完成预测
+## 使用 FasterUNIMOText 完成预测
 
-编写 python 脚本的时候，调用 `FasterUnimo` API 并传入 `libdecoding_op.so` 的位置即可实现将 Faster UNIMO 用于当前的预测。
+编写 python 脚本的时候，调用 `FasterUNIMOText` API 并传入 `libdecoding_op.so` 的位置即可实现将 FasterUNIMOText 用于当前的预测。
 
 举例如下：
 
 ``` python
-from paddlenlp.ops import FasterUnimo
+from paddlenlp.ops import FasterUNIMOText
 
 model = UNIMOLMHeadModel.from_pretrained(args.model_name_or_path)
 tokenizer = UNIMOTokenizer.from_pretrained(args.model_name_or_path)
 
-model = FasterUnimo(
+model = FasterUNIMOText(
     model,
     decoding_strategy=args.decode_strategy,
     decoding_lib=args.decoding_lib,
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 
-更详细的例子可以参考 `infer.py`，我们提供了更详细用例。需要注意的是，当前 Faster UNIMO 只支持基础的策略，后续我们会进一步丰富像是 length penalty 等策略以提升生成式 API 推理性能。
+更详细的例子可以参考 `infer.py`，我们提供了更详细用例。需要注意的是，当前 FasterUNIMOText 只支持基础的策略，后续我们会进一步丰富像是 length penalty 等策略以提升生成式 API 推理性能。
 
 
 ### 数据准备

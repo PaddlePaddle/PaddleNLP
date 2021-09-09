@@ -7,7 +7,7 @@ import paddle
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer, BasicTokenizer
 from paddlenlp.metrics import BLEU
-from paddlenlp.ops import FasterUnimo
+from paddlenlp.ops import FasterUNIMOText
 
 from gen_utils import print_args, create_data_loader, select_sum
 
@@ -77,7 +77,7 @@ def run(args):
 
 @paddle.no_grad()
 def evaluation(model, data_loader, args, tokenizer):
-    model = FasterUnimo(
+    model = FasterUNIMOText(
         model,
         decoding_strategy=args.decode_strategy,
         decoding_lib=args.decoding_lib,
