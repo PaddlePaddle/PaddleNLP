@@ -34,7 +34,8 @@ class ErnieTokenizer(PretrainedTokenizer):
 
     Args:
         vocab_file (str): 
-            File path of the vocabulary.
+            The vocabulary file path (ends with '.txt') required to instantiate
+            a `WordpieceTokenizer`.
         do_lower_case (str, optional): 
             Whether or not to lowercase the input when tokenizing.
             Defaults to`True`.
@@ -67,7 +68,6 @@ class ErnieTokenizer(PretrainedTokenizer):
             # { 'input_ids': [1, 4444, 4385, 1545, 6712, 10062, 9568, 9756, 9500, 2],
             #  'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
             # }
-
 
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
@@ -343,7 +343,7 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         vocab_file (str): 
             The file path of the vocabulary.
         sentencepiece_model_file (str):
-            The file path of sentencepice model.
+            The file path of sentencepiece model.
         word_dict(str):
             The file path of word vocabulary, which is used to do chinese word segmentation.
         do_lower_case (str, optional): 

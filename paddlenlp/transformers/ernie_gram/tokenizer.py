@@ -28,16 +28,19 @@ __all__ = ['ErnieGramTokenizer']
 
 class ErnieGramTokenizer(ErnieTokenizer):
     r"""
-    Constructs an ERNIE-Gram tokenizer. The usage of ErnieGramTokenizer is the same as `ErnieTokenizer`.
-    It uses a basic tokenizer to do punctuation splitting, lower casing and so on,
+    Constructs an ERNIE-Gram tokenizer. It uses a basic tokenizer to do punctuation splitting, lower casing and so on,
     and follows a WordPiece tokenizer to tokenize as subwords.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer`.
+    For more information regarding those methods, please refer to this superclass.
 
     Args:
         vocab_file (str): 
-            File path of the vocabulary.
+            The vocabulary file path (ends with '.txt') required to instantiate
+            a `WordpieceTokenizer`.
         do_lower_case (str, optional):
             Whether or not to lowercase the input when tokenizing.
-            Defaults to`True`.
+            Defaults to `True`.
         unk_token (str, optional): 
             A special token representing the *unknown (out-of-vocabulary)* token.
             An unknown token is set to be `unk_token` inorder to be converted to an ID.
@@ -67,7 +70,6 @@ class ErnieGramTokenizer(ErnieTokenizer):
             #   'input_ids': [1, 4444, 4385, 1545, 6712, 10062, 9568, 9756, 9500, 2],
             #   'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             # }
-
 
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained

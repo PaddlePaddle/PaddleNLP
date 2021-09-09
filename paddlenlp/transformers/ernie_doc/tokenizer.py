@@ -25,13 +25,17 @@ __all__ = ['ErnieDocTokenizer', 'ErnieDocBPETokenizer']
 
 class ErnieDocTokenizer(ErnieTokenizer):
     r"""
-    Constructs an ERNIE-Doc tokenizer. The usage of ErnieDocTokenizer is the same as `ErnieTokenizer`.
+    Constructs an ERNIE-Doc tokenizer.
     It uses a basic tokenizer to do punctuation splitting, lower casing and so on,
     and follows a WordPiece tokenizer to tokenize as subwords.
 
+    This tokenizer inherits from :class:`~paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer`.
+    For more information regarding those methods, please refer to this superclass.
+
     Args:
         vocab_file (str):
-            File path of the vocabulary.
+            The vocabulary file path (ends with '.txt') required to instantiate
+            a `WordpieceTokenizer`.
         do_lower_case (str, optional):
             Whether or not to lowercase the input when tokenizing.
             Defaults to`True`.
@@ -96,6 +100,9 @@ class ErnieDocBPETokenizer(BPETokenizer):
     r"""
     Constructs an ERNIE-Doc BPE tokenizer. It uses a bpe tokenizer to do punctuation
     splitting, lower casing and so on, then tokenize words as subwords.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.BPETokenizer`.
+    For more information regarding those methods, please refer to this superclass.
 
     Args:
         vocab_file (str): 
