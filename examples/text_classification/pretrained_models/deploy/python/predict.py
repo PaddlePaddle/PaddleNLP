@@ -20,94 +20,27 @@ import paddle
 import paddlenlp as ppnlp
 from scipy.special import softmax
 from paddle import inference
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
 
+from utils import convert_example
+
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_dir", type=str, required=True,
-    help="The directory to static model.")
-
-parser.add_argument("--max_seq_length", default=128, type=int,
-    help="The maximum total input sequence length after tokenization. Sequences "
-    "longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=2, type=int,
-    help="Batch size per GPU/CPU for training.")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu",
-    help="Select which device to train model, defaults to gpu.")
-
-parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False],
-    help='Enable to use tensorrt to speed up.')
-parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"],
-    help='The tensorrt precision.')
-
-parser.add_argument('--cpu_threads', default=10, type=int,
-    help='Number of threads to predict when using cpu.')
-parser.add_argument('--enable_mkldnn', default=False, type=eval, choices=[True, False],
-    help='Enable to use mkldnn to speed up when using cpu.')
-
-parser.add_argument("--benchmark", type=eval, default=False,
-    help="To log some information about environment and running.")
-parser.add_argument("--save_log_path", type=str, default="./log_output/",
-    help="The file path to save log.")
+parser.add_argument("--model_dir", type=str, required=True, default="./export/", help="The directory to static model.")
+parser.add_argument("--max_seq_length", type=int, default=128, help="The maximum total input sequence length after tokenization. "
+    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--batch_size", type=int, default=2, help="Batch size per GPU/CPU for training.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--use_tensorrt', type=eval, default=False, choices=[True, False], help='Enable to use tensorrt to speed up.')
+parser.add_argument("--precision", type=str, default="fp32", choices=["fp32", "fp16", "int8"], help='The tensorrt precision.')
+parser.add_argument('--cpu_threads', type=int, default=10, help='Number of threads to predict when using cpu.')
+parser.add_argument('--enable_mkldnn', type=eval, default=False, choices=[True, False], help='Enable to use mkldnn to speed up when using cpu.')
+parser.add_argument("--benchmark", type=eval, default=False, help="To log some information about environment and running.")
+parser.add_argument("--save_log_path", type=str, default="./log_output/", help="The file path to save log.")
 args = parser.parse_args()
 # yapf: enable
-
-
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_length=512,
-                    is_test=False):
-    """
-    Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
-    by concatenating and adding special tokens. And creates a mask from the two sequences passed 
-    to be used in a sequence-pair classification task.
-        
-    A BERT sequence has the following format:
-
-    - single sequence: ``[CLS] X [SEP]``
-    - pair of sequences: ``[CLS] A [SEP] B [SEP]``
-
-    A BERT sequence pair mask has the following format:
-    ::
-        0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
-        | first sequence    | second sequence |
-
-    If only one sequence, only returns the first portion of the mask (0's).
-
-
-    Args:
-        example(obj:`list[str]`): List of input data, containing text and label if it have label.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
-            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        label_list(obj:`list[str]`): All the labels that the data has.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
-            Sequences longer than this will be truncated, sequences shorter will be padded.
-        is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
-
-    Returns:
-        input_ids(obj:`list[int]`): The list of token ids.
-        segment_ids(obj: `list[int]`): List of sequence pair mask.
-        label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
-    """
-    text = example
-    encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length)
-    input_ids = encoded_inputs["input_ids"]
-    segment_ids = encoded_inputs["token_type_ids"]
-
-    if not is_test:
-        # create label maps
-        label_map = {}
-        for (i, l) in enumerate(label_list):
-            label_map[l] = i
-
-        label = label_map[label]
-        label = np.array([label], dtype="int64")
-        return input_ids, segment_ids, label
-    else:
-        return input_ids, segment_ids
 
 
 class Predictor(object):
@@ -142,7 +75,7 @@ class Predictor(object):
             }
             precision_mode = precision_map[precision]
 
-            if args.use_tensorrt:
+            if use_tensorrt:
                 config.enable_tensorrt_engine(
                     max_batch_size=batch_size,
                     min_subgraph_size=30,
@@ -151,11 +84,11 @@ class Predictor(object):
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             config.disable_gpu()
-            if args.enable_mkldnn:
+            if enable_mkldnn:
                 # cache 10 different shapes for mkldnn to avoid memory leak
                 config.set_mkldnn_cache_capacity(10)
                 config.enable_mkldnn()
-            config.set_cpu_math_library_num_threads(args.cpu_threads)
+            config.set_cpu_math_library_num_threads(cpu_threads)
         elif device == "xpu":
             # set XPU configs accordingly
             config.enable_xpu(100)
@@ -206,10 +139,10 @@ class Predictor(object):
 
         examples = []
         for text in data:
+            example = {"text": text}
             input_ids, segment_ids = convert_example(
-                text,
+                example,
                 tokenizer,
-                label_list=label_map.values(),
                 max_seq_length=self.max_seq_length,
                 is_test=True)
             examples.append((input_ids, segment_ids))

@@ -69,6 +69,7 @@ pretrained_models/
 我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 ```shell
 $ unset CUDA_VISIBLE_DEVICES
+$ export PYTHONPATH=$PYTHONPATH:`pwd`
 $ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_dir ./checkpoints
 ```
 
@@ -120,14 +121,14 @@ checkpoints/
   运行方式：
 
 ```shell
-python export_model.py --params_path=./checkpoint/model_900/model_state.pdparams --output_path=./output
+python export_model.py --params_path=./checkpoint/model_900/model_state.pdparams --output_path=./export
 ```
 其中`params_path`是指动态图训练保存的参数路径，`output_path`是指静态图参数导出路径。
 
 导出模型之后，可以用于部署，deploy/python/predict.py文件提供了python部署预测示例。运行方式：
 
 ```shell
-python deploy/python/predict.py --model_dir=./output
+python deploy/python/predict.py --model_dir=./export
 ```
 
 ### 模型预测
@@ -175,13 +176,13 @@ Inference模型参数文件：
 * 服务器端依赖：
 
 ```shell
-pip install paddle-serving-app paddle-serving-client paddle-serving-server==0.5.0
+pip install paddle-serving-app paddle-serving-client paddle-serving-server
 ```
 
-如果服务器端可以使用GPU进行推理，则安装server的gpu版本，安装时要注意参考服务器当前CUDA、TensorRT的版本来安装对应的版本：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.5.0)
+如果服务器端可以使用GPU进行推理，则安装server的gpu版本，安装时要注意参考服务器当前CUDA、TensorRT的版本来安装对应的版本：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.6.0)
 
 ```shell
-pip install paddle-serving-app paddle-serving-client paddle-serving-server-gpu==0.5.0
+pip install paddle-serving-app paddle-serving-client paddle-serving-server-gpu
 ```
 
 * 客户端依赖：
@@ -190,7 +191,7 @@ pip install paddle-serving-app paddle-serving-client paddle-serving-server-gpu==
 pip install paddle-serving-app paddle-serving-client
 ```
 
-建议在**docker**容器中运行服务器端和客户端以避免一些系统依赖库问题，启动docker镜像的命令参考：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.5.0)
+建议在**docker**容器中运行服务器端和客户端以避免一些系统依赖库问题，启动docker镜像的命令参考：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.6.0)
 
 ### Serving的模型和配置导出
 
@@ -198,13 +199,13 @@ pip install paddle-serving-app paddle-serving-client
 
 ```shell
 python -u deploy/serving/export_servable_model.py \
-    --inference_model_dir ./ \
-    --model_file ./output/inference.pdmodel \
-    --params_file ./output/inference.pdiparams
+    --inference_model_dir ./export/ \
+    --model_file inference.pdmodel \
+    --params_file inference.pdiparams
 ```
 
 可支持配置的参数：
-* `inference_model_dir`： Inference推理模型所在目录，这里假设为当前目录。
+* `inference_model_dir`： Inference推理模型所在目录，这里假设为 export 目录。
 * `model_file`： 推理需要加载的模型结构文件。
 * `params_file`： 推理需要加载的模型权重文件。
 
@@ -215,7 +216,7 @@ python -u deploy/serving/export_servable_model.py \
 在服务器端容器中，启动server
 
 ```shell
-python -m deploy/serving/paddle_serving_server_gpu.serve \
+python -m paddle_serving_server.serve \
     --model ./serving_server \
     --port 8090
 ```
@@ -226,7 +227,7 @@ python -m deploy/serving/paddle_serving_server_gpu.serve \
 如果服务器端可以使用GPU进行推理计算，则启动服务器时可以配置server使用的GPU id
 
 ```shell
-python -m paddle_serving_server_gpu.serve \
+python -m paddle_serving_server.serve \
     --model ./serving_server \
     --port 8090 \
     --gpu_id 0
