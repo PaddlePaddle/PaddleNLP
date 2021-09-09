@@ -234,9 +234,9 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
 
   if ("beam_search" == decoding_strategy) {
     TransformerBeamsearch<DecodingTraits_::OpType>*
-        unified_decoding_beamsearch_;
+        unified_decoding_beam_search_;
 
-    unified_decoding_beamsearch_ =
+    unified_decoding_beam_search_ =
         new TransformerBeamsearch<DecodingTraits_::OpType>(
             allocator_,
             batch_size_,
@@ -259,9 +259,9 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             mask_id,
             temperature,
             len_penalty);
-    unified_decoding_beamsearch_->forward(params, decoding_params);
+    unified_decoding_beam_search_->forward(params, decoding_params);
 
-    delete unified_decoding_beamsearch_;
+    delete unified_decoding_beam_search_;
   } else if ("topk_sampling" == decoding_strategy ||
              "topp_sampling" == decoding_strategy ||
              "sampling" == decoding_strategy) {

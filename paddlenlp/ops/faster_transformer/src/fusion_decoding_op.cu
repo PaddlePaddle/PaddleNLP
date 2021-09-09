@@ -242,8 +242,8 @@ std::vector<paddle::Tensor> decoding_kernel(
       position_encoding_table.data<data_t_>());
 
   if ("beam_search" == decoding_strategy) {
-    DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beamsearch_;
-    decoding_beamsearch_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
+    DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beam_search_;
+    decoding_beam_search_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
         allocator_,
         batch_size_,
         beam_width_,
@@ -258,12 +258,12 @@ std::vector<paddle::Tensor> decoding_kernel(
         end_id_,
         beam_search_diversity_rate_);
 
-    decoding_beamsearch_->forward(params, decoding_params);
+    decoding_beam_search_->forward(params, decoding_params);
 
-    delete decoding_beamsearch_;
+    delete decoding_beam_search_;
   } else if ("beam_search_v2" == decoding_strategy) {
-    DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beamsearch_;
-    decoding_beamsearch_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
+    DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beam_search_;
+    decoding_beam_search_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
         allocator_,
         batch_size_,
         beam_width_,
@@ -281,9 +281,9 @@ std::vector<paddle::Tensor> decoding_kernel(
         true,  // keep_alive_beam_
         alpha);
 
-    decoding_beamsearch_->forward(params, decoding_params);
+    decoding_beam_search_->forward(params, decoding_params);
 
-    delete decoding_beamsearch_;
+    delete decoding_beam_search_;
   } else if ("topk_sampling" == decoding_strategy ||
              "topp_sampling" == decoding_strategy) {
     DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
