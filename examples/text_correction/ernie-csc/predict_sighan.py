@@ -57,15 +57,11 @@ def write_sighan_result_to_file(args, corr_preds, det_preds, lengths,
                                            lengths[i], tokenizer,
                                            args.max_seq_length)
                 words = list(words)
-                if len(words) > args.max_seq_length - 2:
-                    words = words[:args.max_seq_length - 2]
-                words = ''.join(words)
-
+                pred_result = list(pred_result)
                 result = ids
                 if pred_result == words:
                     result += ', 0'
                 else:
-                    pred_result = list(pred_result)
                     assert len(pred_result) == len(
                         words), "pred_result: {}, words: {}".format(pred_result,
                                                                     words)
