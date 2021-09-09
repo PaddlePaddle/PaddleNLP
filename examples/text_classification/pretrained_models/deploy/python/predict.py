@@ -24,7 +24,7 @@ from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
 
-from ...utils import convert_example
+from utils import convert_example
 
 # yapf: disable
 parser = argparse.ArgumentParser()

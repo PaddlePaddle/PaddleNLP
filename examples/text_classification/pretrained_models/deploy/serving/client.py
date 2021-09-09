@@ -21,7 +21,7 @@ from paddlenlp.transformers import ErnieTinyTokenizer
 from paddle_serving_client import Client
 from scipy.special import softmax
 
-from ...utils import convert_example
+from utils import convert_example
 
 # yapf: disable
 parser = argparse.ArgumentParser()
