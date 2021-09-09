@@ -287,8 +287,6 @@ class WordTagTask(Task):
             'batch_size'] if 'batch_size' in self.kwargs else 1
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
-        lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
 
         max_seq_length = 512
         if 'max_seq_length' in self.kwargs:
@@ -315,7 +313,7 @@ class WordTagTask(Task):
                 yield tokenized_output['input_ids'], tokenized_output[
                     'token_type_ids'], tokenized_output['seq_len']
 
-        infer_ds = load_dataset(read, inputs=short_input_texts, lazy=lazy_load)
+        infer_ds = load_dataset(read, inputs=short_input_texts, lazy=False)
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self._tokenizer.pad_token_id,dtype='int64'),  # input_ids
             Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id,dtype='int64'),  # token_type_ids

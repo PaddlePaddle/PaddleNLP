@@ -143,9 +143,9 @@ class Task(metaclass=abc.ABCMeta):
                     format(type(inputs)))
             inputs = [inputs]
         elif isinstance(inputs, list):
-            if not isinstance(inputs[0], str):
+            if not (isinstance(inputs[0], str) and len(inputs[0].strip()) > 0):
                 raise TypeError(
-                    "Invalid inputs, input text should be list of str, but list of {} found!".
+                    "Invalid inputs, input text should be list of str, and first element of list should not be empty text.".
                     format(type(inputs[0])))
         else:
             raise TypeError(

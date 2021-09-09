@@ -143,9 +143,11 @@ class TextGenerationTask(Task):
         infer_data = []
 
         examples = []
+        filter_inputs = []
         for input_text in inputs:
             if not (isinstance(input_text, str) and len(input_text) > 0):
                 continue
+            filter_inputs.append(input_text)
             few_shot_input = pre_input.format(input_text)
             ids = self._tokenizer(few_shot_input)["input_ids"]
             examples.append((ids, len(ids)))
@@ -160,7 +162,7 @@ class TextGenerationTask(Task):
             for idx in range(0, len(examples), batch_size)
         ]
         outputs = {}
-        outputs['text'] = inputs
+        outputs['text'] = filter_inputs
         outputs['data_loader'] = batches
         self._batchify_fn = batchify_fn
         return outputs

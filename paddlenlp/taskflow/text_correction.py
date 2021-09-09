@@ -34,19 +34,26 @@ from .task import Task
 
 usage = r"""
            from paddlenlp import Taskflow
+
            text_correction = Taskflow("text_correction")
            text_correction('遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。')
            '''
            [{'source': '遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。',
              'target': '遇到逆境时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。',
-             'errors': [{'position': 3, 'correction': {'竟': '境'}}]}]
+             'errors': [{'position': 3, 'correction': {'竟': '境'}}]}
+           ]
            '''
 
-           text_correction('人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。')
+           text_correction(['遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。',
+                            '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。'])
            '''
-           [{'source': '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。',
-             'target': '人生就是如此，经过磨练才能让自己更加茁壮，才能使自己更加乐观。',
-             'errors': [{'position': 18, 'correction': {'拙': '茁'}}]}]
+           [{'source': '遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。', 
+             'target': '遇到逆境时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。', 
+             'errors': [{'position': 3, 'correction': {'竟': '境'}}]}, 
+            {'source': '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。', 
+             'target': '人生就是如此，经过磨练才能让自己更加茁壮，才能使自己更加乐观。', 
+             'errors': [{'position': 18, 'correction': {'拙': '茁'}}]}
+           ]
            '''
 
          """
@@ -133,13 +140,7 @@ class CSCTask(Task):
         self._tokenizer = ErnieTokenizer.from_pretrained(TASK_MODEL_MAP[model])
 
     def _preprocess(self, inputs, padding=True, add_special_tokens=True):
-        inputs = inputs[0]
-        if isinstance(inputs, str):
-            inputs = [inputs]
-        if not isinstance(inputs, str) and not isinstance(inputs, list):
-            raise TypeError(
-                "Invalid inputs, input text should be str or list of str, {type(inputs)} found!"
-            )
+        inputs = self._check_input_text(inputs)
         batch_size = self.kwargs[
             'batch_size'] if 'batch_size' in self.kwargs else 1
         trans_func = self._convert_example
@@ -154,6 +155,8 @@ class CSCTask(Task):
         examples = []
         texts = []
         for text in inputs:
+            if not (isinstance(text, str) and len(text) > 0):
+                continue
             example = {"source": text.strip()}
             input_ids, token_type_ids, pinyin_ids, length = trans_func(example)
             examples.append((input_ids, token_type_ids, pinyin_ids, length))
