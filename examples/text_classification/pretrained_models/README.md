@@ -202,10 +202,10 @@ Inference模型参数文件：
 pip install paddle-serving-app paddle-serving-client paddle-serving-server==0.5.0
 ```
 
-如果服务器端可以使用GPU进行推理，则安装server的gpu版本，安装时要注意参考服务器当前CUDA、TensorRT的版本来安装对应的版本：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.5.0)
+如果服务器端可以使用GPU进行推理，则安装server的gpu版本，安装时要注意参考服务器当前CUDA、TensorRT的版本来安装对应的版本：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.6.0)
 
 ```shell
-pip install paddle-serving-app paddle-serving-client paddle-serving-server-gpu==0.5.0
+pip install paddle-serving-app paddle-serving-client paddle-serving-server-gpu
 ```
 
 * 客户端依赖：
@@ -214,7 +214,7 @@ pip install paddle-serving-app paddle-serving-client paddle-serving-server-gpu==
 pip install paddle-serving-app paddle-serving-client
 ```
 
-建议在**docker**容器中运行服务器端和客户端以避免一些系统依赖库问题，启动docker镜像的命令参考：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.5.0)
+建议在**docker**容器中运行服务器端和客户端以避免一些系统依赖库问题，启动docker镜像的命令参考：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.6.0)
 
 ### Serving的模型和配置导出
 
