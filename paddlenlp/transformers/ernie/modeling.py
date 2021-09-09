@@ -220,7 +220,7 @@ class ErnieModel(ErniePretrainedModel):
             Vocabulary size of `inputs_ids` in `ErnieModel`. Also is the vocab size of token embedding matrix.
             Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `ErnieModel`.
         hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layer and pooler layer. Defaults to `768`.
+            Dimensionality of the embedding layer, encoder layers and pooler layer. Defaults to `768`.
         num_hidden_layers (int, optional):
             Number of hidden layers in the Transformer encoder. Defaults to `12`.
         num_attention_heads (int, optional):
@@ -240,7 +240,7 @@ class ErnieModel(ErniePretrainedModel):
             Defaults to `0.1`.
         attention_probs_dropout_prob (float, optional):
             The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`
+            Defaults to `0.1`.
         max_position_embeddings (int, optional):
             The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
             sequence. Defaults to `512`.
@@ -325,12 +325,12 @@ class ErnieModel(ErniePretrainedModel):
                 Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
                 usually the paddings or the subsequent positions.
                 Its data type can be int, float and bool.
-                If its data type is int, the values should be either 0 or 1.
-
-                - **1** for tokens that **not masked**,
-                - **0** for tokens that **masked**.
-
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
+                [batch_size, num_attention_heads, sequence_length, sequence_length].
                 Defaults to `None`, which means nothing needed to be prevented attention to.
 
         Returns:
