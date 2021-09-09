@@ -229,7 +229,7 @@ class CSCTask(Task):
 
     def _convert_example(self, example):
         source = example["source"]
-        words = self._tokenizer.tokenize(text=source)
+        words = list(source)
         if len(words) > self._max_seq_length - 2:
             words = words[:self._max_seq_length - 2]
         length = len(words)
@@ -266,64 +266,22 @@ class CSCTask(Task):
     def _parse_decode(self, words, corr_preds, det_preds, lengths):
         UNK = self._tokenizer.unk_token
         UNK_id = self._tokenizer.convert_tokens_to_ids(UNK)
-        tokens = self._tokenizer.tokenize(words)
-        if len(tokens) > self._max_seq_length - 2:
-            tokens = tokens[:self._max_seq_length - 2]
+
         corr_pred = corr_preds[1:1 + lengths].tolist()
         det_pred = det_preds[1:1 + lengths].tolist()
         words = list(words)
+        rest_words = []
         if len(words) > self._max_seq_length - 2:
+            rest_words = words[max_seq_length - 2:]
             words = words[:self._max_seq_length - 2]
 
-        assert len(tokens) == len(
-            corr_pred
-        ), "The number of tokens should be equal to the number of labels {}: {}: {}".format(
-            len(tokens), len(corr_pred), tokens)
         pred_result = ""
-
-        align_offset = 0
-        # Need to be aligned
-        if len(words) != len(tokens):
-            first_unk_flag = True
-            for j, word in enumerate(words):
-                if word.isspace():
-                    tokens.insert(j + 1, word)
-                    corr_pred.insert(j + 1, UNK_id)
-                    det_pred.insert(j + 1, 0)  # No error
-                elif tokens[j] != word:
-                    if self._tokenizer.convert_tokens_to_ids(word) == UNK_id:
-                        if first_unk_flag:
-                            first_unk_flag = False
-                            corr_pred[j] = UNK_id
-                            det_pred[j] = 0
-                        else:
-                            tokens.insert(j, UNK)
-                            corr_pred.insert(j, UNK_id)
-                            det_pred.insert(j, 0)  # No error
-                        continue
-                    elif tokens[j] == UNK:
-                        # Remove rest unk
-                        k = 0
-                        while k + j < len(tokens) and tokens[k + j] == UNK:
-                            k += 1
-                        tokens = tokens[:j] + tokens[j + k:]
-                        corr_pred = corr_pred[:j] + corr_pred[j + k:]
-                        det_pred = det_pred[:j] + det_pred[j + k:]
-                    else:
-                        # Maybe English, number, or suffix
-                        token = tokens[j].lstrip("##")
-                        corr_pred = corr_pred[:j] + [UNK_id] * len(
-                            token) + corr_pred[j + 1:]
-                        det_pred = det_pred[:j] + [0] * len(token) + det_pred[
-                            j + 1:]
-                        tokens = tokens[:j] + list(token) + tokens[j + 1:]
-                first_unk_flag = True
-
         for j, word in enumerate(words):
             candidates = self._tokenizer.convert_ids_to_tokens(corr_pred[j])
-            if det_pred[j] == 0 or candidates == UNK or candidates == '[PAD]':
+            if not is_chinese_char(ord(word)) or det_pred[
+                    j] == 0 or candidates == UNK or candidates == '[PAD]':
                 pred_result += word
             else:
                 pred_result += candidates.lstrip("##")
-
+        pred_result += ''.join(rest_words)
         return pred_result
