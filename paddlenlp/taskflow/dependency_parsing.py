@@ -116,7 +116,7 @@ class DDParserTask(Task):
         rel_vocab_path = download_file(
             self._task_path, self.model + os.path.sep + "rel_vocab.json",
             URLS[self.model][0], URLS[self.model][1])
-        font_file_path = download_file(
+        self.font_file_path = download_file(
             self._task_path,
             self.model + os.path.sep + "SourceHanSansCN-Regular.ttf",
             URLS[self.model][0], URLS[self.model][1])
@@ -314,7 +314,7 @@ class DDParserTask(Task):
             )
 
         self.plt = plt
-        self.font = font_manager.FontProperties(fname=font_file_path)
+        self.font = font_manager.FontProperties(fname=self.font_file_path)
         word, head, deprel = data['word'], data['head'], data['deprel']
 
         nodes = ['ROOT'] + word
