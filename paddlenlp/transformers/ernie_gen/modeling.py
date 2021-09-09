@@ -589,20 +589,30 @@ class ErnieForGeneration(ErnieModel):
             tgt_pos(`Variable` of shape [n_targets, 2]):
                 index of tgt_labels in `src_ids`, can be obtained from `fluid.layers.where(src_ids==mask_id)`
             encoder_only(Bool):
-                if set, will not return loss, logits_2d
+                If `encoder_only` is `False`,  `loss` and `logits_2d` will not be returned.
 
         Returns:
-            tuple: Returns tuple (`loss`, `logits`, `info`).
+            tuple: Returns tuple (`None`, `None`, `info`) or (`output_ids`, `logits`, `info`) or (`loss`, `logits_2d`, `info`).
 
             With the fields:
 
-            - `loss`(`Variable` of shape []):
-                cross entropy loss mean over every target label. if `encode_only`, returns None.
+            - info(Dict):
+                See :class:`ErnieModel`.
 
-            - `logits`(`Variable` of shape [n_targets, vocab_size]):
-                logits for every targets. if `encode_only`, returns None.
+            - output_ids(Tensor):
 
-            - `info`(Dict): see `ErnieModel`
+            - logits(Tensor):
+                Logits for every targets.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+                If `encode_only`, returns None.
+
+            - loss(Tensor):
+                Cross entropy loss mean over every target label.
+                If `encode_only`, returns None.
+
+            - logits_2d(Tensor):
+
+
         """
         tgt_labels = kwargs.pop('tgt_labels', None)
         tgt_pos = kwargs.pop('tgt_pos', None)
