@@ -680,6 +680,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         logits_mask[self.unk_token_id] = -1e9
         logits_mask[self.bos_token_id] = -1e9
         logits_mask[self.pad_token_id] = -1e9
+
         logits_mask_t = paddle.assign(logits_mask)
         if use_fp16_decoding and self._decoding_strategy == "sampling":
             return paddle.cast(logits_mask_t, dtype="float16")
@@ -839,6 +840,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         logits_mask[self.unk_token_id] = -1e9
         logits_mask[self.bos_token_id] = -1e9
         logits_mask[self.pad_token_id] = -1e9
+
         logits_mask_t = paddle.assign(logits_mask)
         if use_fp16_decoding and self._decoding_strategy == "sampling":
             return paddle.cast(logits_mask_t, dtype="float16")
