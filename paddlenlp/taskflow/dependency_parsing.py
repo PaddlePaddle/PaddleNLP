@@ -167,7 +167,7 @@ class DDParserTask(Task):
             n_words=len(self.word_vocab),
             pad_index=self.word_pad_index,
             bos_index=self.word_bos_index,
-            eos_index=self.word_eos_index,)
+            eos_index=self.word_eos_index, )
         # Load the model parameter for the predict
         state_dict = paddle.load(
             os.path.join(self._task_path, self.model, "model.pdparams"))
@@ -187,13 +187,7 @@ class DDParserTask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        inputs = inputs[0]
-        if isinstance(inputs, str):
-            inputs = [inputs]
-        if not isinstance(inputs, str) and not isinstance(inputs, list):
-            raise TypeError(
-                "Invalid inputs, input text should be str or list of str, {type(inputs)} found!"
-            )
+        inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
@@ -254,7 +248,8 @@ class DDParserTask(Task):
             s_arc = self.output_handle[2].copy_to_cpu()
             mask = self.output_handle[3].copy_to_cpu().astype('bool')
 
-            arc_preds, rel_preds = decode(arc_preds, rel_preds, s_arc, mask, self.tree)
+            arc_preds, rel_preds = decode(arc_preds, rel_preds, s_arc, mask,
+                                          self.tree)
 
             arcs.extend([arc_pred[m] for arc_pred, m in zip(arc_preds, mask)])
             rels.extend([rel_pred[m] for rel_pred, m in zip(rel_preds, mask)])
