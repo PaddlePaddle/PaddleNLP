@@ -74,7 +74,7 @@ class Task(metaclass=abc.ABCMeta):
     @abstractmethod
     def _postprocess(self, inputs):
         """
-        The model output is allways the logits and pros, this function will convert the model output to raw text.
+        The model output is the logits and pros, this function will convert the model output to raw text.
         """
 
     @abstractmethod
@@ -133,6 +133,25 @@ class Task(metaclass=abc.ABCMeta):
         save_path = os.path.join(self._task_path, "static", "inference")
         paddle.jit.save(static_model, save_path)
         logger.info("The inference model save in the path:{}".format(save_path))
+
+    def _check_input_text(self, inputs):
+        inputs = inputs[0]
+        if isinstance(inputs, str):
+            if len(inputs) == 0:
+                raise ValueError(
+                    "Invalid inputs, input text should not be empty text, please check your input.".
+                    format(type(inputs)))
+            inputs = [inputs]
+        elif isinstance(inputs, list):
+            if not (isinstance(inputs[0], str) and len(inputs[0].strip()) > 0):
+                raise TypeError(
+                    "Invalid inputs, input text should be list of str, and first element of list should not be empty text.".
+                    format(type(inputs[0])))
+        else:
+            raise TypeError(
+                "Invalid inputs, input text should be str or list of str, but type of {} found!".
+                format(type(inputs)))
+        return inputs
 
     def help(self):
         """
