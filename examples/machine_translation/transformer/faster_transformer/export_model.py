@@ -40,8 +40,10 @@ def parse_args():
         "--decoding_strategy",
         default="beam_search",
         type=str,
-        choices=["beam_search", "topk_sampling", "topp_sampling"],
-        help="Decoding strategy. Can be one of ['beam_search', 'topk_sampling', 'topp_sampling']. "
+        choices=[
+            "beam_search", "topk_sampling", "topp_sampling", "beam_search_v2"
+        ],
+        help="Decoding strategy. Can be one of ['beam_search', 'topk_sampling', 'topp_sampling', 'beam_search_v2']. "
     )
     parser.add_argument("--beam_size", default=5, type=int, help="Beam size. ")
     parser.add_argument(
@@ -60,6 +62,28 @@ def parse_args():
         action="store_true",
         help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
     )
+    parser.add_argument(
+        "--vocab_file",
+        default=None,
+        type=str,
+        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+    )
+    parser.add_argument(
+        "--unk_token",
+        default=None,
+        type=str,
+        help="The unknown token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--bos_token",
+        default=None,
+        type=str,
+        help="The bos token. It should be provided when use custom vocab_file. ")
+    parser.add_argument(
+        "--eos_token",
+        default=None,
+        type=str,
+        help="The eos token. It should be provided when use custom vocab_file. ")
     args = parser.parse_args()
     return args
 
@@ -94,7 +118,9 @@ def do_predict(args):
             beam_size=args.beam_size,
             max_out_len=args.max_out_len,
             decoding_lib=args.decoding_lib,
-            use_fp16_decoding=args.use_fp16_decoding)
+            use_fp16_decoding=args.use_fp16_decoding,
+            rel_len=args.use_rel_len,
+            alpha=args.alpha)
 
         finished_seq = transformer(src_word=src_word)
 
@@ -129,6 +155,10 @@ if __name__ == "__main__":
     args.topk = ARGS.topk
     args.topp = ARGS.topp
     args.benchmark = ARGS.benchmark
+    args.vocab_file = ARGS.vocab_file
+    args.unk_token = ARGS.unk_token
+    args.bos_token = ARGS.bos_token
+    args.eos_token = ARGS.eos_token
     pprint(args)
 
     do_predict(args)

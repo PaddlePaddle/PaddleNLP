@@ -4,3 +4,4 @@ colorlog
 colorama
 seqeval
 multiprocess
+paddlefsl==1.0.0

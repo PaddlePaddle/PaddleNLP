@@ -837,6 +837,17 @@ class InferTransformerModel(TransformerModel):
             Specify beam search version. It should be in one
             of [`v1`, `v2`]. If `v2`, need to set `alpha`(default to 0.6) for length
             penalty. Default to `v1`.
+        kwargs:
+            The key word arguments can be `rel_len` and `alpha`:
+
+            - `rel_len(bool, optional)`: Indicating whether `max_out_len` in
+            is the length relative to that of source text. Only works in `v2`
+            temporarily. It is suggest to set a small `max_out_len` and use
+            `rel_len=True`. Default to False if not set.
+
+            - `alpha(float, optional)`: The power number in length penalty
+            calculation. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
+            Only works in `v2` temporarily. Default to 0.6 if not set.
     """
 
     def __init__(self,
@@ -869,10 +880,8 @@ class InferTransformerModel(TransformerModel):
         self.beam_search_version = args.pop('beam_search_version')
         kwargs = args.pop("kwargs")
         if self.beam_search_version == 'v2':
-            if 'alpha' in kwargs:
-                self.alpha = kwargs['alpha']
-            else:
-                self.alpha = 0.6
+            self.alpha = kwargs.get("alpha", 0.6)
+            self.rel_len = kwargs.get("rel_len", False)
         super(InferTransformerModel, self).__init__(**args)
 
         cell = TransformerDecodeCell(
@@ -1001,14 +1010,15 @@ class InferTransformerModel(TransformerModel):
         """
 
         def expand_to_beam_size(tensor, beam_size):
-            tensor = paddle.reshape(tensor,
-                                    [tensor.shape[0], 1] + tensor.shape[1:])
+            tensor = paddle.unsqueeze(tensor, axis=1)
             tile_dims = [1] * len(tensor.shape)
             tile_dims[1] = beam_size
             return paddle.tile(tensor, tile_dims)
 
         def merge_beam_dim(tensor):
-            return paddle.reshape(tensor, [-1] + tensor.shape[2:])
+            shape = tensor.shape
+            return paddle.reshape(tensor,
+                                  [shape[0] * shape[1]] + list(shape[2:]))
 
         # run encoder
         src_max_len = paddle.shape(src_word)[-1]
@@ -1031,27 +1041,31 @@ class InferTransformerModel(TransformerModel):
         # constant number
         inf = float(1. * 1e7)
         batch_size = enc_output.shape[0]
-        max_len = (enc_output.shape[1] + 20) if max_len is None else max_len
+        max_len = (enc_output.shape[1] + 20) if max_len is None else (
+            enc_output.shape[1] + max_len if self.rel_len else max_len)
 
         ### initialize states of beam search ###
         ## init for the alive ##
-        initial_log_probs = paddle.to_tensor(
+        initial_log_probs = paddle.assign(
             np.array(
                 [[0.] + [-inf] * (beam_size - 1)], dtype="float32"))
         alive_log_probs = paddle.tile(initial_log_probs, [batch_size, 1])
-        # (batch_size, beam_size, 1)
-        alive_seq = paddle.to_tensor(
-            np.tile(np.array([[[self.bos_id]]]), (batch_size, beam_size, 1)),
-            dtype=src_word.dtype)
+
+        alive_seq = paddle.tile(
+            paddle.cast(
+                paddle.assign(np.array([[[self.bos_id]]])), src_word.dtype),
+            [batch_size, beam_size, 1])
 
         ## init for the finished ##
-        finished_scores = paddle.to_tensor(
+        finished_scores = paddle.assign(
             np.array(
                 [[-inf] * beam_size], dtype="float32"))
         finished_scores = paddle.tile(finished_scores, [batch_size, 1])
-        finished_seq = paddle.to_tensor(
-            np.tile(np.array([[[self.bos_id]]]), (batch_size, beam_size, 1)),
-            dtype=src_word.dtype)
+
+        finished_seq = paddle.tile(
+            paddle.cast(
+                paddle.assign(np.array([[[self.bos_id]]])), src_word.dtype),
+            [batch_size, beam_size, 1])
         finished_flags = paddle.zeros_like(finished_scores)
 
         ### initialize inputs and states of transformer decoder ###
@@ -1066,7 +1080,7 @@ class InferTransformerModel(TransformerModel):
         ## init states (caches) for transformer, need to be updated according to selected beam
         caches = self.transformer.decoder.gen_cache(enc_output, do_zip=False)
 
-        def update_states(caches, topk_coordinates, beam_size):
+        def update_states(caches, topk_coordinates, beam_size, batch_size):
             new_caches = []
             for cache in caches:
                 k = gather_2d(
@@ -1097,9 +1111,11 @@ class InferTransformerModel(TransformerModel):
                       beam_size,
                       batch_size,
                       need_unmerge=False):
+
             new_tensor_nd = paddle.reshape(
-                tensor_nd, shape=[batch_size, beam_size] +
-                tensor_nd.shape[1:]) if need_unmerge else tensor_nd
+                tensor_nd,
+                shape=[batch_size, beam_size] +
+                list(tensor_nd.shape[1:])) if need_unmerge else tensor_nd
             topk_seq = paddle.gather_nd(new_tensor_nd, topk_coordinates)
             return merge_beam_dim(topk_seq) if need_unmerge else topk_seq
 
@@ -1152,11 +1168,15 @@ class InferTransformerModel(TransformerModel):
             topk_seq = gather_2d(alive_seq, topk_coordinates, beam_size,
                                  batch_size)
             topk_seq = paddle.concat(
-                [topk_seq, paddle.reshape(topk_ids, topk_ids.shape + [1])],
+                [
+                    topk_seq, paddle.reshape(topk_ids,
+                                             list(topk_ids.shape[:]) + [1])
+                ],
                 axis=2)
-            states = update_states(states, topk_coordinates, beam_size)
+            states = update_states(states, topk_coordinates, beam_size,
+                                   batch_size)
             eos = paddle.full(
-                shape=topk_ids.shape,
+                shape=paddle.shape(topk_ids),
                 dtype=alive_seq.dtype,
                 fill_value=self.eos_id)
             topk_finished = paddle.cast(paddle.equal(topk_ids, eos), "float32")
@@ -1182,7 +1202,8 @@ class InferTransformerModel(TransformerModel):
 
             alive_log_probs = gather_2d(curr_log_probs, topk_coordinates,
                                         beam_size, batch_size)
-            states = update_states(states, topk_coordinates, beam_size * 2)
+            states = update_states(states, topk_coordinates, beam_size * 2,
+                                   batch_size)
 
             return alive_seq, alive_log_probs, states
 
@@ -1224,7 +1245,9 @@ class InferTransformerModel(TransformerModel):
         def inner_loop(i, trg_word, alive_seq, alive_log_probs, finished_seq,
                        finished_scores, finished_flags, caches):
             trg_pos = paddle.full(
-                shape=trg_word.shape, dtype=alive_seq.dtype, fill_value=i)
+                shape=paddle.shape(trg_word),
+                dtype=alive_seq.dtype,
+                fill_value=i)
             trg_emb = self.trg_word_embedding(trg_word)
             trg_pos_emb = self.trg_pos_embedding(trg_pos)
             trg_emb = trg_emb + trg_pos_emb
@@ -1261,13 +1284,19 @@ class InferTransformerModel(TransformerModel):
                 finished_seq, finished_scores, finished_flags, caches
             ])
 
-        finished_flags = paddle.any(paddle.cast(
-            finished_flags, dtype='bool'),
-                                    axis=1,
-                                    keepdim=True).tile([1, beam_size])
-        finished_seq = paddle.where(
-            finished_flags.unsqueeze(-1).tile([1, 1, alive_seq.shape[-1]]),
-            finished_seq, alive_seq)
-        finished_scores = paddle.where(finished_flags, finished_scores,
-                                       alive_log_probs)
+        # (gongenlei) `paddle.where` doesn't support broadcast, so we need to use `paddle.unsqueeze`
+        # and `paddle.tile` to make condition.shape same as X.shape. But when converting dygraph
+        # to static  graph, `paddle.tile` will raise error.
+        finished_flags = paddle.cast(finished_flags, dtype=finished_seq.dtype)
+        neg_finished_flags = 1 - finished_flags
+        finished_seq = paddle.multiply(
+            finished_seq, finished_flags.unsqueeze(-1)) + paddle.multiply(
+                alive_seq, neg_finished_flags.unsqueeze(-1))
+        finished_scores = paddle.multiply(
+            finished_scores,
+            paddle.cast(
+                finished_flags, dtype=finished_scores.dtype)) + paddle.multiply(
+                    alive_log_probs,
+                    paddle.cast(
+                        neg_finished_flags, dtype=alive_log_probs.dtype))
         return finished_seq, finished_scores
