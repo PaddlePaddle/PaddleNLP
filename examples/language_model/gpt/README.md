@@ -61,11 +61,9 @@ python -u  create_pretraining_data.py \
     --workers 40 \
     --log_interval 10000
 ```
-就可以得到我们需要的`gpt_openwebtext_ids.npy`, `gpt_openwebtext_idx.npy`数据集文件
-```
+处理时间约一个小时左右，就可以得到我们需要的`gpt_openwebtext_ids.npy`, `gpt_openwebtext_idx.npz`数据集文件。
 
 为了方便用户运行测试本模型，本项目提供了处理好的300M的训练样本：
-
 ```shell
 wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
 wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
