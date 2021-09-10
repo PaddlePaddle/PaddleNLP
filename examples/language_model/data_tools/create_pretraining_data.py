@@ -325,7 +325,7 @@ def main():
 
     file_paths.sort()
 
-    global_step = 0
+    step = 0
     total_bytes_processed = 0
     startup_start = time.time()
     for file_path in tqdm(file_paths):
@@ -343,7 +343,7 @@ def main():
         encoded_docs = pool.imap(convert.encode, text, 256)
         print("Processing %s" % file_path)
         for i, (doc, bytes_processed) in enumerate(encoded_docs, start=1):
-            global_step += 1
+            step += 1
             total_bytes_processed += bytes_processed
             if len(doc) == 0:
                 continue
@@ -368,13 +368,13 @@ def main():
                 sent_count.to_bytes(
                     8, byteorder='little', signed=True))
 
-            if global_step % args.log_interval == 0:
+            if step % args.log_interval == 0:
                 current = time.time()
                 elapsed = current - startup_start
                 mbs = total_bytes_processed / elapsed / 1024 / 1024
                 print(
-                    f"Processed {global_step} documents",
-                    f"({global_step/elapsed:.2f} docs/s, {mbs:.4f} MB/s).",
+                    f"Processed {step} documents",
+                    f"({step/elapsed:.2f} docs/s, {mbs:.4f} MB/s).",
                     file=sys.stderr)
 
     pool.close()

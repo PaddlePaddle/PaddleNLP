@@ -56,6 +56,7 @@ def run_evaluate(data_loader,
                  epoch,
                  task_name="valid"):
     all_loss = []
+    model.eval()
     local_time = time.time()
     for eval_step, batch in enumerate(data_loader):
         tokens, loss_mask, attention_mask, position_ids, labels = batch
@@ -64,7 +65,7 @@ def run_evaluate(data_loader,
         all_loss.append(float(loss))
         if eval_step >= iter_steps - 1:
             break
-
+    model.train()
     average_loss = sum(all_loss) / len(all_loss)
     logger.info("%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
                 % (task_name, global_step, epoch, eval_step, average_loss,
