@@ -51,6 +51,24 @@ class MPNetTokenizer(BertTokenizer):
             mask_token=mask_token)
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        """
+        Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
+        adding special tokens. 
+        
+        A MPNet sequence has the following format:
+
+        - single sequence:      ``<s> X </s>``
+        - pair of sequences:        ``<s> A </s></s> B </s>``
+
+        Args:
+            token_ids_0 (List[int]):
+                List of IDs to which the special tokens will be added.
+            token_ids_1 (List[int], optional):
+                Optional second list of IDs for sequence pairs. Defaults to None.
+
+        Returns:
+            List[int]: List of input_id with the appropriate special tokens.
+        """
         if token_ids_1 is None:
             return [self.cls_token_id] + token_ids_0 + [self.sep_token_id]
         cls = [self.cls_token_id]
@@ -61,6 +79,22 @@ class MPNetTokenizer(BertTokenizer):
                                 token_ids_0,
                                 token_ids_1=None,
                                 already_has_special_tokens=False):
+        """
+        Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
+        special tokens using the tokenizer ``encode`` methods.
+
+        Args:
+            token_ids_0 (List[int]):
+                A list of `inputs_ids` for the first sequence.
+            token_ids_1 (List[int], optinal):
+                Optional second list of IDs for sequence pairs. Defaults to None.
+            already_has_special_tokens (bool, optional): Whether or not the token list is already 
+                formatted with special tokens for the model. Defaults to None.
+
+        Returns:
+            List[int]: The list of integers either be 0 or 1: 1 for a special token, 0 for a sequence token.
+        """
+
         if already_has_special_tokens:
             return super().get_special_tokens_mask(
                 token_ids_0=token_ids_0,
@@ -75,9 +109,52 @@ class MPNetTokenizer(BertTokenizer):
     def create_token_type_ids_from_sequences(self,
                                              token_ids_0,
                                              token_ids_1=None):
+        """
+        Creates a mask from the two sequences passed to be used in a sequence-pair classification task. MPNet does not
+        make use of token type ids, therefore a list of zeros is returned.
+
+        Args:
+            token_ids_0 (List[int]):
+                A list of `inputs_ids` for the first sequence.
+            token_ids_1 (List[int], optional):
+                Optional second list of IDs for sequence pairs. Defaults to None.
+
+        Returns:
+            List[int]: List of token_type_id according to the given sequence(s).
+        """
+
         sep = [self.sep_token_id]
         cls = [self.cls_token_id]
 
         if token_ids_1 is None:
             return len(cls + token_ids_0 + sep) * [0]
         return len(cls + token_ids_0 + sep + sep + token_ids_1 + sep) * [0]
+
+    def __call__(self,
+                 text,
+                 text_pair=None,
+                 max_seq_len=None,
+                 stride=0,
+                 is_split_into_words=False,
+                 pad_to_max_seq_len=False,
+                 truncation_strategy="longest_first",
+                 return_position_ids=False,
+                 return_token_type_ids=False,
+                 return_attention_mask=False,
+                 return_length=False,
+                 return_overflowing_tokens=False,
+                 return_special_tokens_mask=False):
+        return super().__call__(
+            text,
+            text_pair=text_pair,
+            max_seq_len=max_seq_len,
+            stride=stride,
+            is_split_into_words=is_split_into_words,
+            pad_to_max_seq_len=pad_to_max_seq_len,
+            truncation_strategy=truncation_strategy,
+            return_position_ids=return_position_ids,
+            return_token_type_ids=return_token_type_ids,
+            return_attention_mask=return_attention_mask,
+            return_length=return_length,
+            return_overflowing_tokens=return_overflowing_tokens,
+            return_special_tokens_mask=return_special_tokens_mask)

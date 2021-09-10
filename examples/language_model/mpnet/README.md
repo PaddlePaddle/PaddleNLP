@@ -7,14 +7,6 @@ BERT采用掩码语言建模（MLM）进行预训练，是最成功的预训练�
 
 本项目是 MPNet 在 Paddle 2.x上的开源实现。
 
-## 原论文效果
-<p align="center">
-    <img src="./figure/QQP.png" width="100%" />
-</p>
-<p align="center">
-    <img src="./figure/SQuAD.png" width="100%" />
-</p>
-
 ## 快速开始
 
 ### 下游任务微调
@@ -65,11 +57,6 @@ python run_predict.py --task_name qqp  --ckpt_path qqp/best-qqp_ft_model_106000.
 ```
 
 ##### （3）压缩template文件夹为zip文件，然后提交到[GLUE排行榜](https://gluebenchmark.com/leaderboard)：
-
-###### GLUE排行榜结果：
-<p align="center">
-    <img src="figure/glue.jpg" width="100%" />
-</p>
 
 
 ###### GLUE开发集结果：

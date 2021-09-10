@@ -503,13 +503,12 @@ class MPNetModel(MPNetPretrainedModel):
                               ).astype(input_ids.dtype)
 
         if attention_mask.ndim == 2:
-            extended_attention_mask = attention_mask.unsqueeze(axis=[1, 2])
-            extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+            attention_mask = attention_mask.unsqueeze(axis=[1, 2])
+            attention_mask = (1.0 - attention_mask) * -10000.0
 
         embedding_output = self.embeddings(input_ids, position_ids)
 
-        encoder_outputs, _ = self.encoder(embedding_output,
-                                          extended_attention_mask)
+        encoder_outputs, _ = self.encoder(embedding_output, attention_mask)
 
         sequence_output = encoder_outputs[-1]
         pooled_output = self.pooler(sequence_output)
@@ -783,7 +782,7 @@ class MPNetForTokenClassification(MPNetPretrainedModel):
             instance `mpnet`. Defaults to None.
     """
 
-    def __init__(self, mpnet, num_classes, dropout=None):
+    def __init__(self, mpnet, num_classes=2, dropout=None):
         super(MPNetForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.mpnet = mpnet
