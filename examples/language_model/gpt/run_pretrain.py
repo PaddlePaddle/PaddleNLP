@@ -72,6 +72,30 @@ def run_evaluate(data_loader,
     log_writer.add_scalar(task_name + "_loss", average_loss, global_step)
 
 
+def get_train_data_file(args):
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_idx.npz"))
+    ]
+    files = [x.replace("_idx.npz", "") for x in files]
+    if len(files) == 0:
+        logger.warning(
+            "Not found dataset with name of xxx_ids.npy and xxx_idx.npz! Try to found old compatible xxx_ids.npz file."
+        )
+    else:
+        return files
+
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_ids.npz"))
+    ]
+
+    files = [x.replace("_ids.npz", "") for x in files]
+    return files
+
+
 def do_train(args):
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -169,14 +193,10 @@ def do_train(args):
                            opt_path)
 
     global_step = 0
+    epoch = 0
     tic_train = time.time()
-    for epoch in range(args.num_train_epochs):
-        files = [
-            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz"
-                in str(f))
-        ]
-        files = [x.replace("_idx.npz", "") for x in files]
+    while True:
+        files = get_train_data_file(args)
         files.sort()
         num_files = len(files)
         for f_id in range(num_files):

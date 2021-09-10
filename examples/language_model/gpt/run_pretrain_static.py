@@ -118,16 +118,6 @@ def dist_optimizer(args, topo):
     return dist_strategy
 
 
-def get_train_data_file(args):
-    files = [
-        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in
-            str(f))
-    ]
-    files = [x.replace("_idx.npz", "") for x in files]
-    return files
-
-
 def init_static_with_params(model, dygraph_params, topo, prog=None):
     from paddlenlp.utils.tools import dygraph_params_to_static
     static_params = dygraph_params_to_static(model, dygraph_params, topo)

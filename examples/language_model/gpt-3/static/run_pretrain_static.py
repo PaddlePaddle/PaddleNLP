@@ -19,6 +19,7 @@ import math
 import os
 import random
 import time
+import sys
 
 os.path.expandvars('$HOME')
 os.path.expanduser('~')
@@ -34,6 +35,8 @@ from paddlenlp.utils.log import logger
 import paddlenlp.ops as ops
 from visualdl import LogWriter
 
+# Used to load the data_tools path, should import before dataset
+sys.path.insert(0, "../../")
 from dataset import create_pretrained_dataset
 from args import parse_args
 import lr
@@ -121,12 +124,25 @@ def dist_optimizer(args, topo):
 def get_train_data_file(args):
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_" not in
-            str(f))
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_idx.npz"))
+    ]
+    files = [x.replace("_idx.npz", "") for x in files]
+    if len(files) == 0:
+        logger.warning(
+            "Not found dataset with name of xxx_ids.npy and xxx_idx.npz! Try to found old compatible xxx_ids.npz file."
+        )
+    else:
+        return files
+
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_ids.npz"))
     ]
 
-    data_file = files[0]
-    return data_file
+    files = [x.replace("_ids.npz", "") for x in files]
+    return files
 
 
 def init_static_with_params(model, dygraph_params, topo, prog=None):
@@ -189,6 +205,7 @@ def do_train(args):
 
     worker_num = fleet.worker_num()
     worker_index = fleet.worker_index()
+    local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank())
 
     topo = Topology(
         device_rank=worker_index,
@@ -237,6 +254,7 @@ def do_train(args):
                 train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
                     args,
                     data_file,
+                    local_rank=local_rank,
                     data_world_size=topo.data_info.size,
                     data_world_rank=topo.data_info.rank,
                     eos_id=eos_id,
