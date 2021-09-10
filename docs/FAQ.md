@@ -1,12 +1,3 @@
-## FAQ
-
-
-## 写在前面
-
-+ 我们收集整理了开源以 来在Issues和用户群中的常见问题并且给出了简要解答，旨在为NLP的开发者提供一些参考，也希望帮助大家少走一些弯路。
-+ NLP领域大佬众多，本文档回答主要依赖有限的项目实践，难免挂一漏万，如有遗漏和不足，也**希望有识之士帮忙补充和修正**，万分感谢。
-+ 使用过程中可参考PaddleNLP[官方文档](https://paddlenlp.readthedocs.io/zh/latest/index.html) 、[AI Studio官方项目](https://aistudio.baidu.com/aistudio/projectdetail/1535371)。
-
 ## PaddleNLP常见问题汇总（持续更新）
 
 + [【精选】NLP精选5问](#NLP精选)
@@ -61,7 +52,7 @@
 
 <a name="NLP精选"></a>
 
-## 【精选】NLP精选5问
+## ⭐️【精选】NLP精选5问
 
 <a name="1-1"></a>
 
@@ -80,14 +71,14 @@ def read(data_path):
         # 跳过列名
         next(f)
         for line in f:
-            words, labels = line.strip("\n').split("\t')
-            words = words.split("\002')
-            labels = labels.split("\002')
+            words, labels = line.strip('\n').split('\t')
+            words = words.split('\002')
+            labels = labels.split('\002')
             yield {'tokens': words, 'labels': labels}
 
 # data_path为read()方法的参数
-map_ds = load_dataset(read, data_path='train.txt',lazy=False)
-iter_ds = load_dataset(read, data_path='train.txt',lazy=True)
+map_ds = load_dataset(read, data_path='train.txt', lazy=False)
+iter_ds = load_dataset(read, data_path='train.txt', lazy=True)
 ```
 
 如果您习惯使用`paddle.io.Dataset/IterableDataset`来创建数据集也是支持的，您也可以从其他python对象如`List`对象创建数据集，详细内容可参照[官方文档-自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html)。
@@ -150,11 +141,11 @@ emb.set_state_dict(load_layer_state_dict) # 加载模型参数
 
 **A:** 从工程角度，对于服务器端部署可以使用[Paddle Inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/inference_cn.html)高性能预测引擎进行预测部署。对于Transformer类模型的GPU预测还可以使用PaddleNLP中提供的[FasterTransformer](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/ops)功能来进行快速预测，其集成了[NV FasterTransformer](https://github.com/NVIDIA/FasterTransformer)并进行了功能增强。
 
-从模型策略角度，可以使用一些模型小型化技术来进行模型压缩，如模型蒸馏和裁剪，通过小模型来实现加速。PaddleNLP中集成了TinyERNIE、TinyBERT这样一些通用小模型供下游任务微调使用。另外PaddleNLP提供了[模型压缩示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/model_compression)，实现了DynaBERT、TinyBERT、MiniLM等方法策略，可以参考对自己的模型进行蒸馏压缩。
+从模型策略角度，可以使用一些模型小型化技术来进行模型压缩，如模型蒸馏和裁剪，通过小模型来实现加速。PaddleNLP中集成了ERNIE-Tiny这样一些通用小模型供下游任务微调使用。另外PaddleNLP提供了[模型压缩示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/model_compression)，实现了DynaBERT、TinyBERT、MiniLM等方法策略，可以参考对自己的模型进行蒸馏压缩。
 
 <a name="NLP通用问题"></a>
 
-## 【理论篇】NLP通用问题
+## ⭐️【理论篇】NLP通用问题
 
 <a name="2-2"></a>
 
@@ -179,7 +170,7 @@ emb.set_state_dict(load_layer_state_dict) # 加载模型参数
 
 <a name="PaddleNLP实战问题"></a>
 
-## 【实战篇】PaddleNLP实战问题 
+## ⭐️【实战篇】PaddleNLP实战问题 
 
 <a name="数据问题"></a>
 
@@ -302,7 +293,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 
 ```
 
-（2）第二种方法：以Ernie为例，将模型输出的 tensor 设置 `stop_gradient` 为 True。可以使用 `register_forward_post_hook` 按照如下的方式尝试：
+（2）第二种方法：以ERNIE为例，将模型输出的 tensor 设置 `stop_gradient` 为 True。可以使用 `register_forward_post_hook` 按照如下的方式尝试：
 
 ``` python
    def forward_post_hook(layer, input, output):
@@ -362,8 +353,6 @@ model.set_state_dict(paddle.load("xxx_para"))
 **A:** 目前的API设计不保留中间层输出，当然在PaddleNLP里可以很方便地修改源码。
 此外，还可以在`ErnieModel`的`__init__`函数中通过`register_forward_post_hook()`为想要保留输出的Layer注册一个`forward_post_hook`函数，在`forward_post_hook`函数中把Layer的输出保存到一个全局的`List`里面。`forward_post_hook`函数将会在`forward`函数调用之后被调用，并保存Layer输出到全局的`List`。详情参考[`register_forward_post_hook()`](https://www.paddlepaddle.org.cn/documentation/docs/zh/api/paddle/nn/Layer_cn.html#register_forward_post_hook)。
 
-
-
 <a name="部署问题"></a>
 
 ### 预测部署
@@ -383,7 +372,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 
 （2）借助Paddle Inference部署
 
-   动转静之后保存下来的模型可以借助Paddle Inference完成高性能推理部署。Paddle Inference内置高性能的CPU/GPU Kernel、并结合细粒度OP横向纵向融合等策略、并集成 TensorRT 实现模型推理的性能提升。具体可以参考文档 [Paddle Inference 简介](https://paddleinference.paddlepaddle.org.cn/master/product_introduction/inference_intro.html)。
+   动转静之后保存下来的模型可以借助Paddle Inference完成高性能推理部署。Paddle Inference内置高性能的CPU/GPU Kernel，结合细粒度OP横向纵向融合等策略，并集成 TensorRT 实现模型推理的性能提升。具体可以参考文档 [Paddle Inference 简介](https://paddleinference.paddlepaddle.org.cn/master/product_introduction/inference_intro.html)。
    为便于初次上手的用户更易理解 NLP 模型如何使用Paddle Inference，PaddleNLP 也提供了对应的例子以供参考，可以参考 [/PaddleNLP/examples](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/) 下的deploy目录，如[基于ERNIE的命名实体识别模型部署](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/waybill_ie/deploy/python)。
 
 <a name="5-2"></a>
@@ -394,7 +383,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 
 <a name="NLP应用场景"></a>
 
-### 特定模型和应用场景咨询
+### ⭐️特定模型和应用场景咨询
 
 <a name="6-1"></a>
 
@@ -437,7 +426,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 
 <a name="使用咨询问题"></a>
 
-### 其他使用咨询
+### ⭐️其他使用咨询
 
 <a name="7-1"></a>
 
@@ -489,7 +478,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 
 ##### Q5.4  如何指定用CPU还是GPU训练模型？
 
-**A:** 一般我们的训练脚本提供了，`--use_cuda,` 或者 `--device` 选项，用户可以通过这些选项选择需要使用的设备。
+**A:** 一般我们的训练脚本提供了 `--device` 选项，用户可以通过 `--device` 选择需要使用的设备。
 
 具体而言，在Python文件中，我们可以通过·paddle.device.set_device()·，设置为gpu或者cpu，可参考 [set_device文档](https://www.paddlepaddle.org.cn/documentation/docs/zh/api/paddle/device/set_device_cn.html#set-device)。
 
