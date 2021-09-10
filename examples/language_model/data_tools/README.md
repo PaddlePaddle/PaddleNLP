@@ -30,8 +30,10 @@
  - tqdm
  - numpy
  - pybind11
+ - lac (可选)
+ - zstandard (可选)
 
-安装命令`pip install tqdm numpy pybind11`。另，部分功能需要`g++>=4.8`编译支持
+安装命令`pip install tqdm numpy pybind11 lac zstandard`。另，部分功能需要`g++>=4.8`编译支持
 
 
 ## 训练全流程数据Pipeline
@@ -178,6 +180,12 @@ sh run_static.sh
 用户可以根据自己的需求，灵活修改mask方式。具体可以参考`dataset_utils.py`中`create_masked_lm_predictions`函数。
 可以自定义的选项有do_whole_word_mask, favor_longer_ngram, do_permutation, geometric_dist等，
 可以参考[Megatron](https://github.com/NVIDIA/Megatron-LM)使用这些lm_mask策略。
+
+### FAQ
+
+#### C++代码编译失败怎么办？
+- 请先检查pybind11包是否安装，g++、make工具是否正常。
+- 编译失败可能是本文件夹下的Makefile命令出现了一些问题。可以将Makefile中的python3、python3-config设置成完全的路径，如/usr/bin/python3.7。
 
 ## 参考内容
 

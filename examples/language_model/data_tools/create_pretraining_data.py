@@ -26,6 +26,12 @@ from tqdm import tqdm
 
 import paddlenlp.transformers as tfs
 
+try:
+    import nltk
+    nltk_available = True
+except ImportError:
+    nltk_available = False
+
 
 def get_args():
     parser = argparse.ArgumentParser()
