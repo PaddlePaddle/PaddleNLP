@@ -387,7 +387,7 @@ class TransformerDecoderLayer(nn.Layer):
 
 class GPTEmbeddings(nn.Layer):
     """
-    Include embeddings from word, position and token_type embeddings
+    Include embeddings from word and position embeddings.
     """
 
     def __init__(self,
@@ -584,8 +584,62 @@ class GPTPretrainedModel(PretrainedModel):
 
 @register_base_model
 class GPTModel(GPTPretrainedModel):
-    """
-    The base model of gpt.
+    r"""
+    The bare GPT Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in `GPTModel`. Also is the vocab size of token embedding matrix.
+            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `GPTModel`.
+        hidden_size (int, optional):
+            Dimensionality of the embedding layer and decoder layer. Defaults to `768`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in the Transformer decoder. Defaults to `12`.
+        num_attention_heads (int, optional):
+            Number of attention heads for each attention layer in the Transformer decoder.
+            Defaults to `12`.
+        intermediate_size (int, optional):
+            Dimensionality of the feed-forward (ff) layer in the decoder. Input tensors
+            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
+            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
+            Defaults to `3072`.
+        hidden_act (str, optional):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported. Defaults to `"gelu"`.
+        hidden_dropout_prob (float, optional):
+            The dropout probability for all fully connected layers in the embeddings and decoder.
+            Defaults to `0.1`.
+        attention_probs_dropout_prob (float, optional):
+            The dropout probability used in MultiHeadAttention in all decoder layers to drop some attention target.
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
+            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
+            sequence. Defaults to `512`.
+        type_vocab_size (int, optional):
+            The vocabulary size of the `token_type_ids`. Defaults to `16`.
+
+            .. note::
+                Please NOT using `type_vocab_size`, for it will be obsolete in the future..
+
+        initializer_range (float, optional):
+            The standard deviation of the normal initializer. Default to `0.02`.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`GPTPretrainedModel._init_weights()` for how weights are initialized in `GPTModel`.
+
+        pad_token_id(int, optional):
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
+
     """
 
     def __init__(self,
@@ -651,6 +705,55 @@ class GPTModel(GPTPretrainedModel):
                 attention_mask=None,
                 use_cache=False,
                 cache=None):
+        r'''
+        The GPTModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                max_position_embeddings - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            attention_mask (Tensor, optional):
+                Mask used in self attention to avoid performing attention to some unwanted positions,
+                usually the subsequent positions.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
+                [batch_size, num_attention_heads, sequence_length, sequence_length].
+                Its data type should be float32.
+                The `masked` tokens have `-1e-9` values, and the `unmasked` tokens have `0` values.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+            use_cache (bool, optional):
+                Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
+                can be used to speed up decoding.
+            cache (list, optional):
+                It is a list, and each element in the list is a tuple `(incremental_cache, static_cache)`.
+                See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
+                It is only used for inference and should be None for training.
+                Default to `None`.
+
+        Returns:
+            Tensor: Returns tensor `encoder_output`, which is the output at the last layer of the model.
+            Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import GPTModel, GPTTokenizer
+
+                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
+                model = GPTModel.from_pretrained('gpt2-medium-en')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        '''
+
         self.checkpoints = []
         if position_ids is None:
             past_length = 0
@@ -693,9 +796,12 @@ class GPTModel(GPTPretrainedModel):
 
 class GPTForPretraining(GPTPretrainedModel):
     """
-    The pretraining model of GPT.
+    The pretraining model of GPT. It returns some logits and cached_kvs.
 
-    It returns some logits and cached_kvs.
+    Args:
+        gpt (:class:`GPTModel`):
+            An instance of :class:`GPTModel`.
+
     """
 
     def __init__(self, gpt):
@@ -710,6 +816,44 @@ class GPTForPretraining(GPTPretrainedModel):
                 masked_positions=None,
                 use_cache=False,
                 cache=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`GPTModel`.
+            position_ids (Tensor, optional):
+                See :class:`GPTModel`.
+            attention_mask (Tensor, optional):
+                See :class:`GPTModel`.
+            use_cache (bool, optional):
+                See :class:`GPTModel`.
+            cache (Tensor, optional):
+                See :class:`GPTModel`.
+
+        Returns:
+            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` is True,
+            tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor `logits` will be returned.
+            `logits` is the output of the gpt model.
+            `cache_kvs` is the cache output of gpt model if `use_cache` is True.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import GPTForPretraining, GPTTokenizer
+
+                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
+                model = GPTForPretraining.from_pretrained('gpt2-medium-en')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs,use_cache=True)
+
+                logits = output[0]
+                cached_kvs = output[1]
+
+        """
+
         outputs = self.gpt(input_ids,
                            position_ids=position_ids,
                            attention_mask=attention_mask,
@@ -732,9 +876,7 @@ class GPTForPretraining(GPTPretrainedModel):
 
 class GPTPretrainingCriterion(paddle.nn.Layer):
     """
-    Criterion for GPT.
-
-    It calculates the final loss.
+    Criterion for GPT. It calculates the final loss.
     """
 
     def __init__(self, topo=None):
@@ -742,6 +884,24 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
         self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
+        """
+        Args:
+            prediction_scores(Tensor):
+                The logits of masked token prediction. Its data type should be float32 and
+                its shape is [batch_size, sequence_length, vocab_size].
+            masked_lm_labels(Tensor):
+                The labels of the masked language modeling, the dimensionality of `masked_lm_labels`
+                is equal to `prediction_scores`. Its data type should be int64 and
+                its shape is [batch_size, sequence_length, 1].
+            loss_mask(Tensor):
+                Mask used for calculating the loss of the masked language modeling to avoid
+                calculating some unwanted tokens.
+                Its data type should be float32 and its shape is [batch_size, sequence_length, 1].
+
+        Returns:
+            Tensor: The pretraining loss. Its data type should be float32 and its shape is [1].
+
+        """
         masked_lm_loss = self.loss_func(prediction_scores,
                                         masked_lm_labels.unsqueeze(2))
 
@@ -754,13 +914,21 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
 class GPTForGreedyGeneration(GPTPretrainedModel):
     """
     The generate model for GPT-2.
-    It use the greedy stategy and generate the next word with highest probablity.
+    It use the greedy strategy and generate the output sequence with highest probability.
+
+    Args:
+        gpt (:class:`GPTModel`):
+            An instance of `paddlenlp.transformers.GPTModel`.
+        max_predict_len(int):
+            The max length of the prediction.
+
     """
 
-    def __init__(self, gpt, max_predict_len):
+    def __init__(self, gpt, max_predict_len, eol_token_id=3):
         super(GPTForGreedyGeneration, self).__init__()
         self.gpt = gpt
         self.max_predict_len = max_predict_len
+        self.eol_token_id = eol_token_id
         self.apply(self.init_weights)
 
     def model(self,
@@ -770,6 +938,28 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
               masked_positions=None,
               use_cache=False,
               cache=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`GPTModel`.
+            position_ids (Tensor, optional):
+                See :class:`GPTModel`.
+            attention_mask (Tensor, optional):
+                See :class:`GPTModel`.
+            use_cache (bool, optional):
+                See :class:`GPTModel`.
+            cache (Tensor, optional):
+                See :class:`GPTModel`.
+
+        Returns:
+            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` is True,
+            tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor `logits` will be returned.
+            `logits` is the output of the gpt model.
+            `cache_kvs` is the cache output of gpt model if `use_cache` is True.
+
+        """
+
         outputs = self.gpt(input_ids,
                            position_ids=position_ids,
                            attention_mask=attention_mask,
@@ -789,7 +979,17 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         else:
             return logits
 
-    def forward(self, input_ids, end_id):
+    def forward(self, input_ids):
+        """
+
+        Args:
+            input_ids(Tensor):
+                See :class:`GPTModel`.
+
+        Returns:
+            Tensor: Returns tensor `src_ids`, which means the indices of output sequence tokens in the vocabulary.
+            They are numerical representations of tokens that build the output sequence.
+        """
         output, cached_kvs = self.model(input_ids, use_cache=True, cache=None)
         src_ids = input_ids
         nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
@@ -802,7 +1002,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
             nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
             src_ids = paddle.concat([src_ids, nid], axis=1)
             cur_len += 1
-            if paddle.max(nid) == end_id:
+            if paddle.max(nid) == self.eol_token_id:
                 break
         return src_ids
 
@@ -822,6 +1022,16 @@ class GPTLMHead(nn.Layer):
 
 
 class GPTLMHeadModel(GPTPretrainedModel):
+    """
+    The GPT Model with a language modeling head on top (linear layer with weights tied to the input
+    embeddings).
+
+    Args:
+        gpt (:class:`GPTModel`):
+            An instance of :class:`GPTModel`.
+
+    """
+
     def __init__(self, gpt):
         super(GPTLMHeadModel, self).__init__()
         self.gpt = gpt
@@ -836,6 +1046,28 @@ class GPTLMHeadModel(GPTPretrainedModel):
                 attention_mask=None,
                 use_cache=False,
                 cache=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`GPTModel`.
+            position_ids (Tensor, optional):
+                See :class:`GPTModel`.
+            attention_mask (Tensor, optional):
+                See :class:`GPTModel`.
+            use_cache (bool, optional):
+                See :class:`GPTModel`.
+            cache (Tensor, optional):
+                See :class:`GPTModel`.
+
+        Returns:
+            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` is True,
+            tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor `logits` will be returned.
+            `logits` is the output of the gpt model.
+            `cache_kvs` is the cache output of gpt model if `use_cache` is True.
+
+        """
+
         outputs = self.gpt(input_ids,
                            position_ids=position_ids,
                            attention_mask=attention_mask,

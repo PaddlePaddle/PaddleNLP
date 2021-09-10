@@ -523,6 +523,360 @@ template void topK_kernelLauncher<float>(void* workspace,
                                          DecodingBeamsearchArguments args,
                                          cudaStream_t stream);
 
+template <typename T, int BLOCK_SIZE_, int BLOCKS_PER_BEAM_>
+__global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
+                                         T* topk_tmp_val_buf,
+                                         bool* finished,
+                                         int* sequence_length,
+                                         int* word_ids,
+                                         int* parent_ids,
+                                         int* output_word_ids,
+                                         int* output_parent_ids,
+                                         float* output_cum_log_probs,
+                                         const int beam_width,
+                                         const int vocab_size,
+                                         const int end_id,
+                                         const int step,
+                                         const int max_out_len,
+                                         int k,
+                                         T diversity_rate,
+                                         float length_penalty,
+                                         float max_length_penalty) {
+  const int size = beam_width * BLOCKS_PER_BEAM_ * beam_width * 2;
+  const int tid = threadIdx.x;
+  const int batch_id = blockIdx.x;
+  const bool IS_FP16 = std::is_same<T, half>::value;
+  // to be consistent with MAX_T_VAL in init_kernel, which should also be same
+  // with other topk kernel, however it does not
+  const T MAX_T_VAL = (IS_FP16) ? HALF_FLT_MAX : 1e20f;
+
+  typedef cub::BlockReduce<TopK_2<T>, BLOCK_SIZE_> BlockReduce;
+  __shared__ typename BlockReduce::TempStorage temp_storage;
+
+  TopK_2<T> partial;
+
+  int finish_num = 0;
+  int alive_num = 0;
+  float* tmp_cum_log_probs =
+      (float*)(topk_tmp_val_buf +
+               gridDim.x * beam_width * beam_width * 2 * BLOCKS_PER_BEAM_) +
+      batch_id * beam_width;
+  topk_tmp_id_buf += batch_id * size;
+  topk_tmp_val_buf += batch_id * size;
+  word_ids += batch_id * beam_width;
+  parent_ids += batch_id * beam_width;
+  output_word_ids += batch_id * k;  // k == beam_width*2
+  output_parent_ids += batch_id * k;
+  output_cum_log_probs += batch_id * k;
+  sequence_length += batch_id * k;
+  finished += batch_id * k;
+
+  for (int ite = 0; ite < k; ite++) {
+    partial.init();
+#pragma unroll
+    for (int i = tid; i < size; i += BLOCK_SIZE_) {
+      // diversity_rate only works when BLOCKS_PER_BEAM_ is 1
+      partial.insert(topk_tmp_val_buf[i] +
+                         output_cum_log_probs[topk_tmp_id_buf[i] / vocab_size %
+                                                  beam_width +
+                                              beam_width] +
+                         i % k * diversity_rate,
+                     i);
+    }
+
+    TopK_2<T> total =
+        BlockReduce(temp_storage).Reduce(partial, reduce_topk_op_2<T>);
+
+    if (tid == 0) {
+      if (ite == 0) {
+        if (step == 1) {  // init output
+          for (int i = 0; i < beam_width; i++) {
+            output_word_ids[i] = end_id;
+            output_cum_log_probs[i] = -MAX_T_VAL;
+            output_parent_ids[i] = -1;
+            sequence_length[i] = 0;
+          }
+        } else {
+          for (int i = 0; i < beam_width; i++) {
+            output_word_ids[i] = end_id;
+            output_parent_ids[i] = i;
+            if (output_cum_log_probs[i] != -MAX_T_VAL) finish_num += 1;
+          }
+        }
+      }
+
+      // beam_online_softmax_topk_kernel produces absolute id, which can make
+      // update_KV_cache_kernel use gather instead of gather_nd
+      int abs_id = topk_tmp_id_buf[total.p];
+      float cum_log_prob = total.u;
+      // There are two queues, one for the alive and another for the finish.
+      // `beam_id` stands for parents in the alive, and it uses absolute id
+      // represented as `batch_idx * beam_width + beam_idx`.
+      int beam_id = abs_id / vocab_size;
+      int beam_id_in_output =
+          batch_id * k + (beam_id % beam_width) + beam_width;
+      int word_id = abs_id % vocab_size;
+      if (word_id == end_id) {
+        // grow finish
+        float score = cum_log_prob / length_penalty;
+        if (score > output_cum_log_probs[beam_width - 1]) {
+          output_word_ids[beam_width - 1] = end_id;
+          output_cum_log_probs[beam_width - 1] = score;
+          output_parent_ids[beam_width - 1] = beam_id_in_output;
+          sequence_length[beam_width - 1] = step;
+          finished[beam_width - 1] = 1;
+          for (int i = beam_width - 2; i >= 0; --i) {
+            if (output_cum_log_probs[i + 1] > output_cum_log_probs[i]) {
+              // output_word_ids[i] = end_id;
+              T tmp_f = output_cum_log_probs[i];
+              output_cum_log_probs[i] = output_cum_log_probs[i + 1];
+              output_cum_log_probs[i + 1] = tmp_f;
+              int tmp_i = output_parent_ids[i];
+              output_parent_ids[i] = output_parent_ids[i + 1];
+              output_parent_ids[i + 1] = tmp_i;
+              tmp_i = sequence_length[i];
+              sequence_length[i] = sequence_length[i + 1];
+              sequence_length[i + 1] = tmp_i;
+              tmp_i = finished[i];
+              finished[i] = finished[i + 1];
+              finished[i + 1] = tmp_i;
+            } else {
+              break;
+            }
+          }
+        }
+        if (finish_num != beam_width) finish_num += 1;
+      } else if (alive_num < beam_width) {
+        // grow alive
+        parent_ids[alive_num] = beam_id;
+        word_ids[alive_num] = word_id;
+        // Also put alive candidates after finish candidates, since output
+        // must include both the finish and alive to trace full path
+        output_word_ids[beam_width + alive_num] = word_id;
+        output_parent_ids[beam_width + alive_num] = beam_id_in_output;
+        // output_cum_log_probs[beam_width + alive_num] = cum_log_prob;
+        // Must not override output_cum_log_probs since the after iters would
+        // use it. We will copy tmp_cum_log_probs back to output_cum_log_probs
+        // after the topk all has been selected.
+        tmp_cum_log_probs[alive_num] = cum_log_prob;
+        sequence_length[beam_width + alive_num] = step;
+        finished[beam_width + alive_num] = 0;
+        alive_num += 1;
+      }
+      topk_tmp_val_buf[total.p] = -MAX_T_VAL;
+    }
+    __syncthreads();
+  }
+
+  if (tid == 0) {
+    for (int i = 0; i < beam_width; ++i) {
+      output_cum_log_probs[beam_width + i] = tmp_cum_log_probs[i];
+    }
+    // early finish
+    float lowest_finish =
+        finish_num == 0 ? -MAX_T_VAL : output_cum_log_probs[finish_num - 1];
+    // The best possible score of the most likely alive sequence
+    float lower_bound =
+        (float)output_cum_log_probs[beam_width] / max_length_penalty;
+
+    // output must include both the finish and alive to trace full path
+    if (step == max_out_len || lowest_finish > lower_bound) {  // when finishing
+      for (int i = 0; finish_num < beam_width; ++finish_num, ++i) {
+        output_word_ids[finish_num] = word_ids[i];
+        output_cum_log_probs[finish_num] =
+            output_cum_log_probs[i + beam_width] / length_penalty;
+        output_parent_ids[finish_num] = output_parent_ids[i + beam_width];
+        sequence_length[finish_num] = step;
+        finished[finish_num] = 1;
+      }
+      // If early stop, also mark the alive beams finished.
+      for (int i = beam_width; i < beam_width * 2; ++i) finished[i] = 1;
+    }
+  }
+}
+
+#define CASE_K(K, BLOCK_SIZE_1_, BLOCK_SIZE_2_, BLOCKS_PER_BEAM_)            \
+  case K:                                                                    \
+    topk_stage_1_opt3<float,                                                 \
+                      BLOCK_SIZE_1_,                                         \
+                      BLOCKS_PER_BEAM_><<<batch_size * K * BLOCKS_PER_BEAM_, \
+                                          BLOCK_SIZE_1_,                     \
+                                          0,                                 \
+                                          stream>>>(log_probs,               \
+                                                    temp_log_probs,          \
+                                                    topk_tmp_id_buf,         \
+                                                    topk_tmp_val_buf,        \
+                                                    beam_width * 2,          \
+                                                    vocab_size);             \
+    topk_stage_2_opt3_update<                                                \
+        float,                                                               \
+        BLOCK_SIZE_2_,                                                       \
+        BLOCKS_PER_BEAM_><<<batch_size, BLOCK_SIZE_2_, 0, stream>>>(         \
+        topk_tmp_id_buf,                                                     \
+        topk_tmp_val_buf,                                                    \
+        finished,                                                            \
+        sequence_length,                                                     \
+        word_ids,                                                            \
+        parent_ids,                                                          \
+        output_word_ids,                                                     \
+        output_parent_ids,                                                   \
+        output_cum_log_probs,                                                \
+        beam_width,                                                          \
+        vocab_size,                                                          \
+        end_id,                                                              \
+        step,                                                                \
+        max_out_len,                                                         \
+        beam_width * 2,                                                      \
+        diversity_rate,                                                      \
+        length_penalty,                                                      \
+        max_length_penalty);                                                 \
+    break;
+
+template <typename T>
+void topK_update_kernelLauncher(
+    void* workspace,
+    size_t& workspace_size,
+    const T* log_probs,
+    bool* finished,
+    int* sequence_length,
+    int* word_ids,
+    int* parent_ids,  // for update cache, only include alive beams
+    int* output_word_ids,
+    int* output_parent_ids,   // for gather tree, include both alive and finish
+                              // beams
+    T* output_cum_log_probs,  // NOTE: cum_log_probs is T in V3.1
+    const int step,
+    DecodingBeamsearchArguments args,
+    cudaStream_t stream) {
+  const int batch_size = args.batch_size_;
+  const int beam_width = args.beam_width_;
+  const int vocab_size = args.vocab_size_;
+  const T diversity_rate = args.beam_search_diversity_rate_;
+  const int end_id = args.end_id_;
+  const int max_out_len = args.seq_len_;
+  const float alpha = args.alpha_;
+
+  const int max_block_per_beam = 8;
+  int temp_log_probs_buf_size =
+      batch_size * beam_width * vocab_size;  // type float
+  // select top beam_width*2 for topk_tmp_id_buf and topk_tmp_val_buf
+  int topk_tmp_ids_buf_size = batch_size * beam_width * beam_width * 2 *
+                              max_block_per_beam;  // type int
+  int topk_tmp_val_buf_size = batch_size * beam_width * beam_width * 2 *
+                              max_block_per_beam;  // type float
+  // to save tmp output_cum_log_probs results of the alive beams
+  topk_tmp_val_buf_size += batch_size * beam_width;
+
+  // prevent memory misalinged address
+  temp_log_probs_buf_size = (int)(ceil(temp_log_probs_buf_size / 4.)) * 4;
+  topk_tmp_ids_buf_size = (int)(ceil(topk_tmp_ids_buf_size / 4.)) * 4;
+  topk_tmp_val_buf_size = (int)(ceil(topk_tmp_val_buf_size / 4.)) * 4;
+
+  if (workspace == nullptr) {
+    workspace_size = sizeof(float) * temp_log_probs_buf_size +
+                     sizeof(int) * topk_tmp_ids_buf_size +
+                     sizeof(float) * topk_tmp_val_buf_size;
+    return;
+  } else {
+    T* temp_log_probs = (T*)workspace;
+    int* topk_tmp_id_buf = (int*)(temp_log_probs + temp_log_probs_buf_size);
+    T* topk_tmp_val_buf = (T*)(topk_tmp_id_buf + topk_tmp_ids_buf_size);
+    float length_penalty = std::pow((5. + step + 1) / 6., alpha);
+    float max_length_penalty = std::pow((5. + max_out_len + 1) / 6., alpha);
+    if (diversity_rate == 0.0f) {
+      switch (beam_width) {
+        CASE_K(1, 128, 128, 8);
+        CASE_K(4, 128, 128, 8);
+        CASE_K(10, 128, 128, 8);
+        CASE_K(16, 128, 128, 5);
+        CASE_K(32, 256, 128, 1);
+        CASE_K(64, 256, 256, 1);
+        default:
+          topk_stage_1_opt3<T,
+                            128,
+                            1><<<batch_size * beam_width * 1, 128, 0, stream>>>(
+              log_probs,
+              temp_log_probs,
+              topk_tmp_id_buf,
+              topk_tmp_val_buf,
+              beam_width * 2,
+              vocab_size);
+          topk_stage_2_opt3_update<T, 128, 1><<<batch_size, 128, 0, stream>>>(
+              topk_tmp_id_buf,
+              topk_tmp_val_buf,
+              finished,
+              sequence_length,
+              word_ids,
+              parent_ids,
+              output_word_ids,
+              output_parent_ids,
+              output_cum_log_probs,
+              beam_width,
+              vocab_size,
+              end_id,
+              step,
+              max_out_len,
+              beam_width * 2,
+              diversity_rate,
+              length_penalty,
+              max_length_penalty);
+          break;
+      }
+    } else {
+      // diversity_rate only works when BLOCKS_PER_BEAM_ is 1 to get the correct
+      // branch indice by `idx%k`
+      topk_stage_1_opt3<T,
+                        128,
+                        1><<<batch_size * beam_width * 1, 128, 0, stream>>>(
+          log_probs,
+          temp_log_probs,
+          topk_tmp_id_buf,
+          topk_tmp_val_buf,
+          beam_width * 2,
+          vocab_size);
+      topk_stage_2_opt3_update<T, 128, 1><<<batch_size, 128, 0, stream>>>(
+          topk_tmp_id_buf,
+          topk_tmp_val_buf,
+          finished,
+          sequence_length,
+          word_ids,
+          parent_ids,
+          output_word_ids,
+          output_parent_ids,
+          output_cum_log_probs,
+          beam_width,
+          vocab_size,
+          end_id,
+          step,
+          max_out_len,
+          beam_width * 2,
+          diversity_rate,
+          length_penalty,
+          max_length_penalty);
+    }
+    return;
+  }
+}
+
+#undef CASE_K
+#undef CASE_K_DIV
+
+template void topK_update_kernelLauncher<float>(
+    void* workspace,
+    size_t& workspace_size,
+    const float* log_probs,
+    bool* finished,
+    int* sequence_length,
+    int* word_ids,
+    int* parent_ids,  // for update cache, only include alive beams
+    int* output_word_ids,
+    int* output_parent_ids,  // for gather tree, include both alive and finish
+                             // beams
+    float* output_cum_log_probs,  // NOTE: cum_log_probs is T in V3.1
+    const int step,
+    DecodingBeamsearchArguments args,
+    cudaStream_t stream);
+
 // Sampling kernels
 template <typename T>
 __global__ void sampling(int* topk_tmp_id_buf,

@@ -14,8 +14,10 @@ paddlenlp
    paddlenlp.datasets
    paddlenlp.embeddings
    paddlenlp.layers
+   paddlenlp.losses
    paddlenlp.metrics
    paddlenlp.ops
    paddlenlp.seq2vec
+   paddlenlp.taskflow
    paddlenlp.transformers
    paddlenlp.utils

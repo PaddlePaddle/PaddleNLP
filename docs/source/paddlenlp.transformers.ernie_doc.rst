@@ -1,5 +1,5 @@
-ernie_doc
-======================================
+ernie\_doc
+=========================================
 
 .. automodule:: paddlenlp.transformers.ernie_doc
    :members:
