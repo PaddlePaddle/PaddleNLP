@@ -69,7 +69,6 @@ pretrained_models/
 我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在开发集（dev.tsv）验证
 ```shell
 $ unset CUDA_VISIBLE_DEVICES
-$ export PYTHONPATH=$PYTHONPATH:`pwd`
 $ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_dir ./checkpoints
 ```
 
