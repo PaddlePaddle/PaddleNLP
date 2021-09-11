@@ -24,14 +24,14 @@ import yaml
 from pprint import pprint
 
 from paddlenlp.ops import FasterGPT
-from paddlenlp.transformers import GPTModel, GPTForGreedyGeneration
+from paddlenlp.transformers import GPTModel, GPTLMHeadModel
 from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "gpt-cpm-large-cn": (GPTForGreedyGeneration, GPTChineseTokenizer),
-    "gpt2-medium-en": (GPTForGreedyGeneration, GPTTokenizer),
+    "gpt-cpm-large-cn": (GPTLMHeadModel, GPTChineseTokenizer),
+    "gpt2-medium-en": (GPTLMHeadModel, GPTTokenizer),
 }
 
 

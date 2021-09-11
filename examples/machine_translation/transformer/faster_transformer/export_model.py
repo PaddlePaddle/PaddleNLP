@@ -112,7 +112,9 @@ def do_predict(args):
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
         decoding_lib=args.decoding_lib,
-        use_fp16_decoding=args.use_fp16_decoding)
+        use_fp16_decoding=args.use_fp16_decoding,
+        rel_len=args.use_rel_len,
+        alpha=args.alpha)
 
     # Set evaluate mode
     transformer.eval()

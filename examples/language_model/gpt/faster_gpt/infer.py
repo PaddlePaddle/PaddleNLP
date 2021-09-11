@@ -45,14 +45,11 @@ def parse_args():
     )
     parser.add_argument(
         "--decoding_lib",
-        default="../../build/lib/libdecoding_op.so",
+        default="../../../../paddlenlp/ops/build/lib/libdecoding_op.so",
         type=str,
         help="Path of libdecoding_op.so. ")
     parser.add_argument(
-        "--inference_model_dir",
-        default="./infer_model/",
-        type=str,
-        help="Path to save inference model of gpt. ")
+        "--batch_size", default=1, type=int, help="Batch size. ")
     parser.add_argument(
         "--topk",
         default=4,
@@ -97,10 +94,12 @@ def do_predict(args):
     logger.info('Loading the model parameters, please wait...')
     model = model_class.from_pretrained(
         args.model_name_or_path, max_predict_len=args.max_out_len)
+    model.eval()
 
     bos_id = tokenizer.convert_tokens_to_ids(args.start_token)
     eos_id = tokenizer.convert_tokens_to_ids(args.end_token)
 
+    # Define model
     gpt = FasterGPT(
         model=model,
         topk=args.topk,
@@ -114,21 +113,25 @@ def do_predict(args):
 
     # Set evaluate mode
     gpt.eval()
+    input_ids = np.array(
+        [[bos_id] for i in range(args.batch_size * 1)]).astype("int32").reshape(
+            [args.batch_size, 1])
+    input_ids = paddle.to_tensor(input_ids)
 
-    # Convert dygraph model to static graph model 
-    gpt = paddle.jit.to_static(
-        gpt,
-        input_spec=[
-            # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int32")
-        ])
-
-    # Save converted static graph model
-    paddle.jit.save(gpt, os.path.join(args.inference_model_dir, "gpt"))
-    logger.info("GPT has been saved to {}".format(args.inference_model_dir))
-
-    gpt.save_resources(tokenizer, args.inference_model_dir)
+    with paddle.no_grad():
+        for i in range(100):
+            # For warmup. 
+            if 50 == i:
+                paddle.fluid.core._cuda_synchronize(place)
+                start = time.time()
+            out_seq = gpt(input_ids)
+        paddle.fluid.core._cuda_synchronize(place)
+        logger.info("Average test time for decoding is %f ms" % (
+            (time.time() - start) / 50 * 1000))
+        output_sequence = out_seq.numpy().transpose()
+    for i in range(args.batch_size):
+        print("========== Sample-%d ==========" % i)
+        print(tokenizer.convert_ids_to_string(output_sequence[i][1:]))
 
 
 if __name__ == "__main__":
