@@ -272,7 +272,7 @@ else(ON_INFER)
 
   add_library(encoder_op SHARED ${encoder_op_files})
   add_dependencies(encoder_op extern_${THIRD_PARTY_NAME} boost)
-  target_link_libraries(encoder_op PRIVATE -lcublas -lcudart ${lib_link} ${ft_lib_link} -lencoder -lencoder_gemm_func -lencoder_igemm_func -ltrt_fused_multi_head_attention)
+  target_link_libraries(encoder_op PRIVATE -lcublas -lcudart ${lib_link} -lcuda_int8_kernels -lencoder_gemm_func -lencoder_igemm_func -lcuda_kernels -lencoder)
 
   add_library(decoder_op SHARED ${decoder_op_files})
   add_dependencies(decoder_op extern_${THIRD_PARTY_NAME} boost)
