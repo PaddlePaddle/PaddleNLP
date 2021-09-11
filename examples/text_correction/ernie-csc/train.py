@@ -226,6 +226,7 @@ def do_train(args):
                             global_steps))
                         best_f1 = f1
                         model_file = model_file + "_best"
+                    model_file = model_file + ".pdparams"
                     paddle.save(model.state_dict(),
                                 os.path.join(args.output_dir, model_file))
                     logger.info("Save model at {} step.".format(global_steps))

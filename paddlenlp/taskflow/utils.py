@@ -39,7 +39,7 @@ def download_file(save_dir, filename, url, md5=None, task=None):
 
     Args:
         save_dir(string): The specified directory saving the file.
-        fiename(string): The specified filename saveing the file.
+        filename(string): The specified filename saving the file.
         url(string): The url downling the file.
         md5(string, optional): The md5 value that checking the version downloaded. 
     """

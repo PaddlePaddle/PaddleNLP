@@ -78,6 +78,12 @@
 
 .. toctree::
    :maxdepth: 2
+   :caption: FAQ
+
+   FAQ <FAQ.md>
+
+.. toctree::
+   :maxdepth: 2
    :caption: API Reference
 
    paddlenlp.data <source/paddlenlp.data>
