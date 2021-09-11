@@ -13,11 +13,14 @@
 # limitations under the License.
 
 import argparse
+import sys
 
 import paddle
 import paddle.nn.functional as F
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.transformers import BertTokenizer
+
+sys.path.append('./')
 
 from data import convert_example
 
