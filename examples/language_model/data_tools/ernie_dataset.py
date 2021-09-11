@@ -31,9 +31,19 @@ from paddlenlp.transformers import ErnieTokenizer
 
 
 class ErnieDataset(paddle.io.Dataset):
-    def __init__(self, name, tokenizer, indexed_dataset, data_prefix,
-                 num_epochs, max_num_samples, masked_lm_prob, max_seq_length,
-                 short_seq_prob, seed, binary_head):
+    def __init__(self,
+                 name,
+                 tokenizer,
+                 indexed_dataset,
+                 data_prefix,
+                 num_epochs,
+                 max_num_samples,
+                 masked_lm_prob,
+                 max_seq_length,
+                 short_seq_prob,
+                 seed,
+                 binary_head,
+                 share_folder=False):
 
         # Params to store.
         self.name = name
@@ -41,6 +51,7 @@ class ErnieDataset(paddle.io.Dataset):
         self.masked_lm_prob = masked_lm_prob
         self.max_seq_length = max_seq_length
         self.binary_head = binary_head
+        self.share_folder = share_folder
 
         # Dataset.
         self.indexed_dataset = indexed_dataset
@@ -55,7 +66,8 @@ class ErnieDataset(paddle.io.Dataset):
             short_seq_prob,
             self.seed,
             self.name,
-            self.binary_head)
+            self.binary_head,
+            self.share_folder)
 
         # Vocab stuff.
         # tokenizer = get_tokenizer()
@@ -161,7 +173,7 @@ def build_training_sample(sample, target_seq_length, max_seq_length,
          np_rng,
          vocab_token_to_id_dict=vocab_token_to_id_dict,
          to_chinese_char=True,
-         inplace_random_mask=True, )
+         inplace_random_mask=False, )
 
     # Padding.
     tokens_np, tokentypes_np, labels_np, padding_mask_np, loss_mask_np \
