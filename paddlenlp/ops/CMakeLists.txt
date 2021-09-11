@@ -166,11 +166,12 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/topk_kernels.cuh topk_kernels_cuh_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cuh topk_kernels_cuh_dst)
 
-file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/open_attention.h open_attention_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_attention.h open_attention_h_dst)
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/bert_encoder_transformer.h bert_encoder_transformer_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_dst)
+
+set(OPT_OPEN_ATTN_COMMAND sed -i "370,392d" ${open_attention_h_dst} && sed -i "387,431d" ${open_attention_h_dst} && sed -i "229d" ${open_attention_h_dst})
 
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
@@ -184,7 +185,6 @@ set(FT_PATCH_COMMAND
   && cp ${beamsearch_h_src} ${trans_dst}
   && cp ${sampling_h_src} ${trans_dst}
   && cp ${arguments_h_src} ${trans_dst}
-  && cp ${open_attention_h_src} ${open_attention_h_dst}
   && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
   && cat ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
@@ -194,6 +194,7 @@ set(FT_PATCH_COMMAND
   && cat ${trans_decoder_h_src} >> ${open_decoder_h_dst}
   && cat ${trans_cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat ${trans_decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
+  && ${OPT_OPEN_ATTN_COMMAND}
   && ${MUTE_COMMAND}
 )
 

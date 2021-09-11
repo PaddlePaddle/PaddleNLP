@@ -34,4 +34,8 @@ void update_logits_v2(float* logits,
                       const int m,
                       const int n,
                       cudaStream_t stream);
+
+template <typename T>
+void add_bias_act_kernelLauncher(
+    T* out, const T* bias, int m, int n, cudaStream_t stream, bool is_gelu);
 }  // namespace fastertransformer

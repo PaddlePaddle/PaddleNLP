@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import time
 from functools import partial
 import argparse
 from pprint import pprint
@@ -60,7 +61,7 @@ def parse_args():
 
     parser.add_argument(
         "--encoder_lib",
-        default="../../build/lib/libencoder_op.so",
+        default="../../build_new/lib/libencoder_op.so",
         type=str,
         help="Path of libencoder_op.so. ")
     parser.add_argument("--seed", default=42, type=int, help="Random seed.")
@@ -68,6 +69,10 @@ def parse_args():
         "--use_fp16_encoder",
         action="store_true",
         help="Whether to use fp16 encoder to predict. ")
+    parser.add_argument(
+        "--allow_gemm_test",
+        action="store_true",
+        help="Whether to allow gemm test. ")
     args = parser.parse_args()
     return args
 
@@ -134,13 +139,15 @@ class SemanticIndexingPredictor(nn.Layer):
                  bos_id=0,
                  dropout=0,
                  max_seq_len=128,
+                 is_gelu=False,
                  int8_mode=0,
                  model_name='ernie-1.0',
                  allow_gemm_test=False,
                  use_trt_kernel=False,
                  remove_padding=False,
                  encoder_lib=None,
-                 use_fp16_encoder=False):
+                 use_fp16_encoder=False,
+                 place=None):
         super(SemanticIndexingPredictor, self).__init__()
         configs = pretrained_model.pretrained_init_configuration
         n_layer = configs[model_name]['num_hidden_layers']
@@ -150,9 +157,9 @@ class SemanticIndexingPredictor(nn.Layer):
         self.bos_id = bos_id
         self.ptm = pretrained_model
         self.infer_encoder = InferTransformerEncoder(
-            self.ptm.encoder, n_layer, n_head, size_per_head, max_seq_len,
+            self.ptm.encoder, n_layer, n_head, size_per_head, is_gelu,
             int8_mode, allow_gemm_test, use_trt_kernel, remove_padding,
-            encoder_lib, use_fp16_encoder)
+            encoder_lib, use_fp16_encoder, place)
 
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.0)
         self.output_emb_size = output_emb_size
@@ -161,6 +168,8 @@ class SemanticIndexingPredictor(nn.Layer):
                 initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
             self.emb_reduce_linear = paddle.nn.Linear(
                 768, output_emb_size, weight_attr=weight_attr)
+        self.times = 0.0
+        self.place = place
 
     def get_pooled_embedding(self,
                              input_ids,
@@ -177,17 +186,22 @@ class SemanticIndexingPredictor(nn.Layer):
         src_mask = paddle.concat(x=[src_mask] * seq_len, axis=2)
 
         src_mask.stop_gradient = True
-
         ones = paddle.ones_like(input_ids, dtype="int64")
         seq_length = paddle.cumsum(ones, axis=1)
         position_ids = seq_length - ones
         position_ids.stop_gradient = True
+
         embedding_output = self.ptm.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
+
+        paddle.fluid.core._cuda_synchronize(self.place)
+        time1 = time.time()
         sequence_output = self.infer_encoder(embedding_output, src_mask,
                                              mem_seq_lens)
+        paddle.fluid.core._cuda_synchronize(self.place)
+        self.times += time.time() - time1
 
         cls_embedding = self.ptm.pooler(sequence_output)
 
@@ -228,7 +242,7 @@ class SemanticIndexingPredictor(nn.Layer):
 
 
 def do_predict(args):
-    paddle.set_device("gpu")
+    place = paddle.set_device("gpu")
     paddle.seed(args.seed)
     tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
@@ -261,11 +275,12 @@ def do_predict(args):
         max_seq_len=args.max_seq_length,
         int8_mode=0,
         model_name='ernie-1.0',
-        allow_gemm_test=False,
+        allow_gemm_test=args.allow_gemm_test,
         use_trt_kernel=False,
         remove_padding=False,
         encoder_lib=args.encoder_lib,
-        use_fp16_encoder=False)
+        use_fp16_encoder=False,
+        place=place)
     model.eval()
     model.load(args.init_from_params)
     cosine_sims = []
@@ -281,7 +296,8 @@ def do_predict(args):
             query_token_type_ids=query_token_type_ids,
             title_token_type_ids=title_token_type_ids).numpy()
         cosine_sims.append(batch_cosine_sim)
-
+    print("model.times", model.times, "model.infer_encoder.times",
+          model.infer_encoder.times)
     cosine_sims = np.concatenate(cosine_sims, axis=0)
     for cosine in cosine_sims:
         print('{}'.format(cosine))

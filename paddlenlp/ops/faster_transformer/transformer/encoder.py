@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import time
 
 import paddle
 from paddle.fluid.layer_helper import LayerHelper
@@ -43,9 +44,9 @@ def infer_transformer_encoder(input,
                               amax_list,
                               n_head,
                               size_per_head,
-                              remove_padding,
                               n_layer,
-                              max_seq_length,
+                              is_gelu=True,
+                              remove_padding=False,
                               int8_mode=0,
                               layer_idx=0,
                               allow_gemm_test=False,
@@ -77,13 +78,13 @@ def infer_transformer_encoder(input,
     attrs = {
         'head_num': n_head,
         'size_per_head': size_per_head,
+        'is_gelu': is_gelu,
         "remove_padding": remove_padding,
         'int8_mode': int8_mode,
         'num_layer': n_layer,
         'layer_idx': layer_idx,
         'allow_gemm_test': allow_gemm_test,
         'use_trt_kernel': use_trt_kernel,
-        'max_seq_len': max_seq_length
     }
     encoder_out = helper.create_variable(dtype=input.dtype)
     outputs = {"EncoderOut": encoder_out}
@@ -99,26 +100,32 @@ class InferTransformerEncoder(nn.Layer):
                  n_layer,
                  n_head,
                  size_per_head,
-                 max_seq_length=512,
+                 is_gelu=True,
                  int8_mode=0,
                  allow_gemm_test=False,
                  use_trt_kernel=False,
                  remove_padding=False,
                  encoder_lib=None,
-                 use_fp16_encoder=False):
+                 use_fp16_encoder=False,
+                 place=None):
         if encoder_lib is not None and os.path.isfile(encoder_lib):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 encoder_lib)
         super(InferTransformerEncoder, self).__init__()
         self.n_head = n_head
-        self.max_seq_length = max_seq_length
         self.int8_mode = int8_mode
         self.allow_gemm_test = allow_gemm_test
         self.use_trt_kernel = use_trt_kernel
         self.n_layer = n_layer
         self.size_per_head = size_per_head
-        self.remove_padding = remove_padding
+        self.is_gelu = is_gelu
+        self.remove_padding = False
+        if remove_padding:
+            raise NotImplementedError(
+                "remove padding/rebuild padding is not supported now")
+        if int8_mode:
+            raise NotImplementedError("int8 mode is not supported now")
         if use_fp16_encoder:
             for mod in encoder.layers:
                 mod.self_attn.q_proj.weight = transfer_param(
@@ -147,7 +154,9 @@ class InferTransformerEncoder(nn.Layer):
                 mod.linear2.weight = transfer_param(mod.linear2.weight)
                 mod.linear2.bias = transfer_param(
                     mod.linear2.bias, is_bias=True)
-
+        self.place = place
+        self.times = 0.0
+        self.batches = 0
         self.weights = []
         for mod in encoder.layers:
             layer_weight = []
@@ -174,14 +183,15 @@ class InferTransformerEncoder(nn.Layer):
 
     def forward(self, enc_input, attn_mask, seq_len):
         if self.remove_padding:
-            sequence_id_offset = paddle.zeros(
-                (enc_input.shape[0] * seq_len[0]), dtype="int32")
-            trt_seq_len = paddle.cumsum(
-                paddle.concat(
-                    [paddle.zeros(
-                        (1, ), dtype=seq_len.dtype), seq_len]),
-                axis=0,
-                dtype="int32")
+            pass
+            # sequence_id_offset = paddle.zeros(
+            #     (enc_input.shape[0] * seq_len[0]), dtype="int32")
+            # trt_seq_len = paddle.cumsum(
+            #     paddle.concat(
+            #         [paddle.zeros(
+            #             (1, ), dtype=seq_len.dtype), seq_len]),
+            #     axis=0,
+            #     dtype="int32")
         else:
             sequence_id_offset = paddle.to_tensor([], dtype="int32")
             batch_size = enc_input.shape[0]
@@ -200,8 +210,9 @@ class InferTransformerEncoder(nn.Layer):
                         [batch_size * max_seq_len], dtype=trt_seq_len.dtype)
                 ],
                 axis=0)
+        paddle.fluid.core._cuda_synchronize(self.place)
+        time1 = time.time()
         for idx in range(self.n_layer):
-
             weight = self.weights[idx]
             enc_out = infer_transformer_encoder(
                 input=enc_input,
@@ -227,13 +238,17 @@ class InferTransformerEncoder(nn.Layer):
                 amax_list=weight[16],
                 n_head=self.n_head,
                 size_per_head=self.size_per_head,
-                remove_padding=self.remove_padding,
                 n_layer=self.n_layer,
-                max_seq_length=self.max_seq_length,
+                is_gelu=self.is_gelu,
+                remove_padding=self.remove_padding,
                 int8_mode=self.int8_mode,
                 layer_idx=idx,
                 allow_gemm_test=self.allow_gemm_test,
                 use_trt_kernel=self.use_trt_kernel)
             enc_input = enc_out
+        if self.batches > 10:
+            paddle.fluid.core._cuda_synchronize(self.place)
+            self.times += time.time() - time1
+        self.batches += 1
 
         return enc_out
