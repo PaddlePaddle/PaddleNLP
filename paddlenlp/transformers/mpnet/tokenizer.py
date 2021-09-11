@@ -50,6 +50,35 @@ class MPNetTokenizer(BertTokenizer):
             cls_token=cls_token,
             mask_token=mask_token)
 
+    def __call__(self,
+                 text,
+                 text_pair=None,
+                 max_seq_len=None,
+                 stride=0,
+                 is_split_into_words=False,
+                 pad_to_max_seq_len=False,
+                 truncation_strategy="longest_first",
+                 return_position_ids=False,
+                 return_token_type_ids=False,
+                 return_attention_mask=False,
+                 return_length=False,
+                 return_overflowing_tokens=False,
+                 return_special_tokens_mask=False):
+        return super().__call__(
+            text,
+            text_pair=text_pair,
+            max_seq_len=max_seq_len,
+            stride=stride,
+            is_split_into_words=is_split_into_words,
+            pad_to_max_seq_len=pad_to_max_seq_len,
+            truncation_strategy=truncation_strategy,
+            return_position_ids=return_position_ids,
+            return_token_type_ids=return_token_type_ids,
+            return_attention_mask=return_attention_mask,
+            return_length=return_length,
+            return_overflowing_tokens=return_overflowing_tokens,
+            return_special_tokens_mask=return_special_tokens_mask)
+
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
@@ -129,32 +158,3 @@ class MPNetTokenizer(BertTokenizer):
         if token_ids_1 is None:
             return len(cls + token_ids_0 + sep) * [0]
         return len(cls + token_ids_0 + sep + sep + token_ids_1 + sep) * [0]
-
-    def __call__(self,
-                 text,
-                 text_pair=None,
-                 max_seq_len=None,
-                 stride=0,
-                 is_split_into_words=False,
-                 pad_to_max_seq_len=False,
-                 truncation_strategy="longest_first",
-                 return_position_ids=False,
-                 return_token_type_ids=False,
-                 return_attention_mask=False,
-                 return_length=False,
-                 return_overflowing_tokens=False,
-                 return_special_tokens_mask=False):
-        return super().__call__(
-            text,
-            text_pair=text_pair,
-            max_seq_len=max_seq_len,
-            stride=stride,
-            is_split_into_words=is_split_into_words,
-            pad_to_max_seq_len=pad_to_max_seq_len,
-            truncation_strategy=truncation_strategy,
-            return_position_ids=return_position_ids,
-            return_token_type_ids=return_token_type_ids,
-            return_attention_mask=return_attention_mask,
-            return_length=return_length,
-            return_overflowing_tokens=return_overflowing_tokens,
-            return_special_tokens_mask=return_special_tokens_mask)
