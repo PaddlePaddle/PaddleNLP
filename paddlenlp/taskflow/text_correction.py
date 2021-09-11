@@ -97,6 +97,18 @@ class CSCTask(Task):
             )
         self._pypinyin = pypinyin
         self._max_seq_length = 128
+        self._batchify_fn = lambda samples, fn=Tuple(
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # segment
+            Pad(axis=0, pad_val=self._pinyin_vocab.token_to_idx[self._pinyin_vocab.pad_token]),  # pinyin
+            Stack(axis=0, dtype='int64'),  # length
+        ): [data for data in fn(samples)]
+        self._num_workers = self.kwargs[
+            'num_workers'] if 'num_workers' in self.kwargs else 0
+        self._batch_size = self.kwargs[
+            'batch_size'] if 'batch_size' in self.kwargs else 1
+        self._lazy_load = self.kwargs[
+            'lazy_load'] if 'lazy_load' in self.kwargs else False
 
     def _construct_input_spec(self):
         """
@@ -140,37 +152,45 @@ class CSCTask(Task):
             raise TypeError(
                 "Invalid inputs, input text should be str or list of str, {type(inputs)} found!"
             )
-        batch_size = self.kwargs[
-            'batch_size'] if 'batch_size' in self.kwargs else 1
-        trans_func = self._convert_example
-
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # segment
-            Pad(axis=0, pad_val=self._pinyin_vocab.token_to_idx[self._pinyin_vocab.pad_token]),  # pinyin
-            Stack(axis=0, dtype='int64'),  # length
-        ): [data for data in fn(samples)]
 
         examples = []
         texts = []
         for text in inputs:
             example = {"source": text.strip()}
-            input_ids, token_type_ids, pinyin_ids, length = trans_func(example)
+            input_ids, token_type_ids, pinyin_ids, length = self._convert_example(
+                example)
             examples.append((input_ids, token_type_ids, pinyin_ids, length))
             texts.append(example["source"])
 
         batch_examples = [
-            examples[idx:idx + batch_size]
-            for idx in range(0, len(examples), batch_size)
+            examples[idx:idx + self._batch_size]
+            for idx in range(0, len(examples), self._batch_size)
         ]
         batch_texts = [
-            texts[idx:idx + batch_size]
-            for idx in range(0, len(examples), batch_size)
+            texts[idx:idx + self._batch_size]
+            for idx in range(0, len(examples), self._batch_size)
         ]
         outputs = {}
         outputs['batch_examples'] = batch_examples
         outputs['batch_texts'] = batch_texts
-        self.batchify_fn = batchify_fn
+        if not self._static_mode:
+
+            def read(inputs):
+                for text in inputs:
+                    example = {"source": text.strip()}
+                    input_ids, token_type_ids, pinyin_ids, length = self._convert_example(
+                        example)
+                    yield input_ids, token_type_ids, pinyin_ids, length
+
+            infer_ds = load_dataset(read, inputs=inputs, lazy=self._lazy_load)
+            outputs['data_loader'] = paddle.io.DataLoader(
+                infer_ds,
+                collate_fn=self._batchify_fn,
+                num_workers=self._num_workers,
+                batch_size=self._batch_size,
+                shuffle=False,
+                return_list=True)
+
         return outputs
 
     def _run_model(self, inputs):
@@ -178,21 +198,36 @@ class CSCTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         results = []
-        with static_mode_guard():
-            for examples in inputs['batch_examples']:
-                token_ids, token_type_ids, pinyin_ids, lengths = self.batchify_fn(
-                    examples)
-                self.input_handles[0].copy_from_cpu(token_ids)
-                self.input_handles[1].copy_from_cpu(pinyin_ids)
-                self.predictor.run()
-                det_preds = self.output_handle[0].copy_to_cpu()
-                char_preds = self.output_handle[1].copy_to_cpu()
+        if not self._static_mode:
+            with dygraph_mode_guard():
+                for examples in inputs['data_loader']:
+                    token_ids, token_type_ids, pinyin_ids, lengths = examples
+                    det_preds, char_preds = self._model(token_ids, pinyin_ids)
+                    det_preds = det_preds.numpy()
+                    char_preds = char_preds.numpy()
+                    lengths = lengths.numpy()
 
-                batch_result = []
-                for i in range(len(lengths)):
-                    batch_result.append(
-                        (det_preds[i], char_preds[i], lengths[i]))
-                results.append(batch_result)
+                    batch_result = []
+                    for i in range(len(lengths)):
+                        batch_result.append(
+                            (det_preds[i], char_preds[i], lengths[i]))
+                    results.append(batch_result)
+        else:
+            with static_mode_guard():
+                for examples in inputs['batch_examples']:
+                    token_ids, token_type_ids, pinyin_ids, lengths = self._batchify_fn(
+                        examples)
+                    self.input_handles[0].copy_from_cpu(token_ids)
+                    self.input_handles[1].copy_from_cpu(pinyin_ids)
+                    self.predictor.run()
+                    det_preds = self.output_handle[0].copy_to_cpu()
+                    char_preds = self.output_handle[1].copy_to_cpu()
+
+                    batch_result = []
+                    for i in range(len(lengths)):
+                        batch_result.append(
+                            (det_preds[i], char_preds[i], lengths[i]))
+                    results.append(batch_result)
         inputs['batch_results'] = results
         return inputs
 
