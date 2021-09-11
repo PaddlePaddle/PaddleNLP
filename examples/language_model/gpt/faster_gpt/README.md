@@ -66,9 +66,8 @@ cd ../
 from paddlenlp.ops import FasterGPT
 from paddlenlp.transformers import GPTModel, GPTForPretraining
 
-# GPTForGreedyGeneration 的 class 仅用于载入参数，并不限制 FasterGPT 这里是用的解码策略。
 MODEL_CLASSES = {
-    "gpt2-medium-en": (GPTForGreedyGeneration, GPTTokenizer),
+    "gpt2-medium-en": (GPTLMHeadModel, GPTTokenizer),
 }
 
 model_class, tokenizer_class = MODEL_CLASSES[args.model_name]
