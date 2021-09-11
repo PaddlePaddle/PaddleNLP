@@ -26,11 +26,15 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 ## 快速开始
 
 ### 环境依赖
+
 - regex
 - sentencepiece
 - tqdm
 - visualdl
-安装命令 `pip install regex sentencepiece tqdm visualdl`
+- paddlepaddle-gpu >= 2.2rc
+
+安装命令 `pip install regex sentencepiece tqdm visualdl`。
+注：需要PaddlePaddle版本大于等于2.2rc，或者使用最新develop版本，安装方法请参见Paddle[官网](https://www.paddlepaddle.org.cn)。
 
 ### 数据准备
 
@@ -219,6 +223,32 @@ python deploy/python/inference.py --model_type gpt \
 ```
 
 用户可以看到屏幕输出预测结果。
+
+## Taskflow一键预测
+可以使用PaddleNLP提供的Taskflow工具来进行知识问答和写诗，具体使用方法如下:
+
+```python
+
+from paddlenlp import Taskflow
+
+# 默认是知识问答任务
+question = Taskflow("text_generation")
+question("中国的国土面积有多大？")
+'''
+[{'text': '中国的国土面积有多大？', 'answer': '960万平方公里。'}]
+'''
+
+# 使用写诗任务进行写诗
+poetry  = Taskflow("text_generation", generation_task="poetry")
+poetry("林密不见人")
+'''
+[{'text': '林密不见人', 'answer': ',但闻人语响。'}]
+'''
+poetry(["林密不见人", "举头邀明月"])
+'''
+[{'text': '林密不见人', 'answer': ',但闻人语响。'}, {'text': '举头邀明月', 'answer': ',低头思故乡。'}]
+'''
+```
 
 ## 其他
 
