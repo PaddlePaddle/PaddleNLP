@@ -57,5 +57,5 @@ from .roformer.modeling import *
 from .roformer.tokenizer import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
-from .visual_bert.modeling import *
-from .visual_bert.tokenizer import *
+from .visualbert.modeling import *
+from .visualbert.tokenizer import *
