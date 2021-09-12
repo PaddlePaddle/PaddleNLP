@@ -19,27 +19,28 @@ limitations under the License. */
 #include "fusion_encoder_op.h"
 
 
-// void cuda_print(const float* cudaptr, const int token_num, const int
-// hidden_size, const std::string& message)
-// {
-//   int dim = token_num * hidden_size;
-//   float* data = new float[dim];
+void cuda_print(const float* cudaptr,
+                const int token_num,
+                const int hidden_size,
+                const std::string& message) {
+  int dim = token_num * hidden_size;
+  float* data = new float[dim];
 
-//   std::cout << "bs * max_len:" << token_num << std::endl;
-//   std::cout << "hidden_size:" << hidden_size << std::endl;
+  std::cout << "bs * max_len:" << token_num << std::endl;
+  std::cout << "hidden_size:" << hidden_size << std::endl;
 
-//   cudaMemcpy(data, cudaptr, sizeof(float) * dim, cudaMemcpyDeviceToHost);
+  cudaMemcpy(data, cudaptr, sizeof(float) * dim, cudaMemcpyDeviceToHost);
 
-//   float sum = 0.0f;
-//   for (int i=0; i<dim; ++i) {
-//     if (i <= 10){
-//       std::cout << data[i] << " ";
-//     }
-//     sum += data[i];
-//   }
-//   std::cout << std::endl;
-//   std::cout << message << sum << std::endl;
-// };
+  float sum = 0.0f;
+  for (int i = 0; i < dim; ++i) {
+    if (i <= 10) {
+      std::cout << data[i] << " ";
+    }
+    sum += data[i];
+  }
+  std::cout << std::endl;
+  std::cout << message << sum << std::endl;
+};
 
 std::vector<paddle::Tensor> EncoderForward(
     const paddle::Tensor& input,
