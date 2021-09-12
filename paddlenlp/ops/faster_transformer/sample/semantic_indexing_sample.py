@@ -21,11 +21,13 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.nn import TransformerEncoder, TransformerEncoderLayer
 
 from paddlenlp.transformers import ErnieTokenizer, ErnieModel
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.ops import TransformerEncoder, TransformerEncoderLayer
+from paddlenlp.ops.ext_utils import load
+from paddlenlp.ops import transfer_param, enable_faster_encoder
 
 
 def parse_args():
@@ -57,11 +59,6 @@ def parse_args():
         default=32,
         type=int,
         help="Batch size per GPU/CPU for training.")
-    parser.add_argument(
-        "--encoder_lib",
-        default="../../build_912/lib/libencoder_op.so",
-        type=str,
-        help="Path of libencoder_op.so. ")
     parser.add_argument("--seed", default=42, type=int, help="Random seed.")
     parser.add_argument(
         "--use_fp16_encoder",
@@ -139,17 +136,12 @@ class SemanticIndexingPredictor(nn.Layer):
                  dropout=0,
                  max_seq_len=128,
                  is_gelu=False,
-                 encoder_lib=None,
                  use_fp16_encoder=False):
         super(SemanticIndexingPredictor, self).__init__()
         size_per_head = hidden_size // n_head
         self.bos_id = bos_id
         self.ptm = pretrained_model
-        encoder_layer = TransformerEncoderLayer(
-            hidden_size, n_head, dim_feedforward, dropout=0.0)
-        self.ptm.encoder = TransformerEncoder(
-            encoder_layer, n_layer, encoder_lib=encoder_lib)
-
+        self.use_fp16_encoder = use_fp16_encoder
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.0)
         self.output_emb_size = output_emb_size
         if output_emb_size > 0:
@@ -157,13 +149,23 @@ class SemanticIndexingPredictor(nn.Layer):
                 initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
             self.emb_reduce_linear = paddle.nn.Linear(
                 768, output_emb_size, weight_attr=weight_attr)
+        try:
+            load("FasterTransformer", verbose=True)
+        except Exception:
+            logger.warning(
+                "Exception occurs when using Faster Transformer. " \
+                "The original forward will be involved. ")
+        encoder_layer = TransformerEncoderLayer(
+            hidden_size, n_head, dim_feedforward, dropout=0.0)
+        self.ptm.encoder = TransformerEncoder(encoder_layer, n_layer)
 
     def get_pooled_embedding(self,
                              input_ids,
                              token_type_ids=None,
                              position_ids=None,
                              attention_mask=None):
-        src_mask = (input_ids != self.bos_id).astype(paddle.get_default_dtype())
+        src_mask = (input_ids != self.bos_id
+                    ).astype(self.ptm.encoder.layers[0].norm1.bias.dtype)
         src_mask = paddle.unsqueeze(src_mask, axis=[1, 2])
         src_mask.stop_gradient = True
 
@@ -176,9 +178,13 @@ class SemanticIndexingPredictor(nn.Layer):
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
-
+        if args.use_fp16_encoder:
+            embedding_output = paddle.cast(embedding_output, dtype="float16")
+            # paddle.sum is not supported in fp16.
+            # src_mask = paddle.cast(src_mask, dtype="float16")
         sequence_output = self.ptm.encoder(embedding_output, src_mask)
-
+        if args.use_fp16_encoder:
+            sequence_output = paddle.cast(sequence_output, dtype="float32")
         cls_embedding = self.ptm.pooler(sequence_output)
 
         if self.output_emb_size > 0:
@@ -208,6 +214,37 @@ class SemanticIndexingPredictor(nn.Layer):
         return cosine_sim
 
     def load(self, init_from_params):
+        if self.use_fp16_encoder:
+            for mod in self.ptm.encoder.layers:
+                mod.self_attn.q_proj.weight = transfer_param(
+                    mod.self_attn.q_proj.weight)
+                mod.self_attn.q_proj.bias = transfer_param(
+                    mod.self_attn.q_proj.bias, is_bias=True)
+                mod.self_attn.k_proj.weight = transfer_param(
+                    mod.self_attn.k_proj.weight)
+                mod.self_attn.k_proj.bias = transfer_param(
+                    mod.self_attn.k_proj.bias, is_bias=True)
+                mod.self_attn.v_proj.weight = transfer_param(
+                    mod.self_attn.v_proj.weight)
+                mod.self_attn.v_proj.bias = transfer_param(
+                    mod.self_attn.v_proj.bias, is_bias=True)
+                mod.self_attn.out_proj.weight = transfer_param(
+                    mod.self_attn.out_proj.weight)
+                mod.self_attn.out_proj.bias = transfer_param(
+                    mod.self_attn.out_proj.bias, is_bias=True)
+                mod.norm1.weight = transfer_param(mod.norm1.weight)
+                mod.norm1.bias = transfer_param(mod.norm1.bias, is_bias=True)
+                mod.norm2.weight = transfer_param(mod.norm2.weight)
+                mod.norm2.bias = transfer_param(mod.norm2.bias, is_bias=True)
+                mod.linear1.weight = transfer_param(mod.linear1.weight)
+                mod.linear1.bias = transfer_param(
+                    mod.linear1.bias, is_bias=True)
+                mod.linear2.weight = transfer_param(mod.linear2.weight)
+                mod.linear2.bias = transfer_param(
+                    mod.linear2.bias, is_bias=True)
+            for item in self.state_dict():
+                if "encoder.layers" in item:
+                    state_dict[item] = np.float16(state_dict[item])
         if init_from_params and os.path.isfile(init_from_params):
             state_dict = paddle.load(init_from_params)
             self.set_state_dict(state_dict)
@@ -247,12 +284,14 @@ def do_predict(args):
     model = SemanticIndexingPredictor(
         pretrained_model,
         args.output_emb_size,
+        n_layer=12,
+        activation='relu',
         bos_id=0,
         max_seq_len=args.max_seq_length,
-        encoder_lib=args.encoder_lib,
-        use_fp16_encoder=False)
+        use_fp16_encoder=args.use_fp16_encoder)
     model.eval()
     model.load(args.init_from_params)
+    model = enable_faster_encoder(model)
     cosine_sims = []
     for batch_data in valid_data_loader:
         query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch_data
@@ -265,7 +304,9 @@ def do_predict(args):
             title_input_ids=title_input_ids,
             query_token_type_ids=query_token_type_ids,
             title_token_type_ids=title_token_type_ids).numpy()
+
         cosine_sims.append(batch_cosine_sim)
+
     cosine_sims = np.concatenate(cosine_sims, axis=0)
     for cosine in cosine_sims:
         print('{}'.format(cosine))
@@ -274,5 +315,4 @@ def do_predict(args):
 if __name__ == "__main__":
     args = parse_args()
     pprint(args)
-    print("lib path", args.encoder_lib)
     do_predict(args)

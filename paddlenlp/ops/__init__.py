@@ -19,3 +19,6 @@ from .faster_transformer.transformer.encoder import *
 from .einsum import *
 from .distributed import *
 from . import optimizer
+
+paddle.nn.TransformerEncoderLayer._forward = encoder_layer_forward
+paddle.nn.TransformerEncoder._forward = encoder_forward
