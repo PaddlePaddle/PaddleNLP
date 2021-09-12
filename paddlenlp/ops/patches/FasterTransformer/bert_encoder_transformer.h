@@ -1484,8 +1484,8 @@ public:
           cuda_print(norm_from_tensor_buf_, m, n, message2);
 
 
-          std::string message4("FT self-attn output(origin):");
-          cuda_print(attr_out_buf_, m, n, message4);
+          // std::string message4("FT self-attn output(origin):");
+          // cuda_print(attr_out_buf_, m, n, message4);
 
           cuda::MultiHeadInitParam<DataType_> multi_head_init_param;
 
@@ -1533,16 +1533,25 @@ public:
                            computeType_,
                            static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
 
+          std::string message4("FT self-attn output after proj:");
+          cuda_print(attr_matmul_buf_, m, n, message4);
+
           add_bias_input_pre_layernorm_kernelLauncher<DataType_>(
               attr_matmul_buf_,
               bias_and_input,
               param_.from_tensor,
               param_.self_attention.attention_output_weight.bias,
               param_.ffn_layernorm.gamma,
-              param_.ffn_layernorm.gamma,
+              param_.ffn_layernorm.beta,
               m,
               n,
               param_.stream);
+
+          std::string message5("FT FFN input:");
+          cuda_print(attr_matmul_buf_, m, n, message5);
+
+          std::string message6("FT FFN residual:");
+          cuda_print(bias_and_input, m, n, message6);
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -1578,6 +1587,9 @@ public:
               m,
               n,
               param_.stream);
+
+          std::string message7("FT FFN_linear1 out:");
+          cuda_print(inter_matmul_buf_, m, n, message7);
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();

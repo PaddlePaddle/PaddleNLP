@@ -113,13 +113,15 @@ __global__ void add_bias_input(T* out,
                                int n) {
   int tid = threadIdx.x;
 
-  __shared__ float s_mean;
-  __shared__ float s_variance;
-  float mean = 0.0f;
-  float variance = 0.0f;
+  // __shared__ float s_mean;
+  // __shared__ float s_variance;
+  // float mean = 0.0f;
+  // float variance = 0.0f;
+  // out: [bs, max_len, hidden_size]
 
-  float local_out =
-      (float)(out[blockIdx.x * n + tid] + bias_and_input[blockIdx.x * n + tid]);
+  float local_out = (float)(out[blockIdx.x * n + tid] +
+                            bias_and_input[blockIdx.x * n + tid]) +
+                    bias[tid];
 
   out[blockIdx.x * n + tid] = local_out;
 }

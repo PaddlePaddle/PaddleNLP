@@ -151,6 +151,8 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/open_attention.h open_attention_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_attention.h open_attention_h_dst)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/open_attention.cu open_attention_cu_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_attention.cu open_attention_cu_dst)
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/transformer_cuda_kernels.h trans_cuda_kernels_h_src)
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/transformer_decoding_kernels.cu trans_decoding_kernels_cu_src)
@@ -193,6 +195,7 @@ set(FT_PATCH_COMMAND
   && cp ${myprint_cc_src} ${myprint_cc_dst}
   && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
   && cp ${open_attention_h_src} ${open_attention_h_dst}
+  && cp ${open_attention_cu_src} ${open_attention_cu_dst}
   && cat ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
   && cat ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}

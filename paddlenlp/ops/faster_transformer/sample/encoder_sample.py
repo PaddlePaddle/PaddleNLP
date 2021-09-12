@@ -98,8 +98,10 @@ def do_predict(args):
 
     src_max_len = paddle.shape(src_word)[-1]
 
+    #[bs, max_len] 1 mean true_id, 0 mean mask
     src_mask = F.sequence_mask(
         mem_seq_lens, src_max_len, dtype=paddle.get_default_dtype())
+
     src_word *= src_mask
 
     src_pos = paddle.cast(
@@ -116,15 +118,23 @@ def do_predict(args):
         src_emb, p=encoder.dropout,
         training=encoder.training) if args.dropout else src_emb
 
+    # [bs, 1, 1, max_len]
     src_mask = paddle.unsqueeze(src_mask, axis=[1, 2])
+    print("FT src_mask_unsqueeze:{}".format(src_mask))
+
+    # [bs, 1, max_len, 1]
     src_mask_1 = paddle.transpose(src_mask, [0, 1, 3, 2])
+    print("FT src_mask_1:{}".format(src_mask_1))
+
+    # [bs, 1, max_len, max_len]
     src_mask = src_mask * src_mask_1
+    print("FT final src_mask:{}".format(src_mask))
+
     src_mask.stop_gradient = True
 
     src_slf_attn_bias = (1 - src_mask) * -1e4
     src_slf_attn_bias.stop_gradient = True
 
-    print("FT src_mask:{}".format(src_mask))
     custom_enc_output = encoder(enc_input, src_mask, mem_seq_lens)
 
     # '''
