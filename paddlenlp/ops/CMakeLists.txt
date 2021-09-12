@@ -149,11 +149,6 @@ file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/transformer_deco
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/bert_encoder_transformer.h bert_encoder_transformer_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_dst)
 
-file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/open_attention.h open_attention_h_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_attention.h open_attention_h_dst)
-file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/open_attention.cu open_attention_cu_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_attention.cu open_attention_cu_dst)
-
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/transformer_cuda_kernels.h trans_cuda_kernels_h_src)
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/transformer_decoding_kernels.cu trans_decoding_kernels_cu_src)
 
@@ -173,12 +168,6 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/topk_kernels.cuh topk_kernels_cuh_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cuh topk_kernels_cuh_dst)
 
-file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/myprint.h myprint_h_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/ myprint_h_dst)
-file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/myprint.cc myprint_cc_src)
-file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/ myprint_cc_dst)
-
-
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
 set(FT_PATCH_COMMAND
@@ -191,11 +180,7 @@ set(FT_PATCH_COMMAND
   && cp ${beamsearch_h_src} ${trans_dst}
   && cp ${sampling_h_src} ${trans_dst}
   && cp ${arguments_h_src} ${trans_dst}
-  && cp ${myprint_h_src} ${myprint_h_dst}
-  && cp ${myprint_cc_src} ${myprint_cc_dst}
   && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
-  && cp ${open_attention_h_src} ${open_attention_h_dst}
-  && cp ${open_attention_cu_src} ${open_attention_cu_dst}
   && cat ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
   && cat ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
@@ -304,5 +289,3 @@ if(ON_INFER AND WITH_GPT)
 endif()
 
 add_subdirectory(faster_transformer)
-
-

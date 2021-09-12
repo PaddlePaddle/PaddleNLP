@@ -29,7 +29,6 @@
 #include "fastertransformer/gemm_test/encoder_gemm_func.h"
 #include "fastertransformer/gemm_test/encoder_igemm_func.h"
 
-#include "fastertransformer/myprint.h"
 
 namespace fastertransformer {
 
@@ -846,9 +845,6 @@ public:
         int k = head_num_ * size_per_head_;
         int n = k;
 
-        std::string message("FT transformer input post-norm:");
-        cuda_print(param_.from_tensor, m, n, message);
-
         if (int8_mode_ != 0) {
           if (int8_mode_ == 1) {
             cublasLtMM_withAlgo(int_buf_,
@@ -1457,21 +1453,6 @@ public:
           // Support fp32
           // Todo(tianxin04): support fp16
 
-          // int dim = m * n;
-          // float* tmp_data = new float[dim];
-
-          // cudaMemcpy(tmp_data, param_.from_tensor, sizeof(float) * dim,
-          // cudaMemcpyDeviceToHost);
-
-          // float sum = 0.0f;
-          // for (int i=0; i<dim; ++i) {
-          //   sum += tmp_data[i];
-          // }
-          // std::cout << "FT input tensor sum:" << sum / dim << std::endl;
-
-          std::string message1("FT transformer input pre-norm:");
-          cuda_print(param_.from_tensor, m, n, message1);
-
           layernorm_kernelLauncher(norm_from_tensor_buf_,
                                    param_.from_tensor,
                                    param_.self_layernorm.gamma,
@@ -1479,13 +1460,6 @@ public:
                                    m,
                                    n,
                                    param_.stream);
-
-          std::string message2("FT pre-norm1 output:");
-          cuda_print(norm_from_tensor_buf_, m, n, message2);
-
-
-          // std::string message4("FT self-attn output(origin):");
-          // cuda_print(attr_out_buf_, m, n, message4);
 
           cuda::MultiHeadInitParam<DataType_> multi_head_init_param;
 
@@ -1503,9 +1477,6 @@ public:
           // re-initialize MultiHeadInitParam
           attention_->initialize(multi_head_init_param);
           attention_->forward();
-
-          std::string message3("FT self-attn output:");
-          cuda_print(attr_out_buf_, m, n, message3);
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -1533,9 +1504,6 @@ public:
                            computeType_,
                            static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
 
-          std::string message4("FT self-attn output after proj:");
-          cuda_print(attr_matmul_buf_, m, n, message4);
-
           add_bias_input_pre_layernorm_kernelLauncher<DataType_>(
               attr_matmul_buf_,
               bias_and_input,
@@ -1546,12 +1514,6 @@ public:
               m,
               n,
               param_.stream);
-
-          std::string message5("FT FFN input:");
-          cuda_print(attr_matmul_buf_, m, n, message5);
-
-          std::string message6("FT FFN residual:");
-          cuda_print(bias_and_input, m, n, message6);
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -1587,9 +1549,6 @@ public:
               m,
               n,
               param_.stream);
-
-          std::string message7("FT FFN_linear1 out:");
-          cuda_print(inter_matmul_buf_, m, n, message7);
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
