@@ -91,7 +91,7 @@ class Task(metaclass=abc.ABCMeta):
         if place == 'cpu':
             self._config.disable_gpu()
         else:
-            self._config.enable_use_gpu(100, 0)
+            self._config.enable_use_gpu(100, self.kwargs['device_id'])
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
         self.predictor = paddle.inference.create_predictor(self._config)
