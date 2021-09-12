@@ -224,6 +224,32 @@ python deploy/python/inference.py --model_type gpt \
 
 用户可以看到屏幕输出预测结果。
 
+## Taskflow一键预测
+可以使用PaddleNLP提供的Taskflow工具来进行知识问答和写诗，具体使用方法如下:
+
+```python
+
+from paddlenlp import Taskflow
+
+# 默认是知识问答任务
+question = Taskflow("text_generation")
+question("中国的国土面积有多大？")
+'''
+[{'text': '中国的国土面积有多大？', 'answer': '960万平方公里。'}]
+'''
+
+# 使用写诗任务进行写诗
+poetry  = Taskflow("text_generation", generation_task="poetry")
+poetry("林密不见人")
+'''
+[{'text': '林密不见人', 'answer': ',但闻人语响。'}]
+'''
+poetry(["林密不见人", "举头邀明月"])
+'''
+[{'text': '林密不见人', 'answer': ',但闻人语响。'}, {'text': '举头邀明月', 'answer': ',低头思故乡。'}]
+'''
+```
+
 ## 其他
 
 本项目提供了Huggingface的权重转化示例`converter.py`，`python xxx-gpt.bin`即可完成转换。用户可以参考转化脚本，转换自己需要的模型权重。

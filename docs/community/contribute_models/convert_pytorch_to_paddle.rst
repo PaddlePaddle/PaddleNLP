@@ -164,8 +164,8 @@ PaddleNLP（Paddle框架）和HuggingFace的transformers（PyTorch框架）里�
     >>> import paddle
     >>> model_name = "bert-base-uncased"
     >>> # 模型下载地址： https://paddlenlp.bj.bcebos.com/models/transformers/bert-base-uncased.pdparams
-    >>> model_file = "model_state.pdparams"
-    >>> paddle_state_dict = torch.load(model_file)
+    >>> model_file = "bert-base-uncased.pdparams"
+    >>> paddle_state_dict = paddle.load(model_file)
     >>> paddle_state_dict.keys()
     dict_keys(['bert.embeddings.word_embeddings.weight', 'bert.embeddings.position_embeddings.weight', 'bert.embeddings.token_type_embeddings.weight',
                 'bert.embeddings.layer_norm.weight', 'bert.embeddings.layer_norm.bias',
