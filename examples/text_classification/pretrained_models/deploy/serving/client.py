@@ -14,12 +14,15 @@
 
 import argparse
 import numpy as np
+import sys
 
 import paddle
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.transformers import ErnieTinyTokenizer
 from paddle_serving_client import Client
 from scipy.special import softmax
+
+sys.path.append('./')
 
 from utils import convert_example
 
