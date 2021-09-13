@@ -42,7 +42,7 @@ def to_map_tensor(string_dict, name):
         string_dict(dict): The value will be setted to the tensor.
         name(string): The name of the tensor.
     """
-    tensor = paddle.Tensor(core.VarDesc.VarType.MAP, [], name,
-                           core.VarDesc.VarType.MAP, True)
+    tensor = paddle.Tensor(core.VarDesc.VarType.STRING_MAP, [], name,
+                           core.VarDesc.VarType.STRING_MAP, True)
     tensor.value().set_string_map(string_dict)
     return tensor

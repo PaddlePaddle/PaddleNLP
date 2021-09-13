@@ -22,7 +22,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+import paddlenlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup, BertTokenizer, BertForSequenceClassification
@@ -45,11 +45,6 @@ parser.add_argument("--seed", type=int, default=1000, help="random seed for init
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
-
-
-class TestDataset(paddle.io.Dataset):
-    def __init__(self, file_path, mode):
-        self
 
 
 def set_seed(seed):
@@ -75,6 +70,7 @@ def evaluate(model, criterion, metric, data_loader):
     losses = []
     for batch in data_loader:
         texts, labels = batch
+        texts = paddlenlp.ops.to_strings_tensor(texts, "texts")
         logits = model(texts)
         loss = criterion(logits, labels)
         losses.append(loss.numpy())
@@ -118,21 +114,6 @@ def convert_example(example, is_test=False):
         return example["text"]
     else:
         return example["text"], example["label"]
-
-
-def batchify_fn(batch, tokenizer, max_seq_len=128, pad_to_max_seq_len=True):
-    batch_texts = []
-    batch_labels = []
-    for text, label in batch:
-        batch_texts.append(text)
-        batch_labels.append(label)
-
-    input_ids, token_type_ids = tokenizer(
-        batch_texts,
-        max_seq_len=max_seq_len,
-        pad_to_max_seq_len=pad_to_max_seq_len)
-    batch_labels = paddle.to_tensor(batch_labels, dtype="int64")
-    return input_ids, token_type_ids, batch_labels
 
 
 def create_dataloader(dataset, trans_fn=None, mode='train', batch_size=1):
@@ -204,7 +185,12 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             texts, labels = batch
-            logits = model(texts)
+
+            text_tensor = paddlenlp.ops.to_strings_tensor(texts, "text")
+            # if text_pair_tensor is not None:
+            #     text_pair_tensor = paddlenlp.ops.to_strings_tensor(text_pair,
+            #                                                     "text_pair")
+            logits = model(text_tensor)
             loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
             correct = metric.compute(probs, labels)

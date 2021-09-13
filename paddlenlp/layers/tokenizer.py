@@ -19,6 +19,9 @@ import paddle.nn as nn
 import paddlenlp
 from paddlenlp.transformers import BertTokenizer
 
+from paddle.fluid.layer_helper import LayerHelper
+from paddle.fluid.framework import in_dygraph_mode
+
 __all__ = ["FastTokenizer"]
 
 
@@ -41,22 +44,46 @@ class FastTokenizer(nn.Layer):
         vocab_tensor = paddlenlp.ops.to_map_tensor(vocab, "vocab")
         self.register_buffer("vocab", vocab_tensor, persistable=True)
 
-    def forward(
-            self,
-            text,
-            text_pair=None,
-            max_seq_len=-1,
-            is_split_into_words=False,
-            pad_to_max_seq_len=False, ):
-        text_tensor = paddlenlp.ops.to_strings_tensor(text, "text")
-        text_pair_tensor = text_pair
-        if text_pair_tensor is not None:
-            text_pair_tensor = paddlenlp.ops.to_strings_tensor(text_pair,
-                                                               "text_pair")
-        input_ids, seg_ids = core.ops.tokenizer(
-            self.vocab, text_tensor, text_pair_tensor, "max_seq_len",
-            max_seq_len, "pad_to_max_seq_len", pad_to_max_seq_len,
-            "is_split_into_words", is_split_into_words)
+    def forward(self,
+                text,
+                text_pair=None,
+                max_seq_len=-1,
+                is_split_into_words=False,
+                pad_to_max_seq_len=False):
+        if in_dygraph_mode():
+            input_ids, seg_ids = core.ops.tokenizer(
+                self.vocab, text, text_pair, "max_seq_len", max_seq_len,
+                "pad_to_max_seq_len", pad_to_max_seq_len, "is_split_into_words",
+                is_split_into_words)
+            return input_ids, seg_ids
+
+        attrs = {
+            "max_seq_len": max_seq_len,
+            "pad_to_max_seq_len": pad_to_max_seq_len,
+            "is_split_into_words": is_split_into_words,
+        }
+        helper = LayerHelper("tokenizer")
+        input_ids = helper.create_variable_for_type_inference(dtype="int64")
+        seg_ids = helper.create_variable_for_type_inference(dtype="int64")
+        if text_pair is None:
+            helper.append_op(
+                type='tokenizer',
+                inputs={'Vocab': self.vocab,
+                        'Text': text},
+                outputs={'InputIds': input_ids,
+                         'SegmentIds': seg_ids},
+                attrs=attrs)
+        else:
+            helper.append_op(
+                type='tokenizer',
+                inputs={
+                    'Vocab': self.vocab,
+                    'Text': text,
+                    'TextPair': text_pair
+                },
+                outputs={'InputIds': input_ids,
+                         'SegmentIds': seg_ids},
+                attrs=attrs)
         return input_ids, seg_ids
 
 

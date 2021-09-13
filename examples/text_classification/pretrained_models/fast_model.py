@@ -17,7 +17,5 @@ class FastBertForSequenceClassification(nn.Layer):
 
     def forward(self, text):
         input_ids, token_type_ids = self.tokenizer(text, max_seq_len=128)
-        inputs_ids = input_ids.pin_memory()
-        token_type_ids = token_type_ids.pin_memory()
         logits = self.bert_cls(input_ids, token_type_ids)
         return logits
