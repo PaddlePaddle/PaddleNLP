@@ -56,6 +56,7 @@ def run_evaluate(data_loader,
                  epoch,
                  task_name="valid"):
     all_loss = []
+    model.eval()
     local_time = time.time()
     for eval_step, batch in enumerate(data_loader):
         tokens, loss_mask, attention_mask, position_ids, labels = batch
@@ -64,12 +65,36 @@ def run_evaluate(data_loader,
         all_loss.append(float(loss))
         if eval_step >= iter_steps - 1:
             break
-
+    model.train()
     average_loss = sum(all_loss) / len(all_loss)
     logger.info("%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
                 % (task_name, global_step, epoch, eval_step, average_loss,
                    iter_steps / (time.time() - local_time)))
     log_writer.add_scalar(task_name + "_loss", average_loss, global_step)
+
+
+def get_train_data_file(args):
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_idx.npz"))
+    ]
+    files = [x.replace("_idx.npz", "") for x in files]
+    if len(files) == 0:
+        logger.warning(
+            "Not found dataset with name of xxx_ids.npy and xxx_idx.npz! Try to found old compatible xxx_ids.npz file."
+        )
+    else:
+        return files
+
+    files = [
+        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_ids.npz"))
+    ]
+
+    files = [x.replace("_ids.npz", "") for x in files]
+    return files
 
 
 def do_train(args):
@@ -79,6 +104,7 @@ def do_train(args):
 
     worker_index = paddle.distributed.get_rank()
     worker_num = paddle.distributed.get_world_size()
+    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     set_seed(args)
     # Now, we only support data parallel in dygraph mode for now.
     topo = Topology(
@@ -168,20 +194,17 @@ def do_train(args):
                            opt_path)
 
     global_step = 0
+    epoch = 0
     tic_train = time.time()
-    for epoch in range(args.num_train_epochs):
-        files = [
-            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_"
-                not in str(f))
-        ]
+    while True:
+        files = get_train_data_file(args)
         files.sort()
         num_files = len(files)
         for f_id in range(num_files):
             data_file = files[f_id]
             train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
-                args,
-                data_file,
+                args, [data_file],
+                local_rank=local_rank,
                 data_world_size=topo.data_info.size,
                 data_world_rank=topo.data_info.rank,
                 eos_id=tokenizer.eos_token_id)

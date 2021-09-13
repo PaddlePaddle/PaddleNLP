@@ -8,10 +8,8 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 ```text
 .
 ├── args.py                 # 训练参数配置
-├── create_pretraining_data.py         # 数据预处理脚本
 ├── converter.py            # 权重转化脚本
 ├── dataset.py              # 数据处理
-├── decompress.sh           # 数据集解压脚本
 ├── deploy/                 # 模型部署的inference脚本
 ├── export_model.py         # 导出预测部署的模型脚本
 ├── faster_gpt/             # 使用 FasterGPT 高性能预测 sample  
@@ -39,43 +37,45 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 
 ### 数据准备
 
-#### 原始数据获取
+#### 数据获取与制作
 
 [OpenWebTextCorpus](https://skylion007.github.io/OpenWebTextCorpus/)是一个开源的英文网页文本数据集，数据来源于Reddit，经过去重、清洗、提取，最终包含800多万个文档。
+本示例采用EleutherAI清洗好的[OpenWebText2数据](https://openwebtext2.readthedocs.io/en/latest/index.html#download-plug-and-play-version)
 
 下载以后通过以下命令解压：
 
 ```shell
-xz -d openwebtext.tar.xz
-tar xf openwebtext.tar
-mkdir raw_data
-bash decompress.sh
+wget https://the-eye.eu/public/AI/pile_preliminary_components/openwebtext2.jsonl.zst.tar ./
+tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
 ```
 
-解压以后得到的`raw_data`目录大小约为54GB。
+然后使用[data_tools](../data_tools)工具下的`create_pretraining_data.py`脚本进行数据集制作：
 
-#### 数据预处理
+```
+python -u  create_pretraining_data.py \
+    --model_name gpt2-en \
+    --tokenizer_name GPTTokenizer \
+    --data_format JSON \
+    --input_path /path/to/openwebtext/ \
+    --append_eos \
+    --output_prefix gpt_openwebtext  \
+    --workers 40 \
+    --log_interval 10000
+```
+处理时间约一个小时左右，就可以得到我们需要的`gpt_openwebtext_ids.npy`, `gpt_openwebtext_idx.npz`数据集文件。
 
-为了提升训练速度，我们在训练前将文本数据转成相应的id，并保存为npz格式：
-
+为了方便用户运行测试本模型，本项目提供了处理好的300M的训练样本：
 ```shell
-python create_pretraining_data.py --input_path raw_data \
- --model_name gpt2-en \
- --append_eod \
- --workers 8
+wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
+wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
 ```
 
-运行命令后，产出`raw_data_ids.npz`文件。为了方便用户运行测试本模型，本项目提供了处理好的300M的训练样本：
-
-```shell
-wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/train.data.json_ids.npz
-```
-
-将所有预处理得到的npz文件统一放入一个文件夹中，以备训练使用：
+将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：
 
 ```
 mkdir data
-mv train.data.json_ids.npz data
+mv gpt_en_dataset_300m_ids.npy ./data
+mv gpt_en_dataset_300m_idx.npz ./data
 ```
 
 ### 模型训练
