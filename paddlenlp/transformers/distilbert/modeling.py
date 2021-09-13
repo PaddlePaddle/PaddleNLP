@@ -228,14 +228,16 @@ class DistilBertModel(DistilBertPretrainedModel):
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
             attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention on padding token indices.
-                The values should be either 0 or 1.
-
-                - **1** for tokens that **not masked**,
-                - **0** for tokens that **masked**.
-
-                It's data type should be float32 and has a shape of [batch_size, num_attention_heads, sequence_length, sequence_length].
-                Defaults to `None`.
+                Mask used in multi-head attention to avoid performing attention to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
+                [batch_size, num_attention_heads, sequence_length, sequence_length].
+                Defaults to `None`, which means nothing needed to be prevented attention to.
 
         Returns:
             Tensor: Returns tensor `encoder_output`, which means the sequence of hidden-states at the last layer of the model.
