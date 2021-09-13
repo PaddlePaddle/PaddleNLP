@@ -68,7 +68,9 @@ def do_export(args):
         bos_id=args.bos_idx,
         eos_id=args.eos_idx,
         beam_size=args.beam_size,
-        max_out_len=args.max_out_len)
+        max_out_len=args.max_out_len,
+        rel_len=args.use_rel_len,
+        alpha=args.alpha)
 
     # Load the trained model
     assert args.init_from_params, (

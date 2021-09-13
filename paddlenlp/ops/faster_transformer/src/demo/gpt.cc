@@ -191,7 +191,8 @@ private:
                        std::vector<DataInput>& data_input_vec,
                        int max_len,
                        int batch_size) {
-    auto ids_t = predictor->GetInputHandle("ids");
+    auto ids_name = predictor->GetInputNames();
+    auto ids_t = predictor->GetInputHandle(ids_name[0]);
     std::vector<int> ids_vec;
     ids_vec.resize(max_len * batch_size);
     for (int i = 0; i < batch_size; ++i) {
