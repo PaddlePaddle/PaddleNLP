@@ -93,6 +93,7 @@ struct DecodingBeamsearchArguments : public DecodingArguments {
   int beam_width_;
   int temp_storage_size_;
   float beam_search_diversity_rate_;
+  float alpha_;  // power number for length penalty in beam search v2
 };
 
 struct Gpt2Arguments : public DecodingSamplingArguments {

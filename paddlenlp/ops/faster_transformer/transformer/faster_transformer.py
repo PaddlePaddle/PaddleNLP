@@ -31,6 +31,77 @@ from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
 
 
 class FasterTransformer(TransformerModel):
+    """
+    FasterTransformer is a faster version for generation with the Transformer
+    model. It uses a custom op based on and enhancing NV FasterTransformer to
+    do fast generation.
+
+    Args:
+        src_vocab_size (int):
+            The size of source vocabulary.
+        trg_vocab_size (int):
+            The size of target vocabulary.
+        max_length (int):
+            The maximum length of input sequences.
+        num_encoder_layers (int):
+            The number of sub-layers to be stacked in the encoder.
+        num_decoder_layers (int):
+            The number of sub-layers to be stacked in the decoder.
+        n_head (int):
+            The number of head used in multi-head attention.
+        d_model (int):
+            The dimension for word embeddings, which is also the last dimension of
+            the input and output of multi-head attention, position-wise feed-forward
+            networks, encoder and decoder.
+        d_inner_hid (int):
+            Size of the hidden layer in position-wise feed-forward networks.
+        dropout (float):
+            Dropout rates. Used for pre-process, activation and inside attention.
+        weight_sharing (bool):
+            Whether to use weight sharing. 
+        attn_dropout (float):
+            The dropout probability used in MHA to drop some attention target.
+            If None, use the value of dropout. Defaults to None.
+        act_dropout (float):
+            The dropout probability used after FFN activition. If None, use
+            the value of dropout. Defaults to None.
+        bos_id (int, optional):
+            The start token id and also is used as padding id. Defaults to 0.
+        eos_id (int, optional):
+            The end token id. Defaults to 1.
+        decoding_strategy (str, optional):
+            Indicating the strategy of decoding. It can be 'beam_search', 'beam_search_v2',
+            'topk_sampling' and 'topp_sampling'. For beam search strategies,
+            'v2' would select the top `beam_size * 2` beams and process the top
+            `beam_size` alive and finish beams in them separately, while 'v1'
+            would only select the top `beam_size` beams and mix up the alive and
+            finish beams. 'v2' always searchs more and get better results, since
+            the alive beams would always be `beam_size` while the number of alive
+            beams in `v1` might decrease when meeting the end token. However,
+            'v2' always generates longer results thus might do more calculation
+            and be slower.
+        beam_size (int, optional):
+            The beam width for beam search. Defaults to 4. 
+        topk (int, optional):
+            The number of highest probability tokens to keep for top-k sampling.
+            Defaults to 4. 
+        topp (float, optional):
+            The most probable tokens whose cumulative probability is not less than
+            `topp` are kept for top-p sampling. Defaults to 4. 
+        max_out_len (int, optional):
+            The maximum output length. Defaults to 256.
+        use_fp16_decoding(bool, optional): Whether to use fp16 for decoding. 
+        rel_len(bool, optional):
+            Indicating whether `max_out_len` in is the length relative to that
+            of source text. Only works in `v2` temporarily. It is suggest to set
+            a small `max_out_len` and use `rel_len=True`. Default to False if
+            not set.
+        alpha(float, optional):
+            The power number in length penalty calculation. Only works in `v2`
+            temporarily. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
+            Default to 0.6 if not set.
+    """
+
     def __init__(self,
                  src_vocab_size,
                  trg_vocab_size,
@@ -52,7 +123,9 @@ class FasterTransformer(TransformerModel):
                  topp=0.0,
                  max_out_len=256,
                  decoding_lib=None,
-                 use_fp16_decoding=False):
+                 use_fp16_decoding=False,
+                 rel_len=False,
+                 alpha=0.6):
         # if decoding_lib is None:
         #     raise ValueError(
         #         "The args decoding_lib must be set to use Faster Transformer. ")
@@ -69,6 +142,8 @@ class FasterTransformer(TransformerModel):
         self.max_out_len = args.pop("max_out_len")
         self.decoding_lib = args.pop("decoding_lib")
         self.use_fp16_decoding = args.pop("use_fp16_decoding")
+        self.rel_len = args.pop("rel_len")
+        self.alpha = args.pop("alpha")
         self.dropout = dropout
         self.weight_sharing = weight_sharing
         self.trg_vocab_size = trg_vocab_size
@@ -102,7 +177,9 @@ class FasterTransformer(TransformerModel):
             topp=topp,
             max_out_len=max_out_len,
             decoding_lib=self.decoding_lib,
-            use_fp16_decoding=self.use_fp16_decoding)
+            use_fp16_decoding=self.use_fp16_decoding,
+            rel_len=self.rel_len,
+            alpha=self.alpha)
 
     def forward(self, src_word):
         src_max_len = paddle.shape(src_word)[-1]
@@ -153,8 +230,11 @@ class FasterTransformer(TransformerModel):
         # NOTE: the data type of the embedding bias for logits is different
         # between decoding with beam search and top-k/top-p sampling in
         # Faster Transformer when using float16.
+        # NOTE: This changes since FasterTransformer V4.0 and update accordingly
+        # after update to FT-4.0.
         bias_dtype = "float32"
-        if self.use_fp16_decoding and "beam_search" != self.decoding_strategy:
+        if self.use_fp16_decoding and not self.decoding_strategy.startswith(
+                "beam_search"):
             bias_dtype = "float16"
         model_dict["decoding_linear.bias"] = np.zeros(
             [self.trg_vocab_size], dtype=bias_dtype)
@@ -180,6 +260,71 @@ class FasterTransformer(TransformerModel):
         self.load_dict(model_dict)
 
     def export_params(self, init_from_params, place):
+        '''
+        This method is used for load static graph from dygraph checkpoint
+        or export inference model using static graph. 
+
+        Args:
+            init_from_params (string):
+                The path to dygraph checkpoint. 
+            place (paddle.Place):
+                The place to execute static graph. 
+        
+        Example:
+            .. code-block::
+                paddle.enable_static()
+                place = "gpu"
+                place = paddle.set_device(place)
+                reader.adapt_vocab_size(args)
+
+                test_program = paddle.static.Program()
+                startup_program = paddle.static.Program()
+                with paddle.static.program_guard(test_program, startup_program):
+                    src_word = paddle.static.data(
+                        name="src_word", shape=[None, None], dtype="int64")
+
+                    # Define model
+                    transformer = FasterTransformer(
+                        src_vocab_size=args.src_vocab_size,
+                        trg_vocab_size=args.trg_vocab_size,
+                        max_length=args.max_length + 1,
+                        num_encoder_layers=args.n_layer,
+                        num_decoder_layers=args.n_layer,
+                        n_head=args.n_head,
+                        d_model=args.d_model,
+                        d_inner_hid=args.d_inner_hid,
+                        dropout=args.dropout,
+                        weight_sharing=args.weight_sharing,
+                        bos_id=args.bos_idx,
+                        eos_id=args.eos_idx,
+                        decoding_strategy=args.decoding_strategy,
+                        beam_size=args.beam_size,
+                        max_out_len=args.max_out_len,
+                        decoding_lib=args.decoding_lib,
+                        use_fp16_decoding=args.use_fp16_decoding,
+                        rel_len=args.use_rel_len,
+                        alpha=args.alpha)
+
+                    finished_seq = transformer(src_word=src_word)
+
+                test_program = test_program.clone(for_test=True)
+
+                exe = paddle.static.Executor(place)
+                exe.run(startup_program)
+
+                # Load checkpoint.
+                transformer.export_params(
+                    init_from_params=os.path.join(args.init_from_params,
+                                                "transformer.pdparams"),
+                    place=place)
+
+                paddle.static.save_inference_model(
+                    os.path.join(args.inference_model_dir, "transformer"),
+                    feed_vars=src_word,
+                    fetch_vars=finished_seq,
+                    executor=exe,
+                    program=test_program)
+        '''
         # Load the trained model
         assert init_from_params, (
             "Please set init_from_params to load the infer model.")
@@ -199,8 +344,11 @@ class FasterTransformer(TransformerModel):
         # NOTE: the data type of the embedding bias for logits is different
         # between decoding with beam search and top-k/top-p sampling in
         # Faster Transformer when using float16.
+        # NOTE: This changes since FasterTransformer V4.0 and update accordingly
+        # after update to FT-4.0.
         bias_dtype = "float32"
-        if self.use_fp16_decoding and "beam_search" != self.decoding_strategy:
+        if self.use_fp16_decoding and not self.decoding_strategy.startswith(
+                "beam_search"):
             bias_dtype = "float16"
         model_dict["decoding_linear.bias"] = np.zeros(
             [self.trg_vocab_size], dtype=bias_dtype)
@@ -235,9 +383,9 @@ class FasterTransformer(TransformerModel):
 
 class TransformerGenerator(paddle.nn.Layer):
     """
-    The Transformer model for auto-regressive generation. It wraps `FasterTransformer`
-    and `InferTransformerModel`, and automatically chioces using `FasterTransformer`
-    (with jit building) or the slower verison `InferTransformerModel`.
+    The Transformer model for auto-regressive generation with beam search. It wraps
+    `FasterTransformer` and `InferTransformerModel`, and automatically chioces using
+    `FasterTransformer` (with jit building) or the slower verison `InferTransformerModel`.
 
     Args:
         src_vocab_size (int):
@@ -271,14 +419,39 @@ class TransformerGenerator(paddle.nn.Layer):
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
         kwargs:
-            The key word arguments can be `output_time_major`, `use_fp16_decoding` and `use_ft`.
-            `output_time_major(bool, optional)`: Indicate the data layout of predicted
+            The key word arguments can be `output_time_major`, `use_ft`, `use_fp16_decoding`,
+            `rel_len`, `alpha`:
+
+            - `output_time_major(bool, optional)`: Indicate the data layout of predicted
             Tensor. If `False`, the data layout would be batch major with shape
             `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
-            to `False`. `use_fp16_decoding(bool, optional)`: Whether to use fp16
-            for decoding. `use_ft(bool, optional)`: Whether to use Faster Transformer
-            for decoding. 
+            to `False`. 
+
+            - `use_ft(bool, optional)`: Whether to use Faster Transformer
+            for decoding. Default to True if not set.
+
+            - `use_fp16_decoding(bool, optional)`: Whether to use fp16
+            for decoding.  Only works when using Faster Transformer.
+
+            - `beam_search_version(str, optional)`: Indicating the strategy of
+            beam search. It can be 'v1' or 'v2'. 'v2' would select the top
+            `beam_size * 2` beams and process the top `beam_size` alive and
+            finish beams in them separately, while 'v1' would only select the
+            top `beam_size` beams and mix up the alive and finish beams. 'v2' always
+            searchs more and get better results, since the alive beams would
+            always be `beam_size` while the number of alive beams in `v1` might
+            decrease when meeting the end token. However, 'v2' always generates
+            longer results thus might do more calculation and be slower.
+
+            - `rel_len(bool, optional)`: Indicating whether `max_out_len` in is
+            the length relative to that of source text. Only works in `v2` temporarily.
+            It is suggest to set a small `max_out_len` and use `rel_len=True`.
+            Default to False if not set.
+
+            - `alpha(float, optional)`: The power number in length penalty
+            calculation. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
+            Only works in `v2` temporarily. Default to 0.6 if not set.
     """
 
     def __init__(self,
@@ -308,10 +481,16 @@ class TransformerGenerator(paddle.nn.Layer):
         self.output_time_major = kwargs.pop("output_time_major", True)
         use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
         use_ft = kwargs.pop("use_ft", True)
+        beam_search_version = kwargs.pop("beam_search_version", "v1")
+        rel_len = kwargs.pop("rel_len", False)
+        alpha = kwargs.pop("alpha", 0.6)
 
         if use_ft:
             try:
                 load("FasterTransformer", verbose=True)
+                decoding_strategy = ("beam_search_v2"
+                                     if beam_search_version == "v2" else
+                                     "beam_search")
                 self.transformer = FasterTransformer(
                     src_vocab_size=src_vocab_size,
                     trg_vocab_size=trg_vocab_size,
@@ -327,7 +506,10 @@ class TransformerGenerator(paddle.nn.Layer):
                     eos_id=eos_id,
                     beam_size=beam_size,
                     max_out_len=max_out_len,
-                    use_fp16_decoding=use_fp16_decoding)
+                    decoding_strategy=decoding_strategy,
+                    use_fp16_decoding=use_fp16_decoding,
+                    rel_len=rel_len,
+                    alpha=alpha)
             except Exception:
                 logger.warning(
                     "Exception occurs when using Faster Transformer. " \
@@ -348,7 +530,9 @@ class TransformerGenerator(paddle.nn.Layer):
                     beam_size=beam_size,
                     max_out_len=max_out_len,
                     output_time_major=self.output_time_major,
-                    **kwargs)
+                    beam_search_version=beam_search_version,
+                    rel_len=rel_len,
+                    alpha=alpha)
         else:
             self.transformer = InferTransformerModel(
                 src_vocab_size=src_vocab_size,
@@ -366,7 +550,9 @@ class TransformerGenerator(paddle.nn.Layer):
                 beam_size=beam_size,
                 max_out_len=max_out_len,
                 output_time_major=self.output_time_major,
-                **kwargs)
+                beam_search_version=beam_search_version,
+                rel_len=rel_len,
+                alpha=alpha)
 
     def forward(self, src_word):
         r"""
@@ -382,7 +568,10 @@ class TransformerGenerator(paddle.nn.Layer):
             Tensor:
                 An int64 tensor shaped indicating the predicted ids. Its shape is
                 `[batch_size, seq_len, beam_size]` or `[seq_len, batch_size, beam_size]`
-                according to `output_time_major`.
+                according to `output_time_major`. While, when using FasterTransformer
+                and beam search v2, the beam dimension would be doubled to include
+                both the top `beam_size` alive and finish beams, thus the tensor
+                shape is `[batch_size, seq_len, beam_size * 2]` or `[seq_len, batch_size, beam_size * 2]`.
         
         Example:
             .. code-block::

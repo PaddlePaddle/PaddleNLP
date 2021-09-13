@@ -11,6 +11,7 @@ paddlenlp.transformers
    :maxdepth: 4
 
    paddlenlp.transformers.albert
+   paddlenlp.transformers.bart
    paddlenlp.transformers.bert
    paddlenlp.transformers.bigbird
    paddlenlp.transformers.distilbert
@@ -23,10 +24,12 @@ paddlenlp.transformers
    paddlenlp.transformers.gpt
    paddlenlp.transformers.nezha
    paddlenlp.transformers.roberta
+   paddlenlp.transformers.roformer
    paddlenlp.transformers.skep
    paddlenlp.transformers.tinybert
    paddlenlp.transformers.transformer
    paddlenlp.transformers.unified_transformer
+   paddlenlp.transformers.unimo
    paddlenlp.transformers.xlnet
 
 
