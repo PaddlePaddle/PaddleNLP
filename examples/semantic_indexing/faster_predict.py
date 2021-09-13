@@ -27,7 +27,9 @@ from paddlenlp.transformers import ErnieTokenizer, ErnieModel
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
 from paddlenlp.ops.ext_utils import load
-from paddlenlp.ops import transfer_param, enable_faster_encoder
+from paddlenlp.ops import transfer_param, enable_faster_encoder, disable_faster_encoder
+
+from data import read_text_pair, convert_example, create_dataloader
 
 
 def parse_args():
@@ -43,7 +45,7 @@ def parse_args():
         type=int,
         help="output_embedding_size")
     parser.add_argument(
-        "--init_from_params",
+        "--params_path",
         type=str,
         required=True,
         help="The path to model parameters to be loaded.")
@@ -55,72 +57,20 @@ def parse_args():
         "Sequences longer than this will be truncated, sequences shorter will be padded."
     )
     parser.add_argument(
+        "--dropout", default=0.0, type=float, help="Dropout probability.")
+    parser.add_argument(
         "--batch_size",
         default=32,
         type=int,
         help="Batch size per GPU/CPU for training.")
     parser.add_argument("--seed", default=42, type=int, help="Random seed.")
     parser.add_argument(
-        "--use_fp16_encoder",
+        "--pad_to_max_seq_len",
         action="store_true",
-        help="Whether to use fp16 encoder to predict. ")
+        help="Whether to pad to max_seq_len.")
+
     args = parser.parse_args()
     return args
-
-
-def read_text_pair(data_path):
-    """Reads data."""
-    with open(data_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            data = line.rstrip().split("\t")
-            if len(data) != 2:
-                continue
-            yield {'text_a': data[0], 'text_b': data[1]}
-
-
-def convert_example(example, tokenizer, max_seq_length=512):
-    """
-    Builds model inputs from a sequence.
-        
-    A BERT sequence has the following format:
-    - single sequence: ``[CLS] X [SEP]``
-    Args:
-        example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
-            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
-            Sequences longer than this will be truncated, sequences shorter will be padded.
-        is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
-    Returns:
-        input_ids(obj:`list[int]`): The list of query token ids.
-        token_type_ids(obj: `list[int]`): List of query sequence pair mask.
-    """
-
-    result = []
-    for key, text in example.items():
-        encoded_inputs = tokenizer(
-            text=text, max_seq_len=max_seq_length, pad_to_max_seq_len=True)
-        input_ids = encoded_inputs["input_ids"]
-
-        token_type_ids = encoded_inputs["token_type_ids"]
-        result += [input_ids, token_type_ids]
-    return result
-
-
-def create_dev_dataloader(dataset,
-                          batch_size=1,
-                          batchify_fn=None,
-                          trans_fn=None):
-    if trans_fn:
-        dataset = dataset.map(trans_fn)
-    batch_sampler = paddle.io.BatchSampler(
-        dataset, batch_size=batch_size, shuffle=False)
-
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
 
 
 class SemanticIndexingPredictor(nn.Layer):
@@ -135,13 +85,11 @@ class SemanticIndexingPredictor(nn.Layer):
                  bos_id=0,
                  dropout=0,
                  max_seq_len=128,
-                 is_gelu=False,
-                 use_fp16_encoder=False):
+                 is_gelu=False):
         super(SemanticIndexingPredictor, self).__init__()
         size_per_head = hidden_size // n_head
         self.bos_id = bos_id
         self.ptm = pretrained_model
-        self.use_fp16_encoder = use_fp16_encoder
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.0)
         self.output_emb_size = output_emb_size
         if output_emb_size > 0:
@@ -156,7 +104,7 @@ class SemanticIndexingPredictor(nn.Layer):
                 "Exception occurs when using Faster Transformer. " \
                 "The original forward will be involved. ")
         encoder_layer = TransformerEncoderLayer(
-            hidden_size, n_head, dim_feedforward, dropout=0.0)
+            hidden_size, n_head, dim_feedforward, dropout=dropout)
         self.ptm.encoder = TransformerEncoder(encoder_layer, n_layer)
 
     def get_pooled_embedding(self,
@@ -178,13 +126,7 @@ class SemanticIndexingPredictor(nn.Layer):
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
-        if args.use_fp16_encoder:
-            embedding_output = paddle.cast(embedding_output, dtype="float16")
-            # paddle.sum is not supported in fp16.
-            # src_mask = paddle.cast(src_mask, dtype="float16")
         sequence_output = self.ptm.encoder(embedding_output, src_mask)
-        if args.use_fp16_encoder:
-            sequence_output = paddle.cast(sequence_output, dtype="float32")
         cls_embedding = self.ptm.pooler(sequence_output)
 
         if self.output_emb_size > 0:
@@ -214,37 +156,6 @@ class SemanticIndexingPredictor(nn.Layer):
         return cosine_sim
 
     def load(self, init_from_params):
-        if self.use_fp16_encoder:
-            for mod in self.ptm.encoder.layers:
-                mod.self_attn.q_proj.weight = transfer_param(
-                    mod.self_attn.q_proj.weight)
-                mod.self_attn.q_proj.bias = transfer_param(
-                    mod.self_attn.q_proj.bias, is_bias=True)
-                mod.self_attn.k_proj.weight = transfer_param(
-                    mod.self_attn.k_proj.weight)
-                mod.self_attn.k_proj.bias = transfer_param(
-                    mod.self_attn.k_proj.bias, is_bias=True)
-                mod.self_attn.v_proj.weight = transfer_param(
-                    mod.self_attn.v_proj.weight)
-                mod.self_attn.v_proj.bias = transfer_param(
-                    mod.self_attn.v_proj.bias, is_bias=True)
-                mod.self_attn.out_proj.weight = transfer_param(
-                    mod.self_attn.out_proj.weight)
-                mod.self_attn.out_proj.bias = transfer_param(
-                    mod.self_attn.out_proj.bias, is_bias=True)
-                mod.norm1.weight = transfer_param(mod.norm1.weight)
-                mod.norm1.bias = transfer_param(mod.norm1.bias, is_bias=True)
-                mod.norm2.weight = transfer_param(mod.norm2.weight)
-                mod.norm2.bias = transfer_param(mod.norm2.bias, is_bias=True)
-                mod.linear1.weight = transfer_param(mod.linear1.weight)
-                mod.linear1.bias = transfer_param(
-                    mod.linear1.bias, is_bias=True)
-                mod.linear2.weight = transfer_param(mod.linear2.weight)
-                mod.linear2.bias = transfer_param(
-                    mod.linear2.bias, is_bias=True)
-            for item in self.state_dict():
-                if "encoder.layers" in item:
-                    state_dict[item] = np.float16(state_dict[item])
         if init_from_params and os.path.isfile(init_from_params):
             state_dict = paddle.load(init_from_params)
             self.set_state_dict(state_dict)
@@ -262,7 +173,8 @@ def do_predict(args):
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+        max_seq_length=args.max_seq_length,
+        pad_to_max_seq_len=args.pad_to_max_seq_len)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -274,23 +186,22 @@ def do_predict(args):
     valid_ds = load_dataset(
         read_text_pair, data_path=args.text_pair_file, lazy=False)
 
-    valid_data_loader = create_dev_dataloader(
+    valid_data_loader = create_dataloader(
         valid_ds,
+        mode="predict",
         batch_size=args.batch_size,
         batchify_fn=batchify_fn,
         trans_fn=trans_func)
 
     pretrained_model = ErnieModel.from_pretrained("ernie-1.0")
+
     model = SemanticIndexingPredictor(
         pretrained_model,
         args.output_emb_size,
-        n_layer=12,
-        activation='relu',
-        bos_id=0,
         max_seq_len=args.max_seq_length,
-        use_fp16_encoder=args.use_fp16_encoder)
+        dropout=args.dropout)
     model.eval()
-    model.load(args.init_from_params)
+    model.load(args.params_path)
     model = enable_faster_encoder(model)
     cosine_sims = []
     for batch_data in valid_data_loader:
@@ -304,12 +215,12 @@ def do_predict(args):
             title_input_ids=title_input_ids,
             query_token_type_ids=query_token_type_ids,
             title_token_type_ids=title_token_type_ids).numpy()
-
         cosine_sims.append(batch_cosine_sim)
 
     cosine_sims = np.concatenate(cosine_sims, axis=0)
     for cosine in cosine_sims:
         print('{}'.format(cosine))
+    model = disable_faster_encoder(model)
 
 
 if __name__ == "__main__":

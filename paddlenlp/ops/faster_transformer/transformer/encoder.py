@@ -134,7 +134,7 @@ def encoder_layer_forward(self,
 
 def encoder_forward(self, src, src_mask=None, cache=None):
     if src_mask.dtype == paddle.float16:
-        src_mask = paddle.cast(src_mask, "float32")  # paddle.sum不支持fp16
+        src_mask = paddle.cast(src_mask, "float32")
     mem_seq_lens = paddle.cast(
         paddle.squeeze(
             paddle.sum(src_mask, axis=[3]), axis=[1, 2]),
@@ -176,7 +176,7 @@ def encoder_forward(self, src, src_mask=None, cache=None):
 def enable_faster_encoder(self):
     def init_func(layer):
         if isinstance(layer, (TransformerEncoderLayer, TransformerEncoder)):
-            layer.forward = layer._forward
+            layer.forward = layer._ft_forward
 
     if not self.training:
         for layer in self.children():
@@ -187,9 +187,7 @@ def enable_faster_encoder(self):
 def disable_faster_encoder(self):
     def init_func(layer):
         if isinstance(layer, (TransformerEncoderLayer, TransformerEncoder)):
-            import pdb
-            pdb.set_trace()
-            layer.forward = type(layer).forward
+            layer.forward = layer._ori_forward
 
     for layer in self.children():
         layer.apply(init_func)

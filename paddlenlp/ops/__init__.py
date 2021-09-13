@@ -20,5 +20,8 @@ from .einsum import *
 from .distributed import *
 from . import optimizer
 
-paddle.nn.TransformerEncoderLayer._forward = encoder_layer_forward
-paddle.nn.TransformerEncoder._forward = encoder_forward
+paddle.nn.TransformerEncoderLayer._ft_forward = encoder_layer_forward
+paddle.nn.TransformerEncoder._ft_forward = encoder_forward
+
+paddle.nn.TransformerEncoderLayer._ori_forward = paddle.nn.TransformerEncoderLayer.forward
+paddle.nn.TransformerEncoder._ori_forward = paddle.nn.TransformerEncoder.forward

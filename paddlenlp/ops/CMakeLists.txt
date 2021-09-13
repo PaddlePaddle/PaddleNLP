@@ -46,7 +46,7 @@ if(WITH_UNIFIED)
 endif()
 
 if(WITH_ENCODER)
-  list(APPEND encoder_op_files fusion_encoder_op.cc fusion_encoder_op.cu)
+  list(APPEND decoding_op_files fusion_encoder_op.cc fusion_encoder_op.cu)
 endif()
 
 if(WITH_DECODER)
@@ -172,6 +172,7 @@ file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/bert_encoder_tra
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_dst)
 
 set(OPT_OPEN_ATTN_COMMAND sed -i -e "370,392d" -e "410,454d" -e "229d" ${open_attention_h_dst})
+#set(OPT_BERT_ENCODER_COMMAND sed -i -e "552,592d" -e "118a   bool is_gelu_=true;" ${bert_encoder_transformer_h_dst})
 
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
