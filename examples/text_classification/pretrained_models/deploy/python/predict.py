@@ -14,6 +14,7 @@
 
 import argparse
 import os
+import sys
 
 import numpy as np
 import paddle
@@ -23,6 +24,8 @@ from paddle import inference
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
+
+sys.path.append('./')
 
 from utils import convert_example
 

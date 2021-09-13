@@ -135,6 +135,7 @@ class Taskflow(object):
         self.model = model
         # Update the task config to kwargs
         config_kwargs = TASKS[self.task]['models'][self.model]
+        kwargs['device_id'] = device_id
         kwargs.update(config_kwargs)
         self.kwargs = kwargs
         task_class = TASKS[self.task]['models'][self.model]['task_class']
