@@ -5,6 +5,7 @@ import random
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
+from pycocotools.coco import COCO
 
 from . import DatasetBuilder
 
@@ -39,7 +40,6 @@ class COCOCaptions(DatasetBuilder):
         """Reads data."""
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
 
-        from pycocotools.coco import COCO
         coco = COCO(filename)
         items = coco.loadAnns(coco.getAnnIds())
         
