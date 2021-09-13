@@ -22,17 +22,17 @@ def parse_args():
     parser.add_argument(
         "--inference_model_dir",
         type=str,
-        default="./",
+        default="./export/",
         help="The directory of the inference model.")
     parser.add_argument(
         "--model_file",
         type=str,
-        default='./output/inference.pdmodel',
+        default='inference.pdmodel',
         help="The inference model file name.")
     parser.add_argument(
         "--params_file",
         type=str,
-        default='./output/inference.pdiparams',
+        default='inference.pdiparams',
         help="The input inference parameters file name.")
     return parser.parse_args()
 
