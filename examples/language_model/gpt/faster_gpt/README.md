@@ -23,7 +23,7 @@
 
 #### 克隆 PaddleNLP
 
-首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterUNIMOText 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译。
+首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterGPT 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译。
 
 ``` sh
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
@@ -87,7 +87,7 @@ gpt = FasterGPT(
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 
-目前，GPT-2 的例子仅支持 `batch size` 为 `1` 或是 batch 内输入的样本都是相同的情况。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
+目前，GPT-2 的例子仅支持 `batch size` 为 `1` 或是 batch 内输入的样本的长度都是相同的情况。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
 
 更详细的例子可以参考 `./infer.py`，我们提供了更详细用例。
 
