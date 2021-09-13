@@ -93,7 +93,6 @@ class TextGenerationTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        paddle.nn.initializer.set_global_initializer(None, None)
         model_instance = GPTForGreedyGeneration.from_pretrained(
             self.model, max_predict_len=32)
         # Load the model parameter for the predict
@@ -117,13 +116,7 @@ class TextGenerationTask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        inputs = inputs[0]
-        if isinstance(inputs, str):
-            inputs = [inputs]
-        if not isinstance(inputs, str) and not isinstance(inputs, list):
-            raise TypeError(
-                "Invalid inputs, input text should be str or list of str, {type(inputs)} found!"
-            )
+        inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
         batch_size = self.kwargs[
             'batch_size'] if 'batch_size' in self.kwargs else 1
@@ -150,7 +143,11 @@ class TextGenerationTask(Task):
         infer_data = []
 
         examples = []
+        filter_inputs = []
         for input_text in inputs:
+            if not (isinstance(input_text, str) and len(input_text) > 0):
+                continue
+            filter_inputs.append(input_text)
             few_shot_input = pre_input.format(input_text)
             ids = self._tokenizer(few_shot_input)["input_ids"]
             examples.append((ids, len(ids)))
@@ -165,7 +162,7 @@ class TextGenerationTask(Task):
             for idx in range(0, len(examples), batch_size)
         ]
         outputs = {}
-        outputs['text'] = inputs
+        outputs['text'] = filter_inputs
         outputs['data_loader'] = batches
         self._batchify_fn = batchify_fn
         return outputs
@@ -190,7 +187,7 @@ class TextGenerationTask(Task):
 
     def _postprocess(self, inputs):
         """
-        The model output is allways the logits and pros, this function will convert the model output to raw text.
+        The model output is tag ids, this function will convert the model output to raw text.
         """
         batch_out = []
         preds = inputs['results']

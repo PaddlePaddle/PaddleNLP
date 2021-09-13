@@ -69,13 +69,13 @@ python change_sgml_to_txt.py -i extra_train_ds/train.sgml -o extra_train_ds/trai
 ### 单卡训练
 
 ```python
-python train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir ./checkpoints/ --extra_train_ds_dir ./extra_train_ds/
+python train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir ./checkpoints/ --extra_train_ds_dir ./extra_train_ds/ --max_seq_length 192
 ```
 
 ### 多卡训练
 
 ```python
-python -m paddle.distributed.launch --gpus "0,1"  train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir ./checkpoints/ --extra_train_ds_dir ./extra_train_ds/
+python -m paddle.distributed.launch --gpus "0,1"  train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir ./checkpoints/ --extra_train_ds_dir ./extra_train_ds/ --max_seq_length 192
 ```
 
 ## 模型预测
@@ -132,6 +132,29 @@ Target: 遇到逆境时，我们必须勇于面对，而且要愈挫愈勇，这
 Source: 人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。
 Target: 人生就是如此，经过磨练才能让自己更加茁壮，才能使自己更加乐观。
 ```
+
+### Taskflow一键预测
+可以使用PaddleNLP提供的Taskflow工具来对输入的文本进行一键纠错，具体使用方法如下:
+
+```python
+from paddlenlp import Taskflow
+text_correction = Taskflow("text_correction")
+text_correction('遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。')
+'''
+[{'source': '遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。',
+    'target': '遇到逆境时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。',
+    'errors': [{'position': 3, 'correction': {'竟': '境'}}]}]
+'''
+
+text_correction('人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。')
+'''
+[{'source': '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。',
+    'target': '人生就是如此，经过磨练才能让自己更加茁壮，才能使自己更加乐观。',
+    'errors': [{'position': 18, 'correction': {'拙': '茁'}}]}]
+'''
+
+```
+
 
 ## 参考文献
 * Ruiqing Zhang, Chao Pang et al. "Correcting Chinese Spelling Errors with Phonetic Pre-training", ACL, 2021

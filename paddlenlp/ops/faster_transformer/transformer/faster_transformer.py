@@ -260,6 +260,71 @@ class FasterTransformer(TransformerModel):
         self.load_dict(model_dict)
 
     def export_params(self, init_from_params, place):
+        '''
+        This method is used for load static graph from dygraph checkpoint
+        or export inference model using static graph. 
+
+        Args:
+            init_from_params (string):
+                The path to dygraph checkpoint. 
+            place (paddle.Place):
+                The place to execute static graph. 
+        
+        Example:
+            .. code-block::
+                paddle.enable_static()
+                place = "gpu"
+                place = paddle.set_device(place)
+                reader.adapt_vocab_size(args)
+
+                test_program = paddle.static.Program()
+                startup_program = paddle.static.Program()
+                with paddle.static.program_guard(test_program, startup_program):
+                    src_word = paddle.static.data(
+                        name="src_word", shape=[None, None], dtype="int64")
+
+                    # Define model
+                    transformer = FasterTransformer(
+                        src_vocab_size=args.src_vocab_size,
+                        trg_vocab_size=args.trg_vocab_size,
+                        max_length=args.max_length + 1,
+                        num_encoder_layers=args.n_layer,
+                        num_decoder_layers=args.n_layer,
+                        n_head=args.n_head,
+                        d_model=args.d_model,
+                        d_inner_hid=args.d_inner_hid,
+                        dropout=args.dropout,
+                        weight_sharing=args.weight_sharing,
+                        bos_id=args.bos_idx,
+                        eos_id=args.eos_idx,
+                        decoding_strategy=args.decoding_strategy,
+                        beam_size=args.beam_size,
+                        max_out_len=args.max_out_len,
+                        decoding_lib=args.decoding_lib,
+                        use_fp16_decoding=args.use_fp16_decoding,
+                        rel_len=args.use_rel_len,
+                        alpha=args.alpha)
+
+                    finished_seq = transformer(src_word=src_word)
+
+                test_program = test_program.clone(for_test=True)
+
+                exe = paddle.static.Executor(place)
+                exe.run(startup_program)
+
+                # Load checkpoint.
+                transformer.export_params(
+                    init_from_params=os.path.join(args.init_from_params,
+                                                "transformer.pdparams"),
+                    place=place)
+
+                paddle.static.save_inference_model(
+                    os.path.join(args.inference_model_dir, "transformer"),
+                    feed_vars=src_word,
+                    fetch_vars=finished_seq,
+                    executor=exe,
+                    program=test_program)
+        '''
         # Load the trained model
         assert init_from_params, (
             "Please set init_from_params to load the infer model.")

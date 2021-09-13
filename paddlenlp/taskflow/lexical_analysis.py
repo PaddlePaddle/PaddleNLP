@@ -47,7 +47,9 @@ usage = r"""
            '''
            lac(["LAC是个优秀的分词工具", "三亚是一个美丽的城市"])
            '''
-           [{'text': 'LAC是个优秀的分词工具', 'segs': ['LAC', '是', '个', '优秀', '的', '分词', '工具'], 'tags': ['nz', 'v', 'q', 'a', 'u', 'n', 'n']}, {'text': '三亚是一个美丽的城市', 'segs': ['三亚', '是', '一个', '美丽', '的', '城市'], 'tags': ['LOC', 'v', 'm', 'a', 'u', 'n']}]
+           [{'text': 'LAC是个优秀的分词工具', 'segs': ['LAC', '是', '个', '优秀', '的', '分词', '工具'], 'tags': ['nz', 'v', 'q', 'a', 'u', 'n', 'n']}, 
+            {'text': '三亚是一个美丽的城市', 'segs': ['三亚', '是', '一个', '美丽', '的', '城市'], 'tags': ['LOC', 'v', 'm', 'a', 'u', 'n']}
+           ]
            '''
 
          """
@@ -149,27 +151,25 @@ class LacTask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        inputs = inputs[0]
-        if isinstance(inputs, str):
-            inputs = [inputs]
-        if not isinstance(inputs, str) and not isinstance(inputs, list):
-            raise TypeError(
-                "Invalid inputs, input text should be str or list of str, {type(inputs)} found!"
-            )
+        inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
         batch_size = self.kwargs[
             'batch_size'] if 'batch_size' in self.kwargs else 1
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
-        lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
         max_seq_len = self.kwargs[
             'max_seq_len'] if 'max_seq_len' in self.kwargs else 64
         infer_data = []
         oov_token_id = self._word_vocab.get("OOV")
 
+        filter_inputs = []
+
         def read(inputs):
             for input_tokens in inputs:
+                if not (isinstance(input_tokens, str) and
+                        len(input_tokens.strip()) > 0):
+                    continue
+                filter_inputs.append(input_tokens)
                 input_tokens = input_tokens[:max_seq_len]
                 ids = []
                 for token in input_tokens:
@@ -179,7 +179,7 @@ class LacTask(Task):
                 lens = len(ids)
                 yield ids, lens
 
-        infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
+        infer_ds = load_dataset(read, inputs=inputs, lazy=False)
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=0, dtype="int64"),  # input_ids
             Stack(dtype='int64'),  # seq_len
@@ -192,7 +192,7 @@ class LacTask(Task):
             shuffle=False,
             return_list=True)
         outputs = {}
-        outputs['text'] = inputs
+        outputs['text'] = filter_inputs
         outputs['data_loader'] = infer_data_loader
         return outputs
 
@@ -225,7 +225,7 @@ class LacTask(Task):
 
     def _postprocess(self, inputs):
         """
-        The model output is allways the logits and pros, this function will convert the model output to raw text.
+        The model output is the tag ids, this function will convert the model output to raw text.
         """
         batch_out = []
         lengths = inputs['lens']

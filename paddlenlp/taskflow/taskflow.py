@@ -22,6 +22,7 @@ from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
 from .text_generation import TextGenerationTask
 from .dependency_parsing import DDParserTask
+from .text_correction import CSCTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -87,7 +88,17 @@ TASKS = {
         "default": {
             "model": "ddparser"
         }
-    }, 
+    },
+    'text_correction': {
+        "models": {
+            "csc-ernie-1.0": {
+                "task_class": CSCTask
+            },
+        },
+        "default": {
+            "model": "csc-ernie-1.0"
+        }
+    }
 }
 
 
@@ -124,6 +135,7 @@ class Taskflow(object):
         self.model = model
         # Update the task config to kwargs
         config_kwargs = TASKS[self.task]['models'][self.model]
+        kwargs['device_id'] = device_id
         kwargs.update(config_kwargs)
         self.kwargs = kwargs
         task_class = TASKS[self.task]['models'][self.model]['task_class']

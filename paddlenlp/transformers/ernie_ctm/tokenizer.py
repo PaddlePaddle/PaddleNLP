@@ -263,4 +263,4 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         Returns:
             List(str): A list of string representing converted tokens.
         """
-        return self._tokenize(text, kwargs)
+        return self._tokenize(text, **kwargs)
