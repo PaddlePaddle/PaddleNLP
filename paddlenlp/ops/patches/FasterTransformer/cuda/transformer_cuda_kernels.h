@@ -22,11 +22,12 @@ void embeddings_kernel_launcher(T* from_tensor,
                                 const T* position_encoding_table,
                                 const T* type_table,
                                 const int* memory_sequence_length,
+                                const int* type_id,
                                 const int* word_ids,
-                                const int type_id,
                                 const int step,
                                 const int batch_size,
                                 const int hidden_units,
+                                const bool pos_bias,
                                 cudaStream_t stream);
 
 template <typename T>
@@ -53,6 +54,7 @@ void init_logits_mask_Launcher(T* logits_mask,
 template <typename T>
 void apply_penalties_Launcher(int step,
                               T* log_probs,
+                              const bool* finished,
                               int* current_ids,
                               int* previous_ids,
                               int* parent_ids,
@@ -65,4 +67,17 @@ void apply_penalties_Launcher(int step,
                               float repeat_penalty,
                               cudaStream_t stream,
                               const T* logits_mask);
+
+template <typename T>
+void update_KV_cache_kernelLauncher(T** key_cache,
+                                    T** value_cache,
+                                    const int* beam_ids,
+                                    const int batch_size,
+                                    const int beam_width,
+                                    const int hidden_dim,
+                                    const int step,
+                                    const int start_len,
+                                    const int cache_size,
+                                    const int decoder_layers,
+                                    cudaStream_t stream);
 }

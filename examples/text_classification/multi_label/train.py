@@ -48,11 +48,13 @@ parser.add_argument("--data_path", type=str, default="./data", help="The path of
 args = parser.parse_args()
 # yapf: enable
 
+
 def set_seed(seed):
     """sets random seed"""
     random.seed(seed)
     np.random.seed(seed)
     paddle.seed(seed)
+
 
 @paddle.no_grad()
 def evaluate(model, criterion, metric, data_loader):
@@ -80,6 +82,7 @@ def evaluate(model, criterion, metric, data_loader):
     model.train()
     metric.reset()
 
+
 def do_train():
     paddle.set_device(args.device)
     rank = paddle.distributed.get_rank()
@@ -93,12 +96,7 @@ def do_train():
     train_ds = load_dataset(read_custom_data, filename=os.path.join(
         args.data_path, file_name), is_test=False, lazy=False)
 
-    # If you wanna use ernie pretrained model,
-    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-2.0-en")
     pretrained_model = ppnlp.transformers.BertModel.from_pretrained("bert-base-uncased")
-
-    # If you wanna use ernie pretrained model,
-    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained("ernie-2.0-en")
     tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-uncased')
 
     trans_func = partial(
@@ -134,7 +132,7 @@ def do_train():
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
-    
+
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
@@ -173,6 +171,7 @@ def do_train():
                 save_param_path = os.path.join(save_dir, "model_state.pdparams")
                 paddle.save(model.state_dict(), save_param_path)
                 tokenizer.save_pretrained(save_dir)
+
 
 if __name__ == "__main__":
     do_train()

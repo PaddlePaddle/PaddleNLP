@@ -22,13 +22,87 @@ import paddle.nn.functional as F
 from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     PositionalEmbedding, position_encoding_init,
                                     InferTransformerModel, GPTModel)
-from paddlenlp.ops import InferTransformerDecoding, InferGptDecoding
+from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
+                           InferUnifiedDecoding)
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
+from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
+                                    UnifiedTransformerPretrainedModel,
+                                    UNIMOPretrainedModel)
 
 
 class FasterTransformer(TransformerModel):
+    """
+    FasterTransformer is a faster version for generation with the Transformer
+    model. It uses a custom op based on and enhancing NV FasterTransformer to
+    do fast generation.
+
+    Args:
+        src_vocab_size (int):
+            The size of source vocabulary.
+        trg_vocab_size (int):
+            The size of target vocabulary.
+        max_length (int):
+            The maximum length of input sequences.
+        num_encoder_layers (int):
+            The number of sub-layers to be stacked in the encoder.
+        num_decoder_layers (int):
+            The number of sub-layers to be stacked in the decoder.
+        n_head (int):
+            The number of head used in multi-head attention.
+        d_model (int):
+            The dimension for word embeddings, which is also the last dimension of
+            the input and output of multi-head attention, position-wise feed-forward
+            networks, encoder and decoder.
+        d_inner_hid (int):
+            Size of the hidden layer in position-wise feed-forward networks.
+        dropout (float):
+            Dropout rates. Used for pre-process, activation and inside attention.
+        weight_sharing (bool):
+            Whether to use weight sharing. 
+        attn_dropout (float):
+            The dropout probability used in MHA to drop some attention target.
+            If None, use the value of dropout. Defaults to None.
+        act_dropout (float):
+            The dropout probability used after FFN activition. If None, use
+            the value of dropout. Defaults to None.
+        bos_id (int, optional):
+            The start token id and also is used as padding id. Defaults to 0.
+        eos_id (int, optional):
+            The end token id. Defaults to 1.
+        decoding_strategy (str, optional):
+            Indicating the strategy of decoding. It can be 'beam_search', 'beam_search_v2',
+            'topk_sampling' and 'topp_sampling'. For beam search strategies,
+            'v2' would select the top `beam_size * 2` beams and process the top
+            `beam_size` alive and finish beams in them separately, while 'v1'
+            would only select the top `beam_size` beams and mix up the alive and
+            finish beams. 'v2' always searchs more and get better results, since
+            the alive beams would always be `beam_size` while the number of alive
+            beams in `v1` might decrease when meeting the end token. However,
+            'v2' always generates longer results thus might do more calculation
+            and be slower.
+        beam_size (int, optional):
+            The beam width for beam search. Defaults to 4. 
+        topk (int, optional):
+            The number of highest probability tokens to keep for top-k sampling.
+            Defaults to 4. 
+        topp (float, optional):
+            The most probable tokens whose cumulative probability is not less than
+            `topp` are kept for top-p sampling. Defaults to 4. 
+        max_out_len (int, optional):
+            The maximum output length. Defaults to 256.
+        use_fp16_decoding(bool, optional): Whether to use fp16 for decoding. 
+        rel_len(bool, optional):
+            Indicating whether `max_out_len` in is the length relative to that
+            of source text. Only works in `v2` temporarily. It is suggest to set
+            a small `max_out_len` and use `rel_len=True`. Default to False if
+            not set.
+        alpha(float, optional):
+            The power number in length penalty calculation. Only works in `v2`
+            temporarily. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
+            Default to 0.6 if not set.
+    """
+
     def __init__(self,
                  src_vocab_size,
                  trg_vocab_size,
@@ -50,7 +124,9 @@ class FasterTransformer(TransformerModel):
                  topp=0.0,
                  max_out_len=256,
                  decoding_lib=None,
-                 use_fp16_decoding=False):
+                 use_fp16_decoding=False,
+                 rel_len=False,
+                 alpha=0.6):
         # if decoding_lib is None:
         #     raise ValueError(
         #         "The args decoding_lib must be set to use Faster Transformer. ")
@@ -67,6 +143,8 @@ class FasterTransformer(TransformerModel):
         self.max_out_len = args.pop("max_out_len")
         self.decoding_lib = args.pop("decoding_lib")
         self.use_fp16_decoding = args.pop("use_fp16_decoding")
+        self.rel_len = args.pop("rel_len")
+        self.alpha = args.pop("alpha")
         self.dropout = dropout
         self.weight_sharing = weight_sharing
         self.trg_vocab_size = trg_vocab_size
@@ -100,7 +178,9 @@ class FasterTransformer(TransformerModel):
             topp=topp,
             max_out_len=max_out_len,
             decoding_lib=self.decoding_lib,
-            use_fp16_decoding=self.use_fp16_decoding)
+            use_fp16_decoding=self.use_fp16_decoding,
+            rel_len=self.rel_len,
+            alpha=self.alpha)
 
     def forward(self, src_word):
         src_max_len = paddle.shape(src_word)[-1]
@@ -108,7 +188,7 @@ class FasterTransformer(TransformerModel):
             src_word == self.bos_id,
             dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
         src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
+            src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
                 start=0, end=src_max_len)
 
         # Run encoder
@@ -125,6 +205,7 @@ class FasterTransformer(TransformerModel):
 
         mem_seq_lens = paddle.sum(paddle.cast(
             src_word != self.bos_id, dtype="int32"),
+                                  dtype="int32",
                                   axis=1)
         ids = self.decoding(enc_output, mem_seq_lens)
 
@@ -150,8 +231,11 @@ class FasterTransformer(TransformerModel):
         # NOTE: the data type of the embedding bias for logits is different
         # between decoding with beam search and top-k/top-p sampling in
         # Faster Transformer when using float16.
+        # NOTE: This changes since FasterTransformer V4.0 and update accordingly
+        # after update to FT-4.0.
         bias_dtype = "float32"
-        if self.use_fp16_decoding and "beam_search" != self.decoding_strategy:
+        if self.use_fp16_decoding and not self.decoding_strategy.startswith(
+                "beam_search"):
             bias_dtype = "float16"
         model_dict["decoding_linear.bias"] = np.zeros(
             [self.trg_vocab_size], dtype=bias_dtype)
@@ -177,6 +261,71 @@ class FasterTransformer(TransformerModel):
         self.load_dict(model_dict)
 
     def export_params(self, init_from_params, place):
+        '''
+        This method is used for load static graph from dygraph checkpoint
+        or export inference model using static graph. 
+
+        Args:
+            init_from_params (string):
+                The path to dygraph checkpoint. 
+            place (paddle.Place):
+                The place to execute static graph. 
+        
+        Example:
+            .. code-block::
+                paddle.enable_static()
+                place = "gpu"
+                place = paddle.set_device(place)
+                reader.adapt_vocab_size(args)
+
+                test_program = paddle.static.Program()
+                startup_program = paddle.static.Program()
+                with paddle.static.program_guard(test_program, startup_program):
+                    src_word = paddle.static.data(
+                        name="src_word", shape=[None, None], dtype="int64")
+
+                    # Define model
+                    transformer = FasterTransformer(
+                        src_vocab_size=args.src_vocab_size,
+                        trg_vocab_size=args.trg_vocab_size,
+                        max_length=args.max_length + 1,
+                        num_encoder_layers=args.n_layer,
+                        num_decoder_layers=args.n_layer,
+                        n_head=args.n_head,
+                        d_model=args.d_model,
+                        d_inner_hid=args.d_inner_hid,
+                        dropout=args.dropout,
+                        weight_sharing=args.weight_sharing,
+                        bos_id=args.bos_idx,
+                        eos_id=args.eos_idx,
+                        decoding_strategy=args.decoding_strategy,
+                        beam_size=args.beam_size,
+                        max_out_len=args.max_out_len,
+                        decoding_lib=args.decoding_lib,
+                        use_fp16_decoding=args.use_fp16_decoding,
+                        rel_len=args.use_rel_len,
+                        alpha=args.alpha)
+
+                    finished_seq = transformer(src_word=src_word)
+
+                test_program = test_program.clone(for_test=True)
+
+                exe = paddle.static.Executor(place)
+                exe.run(startup_program)
+
+                # Load checkpoint.
+                transformer.export_params(
+                    init_from_params=os.path.join(args.init_from_params,
+                                                "transformer.pdparams"),
+                    place=place)
+
+                paddle.static.save_inference_model(
+                    os.path.join(args.inference_model_dir, "transformer"),
+                    feed_vars=src_word,
+                    fetch_vars=finished_seq,
+                    executor=exe,
+                    program=test_program)
+        '''
         # Load the trained model
         assert init_from_params, (
             "Please set init_from_params to load the infer model.")
@@ -196,8 +345,11 @@ class FasterTransformer(TransformerModel):
         # NOTE: the data type of the embedding bias for logits is different
         # between decoding with beam search and top-k/top-p sampling in
         # Faster Transformer when using float16.
+        # NOTE: This changes since FasterTransformer V4.0 and update accordingly
+        # after update to FT-4.0.
         bias_dtype = "float32"
-        if self.use_fp16_decoding and "beam_search" != self.decoding_strategy:
+        if self.use_fp16_decoding and not self.decoding_strategy.startswith(
+                "beam_search"):
             bias_dtype = "float16"
         model_dict["decoding_linear.bias"] = np.zeros(
             [self.trg_vocab_size], dtype=bias_dtype)
@@ -232,9 +384,9 @@ class FasterTransformer(TransformerModel):
 
 class TransformerGenerator(paddle.nn.Layer):
     """
-    The Transformer model for auto-regressive generation. It wraps `FasterTransformer`
-    and `InferTransformerModel`, and automatically chioces using `FasterTransformer`
-    (with jit building) or the slower verison `InferTransformerModel`.
+    The Transformer model for auto-regressive generation with beam search. It wraps
+    `FasterTransformer` and `InferTransformerModel`, and automatically chioces using
+    `FasterTransformer` (with jit building) or the slower verison `InferTransformerModel`.
 
     Args:
         src_vocab_size (int):
@@ -268,14 +420,39 @@ class TransformerGenerator(paddle.nn.Layer):
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
         kwargs:
-            The key word arguments can be `output_time_major`, `use_fp16_decoding` and `use_ft`.
-            `output_time_major(bool, optional)`: Indicate the data layout of predicted
+            The key word arguments can be `output_time_major`, `use_ft`, `use_fp16_decoding`,
+            `rel_len`, `alpha`:
+
+            - `output_time_major(bool, optional)`: Indicate the data layout of predicted
             Tensor. If `False`, the data layout would be batch major with shape
             `[batch_size, seq_len, beam_size]`. If  `True`, the data layout would
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
-            to `False`. `use_fp16_decoding(bool, optional)`: Whether to use fp16
-            for decoding. `use_ft(bool, optional)`: Whether to use Faster Transformer
-            for decoding. 
+            to `False`. 
+
+            - `use_ft(bool, optional)`: Whether to use Faster Transformer
+            for decoding. Default to True if not set.
+
+            - `use_fp16_decoding(bool, optional)`: Whether to use fp16
+            for decoding.  Only works when using Faster Transformer.
+
+            - `beam_search_version(str, optional)`: Indicating the strategy of
+            beam search. It can be 'v1' or 'v2'. 'v2' would select the top
+            `beam_size * 2` beams and process the top `beam_size` alive and
+            finish beams in them separately, while 'v1' would only select the
+            top `beam_size` beams and mix up the alive and finish beams. 'v2' always
+            searchs more and get better results, since the alive beams would
+            always be `beam_size` while the number of alive beams in `v1` might
+            decrease when meeting the end token. However, 'v2' always generates
+            longer results thus might do more calculation and be slower.
+
+            - `rel_len(bool, optional)`: Indicating whether `max_out_len` in is
+            the length relative to that of source text. Only works in `v2` temporarily.
+            It is suggest to set a small `max_out_len` and use `rel_len=True`.
+            Default to False if not set.
+
+            - `alpha(float, optional)`: The power number in length penalty
+            calculation. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
+            Only works in `v2` temporarily. Default to 0.6 if not set.
     """
 
     def __init__(self,
@@ -305,10 +482,16 @@ class TransformerGenerator(paddle.nn.Layer):
         self.output_time_major = kwargs.pop("output_time_major", True)
         use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
         use_ft = kwargs.pop("use_ft", True)
+        beam_search_version = kwargs.pop("beam_search_version", "v1")
+        rel_len = kwargs.pop("rel_len", False)
+        alpha = kwargs.pop("alpha", 0.6)
 
         if use_ft:
             try:
                 load("FasterTransformer", verbose=True)
+                decoding_strategy = ("beam_search_v2"
+                                     if beam_search_version == "v2" else
+                                     "beam_search")
                 self.transformer = FasterTransformer(
                     src_vocab_size=src_vocab_size,
                     trg_vocab_size=trg_vocab_size,
@@ -324,7 +507,10 @@ class TransformerGenerator(paddle.nn.Layer):
                     eos_id=eos_id,
                     beam_size=beam_size,
                     max_out_len=max_out_len,
-                    use_fp16_decoding=use_fp16_decoding)
+                    decoding_strategy=decoding_strategy,
+                    use_fp16_decoding=use_fp16_decoding,
+                    rel_len=rel_len,
+                    alpha=alpha)
             except Exception:
                 logger.warning(
                     "Exception occurs when using Faster Transformer. " \
@@ -344,7 +530,10 @@ class TransformerGenerator(paddle.nn.Layer):
                     eos_id=eos_id,
                     beam_size=beam_size,
                     max_out_len=max_out_len,
-                    output_time_major=self.output_time_major)
+                    output_time_major=self.output_time_major,
+                    beam_search_version=beam_search_version,
+                    rel_len=rel_len,
+                    alpha=alpha)
         else:
             self.transformer = InferTransformerModel(
                 src_vocab_size=src_vocab_size,
@@ -361,7 +550,10 @@ class TransformerGenerator(paddle.nn.Layer):
                 eos_id=eos_id,
                 beam_size=beam_size,
                 max_out_len=max_out_len,
-                output_time_major=self.output_time_major)
+                output_time_major=self.output_time_major,
+                beam_search_version=beam_search_version,
+                rel_len=rel_len,
+                alpha=alpha)
 
     def forward(self, src_word):
         r"""
@@ -377,7 +569,10 @@ class TransformerGenerator(paddle.nn.Layer):
             Tensor:
                 An int64 tensor shaped indicating the predicted ids. Its shape is
                 `[batch_size, seq_len, beam_size]` or `[seq_len, batch_size, beam_size]`
-                according to `output_time_major`.
+                according to `output_time_major`. While, when using FasterTransformer
+                and beam search v2, the beam dimension would be doubled to include
+                both the top `beam_size` alive and finish beams, thus the tensor
+                shape is `[batch_size, seq_len, beam_size * 2]` or `[seq_len, batch_size, beam_size * 2]`.
         
         Example:
             .. code-block::
@@ -476,3 +671,323 @@ class FasterGPT(nn.Layer):
             shutil.copyfile(tokenizer._merges_file, merges_file)
         elif isinstance(tokenizer, GPTChineseTokenizer):
             tokenizer.save_resources(path)
+
+
+class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
+    def __init__(self,
+                 model,
+                 decoding_strategy="sampling",
+                 decoding_lib=None,
+                 use_fp16_decoding=False):
+        super(FasterUnifiedTransformer, self).__init__()
+        self._model = model
+        self._decoding_strategy = decoding_strategy
+        self.bos_token_id = model.bos_token_id
+        self.pad_token_id = model.pad_token_id
+        self.eos_token_id = model.eos_token_id
+        self.unk_token_id = model.unk_token_id
+        self.vocab_size = model.lm_head.decoder_bias.shape[0]
+        self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
+
+        self._n_head = self._model.num_attention_heads
+        self._hidden_dims = self._model.hidden_size
+        self._normalize_before = self._model.normalize_before
+        self._size_per_head = self._hidden_dims // self._n_head
+        self._n_layer = self._model.num_hidden_layers
+        self._mask_id = self._model.mask_token_id
+        self._hidden_act = self._model.hidden_act
+
+        self.decoding = InferUnifiedDecoding(
+            model=self._model,
+            decoding_strategy=self._decoding_strategy,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=use_fp16_decoding,
+            logits_mask=self.logits_mask,
+            n_head=self._n_head,
+            hidden_dims=self._hidden_dims,
+            size_per_head=self._size_per_head,
+            n_layer=self._n_layer,
+            unk_id=self.unk_token_id,
+            mask_id=self._mask_id,
+            normalize_before=self._normalize_before,
+            hidden_act=self._hidden_act)
+
+    def prepare_inputs_for_generation(self,
+                                      input_ids,
+                                      token_type_ids,
+                                      position_ids,
+                                      attention_mask,
+                                      use_cache=False,
+                                      cache=None,
+                                      **kwargs):
+        input_ids = input_ids[:, :-1]
+        decoding_type_id = token_type_ids[:, -1]
+        token_type_ids = token_type_ids[:, :-1]
+        position_ids = position_ids[:, :-1]
+        attention_mask = attention_mask[:, :, :-1, :-1]
+        seq_len = kwargs.get("seq_len", None) - 1
+
+        return {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "position_ids": position_ids,
+            "attention_mask": attention_mask,
+            "use_cache": use_cache,
+            "cache": cache,
+            "seq_len": seq_len,
+            "decoding_type_id": paddle.cast(
+                decoding_type_id, dtype="int32")
+        }
+
+    def generate_logits_mask(self, use_fp16_decoding):
+        # pre-process distribution
+        logits_mask = np.zeros(shape=[self.vocab_size], dtype=np.float32)
+        logits_mask[self.unk_token_id] = -1e9
+        logits_mask[self.bos_token_id] = -1e9
+        logits_mask[self.pad_token_id] = -1e9
+
+        logits_mask_t = paddle.assign(logits_mask)
+        if use_fp16_decoding and self._decoding_strategy == "sampling":
+            return paddle.cast(logits_mask_t, dtype="float16")
+        else:
+            return logits_mask_t
+
+    def sample(self,
+               input_ids,
+               logits_processors,
+               max_length,
+               pad_token_id,
+               eos_token_id,
+               top_k=4,
+               top_p=0.0,
+               temperature=1.0,
+               min_tokens_to_keep=1,
+               **model_kwargs):
+        max_length -= input_ids.shape[-1]
+        model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                          **model_kwargs)
+
+        if self._decoding_strategy == "sampling" and (top_p == 1.0 and
+                                                      top_k > 0):
+            top_p = 0.0
+        elif self._decoding_strategy == "sampling" and (top_p != 1.0 and
+                                                        top_k == 0):
+            top_k = 0
+        else:
+            raise ValueError(
+                "Only topk sampling or topp sampling are supported. " \
+                "Topk sampling and topp sampling cannot be both applied. ")
+
+        return self.forward(
+            model_inputs=model_inputs,
+            max_length=max_length,
+            top_k=top_k,
+            top_p=top_p,
+            temperature=temperature)
+
+    def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
+                    pad_token_id, eos_token_id, **model_kwargs):
+        max_length -= input_ids.shape[-1]
+        model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                          **model_kwargs)
+        temperature = model_kwargs.pop('temperature', 1.0)
+
+        return self.forward(
+            model_inputs=model_inputs,
+            max_length=max_length,
+            num_beams=beam_scorer.num_beams,
+            temperature=temperature)
+
+    def forward(self,
+                max_length,
+                decoding_strategy="sampling",
+                top_k=4,
+                top_p=0.0,
+                num_beams=4,
+                temperature=1.0,
+                model_inputs=None,
+                **model_kwargs):
+        seq_len = model_inputs.pop('seq_len', None)
+        decoding_type_id = model_inputs.pop('decoding_type_id')
+
+        outputs = self._model(**model_inputs)
+        if isinstance(outputs, tuple):
+            caches = outputs[1]
+        else:
+            raise RuntimeError('Not support.')
+        cache_k = [c.k for c in caches]
+        cache_v = [c.v for c in caches]
+
+        return self.decoding(
+            cache_k=cache_k,
+            cache_v=cache_v,
+            memory_seq_lens=seq_len,
+            beam_size=num_beams,
+            topk=top_k,
+            topp=top_p,
+            max_out_len=max_length,
+            bos_id=self.bos_token_id,
+            eos_id=self.eos_token_id,
+            temperature=temperature,
+            decoding_type_id=decoding_type_id,
+            pos_bias=True)
+
+
+class FasterUNIMOText(UNIMOPretrainedModel):
+    def __init__(self,
+                 model,
+                 decoding_strategy="sampling",
+                 decoding_lib=None,
+                 use_fp16_decoding=False):
+        super(FasterUNIMOText, self).__init__()
+        self._model = model
+        self._decoding_strategy = decoding_strategy
+        self.bos_token_id = model.bos_token_id
+        self.pad_token_id = model.pad_token_id
+        self.eos_token_id = model.eos_token_id
+        self.unk_token_id = model.unk_token_id
+        self.vocab_size = model.lm_head.decoder_bias.shape[0]
+        self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
+
+        self._n_head = self._model.num_attention_heads
+        self._hidden_dims = self._model.hidden_size
+        self._normalize_before = self._model.normalize_before
+        self._size_per_head = self._hidden_dims // self._n_head
+        self._n_layer = self._model.num_hidden_layers
+        self._mask_id = self._model.mask_token_id
+        self._hidden_act = self._model.hidden_act
+
+        self.decoding = InferUnifiedDecoding(
+            model=self._model,
+            decoding_strategy=self._decoding_strategy,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=use_fp16_decoding,
+            logits_mask=self.logits_mask,
+            n_head=self._n_head,
+            hidden_dims=self._hidden_dims,
+            size_per_head=self._size_per_head,
+            n_layer=self._n_layer,
+            unk_id=self.unk_token_id,
+            mask_id=self._mask_id,
+            normalize_before=self._normalize_before,
+            hidden_act=self._hidden_act)
+
+    def prepare_inputs_for_generation(self,
+                                      input_ids,
+                                      token_type_ids,
+                                      position_ids,
+                                      attention_mask,
+                                      use_cache=False,
+                                      cache=None,
+                                      **kwargs):
+        input_ids = input_ids[:, :-1]
+        decoding_type_id = token_type_ids[:, -1]
+        token_type_ids = token_type_ids[:, :-1]
+        position_ids = position_ids[:, :-1]
+        attention_mask = attention_mask[:, :, :-1, :-1]
+        seq_len = kwargs.get("seq_len", None) - 1
+
+        return {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "position_ids": position_ids,
+            "attention_mask": attention_mask,
+            "use_cache": use_cache,
+            "cache": cache,
+            "seq_len": seq_len,
+            "decoding_type_id": paddle.cast(
+                decoding_type_id, dtype="int32")
+        }
+
+    def generate_logits_mask(self, use_fp16_decoding):
+        # pre-process distribution
+        logits_mask = np.zeros(shape=[self.vocab_size], dtype=np.float32)
+        logits_mask[self.unk_token_id] = -1e9
+        logits_mask[self.bos_token_id] = -1e9
+        logits_mask[self.pad_token_id] = -1e9
+
+        logits_mask_t = paddle.assign(logits_mask)
+        if use_fp16_decoding and self._decoding_strategy == "sampling":
+            return paddle.cast(logits_mask_t, dtype="float16")
+        else:
+            return logits_mask_t
+
+    def sample(self,
+               input_ids,
+               logits_processors,
+               max_length,
+               pad_token_id,
+               eos_token_id,
+               top_k=4,
+               top_p=0.0,
+               temperature=1.0,
+               min_tokens_to_keep=1,
+               **model_kwargs):
+        max_length -= input_ids.shape[-1]
+        model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                          **model_kwargs)
+
+        if self._decoding_strategy == "sampling" and (top_p == 1.0 and
+                                                      top_k > 0):
+            top_p = 0.0
+        elif self._decoding_strategy == "sampling" and (top_p != 1.0 and
+                                                        top_k == 0):
+            top_k = 0
+        else:
+            raise ValueError(
+                "Only topk sampling or topp sampling are supported. " \
+                "Topk sampling and topp sampling cannot be both applied. ")
+
+        return self.forward(
+            model_inputs=model_inputs,
+            max_length=max_length,
+            top_k=top_k,
+            top_p=top_p,
+            temperature=temperature)
+
+    def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
+                    pad_token_id, eos_token_id, **model_kwargs):
+        max_length -= input_ids.shape[-1]
+        model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                          **model_kwargs)
+        temperature = model_kwargs.pop('temperature', 1.0)
+
+        return self.forward(
+            model_inputs=model_inputs,
+            max_length=max_length,
+            num_beams=beam_scorer.num_beams,
+            temperature=temperature)
+
+    def forward(self,
+                max_length,
+                decoding_strategy="sampling",
+                top_k=4,
+                top_p=0.0,
+                num_beams=4,
+                temperature=1.0,
+                model_inputs=None,
+                **model_kwargs):
+        seq_len = model_inputs.pop('seq_len', None)
+        decoding_type_id = model_inputs.pop('decoding_type_id')
+
+        outputs = self._model(**model_inputs)
+        if isinstance(outputs, tuple):
+            caches = outputs[1]
+        else:
+            raise RuntimeError('Not support.')
+        cache_k = [c.k for c in caches]
+        cache_v = [c.v for c in caches]
+
+        return self.decoding(
+            cache_k=cache_k,
+            cache_v=cache_v,
+            memory_seq_lens=seq_len,
+            beam_size=num_beams,
+            topk=top_k,
+            topp=top_p,
+            max_out_len=max_length,
+            bos_id=self.bos_token_id,
+            eos_id=self.eos_token_id,
+            temperature=temperature,
+            decoding_type_id=decoding_type_id,
+            pos_bias=False)

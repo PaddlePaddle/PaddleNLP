@@ -23,4 +23,4 @@ from . import metrics
 from . import seq2vec
 from . import transformers
 from . import utils
-from . import taskflow
+from .taskflow import Taskflow

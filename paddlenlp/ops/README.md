@@ -13,7 +13,7 @@
 
 ## 使用环境说明
 
-* 本项目依赖于 PaddlePaddle 2.0.1 及以上版本或适当的 develop 版本
+* 本项目依赖于 PaddlePaddle 2.1.0 及以上版本或适当的 develop 版本
 * CMake >= 3.10
 * CUDA 10.1（需要 PaddlePaddle 框架一致）
 * gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
@@ -206,7 +206,7 @@ cd PaddleNLP/paddlenlp/ops/
 ``` sh
 mkdir build
 cd build/
-cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./faster_transformer/src/demo/transformer_e2e.cc -DWITH_STATIC_LIB=OFF -DON_INFER=ON -DWITH_MKL=ON
+cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DWITH_STATIC_LIB=OFF -DON_INFER=ON -DWITH_MKL=ON
 make -j
 cd ../
 ```
@@ -226,7 +226,7 @@ cd ../
     └── threadpool/
   └── version.txt
   ```
-* `-DDEMO` 说明预测库使用 demo 的位置。比如指定 -DDEMO=./faster_transformer/src/demo/transformer_e2e.cc 或是 -DDEMO=./faster_transformer/src/demo/gpt.cc。
+* `-DDEMO` 说明预测库使用 demo 的位置。比如指定 -DDEMO=./demo/transformer_e2e.cc 或是 -DDEMO=./demo/gpt.cc。最好使用绝对路径，若使用相对路径，需要是相对于 `PaddleNLP/paddlenlp/ops/faster_transformer/src/` 的相对路径。
 * `-DWITH_GPT`，如果是编译 GPT 的预测库可执行文件，需要加上 `-DWITH_GPT=ON`。
 * **当使用预测库的自定义 op 的时候，请务必开启 `-DON_INFER=ON` 选项，否则，不会得到预测库的可执行文件。**
 
@@ -236,7 +236,7 @@ cd ../
 
 ``` sh
 cd bin/
-./transformer_e2e -batch_size <batch_size> -beam_size <beam_size> -gpu_id <gpu_id> -model_dir <model_directory> -vocab_dir <dict_directory> -data_dir <input_data>
+./transformer_e2e -batch_size <batch_size> -gpu_id <gpu_id> -model_dir <model_directory> -vocab_dir <dict_directory> -data_dir <input_data>
 ```
 
 举例说明：
@@ -244,7 +244,7 @@ cd bin/
 ``` sh
 cd bin/
 ../third-party/build/bin/decoding_gemm 8 5 8 64 38512 256 512 0
-./transformer_e2e -batch_size 8 -beam_size 5 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
+./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
 其中：
@@ -265,10 +265,11 @@ python ./faster_transformer/sample/gpt_export_model_sample.py --model_name_or_pa
 
 ``` text
 .
-├── gpt.pdiparams   # 保存的参数文件
-├── gpt.pdmodel     # 保存的模型文件
-├── merges.txt      # bpe
-└── vocab.txt       # 词表
+├── gpt.pdiparams       # 保存的参数文件
+├── gpt.pdiparams.info  # 保存的一些变量描述信息，预测不会用到
+├── gpt.pdmodel         # 保存的模型文件
+├── merges.txt          # bpe
+└── vocab.txt           # 词表
 ```
 
 同理，完成编译后，可以在 `build/bin/` 路径下将会看到 `gpt` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。

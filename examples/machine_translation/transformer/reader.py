@@ -45,7 +45,13 @@ def create_data_loader(args, places=None):
         raise ValueError(
             "--train_file and --dev_file must be both or neither set. ")
 
-    if not args.benchmark:
+    if args.vocab_file is not None:
+        src_vocab = Vocab.load_vocabulary(
+            filepath=args.vocab_file,
+            unk_token=args.unk_token,
+            bos_token=args.bos_token,
+            eos_token=args.eos_token)
+    elif not args.benchmark:
         src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
     else:
         src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["benchmark"])
@@ -95,7 +101,8 @@ def create_data_loader(args, places=None):
                 bos_idx=args.bos_idx,
                 eos_idx=args.eos_idx,
                 pad_idx=args.bos_idx,
-                pad_seq=args.pad_seq),
+                pad_seq=args.pad_seq,
+                dtype=args.input_dtype),
             num_workers=0)
         data_loaders[i] = (data_loader)
     return data_loaders
@@ -108,7 +115,13 @@ def create_infer_loader(args):
     else:
         dataset = load_dataset('wmt14ende', splits=('test'))
 
-    if not args.benchmark:
+    if args.vocab_file is not None:
+        src_vocab = Vocab.load_vocabulary(
+            filepath=args.vocab_file,
+            unk_token=args.unk_token,
+            bos_token=args.bos_token,
+            eos_token=args.eos_token)
+    elif not args.benchmark:
         src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
     else:
         src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
@@ -142,18 +155,26 @@ def create_infer_loader(args):
             bos_idx=args.bos_idx,
             eos_idx=args.eos_idx,
             pad_idx=args.bos_idx,
-            pad_seq=args.pad_seq),
+            pad_seq=args.pad_seq,
+            dtype=args.input_dtype),
         num_workers=0,
         return_list=True)
     return data_loader, trg_vocab.to_tokens
 
 
 def adapt_vocab_size(args):
-    dataset = load_dataset('wmt14ende', splits=('test'))
-    if not args.benchmark:
-        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
+    if args.vocab_file is not None:
+        src_vocab = Vocab.load_vocabulary(
+            filepath=args.vocab_file,
+            unk_token=args.unk_token,
+            bos_token=args.bos_token,
+            eos_token=args.eos_token)
     else:
-        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
+        dataset = load_dataset('wmt14ende', splits=('test'))
+        if not args.benchmark:
+            src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
+        else:
+            src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
     trg_vocab = src_vocab
 
     padding_vocab = (
@@ -163,11 +184,16 @@ def adapt_vocab_size(args):
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
 
 
-def prepare_train_input(insts, bos_idx, eos_idx, pad_idx, pad_seq=1):
+def prepare_train_input(insts,
+                        bos_idx,
+                        eos_idx,
+                        pad_idx,
+                        pad_seq=1,
+                        dtype="int64"):
     """
     Put all padded data needed by training into a list.
     """
-    word_pad = Pad(pad_idx, dtype="int64")
+    word_pad = Pad(pad_idx, dtype=dtype)
     src_max_len = (
         max([len(inst[0]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
     trg_max_len = (
@@ -190,11 +216,16 @@ def prepare_train_input(insts, bos_idx, eos_idx, pad_idx, pad_seq=1):
     return data_inputs
 
 
-def prepare_infer_input(insts, bos_idx, eos_idx, pad_idx, pad_seq=1):
+def prepare_infer_input(insts,
+                        bos_idx,
+                        eos_idx,
+                        pad_idx,
+                        pad_seq=1,
+                        dtype="int64"):
     """
     Put all padded data needed by beam search decoder into a list.
     """
-    word_pad = Pad(pad_idx, dtype="int64")
+    word_pad = Pad(pad_idx, dtype=dtype)
     src_max_len = (
         max([len(inst[0]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
     src_word = word_pad([

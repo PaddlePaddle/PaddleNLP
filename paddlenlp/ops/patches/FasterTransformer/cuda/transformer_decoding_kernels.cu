@@ -22,11 +22,12 @@ __global__ void embeddings_kernels(T* from_tensor,
                                    const T* position_encoding,
                                    const T* type_table,
                                    const int* memory_sequence_length,
+                                   const int* type_id,
                                    const int* word_ids,
-                                   const int type_id,
                                    const int step,
                                    const int batch_size,
-                                   const int hidden_units) {
+                                   const int hidden_units,
+                                   const bool pos_bias) {
   // 1. lookup from embedding table
   // 2. add the position encoding
   // 3. add the token type embedding
@@ -35,12 +36,12 @@ __global__ void embeddings_kernels(T* from_tensor,
        index += blockDim.x * gridDim.x) {
     const int row_index = index / hidden_units;
     const int col_index = index % hidden_units;
+    int pos = (pos_bias) ? (step - 1 + memory_sequence_length[row_index])
+                         : (step - 1);
     from_tensor[index] =
-        embedding_table[word_ids[row_index] * hidden_units + col_index]  //
-        + position_encoding[(step - 1 + memory_sequence_length[row_index]) *
-                                hidden_units +
-                            col_index] +
-        type_table[type_id * hidden_units + col_index];
+        embedding_table[word_ids[row_index] * hidden_units + col_index] +
+        position_encoding[pos * hidden_units + col_index] +
+        type_table[type_id[row_index] * hidden_units + col_index];
   }
 }
 
@@ -50,11 +51,12 @@ void embeddings_kernel_launcher(T* from_tensor,
                                 const T* position_encoding_table,
                                 const T* type_table,
                                 const int* memory_sequence_length,
+                                const int* type_id,
                                 const int* word_ids,
-                                const int type_id,
                                 const int step,
                                 const int batch_size,
                                 const int hidden_units,
+                                const bool pos_bias,
                                 cudaStream_t stream) {
   dim3 grid(min(batch_size, 65536));
   dim3 block(min(hidden_units, 1024));
@@ -64,11 +66,12 @@ void embeddings_kernel_launcher(T* from_tensor,
                                                     position_encoding_table,
                                                     type_table,
                                                     memory_sequence_length,
-                                                    word_ids,
                                                     type_id,
+                                                    word_ids,
                                                     step,
                                                     batch_size,
-                                                    hidden_units);
+                                                    hidden_units,
+                                                    pos_bias);
 }
 
 
@@ -166,6 +169,7 @@ __global__ void apply_penalties_kernel(int step,
                                        int vocab_size,
                                        int beam_width,
                                        T* log_probs,
+                                       const bool* finished,
                                        int* current_ids,
                                        int* previous_ids,
                                        int* parent_ids,
@@ -176,73 +180,83 @@ __global__ void apply_penalties_kernel(int step,
                                        const T* logits_mask = nullptr) {
   int tid = threadIdx.x;
   int bid = blockIdx.x;
-  int bbid = blockIdx.y;   // batch_size * beam_size
+  int bbid = blockIdx.y;   // batch_size * beam_size: index
   int bbsize = gridDim.y;  // batch_size * beam_size
   int batchid = bbid / beam_width;
   // int beamid = bbid % beam_width;
 
-  // temperature
-  for (int i = tid + bid * blockDim.x; i < vocab_size;
-       i += blockDim.x * gridDim.x) {
-    log_probs[i + bbid * vocab_size] *= inv_temp;
-  }
+  bool finish = (finished != nullptr) ? finished[bbid] : false;
 
-  if (tid == 0 && bid == 0) {
-    // apply repetition penalty (this can apply the penalty multiple times to a
-    // repeated word).
-    if (repeat_penalty != 1.0) {
-      int prev_id = current_ids[bbid];
-      if (log_probs[prev_id + bbid * vocab_size] > T(0)) {
-        log_probs[prev_id + bbid * vocab_size] =
-            float(log_probs[prev_id + bbid * vocab_size]) / repeat_penalty;
-      } else {
-        log_probs[prev_id + bbid * vocab_size] =
-            float(log_probs[prev_id + bbid * vocab_size]) * repeat_penalty;
+  if (!finish) {
+    // temperature
+    if (inv_temp != 1.0) {
+      for (int i = tid + bid * blockDim.x; i < vocab_size;
+           i += blockDim.x * gridDim.x) {
+        log_probs[i + bbid * vocab_size] *= inv_temp;
       }
+    }
 
-      if (step > 1) {
-        int parent_beamid = parent_ids[bbsize * (step - 2) + bbid];
-        for (int i = step - 2; i > 0; --i) {
-          prev_id =
-              previous_ids[i * bbsize + batchid * beam_width + parent_beamid];
-          if (log_probs[prev_id + bbid * vocab_size] > T(0)) {
-            log_probs[prev_id + bbid * vocab_size] =
-                float(log_probs[prev_id + bbid * vocab_size]) / repeat_penalty;
-          } else {
-            log_probs[prev_id + bbid * vocab_size] =
-                float(log_probs[prev_id + bbid * vocab_size]) * repeat_penalty;
+    if (tid == 0 && bid == 0) {
+      // apply repetition penalty (this can apply the penalty multiple times to
+      // a
+      // repeated word).
+      if (repeat_penalty != 1.0) {
+        int prev_id = current_ids[bbid];
+        if (log_probs[prev_id + bbid * vocab_size] > T(0)) {
+          log_probs[prev_id + bbid * vocab_size] =
+              float(log_probs[prev_id + bbid * vocab_size]) / repeat_penalty;
+        } else {
+          log_probs[prev_id + bbid * vocab_size] =
+              float(log_probs[prev_id + bbid * vocab_size]) * repeat_penalty;
+        }
+
+        if (step > 1) {
+          int parent_beamid = parent_ids[bbsize * (step - 2) + bbid];
+          for (int i = step - 2; i > 0; --i) {
+            prev_id =
+                previous_ids[i * bbsize + batchid * beam_width + parent_beamid];
+            if (log_probs[prev_id + bbid * vocab_size] > T(0)) {
+              log_probs[prev_id + bbid * vocab_size] =
+                  float(log_probs[prev_id + bbid * vocab_size]) /
+                  repeat_penalty;
+            } else {
+              log_probs[prev_id + bbid * vocab_size] =
+                  float(log_probs[prev_id + bbid * vocab_size]) *
+                  repeat_penalty;
+            }
+            // if (i > 0) parent_beamid =
+            // parent_ids[bbsize*(i-1)+parent_beamid];
+            parent_beamid = parent_ids[bbsize * (i - 1) + parent_beamid];
           }
-          // if (i > 0) parent_beamid = parent_ids[bbsize*(i-1)+parent_beamid];
-          parent_beamid = parent_ids[bbsize * (i - 1) + parent_beamid];
+        }
+        prev_id = previous_ids[batchid * beam_width];
+        if (log_probs[prev_id + bbid * vocab_size] > T(0)) {
+          log_probs[prev_id + bbid * vocab_size] =
+              float(log_probs[prev_id + bbid * vocab_size]) / repeat_penalty;
+        } else {
+          log_probs[prev_id + bbid * vocab_size] =
+              float(log_probs[prev_id + bbid * vocab_size]) * repeat_penalty;
         }
       }
-      prev_id = previous_ids[batchid * beam_width];
-      if (log_probs[prev_id + bbid * vocab_size] > T(0)) {
-        log_probs[prev_id + bbid * vocab_size] =
-            float(log_probs[prev_id + bbid * vocab_size]) / repeat_penalty;
-      } else {
-        log_probs[prev_id + bbid * vocab_size] =
-            float(log_probs[prev_id + bbid * vocab_size]) * repeat_penalty;
+
+      // apply length penalty
+      // NOTE: The length penalty has different implementation. May be update.
+      if (len_penalty != 1.0) {
+        if (log_probs[end_id + bbid * vocab_size] > T(0)) {
+          log_probs[end_id + bbid * vocab_size] =
+              float(log_probs[end_id + bbid * vocab_size]) / len_penalty;
+        } else {
+          log_probs[end_id + bbid * vocab_size] =
+              float(log_probs[end_id + bbid * vocab_size]) * len_penalty;
+        }
       }
     }
 
-    // apply length penalty
-    // NOTE: The length penalty has different implementation. May be update.
-    if (len_penalty != 1.0) {
-      if (log_probs[end_id + bbid * vocab_size] > T(0)) {
-        log_probs[end_id + bbid * vocab_size] =
-            float(log_probs[end_id + bbid * vocab_size]) / len_penalty;
-      } else {
-        log_probs[end_id + bbid * vocab_size] =
-            float(log_probs[end_id + bbid * vocab_size]) * len_penalty;
+    if (logits_mask) {
+      for (int i = tid + bid * blockDim.x; i < vocab_size;
+           i += blockDim.x * gridDim.x) {
+        log_probs[i + bbid * vocab_size] += logits_mask[i];
       }
-    }
-  }
-
-  if (logits_mask) {
-    for (int i = tid + bid * blockDim.x; i < vocab_size;
-         i += blockDim.x * gridDim.x) {
-      log_probs[i + bbid * vocab_size] += logits_mask[i];
     }
   }
 }
@@ -250,6 +264,7 @@ __global__ void apply_penalties_kernel(int step,
 template <typename T>
 void apply_penalties_Launcher(int step,
                               T* log_probs,
+                              const bool* finished,
                               int* current_ids,
                               int* previous_ids,
                               int* parent_ids,
@@ -269,6 +284,7 @@ void apply_penalties_Launcher(int step,
                                                         vocab_size,
                                                         beam_width,
                                                         log_probs,
+                                                        finished,
                                                         current_ids,
                                                         previous_ids,
                                                         parent_ids,
@@ -279,16 +295,49 @@ void apply_penalties_Launcher(int step,
                                                         logits_mask);
 }
 
+template <typename T>
+void update_KV_cache_kernelLauncher(T** key_cache,
+                                    T** value_cache,
+                                    const int* beam_ids,
+                                    const int batch_size,
+                                    const int beam_width,
+                                    const int hidden_dim,
+                                    const int step,
+                                    const int start_len,
+                                    const int cache_size,
+                                    const int decoder_layers,
+                                    cudaStream_t stream) {
+  dim3 grid(decoder_layers * batch_size * beam_width * (step + start_len));
+  dim3 block(min(1024, hidden_dim));
+  block.x = block.x / (4 / sizeof(T));
+
+  int src_id = step & 0x1;
+  int tgt_id = 1 - src_id;
+
+  update_KV_cache_kernel<<<grid, block, 0, stream>>>(key_cache[src_id],
+                                                     key_cache[tgt_id],
+                                                     value_cache[src_id],
+                                                     value_cache[tgt_id],
+                                                     beam_ids,
+                                                     batch_size,
+                                                     beam_width,
+                                                     hidden_dim,
+                                                     cache_size,
+                                                     step + start_len,
+                                                     decoder_layers);
+}
+
 template void embeddings_kernel_launcher(float* from_tensor,
                                          const float* embedding_table,
                                          const float* position_encoding_table,
                                          const float* sent_table,
                                          const int* memory_sequence_length,
+                                         const int* type_id,
                                          const int* word_ids,
-                                         const int sent_ids,
                                          const int step,
                                          const int batch_size,
                                          const int hidden_units,
+                                         const bool pos_bias,
                                          cudaStream_t stream);
 
 template void embeddings_kernel_launcher(half* from_tensor,
@@ -296,11 +345,12 @@ template void embeddings_kernel_launcher(half* from_tensor,
                                          const half* position_encoding_table,
                                          const half* sent_table,
                                          const int* memory_sequence_length,
+                                         const int* type_id,
                                          const int* word_ids,
-                                         const int sent_ids,
                                          const int step,
                                          const int batch_size,
                                          const int hidden_units,
+                                         const bool pos_bias,
                                          cudaStream_t stream);
 
 template void init_cache_kernel_launcher(const float* cache_k,
@@ -343,6 +393,7 @@ template void init_logits_mask_Launcher(half* logits_mask,
 
 template void apply_penalties_Launcher(int step,
                                        float* log_probs,
+                                       const bool* finished,
                                        int* current_ids,
                                        int* previous_ids,
                                        int* parent_ids,
@@ -358,6 +409,7 @@ template void apply_penalties_Launcher(int step,
 
 template void apply_penalties_Launcher(int step,
                                        half* log_probs,
+                                       const bool* finished,
                                        int* current_ids,
                                        int* previous_ids,
                                        int* parent_ids,
@@ -370,4 +422,28 @@ template void apply_penalties_Launcher(int step,
                                        float repeat_penalty,
                                        cudaStream_t stream,
                                        const half* logits_mask);
+
+template void update_KV_cache_kernelLauncher(float** key_cache,
+                                             float** value_cache,
+                                             const int* beam_ids,
+                                             const int batch_size,
+                                             const int beam_width,
+                                             const int hidden_dim,
+                                             const int step,
+                                             const int start_len,
+                                             const int cache_size,
+                                             const int decoder_layers,
+                                             cudaStream_t stream);
+
+template void update_KV_cache_kernelLauncher(half** key_cache,
+                                             half** value_cache,
+                                             const int* beam_ids,
+                                             const int batch_size,
+                                             const int beam_width,
+                                             const int hidden_dim,
+                                             const int step,
+                                             const int start_len,
+                                             const int cache_size,
+                                             const int decoder_layers,
+                                             cudaStream_t stream);
 }

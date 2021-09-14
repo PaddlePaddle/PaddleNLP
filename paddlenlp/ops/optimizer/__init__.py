@@ -12,35 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-from paddle.utils.cpp_extension import load
 
-from .adamw import AdamW
-from .AdamwOptimizer import AdamwOptimizer
+from .adamwdl import AdamWDL
 
-
-def _jit_compile():
-    try:
-        load(
-            name="custom_jit_ops",
-            sources=[
-                os.path.join(os.path.dirname(__file__), x)
-                for x in [
-                    "adamw.cc",
-                    "adamw.cu",
-                ]
-            ])
-        return True
-    except RuntimeError as e:
-        import sys
-        sys.stderr.write(str(e) + "\n\n")
-        sys.stderr.write(
-            '''Warning with compile custom ops: compile custom adamw op failed. \nIf you do not use custom ops, please ignore this warning! \n\n'''
-        )
-        return False
-
-
-__all__ = [
-    '_jit_compile',
-    'AdamW',
-    'AdamwOptimizer',
-]
+__all__ = ['AdamWDL', ]

@@ -1,6 +1,6 @@
 # Faster Transformer 预测
 
-在这里我们集成了 Nvidia [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。同时集成了 Faster Transformer float32 以及 float16 预测。以下是使用 Faster Transformer 的说明。
+在这里我们集成了 NVIDIA [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。同时集成了 Faster Transformer float32 以及 float16 预测。以下是使用 Faster Transformer 的说明。
 
 ## 使用环境说明
 
@@ -213,7 +213,7 @@ cd PaddleNLP/paddlenlp/ops/
 ``` sh
 mkdir build
 cd build/
-cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DWITH_STATIC_LIB=OFF -DON_INFER=ON
+cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DWITH_STATIC_LIB=OFF -DON_INFER=ON -DWITH_MKL=ON
 make -j
 cd ../
 ```
@@ -233,7 +233,7 @@ cd ../
     └── threadpool/
   └── version.txt
   ```
-* `-DDEMO` 说明预测库使用 demo 的位置。
+* `-DDEMO` 说明预测库使用 demo 的位置。最好使用绝对路径，若使用相对路径，需要是相对于 `PaddleNLP/paddlenlp/ops/faster_transformer/src/` 的相对路径。
 * **当使用预测库的自定义 op 的时候，请务必开启 `-DON_INFER=ON` 选项，否则，不会得到预测库的可执行文件。**
 
 编译完成后，在 `build/bin/` 路径下将会看到 `transformer_e2e` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
@@ -256,8 +256,10 @@ python export_model.py --config ../configs/transformer.base.yaml --decoding_lib 
   ```text
   └── infer_model/
     ├── transformer.pdiparams
+    ├── transformer.pdiparams.info
     └── transformer.pdmodel
   ```
+
 
 ### 使用 PaddlePaddle 预测库预测
 
@@ -265,7 +267,7 @@ python export_model.py --config ../configs/transformer.base.yaml --decoding_lib 
 
 ``` sh
 cd bin/
-./transformer_e2e -batch_size <batch_size> -beam_size <beam_size> -gpu_id <gpu_id> -model_dir <model_directory> -vocab_dir <dict_directory> -data_dir <input_data>
+./transformer_e2e -batch_size <batch_size> -gpu_id <gpu_id> -model_dir <model_directory> -vocab_dir <dict_directory> -data_dir <input_data>
 ```
 
 这里的 `<model_directory>` 即是上文说到导出的 paddle inference 模型。
@@ -275,7 +277,7 @@ cd bin/
 ``` sh
 cd bin/
 ../third-party/build/bin/decoding_gemm 8 5 8 64 38512 256 512 0
-./transformer_e2e -batch_size 8 -beam_size 5 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
+./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
 其中：
