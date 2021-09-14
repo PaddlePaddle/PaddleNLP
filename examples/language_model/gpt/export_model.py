@@ -71,8 +71,6 @@ def main():
         input_spec=[
             paddle.static.InputSpec(
                 shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[1], dtype="int32"),  # end_id
         ])
 
     # Save converted static graph model
