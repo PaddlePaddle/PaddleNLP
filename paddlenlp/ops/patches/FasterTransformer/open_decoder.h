@@ -26,11 +26,6 @@
 #include "fastertransformer/common.h"
 #include "fastertransformer/common_structure.h"
 
-// for prinf to file
-#include <fstream>
-#include <iostream>
-#include <string>
-
 namespace fastertransformer {
 
 template <typename T>

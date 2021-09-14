@@ -27,12 +27,6 @@
 #include "fastertransformer/cuda/cuda_kernels.h"
 #include "fastertransformer/open_decoder.h"
 
-// for prinf to file
-#include <fstream>
-#include <iostream>
-#include <string>
-
-
 namespace fastertransformer {
 
 template <OperationType OpType_>

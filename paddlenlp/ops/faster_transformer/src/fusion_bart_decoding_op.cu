@@ -285,19 +285,7 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
         true,  // keep_alive_beam_
         alpha,
         false);
-    std::cout << "11batch_size_: " << batch_size_ << std::endl;
-    std::cout << "beam_width_: " << beam_width_ << std::endl;
-    std::cout << "max_seq_len_: " << max_seq_len_ << std::endl;
-    std::cout << "head_num_: " << head_num_ << std::endl;
-    std::cout << "size_per_head_: " << size_per_head_ << std::endl;
-    std::cout << "memory_hidden_dim: " << memory_hidden_dim << std::endl;
-    std::cout << "decoder_layers_: " << num_layer_ << std::endl;
-    std::cout << "vocab_size_: " << vocab_size << std::endl;
-    std::cout << "start_id_: " << start_id_ << std::endl;
-    std::cout << "end_id_: " << end_id_ << std::endl;
-    std::cout << "beam_search_diversity_rate_: " << beam_search_diversity_rate_
-              << std::endl;
-    std::cout << "alpha_: " << alpha << std::endl;
+
     decoding_beamsearch_->forward(params, decoding_params);
 
     delete decoding_beamsearch_;
