@@ -38,4 +38,15 @@ void update_logits_v2(float* logits,
 template <typename T>
 void add_bias_act_kernelLauncher(
     T* out, const T* bias, int m, int n, cudaStream_t stream, bool is_gelu);
+
+template <typename T>
+void embedding_position_lookups_bart_kernel_launcher(
+    T* from_tensor,
+    const T* embedding_table,
+    const T* position_encoding_table,
+    const int* word_ids,
+    const int batch_size,
+    const int hidden_units,
+    cudaStream_t stream);
+
 }  // namespace fastertransformer
