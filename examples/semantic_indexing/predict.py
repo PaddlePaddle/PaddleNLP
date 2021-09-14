@@ -38,6 +38,7 @@ parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum 
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--output_emb_size", default=None, type=int, help="output_embedding_size")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--pad_to_max_seq_len", action="store_true", help="Whether to pad to max seq length.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -86,7 +87,8 @@ if __name__ == "__main__":
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+        max_seq_length=args.max_seq_length,
+        pad_to_max_seq_len=args.pad_to_max_seq_len)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input

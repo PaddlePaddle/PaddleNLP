@@ -96,7 +96,7 @@ if __name__ == "__main__":
     # Loads dataset.
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
-    # Constructs the newtork.
+    # Constructs the network.
     network = args.network.lower()
     vocab_size = len(vocab)
     num_classes = len(train_ds.label_list)

@@ -36,7 +36,8 @@ def infer_transformer_decoding(
         ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
         decoder_ln_bias, linear_weight, linear_bias, pos_emb,
         _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
-        _n_layer, _bos_id, _eos_id, _max_out_len, _beam_search_diversity_rate):
+        _n_layer, _bos_id, _eos_id, _max_out_len, _beam_search_diversity_rate,
+        _rel_len, _alpha):
     helper = LayerHelper('fusion_decoding', **locals())
 
     inputs = {
@@ -87,7 +88,9 @@ def infer_transformer_decoding(
         'bos_id': _bos_id,
         'eos_id': _eos_id,
         'max_len': _max_out_len,
-        'beam_search_diversity_rate': _beam_search_diversity_rate
+        'beam_search_diversity_rate': _beam_search_diversity_rate,
+        "rel_len": _rel_len,
+        "alpha": _alpha
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -173,7 +176,7 @@ def infer_unified_decoding(
         linear_bias, pos_emb, type_emb, _decoding_strategy, _beam_size, _topk,
         _topp, _n_head, _size_per_head, _n_layer, _bos_id, _eos_id,
         _max_out_len, _beam_search_diversity_rate, _unk_id, _mask_id,
-        _temperature, _len_penalty):
+        _temperature, _len_penalty, _normalize_before, _pos_bias, _hidden_act):
     helper = LayerHelper('fusion_unified_decoding', **locals())
 
     inputs = {
@@ -226,7 +229,10 @@ def infer_unified_decoding(
         "unk_id": _unk_id,
         "mask_id": _mask_id,
         "temperature": _temperature,
-        "len_penalty": _len_penalty
+        "len_penalty": _len_penalty,
+        "normalize_before": _normalize_before,
+        "pos_bias": _pos_bias,
+        "hidden_act": _hidden_act
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -257,9 +263,9 @@ def finalize(beam_size,
     if max_seq_len is None:
         max_seq_len = paddle.max(out_seq_lens)
     ids = paddle.slice(output_ids, [0], [0], [max_seq_len])
-    if "beam_search" == decoding_strategy:
-        parent_ids = paddle.slice(parent_ids, [0], [0],
-                                  [max_seq_len]) % beam_size
+    if decoding_strategy.startswith("beam_search"):
+        parent_ids = paddle.slice(parent_ids, [0], [0], [max_seq_len]) % (
+            beam_size * 2 if decoding_strategy.endswith("_v2") else beam_size)
         ids = paddle.nn.functional.gather_tree(ids, parent_ids)
     return ids
 
@@ -300,7 +306,9 @@ class InferTransformerDecoding(nn.Layer):
                  max_out_len=256,
                  beam_search_diversity_rate=0.0,
                  decoding_lib=None,
-                 use_fp16_decoding=False):
+                 use_fp16_decoding=False,
+                 rel_len=False,
+                 alpha=0.6):
         # if decoding_lib is None:
         #     raise ValueError(
         #         "The args decoding_lib must be set to use Faster Transformer. ")
@@ -372,7 +380,7 @@ class InferTransformerDecoding(nn.Layer):
             decoder.norm.bias = transfer_param(decoder.norm.bias, is_bias=True)
 
             linear.weight = transfer_param(linear.weight)
-            if "beam_search" != decoding_strategy:
+            if not decoding_strategy.startswith("beam_search"):
                 linear.bias = transfer_param(linear.bias)
 
             positional_embedding.weight = transfer_param(
@@ -448,7 +456,7 @@ class InferTransformerDecoding(nn.Layer):
         self.linear_bias = [linear.bias]
 
     def forward(self, enc_output, memory_seq_lens):
-        if "beam_search" == self._decoding_strategy:
+        if self._decoding_strategy.startswith("beam_search"):
             enc_output = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
                 enc_output, self._beam_size)
             memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
@@ -470,7 +478,7 @@ class InferTransformerDecoding(nn.Layer):
             self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
             self._bos_id, self._eos_id, self._max_out_len,
-            self._beam_search_diversity_rate)
+            self._beam_search_diversity_rate, self._rel_len, self._alpha)
 
         ids = finalize(
             self._beam_size,
@@ -656,13 +664,21 @@ class InferUnifiedDecoding(nn.Layer):
                  decoding_strategy="topk_sampling",
                  decoding_lib=None,
                  use_fp16_decoding=False,
-                 logits_mask=None):
+                 logits_mask=None,
+                 n_head=8,
+                 hidden_dims=512,
+                 size_per_head=64,
+                 n_layer=6,
+                 unk_id=0,
+                 mask_id=30000,
+                 normalize_before=True,
+                 hidden_act="gelu"):
         if decoding_lib is None:
             raise ValueError(
                 "The args decoding_lib must be set to use Faster Transformer. ")
         elif not os.path.exists(decoding_lib):
             raise ValueError("The path to decoding lib is not exist.")
-        # TODO(): Using jit. 
+        # TODO(): Using jit.
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
@@ -805,19 +821,34 @@ class InferUnifiedDecoding(nn.Layer):
                     restore_data=True,
                     reserve_var=True)
             ]
-            self.sub_modules["decoder_ln_weight"] = [
-                transfer_param(
-                    self._model.encoder.norm.weight,
-                    restore_data=True,
-                    reserve_var=True)
-            ]
-            self.sub_modules["decoder_ln_bias"] = [
-                transfer_param(
-                    self._model.encoder.norm.bias,
-                    is_bias=True,
-                    restore_data=True,
-                    reserve_var=True)
-            ]
+            if self._normalize_before:
+                self.sub_modules["decoder_ln_weight"] = [
+                    transfer_param(
+                        self._model.encoder.norm.weight,
+                        restore_data=True,
+                        reserve_var=True)
+                ]
+                self.sub_modules["decoder_ln_bias"] = [
+                    transfer_param(
+                        self._model.encoder.norm.bias,
+                        is_bias=True,
+                        restore_data=True,
+                        reserve_var=True)
+                ]
+            else:
+                self.sub_modules["decoder_ln_weight"] = [
+                    transfer_param(
+                        self._model.encoder_norm.weight,
+                        restore_data=True,
+                        reserve_var=True)
+                ]
+                self.sub_modules["decoder_ln_bias"] = [
+                    transfer_param(
+                        self._model.encoder_norm.bias,
+                        is_bias=True,
+                        restore_data=True,
+                        reserve_var=True)
+                ]
             self.sub_modules["trans_weight"] = [
                 transfer_param(
                     self._model.lm_head.transform.weight,
@@ -894,10 +925,16 @@ class InferUnifiedDecoding(nn.Layer):
             self.sub_modules["type_emb"] = [
                 self._model.embeddings.token_type_embeddings.weight
             ]
-            self.sub_modules[
-                "decoder_ln_weight"] = [self._model.encoder.norm.weight]
-            self.sub_modules[
-                "decoder_ln_bias"] = [self._model.encoder.norm.bias]
+            if self._normalize_before:
+                self.sub_modules[
+                    "decoder_ln_weight"] = [self._model.encoder.norm.weight]
+                self.sub_modules[
+                    "decoder_ln_bias"] = [self._model.encoder.norm.bias]
+            else:
+                self.sub_modules[
+                    "decoder_ln_weight"] = [self._model.encoder_norm.weight]
+                self.sub_modules[
+                    "decoder_ln_bias"] = [self._model.encoder_norm.bias]
 
             self.sub_modules[
                 "trans_weight"] = [self._model.lm_head.transform.weight]
@@ -910,14 +947,6 @@ class InferUnifiedDecoding(nn.Layer):
             self.sub_modules[
                 "linear_weight"] = [self._model.lm_head.decoder_weight.t()]
             self.sub_modules["linear_bias"] = [self._model.lm_head.decoder_bias]
-        self._n_head = self._model.unified_transformer.encoder.layers[
-            0]._config["nhead"]
-        self._hidden_dims = self._model.unified_transformer.encoder.layers[
-            0]._config["d_model"]
-        self._size_per_head = self._hidden_dims // self._n_head
-        self._n_layer = self._model.unified_transformer.encoder.num_layers
-        self._unk_id = self._model.unified_transformer.unk_token_id
-        self._mask_id = self._model.unified_transformer.mask_token_id
 
     def forward(self,
                 cache_k,
@@ -932,7 +961,8 @@ class InferUnifiedDecoding(nn.Layer):
                 eos_id=1,
                 temperature=1.0,
                 length_penalty=1.0,
-                beam_search_diversity_rate=0.0):
+                beam_search_diversity_rate=0.0,
+                pos_bias=True):
         output_ids, parent_ids, sequence_length = infer_unified_decoding(
             cache_k=cache_k,
             cache_v=cache_v,
@@ -980,7 +1010,10 @@ class InferUnifiedDecoding(nn.Layer):
             _unk_id=self._unk_id,
             _mask_id=self._mask_id,
             _temperature=temperature,
-            _len_penalty=length_penalty)
+            _len_penalty=length_penalty,
+            _normalize_before=self._normalize_before,
+            _pos_bias=pos_bias,
+            _hidden_act=self._hidden_act)
 
         ids = finalize(
             beam_size,

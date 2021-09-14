@@ -447,11 +447,9 @@ class BertModel(BertPretrainedModel):
                 Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
                 usually the paddings or the subsequent positions.
                 Its data type can be int, float and bool.
-                If its data type is int, the values should be either 0 or 1.
-
-                - **1** for tokens that **not masked**,
-                - **0** for tokens that **masked**.
-
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
             output_hidden_states (bool, optional):

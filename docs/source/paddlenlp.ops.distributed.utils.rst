@@ -4,7 +4,6 @@ utils
 .. automodule:: paddlenlp.ops.distributed.utils
    :members:
    :no-undoc-members:
-   :show-inheritance:
 
 
 .. toctree::
