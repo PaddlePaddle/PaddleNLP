@@ -26,6 +26,12 @@ from tqdm import tqdm
 
 import paddlenlp.transformers as tfs
 
+try:
+    import nltk
+    nltk_available = True
+except ImportError:
+    nltk_available = False
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -137,7 +143,6 @@ def chinese_segmentation_fn():
 
 def jieba_segmentation_fn():
     import jieba
-    jieba.initialize()  # 手动初始化（可选）
 
     def process(line):
         words = jieba.cut(line)
@@ -280,12 +285,11 @@ class Converter(object):
         if len(doc_ids) > 0 and self.args.append_eos:
             doc_ids[-1].append(Converter.tokenizer.eos_token_id)
 
-        return doc_ids, len(json_line.encode("utf-8"))
+        return doc_ids, len(text.encode("utf-8"))
 
 
 def main():
     args = get_args()
-    startup_start = time.time()
 
     file_paths = []
     if os.path.isfile(args.input_path):
@@ -318,16 +322,28 @@ def main():
 
     sent_count = 0
     token_count = 0
-    for file_path in tqdm(file_paths):
-        total_bytes_processed = 0
-        text = open(file_path, 'r', encoding='utf-8')
-        encoded_docs = pool.imap(convert.encode, text, 256)
 
-        startup_end = time.time()
-        proc_start = time.time()
-        print("Time to startup:", startup_end - startup_start)
+    file_paths.sort()
+
+    step = 0
+    total_bytes_processed = 0
+    startup_start = time.time()
+    for file_path in tqdm(file_paths):
+        if file_path.endswith(".zst"):
+            import zstandard
+            cctx = zstandard.ZstdDecompressor()
+            fh = open(file_path, 'rb')
+            text = io.BufferedReader(cctx.stream_reader(fh))
+        elif file_path.endswith(".jsonl"):
+            text = open(file_path, 'r', encoding='utf-8')
+        else:
+            print("Unexpected data format, skiped %s" % file_path)
+            continue
+
+        encoded_docs = pool.imap(convert.encode, text, 256)
         print("Processing %s" % file_path)
         for i, (doc, bytes_processed) in enumerate(encoded_docs, start=1):
+            step += 1
             total_bytes_processed += bytes_processed
             if len(doc) == 0:
                 continue
@@ -352,13 +368,13 @@ def main():
                 sent_count.to_bytes(
                     8, byteorder='little', signed=True))
 
-            if i % args.log_interval == 0:
+            if step % args.log_interval == 0:
                 current = time.time()
-                elapsed = current - proc_start
+                elapsed = current - startup_start
                 mbs = total_bytes_processed / elapsed / 1024 / 1024
                 print(
-                    f"Processed {i} documents",
-                    f"({i/elapsed:.2f} docs/s, {mbs:.4f} MB/s).",
+                    f"Processed {step} documents",
+                    f"({step/elapsed:.2f} docs/s, {mbs:.4f} MB/s).",
                     file=sys.stderr)
 
     pool.close()
