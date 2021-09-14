@@ -35,9 +35,9 @@ std::vector<paddle::Tensor> EncoderForward(
     const paddle::Tensor& ffn_intermediate_bias,
     const paddle::Tensor& ffn_output_weight,
     const paddle::Tensor& ffn_output_bias,
-    const paddle::Tensor& sequence_id_offset,
-    const paddle::Tensor& trt_seqlen_offset,
-    const paddle::Tensor& amax_list,
+    // const paddle::Tensor& sequence_id_offset,
+    // const paddle::Tensor& trt_seqlen_offset,
+    // const paddle::Tensor& amax_list,
     const int64_t& head_num,
     const int64_t& size_per_head,
     const bool& is_gelu,
@@ -68,9 +68,9 @@ std::vector<paddle::Tensor> EncoderForward(
                               ffn_intermediate_bias,
                               ffn_output_weight,
                               ffn_output_bias,
-                              sequence_id_offset,
-                              trt_seqlen_offset,
-                              amax_list,
+                              // sequence_id_offset,
+                              // trt_seqlen_offset,
+                              // amax_list,
                               encoder_out,
                               head_num,
                               size_per_head,
@@ -105,9 +105,9 @@ std::vector<std::vector<int64_t>> EncoderInferShape(
     const std::vector<int64_t>& ffn_intermediate_bias_shape,
     const std::vector<int64_t>& ffn_output_weight_shape,
     const std::vector<int64_t>& ffn_output_bias_shape,
-    const std::vector<int64_t>& sequence_id_offset,
-    const std::vector<int64_t>& trt_seqlen_offset,
-    const std::vector<int64_t>& amax_list_shape,
+    // const std::vector<int64_t>& sequence_id_offset,
+    // const std::vector<int64_t>& trt_seqlen_offset,
+    // const std::vector<int64_t>& amax_list_shape,
     const int64_t& head_num,
     const int64_t& size_per_head,
     const bool& is_gelu,
@@ -139,10 +139,10 @@ std::vector<paddle::DataType> EncoderInferDtype(
     const paddle::DataType& ffn_intermediate_weight,
     const paddle::DataType& ffn_intermediate_bias,
     const paddle::DataType& ffn_output_weight,
-    const paddle::DataType& ffn_output_bias,
-    const paddle::DataType& sequence_id_offset,
-    const paddle::DataType& trt_seqlen_offset,
-    const paddle::DataType& amax_list) {
+    const paddle::DataType& ffn_output_bias) {
+  // const paddle::DataType& sequence_id_offset,
+  // const paddle::DataType& trt_seqlen_offset,
+  // const paddle::DataType& amax_list) {
   switch (input) {
     case paddle::DataType::FLOAT16: {
       return {input};
@@ -179,9 +179,9 @@ PD_BUILD_OP(fusion_encoder)
         "FFNInterBias",
         "FFNOutputWeight",
         "FFNOutputBias",
-        "SequenceIdOffset",
-        "TRTSeqLenOffset",
-        "AmaxList",
+        // "SequenceIdOffset",
+        // "TRTSeqLenOffset",
+        // "AmaxList",
     })
     .Outputs({"EncoderOut"})
     .Attrs({"head_num: int64_t",

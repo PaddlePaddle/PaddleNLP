@@ -26,8 +26,7 @@ from paddle.nn import TransformerEncoder, TransformerEncoderLayer
 from paddlenlp.transformers import ErnieTokenizer, ErnieModel
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.ops.ext_utils import load
-from paddlenlp.ops import transfer_param, enable_faster_encoder, disable_faster_encoder
+from paddlenlp.ops import enable_faster_encoder, disable_faster_encoder
 
 from data import read_text_pair, convert_example, create_dataloader
 
@@ -97,12 +96,6 @@ class SemanticIndexingPredictor(nn.Layer):
                 initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
             self.emb_reduce_linear = paddle.nn.Linear(
                 768, output_emb_size, weight_attr=weight_attr)
-        try:
-            load("FasterTransformer", verbose=True)
-        except Exception:
-            logger.warning(
-                "Exception occurs when using Faster Transformer. " \
-                "The original forward will be involved. ")
         encoder_layer = TransformerEncoderLayer(
             hidden_size, n_head, dim_feedforward, dropout=dropout)
         self.ptm.encoder = TransformerEncoder(encoder_layer, n_layer)

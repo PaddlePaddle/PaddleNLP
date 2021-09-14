@@ -48,9 +48,9 @@ std::vector<paddle::Tensor> encoder_kernel(
     const paddle::Tensor& ffn_intermediate_bias,
     const paddle::Tensor& ffn_output_weight,
     const paddle::Tensor& ffn_output_bias,
-    const paddle::Tensor& sequence_id_offset,
-    const paddle::Tensor& trt_seqlen_offset,
-    const paddle::Tensor& amax_list,
+    // const paddle::Tensor& sequence_id_offset,
+    // const paddle::Tensor& trt_seqlen_offset,
+    // const paddle::Tensor& amax_list,
     paddle::Tensor& encoder_out,
     int64_t head_num_,
     int64_t size_per_head_,
@@ -125,26 +125,27 @@ std::vector<paddle::Tensor> encoder_kernel(
   encoder_param.ffn_layernorm.beta =
       reinterpret_cast<const DataType_*>(output_layernorm_bias.data<data_t_>());
   int valid_word_num;
-  if (remove_padding) {
-    valid_word_num = sequence_id_offset.shape()[0];
-    encoder_param.sequence_id_offset = sequence_id_offset.data<int>();
-  } else {
-    encoder_param.sequence_id_offset = nullptr;
-    valid_word_num = batch_size_ * max_seq_len_;
-  }
+  //   if (remove_padding) {
+  // valid_word_num = sequence_id_offset.shape()[0];
+  // encoder_param.sequence_id_offset = sequence_id_offset.data<int>();
+  //   } else {
+  encoder_param.sequence_id_offset = nullptr;
+  valid_word_num = batch_size_ * max_seq_len_;
+  //   }
   encoder_param.valid_word_num = valid_word_num;
 
-  encoder_param.trt_seqlen_offset = trt_seqlen_offset.data<int>();
-  encoder_param.trt_seqlen_size =
-      static_cast<int>(trt_seqlen_offset.shape()[0]);
-  if (int8_mode != 0) {
-    encoder_param.amaxList =
-        reinterpret_cast<const float*>(amax_list.data<float>());
-    encoder_param.layer_num = num_layer_;
-    encoder_param.layer_idx = layer_idx_;
-  } else {
-    encoder_param.amaxList = nullptr;
-  }
+  encoder_param.trt_seqlen_offset = nullptr;  // trt_seqlen_offset.data<int>();
+  encoder_param.trt_seqlen_size = batch_size_ + 1;
+  //   static_cast<int>(trt_seqlen_offset.shape()[0]);
+  //   int8_mode = 0;
+  //   if (int8_mode != 0) {
+  // encoder_param.amaxList =
+  // reinterpret_cast<const float*>(amax_list.data<float>());
+  // encoder_param.layer_num = num_layer_;
+  // encoder_param.layer_idx = layer_idx_;
+  //   } else {
+  encoder_param.amaxList = nullptr;
+  //   }
 
   BertEncoderTransformer<EncoderTraits_>* encoder =
       new BertEncoderTransformer<EncoderTraits_>(int8_mode, allow_gemm_test);
@@ -186,9 +187,9 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
     const paddle::Tensor& ffn_intermediate_bias,
     const paddle::Tensor& ffn_output_weight,
     const paddle::Tensor& ffn_output_bias,
-    const paddle::Tensor& sequence_id_offset,
-    const paddle::Tensor& trt_seqlen_offset,
-    const paddle::Tensor& amax_list,
+    // const paddle::Tensor& sequence_id_offset,
+    // const paddle::Tensor& trt_seqlen_offset,
+    // const paddle::Tensor& amax_list,
     paddle::Tensor& encoder_out,
     int64_t head_num,
     int64_t size_per_head,
@@ -227,9 +228,9 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
           ffn_intermediate_bias,
           ffn_output_weight,
           ffn_output_bias,
-          sequence_id_offset,
-          trt_seqlen_offset,
-          amax_list,
+          //   sequence_id_offset,
+          //   trt_seqlen_offset,
+          //   amax_list,
           encoder_out,
           head_num,
           size_per_head,
@@ -265,9 +266,9 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
           ffn_intermediate_bias,
           ffn_output_weight,
           ffn_output_bias,
-          sequence_id_offset,
-          trt_seqlen_offset,
-          amax_list,
+          //   sequence_id_offset,
+          //   trt_seqlen_offset,
+          //   amax_list,
           encoder_out,
           head_num,
           size_per_head,
