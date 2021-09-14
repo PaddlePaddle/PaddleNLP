@@ -64,7 +64,7 @@ class BertEmbeddings(nn.Layer):
 
 class DistilBertPretrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained DistilBERT models. It provides DistilBERT related
+    An abstract class for pretrained DistilBert models. It provides DistilBert related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
     `pretrained_init_configuration`, `base_model_prefix` for downloading and
     loading pretrained models. See `PretrainedModel` for more details.
