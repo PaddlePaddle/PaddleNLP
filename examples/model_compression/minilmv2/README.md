@@ -96,7 +96,6 @@ python -u ./run_clue.py \
     --warmup_proportion 0.1 \
     --weight_decay 0.01 \
     --adam_epsilon 1e-8 \
-    --output_dir ./tmp/${TASK_NAME}/ \
     --device gpu  \
 
 ```
