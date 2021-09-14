@@ -73,4 +73,58 @@ void update_logits_v2(float* logits,
       logits, bias, end_id, finished, n);
 }
 
+template <typename T>
+__global__ void add_bias_relu_encoder(T* out, const T* bias, int m, int n) {
+  for (int id = blockIdx.x * blockDim.x + threadIdx.x; id < m * n;
+       id += blockDim.x * gridDim.x) {
+    T reg_bias = __ldg(&bias[id % n]);
+    T val = out[id] + reg_bias;
+    out[id] = (T)(val > 0.0f ? val : 0.0f);
+  }
+}
+
+template <>
+__global__ void add_bias_relu_encoder(half* out,
+                                      const half* bias,
+                                      int m,
+                                      int n) {
+  half2* out_ptr = (half2*)out;
+  const half2* bias_ptr = (half2*)bias;
+
+  for (int id = blockIdx.x * blockDim.x + threadIdx.x; id < m * n;
+       id += blockDim.x * gridDim.x) {
+    half2 reg_bias = __ldg(&bias_ptr[id % n]);
+    half2 val = out_ptr[id] + reg_bias;
+    val.x = val.x > (half)0.0f ? val.x : (half)0.0f;
+    val.y = val.y > (half)0.0f ? val.y : (half)0.0f;
+    out_ptr[id] = val;
+  }
+}
+
+template void add_bias_act_kernelLauncher<float>(float* out,
+                                                 const float* bias,
+                                                 int m,
+                                                 int n,
+                                                 cudaStream_t stream,
+                                                 bool is_gelu);
+
+template void add_bias_act_kernelLauncher<half>(half* out,
+                                                const half* bias,
+                                                int m,
+                                                int n,
+                                                cudaStream_t stream,
+                                                bool is_gelu);
+
+template <typename T>
+void add_bias_act_kernelLauncher(
+    T* out, const T* bias, int m, int n, cudaStream_t stream, bool is_gelu) {
+  dim3 grid(ceil(m / 4.));
+  dim3 block(n / 4);
+  assert(block.x <= 1024);
+  if (is_gelu)
+    add_bias_act<T><<<grid, block, 0, stream>>>(out, bias, m, n);
+  else
+    add_bias_relu_encoder<T><<<grid, block, 0, stream>>>(out, bias, m, n);
+}
+
 }  // namespace fastertransformer
