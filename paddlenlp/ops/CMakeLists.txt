@@ -48,6 +48,7 @@ if(WITH_UNIFIED)
   list(APPEND decoding_op_files fusion_unified_decoding_op.cc fusion_unified_decoding_op.cu)
 endif()
 
+# TODO: Support encoder when ON_INFER
 if(WITH_ENCODER AND NOT ON_INFER)
   list(APPEND decoding_op_files fusion_encoder_op.cc fusion_encoder_op.cu)
 endif()
