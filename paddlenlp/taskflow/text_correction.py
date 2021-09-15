@@ -104,6 +104,18 @@ class CSCTask(Task):
             )
         self._pypinyin = pypinyin
         self._max_seq_length = 128
+        self._batchify_fn = lambda samples, fn=Tuple(
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # segment
+            Pad(axis=0, pad_val=self._pinyin_vocab.token_to_idx[self._pinyin_vocab.pad_token]),  # pinyin
+            Stack(axis=0, dtype='int64'),  # length
+        ): [data for data in fn(samples)]
+        self._num_workers = self.kwargs[
+            'num_workers'] if 'num_workers' in self.kwargs else 0
+        self._batch_size = self.kwargs[
+            'batch_size'] if 'batch_size' in self.kwargs else 1
+        self._lazy_load = self.kwargs[
+            'lazy_load'] if 'lazy_load' in self.kwargs else False
 
     def _construct_input_spec(self):
         """
@@ -141,39 +153,46 @@ class CSCTask(Task):
 
     def _preprocess(self, inputs, padding=True, add_special_tokens=True):
         inputs = self._check_input_text(inputs)
-        batch_size = self.kwargs[
-            'batch_size'] if 'batch_size' in self.kwargs else 1
-        trans_func = self._convert_example
-
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # segment
-            Pad(axis=0, pad_val=self._pinyin_vocab.token_to_idx[self._pinyin_vocab.pad_token]),  # pinyin
-            Stack(axis=0, dtype='int64'),  # length
-        ): [data for data in fn(samples)]
-
         examples = []
         texts = []
         for text in inputs:
             if not (isinstance(text, str) and len(text) > 0):
                 continue
             example = {"source": text.strip()}
-            input_ids, token_type_ids, pinyin_ids, length = trans_func(example)
+            input_ids, token_type_ids, pinyin_ids, length = self._convert_example(
+                example)
             examples.append((input_ids, token_type_ids, pinyin_ids, length))
             texts.append(example["source"])
 
         batch_examples = [
-            examples[idx:idx + batch_size]
-            for idx in range(0, len(examples), batch_size)
+            examples[idx:idx + self._batch_size]
+            for idx in range(0, len(examples), self._batch_size)
         ]
         batch_texts = [
-            texts[idx:idx + batch_size]
-            for idx in range(0, len(examples), batch_size)
+            texts[idx:idx + self._batch_size]
+            for idx in range(0, len(examples), self._batch_size)
         ]
         outputs = {}
         outputs['batch_examples'] = batch_examples
         outputs['batch_texts'] = batch_texts
-        self.batchify_fn = batchify_fn
+        if not self._static_mode:
+
+            def read(inputs):
+                for text in inputs:
+                    example = {"source": text.strip()}
+                    input_ids, token_type_ids, pinyin_ids, length = self._convert_example(
+                        example)
+                    yield input_ids, token_type_ids, pinyin_ids, length
+
+            infer_ds = load_dataset(read, inputs=inputs, lazy=self._lazy_load)
+            outputs['data_loader'] = paddle.io.DataLoader(
+                infer_ds,
+                collate_fn=self._batchify_fn,
+                num_workers=self._num_workers,
+                batch_size=self._batch_size,
+                shuffle=False,
+                return_list=True)
+
         return outputs
 
     def _run_model(self, inputs):
@@ -181,21 +200,36 @@ class CSCTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         results = []
-        with static_mode_guard():
-            for examples in inputs['batch_examples']:
-                token_ids, token_type_ids, pinyin_ids, lengths = self.batchify_fn(
-                    examples)
-                self.input_handles[0].copy_from_cpu(token_ids)
-                self.input_handles[1].copy_from_cpu(pinyin_ids)
-                self.predictor.run()
-                det_preds = self.output_handle[0].copy_to_cpu()
-                char_preds = self.output_handle[1].copy_to_cpu()
+        if not self._static_mode:
+            with dygraph_mode_guard():
+                for examples in inputs['data_loader']:
+                    token_ids, token_type_ids, pinyin_ids, lengths = examples
+                    det_preds, char_preds = self._model(token_ids, pinyin_ids)
+                    det_preds = det_preds.numpy()
+                    char_preds = char_preds.numpy()
+                    lengths = lengths.numpy()
 
-                batch_result = []
-                for i in range(len(lengths)):
-                    batch_result.append(
-                        (det_preds[i], char_preds[i], lengths[i]))
-                results.append(batch_result)
+                    batch_result = []
+                    for i in range(len(lengths)):
+                        batch_result.append(
+                            (det_preds[i], char_preds[i], lengths[i]))
+                    results.append(batch_result)
+        else:
+            with static_mode_guard():
+                for examples in inputs['batch_examples']:
+                    token_ids, token_type_ids, pinyin_ids, lengths = self._batchify_fn(
+                        examples)
+                    self.input_handles[0].copy_from_cpu(token_ids)
+                    self.input_handles[1].copy_from_cpu(pinyin_ids)
+                    self.predictor.run()
+                    det_preds = self.output_handle[0].copy_to_cpu()
+                    char_preds = self.output_handle[1].copy_to_cpu()
+
+                    batch_result = []
+                    for i in range(len(lengths)):
+                        batch_result.append(
+                            (det_preds[i], char_preds[i], lengths[i]))
+                    results.append(batch_result)
         inputs['batch_results'] = results
         return inputs
 
@@ -232,7 +266,7 @@ class CSCTask(Task):
 
     def _convert_example(self, example):
         source = example["source"]
-        words = self._tokenizer.tokenize(text=source)
+        words = list(source)
         if len(words) > self._max_seq_length - 2:
             words = words[:self._max_seq_length - 2]
         length = len(words)
@@ -269,64 +303,22 @@ class CSCTask(Task):
     def _parse_decode(self, words, corr_preds, det_preds, lengths):
         UNK = self._tokenizer.unk_token
         UNK_id = self._tokenizer.convert_tokens_to_ids(UNK)
-        tokens = self._tokenizer.tokenize(words)
-        if len(tokens) > self._max_seq_length - 2:
-            tokens = tokens[:self._max_seq_length - 2]
+
         corr_pred = corr_preds[1:1 + lengths].tolist()
         det_pred = det_preds[1:1 + lengths].tolist()
         words = list(words)
+        rest_words = []
         if len(words) > self._max_seq_length - 2:
+            rest_words = words[max_seq_length - 2:]
             words = words[:self._max_seq_length - 2]
 
-        assert len(tokens) == len(
-            corr_pred
-        ), "The number of tokens should be equal to the number of labels {}: {}: {}".format(
-            len(tokens), len(corr_pred), tokens)
         pred_result = ""
-
-        align_offset = 0
-        # Need to be aligned
-        if len(words) != len(tokens):
-            first_unk_flag = True
-            for j, word in enumerate(words):
-                if word.isspace():
-                    tokens.insert(j + 1, word)
-                    corr_pred.insert(j + 1, UNK_id)
-                    det_pred.insert(j + 1, 0)  # No error
-                elif tokens[j] != word:
-                    if self._tokenizer.convert_tokens_to_ids(word) == UNK_id:
-                        if first_unk_flag:
-                            first_unk_flag = False
-                            corr_pred[j] = UNK_id
-                            det_pred[j] = 0
-                        else:
-                            tokens.insert(j, UNK)
-                            corr_pred.insert(j, UNK_id)
-                            det_pred.insert(j, 0)  # No error
-                        continue
-                    elif tokens[j] == UNK:
-                        # Remove rest unk
-                        k = 0
-                        while k + j < len(tokens) and tokens[k + j] == UNK:
-                            k += 1
-                        tokens = tokens[:j] + tokens[j + k:]
-                        corr_pred = corr_pred[:j] + corr_pred[j + k:]
-                        det_pred = det_pred[:j] + det_pred[j + k:]
-                    else:
-                        # Maybe English, number, or suffix
-                        token = tokens[j].lstrip("##")
-                        corr_pred = corr_pred[:j] + [UNK_id] * len(
-                            token) + corr_pred[j + 1:]
-                        det_pred = det_pred[:j] + [0] * len(token) + det_pred[
-                            j + 1:]
-                        tokens = tokens[:j] + list(token) + tokens[j + 1:]
-                first_unk_flag = True
-
         for j, word in enumerate(words):
             candidates = self._tokenizer.convert_ids_to_tokens(corr_pred[j])
-            if det_pred[j] == 0 or candidates == UNK or candidates == '[PAD]':
+            if not is_chinese_char(ord(word)) or det_pred[
+                    j] == 0 or candidates == UNK or candidates == '[PAD]':
                 pred_result += word
             else:
                 pred_result += candidates.lstrip("##")
-
+        pred_result += ''.join(rest_words)
         return pred_result
