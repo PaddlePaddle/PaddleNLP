@@ -89,7 +89,6 @@ def parse_args():
 
 
 def do_predict(args):
-    paddle.enable_static()
     place = "gpu"
     place = paddle.set_device(place)
     reader.adapt_vocab_size(args)
