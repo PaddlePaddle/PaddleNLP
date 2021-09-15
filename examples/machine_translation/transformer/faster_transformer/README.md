@@ -126,7 +126,7 @@ tar -zxf tranformer-base-wmt_ende_bpe.tar.gz
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
-cp -rf ../../../../paddlenlp/ops/build/third-party/build/bin/decoding_gemm ./
+cp -rf ../../../../paddlenlp/ops/build/third-party/build/fastertransformer/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 0
 python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --decoding_strategy beam_search --beam_size 5
 ```
@@ -153,7 +153,7 @@ float16 与 float32 预测的基本流程相同，不过在使用 float16 的 de
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
-cp -rf ../../../../paddlenlp/ops/build/third-party/build/bin/decoding_gemm ./
+cp -rf ../../../../paddlenlp/ops/build/third-party/build/fastertransformer/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 1
 python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --use_fp16_decoding --decoding_strategy beam_search --beam_size 5
 ```
@@ -276,7 +276,7 @@ cd bin/
 
 ``` sh
 cd bin/
-../third-party/build/bin/decoding_gemm 8 5 8 64 38512 256 512 0
+../third-party/build/fastertransformer/bin/decoding_gemm 8 5 8 64 38512 256 512 0
 ./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
