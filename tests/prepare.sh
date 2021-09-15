@@ -72,9 +72,9 @@ elif [ ${MODE} = "whole_infer" ]; then
 
     # Trained transformer base model checkpoint. 
     # For infer. 
-    if [ ! -f tranformer-base-wmt_ende_bpe.tar.gz ]; then
-        wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz
-        tar -zxf tranformer-base-wmt_ende_bpe.tar.gz
+    if [ ! -f transformer-base-wmt_ende_bpe.tar.gz ]; then
+        wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
+        tar -zxf transformer-base-wmt_ende_bpe.tar.gz
         mv base_trained_models/ trained_models/
     fi
     # For train. 
@@ -191,9 +191,9 @@ else # infer
     sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.big.yaml
 
     # Trained transformer base model checkpoint. 
-    if [ ! -f tranformer-base-wmt_ende_bpe.tar.gz ]; then
-        wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz
-        tar -zxf tranformer-base-wmt_ende_bpe.tar.gz
+    if [ ! -f transformer-base-wmt_ende_bpe.tar.gz ]; then
+        wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
+        tar -zxf transformer-base-wmt_ende_bpe.tar.gz
         mv base_trained_models/ trained_models/
     fi
     # Whole data set prepared. 
