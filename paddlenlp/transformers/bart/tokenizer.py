@@ -67,9 +67,6 @@ class BartTokenizer(GPTTokenizer):
             A special token representing a masked token. This is the token used
             in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to `"<mask>"`.
-        eol_token (str, optional):
-            A special token representing the token of newline.
-            Defaults to `"\u010a"`.
 
     Examples:
         .. code-block::
