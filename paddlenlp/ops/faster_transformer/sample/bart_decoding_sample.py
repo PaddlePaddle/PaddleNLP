@@ -192,7 +192,6 @@ def do_predict(args):
         # Output    
         if args.decoding_strategy.startswith('beam_search'):
             finished_seq = finished_seq.numpy().transpose([1, 2, 0])
-            print(finished_seq.shape)
             for ins in finished_seq:
                 for beam_idx, beam in enumerate(ins):
                     if beam_idx >= args.n_best:
