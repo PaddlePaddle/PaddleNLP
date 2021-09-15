@@ -140,6 +140,8 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/topk_kernels.cu topk_kernels_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cu topk_kernels_dst)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/lightseq_kernels.cu lightseq_kernels_cu_src)
+
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_decoder.cu open_decoder_cu_dst)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/open_decoder.h open_decoder_h_dst)
 
@@ -190,6 +192,7 @@ set(FT_PATCH_COMMAND
   && cp ${arguments_h_src} ${trans_dst}
   && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
   && cat ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
+  && cat ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
   && cat ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
   && cat ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
   && cat ${topk_kernels_cuh_src} >> ${topk_kernels_cuh_dst}
