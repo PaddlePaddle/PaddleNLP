@@ -142,6 +142,7 @@ def do_train(args):
             "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
 
         model_config['num_partitions'] = args.mp_degree
+        model_config['use_recompute'] = args.use_recompute
         if args.pp_degree == 1:
             model = GPTForPretraining(GPTModel(**model_config))
         else:
