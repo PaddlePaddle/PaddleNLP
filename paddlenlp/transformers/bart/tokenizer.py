@@ -120,13 +120,10 @@ class BartTokenizer(GPTTokenizer):
             unk_token="<unk>",
             pad_token="<pad>",
             mask_token="<mask>",
-            eol_token='\u010a',  # The token of newline.
     ):
         super(BartTokenizer, self).__init__(vocab_file, merges_file, errors,
                                             max_len, special_tokens, pad_token,
-                                            eos_token, eol_token)
-        self.mask_token = mask_token
-        self.unique_no_split_tokens = [cls_token, sep_token, unk_token, pad_token, mask_token]
+                                            eos_token)
 
     def __call__(self,
                  text,
@@ -189,7 +186,7 @@ class BartTokenizer(GPTTokenizer):
             for tok in tok_list:
                 tokenized_text = []
                 for sub_text in text_list:
-                    if sub_text not in self.unique_no_split_tokens:
+                    if sub_text not in self.all_special_tokens:
                         tokenized_text.extend(split_on_token(tok, sub_text))
                     else:
                         tokenized_text.append(sub_text)
@@ -198,13 +195,12 @@ class BartTokenizer(GPTTokenizer):
             return list(
                 itertools.chain.from_iterable(
                     (
-                        self._bpe_encode(token) if token not in self.unique_no_split_tokens else [token]
+                        self._bpe_encode(token) if token not in self.all_special_tokens else [token]
                         for token in tokenized_text
                     )
                 )
             )
-
-        tokenized_text = split_on_tokens(self.unique_no_split_tokens, text)
+        tokenized_text = split_on_tokens(self.all_special_tokens, text)
         return tokenized_text
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
