@@ -1,5 +1,4 @@
 #include <pthread.h>
-#include <sentencepiece_processor.h>
 #include <algorithm>
 #include <atomic>
 #include <codecvt>
@@ -11,6 +10,10 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+
+#ifdef GPT_ON_SENTENCEPIECE
+#include <sentencepiece_processor.h>
+#endif
 
 #include "helper.h"
 
