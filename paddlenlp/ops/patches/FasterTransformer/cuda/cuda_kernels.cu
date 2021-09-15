@@ -187,7 +187,6 @@ void add_bias_input_pre_layernorm_kernelLauncher(T* out,
                                                  cudaStream_t stream) {
   dim3 grid(m);
   dim3 block(n);
-  assert(n <= 1024);
   add_bias_input_pre_layernorm_generalize<T><<<grid, block, 0, stream>>>(
       out, bias_and_input, input, bias, gamma, beta, n);
 }
@@ -201,7 +200,6 @@ void add_bias_input_kernelLauncher(T* out,
                                    cudaStream_t stream) {
   dim3 grid(m);
   dim3 block(n);
-  assert(n <= 1024);
   add_bias_input_generalize<T><<<grid, block, 0, stream>>>(
       out, bias_and_input, bias, n);
 }
@@ -216,7 +214,6 @@ void layernorm_kernelLauncher(T* out,
                               cudaStream_t stream) {
   dim3 grid(m);
   dim3 block(n);
-  assert(n <= 1024);
   encoder_layernorm_generalize<T><<<grid, block, 0, stream>>>(
       out, input, gamma, beta, n);
 }
