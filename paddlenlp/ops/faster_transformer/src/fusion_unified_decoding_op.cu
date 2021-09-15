@@ -78,6 +78,9 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const int& mask_id,
     const float& temperature,
     const float& len_penalty,
+    const bool& normalize_before,
+    const bool& pos_bias,
+    const std::string& hidden_act,
     cublasHandle_t cublas_handle_,
     cudaStream_t stream) {
   int beam_width_ = (decoding_strategy == "beam_search") ? beam_size : 1;
@@ -226,11 +229,14 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   decoding_params.type_table =
       reinterpret_cast<const DataType_*>(type_embedding_weight.data<data_t_>());
 
+  ActivationType activate =
+      (hidden_act == "gelu") ? ActivationType::GELU : ActivationType::RELU;
+
   if ("beam_search" == decoding_strategy) {
     TransformerBeamsearch<DecodingTraits_::OpType>*
-        unified_decoding_beamsearch_;
+        unified_decoding_beam_search_;
 
-    unified_decoding_beamsearch_ =
+    unified_decoding_beam_search_ =
         new TransformerBeamsearch<DecodingTraits_::OpType>(
             allocator_,
             batch_size_,
@@ -246,14 +252,16 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             end_id_,
             beam_search_diversity_rate_,
             false, /*is_fuse_topk_softMax set false cause topk reason*/
-            true,  /*normalization_before*/
+            normalize_before,
+            pos_bias,
+            activate,
             unk_id,
             mask_id,
             temperature,
             len_penalty);
-    unified_decoding_beamsearch_->forward(params, decoding_params);
+    unified_decoding_beam_search_->forward(params, decoding_params);
 
-    delete unified_decoding_beamsearch_;
+    delete unified_decoding_beam_search_;
   } else if ("topk_sampling" == decoding_strategy ||
              "topp_sampling" == decoding_strategy ||
              "sampling" == decoding_strategy) {
@@ -272,7 +280,9 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
                                                          end_id_,
                                                          candidate_num_,
                                                          probability_threshold_,
-                                                         true,
+                                                         normalize_before,
+                                                         pos_bias,
+                                                         activate,
                                                          unk_id,
                                                          mask_id,
                                                          temperature);
@@ -339,7 +349,10 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const int& unk_id,
     const int& mask_id,
     const float& temperature,
-    const float& len_penalty) {
+    const float& len_penalty,
+    const bool& normalize_before,
+    const bool& pos_bias,
+    const std::string& hidden_act) {
   auto stream = cache_k[0].stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
@@ -400,6 +413,9 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           mask_id,
           temperature,
           len_penalty,
+          normalize_before,
+          pos_bias,
+          hidden_act,
           cublas_handle_,
           stream);
       break;
@@ -456,6 +472,9 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           mask_id,
           temperature,
           len_penalty,
+          normalize_before,
+          pos_bias,
+          hidden_act,
           cublas_handle_,
           stream);
       break;
