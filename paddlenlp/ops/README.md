@@ -106,7 +106,7 @@ transformer = FasterTransformer(
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
-./build/third-party/build/bin/decoding_gemm 32 4 8 64 30000 32 512 0
+./build/third-party/build/fastertransformer/bin/decoding_gemm 32 4 8 64 30000 32 512 0
 python ./faster_transformer/sample/decoding_sample.py --config ./faster_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so
 ```
 
@@ -116,7 +116,7 @@ python ./faster_transformer/sample/decoding_sample.py --config ./faster_transfor
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
-./build/third-party/build/bin/decoding_gemm 32 4 8 64 30000 32 512 1
+./build/third-party/build/fastertransformer/bin/decoding_gemm 32 4 8 64 30000 32 512 1
 python ./faster_transformer/sample/decoding_sample.py --config ./faster_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so --use_fp16_decoding
 ```
 
@@ -243,7 +243,7 @@ cd bin/
 
 ``` sh
 cd bin/
-../third-party/build/bin/decoding_gemm 8 5 8 64 38512 256 512 0
+../third-party/build/fastertransformer/bin/decoding_gemm 8 5 8 64 38512 256 512 0
 ./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 

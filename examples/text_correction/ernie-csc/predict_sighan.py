@@ -94,9 +94,9 @@ def do_predict(args):
         max_seq_length=args.max_seq_length,
         is_test=True)
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Pad(axis=0, pad_val=pinyin_vocab.token_to_idx[pinyin_vocab.pad_token]),  # pinyin
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # segment
+        Pad(axis=0, pad_val=pinyin_vocab.token_to_idx[pinyin_vocab.pad_token], dtype='int64'),  # pinyin
         Stack(axis=0, dtype='int64'),  # length
     ): [data for data in fn(samples)]
 
