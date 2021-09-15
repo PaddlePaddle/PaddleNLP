@@ -323,6 +323,7 @@ class TransformerDecoder(nn.Layer):
                                             cache=cache)
                     new_caches.append(new_cache)
                 else:
+                    # TODO(shenliang03) support random state for mp
                     output = recompute(mod, output, memory, tgt_mask, use_cache, cache) if self.use_recompute \
                         else mod(output, memory, tgt_mask, use_cache, cache)
             else:
