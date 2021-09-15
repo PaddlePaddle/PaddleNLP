@@ -23,7 +23,7 @@ from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     PositionalEmbedding, position_encoding_init,
                                     InferTransformerModel, GPTModel)
 from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
-                           InferUnifiedDecoding)
+                           InferUnifiedDecoding, InferBartDecoding)
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
@@ -991,3 +991,33 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             temperature=temperature,
             decoding_type_id=decoding_type_id,
             pos_bias=False)
+
+
+class FasterBART(nn.Layer):
+    def __init__(self,
+                 model,
+                 decoding_strategy="beam_search_v2",
+                 beam_size=4,
+                 topk=1,
+                 topp=0.0,
+                 max_out_len=256,
+                 beam_search_diversity_rate=0.0,
+                 decoding_lib=None,
+                 use_fp16_decoding=False,
+                 rel_len=False,
+                 alpha=0.6):
+        super(FasterBART, self).__init__()
+        self.use_fp16_decoding = use_fp16_decoding
+        self.decoding = InferBartDecoding(
+            model=model,
+            decoding_strategy=decoding_strategy,
+            beam_size=beam_size,
+            topk=topk,
+            topp=topp,
+            max_out_len=max_out_len,
+            beam_search_diversity_rate=beam_search_diversity_rate,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=use_fp16_decoding)
+
+    def forward(self, enc_output, memory_seq_lens):
+        return self.decoding(enc_output, memory_seq_lens)
