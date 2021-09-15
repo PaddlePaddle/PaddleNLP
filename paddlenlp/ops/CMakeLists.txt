@@ -27,6 +27,7 @@ option(WITH_TRANSFORMER "Compile with Transformer"                              
 option(WITH_GPT         "Compile with GPT"                                        OFF)
 option(WITH_UNIFIED         "Compile with Unified Transformer"                        ON)
 option(WITH_DECODER     "Compile with Transformer Decoder"                        ON)
+option(WITH_ENCODER     "Compile with Transformer Encoder"                        ON)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
@@ -45,7 +46,7 @@ if(WITH_UNIFIED)
 endif()
 
 if(WITH_ENCODER)
-  list(APPEND encoder_op_files fusion_encoder_op.cc fusion_encoder_op.cu)
+  list(APPEND decoding_op_files fusion_encoder_op.cc fusion_encoder_op.cu)
 endif()
 
 if(WITH_DECODER)
@@ -53,7 +54,7 @@ if(WITH_DECODER)
 endif()
 
 if(NOT WITH_TRANSFORMER AND NOT WITH_GPT AND NOT WITH_DECODER AND NOT WITH_ENCODER)
-  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON or/and -DWITH_DECODER=ON must be set to use FasterTransformer. ")
+  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON or/and -DWITH_DECODER=ON or/and -DWITH_ENCODER=ON must be set to use FasterTransformer. ")
 endif()
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
@@ -168,6 +169,13 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/topk_kernels.cuh topk_kernels_cuh_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cuh topk_kernels_cuh_dst)
 
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_attention.h open_attention_h_dst)
+
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/bert_encoder_transformer.h bert_encoder_transformer_h_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_dst)
+
+set(OPT_OPEN_ATTN_COMMAND sed -i -e "370,392d" -e "410,454d" -e "229d" ${open_attention_h_dst})
+
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
 set(FT_PATCH_COMMAND
@@ -189,6 +197,7 @@ set(FT_PATCH_COMMAND
   && cat ${trans_decoder_h_src} >> ${open_decoder_h_dst}
   && cat ${trans_cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat ${trans_decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
+  && ${OPT_OPEN_ATTN_COMMAND}
   && ${MUTE_COMMAND}
 )
 

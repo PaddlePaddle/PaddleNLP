@@ -26,7 +26,8 @@ __global__ void embeddings_kernels(T* from_tensor,
                                    const int* word_ids,
                                    const int step,
                                    const int batch_size,
-                                   const int hidden_units) {
+                                   const int hidden_units,
+                                   const bool pos_bias) {
   // 1. lookup from embedding table
   // 2. add the position encoding
   // 3. add the token type embedding
@@ -35,11 +36,11 @@ __global__ void embeddings_kernels(T* from_tensor,
        index += blockDim.x * gridDim.x) {
     const int row_index = index / hidden_units;
     const int col_index = index % hidden_units;
+    int pos = (pos_bias) ? (step - 1 + memory_sequence_length[row_index])
+                         : (step - 1);
     from_tensor[index] =
         embedding_table[word_ids[row_index] * hidden_units + col_index] +
-        position_encoding[(step - 1 + memory_sequence_length[row_index]) *
-                              hidden_units +
-                          col_index] +
+        position_encoding[pos * hidden_units + col_index] +
         type_table[type_id[row_index] * hidden_units + col_index];
   }
 }
@@ -55,6 +56,7 @@ void embeddings_kernel_launcher(T* from_tensor,
                                 const int step,
                                 const int batch_size,
                                 const int hidden_units,
+                                const bool pos_bias,
                                 cudaStream_t stream) {
   dim3 grid(min(batch_size, 65536));
   dim3 block(min(hidden_units, 1024));
@@ -68,7 +70,8 @@ void embeddings_kernel_launcher(T* from_tensor,
                                                     word_ids,
                                                     step,
                                                     batch_size,
-                                                    hidden_units);
+                                                    hidden_units,
+                                                    pos_bias);
 }
 
 
@@ -334,6 +337,7 @@ template void embeddings_kernel_launcher(float* from_tensor,
                                          const int step,
                                          const int batch_size,
                                          const int hidden_units,
+                                         const bool pos_bias,
                                          cudaStream_t stream);
 
 template void embeddings_kernel_launcher(half* from_tensor,
@@ -346,6 +350,7 @@ template void embeddings_kernel_launcher(half* from_tensor,
                                          const int step,
                                          const int batch_size,
                                          const int hidden_units,
+                                         const bool pos_bias,
                                          cudaStream_t stream);
 
 template void init_cache_kernel_launcher(const float* cache_k,

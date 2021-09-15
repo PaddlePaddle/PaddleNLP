@@ -45,17 +45,17 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
     const paddle::Tensor& ffn_intermediate_bias,
     const paddle::Tensor& ffn_output_weight,
     const paddle::Tensor& ffn_output_bias,
-    const paddle::Tensor& sequence_id_offset,
-    const paddle::Tensor& trt_seqlen_offset,
-    const paddle::Tensor& amax_list,
+    // const paddle::Tensor& sequence_id_offset,
+    // const paddle::Tensor& trt_seqlen_offset,
+    // const paddle::Tensor& amax_list,
     paddle::Tensor& encoder_out,
     int64_t head_num_,
     int64_t size_per_head_,
+    bool is_gelu,
     bool remove_padding,
     int64_t int8_mode,  // no support now
     int64_t num_layer_,
     int64_t layer_idx_,
     bool allow_gemm_test,
     bool use_trt_kernel_,
-    bool normalize_before,
-    int64_t max_seq_len_);
+    bool normalize_before);

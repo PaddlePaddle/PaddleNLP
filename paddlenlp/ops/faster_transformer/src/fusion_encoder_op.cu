@@ -16,7 +16,6 @@ limitations under the License. */
 #include <curand.h>
 #include <curand_kernel.h>
 #include <algorithm>
-#include <iostream>
 #include <iterator>
 #include <random>
 #include <sstream>
@@ -49,12 +48,13 @@ std::vector<paddle::Tensor> encoder_kernel(
     const paddle::Tensor& ffn_intermediate_bias,
     const paddle::Tensor& ffn_output_weight,
     const paddle::Tensor& ffn_output_bias,
-    const paddle::Tensor& sequence_id_offset,
-    const paddle::Tensor& trt_seqlen_offset,
-    const paddle::Tensor& amax_list,
+    // const paddle::Tensor& sequence_id_offset,
+    // const paddle::Tensor& trt_seqlen_offset,
+    // const paddle::Tensor& amax_list,
     paddle::Tensor& encoder_out,
     int64_t head_num_,
     int64_t size_per_head_,
+    bool is_gelu,
     bool remove_padding,
     int64_t int8_mode,  // no support now
     int64_t num_layer_,
@@ -62,10 +62,10 @@ std::vector<paddle::Tensor> encoder_kernel(
     bool allow_gemm_test,
     bool use_trt_kernel_,
     bool normalize_before,
-    int64_t max_seq_len_,
     cublasHandle_t cublas_handle_,
     cudaStream_t stream) {
   int batch_size_ = input.shape()[0];
+  int max_seq_len_ = input.shape()[1];
   typedef PDTraits<D> traits_;
   typedef BertEncoderTransformerTraits<traits_::OpType,
                                        cuda::OpenMultiHeadAttention>
@@ -126,39 +126,45 @@ std::vector<paddle::Tensor> encoder_kernel(
   encoder_param.ffn_layernorm.beta =
       reinterpret_cast<const DataType_*>(output_layernorm_bias.data<data_t_>());
   int valid_word_num;
-  if (remove_padding == true) {
-    valid_word_num = output_layernorm_weight.shape()[0];
-    encoder_param.sequence_id_offset = sequence_id_offset.data<int>();
-  } else {
-    encoder_param.sequence_id_offset = nullptr;
-    valid_word_num = batch_size_ * max_seq_len_;
-  }
+  //   if (remove_padding) {
+  // valid_word_num = sequence_id_offset.shape()[0];
+  // encoder_param.sequence_id_offset = sequence_id_offset.data<int>();
+  //   } else {
+  encoder_param.sequence_id_offset = nullptr;
+  valid_word_num = batch_size_ * max_seq_len_;
+  //   }
   encoder_param.valid_word_num = valid_word_num;
 
-  encoder_param.trt_seqlen_offset = trt_seqlen_offset.data<int>();
-  encoder_param.trt_seqlen_size =
-      static_cast<int>(trt_seqlen_offset.shape()[0]);
-  if (int8_mode != 0) {
-    encoder_param.amaxList =
-        reinterpret_cast<const float*>(amax_list.data<float>());
-    encoder_param.layer_num = num_layer_;
-    encoder_param.layer_idx = layer_idx_;
-  } else {
-    encoder_param.amaxList = nullptr;
-  }
+  encoder_param.trt_seqlen_offset = nullptr;  // trt_seqlen_offset.data<int>();
+  encoder_param.trt_seqlen_size = batch_size_ + 1;
+  //   static_cast<int>(trt_seqlen_offset.shape()[0]);
+  //   int8_mode = 0;
+  //   if (int8_mode != 0) {
+  // encoder_param.amaxList =
+  // reinterpret_cast<const float*>(amax_list.data<float>());
+  // encoder_param.layer_num = num_layer_;
+  // encoder_param.layer_idx = layer_idx_;
+  //   } else {
+  encoder_param.amaxList = nullptr;
+  //   }
+
   BertEncoderTransformer<EncoderTraits_>* encoder =
-      new BertEncoderTransformer<EncoderTraits_>(
-          int8_mode, allow_gemm_test, normalize_before);
+      new BertEncoderTransformer<EncoderTraits_>(int8_mode, allow_gemm_test);
+
   encoder->allocateBuffer(allocator_,
                           batch_size_,
                           max_seq_len_,
                           max_seq_len_,
                           head_num_,
-                          size_per_head_);  //, use_trt_kernel_);
+                          size_per_head_,
+                          is_gelu,
+                          use_trt_kernel_);
   encoder->initialize(encoder_param);
   encoder->forward();
   encoder->freeBuffer();
   delete allocator_;
+  delete encoder;
+
   return {encoder_out};
 }
 
@@ -182,20 +188,20 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
     const paddle::Tensor& ffn_intermediate_bias,
     const paddle::Tensor& ffn_output_weight,
     const paddle::Tensor& ffn_output_bias,
-    const paddle::Tensor& sequence_id_offset,
-    const paddle::Tensor& trt_seqlen_offset,
-    const paddle::Tensor& amax_list,
+    // const paddle::Tensor& sequence_id_offset,
+    // const paddle::Tensor& trt_seqlen_offset,
+    // const paddle::Tensor& amax_list,
     paddle::Tensor& encoder_out,
     int64_t head_num,
     int64_t size_per_head,
+    bool is_gelu,
     bool remove_padding,
     int64_t int8_mode,
     int64_t num_layer,
     int64_t layer_idx,
     bool allow_gemm_test,
     bool use_trt_kernel,
-    bool normalize_before,
-    int64_t max_seq_len) {
+    bool normalize_before) {
   auto stream = input.stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
@@ -204,46 +210,45 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
   std::vector<paddle::Tensor> ret;
 
   switch (input.type()) {
-    /*
-  case paddle::DataType::FLOAT16: {
-    ret = encoder_kernel<paddle::DataType::FLOAT16>(
-        input,
-        attn_query_weight,
-        attn_query_bias,
-        attn_key_weight,
-        attn_key_bias,
-        attn_value_weight,
-        attn_value_bias,
-        attn_output_weight,
-        attn_output_bias,
-        attn_mask,
-        attn_output_layernorm_weight,
-        attn_output_layernorm_bias,
-        output_layernorm_weight,
-        output_layernorm_bias,
-        ffn_intermediate_weight,
-        ffn_intermediate_bias,
-        ffn_output_weight,
-        ffn_output_bias,
-        sequence_id_offset,
-        trt_seqlen_offset,
-        amax_list,
-        encoder_out,
-        head_num,
-        size_per_head,
-        remove_padding,
-        int8_mode,
-        num_layer,
-        layer_idx,
-        allow_gemm_test,
-        use_trt_kernel,
-        normalize_before,
-        max_seq_len,
-        cublas_handle_,
-        stream);
+    case paddle::DataType::FLOAT16: {
+      ret = encoder_kernel<paddle::DataType::FLOAT16>(
+          input,
+          attn_query_weight,
+          attn_query_bias,
+          attn_key_weight,
+          attn_key_bias,
+          attn_value_weight,
+          attn_value_bias,
+          attn_output_weight,
+          attn_output_bias,
+          attn_mask,
+          attn_output_layernorm_weight,
+          attn_output_layernorm_bias,
+          output_layernorm_weight,
+          output_layernorm_bias,
+          ffn_intermediate_weight,
+          ffn_intermediate_bias,
+          ffn_output_weight,
+          ffn_output_bias,
+          //   sequence_id_offset,
+          //   trt_seqlen_offset,
+          //   amax_list,
+          encoder_out,
+          head_num,
+          size_per_head,
+          is_gelu,
+          remove_padding,
+          int8_mode,
+          num_layer,
+          layer_idx,
+          allow_gemm_test,
+          use_trt_kernel,
+          normalize_before,
+          cublas_handle_,
+          stream);
 
-    break;
-  }*/
+      break;
+    }
     case paddle::DataType::FLOAT32: {
       ret = encoder_kernel<paddle::DataType::FLOAT32>(
           input,
@@ -264,12 +269,13 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
           ffn_intermediate_bias,
           ffn_output_weight,
           ffn_output_bias,
-          sequence_id_offset,
-          trt_seqlen_offset,
-          amax_list,
+          //   sequence_id_offset,
+          //   trt_seqlen_offset,
+          //   amax_list,
           encoder_out,
           head_num,
           size_per_head,
+          is_gelu,
           remove_padding,
           int8_mode,
           num_layer,
@@ -277,7 +283,6 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
           allow_gemm_test,
           use_trt_kernel,
           normalize_before,
-          max_seq_len,
           cublas_handle_,
           stream);
       break;

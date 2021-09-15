@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
  * Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,7 +29,6 @@
 #include "fastertransformer/cuda/open_attention.h"
 #include "fastertransformer/gemm_test/encoder_gemm_func.h"
 #include "fastertransformer/gemm_test/encoder_igemm_func.h"
-
 
 namespace fastertransformer {
 
@@ -130,6 +130,7 @@ class BertEncoderTransformer {
   bool allow_gemm_test_ = false;
   bool use_ORDER_COL32_2R_4R4_ = false;
   bool normalize_before_ = false;
+  bool is_gelu_ = true;
 
   // for int8 quantization
   const float *FC0_weight_amax_list, *FC1_weight_amax_list,
@@ -471,9 +472,8 @@ public:
     }
 
     if (foundAlgo != 3) {
-      printf(
-          "[WARNING][BertEncoderTransformer] Loading GEMM algorithms error, "
-          "using default GEMM algorithms!\n");
+      // printf("[WARNING][BertEncoderTransformer] Loading GEMM algorithms
+      // error, using default GEMM algorithms!\n");
       if (is_fp16 == 0) {
         cublasAlgo_[0] = -1;
         cublasAlgo_[1] = -1;
@@ -513,7 +513,10 @@ public:
                       int to_seq_len,
                       int head_num,
                       int size_per_head,
-                      bool use_trt_kernel = true) {
+                      bool is_gelu = true,
+                      bool use_trt_kernel = true)
+
+  {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -541,6 +544,7 @@ public:
         to_seq_len_ = to_seq_len;
         head_num_ = head_num;
         size_per_head_ = size_per_head;
+        is_gelu_ = is_gelu;
 
         int m = batch_size_ * from_seq_len_;
         int k = head_num_ * size_per_head_;
@@ -600,18 +604,19 @@ public:
             throw std::runtime_error(
                 std::string("Allocator failed to allocate internal buffer."));
 
-          // self_attention_output
+          // self_attention_output buf
           attr_out_buf_ = buf_;
 
-          // attn_out matmul out
+          // self_attention matmul output buf
           attr_matmul_buf_ = attr_out_buf_ + buf_size;
 
-          // Feedforward 4d out_buf
+          // Feedforward 4*hiddensize output buf
           inter_matmul_buf_ = attr_matmul_buf_ + buf_size;
 
-          // unused buf
           norm_from_tensor_buf_ = inter_matmul_buf_ + 4 * buf_size;
           bias_and_input = norm_from_tensor_buf_ + buf_size;
+
+          // unused buf
           from_tensor_tmp_buf_ = bias_and_input + buf_size;
         }
       }
@@ -664,43 +669,52 @@ public:
 #endif
 
     try {
-      if (int8_mode_ != 0) {
-// check sm version
+      /*
+      if (int8_mode_ != 0){
+
+        // check sm version
 #ifdef CUDA11_MODE
         int device{-1};
         cudaGetDevice(&device);
         cudaDeviceProp props;
         cudaGetDeviceProperties(&props, device);
-        if (props.major * 10 + props.minor >= 80) {
+        if (props.major * 10 + props.minor >= 80){
           use_ORDER_COL32_2R_4R4_ = true;
         }
 #endif
 
-        // read best algos from config
+        //read best algos from config
         int isConfigExist = access(IGEMM_CONFIG, 0);
-        if (isConfigExist == -1) {
-          if (!allow_gemm_test_) {
-            printf(
-                "[WARNING][BertEncoderTransformer] %s is not found; using "
-                "default GEMM algo\n",
-                IGEMM_CONFIG);
+        if (isConfigExist == -1)
+        {
+          if (!allow_gemm_test_)
+          {
+            printf("[WARNING][BertEncoderTransformer] %s is not found; using
+default GEMM algo\n", IGEMM_CONFIG);
           }
-        } else {
-          readAlgoFromConfig(int8_mode_);
         }
-      } else {
-        int isConfigExist = access(GEMM_CONFIG, 0);
-        if (isConfigExist == -1) {
-          if (!allow_gemm_test_) {
-            printf(
-                "[WARNING][BertEncoderTransformer] %s is not found; using "
-                "default GEMM algo\n",
-                GEMM_CONFIG);
-          }
-        } else {
+        else
+        {
           readAlgoFromConfig(int8_mode_);
         }
       }
+
+      else{
+        int isConfigExist = access(GEMM_CONFIG, 0);
+        if (isConfigExist == -1)
+        {
+          if (!allow_gemm_test_)
+          {
+            printf("[WARNING][BertEncoderTransformer] %s is not found; using
+default GEMM algo\n", GEMM_CONFIG);
+          }
+        }
+        else
+        {
+          readAlgoFromConfig(int8_mode_);
+        }
+      }
+      */
       attention_ = new typename Traits_::MultiHeadAttention(
           int8_mode_, allow_gemm_test_, use_ORDER_COL32_2R_4R4_);
     } catch (std::runtime_error &error) {

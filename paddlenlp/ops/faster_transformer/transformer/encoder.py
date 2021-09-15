@@ -12,47 +12,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-import numpy as np
 
 import paddle
-import paddle.nn as nn
 from paddle.fluid.layer_helper import LayerHelper
+import paddle.nn as nn
+from paddle.nn import TransformerEncoder, TransformerEncoderLayer
 
-from paddlenlp.ops import transfer_param
-from paddlenlp.transformers import WordEmbedding, PositionalEmbedding, position_encoding_init
+from paddlenlp.utils.log import logger
+from paddlenlp.ops.ext_utils import load
 
 
-def infer_transformer_encoder(input,
-                              q_weight,
-                              q_bias,
-                              k_weight,
-                              k_bias,
-                              v_weight,
-                              v_bias,
-                              attn_out_weight,
-                              attn_out_bias,
-                              attn_mask,
-                              attn_ln_weight,
-                              attn_ln_bias,
-                              out_ln_weight,
-                              out_ln_bias,
-                              ffn_inter_weight,
-                              ffn_inter_bias,
-                              ffn_out_weight,
-                              ffn_out_bias,
-                              sequence_id_offset,
-                              trt_seqlen_offset,
-                              amax_list,
-                              n_head,
-                              size_per_head,
-                              remove_padding,
-                              n_layer,
-                              max_seq_length,
-                              int8_mode=0,
-                              layer_idx=0,
-                              allow_gemm_test=False,
-                              use_trt_kernel=False,
-                              normalize_before=False):
+def infer_transformer_encoder(
+        input,
+        q_weight,
+        q_bias,
+        k_weight,
+        k_bias,
+        v_weight,
+        v_bias,
+        attn_out_weight,
+        attn_out_bias,
+        attn_mask,
+        attn_ln_weight,
+        attn_ln_bias,
+        out_ln_weight,
+        out_ln_bias,
+        ffn_inter_weight,
+        ffn_inter_bias,
+        ffn_out_weight,
+        ffn_out_bias,
+        #   sequence_id_offset,
+        #   trt_seqlen_offset,
+        #   amax_list,
+        n_head,
+        size_per_head,
+        n_layer=12,
+        is_gelu=True,
+        remove_padding=False,
+        int8_mode=0,
+        layer_idx=0,
+        allow_gemm_test=False,
+        use_trt_kernel=False,
+        normalize_before=False):
+    """
+    Fusion Encoder API intergrating Encoder inference in FasterTransformer. It
+    accepts the weight and bias of TransformerEncoder and some other parameters
+    for inference.
+    """
     helper = LayerHelper('fusion_encoder', **locals())
     inputs = {
         'Input': input,
@@ -73,269 +79,232 @@ def infer_transformer_encoder(input,
         'FFNInterBias': ffn_inter_bias,
         'FFNOutputWeight': ffn_out_weight,
         'FFNOutputBias': ffn_out_bias,
-        "SequenceIdOffset": sequence_id_offset,
-        "TRTSeqLenOffset": trt_seqlen_offset,
-        'AmaxList': amax_list
+        # "SequenceIdOffset": sequence_id_offset,
+        # "TRTSeqLenOffset": trt_seqlen_offset,
+        # 'AmaxList': amax_list
     }
     attrs = {
         'head_num': n_head,
         'size_per_head': size_per_head,
+        'is_gelu': is_gelu,
         "remove_padding": remove_padding,
         'int8_mode': int8_mode,
         'num_layer': n_layer,
         'layer_idx': layer_idx,
         'allow_gemm_test': allow_gemm_test,
         'use_trt_kernel': use_trt_kernel,
-        'max_seq_len': max_seq_length,
-        'normalize_before': normalize_before,
+        'normalize_before': normalize_before
     }
     encoder_out = helper.create_variable(dtype=input.dtype)
-    outputs = {"encoder_out": encoder_out}
+    outputs = {"EncoderOut": encoder_out}
 
     helper.append_op(
         type='fusion_encoder', inputs=inputs, outputs=outputs, attrs=attrs)
     return encoder_out
 
 
-class InferTransformerEncoder(nn.Layer):
-    def __init__(self,
-                 encoder,
-                 n_layer,
-                 n_head,
-                 size_per_head,
-                 max_seq_length=512,
-                 int8_mode=0,
-                 allow_gemm_test=False,
-                 use_trt_kernel=False,
-                 remove_padding=False,
-                 encoder_lib=None,
-                 use_fp16_encoder=False,
-                 normalize_before=False):
-        if encoder_lib is not None and os.path.isfile(encoder_lib):
-            # Maybe it has been loadad by `ext_utils.load`
-            paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                encoder_lib)
-        super(InferTransformerEncoder, self).__init__()
-        self.n_head = n_head
-        self.max_seq_length = max_seq_length
-        self.int8_mode = int8_mode
-        self.allow_gemm_test = allow_gemm_test
-        self.use_trt_kernel = use_trt_kernel
-        self.normalize_before = normalize_before
-        self.n_layer = n_layer
-        self.size_per_head = size_per_head
-        self.remove_padding = remove_padding
-        if use_fp16_encoder:
-            for idx, mod in enumerate(encoder.layers):
-                mod.self_attn.q_proj.weight = transfer_param(
-                    mod.self_attn.q_proj.weight)
-                mod.self_attn.q_proj.bias = transfer_param(
-                    mod.self_attn.q_proj.bias, is_bias=True)
-                mod.self_attn.k_proj.weight = transfer_param(
-                    mod.self_attn.k_proj.weight)
-                mod.self_attn.k_proj.bias = transfer_param(
-                    mod.self_attn.k_proj.bias, is_bias=True)
-                mod.self_attn.v_proj.weight = transfer_param(
-                    mod.self_attn.v_proj.weight)
-                mod.self_attn.v_proj.bias = transfer_param(
-                    mod.self_attn.v_proj.bias, is_bias=True)
-                mod.self_attn.out_proj.weight = transfer_param(
-                    mod.self_attn.out_proj.weight)
-                mod.self_attn.out_proj.bias = transfer_param(
-                    mod.self_attn.out_proj.bias, is_bias=True)
-                mod.norm1.weight = transfer_param(mod.norm1.weight)
-                mod.norm1.bias = transfer_param(mod.norm1.bias, is_bias=True)
-                mod.norm2.weight = transfer_param(mod.norm2.weight)
-                mod.norm2.bias = transfer_param(mod.norm2.bias, is_bias=True)
-                mod.linear1.weight = transfer_param(mod.linear1.weight)
-                mod.linear1.bias = transfer_param(
-                    mod.linear1.bias, is_bias=True)
-                mod.linear2.weight = transfer_param(mod.linear2.weight)
-                mod.linear2.bias = transfer_param(
-                    mod.linear2.bias, is_bias=True)
+def encoder_layer_forward(self,
+                          src,
+                          src_mask,
+                          cache=None,
+                          sequence_id_offset=None,
+                          trt_seq_len=None):
+    """
+    Redefines `forward` function of `paddle.nn.TransformerEncoderLayer` for
+    integrating FasterTransformer for inference.
 
-        self.weights = []
-        for idx, mod in enumerate(encoder.layers):
-            layer_weight = []
-            layer_weight.append(mod.self_attn.q_proj.weight)
-            layer_weight.append(mod.self_attn.q_proj.bias)
-            layer_weight.append(mod.self_attn.k_proj.weight)
-            layer_weight.append(mod.self_attn.k_proj.bias)
-            layer_weight.append(mod.self_attn.v_proj.weight)
-            layer_weight.append(mod.self_attn.v_proj.bias)
-            layer_weight.append(mod.self_attn.out_proj.weight)
-            layer_weight.append(mod.self_attn.out_proj.bias)
-            layer_weight.append(mod.norm1.weight)
-            layer_weight.append(mod.norm1.bias)
-            layer_weight.append(mod.norm2.weight)
-            layer_weight.append(mod.norm2.bias)
-            layer_weight.append(mod.linear1.weight)
-            layer_weight.append(mod.linear1.bias)
-            layer_weight.append(mod.linear2.weight)
-            layer_weight.append(mod.linear2.bias)
-            # if not self.int8_mode:
-            layer_weight.append(paddle.to_tensor([]))
+    The original `forward` function would not be replaced unless
+    `enable_faster_encoder` is called by objects of its base class. After
+    replacing, objects of `paddle.nn.TransformerEncoderLayer` also have the
+    same member variables as before.
 
-            self.weights.append(layer_weight)
+    After inference, `disable_faster_encoder` could be called to restore the
+    `forward` function of `paddle.nn.TransformerEncoder` and
+    `paddle.nn.TransformerEncoder`.
 
-    def forward(self, enc_input, attn_mask, seq_len):
-        if self.remove_padding:
-            sequence_id_offset = paddle.zeros(
-                (enc_input.shape[0] * seq_len[0]), dtype="int32")
-            trt_seq_len = paddle.cumsum(
-                paddle.concat(
-                    [paddle.zeros(
-                        (1, ), dtype=seq_len.dtype), seq_len]),
-                axis=0,
-                dtype="int32")
-        else:
-            sequence_id_offset = paddle.to_tensor([], dtype="int32")  # 不需要
-            batch_size = enc_input.shape[0]
-            max_seq_len = enc_input.shape[1]
-            padding_offset = paddle.arange(
-                0, batch_size * max_seq_len, max_seq_len, dtype="int32")
-            squence_offset_with_padding = seq_len + padding_offset
-            c = paddle.concat(
-                [padding_offset, squence_offset_with_padding], axis=0)
-            c_r = paddle.reshape(c, [2, -1])
-            t = paddle.transpose(c_r, [1, 0])  # 一个batch内有效（非padding）区间
-            trt_seq_len = paddle.reshape(t, [-1])
-            trt_seq_len = paddle.concat(
-                [
-                    trt_seq_len, paddle.to_tensor(
-                        [batch_size * max_seq_len], dtype=trt_seq_len.dtype)
-                ],
-                axis=0)  # 加上最大的那个index
+    Args:
+        src (Tensor):
+            The input of Transformer encoder layer. It is a tensor with shape
+            `[batch_size, sequence_length, d_model]`. The data type should be
+            float32 or float64.
+        src_mask (Tensor, optional):
+            A tensor used in multi-head attention to prevents attention to some
+            unwanted positions, usually the paddings or the subsequent
+            positions. It is a tensor with shape broadcasted to
+            `[batch_size, n_head, sequence_length, sequence_length]`. When the
+            data type is bool, the unwanted positions have `False` values and
+            the others have `True` values. When the data type is int, the
+            unwanted positions have 0 values and the others have 1 values. When
+            the data type is float, the unwanted positions have `-INF` values
+            and the others have 0 values. It can be None when nothing wanted or
+            needed to be prevented attention to. Defaults to None.
 
-        for idx in range(self.n_layer):
-            weight = self.weights[idx]
-            enc_out = infer_transformer_encoder(
-                input=enc_input,
-                q_weight=weight[0],
-                q_bias=weight[1],
-                k_weight=weight[2],
-                k_bias=weight[3],
-                v_weight=weight[4],
-                v_bias=weight[5],
-                attn_out_weight=weight[6],
-                attn_out_bias=weight[7],
-                attn_mask=attn_mask,
-                attn_ln_weight=weight[8],
-                attn_ln_bias=weight[9],
-                out_ln_weight=weight[10],
-                out_ln_bias=weight[11],
-                ffn_inter_weight=weight[12],
-                ffn_inter_bias=weight[13],
-                ffn_out_weight=weight[14],
-                ffn_out_bias=weight[15],
-                sequence_id_offset=sequence_id_offset,
-                trt_seqlen_offset=trt_seq_len,
-                amax_list=weight[16],
-                n_head=self.n_head,
-                size_per_head=self.size_per_head,
-                remove_padding=self.remove_padding,
-                n_layer=self.n_layer,
-                max_seq_length=self.max_seq_length,
-                int8_mode=self.int8_mode,
-                layer_idx=idx,
-                allow_gemm_test=self.allow_gemm_test,
-                use_trt_kernel=self.use_trt_kernel,
-                normalize_before=self.normalize_before)
-            enc_input = enc_out
-
-        return enc_out
+    Returns:
+        src(Tensor|tuple):
+            It is a tensor that has the same shape and data type as `enc_input`,
+            representing the output of Transformer encoder layer. Or a tuple if
+            `cache` is not None, except for encoder layer output, the tuple
+            includes the new cache which is same as input `cache` argument but
+            `incremental_cache` has an incremental length. See
+            `paddle.nn.MultiHeadAttention.gen_cache` and
+            `paddle.nn.MultiHeadAttention.forward` for more details.
+    """
+    if cache is not None:
+        raise NotImplementedError("cache in encoder is not supported now")
+    src = infer_transformer_encoder(
+        input=src,
+        q_weight=self.self_attn.q_proj.weight,
+        q_bias=self.self_attn.q_proj.bias,
+        k_weight=self.self_attn.k_proj.weight,
+        k_bias=self.self_attn.k_proj.bias,
+        v_weight=self.self_attn.v_proj.weight,
+        v_bias=self.self_attn.v_proj.bias,
+        attn_out_weight=self.self_attn.out_proj.weight,
+        attn_out_bias=self.self_attn.out_proj.bias,
+        attn_mask=src_mask,
+        attn_ln_weight=self.norm1.weight,
+        attn_ln_bias=self.norm1.bias,
+        out_ln_weight=self.norm2.weight,
+        out_ln_bias=self.norm2.bias,
+        ffn_inter_weight=self.linear1.weight,
+        ffn_inter_bias=self.linear1.bias,
+        ffn_out_weight=self.linear2.weight,
+        ffn_out_bias=self.linear2.bias,
+        # sequence_id_offset=paddle.to_tensor([]),
+        # trt_seqlen_offset=paddle.to_tensor([]),
+        # amax_list=paddle.to_tensor([]),  # int8 mode is not supported.
+        n_head=self._config['nhead'],
+        size_per_head=self._config['d_model'] // self._config['nhead'],
+        is_gelu=self._config['activation'] == 'gelu',
+        normalize_before=self._config['normalize_before'] == True)
+    return src
 
 
-class FasterEncoder(nn.Layer):
-    def __init__(self,
-                 src_vocab_size,
-                 max_seq_length,
-                 n_layer,
-                 n_head,
-                 d_model,
-                 d_inner_hid,
-                 dropout,
-                 bos_id=0,
-                 int8_mode=0,
-                 allow_gemm_test=False,
-                 use_trt_kernel=False,
-                 remove_padding=False,
-                 encoder_lib=None,
-                 use_fp16_encoder=False,
-                 normalize_before=False):
-        super().__init__()
-        self.bos_id = bos_id
-        self.dropout = dropout
-        self.remove_padding = remove_padding
-        self.use_fp16_encoder = use_fp16_encoder
-        self.max_seq_length = max_seq_length
-        self.d_model = d_model
+def encoder_forward(self, src, src_mask=None, cache=None):
+    """
+    Redefines `forward` function of `paddle.nn.TransformerEncoder` for
+    integrating FasterTransformer for inference.
 
-        self.src_word_embedding = WordEmbedding(
-            vocab_size=src_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
-        self.src_pos_embedding = PositionalEmbedding(
-            emb_dim=d_model, max_length=max_seq_length)
-        encoder_layer = paddle.nn.TransformerEncoderLayer(
-            d_model,
-            n_head,
-            d_inner_hid,
-            dropout,
-            activation="gelu",
-            attn_dropout=dropout,
-            act_dropout=dropout,
-            normalize_before=normalize_before)
-        custom_encoder = paddle.nn.TransformerEncoder(encoder_layer, n_layer)
+    The original `forward` function would not be replaced unless
+    `enable_faster_encoder` is called by objects of its base class. After
+    replacing, objects of `paddle.nn.TransformerEncoder` also have the same
+    member variables as before.
 
-        self.transformer = paddle.nn.Transformer(
-            d_model=d_model,
-            nhead=n_head,
-            num_encoder_layers=n_layer,
-            num_decoder_layers=n_layer,
-            dim_feedforward=d_inner_hid,
-            dropout=dropout,
-            custom_encoder=custom_encoder,
-            activation="gelu",
-            normalize_before=normalize_before)
+    After inference, `disable_faster_encoder` could be called to restore the
+    `forward` function of `paddle.nn.TransformerEncoder` and
+    `paddle.nn.TransformerEncoder`.
 
-        self.encoder = InferTransformerEncoder(
-            encoder=self.transformer.encoder,
-            n_layer=n_layer,
-            n_head=n_head,
-            size_per_head=d_model // n_head,
-            max_seq_length=max_seq_length,
-            int8_mode=int8_mode,
-            allow_gemm_test=allow_gemm_test,
-            use_trt_kernel=use_trt_kernel,
-            remove_padding=remove_padding,
-            encoder_lib=encoder_lib,
-            use_fp16_encoder=use_fp16_encoder,
-            normalize_before=normalize_before)
+    Args:
+        src (Tensor):
+            The input of Transformer encoder. It is a tensor
+            with shape `[batch_size, sequence_length, d_model]`. The data
+            type should be float32 or float64.
+        src_mask (Tensor, optional):
+            A tensor used in multi-head attention to prevents attention to
+            some unwanted positions, usually the paddings or the subsequent
+            positions. It is a tensor with shape broadcasted to
+            `[batch_size, n_head, sequence_length, sequence_length]`. When the
+            data type is bool, the unwanted positions have `False` values and
+            the others have `True` values. When the data type is int, the
+            unwanted positions have 0 values and the others have 1 values.
+            When the data type is float, the unwanted positions have `-INF`
+            values and the others have 0 values. It can be None when nothing
+            wanted or needed to be prevented attention to. Default None.
 
-    def forward(self, enc_input, src_mask, mem_seq_lens):
-        self.encoder.eval()
-        dtype = "float32"
-        if self.use_fp16_encoder:
-            dtype = "float16"
-            enc_input = paddle.cast(enc_input, dtype)
-            src_mask = paddle.cast(src_mask, dtype)
-        enc_out = self.encoder(enc_input, src_mask, mem_seq_lens)
+    Returns:
+        output (Tensor|tuple):
+            It is a tensor that has the same shape and data type as `src`,
+            representing the output of Transformer encoder. Or a tuple if
+            `cache` is not None, except for encoder output, the tuple includes
+            the new cache which is same as input `cache` argument but
+            `incremental_cache` in it has an incremental length. See
+            `paddle.nn.MultiHeadAttention.gen_cache` and
+            `paddle.nn.MultiHeadAttention.forward` for more details.
+    """
 
-        if self.use_fp16_encoder:
-            enc_out = paddle.cast(enc_out, "float32")
-        return enc_out
+    max_seq_len = src.shape[1]
+    # broadcast
+    src_mask = paddle.concat(x=[src_mask] * max_seq_len, axis=2)
+    output = src
+    for i, layer in enumerate(self.layers):
+        output = layer(output, src_mask)
+    if self.norm is not None:
+        output = self.norm(output)
+    return output
 
-    def load(self, init_from_params):
-        # Load the trained model
-        assert init_from_params, (
-            "Please set init_from_params to load the infer model.")
-        # To avoid a longer length than training, reset the size of position
-        # encoding to max_length
-        model_dict = paddle.load(init_from_params, return_numpy=True)
-        model_dict["encoder.pos_encoder.weight"] = position_encoding_init(
-            self.max_seq_length, self.d_model)
-        if self.use_fp16_encoder:
-            for item in self.state_dict():
-                if "encoder.layers" in item:
-                    model_dict[item] = np.float16(model_dict[item])
 
-        self.load_dict(model_dict)
+def enable_faster_encoder(self):
+    """
+    Compiles fusion encoder operator intergrated FasterTransformer using the
+    method of JIT(Just-In-Time) and replaces the `forward` function of
+    `paddle.nn.TransformerEncoder` and `paddle.nn.TransformerEncoderLayer`
+    objects inherited from `self` to support inference using FasterTransformer.
+
+    Examples:
+
+        .. code-block:: python
+
+            from paddlenlp.ops import enable_faster_encoder, disable_faster_encoder
+
+            model.eval()
+            model = enable_faster_encoder(model)
+            enc_out = model(src, src_mask)
+            model = disable_faster_encoder(model)
+    """
+
+    def check_if_usable(layer):
+        for sub_layer in layer.children():
+            if isinstance(sub_layer,
+                          TransformerEncoderLayer) and sub_layer._config[
+                              'bias_attr'] == False:
+                logger.warning("`False` for paddle.nn.TransformerEncoder's" \
+                               " parameter `bias_attr` is not supported in " \
+                               "FasterTransformer by now. Original Paddle API " \
+                               "would be called.")
+                return False
+            elif not check_if_usable(sub_layer):
+                return False
+        return True
+
+    def init_func(layer):
+        if isinstance(layer, (TransformerEncoderLayer, TransformerEncoder)):
+            layer.forward = layer._ft_forward
+
+    if not self.training:
+        if not check_if_usable(self):
+            return self
+        try:
+            load("FasterTransformer", verbose=True)
+            for layer in self.children():
+                layer.apply(init_func)
+        except Exception:
+            logger.warning(
+                "Exception occurs when using Faster Transformer. " \
+                "The original forward will be involved. ")
+    return self
+
+
+def disable_faster_encoder(self):
+    """
+    Restores the original `forward` function of `paddle.nn.TransformerEncoder`
+    and `paddle.nn.TransformerEncoderLayer` objects inherited from `self`.
+
+    Examples:
+
+        .. code-block:: python
+
+            from paddlenlp.ops import enable_faster_encoder, disable_faster_encoder
+
+            model.eval()
+            model = enable_faster_encoder(model)
+            enc_out = model(src, src_mask)
+            model = disable_faster_encoder(model)
+    """
+
+    def init_func(layer):
+        if isinstance(layer, (TransformerEncoderLayer, TransformerEncoder)):
+            layer.forward = layer._ori_forward
+
+    for layer in self.children():
+        layer.apply(init_func)
+    return self

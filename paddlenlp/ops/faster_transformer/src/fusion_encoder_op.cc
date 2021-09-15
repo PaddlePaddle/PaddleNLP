@@ -14,33 +14,7 @@ limitations under the License. */
 #include <string>
 #include <vector>
 
-
-#include <iostream>
 #include "fusion_encoder_op.h"
-
-
-// void cuda_print(const float* cudaptr,
-//                 const int token_num,
-//                 const int hidden_size,
-//                 const std::string& message) {
-//   int dim = token_num * hidden_size;
-//   float* data = new float[dim];
-
-//   std::cout << "bs * max_len:" << token_num << std::endl;
-//   std::cout << "hidden_size:" << hidden_size << std::endl;
-
-//   cudaMemcpy(data, cudaptr, sizeof(float) * dim, cudaMemcpyDeviceToHost);
-
-//   float sum = 0.0f;
-//   for (int i = 0; i < dim; ++i) {
-//     if (i <= 10) {
-//       std::cout << data[i] << " ";
-//     }
-//     sum += data[i];
-//   }
-//   std::cout << std::endl;
-//   std::cout << message << sum << std::endl;
-// };
 
 std::vector<paddle::Tensor> EncoderForward(
     const paddle::Tensor& input,
@@ -61,24 +35,22 @@ std::vector<paddle::Tensor> EncoderForward(
     const paddle::Tensor& ffn_intermediate_bias,
     const paddle::Tensor& ffn_output_weight,
     const paddle::Tensor& ffn_output_bias,
-    const paddle::Tensor& sequence_id_offset,
-    const paddle::Tensor& trt_seqlen_offset,
-    const paddle::Tensor& amax_list,
+    // const paddle::Tensor& sequence_id_offset,
+    // const paddle::Tensor& trt_seqlen_offset,
+    // const paddle::Tensor& amax_list,
     const int64_t& head_num,
     const int64_t& size_per_head,
+    const bool& is_gelu,
     const bool& remove_padding,
     const int64_t& int8_mode,
     const int64_t& num_layer,
     const int64_t& layer_idx,
     const bool& allow_gemm_test,
     const bool& use_trt_kernel,
-    const bool& normalize_before,
-    const int64_t& max_seq_len) {
+    const bool& normalize_before) {
   if (input.place() == paddle::PlaceType::kGPU) {
     auto shape = input.shape();
-
-    std::vector<int64_t> output_dims = {shape[0], shape[1], shape[2]};
-    auto encoder_out = paddle::Tensor(paddle::PlaceType::kGPU, output_dims);
+    auto encoder_out = paddle::Tensor(paddle::PlaceType::kGPU, shape);
     return EncoderCUDAForward(input,
                               attn_query_weight,
                               attn_query_bias,
@@ -97,20 +69,20 @@ std::vector<paddle::Tensor> EncoderForward(
                               ffn_intermediate_bias,
                               ffn_output_weight,
                               ffn_output_bias,
-                              sequence_id_offset,
-                              trt_seqlen_offset,
-                              amax_list,
+                              // sequence_id_offset,
+                              // trt_seqlen_offset,
+                              // amax_list,
                               encoder_out,
                               head_num,
                               size_per_head,
+                              is_gelu,
                               remove_padding,
                               int8_mode,  // no support now
                               num_layer,
                               layer_idx,
                               allow_gemm_test,
                               use_trt_kernel,
-                              normalize_before,
-                              max_seq_len);
+                              normalize_before);
   } else {
     PD_THROW("Not implemented place. Only GPU is supported. ");
   }
@@ -135,20 +107,20 @@ std::vector<std::vector<int64_t>> EncoderInferShape(
     const std::vector<int64_t>& ffn_intermediate_bias_shape,
     const std::vector<int64_t>& ffn_output_weight_shape,
     const std::vector<int64_t>& ffn_output_bias_shape,
-    const std::vector<int64_t>& sequence_id_offset,
-    const std::vector<int64_t>& trt_seqlen_offset,
-    const std::vector<int64_t>& amax_list_shape,
+    // const std::vector<int64_t>& sequence_id_offset,
+    // const std::vector<int64_t>& trt_seqlen_offset,
+    // const std::vector<int64_t>& amax_list_shape,
     const int64_t& head_num,
     const int64_t& size_per_head,
+    const bool& is_gelu,
     const bool& remove_padding,
     const int64_t& int8_mode,  // no support now
     const int64_t& num_layer,
     const int64_t& layer_idx,
     const bool& allow_gemm_test,
     const bool& use_trt_kernel,
-    const bool& normalize_before,
-    const int64_t& max_seq_len) {
-  return {{input_shape[0], input_shape[1], input_shape[2]}};
+    const bool& normalize_before) {
+  return {input_shape};
 }
 
 
@@ -170,16 +142,16 @@ std::vector<paddle::DataType> EncoderInferDtype(
     const paddle::DataType& ffn_intermediate_weight,
     const paddle::DataType& ffn_intermediate_bias,
     const paddle::DataType& ffn_output_weight,
-    const paddle::DataType& ffn_output_bias,
-    const paddle::DataType& sequence_id_offset,
-    const paddle::DataType& trt_seqlen_offset,
-    const paddle::DataType& amax_list) {
+    const paddle::DataType& ffn_output_bias) {
+  // const paddle::DataType& sequence_id_offset,
+  // const paddle::DataType& trt_seqlen_offset,
+  // const paddle::DataType& amax_list) {
   switch (input) {
     case paddle::DataType::FLOAT16: {
-      return {paddle::DataType::FLOAT16};
+      return {input};
     }
     case paddle::DataType::FLOAT32: {
-      return {paddle::DataType::FLOAT32};
+      return {input};
     }
     default: {
       PD_THROW(
@@ -210,21 +182,21 @@ PD_BUILD_OP(fusion_encoder)
         "FFNInterBias",
         "FFNOutputWeight",
         "FFNOutputBias",
-        "SequenceIdOffset",
-        "TRTSeqLenOffset",
-        "AmaxList",
+        // "SequenceIdOffset",
+        // "TRTSeqLenOffset",
+        // "AmaxList",
     })
-    .Outputs({"encoder_out"})
+    .Outputs({"EncoderOut"})
     .Attrs({"head_num: int64_t",
             "size_per_head: int64_t",
+            "is_gelu: bool",
             "remove_padding: bool",
             "int8_mode: int64_t",
             "num_layer: int64_t",
             "layer_idx: int64_t",
             "allow_gemm_test: bool",
             "use_trt_kernel: bool",
-            "normalize_before: bool",
-            "max_seq_len: int64_t"})
+            "normalize_before: bool"})
     .SetKernelFn(PD_KERNEL(EncoderForward))
     .SetInferShapeFn(PD_INFER_SHAPE(EncoderInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(EncoderInferDtype));
