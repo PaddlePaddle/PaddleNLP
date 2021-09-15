@@ -78,4 +78,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const int& unk_id,
     const int& mask_id,
     const float& temperature,
-    const float& len_penalty);
+    const float& len_penalty,
+    const bool& normalize_before,
+    const bool& pos_bias,
+    const std::string& hidden_act);

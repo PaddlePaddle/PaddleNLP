@@ -69,15 +69,15 @@ LAS (依存标注准备率) = number of words assigned correct head and relation
 | LEMMA | 当前词语的原型或词干，在中文中此列与FORM相同 |  
 | CPOSTAG | 当前词语的词性（粗粒度） |
 | POSTAG | 当前词语的词性（细粒度） |
-| FEATS | 句法特征 | 
-| HEAD | 当前单词的中心词 | 
+| FEATS | 句法特征 |
+| HEAD | 当前单词的中心词 |
 | DEPREL | 当前单词与中心词的依存关系 |
 | PHEAD | 当前单词的主观中心词 |
 | PDEPREL | 当前单词与主观中心词的依存关系 |
 
 NLPCC2013_EVSAM05_THU数据集示例：
 ```
-ID      FROM   LEMMA CPOSTAG POSTAG  FEATS   HEAD    DEPREL 
+ID      FROM   LEMMA CPOSTAG POSTAG  FEATS   HEAD    DEPREL
 1       世界    世界    n       n       _       5       限定
 2       第      第      m       m       _       4       限定
 3       八      八      m       m       _       2       连接依存
@@ -175,7 +175,7 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
     --encoding_model=lstm \
     --feat=pos \
     --params_path=./model_file/best.pdparams \
-    --infer_output_file=infer_output.conll 
+    --infer_output_file=infer_output.conll
 ```
 
 **NOTE**: 预测时的`encoding_model`和`feat`需要与训练时的参数保持一致。
@@ -194,7 +194,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --task_name=nlpcc13_evsam05_hit \
     --encoding_model=lstm-pe \
     --save_dir=./model_file \
-    --lstm_lr=0.002 
+    --lstm_lr=0.002
 ```
 
 ##### 基于动态图的预测
@@ -206,7 +206,7 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
     --task_name=nlpcc13_evsam05_hit \
     --encoding_model=lstm-pe \
     --params_path=./model_file/best.pdparams \
-    --infer_output_file=infer_output.conll 
+    --infer_output_file=infer_output.conll
 ```
 
 ##### 基于静态图的预测部署
@@ -216,7 +216,7 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
 ```shell
 python export_model.py --encoding_model=lstm-pe \
     --params_path=./model_file/best.pdparams \
-    --output_path=./output 
+    --output_path=./output
 ```
 
 导出静态图模型之后，可以用于部署，`deploy/python/predict.py`脚本提供了python部署预测示例。运行方式：
@@ -238,7 +238,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --task_name=nlpcc13_evsam05_hit \
     --encoding_model=ernie-gram-zh \
     --save_dir=./model_file \
-    --ernie_lr=5e-5 
+    --ernie_lr=5e-5
 ```
 
 ##### 基于动态图的预测
@@ -250,7 +250,7 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
     --task_name=nlpcc13_evsam05_hit \
     --encoding_model=ernie-gram-zh \
     --params_path=./model_file/best.pdparams \
-    --infer_output_file=infer_output.conll 
+    --infer_output_file=infer_output.conll
 ```
 
 ##### 基于静态图的预测部署
@@ -260,7 +260,7 @@ python -m paddle.distributed.launch --gpus "0" predict.py \
 ```shell
 python export_model.py --encoding_model=ernie-gram-zh \
     --params_path=./model_file/best.pdparams \
-    --output_path=./output 
+    --output_path=./output
 ```
 
 导出静态图模型之后，可以用于部署，`deploy/python/predict.py`脚本提供了python部署预测示例。运行方式：
@@ -306,39 +306,49 @@ from paddlenlp import Taskflow
 
 ddp = Taskflow("dependency_parsing")
 ddp("百度是一家高科技公司")
-# [{'word': ['百度', '是', '一家', '高科技', '公司'], 
-#   'head': ['2', '0', '5', '5', '2'], 
-#   'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+'''
+[{'word': ['百度', '是', '一家', '高科技', '公司'],
+  'head': ['2', '0', '5', '5', '2'],
+  'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+'''
 ddp(["百度是一家高科技公司", "他送了一本书"])
-# [{'word': ['百度', '是', '一家', '高科技', '公司'], 
-#   'head': ['2', '0', '5', '5', '2'], 
-#   'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}, 
-#  {'word': ['他', '送', '了', '一本', '书'], 
-#   'head': ['2', '0', '2', '5', '2'], 
-#   'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
+'''
+[{'word': ['百度', '是', '一家', '高科技', '公司'],
+  'head': ['2', '0', '5', '5', '2'],
+  'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']},
+ {'word': ['他', '送', '了', '一本', '书'],
+  'head': ['2', '0', '2', '5', '2'],
+  'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
+'''
 
 # 输出概率和词性标签
 ddp = Taskflow("dependency_parsing", prob=True, use_pos=True)
 ddp("百度是一家高科技公司")
-# [{'word': ['百度', '是', '一家', '高科技', '公司'], 
-#   'postag': ['ORG', 'v', 'm', 'n', 'n'], 
-#   'head': ['2', '0', '5', '5', '2'], 
-#   'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 
-#   'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
+'''
+[{'word': ['百度', '是', '一家', '高科技', '公司'],
+  'postag': ['ORG', 'v', 'm', 'n', 'n'],
+  'head': ['2', '0', '5', '5', '2'],
+  'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'],
+  'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
+'''
 
 # 使用ddparser-ernie-1.0进行预测
 ddp = Taskflow("dependency_parsing", model="ddparser-ernie-1.0")
 ddp("百度是一家高科技公司")
-# [{'word': ['百度', '是', '一家', '高科技', '公司'], 
-#   'head': ['2', '0', '5', '5', '2'], 
-#   'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+'''
+[{'word': ['百度', '是', '一家', '高科技', '公司'],
+  'head': ['2', '0', '5', '5', '2'],
+  'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+'''
 
 # 使用ddparser-ernie-gram-zh进行预测
 ddp = Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")
 ddp("百度是一家高科技公司")
-# [{'word': ['百度', '是', '一家', '高科技', '公司'], 
-#   'head': ['2', '0', '5', '5', '2'], 
-#   'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+'''
+[{'word': ['百度', '是', '一家', '高科技', '公司'],
+  'head': ['2', '0', '5', '5', '2'],
+  'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+'''
 ```
 
 ### 依存关系可视化

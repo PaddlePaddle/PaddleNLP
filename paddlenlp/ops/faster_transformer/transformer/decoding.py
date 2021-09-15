@@ -176,7 +176,7 @@ def infer_unified_decoding(
         linear_bias, pos_emb, type_emb, _decoding_strategy, _beam_size, _topk,
         _topp, _n_head, _size_per_head, _n_layer, _bos_id, _eos_id,
         _max_out_len, _beam_search_diversity_rate, _unk_id, _mask_id,
-        _temperature, _len_penalty):
+        _temperature, _len_penalty, _normalize_before, _pos_bias, _hidden_act):
     helper = LayerHelper('fusion_unified_decoding', **locals())
 
     inputs = {
@@ -229,7 +229,10 @@ def infer_unified_decoding(
         "unk_id": _unk_id,
         "mask_id": _mask_id,
         "temperature": _temperature,
-        "len_penalty": _len_penalty
+        "len_penalty": _len_penalty,
+        "normalize_before": _normalize_before,
+        "pos_bias": _pos_bias,
+        "hidden_act": _hidden_act
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -661,7 +664,15 @@ class InferUnifiedDecoding(nn.Layer):
                  decoding_strategy="topk_sampling",
                  decoding_lib=None,
                  use_fp16_decoding=False,
-                 logits_mask=None):
+                 logits_mask=None,
+                 n_head=8,
+                 hidden_dims=512,
+                 size_per_head=64,
+                 n_layer=6,
+                 unk_id=0,
+                 mask_id=30000,
+                 normalize_before=True,
+                 hidden_act="gelu"):
         if decoding_lib is None:
             raise ValueError(
                 "The args decoding_lib must be set to use Faster Transformer. ")
@@ -810,19 +821,34 @@ class InferUnifiedDecoding(nn.Layer):
                     restore_data=True,
                     reserve_var=True)
             ]
-            self.sub_modules["decoder_ln_weight"] = [
-                transfer_param(
-                    self._model.encoder.norm.weight,
-                    restore_data=True,
-                    reserve_var=True)
-            ]
-            self.sub_modules["decoder_ln_bias"] = [
-                transfer_param(
-                    self._model.encoder.norm.bias,
-                    is_bias=True,
-                    restore_data=True,
-                    reserve_var=True)
-            ]
+            if self._normalize_before:
+                self.sub_modules["decoder_ln_weight"] = [
+                    transfer_param(
+                        self._model.encoder.norm.weight,
+                        restore_data=True,
+                        reserve_var=True)
+                ]
+                self.sub_modules["decoder_ln_bias"] = [
+                    transfer_param(
+                        self._model.encoder.norm.bias,
+                        is_bias=True,
+                        restore_data=True,
+                        reserve_var=True)
+                ]
+            else:
+                self.sub_modules["decoder_ln_weight"] = [
+                    transfer_param(
+                        self._model.encoder_norm.weight,
+                        restore_data=True,
+                        reserve_var=True)
+                ]
+                self.sub_modules["decoder_ln_bias"] = [
+                    transfer_param(
+                        self._model.encoder_norm.bias,
+                        is_bias=True,
+                        restore_data=True,
+                        reserve_var=True)
+                ]
             self.sub_modules["trans_weight"] = [
                 transfer_param(
                     self._model.lm_head.transform.weight,
@@ -899,10 +925,16 @@ class InferUnifiedDecoding(nn.Layer):
             self.sub_modules["type_emb"] = [
                 self._model.embeddings.token_type_embeddings.weight
             ]
-            self.sub_modules[
-                "decoder_ln_weight"] = [self._model.encoder.norm.weight]
-            self.sub_modules[
-                "decoder_ln_bias"] = [self._model.encoder.norm.bias]
+            if self._normalize_before:
+                self.sub_modules[
+                    "decoder_ln_weight"] = [self._model.encoder.norm.weight]
+                self.sub_modules[
+                    "decoder_ln_bias"] = [self._model.encoder.norm.bias]
+            else:
+                self.sub_modules[
+                    "decoder_ln_weight"] = [self._model.encoder_norm.weight]
+                self.sub_modules[
+                    "decoder_ln_bias"] = [self._model.encoder_norm.bias]
 
             self.sub_modules[
                 "trans_weight"] = [self._model.lm_head.transform.weight]
@@ -915,14 +947,6 @@ class InferUnifiedDecoding(nn.Layer):
             self.sub_modules[
                 "linear_weight"] = [self._model.lm_head.decoder_weight.t()]
             self.sub_modules["linear_bias"] = [self._model.lm_head.decoder_bias]
-        self._n_head = self._model.unified_transformer.encoder.layers[
-            0]._config["nhead"]
-        self._hidden_dims = self._model.unified_transformer.encoder.layers[
-            0]._config["d_model"]
-        self._size_per_head = self._hidden_dims // self._n_head
-        self._n_layer = self._model.unified_transformer.encoder.num_layers
-        self._unk_id = self._model.unified_transformer.unk_token_id
-        self._mask_id = self._model.unified_transformer.mask_token_id
 
     def forward(self,
                 cache_k,
@@ -937,7 +961,8 @@ class InferUnifiedDecoding(nn.Layer):
                 eos_id=1,
                 temperature=1.0,
                 length_penalty=1.0,
-                beam_search_diversity_rate=0.0):
+                beam_search_diversity_rate=0.0,
+                pos_bias=True):
         output_ids, parent_ids, sequence_length = infer_unified_decoding(
             cache_k=cache_k,
             cache_v=cache_v,
@@ -985,7 +1010,10 @@ class InferUnifiedDecoding(nn.Layer):
             _unk_id=self._unk_id,
             _mask_id=self._mask_id,
             _temperature=temperature,
-            _len_penalty=length_penalty)
+            _len_penalty=length_penalty,
+            _normalize_before=self._normalize_before,
+            _pos_bias=pos_bias,
+            _hidden_act=self._hidden_act)
 
         ids = finalize(
             beam_size,

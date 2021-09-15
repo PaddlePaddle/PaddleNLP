@@ -113,8 +113,10 @@ struct TransformerSamplingArguments : public DecodingSamplingArguments {
   float repeat_penalty{1.0};
   int *vocab_mask{nullptr};
   bool normalization_before_{true};
+  bool pos_bias_{true};
   int unk_id_{-1};
   int mask_id_{-1};
+  ActivationType act_{ActivationType::GELU};
 };
 
 struct TransformerBeamsearchArguments : public DecodingBeamsearchArguments {
@@ -123,8 +125,10 @@ struct TransformerBeamsearchArguments : public DecodingBeamsearchArguments {
   float len_penalty{1.0};
   float repeat_penalty{2.0};
   bool normalization_before_{true};
+  bool pos_bias_{true};
   int unk_id_{-1};
   int mask_id_{-1};
+  ActivationType act_{ActivationType::GELU};
 };
 
 }  // namespace fastertransformer

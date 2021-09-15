@@ -17,6 +17,22 @@ import paddle.nn as nn
 
 
 class ErnieForCSC(nn.Layer):
+    r"""
+    ErnieForCSC is a model specified for Chinese Spelling Correction task.
+
+    It integrates phonetic features into language model by leveraging the powerful
+    pre-training and fine-tuning method.
+
+    See more details on https://aclanthology.org/2021.findings-acl.198.pdf.
+    Args:
+        ernie (ErnieModel): 
+            An instance of `paddlenlp.transformers.ErnieModel`.
+        pinyin_vocab_size (int): 
+            The vocab size of pinyin vocab.
+        pad_pinyin_id (int, optional): 
+            The pad token id of pinyin vocab. Defaults to 0.
+    """
+
     def __init__(self, ernie, pinyin_vocab_size, pad_pinyin_id=0):
         super(ErnieForCSC, self).__init__()
         self.ernie = ernie
@@ -39,6 +55,52 @@ class ErnieForCSC(nn.Layer):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+            pinyin_ids (Tensor):
+                Indices of pinyin tokens of input sequence in the pinyin vocabulary. They are
+                numerical representations of tokens that build the pinyin input sequence.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate first and second portions of the inputs.
+                Indices can be either 0 or 1:
+
+                - 0 corresponds to a **sentence A** token,
+                - 1 corresponds to a **sentence B** token.
+
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                Defaults to None, which means no segment embeddings is added to token embeddings.
+            position_ids (Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                config.max_position_embeddings - 1]``.
+                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+            attention_mask (Tensor, optional):
+                Mask to indicate whether to perform attention on each input token or not.
+                The values should be either 0 or 1. The attention scores will be set
+                to **-infinity** for any positions in the mask that are **0**, and will be
+                **unchanged** for positions that are **1**.
+
+                - **1** for tokens that are **not masked**,
+                - **0** for tokens that are **masked**.
+
+                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+                Defaults to `None`.
+
+
+        Returns:
+            detection_error_probs (Tensor):
+                A Tensor of the detection probablity of each tokens.
+                Shape as `(batch_size, sequence_length, 2)` and dtype as `int`.
+
+            correction_logits (Tensor):
+                A Tensor of the correction logits of each tokens.
+                Shape as `(batch_size, sequence_length, vocab_size)` and dtype as `int`.
+
+        """
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id

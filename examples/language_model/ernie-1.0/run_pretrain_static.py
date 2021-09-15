@@ -644,7 +644,7 @@ def do_train(args):
             if global_step >= args.max_steps:
                 eval_fetch = []
                 if topo.is_last:
-                    eval_fetch = [loss]
+                    eval_fetch = [loss, lm_loss, sop_loss]
 
                 run_evaluate(test_data_loader, exe, test_program,
                              args.test_iters, log_writer, global_step, args,

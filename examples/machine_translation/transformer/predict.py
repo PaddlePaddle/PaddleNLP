@@ -35,6 +35,28 @@ def parse_args():
         "--without_ft",
         action="store_true",
         help="Whether to use Faster Transformer to do predict. ")
+    parser.add_argument(
+        "--vocab_file",
+        default=None,
+        type=str,
+        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+    )
+    parser.add_argument(
+        "--unk_token",
+        default=None,
+        type=str,
+        help="The unknown token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--bos_token",
+        default=None,
+        type=str,
+        help="The bos token. It should be provided when use custom vocab_file. ")
+    parser.add_argument(
+        "--eos_token",
+        default=None,
+        type=str,
+        help="The eos token. It should be provided when use custom vocab_file. ")
     args = parser.parse_args()
     return args
 
@@ -127,6 +149,10 @@ if __name__ == "__main__":
     args.benchmark = ARGS.benchmark
     args.test_file = ARGS.test_file
     args.without_ft = ARGS.without_ft
+    args.vocab_file = ARGS.vocab_file
+    args.unk_token = ARGS.unk_token
+    args.bos_token = ARGS.bos_token
+    args.eos_token = ARGS.eos_token
     pprint(args)
 
     do_predict(args)
