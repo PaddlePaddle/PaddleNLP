@@ -32,6 +32,8 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer, SharedLayerDesc
 import paddle.incubate as incubate
+from paddle.distributed.fleet.utils import recompute
+
 
 __all__ = [
     'GPTModel',
@@ -282,12 +284,13 @@ class TransformerDecoder(nn.Layer):
     TransformerDecoder is a stack of N decoder layers.
     """
 
-    def __init__(self, decoder_layers, num_layers, norm=None, hidden_size=None):
+    def __init__(self, decoder_layers, num_layers, norm=None, hidden_size=None, use_recompute=False):
         super(TransformerDecoder, self).__init__()
 
         self.num_layers = num_layers
         self.layers = decoder_layers
         self.norm = norm
+        self.use_recompute = use_recompute
         if norm == "LayerNorm":
             self.norm = nn.LayerNorm(hidden_size)
         elif norm is not None:
@@ -320,12 +323,9 @@ class TransformerDecoder(nn.Layer):
                                             cache=cache)
                     new_caches.append(new_cache)
                 else:
-                    output = mod(output,
-                                 memory,
-                                 tgt_mask=tgt_mask,
-                                 use_cache=use_cache,
-                                 cache=cache)
-
+                    # TODO(shenliang03) support random state for mp
+                    output = recompute(mod, output, memory, tgt_mask, use_cache, cache) if self.use_recompute \
+                        else mod(output, memory, tgt_mask, use_cache, cache)
             else:
                 output, new_cache = mod(output,
                                         memory,
@@ -530,6 +530,7 @@ class GPTPretrainedModel(PretrainedModel):
             "bos_token_id": 0,
             "eol_token_id": 3,
             "num_partitions": 1,
+            "use_recompute": False,
         },
         "gpt-cpm-small-cn-distill": { # 109M
             "vocab_size": 30000,
@@ -548,6 +549,7 @@ class GPTPretrainedModel(PretrainedModel):
             "bos_token_id": 0,
             "eol_token_id": 3,
             "num_partitions": 1,
+            "use_recompute": False,
         },
         "gpt3-13B-en": { # 13B
             "vocab_size": 50304,
@@ -564,6 +566,7 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
             "num_partitions": 1,
+            "use_recompute": False,
         },
         "gpt3-1.3B-en": { # 1.3B
             "vocab_size": 50304,
@@ -580,6 +583,7 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
             "num_partitions": 1,
+            "use_recompute": False,
         },
         "gpt2-medium-en": { #345M
             "vocab_size": 50304,
@@ -596,6 +600,7 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
             "num_partitions": 1,
+            "use_recompute": False,
         },
         "gpt2-en": { #117M
             "vocab_size": 50304,
@@ -612,6 +617,7 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
             "num_partitions": 1,
+            "use_recompute": False,
         },
         "gpt2-small-en": { # config for CE
             "vocab_size": 50304,
@@ -628,6 +634,7 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
             "num_partitions": 1,
+            "use_recompute": False,
         },
 
 
@@ -684,7 +691,8 @@ class GPTModel(GPTPretrainedModel):
                  eos_token_id=7,
                  bos_token_id=0,
                  eol_token_id=3,
-                 num_partitions=1):
+                 num_partitions=1,
+                 use_recompute=False):
         super(GPTModel, self).__init__()
 
         self.pad_token_id = pad_token_id
@@ -717,7 +725,8 @@ class GPTModel(GPTPretrainedModel):
             decoder_layers,
             num_hidden_layers,
             norm="LayerNorm",
-            hidden_size=hidden_size)
+            hidden_size=hidden_size,
+            use_recompute=use_recompute)
 
         self.apply(self.init_weights)
         self.checkpoints = []
