@@ -550,24 +550,24 @@ void topK_kernelLauncher(void* workspace,
 
   // prevent memory misalinged address
   temp_log_probs_buf_size = (int)(ceil(temp_log_probs_buf_size / 4.)) * 4;
-  can_score_buf_size = (int)(ceil(can_score_buf_size / 4.)) * 4;
-  can_idx_buf_size = (int)(ceil(can_idx_buf_size / 4.)) * 4;
+  // can_score_buf_size = (int)(ceil(can_score_buf_size / 4.)) * 4;
+  // can_idx_buf_size = (int)(ceil(can_idx_buf_size / 4.)) * 4;
   topk_tmp_ids_buf_size = (int)(ceil(topk_tmp_ids_buf_size / 4.)) * 4;
   topk_tmp_val_buf_size = (int)(ceil(topk_tmp_val_buf_size / 4.)) * 4;
 
   if (workspace == nullptr) {
     workspace_size = sizeof(float) * temp_log_probs_buf_size +
                      sizeof(int) * topk_tmp_ids_buf_size +
-                     sizeof(float) * topk_tmp_val_buf_size +
-                     sizeof(float) * can_score_buf_size +
-                     sizeof(int) * can_idx_buf_size;
+                     sizeof(float) * topk_tmp_val_buf_size;
+    // sizeof(float) * can_score_buf_size +
+    // sizeof(int) * can_idx_buf_size;
     return;
   } else {
     T* temp_log_probs = (T*)workspace;
     int* topk_tmp_id_buf = (int*)(temp_log_probs + temp_log_probs_buf_size);
     T* topk_tmp_val_buf = (T*)(topk_tmp_id_buf + topk_tmp_ids_buf_size);
-    T* can_score_buf = (T*)(topk_tmp_val_buf + topk_tmp_val_buf_size);
-    int* can_idx_buf = (int*)(can_score_buf + can_score_buf_size);
+    // T* can_score_buf = (T*)(topk_tmp_val_buf + topk_tmp_val_buf_size);
+    // int* can_idx_buf = (int*)(can_score_buf + can_score_buf_size);
     if (diversity_rate == 0.0f) {
       switch (beam_width) {
         CASE_K(1, 128, 128, 8);
