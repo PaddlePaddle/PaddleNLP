@@ -9,7 +9,7 @@ if(ON_INFER)
   link_directories(${COMMON_LIB_DIRS})
 
   set(ft_lib_link
-    decoder decoding topk cuda_int8_kernels cuda_kernels online_softmax_beamsearch encoder
+    decoder decoding topk cuda_int8_kernels cuda_kernels online_softmax_beamsearch
   )
 
   if(WITH_GPU)
