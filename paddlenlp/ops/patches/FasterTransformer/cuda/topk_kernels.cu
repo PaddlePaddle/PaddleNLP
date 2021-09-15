@@ -545,8 +545,8 @@ void topK_kernelLauncher(void* workspace,
       batch_size * beam_width * beam_width * max_block_per_beam;  // type int
   int topk_tmp_val_buf_size =
       batch_size * beam_width * beam_width * max_block_per_beam;  // type float
-  int can_score_buf_size = batch_size * beam_width * vocab_size;  // type float
-  int can_idx_buf_size = batch_size * beam_width * vocab_size;    // type float
+  // int can_score_buf_size = batch_size * beam_width * vocab_size;
+  // int can_idx_buf_size = batch_size * beam_width * vocab_size;
 
   // prevent memory misalinged address
   temp_log_probs_buf_size = (int)(ceil(temp_log_probs_buf_size / 4.)) * 4;
