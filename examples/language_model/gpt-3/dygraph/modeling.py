@@ -616,7 +616,7 @@ class GPTPretrainedModel(PretrainedModel):
         "gpt2-small-en": { # config for CE
             "vocab_size": 50304,
             "hidden_size": 1024,
-            "num_hidden_layers": 2, #4
+            "num_hidden_layers": 4,
             "num_attention_heads": 4,
             "intermediate_size": 4096,
             "hidden_act": "gelu",
