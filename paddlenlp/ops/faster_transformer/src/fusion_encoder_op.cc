@@ -143,20 +143,7 @@ std::vector<paddle::DataType> EncoderInferDtype(
   // const paddle::DataType& sequence_id_offset,
   // const paddle::DataType& trt_seqlen_offset,
   // const paddle::DataType& amax_list) {
-  switch (input) {
-    case paddle::DataType::FLOAT16: {
-      return {input};
-    }
-    case paddle::DataType::FLOAT32: {
-      return {input};
-    }
-    default: {
-      PD_THROW(
-          "NOT supported data type. "
-          "Only float16 and float32 are supported. ");
-      break;
-    }
-  }
+  return {input};
 }
 
 PD_BUILD_OP(fusion_encoder)
