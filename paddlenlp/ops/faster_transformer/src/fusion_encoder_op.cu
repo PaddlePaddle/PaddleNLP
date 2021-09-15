@@ -149,7 +149,8 @@ std::vector<paddle::Tensor> encoder_kernel(
   //   }
 
   BertEncoderTransformer<EncoderTraits_>* encoder =
-      new BertEncoderTransformer<EncoderTraits_>(int8_mode, allow_gemm_test);
+      new BertEncoderTransformer<EncoderTraits_>(
+          int8_mode, allow_gemm_test, normalize_before);
 
   encoder->allocateBuffer(allocator_,
                           batch_size_,

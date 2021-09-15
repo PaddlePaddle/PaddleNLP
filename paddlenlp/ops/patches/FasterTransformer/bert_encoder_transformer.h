@@ -108,17 +108,13 @@ class BertEncoderTransformer {
   std::map<std::string, int> cublasAlgoMap_;
   std::map<std::string, int> parameterMap_;
 
-  // begin address of cuda memory
   DataType_ *buf_ = NULL;
   DataType_ *attr_out_buf_;
   DataType_ *attr_matmul_buf_;
   DataType_ *inter_matmul_buf_;
 
-  // For pre-normalizaiton
   DataType_ *norm_from_tensor_buf_;
   DataType_ *bias_and_input;
-
-  // Unused buf
   DataType_ *from_tensor_tmp_buf_;
 
   int batch_size_;
@@ -126,11 +122,11 @@ class BertEncoderTransformer {
   int to_seq_len_;
   int head_num_;
   int size_per_head_;
+  bool is_gelu_ = true;
 
   bool allow_gemm_test_ = false;
   bool use_ORDER_COL32_2R_4R4_ = false;
   bool normalize_before_ = false;
-  bool is_gelu_ = true;
 
   // for int8 quantization
   const float *FC0_weight_amax_list, *FC1_weight_amax_list,
@@ -604,19 +600,12 @@ public:
             throw std::runtime_error(
                 std::string("Allocator failed to allocate internal buffer."));
 
-          // self_attention_output buf
           attr_out_buf_ = buf_;
-
-          // self_attention matmul output buf
           attr_matmul_buf_ = attr_out_buf_ + buf_size;
-
-          // Feedforward 4*hiddensize output buf
           inter_matmul_buf_ = attr_matmul_buf_ + buf_size;
 
           norm_from_tensor_buf_ = inter_matmul_buf_ + 4 * buf_size;
           bias_and_input = norm_from_tensor_buf_ + buf_size;
-
-          // unused buf
           from_tensor_tmp_buf_ = bias_and_input + buf_size;
         }
       }
@@ -660,7 +649,7 @@ public:
 
   BertEncoderTransformer(int int8_mode = 0,
                          bool allow_gemm_test = false,
-                         int normalize_before = false)
+                         bool normalize_before = false)
       : int8_mode_(int8_mode),
         allow_gemm_test_(allow_gemm_test),
         normalize_before_(normalize_before) {
@@ -843,7 +832,7 @@ default GEMM algo\n", GEMM_CONFIG);
 #endif
     try {
       if (normalize_before_ == false) {
-        // post-norm
+        // post-normalization
         attention_->forward();
 
 #ifndef NDEBUG
@@ -1121,7 +1110,6 @@ default GEMM algo\n", GEMM_CONFIG);
                            n,
                            computeType_,
                            static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
-
           add_bias_input_layernorm_kernelLauncher<DataType_>(
               attr_matmul_buf_,
               param_.from_tensor,
@@ -1165,7 +1153,8 @@ default GEMM algo\n", GEMM_CONFIG);
               param_.ffn.intermediate_weight.bias,
               m,
               n,
-              param_.stream);
+              param_.stream,
+              is_gelu_);
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -1213,7 +1202,7 @@ default GEMM algo\n", GEMM_CONFIG);
         }
       } else {
         // pre-normalization
-
+        // Todo(tianxin04) support fp16 and int8
         DataType_ alpha = (DataType_)1.0f;
         DataType_ beta = (DataType_)0.0f;
         const int m = param_.sequence_id_offset == nullptr
@@ -1222,390 +1211,144 @@ default GEMM algo\n", GEMM_CONFIG);
         int k = head_num_ * size_per_head_;
         int n = k;
 
-        if (int8_mode_ != 0) {
-          if (int8_mode_ == 1) {
-            cublasLtMM_withAlgo(int_buf_,
-                                1,
-                                m,
-                                n,
-                                k,
-                                m * k,
-                                n * k,
-                                m * n,
-                                (int8_t *)attr_out_buf_,
-                                (int8_t *)(param_.self_attention
-                                               .attention_output_weight.kernel),
-                                param_.cublaslt_handle,
-                                param_.stream,
-                                cublasLtAlgoMap_,
-                                use_ORDER_COL32_2R_4R4_);
-            add_bias_input_layernorm_COL32_int32I_DataTypeO_kernelLauncher(
-                attr_matmul_buf_,
-                int_buf_,
-                transA_from_tensor_,
-                param_.self_attention.attention_output_weight.bias,
-                param_.self_layernorm.gamma,
-                param_.self_layernorm.beta,
-                m,
-                n,
-                param_.stream,
-                FC0_weight_amax_list,
-                bmm2_amax_ptr);
-          } else {
-            cublasLtMM_withAlgo_int8IO(
-                (int8_t *)int_buf_,
-                1,
-                m,
-                n,
-                k,
-                m * k,
-                n * k,
-                m * n,
-                int8O_gemm_deQ_scale_list[5],
-                (int8_t *)attr_out_buf_,
-                (int8_t *)(param_.self_attention.attention_output_weight
-                               .kernel),
-                param_.cublaslt_handle,
-                param_.stream,
-                cublasLtAlgoMap_,
-                use_ORDER_COL32_2R_4R4_);
-            add_bias_input_layernorm_COL32_int8IO_kernelLauncher(
-                (int8_t *)attr_matmul_buf_,
-                (int8_t *)int_buf_,
-                int8_from_tensor_,
-                param_.self_attention.attention_output_weight.bias,
-                param_.self_layernorm.gamma,
-                param_.self_layernorm.beta,
-                m,
-                n,
-                param_.stream,
-                Proj_aftergemm_amax_ptr + 1,
-                to_tensor_amax_ptr + 1,
-                ProjBiasNorm_amax_ptr + 3);
-          }
+        layernorm_kernelLauncher(norm_from_tensor_buf_,
+                                 param_.from_tensor,
+                                 param_.self_layernorm.gamma,
+                                 param_.self_layernorm.beta,
+                                 m,
+                                 n,
+                                 param_.stream);
+
+        cuda::MultiHeadInitParam<DataType_> multi_head_init_param;
+
+        multi_head_init_param.from_tensor = norm_from_tensor_buf_;
+        multi_head_init_param.to_tensor = norm_from_tensor_buf_;
+        multi_head_init_param.self_attention = param_.self_attention;
+        multi_head_init_param.attr_mask = param_.attr_mask;
+        multi_head_init_param.stream = param_.stream;
+        multi_head_init_param.cublas_handle = param_.cublas_handle;
+        multi_head_init_param.attr_out = attr_out_buf_;
+        multi_head_init_param.valid_word_num = param_.valid_word_num;
+        multi_head_init_param.sequence_id_offset = param_.sequence_id_offset;
+        multi_head_init_param.trt_seqlen_offset = param_.trt_seqlen_offset;
+        multi_head_init_param.trt_seqlen_size = param_.trt_seqlen_size;
+        // re-initialize MultiHeadInitParam
+        attention_->initialize(multi_head_init_param);
+        attention_->forward();
 
 #ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
 
-          n *= 4;
+        check_cuda_error(
+            cublasGemmEx(param_.cublas_handle,
+                         CUBLAS_OP_N,
+                         CUBLAS_OP_N,
+                         n,
+                         m,
+                         k,
+                         &alpha,
+                         param_.self_attention.attention_output_weight.kernel,
+                         AType_,
+                         n,
+                         attr_out_buf_,
+                         BType_,
+                         k,
+                         &beta,
+                         attr_matmul_buf_,
+                         CType_,
+                         n,
+                         computeType_,
+                         static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
 
-          if (int8_mode_ == 1) {
-            quantized_kernelLauncher(attr_matmul_buf_tmp_,
-                                     attr_matmul_buf_,
-                                     k * m,
-                                     ProjBiasNorm_amax_ptr + 3,
-                                     param_.stream);
-            cublasLtMM_withAlgo(
-                int_buf_,
-                1,
-                m,
-                n,
-                k,
-                m * k,
-                n * k,
-                m * n,
-                attr_matmul_buf_tmp_,
-                (int8_t *)(param_.ffn.intermediate_weight.kernel),
-                param_.cublaslt_handle,
-                param_.stream,
-                cublasLtAlgoMap_,
-                use_ORDER_COL32_2R_4R4_);
-            add_bias_act_COL32_int32I_int8O_kernelLauncher(
-                (int8_t *)inter_matmul_buf_,
-                int_buf_,
-                param_.ffn.intermediate_weight.bias,
-                m,
-                n,
-                param_.stream,
-                FC1_weight_amax_list,
-                ProjBiasNorm_amax_ptr + 2,
-                F1Bias_amax_ptr + 3);
-          } else {
-            cublasLtMM_withAlgo_int8IO(
-                (int8_t *)int_buf_,
-                1,
-                m,
-                n,
-                k,
-                m * k,
-                n * k,
-                m * n,
-                int8O_gemm_deQ_scale_list[6],
-                (int8_t *)attr_matmul_buf_,
-                (int8_t *)(param_.ffn.intermediate_weight.kernel),
-                param_.cublaslt_handle,
-                param_.stream,
-                cublasLtAlgoMap_,
-                use_ORDER_COL32_2R_4R4_);
-            add_bias_act_COL32_int8IO_kernelLauncher(
-                (int8_t *)inter_matmul_buf_,
-                (int8_t *)int_buf_,
-                param_.ffn.intermediate_weight.bias,
-                m,
-                n,
-                param_.stream,
-                F1_aftergemm_amax_ptr + 1,
-                F1Bias_amax_ptr + 3);
-          }
+        add_bias_input_pre_layernorm_kernelLauncher<DataType_>(
+            attr_matmul_buf_,
+            bias_and_input,
+            param_.from_tensor,
+            param_.self_attention.attention_output_weight.bias,
+            param_.ffn_layernorm.gamma,
+            param_.ffn_layernorm.beta,
+            m,
+            n,
+            param_.stream);
 
 #ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
 
-          n = k;
-          k *= 4;
+        n *= 4;
 
-          if (int8_mode_ == 1) {
-            cublasLtMM_withAlgo(int_buf_,
-                                1,
-                                m,
-                                n,
-                                k,
-                                m * k,
-                                n * k,
-                                m * n,
-                                (int8_t *)inter_matmul_buf_,
-                                (int8_t *)(param_.ffn.output_weight.kernel),
-                                param_.cublaslt_handle,
-                                param_.stream,
-                                cublasLtAlgoMap_,
-                                use_ORDER_COL32_2R_4R4_);
-            if (layer_idx_ != layer_num_ - 1) {
-              add_bias_input_layernorm_COL32_int32I_DataTypeO_kernelLauncher(
-                  param_.transformer_out,
-                  int_buf_,
-                  attr_matmul_buf_,
-                  param_.ffn.output_weight.bias,
-                  param_.ffn_layernorm.gamma,
-                  param_.ffn_layernorm.beta,
-                  m,
-                  n,
-                  param_.stream,
-                  FC2_weight_amax_list,
-                  F1Bias_amax_ptr);
-            } else {
-              add_bias_input_layernorm_COL32_int32I_DataTypeO_kernelLauncher(
-                  transformer_out_tmp_DataType_,
-                  int_buf_,
-                  attr_matmul_buf_,
-                  param_.ffn.output_weight.bias,
-                  param_.ffn_layernorm.gamma,
-                  param_.ffn_layernorm.beta,
-                  m,
-                  n,
-                  param_.stream,
-                  FC2_weight_amax_list,
-                  F1Bias_amax_ptr);
-              transposeMatrix_COL32ToColMajor_kernelLauncher(
-                  param_.transformer_out,
-                  transformer_out_tmp_DataType_,
-                  m,
-                  n,
-                  param_.stream);
-            }
-          } else {
-            cublasLtMM_withAlgo_int8IO(
-                (int8_t *)int_buf_,
-                1,
-                m,
-                n,
-                k,
-                m * k,
-                n * k,
-                m * n,
-                int8O_gemm_deQ_scale_list[7],
-                (int8_t *)inter_matmul_buf_,
-                (int8_t *)(param_.ffn.output_weight.kernel),
-                param_.cublaslt_handle,
-                param_.stream,
-                cublasLtAlgoMap_,
-                use_ORDER_COL32_2R_4R4_);
-            if (layer_idx_ != layer_num_ - 1) {
-              add_bias_input_layernorm_COL32_int8IO_kernelLauncher(
-                  (int8_t *)param_.transformer_out,
-                  (int8_t *)int_buf_,
-                  (int8_t *)attr_matmul_buf_,
-                  param_.ffn.output_weight.bias,
-                  param_.ffn_layernorm.gamma,
-                  param_.ffn_layernorm.beta,
-                  m,
-                  n,
-                  param_.stream,
-                  F2_aftergemm_amax_ptr + 1,
-                  ProjBiasNorm_amax_ptr + 1,
-                  F2BiasNorm_amax_ptr + 3);
-            } else {
-              add_bias_input_layernorm_COL32_int8I_DataTypeO_kernelLauncher(
-                  transformer_out_tmp_DataType_,
-                  (int8_t *)int_buf_,
-                  (int8_t *)attr_matmul_buf_,
-                  param_.ffn.output_weight.bias,
-                  param_.ffn_layernorm.gamma,
-                  param_.ffn_layernorm.beta,
-                  m,
-                  n,
-                  param_.stream,
-                  F2_aftergemm_amax_ptr + 1,
-                  ProjBiasNorm_amax_ptr + 1);
-              transposeMatrix_COL32ToColMajor_kernelLauncher(
-                  param_.transformer_out,
-                  transformer_out_tmp_DataType_,
-                  m,
-                  n,
-                  param_.stream);
-            }
-          }
+        check_cuda_error(
+            cublasGemmEx(param_.cublas_handle,
+                         CUBLAS_OP_N,
+                         CUBLAS_OP_N,
+                         n,
+                         m,
+                         k,
+                         &alpha,
+                         param_.ffn.intermediate_weight.kernel,
+                         AType_,
+                         n,
+                         attr_matmul_buf_,
+                         BType_,
+                         k,
+                         &beta,
+                         inter_matmul_buf_,
+                         CType_,
+                         n,
+                         computeType_,
+                         static_cast<cublasGemmAlgo_t>(cublasAlgo_[1])));
+
+        add_bias_act_kernelLauncher<DataType_>(
+            inter_matmul_buf_,
+            param_.ffn.intermediate_weight.bias,
+            m,
+            n,
+            param_.stream,
+            is_gelu_);
 
 #ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
-        } else {
-          // Support fp32
-          // Todo(tianxin04): support fp16
 
-          layernorm_kernelLauncher(norm_from_tensor_buf_,
-                                   param_.from_tensor,
-                                   param_.self_layernorm.gamma,
-                                   param_.self_layernorm.beta,
-                                   m,
-                                   n,
-                                   param_.stream);
+        n = k;
+        k *= 4;
 
-          cuda::MultiHeadInitParam<DataType_> multi_head_init_param;
+        check_cuda_error(
+            cublasGemmEx(param_.cublas_handle,
+                         CUBLAS_OP_N,
+                         CUBLAS_OP_N,
+                         n,
+                         m,
+                         k,
+                         &alpha,
+                         param_.ffn.output_weight.kernel,
+                         AType_,
+                         n,
+                         inter_matmul_buf_,
+                         BType_,
+                         k,
+                         &beta,
+                         param_.transformer_out,
+                         CType_,
+                         n,
+                         computeType_,
+                         static_cast<cublasGemmAlgo_t>(cublasAlgo_[2])));
 
-          multi_head_init_param.from_tensor = norm_from_tensor_buf_;
-          multi_head_init_param.to_tensor = norm_from_tensor_buf_;
-          multi_head_init_param.self_attention = param_.self_attention;
-          multi_head_init_param.attr_mask = param_.attr_mask;
-          multi_head_init_param.stream = param_.stream;
-          multi_head_init_param.cublas_handle = param_.cublas_handle;
-          multi_head_init_param.attr_out = attr_out_buf_;
-          multi_head_init_param.valid_word_num = param_.valid_word_num;
-          multi_head_init_param.sequence_id_offset = param_.sequence_id_offset;
-          multi_head_init_param.trt_seqlen_offset = param_.trt_seqlen_offset;
-          multi_head_init_param.trt_seqlen_size = param_.trt_seqlen_size;
-          // re-initialize MultiHeadInitParam
-          attention_->initialize(multi_head_init_param);
-          attention_->forward();
+        add_bias_input_kernelLauncher<DataType_>(param_.transformer_out,
+                                                 bias_and_input,
+                                                 param_.ffn.output_weight.bias,
+                                                 m,
+                                                 n,
+                                                 param_.stream);
 
 #ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
-
-          check_cuda_error(
-              cublasGemmEx(param_.cublas_handle,
-                           CUBLAS_OP_N,
-                           CUBLAS_OP_N,
-                           n,
-                           m,
-                           k,
-                           &alpha,
-                           param_.self_attention.attention_output_weight.kernel,
-                           AType_,
-                           n,
-                           attr_out_buf_,
-                           BType_,
-                           k,
-                           &beta,
-                           attr_matmul_buf_,
-                           CType_,
-                           n,
-                           computeType_,
-                           static_cast<cublasGemmAlgo_t>(cublasAlgo_[0])));
-
-          add_bias_input_pre_layernorm_kernelLauncher<DataType_>(
-              attr_matmul_buf_,
-              bias_and_input,
-              param_.from_tensor,
-              param_.self_attention.attention_output_weight.bias,
-              param_.ffn_layernorm.gamma,
-              param_.ffn_layernorm.beta,
-              m,
-              n,
-              param_.stream);
-
-#ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
-#endif
-
-          n *= 4;
-
-          check_cuda_error(
-              cublasGemmEx(param_.cublas_handle,
-                           CUBLAS_OP_N,
-                           CUBLAS_OP_N,
-                           n,
-                           m,
-                           k,
-                           &alpha,
-                           param_.ffn.intermediate_weight.kernel,
-                           AType_,
-                           n,
-                           attr_matmul_buf_,
-                           BType_,
-                           k,
-                           &beta,
-                           inter_matmul_buf_,
-                           CType_,
-                           n,
-                           computeType_,
-                           static_cast<cublasGemmAlgo_t>(cublasAlgo_[1])));
-
-          add_bias_act_kernelLauncher<DataType_>(
-              inter_matmul_buf_,
-              param_.ffn.intermediate_weight.bias,
-              m,
-              n,
-              param_.stream);
-
-#ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
-#endif
-
-          n = k;
-          k *= 4;
-
-          check_cuda_error(
-              cublasGemmEx(param_.cublas_handle,
-                           CUBLAS_OP_N,
-                           CUBLAS_OP_N,
-                           n,
-                           m,
-                           k,
-                           &alpha,
-                           param_.ffn.output_weight.kernel,
-                           AType_,
-                           n,
-                           inter_matmul_buf_,
-                           BType_,
-                           k,
-                           &beta,
-                           param_.transformer_out,
-                           CType_,
-                           n,
-                           computeType_,
-                           static_cast<cublasGemmAlgo_t>(cublasAlgo_[2])));
-
-          add_bias_input_kernelLauncher<DataType_>(
-              param_.transformer_out,
-              bias_and_input,
-              param_.ffn.output_weight.bias,
-              m,
-              n,
-              param_.stream);
-
-#ifndef NDEBUG
-          cudaDeviceSynchronize();
-          check_cuda_error(cudaGetLastError());
-#endif
-        }
       }
     } catch (std::runtime_error &error) {
       throw error;
