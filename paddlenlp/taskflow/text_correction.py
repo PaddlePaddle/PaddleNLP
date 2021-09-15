@@ -105,9 +105,9 @@ class CSCTask(Task):
         self._pypinyin = pypinyin
         self._max_seq_length = 128
         self._batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # segment
-            Pad(axis=0, pad_val=self._pinyin_vocab.token_to_idx[self._pinyin_vocab.pad_token]),  # pinyin
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'),  # input
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype='int64'),  # segment
+            Pad(axis=0, pad_val=self._pinyin_vocab.token_to_idx[self._pinyin_vocab.pad_token], dtype='int64'),  # pinyin
             Stack(axis=0, dtype='int64'),  # length
         ): [data for data in fn(samples)]
         self._num_workers = self.kwargs[
