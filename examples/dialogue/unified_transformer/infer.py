@@ -34,8 +34,7 @@ def parse_args():
     parser.add_argument('--device', type=str, default='gpu', help='The device to select for training the model.')
     parser.add_argument('--faster', action='store_true', help='Whether to process inference using faster transformer. ')
     parser.add_argument('--use_fp16_decoding', action='store_true', help='Whether to use fp16 when using faster transformer. Only works when using faster transformer. ')
-    parser.add_argument('--decoding_lib', type=str, default='../../../paddlenlp/ops/build/lib/libdecoding.so', help='The decoding lib of faster transformer. ')
-    parser.add_argument('--decoding_type_id', type=int, default=1, help='The token type id used for decoding. Only works when using faster transformer. ')
+    parser.add_argument('--decoding_lib', type=str, default='../../../paddlenlp/ops/build/lib/libdecoding_op.so', help='The decoding lib of faster transformer. ')
 
     args = parser.parse_args()
     return args
