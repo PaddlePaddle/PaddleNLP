@@ -179,7 +179,7 @@ class BartEncoder(BartPretrainedModel):
     def forward(
             self,
             input_ids=None,
-            attention_mask=None, ):
+            attention_mask=None):
         if input_ids is None:
             raise ValueError("Input_ids cannot be None.")
         inputs_embeds = self.embed_tokens(input_ids)
