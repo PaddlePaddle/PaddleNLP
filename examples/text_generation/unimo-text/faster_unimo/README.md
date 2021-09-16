@@ -112,7 +112,6 @@ python infer.py \
     --batch_size=16 \
     --max_seq_len=512 \
     --max_target_len=30 \
-    --do_predict \
     --max_dec_len=20 \
     --min_dec_len=3 \
     --decode_strategy=sampling \

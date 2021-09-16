@@ -145,9 +145,9 @@ if(ON_INFER)
     set(DEPS ${DEPS} shlwapi.lib)
   endif(NOT WIN32)
 
-  cuda_add_library(pd_infer_custom_op ${decoding_op_files} ${decoder_op_files} SHARED)
+  cuda_add_library(decoding_infer_op ${decoding_op_files} ${decoder_op_files} SHARED)
+  add_dependencies(decoding_infer_op extern_${THIRD_PARTY_NAME})
 
-  add_dependencies(pd_infer_custom_op extern_${THIRD_PARTY_NAME})
   string(REPLACE "/" ";" DEMO_PATH ${DEMO})
 
   list(LENGTH DEMO_PATH PATH_LEN)
@@ -157,9 +157,9 @@ if(ON_INFER)
   string(REPLACE "." ";" DEMO_NAME ${DEMO_NAME})
   list(GET DEMO_NAME 0 DEMO_NAME)
   add_executable(${DEMO_NAME} ${DEMO})
-  set(DEPS pd_infer_custom_op ${ft_lib_link} boost ${DEPS} cublas cudart)
+  set(DEPS decoding_infer_op ${ft_lib_link} boost ${DEPS} cublas cudart)
 
-  if(WITH_GPT)
+  if(WITH_GPT AND WITH_SP)
     set(DEPS ${DEPS} sentencepiece)
   endif()
 

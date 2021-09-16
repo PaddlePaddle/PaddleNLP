@@ -20,14 +20,17 @@ INCLUDE(ExternalProject)
 
 set(CXX_STD "14" CACHE STRING "C++ standard")
 
-option(ON_INFER         "Compile with inference. "                                OFF)
-option(WITH_GPU         "Compile with GPU/CPU, default use CPU."                  ON)
-option(USE_TENSORRT     "Compile with TensorRT."                                  OFF)
-option(WITH_TRANSFORMER "Compile with Transformer"                                ON)
-option(WITH_GPT         "Compile with GPT"                                        OFF)
-option(WITH_UNIFIED         "Compile with Unified Transformer"                        ON)
-option(WITH_DECODER     "Compile with Transformer Decoder"                        ON)
-option(WITH_ENCODER     "Compile with Transformer Encoder"                        ON)
+option(ON_INFER         "Compiled with inference. "                                 OFF)
+option(WITH_GPU         "Compiled with GPU/CPU, default use CPU."                   ON)
+option(WITH_MKL         "Compile with MKL. Only works when ON_INFER is ON."         ON)
+option(USE_TENSORRT     "Compiled with TensorRT."                                   OFF)
+option(WITH_TRANSFORMER "Compiled with Transformer."                                ON)
+option(WITH_GPT         "Compiled with GPT."                                        OFF)
+option(WITH_UNIFIED     "Compiled with Unified Transformer."                        ON)
+option(WITH_SP          "Compiled with sentencepiece. Only works when WITH_GPT and ON_INFER is ON." ON)
+option(WITH_DECODER     "Compile with Transformer Decoder"                          ON)
+option(WITH_ENCODER     "Compile with Transformer Encoder"                          ON)
+option(WITH_STATIC_LIB  "Compile static lib"                                        OFF)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
@@ -45,7 +48,8 @@ if(WITH_UNIFIED)
   list(APPEND decoding_op_files fusion_unified_decoding_op.cc fusion_unified_decoding_op.cu)
 endif()
 
-if(WITH_ENCODER)
+# TODO: Support encoder when ON_INFER
+if(WITH_ENCODER AND NOT ON_INFER)
   list(APPEND decoding_op_files fusion_encoder_op.cc fusion_encoder_op.cu)
 endif()
 
@@ -138,6 +142,8 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/topk_kernels.cu topk_kernels_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/topk_kernels.cu topk_kernels_dst)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/cuda/lightseq_kernels.cu lightseq_kernels_cu_src)
+
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_decoder.cu open_decoder_cu_dst)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/open_decoder.h open_decoder_h_dst)
 
@@ -187,6 +193,7 @@ set(FT_PATCH_COMMAND
   && cp ${arguments_h_src} ${trans_dst}
   && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
   && cat ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
+  && cat ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
   && cat ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
   && cat ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
   && cat ${topk_kernels_cuh_src} >> ${topk_kernels_cuh_dst}
@@ -258,7 +265,7 @@ ExternalProject_Add(
   PATCH_COMMAND     ${FT_PATCH_COMMAND}
   BINARY_DIR        ${THIRD_PATH}/build/${THIRD_PARTY_NAME}
   INSTALL_COMMAND   ""
-  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DPY_CMD=${PY_CMD}
+  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_STATIC_LIB=${WITH_STATIC_LIB}
 )
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} BINARY_DIR)
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} SOURCE_DIR)
@@ -275,7 +282,7 @@ link_directories(
   ${FT_LIB_PATH}
 )
 
-if(ON_INFER AND WITH_GPT)
+if(ON_INFER AND WITH_GPT AND WITH_SP)
   ExternalProject_Add(
     extern_sentencepiece
     GIT_REPOSITORY    https://github.com/google/sentencepiece.git
@@ -292,6 +299,8 @@ if(ON_INFER AND WITH_GPT)
   link_directories(
     ${THIRD_PATH}/build/sentencepiece/src/
   )
+
+  add_definitions(-DGPT_ON_SENTENCEPIECE)
 endif()
 
 add_subdirectory(faster_transformer)

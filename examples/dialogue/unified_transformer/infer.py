@@ -120,7 +120,11 @@ def infer(args):
 
         if args.faster:
             ids = output
-            results = select_response(ids, None, tokenizer)
+            results = select_response(
+                ids,
+                None,
+                tokenizer,
+                num_return_sequences=args.num_return_sequences)
         else:
             ids, scores = output
             results = select_response(ids, scores, tokenizer, args.max_dec_len,
