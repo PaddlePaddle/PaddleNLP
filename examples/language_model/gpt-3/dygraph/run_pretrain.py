@@ -121,8 +121,8 @@ def do_train(args):
     # Define log writer
     log_writer_path = os.path.join(
         args.output_dir, "train_log",
-        "{}_globalbsz_{}_amp_{}_recompute_{}_card_{}".format(
-            args.model_name_or_path, args.global_batch_size, args.use_amp,
+        "{}_globalbsz_{}_fp16_{}_recompute_{}_card_{}".format(
+            args.model_name_or_path, args.global_batch_size, args.use_pure_fp16,
             False, global_rank).lower())
 
     if os.path.exists(log_writer_path):
@@ -147,7 +147,6 @@ def do_train(args):
             model = GPTForPretraining(GPTModel(**model_config))
         else:
             model_config['topology'] = hcg.topology()
-            model_config["recompute_interval"] = 1 if args.use_recompute else 0
             model = GPTForPretrainingPipe(**model_config)
     else:
         model = GPTForPretraining.from_pretrained(
@@ -175,7 +174,9 @@ def do_train(args):
 
     clip = None
     if args.grad_clip > 0:
-        clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.grad_clip)
+        # pure fp16 not support ClipGradGlobalNorm
+        # clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.grad_clip)
+        clip = paddle.nn.ClipGradByNorm(clip_norm=args.grad_clip)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
@@ -192,15 +193,21 @@ def do_train(args):
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         grad_clip=clip,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+        multi_precision=args.use_pure_fp16)
+
+
+    if args.use_pure_fp16:
+        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
+        scaler = fleet.distributed_scaler(scaler)
+        model, optimizer = paddle.amp.decorator(models=model, 
+                                                optimizers=optimizer, 
+                                                mode='L2', 
+                                                save_dtype='float32')
 
     if paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
         optimizer = fleet.distributed_optimizer(optimizer)
-
-    if args.use_amp:
-        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
-        scaler = fleet.distributed_scaler(scaler)
 
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
@@ -245,20 +252,16 @@ def do_train(args):
 
                 if args.pp_degree == 1:
                     with paddle.amp.auto_cast(
-                            args.use_amp,
-                            custom_white_list=[
-                                "layer_norm", "softmax", "gelu"
-                            ],
+                            args.use_pure_fp16,
                             custom_black_list=[
-                                "reduce_sum", "c_softmax_with_cross_entropy",
-                                "c_embedding"
-                            ]):
+                                "reduce_sum", "c_softmax_with_cross_entropy","elementwise_div"
+                            ], mode='L2'):
                         preds = model(tokens)
                         loss = criterion(preds, labels, loss_mask)
 
-                    if args.use_amp:
+                    if args.use_pure_fp16:
                         scaler.scale(loss).backward()
-                        scaler.minimize(optimizer, loss)
+                        scaler.step(optimizer)
                     else:
                         loss.backward()
                         optimizer.step()
@@ -270,19 +273,15 @@ def do_train(args):
                 else:
                     data = [tokens, (labels, loss_mask)]
                     with paddle.amp.auto_cast(
-                            args.use_amp,
-                            custom_white_list=[
-                                "layer_norm", "softmax", "gelu"
-                            ],
+                            args.use_pure_fp16,
                             custom_black_list=[
-                                "reduce_sum", "c_softmax_with_cross_entropy",
-                                "c_embedding"
-                            ]):
+                                "reduce_sum", "c_softmax_with_cross_entropy","elementwise_div"
+                            ], mode='L2'):
                         loss = model.train_batch(
                             data,
                             optimizer=optimizer,
                             lr_scheduler=lr_scheduler,
-                            scaler=scaler if args.use_amp else None)
+                            scaler=scaler if args.use_pure_fp16 else None)
 
                 if global_step % args.logging_freq == 0:
                     avg_loss = loss.numpy()

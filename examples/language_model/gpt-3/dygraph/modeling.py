@@ -1033,7 +1033,7 @@ class GPTForPretrainingPipe(PipelineLayer):
                  eol_token_id=3,
                  num_partitions=1,
                  topology=None,
-                 recompute_interval=0):
+                 use_recompute=False):
 
         # forward desc
         self.descs = []
@@ -1090,6 +1090,6 @@ class GPTForPretrainingPipe(PipelineLayer):
             loss_fn=GPTPretrainingCriterionPipe(),
             topology=topology,
             seg_method="layer:TransformerDecoderLayer",
-            recompute_interval=recompute_interval,
+            recompute_interval=1 if use_recompute else 0,
             recompute_partition=False,
             recompute_offload=False)

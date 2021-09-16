@@ -220,12 +220,19 @@ def parse_args(MODEL_CLASSES):
         help="Using the recompute to save the memory.")
 
     # AMP config
+    # parser.add_argument(
+    #     "--use_amp",
+    #     type=str2bool,
+    #     nargs='?',
+    #     const=False,
+    #     help="Enable mixed precision training.")
+
     parser.add_argument(
-        "--use_amp",
+        "--use_pure_fp16",
         type=str2bool,
         nargs='?',
         const=False,
-        help="Enable mixed precision training.")
+        help="Enable pure fp16 precision training.")
 
     parser.add_argument(
         "--scale_loss",
