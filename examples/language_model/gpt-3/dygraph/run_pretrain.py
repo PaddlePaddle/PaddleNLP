@@ -147,7 +147,6 @@ def do_train(args):
             model = GPTForPretraining(GPTModel(**model_config))
         else:
             model_config['topology'] = hcg.topology()
-            model_config["recompute_interval"] = 1 if args.use_recompute else 0
             model = GPTForPretrainingPipe(**model_config)
     else:
         model = GPTForPretraining.from_pretrained(
