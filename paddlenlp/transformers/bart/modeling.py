@@ -490,6 +490,22 @@ class BartClassificationHead(Layer):
 
 
 class BartForSequenceClassification(BartPretrainedModel):
+    r"""
+    Bart Model with a linear layer on top of the pooled output,
+    designed for sequence classification/regression tasks like GLUE tasks.
+
+    Args:
+        bart (:class:`BartModel`):
+            An instance of BartModel.
+        num_labels (int, optional):
+            The number of different labels. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of Bart.
+            If None, use the same value as `hidden_dropout_prob` of `BartModel`
+            instance `bart`. Defaults to None.
+
+    """
+
     def __init__(self, bart, num_labels=2, dropout=None):
         super().__init__()
         self.bart = bart
@@ -506,6 +522,44 @@ class BartForSequenceClassification(BartPretrainedModel):
                 encoder_output=None,
                 use_cache=False,
                 cache=None):
+        r"""
+        The BartForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`BartModel`.
+            attention_mask (Tensor, optional):
+                See :class:`BartModel`.
+            decoder_input_ids (Tensor, `optional`):
+                See :class:`BartModel`.
+            decoder_attention_mask (Tensor, optional):
+                See :class:`BartModel`.
+            encoder_output (Tensor, optonal):
+                See :class:`BartModel`.
+            use_cache (Tensor, optional):
+                See :class:`BartModel`.
+            cache (Tensor, optional):
+                See :class:`BartModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Shape as `[batch_size, num_labels]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import BartForSequenceClassification, BartTokenizer
+
+                tokenizer = BartTokenizer.from_pretrained('bart-base')
+                model = BartForSequenceClassification.from_pretrained('bart-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+
+        """
+
         output = self.bart(input_ids, attention_mask, decoder_input_ids,
                            decoder_attention_mask, encoder_output, use_cache,
                            cache)
@@ -529,6 +583,16 @@ class BartForSequenceClassification(BartPretrainedModel):
 
 
 class BartForQuestionAnswering(BartPretrainedModel):
+    r"""
+    Bart Model with a linear layer on top of the hidden-states output to
+    compute `span_start_logits` and `span_end_logits`, designed for question-answering tasks like SQuAD .
+
+    Args:
+        bart (:class:`BartModel`):
+            An instance of BartModel.
+
+    """
+
     def __init__(self, bart):
         super().__init__()
         self.bart = bart
@@ -543,6 +607,55 @@ class BartForQuestionAnswering(BartPretrainedModel):
                 encoder_output=None,
                 use_cache=False,
                 cache=None):
+        r"""
+        The BartForQuestionAnswering forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`BartModel`.
+            attention_mask (Tensor, optional):
+                See :class:`BartModel`.
+            decoder_input_ids (Tensor, `optional`):
+                See :class:`BartModel`.
+            decoder_attention_mask (Tensor, optional):
+                See :class:`BartModel`.
+            encoder_output (Tensor, optonal):
+                See :class:`BartModel`.
+            use_cache (Tensor, optional):
+                See :class:`BartModel`.
+            cache (Tensor, optional):
+                See :class:`BartModel`.
+
+        Returns:
+            tuple: Returns tuple (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import BartForQuestionAnswering, BartTokenizer
+
+                tokenizer = BartTokenizer.from_pretrained('bart-base')
+                model = BartForSequenceClassification.from_pretrained('bart-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                start_logits = outputs[0]
+                end_logits  =outputs[1]
+
+        """
         output = self.bart(input_ids, attention_mask, decoder_input_ids,
                            decoder_attention_mask, encoder_output, use_cache,
                            cache)
@@ -553,6 +666,16 @@ class BartForQuestionAnswering(BartPretrainedModel):
 
 
 class BartForConditionalGeneration(BartPretrainedModel):
+    r"""
+    Bart Model with a linear layer on top of the hidden-states output to
+    compute `span_start_logits` and `span_end_logits`, designed for question-answering tasks like SQuAD .
+
+    Args:
+        bart (:class:`BartModel`):
+            An instance of BartModel.
+
+    """
+
     def __init__(self, bart):
         super().__init__()
         self.bart = bart
@@ -580,6 +703,52 @@ class BartForConditionalGeneration(BartPretrainedModel):
                 encoder_output=None,
                 use_cache=False,
                 cache=None):
+        r"""
+        The BartForQuestionAnswering forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`BartModel`.
+            attention_mask (Tensor, optional):
+                See :class:`BartModel`.
+            decoder_input_ids (Tensor, `optional`):
+                See :class:`BartModel`.
+            decoder_attention_mask (Tensor, optional):
+                See :class:`BartModel`.
+            encoder_output (Tensor, optonal):
+                See :class:`BartModel`.
+            use_cache (Tensor, optional):
+                See :class:`BartModel`.
+            cache (Tensor, optional):
+                See :class:`BartModel`.
+
+        Returns:
+            Tensor or tuple: Returns Tensor `lm_logits` or tuple (`lm_logits`, `cache`).
+
+            With the fields:
+
+            - `lm_logits` (Tensor):
+
+
+            - `cache` (Tensor):
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import BartForQuestionAnswering, BartTokenizer
+
+                tokenizer = BartTokenizer.from_pretrained('bart-base')
+                model = BartForSequenceClassification.from_pretrained('bart-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                start_logits = outputs[0]
+                end_logits  =outputs[1]
+
+        """
         output = self.bart(input_ids, attention_mask, decoder_input_ids,
                            decoder_attention_mask, encoder_output, use_cache,
                            cache)

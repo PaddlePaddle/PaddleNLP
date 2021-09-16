@@ -97,10 +97,11 @@ class SkepPooler(nn.Layer):
 
 class SkepPretrainedModel(PretrainedModel):
     r"""
-    An abstract class for pretrained Skep models. It provides SKEP related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models. See `PretrainedModel` for more details.
+    An abstract class for pretrained Skep models. It provides Skep related
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
 
     """
 
@@ -182,7 +183,7 @@ class SkepPretrainedModel(PretrainedModel):
 @register_base_model
 class SkepModel(SkepPretrainedModel):
     r"""
-    The bare SKEP Model transformer outputting raw hidden-states without any specific head on top.
+    The bare SKEP Model outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -198,7 +199,7 @@ class SkepModel(SkepPretrainedModel):
             Vocabulary size of `inputs_ids` in `SKEPModel`. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling `SKEPModel`.
         hidden_size (int, optional):
-            Dimension of the embedding layer, encoder layers and the pooler layer. Defaults to `768`.
+            Dimensionality of the embedding layer, encoder layers and the pooler layer. Defaults to `768`.
         num_hidden_layers (int, optional):
             Number of hidden layers in the Transformer encoder. Defaults to `12`.
         num_attention_heads (int, optional):
@@ -232,7 +233,8 @@ class SkepModel(SkepPretrainedModel):
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`TinyBertPretrainedModel.init_weights()` for how weights are initialized in `TinyBertModel`.
+                See :meth:`SkepPretrainedModel.init_weights()` for how weights are initialized in `SkepModel`.
+
         pad_token_id(`int`, optional):
             The index of padding token in the token vocabulary.
             Defaults to `0`.
@@ -355,8 +357,8 @@ class SkepModel(SkepPretrainedModel):
 
 class SkepForSequenceClassification(SkepPretrainedModel):
     r"""
-    SKEP Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
-    for GLUE tasks.
+    SKEP Model with a linear layer on top of the pooled output,
+    designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
         skep (:class:`SkepModel`):
@@ -429,8 +431,8 @@ class SkepForSequenceClassification(SkepPretrainedModel):
 
 class SkepForTokenClassification(SkepPretrainedModel):
     r"""
-    SKEP Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
-    for Named-Entity-Recognition (NER) tasks.
+    SKEP Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         skep (:class:`SkepModel`):
@@ -503,8 +505,8 @@ class SkepForTokenClassification(SkepPretrainedModel):
 
 class SkepCrfForTokenClassification(nn.Layer):
     r"""
-    SKEPCRF Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
-    for Named-Entity-Recognition (NER) tasks.
+    SKEPCRF Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         skep (:class:`SkepModel`):
