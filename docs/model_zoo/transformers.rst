@@ -71,16 +71,6 @@ Transformer预训练模型汇总
 |                    |                                     |              | 4096-hidden, 16-heads, 235M parameters  |
 |                    |                                     |              | ALBERT xxlarge model (Chinese)          |
 +--------------------+-------------------------------------+--------------+-----------------------------------------+
-|BART_               |``bart-base``                        | English      | 12-layer, 768-hidden,                   |
-|                    |                                     |              | 12-heads, 66M parameters.               |
-|                    |                                     |              | The DistilBERT model distilled from     |
-|                    |                                     |              | the BERT model ``bart-base``            |
-|                    +-------------------------------------+--------------+-----------------------------------------+
-|                    |``bart-large``                       | English      | 24-layer, 768-hidden,                   |
-|                    |                                     |              | 12-heads, 66M parameters.               |
-|                    |                                     |              | The DistilBERT model distilled from     |
-|                    |                                     |              | the BERT model ``bart-large``           |
-+--------------------+-------------------------------------+--------------+-----------------------------------------+
 |BERT_               |``bert-base-uncased``                | English      | 12-layer, 768-hidden,                   |
 |                    |                                     |              | 12-heads, 110M parameters.              |
 |                    |                                     |              | Trained on lower-cased English text.    |
@@ -215,23 +205,7 @@ Transformer预训练模型汇总
 |                    |                                     |              | The model distilled from                |
 |                    |                                     |              | the GPT model ``gpt-cpm-large-cn``      |
 |                    +-------------------------------------+--------------+-----------------------------------------+
-|                    |``gpt3-13B-en``                 | English      | 24-layer, 1024-hidden,                  |
-|                    |                                     |              | 16-heads, 345M parameters.              |
-|                    |                                     |              | Trained on English text.                |
-|                    +-------------------------------------+--------------+-----------------------------------------+
-|                    |``gpt3-1.3B-en``                 | English      | 24-layer, 1024-hidden,                  |
-|                    |                                     |              | 16-heads, 345M parameters.              |
-|                    |                                     |              | Trained on English text.                |
-|                    +-------------------------------------+--------------+-----------------------------------------+
 |                    |``gpt2-medium-en``                   | English      | 24-layer, 1024-hidden,                  |
-|                    |                                     |              | 16-heads, 345M parameters.              |
-|                    |                                     |              | Trained on English text.                |
-|                    +-------------------------------------+--------------+-----------------------------------------+
-|                    |``gpt2-en``                   | English      | 24-layer, 1024-hidden,                  |
-|                    |                                     |              | 16-heads, 345M parameters.              |
-|                    |                                     |              | Trained on English text.                |
-|                    +-------------------------------------+--------------+-----------------------------------------+
-|                    |``gpt2-small-en``               | English      | 24-layer, 1024-hidden,                  |
 |                    |                                     |              | 16-heads, 345M parameters.              |
 |                    |                                     |              | Trained on English text.                |
 +--------------------+-------------------------------------+--------------+-----------------------------------------+
