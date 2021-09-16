@@ -167,7 +167,7 @@ class BpeEncoder(object):
 
 class SkepTokenizer(PretrainedTokenizer):
     r"""
-    Constructs an ERNIE tokenizer. It uses a basic tokenizer to do punctuation
+    Constructs a Skep tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
 
@@ -382,7 +382,7 @@ class SkepTokenizer(PretrainedTokenizer):
                 Defaults to `None`.
 
         Returns:
-            `List[int]`: List of input_id with the appropriate special tokens.
+            list[int]: List of input_id with the appropriate special tokens.
         """
         if not self.add_two_sep_token_inter:
             if token_ids_1 is None:

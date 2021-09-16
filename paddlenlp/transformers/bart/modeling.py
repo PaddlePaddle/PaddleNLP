@@ -270,7 +270,66 @@ class BartDecoder(BartPretrainedModel):
 
 @register_base_model
 class BartModel(BartPretrainedModel):
-    """
+    r"""
+    The bare Bart Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in `BartModel`. Also is the vocab size of token embedding matrix.
+            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `BartModel`.
+        pad_token_id(int, optional):
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
+        d_model (int, optional):
+            Dimensionality of the embedding layer, encoder layer and decoder layer. Defaults to `768`.
+
+        num_encoder_layers (int, optional):
+            Number of hidden layers in the Transformer encoder. Defaults to `6`.
+        num_decoder_layers (int, optional):
+            Number of hidden layers in the Transformer decoder. Defaults to `6`.
+        encoder_attention_heads (int, optional):
+            Number of attention heads for each attention layer in the Transformer encoder.
+            Defaults to `12`.
+        decoder_attention_heads (int, optional):
+            Number of attention heads for each attention layer in the Transformer decoder.
+            Defaults to `12`.
+        encoder_ffn_dim (int, optional):
+            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
+            to ff layers are firstly projected from `d_model` to `encoder_ffn_dim`,
+            and then projected back to `d_model`. Typically `encoder_ffn_dim` is larger than `d_model`.
+            Defaults to `3072`.
+        decoder_ffn_dim (int, optional):
+            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
+            to ff layers are firstly projected from `d_model` to `decoder_ffn_dim`,
+            and then projected back to `d_model`. Typically `decoder_ffn_dim` is larger than `d_model`.
+            Defaults to `3072`.
+        dropout (float, optional):
+            The dropout probability used in all fully connected layers (pre-process and post-process of MHA and FFN sub-layer)
+            in the encoders and decoders. Defaults to `0.1`.
+        activation_function (str, optional):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions are supported.
+            Defaults to `"gelu"`.
+        attention_dropout (float, optional):
+            The dropout probability used in MultiHeadAttention in all encoder layers and decoder layers to drop some attention target.
+            Defaults to `0.1`.
+        activation_dropout (float, optional):
+            The dropout probability used after FFN activation in all encoder layers and decoder layers.
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
+            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
+            sequence. Defaults to `1024`.
+        init_std (float, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Default to `0.02`.
+
     """
 
     def __init__(self,
@@ -324,6 +383,58 @@ class BartModel(BartPretrainedModel):
                 encoder_output=None,
                 use_cache=False,
                 cache=None):
+        r'''
+        The BartModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
+                [batch_size, num_attention_heads, sequence_length, sequence_length].
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+            decoder_input_ids (Tensor, optional):
+
+            decoder_attention_mask (Tensor, optional):
+
+            encoder_output ():
+
+            use_cache (bool, optional):
+                Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
+                can be used to speed up decoding.
+            cache (list, optional):
+                It is a list, and each element in the list is a tuple `(incremental_cache, static_cache)`.
+                See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
+                It is only used for inference and should be None for training.
+                Default to `None`.
+
+        Returns:
+            Tensor: Returns tensor `decoder_output`, which is the output at the last layer of the model.
+            Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import BartModel, BartTokenizer
+
+                tokenizer = BartTokenizer.from_pretrained('bart-base')
+                model = BartModel.from_pretrained('bart-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        '''
+
         # different to other models, Bart automatically creates decoder_input_ids from
         # inputBartForSequenceClassification_ids if no decoder_input_ids are provided
         if input_ids is None and encoder_output is None:
