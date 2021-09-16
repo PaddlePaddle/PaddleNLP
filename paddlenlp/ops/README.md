@@ -106,7 +106,7 @@ transformer = FasterTransformer(
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
-./build/third-party/build/bin/decoding_gemm 32 4 8 64 30000 32 512 0
+./build/third-party/build/fastertransformer/bin/decoding_gemm 32 4 8 64 30000 32 512 0
 python ./faster_transformer/sample/decoding_sample.py --config ./faster_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so
 ```
 
@@ -116,7 +116,7 @@ python ./faster_transformer/sample/decoding_sample.py --config ./faster_transfor
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
-./build/third-party/build/bin/decoding_gemm 32 4 8 64 30000 32 512 1
+./build/third-party/build/fastertransformer/bin/decoding_gemm 32 4 8 64 30000 32 512 1
 python ./faster_transformer/sample/decoding_sample.py --config ./faster_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so --use_fp16_decoding
 ```
 
@@ -206,7 +206,7 @@ cd PaddleNLP/paddlenlp/ops/
 ``` sh
 mkdir build
 cd build/
-cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DWITH_STATIC_LIB=OFF -DON_INFER=ON -DWITH_MKL=ON
+cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON
 make -j
 cd ../
 ```
@@ -228,6 +228,8 @@ cd ../
   ```
 * `-DDEMO` 说明预测库使用 demo 的位置。比如指定 -DDEMO=./demo/transformer_e2e.cc 或是 -DDEMO=./demo/gpt.cc。最好使用绝对路径，若使用相对路径，需要是相对于 `PaddleNLP/paddlenlp/ops/faster_transformer/src/` 的相对路径。
 * `-DWITH_GPT`，如果是编译 GPT 的预测库可执行文件，需要加上 `-DWITH_GPT=ON`。
+* `-DWITH_MKL`，若当前是使用的 mkl 的 Paddle lib，那么需要打开 MKL 以引入 MKL 相关的依赖。
+* `-DON_INFER`，是否编译 paddle inference 预测库。
 * **当使用预测库的自定义 op 的时候，请务必开启 `-DON_INFER=ON` 选项，否则，不会得到预测库的可执行文件。**
 
 #### 执行 Transformer decoding on PaddlePaddle
@@ -243,7 +245,7 @@ cd bin/
 
 ``` sh
 cd bin/
-../third-party/build/bin/decoding_gemm 8 5 8 64 38512 256 512 0
+../third-party/build/fastertransformer/bin/decoding_gemm 8 5 8 64 38512 256 512 0
 ./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 

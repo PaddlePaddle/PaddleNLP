@@ -142,11 +142,11 @@ def do_train(args):
             "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
 
         model_config['num_partitions'] = args.mp_degree
+        model_config['use_recompute'] = args.use_recompute
         if args.pp_degree == 1:
             model = GPTForPretraining(GPTModel(**model_config))
         else:
             model_config['topology'] = hcg.topology()
-            model_config["recompute_interval"] = 1 if args.use_recompute else 0
             model = GPTForPretrainingPipe(**model_config)
     else:
         model = GPTForPretraining.from_pretrained(
