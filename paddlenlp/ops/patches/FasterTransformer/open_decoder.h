@@ -75,6 +75,7 @@ private:
   int hidden_units_;
   int memory_hidden_units_;
   int normalization_before_;
+  ActivationType act_;
 
   DataType_ *norm_from_tensor_buf_, *query_buf_;
   DataType_ *context_buf_, *masked_output_buf_;
@@ -94,13 +95,15 @@ public:
               int head_num,
               int size_per_head,
               int memory_hidden_units,
-              bool normalization_before = true)
+              bool normalization_before = true,
+              ActivationType act = ActivationType::RELU)
       : batch_size_(batch_size),
         max_seq_len_(seq_len),
         head_num_(head_num),
         size_per_head_(size_per_head),
         memory_hidden_units_(memory_hidden_units),
-        normalization_before_(normalization_before) {
+        normalization_before_(normalization_before),
+        act_(act) {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -314,7 +317,7 @@ public:
               m,
               4 * n,
               n,
-              ActivationType::RELU);
+              act_);
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());
@@ -340,7 +343,7 @@ public:
               m,
               4 * n,
               n,
-              ActivationType::GELU);
+              act_);
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());
@@ -412,7 +415,7 @@ public:
               m,
               4 * n,
               n,
-              ActivationType::GELU);
+              act_);
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -439,7 +442,7 @@ public:
               m,
               4 * n,
               n,
-              ActivationType::GELU);
+              act_);
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());

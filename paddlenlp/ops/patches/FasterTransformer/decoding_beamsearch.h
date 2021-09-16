@@ -86,7 +86,8 @@ public:
                      const bool keep_alive_beam = false,
                      const float alpha = 0.6,
                      const bool normalization_before = true,
-                     const int pos_offset = 0)
+                     const int pos_offset = 0,
+                     const ActivationType act = ActivationType::RELU)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam) {
@@ -107,6 +108,8 @@ public:
     args_.alpha_ = alpha;
     args_.normalization_before_ = normalization_before;
     args_.pos_offset_ = pos_offset;
+    args_.act_ = act;
+
     if (args_.beam_width_ > 16 || args_.beam_width_ > MAX_K)
       is_fuse_topk_softMax_ = false;
 
@@ -120,7 +123,8 @@ public:
                                         head_num,
                                         size_per_head,
                                         memory_hidden_units,
-                                        normalization_before);
+                                        normalization_before,
+                                        args_.act_);
 
     int from_tensor_size =
         args_.batch_size_ * args_.beam_width_ * args_.hidden_units_;  // type T

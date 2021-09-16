@@ -82,7 +82,8 @@ public:
                    const int candidate_num = 0,
                    const float probability_threshold = 0.0,
                    const bool normalization_before = true,
-                   const int pos_offset = 0)
+                   const int pos_offset = 0,
+                   const ActivationType act = ActivationType::RELU)
       : allocator_(allocator) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
@@ -97,6 +98,7 @@ public:
     args_.end_id_ = end_id;
     args_.normalization_before_ = normalization_before;
     args_.pos_offset_ = pos_offset;
+    args_.act_ = act;
 
     if (args_.candidate_num_ == 0 && args_.probability_threshold_ == 0.0) {
       printf(
@@ -124,7 +126,8 @@ public:
                                         head_num,
                                         size_per_head,
                                         memory_hidden_units,
-                                        normalization_before);
+                                        normalization_before,
+                                        args_.act_);
 
     int from_tensor_size = args_.batch_size_ * args_.hidden_units_;  // type T
     int decoder_workspace_size = decoder_->getWorkspaceSize();       // type T

@@ -261,7 +261,8 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
         false,
         alpha,
         false,
-        2);
+        2,
+        ActivationType::GELU);
 
     decoding_beamsearch_->forward(params, decoding_params);
 
@@ -286,7 +287,8 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
         true,  // keep_alive_beam_
         alpha,
         false,
-        2);
+        2,
+        ActivationType::GELU);
 
     decoding_beamsearch_->forward(params, decoding_params);
 
@@ -309,7 +311,8 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
                                                       candidate_num_,
                                                       probability_threshold_,
                                                       false,
-                                                      2);
+                                                      2,
+                                                      ActivationType::GELU);
 
     decoding_sampling_->forward(params, decoding_params);
 
