@@ -106,7 +106,7 @@ public:
     args_.beam_search_diversity_rate_ = beam_search_diversity_rate;
     args_.alpha_ = alpha;
     args_.normalization_before_ = normalization_before;
-    args_.pos_offset = pos_offset;
+    args_.pos_offset_ = pos_offset;
     if (args_.beam_width_ > 16 || args_.beam_width_ > MAX_K)
       is_fuse_topk_softMax_ = false;
 
@@ -355,7 +355,7 @@ public:
             embedding_buf_,
             decoding_params.embedding_table,
             decoding_params.position_encoding_table +
-                (step - 1 + args_.pos_offset) * args_.hidden_units_,
+                (step - 1 + args_.pos_offset_) * args_.hidden_units_,
             word_ids_buf_,
             m,
             args_.hidden_units_,
