@@ -85,7 +85,8 @@ public:
                      const bool is_fuse_topk_softMax = false,
                      const bool keep_alive_beam = false,
                      const float alpha = 0.6,
-                     const bool normalization_before = true)
+                     const bool normalization_before = true,
+                     const int pos_offset = 0)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam) {
@@ -105,6 +106,7 @@ public:
     args_.beam_search_diversity_rate_ = beam_search_diversity_rate;
     args_.alpha_ = alpha;
     args_.normalization_before_ = normalization_before;
+    args_.pos_offset = pos_offset;
     if (args_.beam_width_ > 16 || args_.beam_width_ > MAX_K)
       is_fuse_topk_softMax_ = false;
 
@@ -353,7 +355,7 @@ public:
             embedding_buf_,
             decoding_params.embedding_table,
             decoding_params.position_encoding_table +
-                (step - 1 + 2) * args_.hidden_units_,
+                (step - 1 + args_.pos_offset) * args_.hidden_units_,
             word_ids_buf_,
             m,
             args_.hidden_units_,

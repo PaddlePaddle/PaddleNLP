@@ -260,7 +260,8 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
         false,
         false,
         alpha,
-        false);
+        false,
+        2);
 
     decoding_beamsearch_->forward(params, decoding_params);
 
@@ -284,7 +285,8 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
         true,  // is_fuse_topk_softMax_
         true,  // keep_alive_beam_
         alpha,
-        false);
+        false,
+        2);
 
     decoding_beamsearch_->forward(params, decoding_params);
 
@@ -306,7 +308,8 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
                                                       end_id_,
                                                       candidate_num_,
                                                       probability_threshold_,
-                                                      false);
+                                                      false,
+                                                      2);
 
     decoding_sampling_->forward(params, decoding_params);
 

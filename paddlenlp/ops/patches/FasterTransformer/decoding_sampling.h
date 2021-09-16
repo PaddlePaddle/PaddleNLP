@@ -81,7 +81,8 @@ public:
                    const int end_id,
                    const int candidate_num = 0,
                    const float probability_threshold = 0.0,
-                   const bool normalization_before = true)
+                   const bool normalization_before = true,
+                   const int pos_offset = 0)
       : allocator_(allocator) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
@@ -95,6 +96,7 @@ public:
     args_.start_id_ = start_id;
     args_.end_id_ = end_id;
     args_.normalization_before_ = normalization_before;
+    args_.pos_offset = pos_offset;
 
     if (args_.candidate_num_ == 0 && args_.probability_threshold_ == 0.0) {
       printf(
@@ -311,7 +313,7 @@ public:
             embedding_buf_,
             decoding_params.embedding_table,
             decoding_params.position_encoding_table +
-                (step - 1 + 2) * args_.hidden_units_,
+                (step - 1 + args_.pos_offset) * args_.hidden_units_,
             word_ids_buf_,
             args_.batch_size_,
             args_.hidden_units_,

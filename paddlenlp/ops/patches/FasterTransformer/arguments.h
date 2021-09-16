@@ -88,6 +88,7 @@ struct DecodingSamplingArguments : public DecodingArguments {
   float probability_threshold_;
   size_t cub_temp_storage_size_{0};
   bool normalization_before_{true};
+  int pos_offset{0};  // for position embedding
 };
 
 struct DecodingBeamsearchArguments : public DecodingArguments {
@@ -96,6 +97,7 @@ struct DecodingBeamsearchArguments : public DecodingArguments {
   float beam_search_diversity_rate_;
   float alpha_;  // power number for length penalty in beam search v2
   bool normalization_before_{true};
+  int pos_offset{0};  // for position embedding
 };
 
 struct Gpt2Arguments : public DecodingSamplingArguments {
