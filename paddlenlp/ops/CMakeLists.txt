@@ -30,6 +30,7 @@ option(WITH_UNIFIED     "Compiled with Unified Transformer."                    
 option(WITH_SP          "Compiled with sentencepiece. Only works when WITH_GPT and ON_INFER is ON." ON)
 option(WITH_DECODER     "Compile with Transformer Decoder"                          ON)
 option(WITH_ENCODER     "Compile with Transformer Encoder"                          ON)
+option(WITH_STATIC_LIB  "Compile static lib"                                        OFF)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
@@ -47,7 +48,8 @@ if(WITH_UNIFIED)
   list(APPEND decoding_op_files fusion_unified_decoding_op.cc fusion_unified_decoding_op.cu)
 endif()
 
-if(WITH_ENCODER)
+# TODO: Support encoder when ON_INFER
+if(WITH_ENCODER AND NOT ON_INFER)
   list(APPEND decoding_op_files fusion_encoder_op.cc fusion_encoder_op.cu)
 endif()
 
@@ -264,7 +266,7 @@ ExternalProject_Add(
   PATCH_COMMAND     ${FT_PATCH_COMMAND}
   BINARY_DIR        ${THIRD_PATH}/build/${THIRD_PARTY_NAME}
   INSTALL_COMMAND   ""
-  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_WITH_STATIC_LIB=${WITH_STATIC_LIB}
+  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_STATIC_LIB=${WITH_STATIC_LIB}
 )
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} BINARY_DIR)
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} SOURCE_DIR)

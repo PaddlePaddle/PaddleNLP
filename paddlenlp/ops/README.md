@@ -206,7 +206,7 @@ cd PaddleNLP/paddlenlp/ops/
 ``` sh
 mkdir build
 cd build/
-cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DWITH_STATIC_LIB=OFF -DON_INFER=ON -DWITH_MKL=ON
+cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON
 make -j
 cd ../
 ```
@@ -228,6 +228,8 @@ cd ../
   ```
 * `-DDEMO` 说明预测库使用 demo 的位置。比如指定 -DDEMO=./demo/transformer_e2e.cc 或是 -DDEMO=./demo/gpt.cc。最好使用绝对路径，若使用相对路径，需要是相对于 `PaddleNLP/paddlenlp/ops/faster_transformer/src/` 的相对路径。
 * `-DWITH_GPT`，如果是编译 GPT 的预测库可执行文件，需要加上 `-DWITH_GPT=ON`。
+* `-DWITH_MKL`，若当前是使用的 mkl 的 Paddle lib，那么需要打开 MKL 以引入 MKL 相关的依赖。
+* `-DON_INFER`，是否编译 paddle inference 预测库。
 * **当使用预测库的自定义 op 的时候，请务必开启 `-DON_INFER=ON` 选项，否则，不会得到预测库的可执行文件。**
 
 #### 执行 Transformer decoding on PaddlePaddle
