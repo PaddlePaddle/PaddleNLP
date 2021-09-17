@@ -65,6 +65,98 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__
   }
 }
 
+template <typename T, int K>
+__forceinline__ __device__ T blockRoughTopK(T val);
+
+template <typename T, int beam_size, int THREADBLOCK_SIZE>
+__launch_bounds__(THREADBLOCK_SIZE) __global__
+    void beam_topK_kernel_hierarchical(const T* log_probs,
+                                       T* can_score_buf,
+                                       int* can_idx_buf,
+                                       int* topk_tmp_id_buf,
+                                       T* topk_tmp_val_buf,
+                                       const int vocab_size,
+                                       T diversity_rate) {
+  __shared__ T s_topk;
+  __shared__ int num_cur_beam_can;
+  typedef cub::BlockReduce<TopK<T, beam_size>, THREADBLOCK_SIZE> BlockReduce;
+  __shared__ typename BlockReduce::TempStorage temp_storage;
+
+  int thread_id = threadIdx.x;
+  int block_id = blockIdx.x;
+  const bool IS_FP16 = std::is_same<T, half>::value;
+  const T MAX_T_VAL = (IS_FP16) ? HALF_FLT_MAX : FLT_MAX;
+  T rough_top_kth_logit = -MAX_T_VAL;
+
+#pragma unroll
+  for (int elem_id = thread_id; elem_id < vocab_size;
+       elem_id += THREADBLOCK_SIZE) {
+    int index = elem_id + block_id * vocab_size;
+    rough_top_kth_logit = fmaxf(rough_top_kth_logit, log_probs[index]);
+  }
+  rough_top_kth_logit = blockRoughTopK<float, beam_size>(rough_top_kth_logit);
+  if (thread_id == 0) {
+    s_topk = rough_top_kth_logit;
+    num_cur_beam_can = 0;
+  }
+
+  int idx = block_id * vocab_size + thread_id;
+
+  __shared__ int l_n;  // current iteration candidate number
+  for (int iter = 0;
+       iter < (vocab_size + THREADBLOCK_SIZE - 1) / THREADBLOCK_SIZE;
+       iter++) {
+    // zero the counter
+    if (threadIdx.x == 0) l_n = 0;
+    __syncthreads();
+    T lgt = -MAX_T_VAL;  // min s_topk is CUDA_FLOAT_INF_NEG
+    int pos;
+    int vocab_id = idx - block_id * vocab_size;
+
+    if (vocab_id < vocab_size) {
+      lgt = log_probs[idx];
+      if (lgt >= s_topk) pos = atomicAdd(&l_n, 1);
+    }
+    __syncthreads();
+    if (threadIdx.x == 0) {
+      l_n = atomicAdd(&num_cur_beam_can, l_n);
+    }
+    __syncthreads();
+
+    if (lgt >= s_topk) {
+      pos += l_n;
+      can_score_buf[pos + block_id * vocab_size] = lgt;
+      can_idx_buf[pos + block_id * vocab_size] = idx;
+    }
+    __syncthreads();
+    idx += THREADBLOCK_SIZE;
+  }
+
+  TopK<T, beam_size> partial;
+#pragma unroll
+  for (int i = 0; i < beam_size; ++i) {
+    partial.p[i] = -1;
+    partial.u[i] = -MAX_T_VAL;
+  }
+  for (int elem_id = thread_id; elem_id < num_cur_beam_can;
+       elem_id += THREADBLOCK_SIZE) {
+    int index = elem_id + block_id * vocab_size;
+    partial.insert(can_score_buf[index], index);
+  }
+  TopK<T, beam_size> total =
+      BlockReduce(temp_storage).Reduce(partial, reduce_topk_op<T, beam_size>);
+
+  if (thread_id == 0) {
+    int index = block_id * beam_size;
+
+#pragma unroll
+    for (int i = 0; i < beam_size; ++i) {
+      topk_tmp_id_buf[index + i] = can_idx_buf[total.p[i]];
+      topk_tmp_val_buf[index + i] = total.u[i] + diversity_rate * (T)i;
+    }
+  }
+}
+
 template <typename T, int THREADBLOCK_SIZE>
 __global__ void beam_topK_kernel_general(const T* log_probs,
                                          T* tmp_log_probs,
@@ -453,9 +545,13 @@ void topK_kernelLauncher(void* workspace,
       batch_size * beam_width * beam_width * max_block_per_beam;  // type int
   int topk_tmp_val_buf_size =
       batch_size * beam_width * beam_width * max_block_per_beam;  // type float
+  // int can_score_buf_size = batch_size * beam_width * vocab_size;
+  // int can_idx_buf_size = batch_size * beam_width * vocab_size;
 
   // prevent memory misalinged address
   temp_log_probs_buf_size = (int)(ceil(temp_log_probs_buf_size / 4.)) * 4;
+  // can_score_buf_size = (int)(ceil(can_score_buf_size / 4.)) * 4;
+  // can_idx_buf_size = (int)(ceil(can_idx_buf_size / 4.)) * 4;
   topk_tmp_ids_buf_size = (int)(ceil(topk_tmp_ids_buf_size / 4.)) * 4;
   topk_tmp_val_buf_size = (int)(ceil(topk_tmp_val_buf_size / 4.)) * 4;
 
@@ -463,11 +559,15 @@ void topK_kernelLauncher(void* workspace,
     workspace_size = sizeof(float) * temp_log_probs_buf_size +
                      sizeof(int) * topk_tmp_ids_buf_size +
                      sizeof(float) * topk_tmp_val_buf_size;
+    // sizeof(float) * can_score_buf_size +
+    // sizeof(int) * can_idx_buf_size;
     return;
   } else {
     T* temp_log_probs = (T*)workspace;
     int* topk_tmp_id_buf = (int*)(temp_log_probs + temp_log_probs_buf_size);
     T* topk_tmp_val_buf = (T*)(topk_tmp_id_buf + topk_tmp_ids_buf_size);
+    // T* can_score_buf = (T*)(topk_tmp_val_buf + topk_tmp_val_buf_size);
+    // int* can_idx_buf = (int*)(can_score_buf + can_score_buf_size);
     if (diversity_rate == 0.0f) {
       switch (beam_width) {
         CASE_K(1, 128, 128, 8);
