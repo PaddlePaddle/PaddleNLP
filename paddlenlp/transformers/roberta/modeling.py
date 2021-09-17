@@ -84,8 +84,8 @@ class RobertaPooler(nn.Layer):
 
 class RobertaPretrainedModel(PretrainedModel):
     r"""
-    An abstract class for pretrained RoBERTa models. It provides RoBERTa related
-    `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
+    An abstract class for pretrained RoBerta models. It provides RoBerta related
+    `model_config_file`, `pretrained_resource_files_map`, `resource_files_names`,
     `pretrained_init_configuration`, `base_model_prefix` for downloading and
     loading pretrained models. 
     Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
@@ -185,7 +185,7 @@ class RobertaPretrainedModel(PretrainedModel):
 @register_base_model
 class RobertaModel(RobertaPretrainedModel):
     r"""
-    The bare RoBERTa Model transformer outputting raw hidden-states without any specific head on top.
+    The bare Roberta Model outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -195,34 +195,37 @@ class RobertaModel(RobertaPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-
         vocab_size (int):
-            Vocabulary size of the RoBERTa model. Also is the vocab size of token embedding matrix.
+            Vocabulary size of `inputs_ids` in `RobertaModel`. Also is the vocab size of token embedding matrix.
+            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `RobertaModel`.
         hidden_size (int, optional):
-            Dimension of the encoder layers and the pooler layer. Defaults to ``768``.
+            Dimensionality of the embedding layer, encoder layer and pooler layer. Defaults to `768`.
         num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to ``12``.
+            Number of hidden layers in the Transformer encoder. Defaults to `12`.
         num_attention_heads (int, optional):
             Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to ``12``.
+            Defaults to `12`.
         intermediate_size (int, optional):
-            Dimension of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
-            Defaults to ``3072``.
+            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
+            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
+            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
+            Defaults to `3072`.
         hidden_act (str, optional):
             The non-linear activation function in the feed-forward layer.
             ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
             are supported. Defaults to ``"gelu"``.
         hidden_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to ``0.1``.
+            Defaults to `0.1`.
         attention_probs_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the pooler.
-            Defaults to ``0.1``.
+            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
+            Defaults to `0.1`.
         max_position_embeddings (int, optional):
-            The max position index of an input sequence. Defaults to ``512``.
+            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
+            sequence. Defaults to `512`.
         type_vocab_size (int, optional):
             The vocabulary size of the `token_type_ids` passed when calling `~transformers.RobertaModel`.
-            Defaults to ``2``.
+            Defaults to `2`.
         initializer_range (float, optional):
             The standard deviation of the normal initializer. Defaults to 0.02.
             
@@ -231,7 +234,8 @@ class RobertaModel(RobertaPretrainedModel):
                 See :meth:`RobertaPretrainedModel._init_weights()` for how weights are initialized in `RobertaModel`.
 
         pad_token_id(int, optional):
-            The pad token index in the token vocabulary.
+            The non-linear activation function in the pooling layer.
+            Defaults to `"tanh"`.
 
     """
 
@@ -287,33 +291,35 @@ class RobertaModel(RobertaPretrainedModel):
                 It's data type should be `int64` and has a shape of [batch_size, sequence_length].
                 Defaults to None, which means no segment embeddings is added to token embeddings.
             position_ids (Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
-            attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
+                Indices of positions of each input sequence tokens in the position embeddings.
+                Selected in the range ``[0, max_position_embeddings - 1]``.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
                 Defaults to `None`.
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
+                [batch_size, num_attention_heads, sequence_length, sequence_length].
+                Defaults to `None`, which means nothing needed to be prevented attention to.
 
         Returns:
-            A tuple of shape (``sequence_output``, ``pooled_output``).
+            tuple: Returns tuple (`sequence_output`, `pooled_output`).
 
             With the fields:
+
             - sequence_output (Tensor):
                 Sequence of hidden-states at the last layer of the model.
-                It's data type should be `float` and has a shape of `(batch_size, seq_lens, hidden_size)`.
-                ``seq_lens`` corresponds to the length of input sequence.
+                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+
             - pooled_output (Tensor):
-                A Tensor of the first token representation.
-                It's data type should be `float` and has a shape of `(batch_size, hidden_size]`.
+                The output of first token (`[CLS]`) in sequence.
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
+                Its data type should be float32 and its shape is [batch_size, hidden_size].
 
         Example:
             .. code-block::
@@ -324,7 +330,7 @@ class RobertaModel(RobertaPretrainedModel):
                 tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
                 model = RobertaModel.from_pretrained('roberta-wwm-ext')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 sequence_output, pooled_output = model(**inputs)
 
@@ -346,17 +352,12 @@ class RobertaModel(RobertaPretrainedModel):
 
 class RobertaForQuestionAnswering(RobertaPretrainedModel):
     r"""
-    Model for sentence (pair) classification task with RoBERTa.
+    Roberta Model with a linear layer on top of the hidden-states output to
+    compute `span_start_logits` and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        roberta (RobertaModel): 
-            An instance of `paddlenlp.transformers.RobertaModel`.
-        num_classes (int, optional): 
-            The number of classes. Default to `2`.
-        dropout (float, optional): 
-            The dropout probability for output of RoBERTa. 
-            If None, use the same value as `hidden_dropout_prob` 
-            of `paddlenlp.transformers.RobertaModel` instance. Defaults to `None`.
+        roberta (:class:`RobertaModel`):
+            An instance of RobertaModel.
     """
 
     def __init__(self, roberta, dropout=None):
@@ -369,39 +370,26 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                See :class:`RobertaModel`.
             token_type_ids (Tensor, optional):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
-
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
-
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-                Defaults to None, which means no segment embeddings is added to token embeddings.
+                See :class:`RobertaModel`.
             position_ids (Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
-                Defaults to `None`.
-
+                See :class:`RobertaModel`.
 
         Returns:
-            logits (Tensor):
-                A Tensor of the input text classification logits.
-                Shape as `(batch_size, num_classes)` and dtype as `float`.
+            tuple: Returns tuple (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
 
         Example:
             .. code-block::
@@ -412,7 +400,7 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
                 tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
                 model = RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
@@ -432,17 +420,16 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
 
 class RobertaForSequenceClassification(RobertaPretrainedModel):
     r"""
-    RoBERTa Model transformer with a sequence classification/regression head on top 
-    (a linear layer on top of the pooledoutput) e.g. for GLUE tasks.
-
+    Roberta Model with a linear layer on top of the output layer,
+    designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        roberta (`RobertaModel`): 
+        roberta (:class:`RobertaModel`):
             An instance of `RobertaModel`.
         num_classes (int, optional): 
-            The number of classes. Default to `2`.
+            The number of classes. Defaults to `2`.
         dropout (float, optional): 
-            The dropout probability for output of RoBERTa. 
+            The dropout probability for output of Roberta.
             If None, use the same value as `hidden_dropout_prob` 
             of `RobertaModel` instance `roberta`. Defaults to `None`.
     """
@@ -465,39 +452,17 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                See :class:`RobertaModel`.
             token_type_ids (Tensor, optional):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
-
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
-
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-                Defaults to None, which means no segment embeddings is added to token embeddings.
+                See :class:`RobertaModel`.
             position_ids (Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
-                Defaults to `None`.
-
+                See :class:`RobertaModel`.
 
         Returns:
-            logits (Tensor):
-                A Tensor of the input text classification logits.
-                Shape as `(batch_size, num_classes)` and dtype as `float`.
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Its data type should be float32 and it has a shape of [batch_size, num_classes].
 
         Example:
             .. code-block::
@@ -508,7 +473,7 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
                 model = RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
@@ -526,17 +491,16 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
 
 class RobertaForTokenClassification(RobertaPretrainedModel):
     r"""
-    RoBERTa Model transformer with a sequence classification/regression head on top 
-    (a linear layer on top of the pooledoutput) e.g. for GLUE tasks.
-
+    Roberta Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
-        roberta (`RobertaModel`): 
+        roberta (:class:`RobertaModel`):
             An instance of `RobertaModel`.
         num_classes (int, optional): 
-            The number of classes. Default to `2`.
+            The number of classes. Defaults to `2`.
         dropout (float, optional): 
-            The dropout probability for output of RoBERTa. 
+            The dropout probability for output of Roberta.
             If None, use the same value as `hidden_dropout_prob` 
             of `RobertaModel` instance `roberta`. Defaults to `None`.
     """
@@ -559,39 +523,17 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                See :class:`RobertaModel`.
             token_type_ids (Tensor, optional):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
-
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
-
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-                Defaults to None, which means no segment embeddings is added to token embeddings.
+                See :class:`RobertaModel`.
             position_ids (Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
-                Defaults to `None`.
-
+                See :class:`RobertaModel`.
 
         Returns:
-            logits (Tensor):
-                A Tensor of the input text classification logits, shape as (batch_size, seq_lens, `num_classes`).
-                seq_lens mean the number of tokens of the input sequence.
+            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
 
         Example:
             .. code-block::
@@ -602,7 +544,7 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
                 tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
                 model = RobertaForTokenClassification.from_pretrained('roberta-wwm-ext')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 

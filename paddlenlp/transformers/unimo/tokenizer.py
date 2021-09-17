@@ -36,37 +36,35 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
     Args:
         vocab_file (str): 
-            file path of the vocabulary.
+            The vocabulary file path (ends with '.txt') required to instantiate
+            a `WordpieceTokenizer`.
         do_lower_case (str, optional): 
-            Whether the text strips accents and convert to lower case. 
-            Defaults to `True`.
-        unk_token (str, optional): 
-            The special token for unknown words. 
+            Whether or not to lowercase the input when tokenizing.
+            Defaults to`True`.
+        unk_token (str):
+            A special token representing the *unknown (out-of-vocabulary)* token.
+            An unknown token is set to be `unk_token` inorder to be converted to an ID.
             Defaults to "[UNK]".
-        sep_token (str, optional): 
-            The special token for separator token. 
+        sep_token (str):
+            A special token separating two different sentences in the same input.
             Defaults to "[SEP]".
-        pad_token (str, optional): 
-            The special token for padding. 
+        pad_token (str):
+            A special token used to make arrays of tokens the same size for batching purposes.
             Defaults to "[PAD]".
-        cls_token (str, optional): 
-            The special token for cls. 
-            Defaults to "[CLS]".
-        mask_token (str, optional): 
-            The special token for mask.
+        cls_token (str):
+            A special token used for sequence classification. It is the last token
+            of the sequence when built with special tokens. Defaults to "[CLS]".
+        mask_token (str):
+            A special token representing a masked token. This is the token used
+            in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to "[MASK]".
     
     Examples:
-        .. code-block:: python
+        .. code-block::
+
             from paddlenlp.transformers import UNIMOTokenizer
             tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
-            encoded_inputs = tokenizer('这是一个测试样例')
-            # encoded_inputs: 
-            # { 
-            #   'input_ids': [1, 47, 10, 7, 27, 558, 525, 314, 656, 2], 
-            #   'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            # }
-
+            encoded_inputs = tokenizer('He was a puppeteer')
 
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
@@ -109,11 +107,11 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
     @property
     def vocab_size(self):
-        r"""
-        return the size of vocabulary.
+        """
+        Return the size of vocabulary.
 
         Returns:
-            int: the size of vocabulary.
+            int: The size of vocabulary.
         """
         return len(self.vocab)
 
@@ -155,14 +153,23 @@ class UNIMOTokenizer(PretrainedTokenizer):
         return split_tokens
 
     def tokenize(self, text):
-        r"""
-        End-to-end tokenization for UNIMO models.
+        """
+        Converts a string to a list of tokens.
 
         Args:
             text (str): The text to be tokenized.
-        
+
         Returns:
-            List[str]: A list of string representing converted tokens.
+            List(str): A list of string representing converted tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import UNIMOTokenizer
+
+                tokenizer = UNIMOtokenizer.from_pretrained('unimo-text-1.0')
+                tokens = tokenizer.tokenize('He was a puppeteer')
+
         """
         return self._tokenize(text)
 
@@ -173,10 +180,24 @@ class UNIMOTokenizer(PretrainedTokenizer):
         `##` when converting.
 
         Args:
-            tokens (List[str]): A list of string representing tokens to be converted.
+            tokens (list): A list of string representing tokens to be converted.
 
         Returns:
             str: Converted string from tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import UNIMOTokenizer
+
+                tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
+                tokens = tokenizer.tokenize('He was a puppeteer')
+
+                strings = tokenizer.convert_tokens_to_string(tokens)
+                '''
+                he was a puppeteer
+                '''
+
         """
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
@@ -185,18 +206,13 @@ class UNIMOTokenizer(PretrainedTokenizer):
         r"""
         Returns the number of added tokens when encoding a sequence with special tokens.
 
-        Note:
-            This encodes inputs and checks the number of added tokens, and is 
-            therefore not efficient. Do not put this inside your training loop.
-
         Args:
-            pair (str, optional): Returns the number of added tokens in the 
-                case of a sequence pair if set to True, returns the number 
-                of added tokens in the case of a single sequence if set to 
-                False. Defaults to False.
+            pair(bool):
+                Whether the input is a sequence pair or a single sequence.
+                Defaults to `False` and the input is a single sequence.
 
         Returns:
-            `int`: Number of tokens added to sequences
+            int: Number of tokens added to sequences.
         """
         token_ids_0 = []
         token_ids_1 = []
@@ -210,9 +226,9 @@ class UNIMOTokenizer(PretrainedTokenizer):
         classification tasks by concatenating and adding special tokens. 
         
         A UNIMO sequence has the following format:
-        ::
-            - single sequence: ``[CLS] X [SEP]``
-            - pair of sequences: ``[CLS] A [SEP] B [SEP]``
+
+        - single sequence:      ``[CLS] X [SEP]``
+        - pair of sequences:        ``[CLS] A [SEP] B [SEP]``
 
         Args:
             token_ids_0 (List[int]):
@@ -411,19 +427,8 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
                 tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
 
-                inputs = tokenizer.gen_encode('我爱祖国')
-                for key in inputs:
-                    print(key + ':')
-                    print(inputs[key])
-                # input_ids: [1, 75, 329, 997, 20, 2]
-                # token_type_ids: [0, 0, 0, 0, 0, 0]
-                # position_ids: [0, 1, 2, 3, 4, 5]
-                # attention_mask: [[0. 0. 0. 0. 0. 0.]
-                # [0. 0. 0. 0. 0. 0.]
-                # [0. 0. 0. 0. 0. 0.]
-                # [0. 0. 0. 0. 0. 0.]
-                # [0. 0. 0. 0. 0. 0.]
-                # [0. 0. 0. 0. 0. 0.]]
+                inputs = tokenizer.gen_encode('He was a puppeteer')
+
         """
 
         # Input type checking for clearer error
