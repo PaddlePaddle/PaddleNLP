@@ -52,7 +52,8 @@ def infer_transformer_encoder(
         int8_mode=0,
         layer_idx=0,
         allow_gemm_test=False,
-        use_trt_kernel=False):
+        use_trt_kernel=False,
+        normalize_before=False):
     """
     Fusion Encoder API intergrating Encoder inference in FasterTransformer. It
     accepts the weight and bias of TransformerEncoder and some other parameters
@@ -92,6 +93,7 @@ def infer_transformer_encoder(
         'layer_idx': layer_idx,
         'allow_gemm_test': allow_gemm_test,
         'use_trt_kernel': use_trt_kernel,
+        'normalize_before': normalize_before
     }
     encoder_out = helper.create_variable(dtype=input.dtype)
     outputs = {"EncoderOut": encoder_out}
@@ -173,7 +175,8 @@ def encoder_layer_forward(self,
         # amax_list=paddle.to_tensor([]),  # int8 mode is not supported.
         n_head=self._config['nhead'],
         size_per_head=self._config['d_model'] // self._config['nhead'],
-        is_gelu=self._config['activation'] == 'gelu')
+        is_gelu=self._config['activation'] == 'gelu',
+        normalize_before=self._config['normalize_before'] == True)
     return src
 
 

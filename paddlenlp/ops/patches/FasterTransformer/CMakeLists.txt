@@ -223,4 +223,4 @@ link_directories(
 
 add_subdirectory(fastertransformer)
 add_subdirectory(tools)
-add_subdirectory(sample)
+#add_subdirectory(sample)
