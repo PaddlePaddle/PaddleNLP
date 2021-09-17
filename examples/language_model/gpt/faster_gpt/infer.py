@@ -52,7 +52,7 @@ def parse_args():
         "--batch_size", default=1, type=int, help="Batch size. ")
     parser.add_argument(
         "--topk",
-        default=4,
+        default=1,
         type=int,
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
@@ -126,9 +126,32 @@ def do_predict(args):
                 start = time.time()
             out_seq = gpt(input_ids)
         paddle.fluid.core._cuda_synchronize(place)
-        logger.info("Average test time for decoding is %f ms" % (
+        logger.info("Average test time for fast decoding is %f ms" % (
             (time.time() - start) / 50 * 1000))
         output_sequence = out_seq.numpy().transpose()
+    for i in range(args.batch_size):
+        print("========== Sample-%d ==========" % i)
+        print(tokenizer.convert_ids_to_string(output_sequence[i][1:]))
+
+    input_ids = paddle.cast(input_ids, "int64")
+    with paddle.no_grad():
+        for i in range(100):
+            # For warmup. 
+            if 5 == i:
+                paddle.fluid.core._cuda_synchronize(place)
+                start = time.time()
+            out_seq, _ = model.generate(
+                input_ids=input_ids,
+                max_length=args.max_out_len,
+                decode_strategy="sampling",
+                temperature=args.temperature,
+                top_k=args.topk,
+                top_p=1.0,
+                num_return_sequences=1)
+        paddle.fluid.core._cuda_synchronize(place)
+        logger.info("Average test time for decoding is %f ms" % (
+            (time.time() - start) / 50 * 1000))
+        output_sequence = out_seq.numpy()
     for i in range(args.batch_size):
         print("========== Sample-%d ==========" % i)
         print(tokenizer.convert_ids_to_string(output_sequence[i][1:]))
