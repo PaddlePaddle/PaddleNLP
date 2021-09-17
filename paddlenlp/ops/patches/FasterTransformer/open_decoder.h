@@ -96,7 +96,8 @@ public:
               int size_per_head,
               int memory_hidden_units,
               bool normalization_before = true,
-              ActivationType act = ActivationType::RELU)
+              ActivationType act = ActivationType::GELU)
+      // Activation function default to GELU for GPT.
       : batch_size_(batch_size),
         max_seq_len_(seq_len),
         head_num_(head_num),
