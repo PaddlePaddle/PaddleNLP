@@ -1,16 +1,17 @@
 set -x
 
 task_name="gpt-acc-dp-dygraph"
-rm -rf output/$task_name/log
+base_out="tests/output"
+rm -rf $base_out/$task_name/log
 
 unset CUDA_VISIBLE_DEVICES
-PYTHONPATH=../../../../ python -m paddle.distributed.launch \
+PYTHONPATH=../../../ python -m paddle.distributed.launch \
     --gpus "0,1" \
-    --log_dir "output/$task_name/log"  ../run_pretrain.py \
+    --log_dir "$base_out/$task_name/log"  run_pretrain.py \
     --model_type "gpt" \
-    --model_name_or_path "../ckpt/gpt2-small-en-init-checkpoint"\
-    --input_dir "../data"\
-    --output_dir "output/$task_name"\
+    --model_name_or_path "./ckpt/gpt2-small-en-init-checkpoint"\
+    --input_dir "./data"\
+    --output_dir "$base_out/$task_name"\
     --max_seq_len 1024 \
     --micro_batch_size 4\
     --max_lr 0.00015\
