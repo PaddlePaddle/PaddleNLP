@@ -38,7 +38,16 @@ def get_groundtruth():
     return res
 
 
+def get_gpt_path():
+    return "../../../examples/language_model/gpt"
+
+
+def get_scripts_path():
+    return "../../../tests/examples/gpt"
+
+
 def parse_log(path=None):
+    path = os.path.join(get_gpt_path(), "tests", path)
     if not os.path.exists(path):
         raise ValueError("File not found in %s ." % path)
 
@@ -75,7 +84,8 @@ class GPTAccuarcy(unittest.TestCase):
         check_init_checkpoint()
 
         for task_name in ["acc_single_dygraph", "acc_single_static"]:
-            ret = os.system("cd .. && sh tests/%s.sh" % task_name)
+            ret = os.system("cd %s && sh %s/%s.sh" %
+                            (get_gpt_path(), get_scripts_path(), task_name))
             if ret != 0:
                 print(ret)
                 raise ValueError("Train script failed")
@@ -95,7 +105,8 @@ class GPTAccuarcy(unittest.TestCase):
         check_init_checkpoint()
 
         for task_name in ["acc_dp_dygraph", "acc_dp_static"]:
-            ret = os.system("cd .. && sh tests/%s.sh" % task_name)
+            ret = os.system("cd %s && sh %s/%s.sh" %
+                            (get_gpt_path(), get_scripts_path(), task_name))
             if ret != 0:
                 print(ret)
                 raise ValueError("Train script failed")
@@ -119,7 +130,8 @@ class GPTAccuarcy(unittest.TestCase):
         check_init_checkpoint()
 
         for task_name in ["acc_sharding_static"]:
-            ret = os.system("cd .. && sh tests/%s.sh" % task_name)
+            ret = os.system("cd %s && sh %s/%s.sh" %
+                            (get_gpt_path(), get_scripts_path(), task_name))
             if ret != 0:
                 print(ret)
                 raise ValueError("Train script failed")
@@ -145,7 +157,8 @@ class GPTAccuarcy(unittest.TestCase):
         check_init_checkpoint()
 
         for task_name in ["acc_mp_static"]:
-            ret = os.system("cd .. && sh tests/%s.sh" % task_name)
+            ret = os.system("cd %s && sh %s/%s.sh" %
+                            (get_gpt_path(), get_gpt_path(), task_name))
             if ret != 0:
                 print(ret)
                 raise ValueError("Train script failed")
