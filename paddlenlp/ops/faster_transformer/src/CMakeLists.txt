@@ -161,6 +161,7 @@ if(ON_INFER)
 
   if(WITH_GPT AND WITH_SP)
     set(DEPS ${DEPS} sentencepiece)
+    add_dependencies(decoding_infer_op extern_sentencepiece)
   endif()
 
   if(WIN32)
