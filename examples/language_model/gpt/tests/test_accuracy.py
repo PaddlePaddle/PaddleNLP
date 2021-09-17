@@ -75,7 +75,7 @@ class GPTAccuarcy(unittest.TestCase):
         check_init_checkpoint()
 
         for task_name in ["acc_single_dygraph", "acc_single_static"]:
-            ret = os.system("sh  %s.sh" % task_name)
+            ret = os.system("cd .. && sh tests/%s.sh" % task_name)
             if ret != 0:
                 print(ret)
                 raise ValueError("Train script failed")
@@ -93,8 +93,9 @@ class GPTAccuarcy(unittest.TestCase):
     def test_acc_dp(self):
         check_dataset()
         check_init_checkpoint()
+
         for task_name in ["acc_dp_dygraph", "acc_dp_static"]:
-            ret = os.system("sh  %s.sh" % task_name)
+            ret = os.system("cd .. && sh tests/%s.sh" % task_name)
             if ret != 0:
                 print(ret)
                 raise ValueError("Train script failed")
@@ -113,14 +114,12 @@ class GPTAccuarcy(unittest.TestCase):
                 self.assertAlmostEqual(gt[k]["loss"], mean, delta=5e-6)
             print("\n" * 5)
 
-    @unittest.skipIf(not paddlenlp.ops.optimizer._jit_compile(),
-                     "The paddle.optimizer.AdamW not compatible with Sharding")
     def test_acc_sharding_static(self):
         check_dataset()
         check_init_checkpoint()
 
         for task_name in ["acc_sharding_static"]:
-            ret = os.system("sh  %s.sh" % task_name)
+            ret = os.system("cd .. && sh tests/%s.sh" % task_name)
             if ret != 0:
                 print(ret)
                 raise ValueError("Train script failed")
@@ -146,7 +145,7 @@ class GPTAccuarcy(unittest.TestCase):
         check_init_checkpoint()
 
         for task_name in ["acc_mp_static"]:
-            ret = os.system("sh  %s.sh" % task_name)
+            ret = os.system("cd .. && sh tests/%s.sh" % task_name)
             if ret != 0:
                 print(ret)
                 raise ValueError("Train script failed")
