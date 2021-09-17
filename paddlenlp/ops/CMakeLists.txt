@@ -305,11 +305,11 @@ if(ON_INFER AND WITH_GPT AND WITH_SP)
   )
   
   include_directories(
-    ${THIRD_PATH}/source/sentencepiece/src/
+    ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/sentencepiece/src/
   )
 
   link_directories(
-    ${THIRD_PATH}/build/sentencepiece/src/
+    ${CMAKE_BINARY_DIR}/${THIRD_PATH}/build/sentencepiece/src/
   )
 
   add_definitions(-DGPT_ON_SENTENCEPIECE)
