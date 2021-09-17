@@ -23,7 +23,7 @@ from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     PositionalEmbedding, position_encoding_init,
                                     InferTransformerModel, GPTModel)
 from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
-                           InferUnifiedDecoding)
+                           InferUnifiedDecoding, InferBartDecoding)
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
@@ -991,3 +991,48 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             temperature=temperature,
             decoding_type_id=decoding_type_id,
             pos_bias=False)
+
+
+class FasterBART(nn.Layer):
+    def __init__(self,
+                 model,
+                 decoding_strategy="beam_search_v2",
+                 beam_size=4,
+                 topk=1,
+                 topp=0.0,
+                 max_out_len=256,
+                 beam_search_diversity_rate=0.0,
+                 decoding_lib=None,
+                 use_fp16_decoding=False,
+                 rel_len=False,
+                 alpha=0.6):
+        super(FasterBART, self).__init__()
+        self.use_fp16_decoding = use_fp16_decoding
+        if use_fp16_decoding:
+            weight_attr = paddle.ParamAttr(initializer=nn.initializer.Assign(
+                model.bart.encoder.embed_tokens.weight))
+            model.bart.encoder.embed_tokens = nn.Embedding(
+                *model.bart.encoder.embed_tokens.weight.shape,
+                weight_attr=weight_attr)
+        self.bart_encoder = model.bart.get_encoder()
+        self.pad_id = model.bart.config['pad_token_id']
+        self.decoding = InferBartDecoding(
+            model=model,
+            decoding_strategy=decoding_strategy,
+            beam_size=beam_size,
+            topk=topk,
+            topp=topp,
+            max_out_len=max_out_len,
+            beam_search_diversity_rate=beam_search_diversity_rate,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=use_fp16_decoding)
+
+    def forward(self, input_ids):
+        encoder_output = self.bart_encoder(input_ids)
+        mem_seq_lens = paddle.sum(paddle.cast(
+            input_ids != self.pad_id, dtype="int32"),
+                                  axis=-1,
+                                  keepdim=True)
+        if self.use_fp16_decoding:
+            encoder_output = paddle.cast(encoder_output, "float16")
+        return self.decoding(encoder_output, mem_seq_lens)

@@ -21,7 +21,6 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.nn import TransformerEncoder, TransformerEncoderLayer
 
 from paddlenlp.transformers import ErnieTokenizer, ErnieModel
 from paddlenlp.data import Pad, Tuple
@@ -73,20 +72,8 @@ def parse_args():
 
 
 class SemanticIndexingPredictor(nn.Layer):
-    def __init__(self,
-                 pretrained_model,
-                 output_emb_size,
-                 n_layer=12,
-                 n_head=12,
-                 hidden_size=768,
-                 dim_feedforward=3072,
-                 activation="relu",
-                 bos_id=0,
-                 dropout=0,
-                 max_seq_len=128,
-                 is_gelu=False):
+    def __init__(self, pretrained_model, output_emb_size, bos_id=0, dropout=0):
         super(SemanticIndexingPredictor, self).__init__()
-        size_per_head = hidden_size // n_head
         self.bos_id = bos_id
         self.ptm = pretrained_model
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.0)
@@ -96,9 +83,6 @@ class SemanticIndexingPredictor(nn.Layer):
                 initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
             self.emb_reduce_linear = paddle.nn.Linear(
                 768, output_emb_size, weight_attr=weight_attr)
-        encoder_layer = TransformerEncoderLayer(
-            hidden_size, n_head, dim_feedforward, dropout=dropout)
-        self.ptm.encoder = TransformerEncoder(encoder_layer, n_layer)
 
     def get_pooled_embedding(self,
                              input_ids,
@@ -189,10 +173,7 @@ def do_predict(args):
     pretrained_model = ErnieModel.from_pretrained("ernie-1.0")
 
     model = SemanticIndexingPredictor(
-        pretrained_model,
-        args.output_emb_size,
-        max_seq_len=args.max_seq_length,
-        dropout=args.dropout)
+        pretrained_model, args.output_emb_size, dropout=args.dropout)
     model.eval()
     model.load(args.params_path)
     model = enable_faster_encoder(model)
