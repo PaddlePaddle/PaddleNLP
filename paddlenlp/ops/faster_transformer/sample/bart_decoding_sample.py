@@ -11,21 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
-import os
-import numpy as np
+
 import argparse
 import time
-
-import paddle
-
-import yaml
 from pprint import pprint
 
+import paddle
 from paddlenlp.ops import FasterBART
 from paddlenlp.transformers import BartForConditionalGeneration, BartTokenizer
 from paddlenlp.data import Pad
-
 from paddlenlp.utils.log import logger
 
 
@@ -50,9 +44,7 @@ def prepare_input(tokenizer, sentences, pad_id):
     tokenized = tokenizer(sentences)
     inputs = word_pad([i["input_ids"] for i in tokenized])
     input_ids = paddle.to_tensor(inputs)
-    mem_seq_lens = [[sum(i["attention_mask"])] for i in tokenized]
-    mem_seq_lens = paddle.to_tensor(mem_seq_lens, dtype='int32')
-    return input_ids, mem_seq_lens
+    return input_ids
 
 
 def parse_args():
@@ -67,7 +59,7 @@ def parse_args():
         "--batch_size", default=1, type=int, help="Batch size. ")
     parser.add_argument(
         "--decoding_strategy",
-        default='beam_search_v2',
+        default='beam_search',
         type=str,
         help="The decoding strategy. Can be one of [beam_search, beam_search_v2, topk_sampling, topp_sampling]"
     )
@@ -87,22 +79,7 @@ def parse_args():
         type=float,
         help="The probability threshold to procedure topp sampling. ")
     parser.add_argument(
-        "--max_out_len", default=32, type=int, help="Maximum output length. ")
-    parser.add_argument(
-        "--start_token",
-        default="<s>",
-        type=str,
-        help="The start token. Defaults to <s>. ")
-    parser.add_argument(
-        "--end_token",
-        default="</s>",
-        type=str,
-        help="The end token. Defaults to </s>. ")
-    parser.add_argument(
-        "--pad_token",
-        default="<pad>",
-        type=str,
-        help="The pad token. Defaults to <pad>. ")
+        "--max_out_len", default=50, type=int, help="Maximum output length. ")
     parser.add_argument(
         "--beam_search_diversity_rate",
         default=0.0,
@@ -153,14 +130,11 @@ def do_predict(args):
         "Nothing's gonna <mask> my love for you.",
         "Drop everything now. Meet me in the pouring <mask>. Kiss me on the sidewalk.",
     ]
-    bos_id = tokenizer.convert_tokens_to_ids(args.start_token)
-    eos_id = tokenizer.convert_tokens_to_ids(args.end_token)
-    pad_id = tokenizer.convert_tokens_to_ids(args.pad_token)
-    input_ids, mem_seq_lens = prepare_input(tokenizer, sentences, pad_id)
 
-    encoder_output = model.bart.get_encoder()(input_ids)
-    if args.use_fp16_decoding:
-        encoder_output = paddle.cast(encoder_output, "float16")
+    bos_id = model.bart.config['bos_token_id']
+    eos_id = model.bart.config['eos_token_id']
+    pad_id = model.bart.config['pad_token_id']
+    input_ids = prepare_input(tokenizer, sentences, pad_id)
 
     # Define model
     faster_bart = FasterBART(
@@ -181,15 +155,16 @@ def do_predict(args):
 
     with paddle.no_grad():
         for i in range(100):
-            # For warmup. 
+            # For warmup.
             if 50 == i:
                 paddle.fluid.core._cuda_synchronize(place)
-                start = time.time()
-            finished_seq = faster_bart(encoder_output, mem_seq_lens)
+                start = time.perf_counter()
+            finished_seq = faster_bart(input_ids)
         paddle.fluid.core._cuda_synchronize(place)
         logger.info("Average test time for decoding is %f ms" % (
-            (time.time() - start) / 50 * 1000))
-        # Output    
+            (time.perf_counter() - start) / 50 * 1000))
+
+        # Output
         if args.decoding_strategy.startswith('beam_search'):
             finished_seq = finished_seq.numpy().transpose([1, 2, 0])
             for ins in finished_seq:

@@ -1008,6 +1008,14 @@ class FasterBART(nn.Layer):
                  alpha=0.6):
         super(FasterBART, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
+        if use_fp16_decoding:
+            weight_attr = paddle.ParamAttr(initializer=nn.initializer.Assign(
+                model.bart.encoder.embed_tokens.weight))
+            model.bart.encoder.embed_tokens = nn.Embedding(
+                *model.bart.encoder.embed_tokens.weight.shape,
+                weight_attr=weight_attr)
+        self.bart_encoder = model.bart.get_encoder()
+        self.pad_id = model.bart.config['pad_token_id']
         self.decoding = InferBartDecoding(
             model=model,
             decoding_strategy=decoding_strategy,
@@ -1019,5 +1027,12 @@ class FasterBART(nn.Layer):
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding)
 
-    def forward(self, enc_output, memory_seq_lens):
-        return self.decoding(enc_output, memory_seq_lens)
+    def forward(self, input_ids):
+        encoder_output = self.bart_encoder(input_ids)
+        mem_seq_lens = paddle.sum(paddle.cast(
+            input_ids != self.pad_id, dtype="int32"),
+                                  axis=-1,
+                                  keepdim=True)
+        if self.use_fp16_decoding:
+            encoder_output = paddle.cast(encoder_output, "float16")
+        return self.decoding(encoder_output, mem_seq_lens)
