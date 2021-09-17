@@ -278,7 +278,7 @@ class GenerationMixin(object):
 
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
-        shape = 1
+        batch_size = 1
         if bos_token_id is None:
             raise ValueError("`bos_token_id` should be defined when no "
                              "`input_ids` are provided.")
@@ -894,15 +894,17 @@ class GenerationMixin(object):
                 next_scores, next_tokens = paddle.topk(
                     next_scores, 2 * num_beams, axis=1)
 
+                next_indices = next_tokens // vocab_size
+
             else:
                 next_scores, next_tokens = paddle.topk(
                     next_scores, 2 * num_beams, axis=1)
 
                 sibling_score = paddle.tile(
-                    paddle.arange(1, num_beams + 1),
-                    repeat_times=[batch_size]) * diversity_rate
+                    paddle.arange(1, 2 * num_beams + 1),
+                    repeat_times=[batch_size * num_beams, 1]) * diversity_rate
 
-                diversed_score = next_scores - sibling_score.unsqueeze(-1)
+                diversed_score = next_scores - sibling_score
                 next_scores = next_scores.reshape(
                     [batch_size, 2 * num_beams * num_beams])
                 next_tokens = next_tokens.reshape(
@@ -913,6 +915,8 @@ class GenerationMixin(object):
                 diversed_score, diversed_tokens = paddle.topk(
                     diversed_score, 2 * num_beams, axis=1)
 
+                # TODO
+                # Use gather_nd() to select origan token and score
                 next_scores = paddle.stack([
                     paddle.index_select(next_scores[i], diversed_tokens[i])
                     for i in range(next_scores.shape[0])
@@ -924,7 +928,6 @@ class GenerationMixin(object):
 
                 next_indices = next_tokens // (2 * num_beams)
 
-            next_indices = next_tokens // vocab_size
             next_tokens = next_tokens % vocab_size
 
             # stateless
