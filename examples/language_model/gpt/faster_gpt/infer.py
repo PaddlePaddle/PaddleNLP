@@ -52,7 +52,7 @@ def parse_args():
         "--batch_size", default=1, type=int, help="Batch size. ")
     parser.add_argument(
         "--topk",
-        default=1,
+        default=4,
         type=int,
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
@@ -149,8 +149,9 @@ def do_predict(args):
                 top_p=1.0,
                 num_return_sequences=1)
         paddle.fluid.core._cuda_synchronize(place)
-        logger.info("Average test time for decoding is %f ms" % (
-            (time.time() - start) / 50 * 1000))
+        logger.info(
+            "Average test time for origin generate api decoding is %f ms" % (
+                (time.time() - start) / 50 * 1000))
         output_sequence = out_seq.numpy()
     for i in range(args.batch_size):
         print("========== Sample-%d ==========" % i)
