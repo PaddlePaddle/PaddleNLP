@@ -3,7 +3,7 @@
 
 用Paddle来复现论文End-To-End Memory Networks 
 
-![模型简介](./images/model_introduction.png)
+![模型简介](./image/model_introduction.png)
 
 原论文地址：[Sainbayar Sukhbaatar, Arthur Szlam, Jason Weston, Rob Fergus: “End-To-End Memory Networks”, 2015.](https://arxiv.org/pdf/1503.08895v5.pdf)
 
