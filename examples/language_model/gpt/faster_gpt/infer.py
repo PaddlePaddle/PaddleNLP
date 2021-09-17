@@ -137,7 +137,7 @@ def do_predict(args):
     with paddle.no_grad():
         for i in range(100):
             # For warmup. 
-            if 5 == i:
+            if 50 == i:
                 paddle.fluid.core._cuda_synchronize(place)
                 start = time.time()
             out_seq, _ = model.generate(
