@@ -14,34 +14,43 @@
 
 import argparse
 import os
-import sys
 
 import numpy as np
 import paddle
 import paddlenlp as ppnlp
 from scipy.special import softmax
 from paddle import inference
-from paddlenlp.data import Tuple, Pad
+from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
 
-sys.path.append('./')
-
-from utils import convert_example
-
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_dir", type=str, required=True, default="./export/", help="The directory to static model.")
-parser.add_argument("--max_seq_length", type=int, default=128, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", type=int, default=2, help="Batch size per GPU/CPU for training.")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--use_tensorrt', type=eval, default=False, choices=[True, False], help='Enable to use tensorrt to speed up.')
-parser.add_argument("--precision", type=str, default="fp32", choices=["fp32", "fp16", "int8"], help='The tensorrt precision.')
-parser.add_argument('--cpu_threads', type=int, default=10, help='Number of threads to predict when using cpu.')
-parser.add_argument('--enable_mkldnn', type=eval, default=False, choices=[True, False], help='Enable to use mkldnn to speed up when using cpu.')
-parser.add_argument("--benchmark", type=eval, default=False, help="To log some information about environment and running.")
-parser.add_argument("--save_log_path", type=str, default="./log_output/", help="The file path to save log.")
+parser.add_argument("--model_dir", type=str, required=True,
+    help="The directory to static model.")
+
+parser.add_argument("--max_seq_length", default=128, type=int,
+    help="The maximum total input sequence length after tokenization. Sequences "
+    "longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--batch_size", default=1, type=int,
+    help="Batch size per GPU/CPU for training.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu",
+    help="Select which device to train model, defaults to gpu.")
+
+parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False],
+    help='Enable to use tensorrt to speed up.')
+parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"],
+    help='The tensorrt precision.')
+
+parser.add_argument('--cpu_threads', default=50, type=int,
+    help='Number of threads to predict when using cpu.')
+parser.add_argument('--enable_mkldnn', default=False, type=eval, choices=[True, False],
+    help='Enable to use mkldnn to speed up when using cpu.')
+
+parser.add_argument("--benchmark", type=eval, default=False,
+    help="To log some information about environment and running.")
+parser.add_argument("--save_log_path", type=str, default="./log_output/",
+    help="The file path to save log.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -70,31 +79,16 @@ class Predictor(object):
         if device == "gpu":
             # set GPU configs accordingly
             # such as intialize the gpu memory, enable tensorrt
-            config.enable_use_gpu(100, 0)
-            precision_map = {
-                "fp16": inference.PrecisionType.Half,
-                "fp32": inference.PrecisionType.Float32,
-                "int8": inference.PrecisionType.Int8
-            }
-            precision_mode = precision_map[precision]
-
-            if use_tensorrt:
-                config.enable_tensorrt_engine(
-                    max_batch_size=batch_size,
-                    min_subgraph_size=30,
-                    precision_mode=precision_mode)
+            config.enable_use_gpu(100, 6)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             config.disable_gpu()
-            if enable_mkldnn:
+            if args.enable_mkldnn:
                 # cache 10 different shapes for mkldnn to avoid memory leak
                 config.set_mkldnn_cache_capacity(10)
                 config.enable_mkldnn()
-            config.set_cpu_math_library_num_threads(cpu_threads)
-        elif device == "xpu":
-            # set XPU configs accordingly
-            config.enable_xpu(100)
+            config.set_cpu_math_library_num_threads(args.cpu_threads)
 
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
@@ -105,32 +99,11 @@ class Predictor(object):
         self.output_handle = self.predictor.get_output_handle(
             self.predictor.get_output_names()[0])
 
-        if args.benchmark:
-            import auto_log
-            pid = os.getpid()
-            self.autolog = auto_log.AutoLogger(
-                model_name="bert-base-chinese",
-                model_precision=precision,
-                batch_size=self.batch_size,
-                data_shape="dynamic",
-                save_path=args.save_log_path,
-                inference_config=config,
-                pids=pid,
-                process_name=None,
-                gpu_ids=0,
-                time_keys=[
-                    'preprocess_time', 'inference_time', 'postprocess_time'
-                ],
-                warmup=0,
-                logger=logger)
-
-    def predict(self, data, tokenizer, label_map):
+    def predict(self, data, label_map):
         """
         Predicts the data labels.
         Args:
             data (obj:`List(str)`): The batch data whose each element is a raw text.
-            tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
-                which contains most of the methods. Users should refer to the superclass for more information regarding methods.
             label_map(obj:`dict`): The label id (key) to label str (value) map.
         Returns:
             results(obj:`dict`): All the predictions labels.
@@ -138,27 +111,7 @@ class Predictor(object):
         if args.benchmark:
             self.autolog.times.start()
 
-        examples = []
-        for text in data:
-            example = {"text": text}
-            input_ids, segment_ids = convert_example(
-                example,
-                tokenizer,
-                max_seq_length=self.max_seq_length,
-                is_test=True)
-            examples.append((input_ids, segment_ids))
-
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
-        ): fn(samples)
-
-        if args.benchmark:
-            self.autolog.times.stamp()
-
-        input_ids, segment_ids = batchify_fn(examples)
-        self.input_handles[0].copy_from_cpu(input_ids)
-        self.input_handles[1].copy_from_cpu(segment_ids)
+        self.input_handles[0].copy_from_cpu(data)
         self.predictor.run()
         logits = self.output_handle.copy_to_cpu()
         if args.benchmark:
@@ -181,11 +134,8 @@ if __name__ == "__main__":
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.cpu_threads, args.enable_mkldnn)
 
-    # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
-        'bert-base-chinese')
     test_ds = load_dataset("chnsenticorp", splits=["test"])
-    data = [d["text"] for d in test_ds]
+    data = [example["text"] for example in test_ds]
     batches = [
         data[idx:idx + args.batch_size]
         for idx in range(0, len(data), args.batch_size)
@@ -194,8 +144,12 @@ if __name__ == "__main__":
 
     results = []
     for batch_data in batches:
-        results.extend(predictor.predict(batch_data, tokenizer, label_map))
-    for idx, text in enumerate(data):
-        print('Data: {} \t Label: {}'.format(text, results[idx]))
-    if args.benchmark:
-        predictor.autolog.report()
+        predictor.predict(batch_data, label_map)
+    import time
+    start_time = time.time()
+    for _ in range(10):
+        for batch_data in batches:
+            predictor.predict(batch_data, label_map)
+    end_time = time.time()
+    print("#sample %d, cost time: %.5f" % (len(data) * 10,
+                                           (end_time - start_time)))
