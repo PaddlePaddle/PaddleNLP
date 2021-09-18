@@ -120,7 +120,7 @@ def encoder_layer_forward(self,
 
     After inference, `disable_faster_encoder` could be called to restore the
     `forward` function of `paddle.nn.TransformerEncoder` and
-    `paddle.nn.TransformerEncoder`.
+    `paddle.nn.TransformerEncoderLayer`.
 
     Args:
         src (Tensor):
@@ -130,14 +130,13 @@ def encoder_layer_forward(self,
         src_mask (Tensor, optional):
             A tensor used in multi-head attention to prevents attention to some
             unwanted positions, usually the paddings or the subsequent
-            positions. It is a tensor with shape broadcasted to
-            `[batch_size, n_head, sequence_length, sequence_length]`. When the
-            data type is bool, the unwanted positions have `False` values and
-            the others have `True` values. When the data type is int, the
-            unwanted positions have 0 values and the others have 1 values. When
-            the data type is float, the unwanted positions have `-INF` values
-            and the others have 0 values. It can be None when nothing wanted or
-            needed to be prevented attention to. Defaults to None.
+            positions. It is a tensor with shape `[batch_size, 1, 1, sequence_length]`.
+            When the data type is bool, the unwanted positions have `False`
+            values and the others have `True` values. When the data type is int,
+            the unwanted positions have 0 values and the others have 1 values.
+            When the data type is float, the unwanted positions have `-INF`
+            values and the others have 0 values. It can be None when nothing
+            wanted or needed to be prevented attention to. Defaults to None.
 
     Returns:
         src(Tensor|tuple):
@@ -192,7 +191,7 @@ def encoder_forward(self, src, src_mask=None, cache=None):
 
     After inference, `disable_faster_encoder` could be called to restore the
     `forward` function of `paddle.nn.TransformerEncoder` and
-    `paddle.nn.TransformerEncoder`.
+    `paddle.nn.TransformerEncoderLayer`.
 
     Args:
         src (Tensor):
@@ -202,14 +201,14 @@ def encoder_forward(self, src, src_mask=None, cache=None):
         src_mask (Tensor, optional):
             A tensor used in multi-head attention to prevents attention to
             some unwanted positions, usually the paddings or the subsequent
-            positions. It is a tensor with shape broadcasted to
-            `[batch_size, n_head, sequence_length, sequence_length]`. When the
-            data type is bool, the unwanted positions have `False` values and
-            the others have `True` values. When the data type is int, the
-            unwanted positions have 0 values and the others have 1 values.
-            When the data type is float, the unwanted positions have `-INF`
-            values and the others have 0 values. It can be None when nothing
-            wanted or needed to be prevented attention to. Default None.
+            positions. It is a tensor with shape `[batch_size, 1, 1, sequence_length]`.
+            When the data type is bool, the unwanted positions have `False`
+            values and the others have `True` values. When the data type is
+            int, the unwanted positions have 0 values and the others have 1
+            values. When the data type is float, the unwanted positions have
+            `-INF` values and the others have 0 values. It can be None when
+            nothing wanted or needed to be prevented attention to. Defaults
+            to None.
 
     Returns:
         output (Tensor|tuple):
@@ -252,35 +251,34 @@ def enable_faster_encoder(self):
             model = disable_faster_encoder(model)
     """
 
-    def check_if_usable(layer):
-        for sub_layer in layer.children():
-            if isinstance(sub_layer,
-                          TransformerEncoderLayer) and sub_layer._config[
-                              'bias_attr'] == False:
+    def init_func(layer):
+        if isinstance(layer, TransformerEncoderLayer):
+            is_usable = True
+            if layer._config['bias_attr'] == False:
                 logger.warning("`False` for paddle.nn.TransformerEncoder's" \
                                " parameter `bias_attr` is not supported in " \
-                               "FasterTransformer by now. Original Paddle API " \
-                               "would be called.")
-                return False
-            elif not check_if_usable(sub_layer):
-                return False
-        return True
-
-    def init_func(layer):
-        if isinstance(layer, (TransformerEncoderLayer, TransformerEncoder)):
+                               "FasterTransformer by now. The original forward" \
+                               " will be involved.")
+                is_usable = False
+            if layer._config['activation'] not in ('relu', 'gelu'):
+                logger.warning("Only 'relu' or 'gelu' is supported by now. " \
+                                "The original forward will be involved.")
+                is_usable = False
+            if is_usable:
+                layer.forward = layer._ft_forward
+        elif isinstance(layer, TransformerEncoder):
             layer.forward = layer._ft_forward
 
     if not self.training:
-        if not check_if_usable(self):
-            return self
         try:
             load("FasterTransformer", verbose=True)
-            for layer in self.children():
-                layer.apply(init_func)
         except Exception:
             logger.warning(
                 "Exception occurs when using Faster Transformer. " \
                 "The original forward will be involved. ")
+            return self
+        for layer in self.children():
+            layer.apply(init_func)
     return self
 
 

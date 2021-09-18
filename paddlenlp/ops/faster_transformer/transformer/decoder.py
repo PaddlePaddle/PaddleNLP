@@ -374,7 +374,8 @@ class FasterDecoder(nn.Layer):
         mem_seq_lens = paddle.sum(paddle.cast(
             src_word != self.bos_id, dtype="int32"),
                                   axis=-1,
-                                  keepdim=True)
+                                  keepdim=True,
+                                  dtype="int32")
 
         src_slf_attn_bias = paddle.cast(
             src_word == self.bos_id,
