@@ -41,6 +41,8 @@ if __name__ == "__main__":
         print("Loaded parameters from %s" % args.params_path)
     model.eval()
 
+    # model.to_static_model(args.output_path)
+
     # Convert to static graph with specific input description
     model = paddle.jit.to_static(
         model,

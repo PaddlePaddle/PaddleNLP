@@ -21,10 +21,14 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+
+import paddlenlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import LinearDecayWithWarmup, BertTokenizer, BertForSequenceClassification
+from paddlenlp.layers import FasterTokenizer
+
+from fast_model import FastBertForSequenceClassification
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -64,42 +68,22 @@ def evaluate(model, criterion, metric, data_loader):
     metric.reset()
     losses = []
     for batch in data_loader:
-        input_ids, token_type_ids, labels = batch
-        logits = model(input_ids, token_type_ids)
+        texts, labels = batch
+        texts = paddlenlp.ops.to_strings_tensor(texts, "texts")
+        logits = model(texts)
         loss = criterion(logits, labels)
         losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
         metric.update(correct)
         accu = metric.accumulate()
+    print("=" * 50)
     print("eval loss: %.5f, accu: %.5f" % (np.mean(losses), accu))
+    print("=" * 50)
     model.train()
     metric.reset()
 
 
-def create_dataloader(dataset,
-                      mode='train',
-                      batch_size=1,
-                      batchify_fn=None,
-                      trans_fn=None):
-    if trans_fn:
-        dataset = dataset.map(trans_fn)
-
-    shuffle = True if mode == 'train' else False
-    if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
-    else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
-
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
-
-
-def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
+def convert_example(example, is_test=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
@@ -120,14 +104,26 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
         token_type_ids(obj: `list[int]`): List of sequence pair mask.
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
-    encoded_inputs = tokenizer(text=example["text"], max_seq_len=max_seq_length)
-    input_ids = encoded_inputs["input_ids"]
-    token_type_ids = encoded_inputs["token_type_ids"]
-
     if is_test:
-        return input_ids, token_type_ids
-    label = np.array([example["label"]], dtype="int64")
-    return input_ids, token_type_ids, label
+        return example["text"]
+    else:
+        return example["text"], example["label"]
+
+
+def create_dataloader(dataset, trans_fn=None, mode='train', batch_size=1):
+    if trans_fn:
+        dataset = dataset.map(trans_fn)
+
+    shuffle = True if mode == 'train' else False
+    if mode == 'train':
+        batch_sampler = paddle.io.DistributedBatchSampler(
+            dataset, batch_size=batch_size, shuffle=shuffle)
+    else:
+        batch_sampler = paddle.io.BatchSampler(
+            dataset, batch_size=batch_size, shuffle=shuffle)
+
+    return paddle.io.DataLoader(
+        dataset=dataset, batch_sampler=batch_sampler, return_list=True)
 
 
 def do_train():
@@ -141,43 +137,17 @@ def do_train():
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
     # If you wanna use bert/roberta/electra pretrained model,
-    model = ppnlp.transformers.BertForSequenceClassification.from_pretrained(
-        'bert-base-chinese', num_class=2)
-    # model = ppnlp.transformers.RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext', num_class=2)
-    # model = ppnlp.transformers.ElectraForSequenceClassification.from_pretrained('chinese-electra-small', num_classes=2)
-    # model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-    #     'ernie-tiny', num_classes=len(train_ds.label_list))
+    # model = ppnlp.transformers.BertForSequenceClassification.from_pretrained(
+    #     'bert-base-chinese', num_class=len(train_ds.label_list))
+    # tokenizer = FastTokenizer("/root/.paddlenlp/models/bert-base-chinese/bert-base-chinese-vocab.txt")
+    model = FastBertForSequenceClassification(
+        "/root/.paddlenlp/models/bert-base-chinese/bert-base-chinese-vocab.txt",
+        num_classes=len(train_ds.label_list))
 
-    # If you wanna use bert/roberta/electra pretrained model,
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
-        'bert-base-chinese')
-    # tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext')
-    # tokenizer = ppnlp.transformers.ElectraTokenizer.from_pretrained('chinese-electra-small', num_classes=2)
-    # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    # tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
-    #     'ernie-tiny')
-
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Stack(dtype="int64")  # label
-    ): [data for data in fn(samples)]
     train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+        train_ds, convert_example, mode='train', batch_size=args.batch_size)
     dev_data_loader = create_dataloader(
-        dev_ds,
-        mode='dev',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+        dev_ds, convert_example, mode='dev', batch_size=args.batch_size)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -208,8 +178,13 @@ def do_train():
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
-            input_ids, token_type_ids, labels = batch
-            logits = model(input_ids, token_type_ids)
+            texts, labels = batch
+
+            text_tensor = paddlenlp.ops.to_strings_tensor(texts, "text")
+            # if text_pair_tensor is not None:
+            #     text_pair_tensor = paddlenlp.ops.to_strings_tensor(text_pair,
+            #                                                     "text_pair")
+            logits = model(text_tensor)
             loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
             correct = metric.compute(probs, labels)
@@ -228,12 +203,10 @@ def do_train():
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % 100 == 0 and rank == 0:
-                save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
+                save_path = os.path.join(args.save_dir,
+                                         "model_%d.pdparams" % global_step)
                 evaluate(model, criterion, metric, dev_data_loader)
-                model._layers.save_pretrained(save_dir)
-                tokenizer.save_pretrained(save_dir)
+                paddle.save(model.state_dict(), save_path)
 
 
 if __name__ == "__main__":

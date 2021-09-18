@@ -3,7 +3,7 @@ import paddle.fluid.core as core
 import paddle.nn as nn
 import paddlenlp
 from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.layers import FastTokenizer
+from paddlenlp.layers import FasterTokenizer
 
 import numpy as np
 
@@ -13,7 +13,7 @@ class FastBertForSequenceClassification(nn.Layer):
         super(FastBertForSequenceClassification, self).__init__()
         self.bert_cls = BertForSequenceClassification.from_pretrained(
             "bert-base-chinese", num_classes=num_classes)
-        self.tokenizer = FastTokenizer(vocab_path)
+        self.tokenizer = FasterTokenizer(vocab_path)
 
     def forward(self, text):
         input_ids, token_type_ids = self.tokenizer(text, max_seq_len=128)

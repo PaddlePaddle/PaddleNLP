@@ -135,7 +135,7 @@ class Predictor(object):
         if device == "gpu":
             # set GPU configs accordingly
             # such as intialize the gpu memory, enable tensorrt
-            config.enable_use_gpu(100, 3)
+            config.enable_use_gpu(100, 6)
             precision_map = {
                 "fp16": inference.PrecisionType.Half,
                 "fp32": inference.PrecisionType.Float32,
@@ -227,19 +227,20 @@ class Predictor(object):
         self.input_handles[0].copy_from_cpu(input_ids)
         self.input_handles[1].copy_from_cpu(segment_ids)
         self.predictor.run()
-        logits = self.output_handle.copy_to_cpu()
-        if args.benchmark:
-            self.autolog.times.stamp()
 
-        probs = softmax(logits, axis=1)
-        idx = np.argmax(probs, axis=1)
-        idx = idx.tolist()
-        labels = [label_map[i] for i in idx]
+        # logits = self.output_handle.copy_to_cpu()
+        # if args.benchmark:
+        #     self.autolog.times.stamp()
 
-        if args.benchmark:
-            self.autolog.times.end(stamp=True)
+        # probs = softmax(logits, axis=1)
+        # idx = np.argmax(probs, axis=1)
+        # idx = idx.tolist()
+        # labels = [label_map[i] for i in idx]
 
-        return labels
+        # if args.benchmark:
+        #     self.autolog.times.end(stamp=True)
+
+        # return labels
 
 
 if __name__ == "__main__":
@@ -270,14 +271,14 @@ if __name__ == "__main__":
 
     results = []
     for batch_data in batches:
-        results.extend(predictor.predict(batch_data, tokenizer, label_map))
+        predictor.predict(batch_data, tokenizer, label_map)
     import time
     start_time = time.time()
     for _ in range(10):
         for batch_data in batches:
-            results.extend(predictor.predict(batch_data, tokenizer, label_map))
+            predictor.predict(batch_data, tokenizer, label_map)
     end_time = time.time()
     print("#sample %d, cost time: %.5f" % (len(data) * 10,
                                            (end_time - start_time)))
-    if args.benchmark:
-        predictor.autolog.report()
+    # if args.benchmark:
+    #     predictor.autolog.report()

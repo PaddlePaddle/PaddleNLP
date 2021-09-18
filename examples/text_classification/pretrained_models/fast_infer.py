@@ -79,7 +79,7 @@ class Predictor(object):
         if device == "gpu":
             # set GPU configs accordingly
             # such as intialize the gpu memory, enable tensorrt
-            config.enable_use_gpu(100, 3)
+            config.enable_use_gpu(100, 6)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -115,19 +115,19 @@ class Predictor(object):
 
         self.input_handles[0].copy_from_cpu(data)
         self.predictor.run()
-        logits = self.output_handle.copy_to_cpu()
-        if args.benchmark:
-            self.autolog.times.stamp()
+        # logits = self.output_handle.copy_to_cpu()
+        # if args.benchmark:
+        #     self.autolog.times.stamp()
 
-        probs = softmax(logits, axis=1)
-        idx = np.argmax(probs, axis=1)
-        idx = idx.tolist()
-        labels = [label_map[i] for i in idx]
+        # probs = softmax(logits, axis=1)
+        # idx = np.argmax(probs, axis=1)
+        # idx = idx.tolist()
+        # labels = [label_map[i] for i in idx]
 
-        if args.benchmark:
-            self.autolog.times.end(stamp=True)
+        # if args.benchmark:
+        #     self.autolog.times.end(stamp=True)
 
-        return labels
+        # return labels
 
 
 if __name__ == "__main__":
@@ -151,12 +151,12 @@ if __name__ == "__main__":
 
     results = []
     for batch_data in batches:
-        results.extend(predictor.predict(batch_data, label_map))
+        predictor.predict(batch_data, label_map)
     import time
     start_time = time.time()
     for _ in range(10):
         for batch_data in batches:
-            results.extend(predictor.predict(batch_data, label_map))
+            predictor.predict(batch_data, label_map)
     end_time = time.time()
     print("#sample %d, cost time: %.5f" % (len(data) * 10,
                                            (end_time - start_time)))

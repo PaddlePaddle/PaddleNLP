@@ -15,4 +15,4 @@
 from .sequence import sequence_mask
 from .tcn import TCN, TemporalBlock
 from .crf import LinearChainCrf, LinearChainCrfLoss, ViterbiDecoder
-from .tokenizer import FastTokenizer
+from .tokenizer import FasterTokenizer
