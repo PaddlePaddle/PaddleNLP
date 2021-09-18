@@ -143,19 +143,10 @@ def do_train():
     # If you wanna use bert/roberta/electra pretrained model,
     model = ppnlp.transformers.BertForSequenceClassification.from_pretrained(
         'bert-base-chinese', num_class=2)
-    # model = ppnlp.transformers.RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext', num_class=2)
-    # model = ppnlp.transformers.ElectraForSequenceClassification.from_pretrained('chinese-electra-small', num_classes=2)
-    # model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-    #     'ernie-tiny', num_classes=len(train_ds.label_list))
 
     # If you wanna use bert/roberta/electra pretrained model,
     tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
         'bert-base-chinese')
-    # tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext')
-    # tokenizer = ppnlp.transformers.ElectraTokenizer.from_pretrained('chinese-electra-small', num_classes=2)
-    # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    # tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
-    #     'ernie-tiny')
 
     trans_func = partial(
         convert_example,

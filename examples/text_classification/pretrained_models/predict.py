@@ -147,11 +147,6 @@ if __name__ == "__main__":
         'bert-base-chinese', num_class=2)
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
     data = [example["text"] for example in train_ds]
-    # data = [
-    #     '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
-    #     '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
-    #     '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
-    # ]
     label_map = {0: 'negative', 1: 'positive'}
 
     tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
@@ -168,6 +163,5 @@ if __name__ == "__main__":
     results = predict(
         model, data, tokenizer, label_map, batch_size=args.batch_size)
     end_time = time.time()
-    print("#sample %d, cost time: %.5f" % (len(data), (end_time - start_time)))
-    # for idx, text in enumerate(data):
-    #     print('Data: {} \t Lable: {}'.format(text, results[idx]))
+    for idx, text in enumerate(data):
+        print('Data: {} \t Lable: {}'.format(text, results[idx]))
