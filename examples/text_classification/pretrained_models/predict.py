@@ -21,6 +21,7 @@ import paddle
 import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.datasets import load_dataset
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -139,28 +140,34 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
 
 
 if __name__ == "__main__":
-    paddle.set_device(args.device)
+    paddle.set_device("gpu:6")
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
-        'ernie-tiny')
-
-    data = [
-        '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
-        '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
-        '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
-    ]
+    model = ppnlp.transformers.BertForSequenceClassification.from_pretrained(
+        'bert-base-chinese', num_class=2)
+    train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
+    data = [example["text"] for example in train_ds]
+    # data = [
+    #     '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
+    #     '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
+    #     '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
+    # ]
     label_map = {0: 'negative', 1: 'positive'}
 
-    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        'ernie-tiny', num_classes=len(label_map))
+    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
+        'bert-base-chinese')
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
 
+    import time
+
+    start_time = time.time()
     results = predict(
         model, data, tokenizer, label_map, batch_size=args.batch_size)
-    for idx, text in enumerate(data):
-        print('Data: {} \t Lable: {}'.format(text, results[idx]))
+    end_time = time.time()
+    print("#sample %d, cost time: %.5f" % (len(data), (end_time - start_time)))
+    # for idx, text in enumerate(data):
+    #     print('Data: {} \t Lable: {}'.format(text, results[idx]))

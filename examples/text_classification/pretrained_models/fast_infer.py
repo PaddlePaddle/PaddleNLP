@@ -32,7 +32,7 @@ parser.add_argument("--model_dir", type=str, required=True,
 parser.add_argument("--max_seq_length", default=128, type=int,
     help="The maximum total input sequence length after tokenization. Sequences "
     "longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=64, type=int,
+parser.add_argument("--batch_size", default=1, type=int,
     help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu",
     help="Select which device to train model, defaults to gpu.")
@@ -42,7 +42,7 @@ parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, F
 parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"],
     help='The tensorrt precision.')
 
-parser.add_argument('--cpu_threads', default=10, type=int,
+parser.add_argument('--cpu_threads', default=50, type=int,
     help='Number of threads to predict when using cpu.')
 parser.add_argument('--enable_mkldnn', default=False, type=eval, choices=[True, False],
     help='Enable to use mkldnn to speed up when using cpu.')
@@ -79,7 +79,7 @@ class Predictor(object):
         if device == "gpu":
             # set GPU configs accordingly
             # such as intialize the gpu memory, enable tensorrt
-            config.enable_use_gpu(100, 5)
+            config.enable_use_gpu(100, 3)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -120,7 +120,6 @@ class Predictor(object):
             self.autolog.times.stamp()
 
         probs = softmax(logits, axis=1)
-        print(probs)
         idx = np.argmax(probs, axis=1)
         idx = idx.tolist()
         labels = [label_map[i] for i in idx]
@@ -138,7 +137,12 @@ if __name__ == "__main__":
                           args.cpu_threads, args.enable_mkldnn)
 
     test_ds = load_dataset("chnsenticorp", splits=["test"])
-    data = [d["text"] for d in test_ds]
+    data = [example["text"] for example in test_ds]
+    # data = [
+    #     '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
+    #     '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
+    #     '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
+    # ]
     batches = [
         data[idx:idx + args.batch_size]
         for idx in range(0, len(data), args.batch_size)
@@ -148,3 +152,11 @@ if __name__ == "__main__":
     results = []
     for batch_data in batches:
         results.extend(predictor.predict(batch_data, label_map))
+    import time
+    start_time = time.time()
+    for _ in range(10):
+        for batch_data in batches:
+            results.extend(predictor.predict(batch_data, label_map))
+    end_time = time.time()
+    print("#sample %d, cost time: %.5f" % (len(data) * 10,
+                                           (end_time - start_time)))

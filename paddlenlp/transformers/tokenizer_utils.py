@@ -24,9 +24,12 @@ import unicodedata
 from shutil import copyfile
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
 
+import paddlenlp
 from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
+import paddle
+import paddle.fluid.core as core
 
 from ..data.vocab import Vocab
 from .utils import InitTrackerMeta, fn_args_to_dict
@@ -282,6 +285,28 @@ class PretrainedTokenizer(object):
                 - **overflow_to_sample** (int, optional): Index of example from which this
                   feature is generated. Included when `stride` works.
         """
+        if self.accelerate_mode:
+            assert isinstance(text, str)
+            if isinstance(text, str):
+                text = [text]
+            elif isinstance(text, list) and isinstance(text[0], str):
+                pass
+            else:
+                raise ValueError(
+                    "text input must be of type `str` (single example), "
+                    ", `List[str]` (batch or single pretokenized example) ")
+            text_tensor = paddlenlp.ops.to_strings_tensor(text, "text")
+            text_pair = None
+            input_ids, seg_ids = core.ops.tokenizer(
+                self.vocab_tensor, text_tensor, text_pair, "max_seq_len",
+                max_seq_len, "pad_to_max_seq_len", pad_to_max_seq_len,
+                "is_split_into_words", is_split_into_words)
+            res = {
+                "input_ids": input_ids.numpy()[0],
+                "token_type_ids": seg_ids.numpy()[0]
+            }
+            return res
+
         # Input type checking for clearer error
         assert isinstance(text, str) or (
             isinstance(text, (list, tuple)) and (len(text) == 0 or (
@@ -407,7 +432,11 @@ class PretrainedTokenizer(object):
         return tokens
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+    def from_pretrained(cls,
+                        pretrained_model_name_or_path,
+                        accelerate_mode=True,
+                        *args,
+                        **kwargs):
         """
         Creates an instance of `PretrainedTokenizer`. Related resources are loaded
         by specifying name of a built-in pretrained model, or a community-contributed
@@ -511,6 +540,7 @@ class PretrainedTokenizer(object):
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())
         init_kwargs.pop("init_class", None)
+        accelerate_mode = init_kwargs.pop("accelerate_mode", False)
 
         # Update with newly provided args and kwargs
         init_args = init_args if not args else args
@@ -535,6 +565,10 @@ class PretrainedTokenizer(object):
                 init_kwargs[args_name] = file_path
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)
+        tokenizer.accelerate_mode = accelerate_mode
+        if accelerate_mode:
+            tokenizer.vocab_tensor = paddlenlp.ops.to_map_tensor(
+                tokenizer.vocab.token_to_idx, "vocab")
         return tokenizer
 
     def save_pretrained(self, save_directory):

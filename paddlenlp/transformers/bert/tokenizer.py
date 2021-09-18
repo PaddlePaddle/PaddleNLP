@@ -277,40 +277,52 @@ class BertTokenizer(PretrainedTokenizer):
     }
     pretrained_init_configuration = {
         "bert-base-uncased": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "accelerate_mode": False
         },
         "bert-large-uncased": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "accelerate_mode": False
         },
         "bert-base-cased": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "accelerate_mode": False
         },
         "bert-large-cased": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "accelerate_mode": False
         },
         "bert-base-multilingual-uncased": {
-            "do_lower_case": True
+            "do_lower_case": True,
+            "accelerate_mode": False
         },
         "bert-base-multilingual-cased": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "accelerate_mode": False
         },
         "bert-base-chinese": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "accelerate_mode": True
         },
         "bert-wwm-chinese": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "accelerate_mode": False
         },
         "bert-wwm-ext-chinese": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "accelerate_mode": False
         },
         "macbert-large-chinese": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "accelerate_mode": False
         },
         "macbert-base-chinese": {
-            "do_lower_case": False
+            "do_lower_case": False,
+            "accelerate_mode": False
         },
-        "simbert-base-chinese":{
-            "do_lower_case": True
+        "simbert-base-chinese": {
+            "do_lower_case": True,
+            "accelerate_mode": False
         },
     }
     padding_side = 'right'

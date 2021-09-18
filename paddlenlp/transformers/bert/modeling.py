@@ -114,6 +114,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "accelerate_mode": False
         },
         "bert-large-uncased": {
             "vocab_size": 30522,
@@ -128,6 +129,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "accelerate_mode": False
         },
         "bert-base-multilingual-uncased": {
             "vocab_size": 105879,
@@ -142,6 +144,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "accelerate_mode": False
         },
         "bert-base-cased": {
             "vocab_size": 28996,
@@ -156,6 +159,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "accelerate_mode": False
         },
         "bert-base-chinese": {
             "vocab_size": 21128,
@@ -170,6 +174,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "accelerate_mode": True
         },
         "bert-base-multilingual-cased": {
             "vocab_size": 119547,
@@ -184,6 +189,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "accelerate_mode": False
         },
         "bert-large-cased": {
             "vocab_size": 28996,
@@ -198,6 +204,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "accelerate_mode": False
         },
         "bert-wwm-chinese": {
             "vocab_size": 21128,
@@ -212,6 +219,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "accelerate_mode": False
         },
         "bert-wwm-ext-chinese": {
             "vocab_size": 21128,
@@ -226,6 +234,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "accelerate_mode": False
         },
         "macbert-base-chinese": {
             "vocab_size": 21128,
@@ -240,6 +249,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "accelerate_mode": False
         },
         "macbert-large-chinese": {
             "vocab_size": 21128,
@@ -254,6 +264,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "accelerate_mode": False
         },
         "simbert-base-chinese": {
             "vocab_size": 13685,
@@ -268,6 +279,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
+            "accelerate_mode": False
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -372,7 +384,8 @@ class BertModel(BertPretrainedModel):
                  type_vocab_size=16,
                  initializer_range=0.02,
                  pad_token_id=0,
-                 pool_act="tanh"):
+                 pool_act="tanh",
+                 accelerate_mode=False):
         super(BertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range

@@ -24,7 +24,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 
 import paddle.fluid.core as core
 
-from model import FastBertForSequenceClassification
+from fast_model import FastBertForSequenceClassification
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -46,8 +46,18 @@ if __name__ == "__main__":
         num_classes=len(label_map))
 
     if args.params_path and os.path.isfile(args.params_path):
-        state_dict = paddle.load(args.params_path)
-        model.set_dict(state_dict)
+        fast_state_dict = paddle.load(args.params_path)
+        # state_dict = paddle.load('checkpoint/model_900/model_state.pdparams')
+
+        # convention_dict = {}
+
+        # for name, value in fast_state_dict.items():
+        #     if "bert_cls" in name:
+        #         convention_dict[name] = state_dict[name.replace("bert_cls.", "")]
+        #     else:
+        #         convention_dict[name] = value
+
+        model.set_dict(fast_state_dict)
         print("Loaded parameters from %s" % args.params_path)
     model.eval()
 

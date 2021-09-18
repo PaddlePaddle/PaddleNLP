@@ -19,17 +19,18 @@ from functools import partial
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+import paddlenlp
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.datasets import load_dataset
 
-from model import FastBertForSequenceClassification
+from fast_model import FastBertForSequenceClassification
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True, help="The path to model parameters to be loaded.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--batch_size", default=128, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
@@ -130,6 +131,7 @@ def predict(model, data, label_map, batch_size=1):
         # input_ids, token_type_ids = batchify_fn(batch)
         # input_ids = paddle.to_tensor(input_ids)
         # token_type_ids = paddle.to_tensor(token_type_ids)
+        texts = paddlenlp.ops.to_strings_tensor(texts, "texts")
         logits = model(texts)
         probs = F.softmax(logits, axis=1)
         idx = paddle.argmax(probs, axis=1).numpy()
@@ -140,17 +142,19 @@ def predict(model, data, label_map, batch_size=1):
 
 
 if __name__ == "__main__":
-    paddle.set_device(args.device)
+    paddle.set_device("gpu:6")
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
     # tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
     #     'ernie-tiny')
+    train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
+    data = [example["text"] for example in train_ds]
 
-    data = [
-        '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
-        '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
-        '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
-    ]
+    # data = [
+    #     '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
+    #     '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
+    #     '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
+    # ]
     label_map = {0: 'negative', 1: 'positive'}
 
     # If you wanna use bert/roberta/electra pretrained model,
@@ -162,10 +166,27 @@ if __name__ == "__main__":
         num_classes=len(label_map))
 
     if args.params_path and os.path.isfile(args.params_path):
-        state_dict = paddle.load(args.params_path)
-        model.set_dict(state_dict)
+        fast_state_dict = paddle.load(args.params_path)
+        # state_dict = paddle.load('checkpoint/model_900/model_state.pdparams')
+
+        # convention_dict = {}
+
+        # for name, value in fast_state_dict.items():
+        #     if "bert_cls" in name:
+        #         convention_dict[name] = state_dict[name.replace("bert_cls.", "")]
+        #     else:
+        #         print(name)
+        #         convention_dict[name] = value
+        model.set_dict(fast_state_dict)
+        # convention_dict['tokenizer.vocab'] = paddlenlp.ops.to_map_tensor(
+        #     convention_dict['tokenizer.vocab'], name='tokenizer.vocab')
+        # paddle.save(convention_dict, 'convention.pdparams')
         print("Loaded parameters from %s" % args.params_path)
 
+    import time
+    start_time = time.time()
     results = predict(model, data, label_map, batch_size=args.batch_size)
-    for idx, text in enumerate(data):
-        print('Data: {} \t Lable: {}'.format(text, results[idx]))
+    end_time = time.time()
+    print("#sample %d, cost time: %.5f" % (len(data), (end_time - start_time)))
+    # for idx, text in enumerate(data):
+    #     print('Data: {} \t Lable: {}'.format(text, results[idx]))

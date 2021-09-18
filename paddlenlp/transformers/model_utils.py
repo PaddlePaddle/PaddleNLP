@@ -259,6 +259,7 @@ class PretrainedModel(Layer, GenerationMixin):
         # class name corresponds to this configuration
         init_class = init_kwargs.pop("init_class",
                                      cls.base_model_class.__name__)
+        accelerate_mode = init_kwargs.pop("accelerate_mode", False)
         # Check if the loaded config matches the current model class's __init__
         # arguments. If not match, the loaded config is for the base model class.
         if init_class == cls.base_model_class.__name__:
@@ -315,6 +316,8 @@ class PretrainedModel(Layer, GenerationMixin):
                 if k in derived_parameters_dict:
                     derived_kwargs[k] = v
             model = cls(*derived_args, **derived_kwargs)
+
+        model.accelerate_mode = accelerate_mode
 
         # Maybe need more ways to load resources.
         weight_path = resolved_resource_files["model_state"]

@@ -17,7 +17,7 @@ import paddle
 import paddle.fluid.core as core
 import paddle.nn as nn
 import paddlenlp
-from paddlenlp.transformers import BertTokenizer
+from paddlenlp.transformers import PretrainedTokenizer
 
 from paddle.fluid.layer_helper import LayerHelper
 from paddle.fluid.framework import in_dygraph_mode
@@ -37,11 +37,11 @@ def load_vocabulary(filepath):
     return token_to_idx
 
 
-class FastTokenizer(nn.Layer):
+class FastTokenizer(PretrainedTokenizer):
     def __init__(self, vocab_path):
         super(FastTokenizer, self).__init__()
-        vocab = load_vocabulary(vocab_path)
-        vocab_tensor = paddlenlp.ops.to_map_tensor(vocab, "vocab")
+        vocab_dict = load_vocabulary(vocab_path)
+        vocab_tensor = paddlenlp.ops.to_map_tensor(vocab_dict, "vocab")
         self.register_buffer("vocab", vocab_tensor, persistable=True)
 
     def forward(self,

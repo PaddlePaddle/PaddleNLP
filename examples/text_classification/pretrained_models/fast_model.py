@@ -17,5 +17,6 @@ class FastBertForSequenceClassification(nn.Layer):
 
     def forward(self, text):
         input_ids, token_type_ids = self.tokenizer(text, max_seq_len=128)
+        # paddle.static.Print(input_ids, message='input_ids')
         logits = self.bert_cls(input_ids, token_type_ids)
         return logits
