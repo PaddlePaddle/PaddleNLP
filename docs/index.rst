@@ -80,7 +80,7 @@
    :maxdepth: 2
    :caption: FAQ
 
-   FAQ <FAQ.md>
+   FAQ <faq/faq>
 
 .. toctree::
    :maxdepth: 2
