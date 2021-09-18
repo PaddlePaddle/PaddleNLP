@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 import paddle
 import paddle.nn as nn
 import paddle.tensor as tensor
 import paddle.nn.functional as F
 from paddle.nn import TransformerEncoder, Linear, Layer, Embedding, LayerNorm, Tanh
+from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
+from paddlenlp.utils.env import MODEL_HOME
 
+from paddlenlp.layers import FasterTokenizer
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -114,7 +119,9 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
-            "accelerate_mode": False
+            "accelerate_mode": False,
+            "vocab_file":
+            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-uncased-vocab.txt"
         },
         "bert-large-uncased": {
             "vocab_size": 30522,
@@ -129,7 +136,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
-            "accelerate_mode": False
+            "accelerate_mode": False,
         },
         "bert-base-multilingual-uncased": {
             "vocab_size": 105879,
@@ -144,7 +151,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
-            "accelerate_mode": False
+            "accelerate_mode": False,
         },
         "bert-base-cased": {
             "vocab_size": 28996,
@@ -159,7 +166,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
-            "accelerate_mode": False
+            "accelerate_mode": False,
         },
         "bert-base-chinese": {
             "vocab_size": 21128,
@@ -174,7 +181,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
-            "accelerate_mode": True
+            "accelerate_mode": True,
         },
         "bert-base-multilingual-cased": {
             "vocab_size": 119547,
@@ -189,7 +196,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
-            "accelerate_mode": False
+            "accelerate_mode": False,
         },
         "bert-large-cased": {
             "vocab_size": 28996,
@@ -204,7 +211,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
-            "accelerate_mode": False
+            "accelerate_mode": False,
         },
         "bert-wwm-chinese": {
             "vocab_size": 21128,
@@ -219,7 +226,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
-            "accelerate_mode": False
+            "accelerate_mode": False,
         },
         "bert-wwm-ext-chinese": {
             "vocab_size": 21128,
@@ -234,7 +241,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
-            "accelerate_mode": False
+            "accelerate_mode": False,
         },
         "macbert-base-chinese": {
             "vocab_size": 21128,
@@ -249,7 +256,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
-            "accelerate_mode": False
+            "accelerate_mode": False,
         },
         "macbert-large-chinese": {
             "vocab_size": 21128,
@@ -264,7 +271,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
-            "accelerate_mode": False
+            "accelerate_mode": False,
         },
         "simbert-base-chinese": {
             "vocab_size": 13685,
@@ -279,7 +286,7 @@ class BertPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "initializer_range": 0.02,
             "pad_token_id": 0,
-            "accelerate_mode": False
+            "accelerate_mode": False,
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -309,6 +316,32 @@ class BertPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-large-chinese.pdparams",
             "simbert-base-chinese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/simbert-base-chinese-v1.pdparams",
+        },
+        "vocab_file": {
+            "bert-base-uncased":
+            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-uncased-vocab.txt",
+            "bert-large-uncased":
+            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-large-uncased-vocab.txt",
+            "bert-base-cased":
+            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-cased-vocab.txt",
+            "bert-large-cased":
+            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-large-cased-vocab.txt",
+            "bert-base-multilingual-uncased":
+            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-multilingual-uncased-vocab.txt",
+            "bert-base-multilingual-cased":
+            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-multilingual-cased-vocab.txt",
+            "bert-base-chinese":
+            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-chinese-vocab.txt",
+            "bert-wwm-chinese":
+            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-wwm-chinese-vocab.txt",
+            "bert-wwm-ext-chinese":
+            "http://paddlenlp.bj.bcebos.com/models/transformers/bert/bert-wwm-ext-chinese-vocab.txt",
+            "macbert-large-chinese":
+            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-chinese-vocab.txt",
+            "macbert-base-chinese":
+            "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-chinese-vocab.txt",
+            "simbert-base-chinese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/vocab.txt",
         }
     }
     base_model_prefix = "bert"
@@ -385,8 +418,14 @@ class BertModel(BertPretrainedModel):
                  initializer_range=0.02,
                  pad_token_id=0,
                  pool_act="tanh",
-                 accelerate_mode=False):
+                 accelerate_mode=False,
+                 vocab_file=None):
         super(BertModel, self).__init__()
+
+        self.accelerate_mode = accelerate_mode
+        if self.accelerate_mode and vocab_file is not None:
+            self.tokenizer = FasterTokenizer(vocab_file)
+
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         self.embeddings = BertEmbeddings(
@@ -405,11 +444,18 @@ class BertModel(BertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False):
+                output_hidden_states=False,
+                text=None,
+                max_seq_len=128):
+
+        if text is not None and self.accelerate_mode:
+            input_ids, token_type_ids = self.tokenizer(
+                text, max_seq_len=max_seq_len)
+
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
@@ -479,13 +525,16 @@ class BertForSequenceClassification(BertPretrainedModel):
                                     num_classes)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(
+            self,
+            input_ids=None,
+            token_type_ids=None,
+            position_ids=None,
+            attention_mask=None,
+            text=None, ):
         _, pooled_output = self.bert(
-            input_ids,
+            text=text,
+            input_ids=input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask)

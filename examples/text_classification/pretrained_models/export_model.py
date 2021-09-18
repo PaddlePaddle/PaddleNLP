@@ -41,17 +41,4 @@ if __name__ == "__main__":
         print("Loaded parameters from %s" % args.params_path)
     model.eval()
 
-    # model.to_static_model(args.output_path)
-
-    # Convert to static graph with specific input description
-    model = paddle.jit.to_static(
-        model,
-        input_spec=[
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64")  # segment_ids
-        ])
-    # Save in static graph model.
-    save_path = os.path.join(args.output_path, "inference")
-    paddle.jit.save(model, save_path)
+    model.to_static_model(args.output_path)

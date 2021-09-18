@@ -21,11 +21,13 @@ import logging
 import inspect
 
 import paddle
+import paddle.fluid.core as core
 from paddle.nn import Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
+from paddlenlp.layers import FasterTokenizer
 
 from .generation_utils import GenerationMixin
 from .utils import InitTrackerMeta, fn_args_to_dict
@@ -259,9 +261,11 @@ class PretrainedModel(Layer, GenerationMixin):
         # class name corresponds to this configuration
         init_class = init_kwargs.pop("init_class",
                                      cls.base_model_class.__name__)
-        accelerate_mode = init_kwargs.pop("accelerate_mode", False)
+        vocab_file = resolved_resource_files.pop("vocab_file", None)
         # Check if the loaded config matches the current model class's __init__
         # arguments. If not match, the loaded config is for the base model class.
+        init_kwargs["vocab_file"] = vocab_file
+        accelerate_mode = init_kwargs.get("accelerate_mode", False)
         if init_class == cls.base_model_class.__name__:
             base_args = init_args
             base_kwargs = init_kwargs
@@ -360,6 +364,36 @@ class PretrainedModel(Layer, GenerationMixin):
             model_to_load.set_state_dict(state_to_load)
             return model
         return model, state_to_load
+
+    def to_static_model(self, output_path):
+        if self.accelerate_mode:
+            static_model = paddle.jit.to_static(
+                self,
+                input_spec=[
+                    None,
+                    None,
+                    None,
+                    None,
+                    paddle.static.InputSpec(
+                        shape=[None],
+                        dtype=core.VarDesc.VarType.STRINGS),  # texts
+                ])
+            # Save in static graph model.
+            save_path = os.path.join(output_path, "inference")
+            paddle.jit.save(static_model, save_path)
+        else:
+            # Convert to static graph with specific input description
+            static_model = paddle.jit.to_static(
+                self,
+                input_spec=[                                  # texts
+                    paddle.static.InputSpec(
+                        shape=[None, None], dtype="int64"),  # input_ids
+                    paddle.static.InputSpec(
+                        shape=[None, None], dtype="int64")   # segment_ids
+                ])
+            # Save in static graph model.
+            save_path = os.path.join(args.output_path, "inference")
+            paddle.jit.save(model, save_path)
 
     def save_model_config(self, save_dir):
         """
