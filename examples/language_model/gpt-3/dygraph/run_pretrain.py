@@ -66,12 +66,12 @@ def run_evaluate(args,
     all_loss = []
     local_time = time.time()
     for eval_step, batch in enumerate(data_loader):
-        tokens, loss_mask, labels = batch
+        tokens, loss_mask, position_ids, labels = batch
         if args.pp_degree < 2:
-            preds = model(tokens)
+            preds = model(tokens, position_ids)
             loss = criterion(preds, labels, loss_mask)
         else:
-            data = [tokens, (labels, loss_mask)]
+            data = [(tokens, position_ids), (labels, loss_mask)]
             loss = model.eval_batch(data, compute_loss=True)
 
         all_loss.append(float(loss))
@@ -237,10 +237,11 @@ def do_train(args):
 
             for step, batch in enumerate(train_data_loader()):
                 global_step += 1
-                tokens, loss_mask, labels = batch
+                tokens, loss_mask, position_ids, labels = batch
 
                 loss_mask.stop_gradient = True
                 labels.stop_gradient = True
+                position_ids.stop_gradient = True
 
                 if args.pp_degree == 1:
                     with paddle.amp.auto_cast(
@@ -252,7 +253,7 @@ def do_train(args):
                                 "reduce_sum", "c_softmax_with_cross_entropy",
                                 "c_embedding"
                             ]):
-                        preds = model(tokens)
+                        preds = model(tokens, position_ids)
                         loss = criterion(preds, labels, loss_mask)
 
                     if args.use_amp:
@@ -267,7 +268,7 @@ def do_train(args):
                     optimizer.clear_grad()
 
                 else:
-                    data = [tokens, (labels, loss_mask)]
+                    data = [(tokens, position_ids), (labels, loss_mask)]
                     with paddle.amp.auto_cast(
                             args.use_amp,
                             custom_white_list=[
