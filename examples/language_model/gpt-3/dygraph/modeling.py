@@ -497,8 +497,8 @@ class GPTEmbeddings(nn.Layer):
         position_embeddings = self.position_embeddings(position_ids)
         embeddings = input_embedings + position_embeddings
 
-        with get_rng_state_tracker().rng_state('global_seed'):
-            embeddings = self.dropout(embeddings)
+        #with get_rng_state_tracker().rng_state('global_seed'):
+        embeddings = self.dropout(embeddings)
 
         return embeddings
 
