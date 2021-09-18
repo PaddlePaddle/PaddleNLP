@@ -66,12 +66,12 @@ def run_evaluate(args,
     all_loss = []
     local_time = time.time()
     for eval_step, batch in enumerate(data_loader):
-        tokens, loss_mask, labels = batch
+        tokens, loss_mask, position_ids, labels = batch
         if args.pp_degree < 2:
-            preds = model(tokens)
+            preds = model(tokens, position_ids)
             loss = criterion(preds, labels, loss_mask)
         else:
-            data = [tokens, (labels, loss_mask)]
+            data = [(tokens, position_ids), (labels, loss_mask)]
             loss = model.eval_batch(data, compute_loss=True)
 
         all_loss.append(float(loss))
