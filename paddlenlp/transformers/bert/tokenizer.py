@@ -20,6 +20,8 @@ import os
 import six
 import unicodedata
 
+import paddlenlp
+
 from .. import PretrainedTokenizer
 from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize, _is_whitespace, _is_control, _is_punctuation
 
@@ -59,7 +61,8 @@ class BasicTokenizer(object):
             if self.do_lower_case:
                 token = token.lower()
                 token = self._run_strip_accents(token)
-            split_tokens.extend(self._run_split_on_punc(token))
+            tmp = self._run_split_on_punc(token)
+            split_tokens.extend(tmp)
 
         output_tokens = whitespace_tokenize(" ".join(split_tokens))
         return output_tokens
@@ -302,7 +305,7 @@ class BertTokenizer(PretrainedTokenizer):
         },
         "bert-base-chinese": {
             "do_lower_case": False,
-            "accelerate_mode": True
+            "accelerate_mode": True,
         },
         "bert-wwm-chinese": {
             "do_lower_case": False,
@@ -334,7 +337,9 @@ class BertTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 accelerate_mode=False):
+        self.accelerate_mode = accelerate_mode
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
@@ -346,6 +351,9 @@ class BertTokenizer(PretrainedTokenizer):
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
         self.wordpiece_tokenizer = WordpieceTokenizer(
             vocab=self.vocab, unk_token=unk_token)
+        if self.accelerate_mode:
+            self.vocab_tensor = paddlenlp.ops.to_map_tensor(
+                self.vocab.token_to_idx, "vocab")
 
     @property
     def vocab_size(self):

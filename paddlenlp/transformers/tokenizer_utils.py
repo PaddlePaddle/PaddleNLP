@@ -434,7 +434,7 @@ class PretrainedTokenizer(object):
     @classmethod
     def from_pretrained(cls,
                         pretrained_model_name_or_path,
-                        accelerate_mode=True,
+                        accelerate_mode=False,
                         *args,
                         **kwargs):
         """
@@ -540,7 +540,12 @@ class PretrainedTokenizer(object):
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())
         init_kwargs.pop("init_class", None)
-        accelerate_mode = init_kwargs.pop("accelerate_mode", False)
+        model_accelerate_mode = init_kwargs.pop("accelerate_mode", False)
+        if accelerate_mode and model_accelerate_mode:
+            accelerate_mode = True
+        else:
+            accelerate_mode = False
+        init_kwargs['accelerate_mode'] = accelerate_mode
 
         # Update with newly provided args and kwargs
         init_args = init_args if not args else args
@@ -564,11 +569,8 @@ class PretrainedTokenizer(object):
                     file_path):
                 init_kwargs[args_name] = file_path
         # TODO(guosheng): avoid reduplication of position args and key word args
+        print(init_kwargs)
         tokenizer = cls(*init_args, **init_kwargs)
-        tokenizer.accelerate_mode = accelerate_mode
-        if accelerate_mode:
-            tokenizer.vocab_tensor = paddlenlp.ops.to_map_tensor(
-                tokenizer.vocab.token_to_idx, "vocab")
         return tokenizer
 
     def save_pretrained(self, save_directory):
