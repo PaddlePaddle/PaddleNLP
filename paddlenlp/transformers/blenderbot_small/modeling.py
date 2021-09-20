@@ -406,12 +406,6 @@ class BlenderbotSmallDecoder(BlenderbotSmallPretrainedModel):
         """
         Please refer to :class:`~paddlenlp.transformers.Blenderbot.BlenderbotModel` for more
         information regarding the arguments.
-        Returns:
-            Tensor|tuple:
-                If ``use_cache=False``, the return will be the last hidden state of decoder with shape
-                of [batch_size, seq_lens, hidden_size]. ``seq_lens`` corresponds to the length of input sequence.
-                Otherwise, the return will be a tuple of ``(decoder_output, cache)``. Please refer to
-                class :class:`paddle.nn.TransformerDecoder` for more information regarding ``cache``.
         """
         if decoder_input_ids is None:
             raise ValueError("Decoder_input_ids cannot be None.")
@@ -623,7 +617,7 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
 
             encoder_output (Tensor, optional):
                 The output of encoder. If not provided, a new ``encoder_output`` will be generated
-                from BlenderbotSmallEncoder. Defaults to ``None``.
+                from BlenderbotEncoder. Defaults to ``None``.
 
             use_cache (bool, optional):
                 Indicates whether to use cache to speed up decoding. Defaults to ``False``
@@ -633,7 +627,11 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
                 `TransformerDecoder.gen_cache` for more details. It is only
                 used for inference and should be None for training. Default None.
         Returns:
-            tuple: A tuple of `decoder_output` and `encoder_output`.
+            Tensor|tuple:
+                If ``use_cache=False``, the return will be the last hidden state of decoder with shape
+                of [batch_size, seq_lens, hidden_size]. ``seq_lens`` corresponds to the length of input sequence.
+                Otherwise, the return will be a tuple of ``(decoder_output, cache)``. Please refer to
+                class :class:`paddle.nn.TransformerDecoder` for more information regarding ``cache``.
 
         Example:
             .. code-block::
@@ -651,7 +649,7 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
             sample_text = "My friends are cool but they eat too many carbs."
             inputs = tokenizer(sample_text, return_attention_mask=True, return_token_type_ids=False)
             inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-            decoder_output, encoder_output = model(**inputs)
+            decoder_output = model(**inputs)
         """
         if decoder_input_ids is None:
             decoder_input_ids = shift_tokens_right(
@@ -660,17 +658,22 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
         if encoder_output is None:
             encoder_output = self.encoder(
                 input_ids=input_ids, attention_mask=attention_mask)
-            # initialize cache for decoding ONLY at 1st time step.
-            if use_cache and cache is None:
-                cache = self.decoder.decoder.gen_cache(memory=encoder_output)
+        # initialize cache based on encoder output for decoding at 1st time step.
+        if use_cache:
+            if cache is None:
+                cache = self.decoder.decoder.gen_cache(encoder_output)
+        else:
+            cache = None
 
-        if use_cache and cache is None:
-            raise ValueError("Please specify cache when use_cache is True")
-
-        memory_mask = paddle.cast(
-            input_ids == self.pad_token_id,
-            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
-        memory_mask.stop_gradient = True
+        if attention_mask is None:
+            assert input_ids is not None, "input_ids should be " \
+                                          "specified when generating attention_mask"
+            memory_mask = paddle.cast(
+                input_ids == self.pad_token_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+            memory_mask.stop_gradient = True
+        else:
+            memory_mask = attention_mask
 
         decoder_output = self.decoder(
             decoder_input_ids=decoder_input_ids,
@@ -679,14 +682,19 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
             memory_mask=memory_mask,
             use_cache=use_cache,
             cache=cache)
-        # return encoder output for decoder to generate sequence.
-        return decoder_output, encoder_output
+        return decoder_output
+
+    def get_encoder(self):
+        """
+        This method is required for model with encoder-decoder architecture.
+        """
+        return self.encoder
 
 
 class BlenderbotSmallForConditionalGeneration(BlenderbotSmallPretrainedModel):
     """
-    Please refer to :class:`~paddlenlp.transformers.BlenderbotSmall.BlenderbotSmallModel`
-    for more information regarding arguments.
+    Please refer to :class:`~paddlenlp.transformers.Blenderbot.BlenderbotModel` for more
+    information regarding arguments.
     Return:
         Tensor|tuple: If ``use_cache=False``, the return will be a tensor with shape of
             [batch_size, seq_lens, hidden_size]. Otherwise, the return will be a tuple
@@ -703,9 +711,17 @@ class BlenderbotSmallForConditionalGeneration(BlenderbotSmallPretrainedModel):
 
             sample_text = "My friends are cool but they eat too many carbs."
             inputs = tokenizer(sample_text, return_attention_mask=True, return_token_type_ids=False)
-            inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-            outputs = model(**inputs, use_cache=True)
-            # outputs will be a tuple of (lm_logits, cache) if ``use_cache=True``.
+            inputs = {k: paddle.to_tensor([v]) for (k, v) in inputs.items()}
+            result_ids, score = model.generate(input_ids=inputs['input_ids'],
+                                               max_length=60,
+                                               min_length=20,
+                                               decode_strategy='beam_search',
+                                               num_beams=10,
+                                               length_penalty=0.65
+                                               )
+            for sequence_ids in result_ids.numpy().tolist():
+                print("User:\t", sample_text)
+                print("bot:\t", tokenizer.convert_ids_to_string(sequence_ids))
     """
 
     def __init__(self, blenderbot_small):
@@ -736,7 +752,7 @@ class BlenderbotSmallForConditionalGeneration(BlenderbotSmallPretrainedModel):
                 encoder_output=None,
                 use_cache=False,
                 cache=None):
-        decoder_outputs, encoder_output = self.blenderbot_small(
+        decoder_outputs = self.blenderbot_small(
             input_ids=input_ids,
             attention_mask=attention_mask,
             decoder_input_ids=decoder_input_ids,
@@ -761,9 +777,24 @@ class BlenderbotSmallForConditionalGeneration(BlenderbotSmallPretrainedModel):
                                       use_cache=True,
                                       cache=None,
                                       **kwargs):
-        if cache is not None:
-            decoder_input_ids = decoder_input_ids[:, -1:].unsqueeze(-1)
 
+        if encoder_output is not None:
+            expand_size = int(decoder_input_ids.shape[0] /
+                              encoder_output.shape[0])
+            if expand_size > 1:
+                index = paddle.tile(
+                    paddle.arange(encoder_output.shape[0]).unsqueeze(-1),
+                    [1, expand_size]).reshape([-1])
+                encoder_output = paddle.index_select(encoder_output, index)
+
+        if use_cache and cache is None:
+            if encoder_output is None:
+                raise ValueError(
+                    "Encoder output can not be none if `use_cache` is True")
+            cache = self.decoder.decoder.gen_cache(memory=encoder_output)
+
+        if cache is not None:
+            decoder_input_ids = decoder_input_ids[:, -1:]
         return {
             "input_ids":
             None,  # during prediction, Encoder_output is provided, do not need input_ids.
@@ -773,6 +804,24 @@ class BlenderbotSmallForConditionalGeneration(BlenderbotSmallPretrainedModel):
             "use_cache": use_cache,
             "cache": cache
         }
+
+    def get_encoder(self):
+        """
+        This method is required for model with encoder-decoder architecture.
+        """
+        return self.encoder
+
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError as e:
+            try:
+                return getattr(getattr(self, self.base_model_prefix), name)
+            except AttributeError:
+                try:
+                    return getattr(self, self.base_model_prefix).config[name]
+                except KeyError:
+                    raise e
 
 
 class BlenderbotSmallForCausalLM(BlenderbotSmallPretrainedModel):

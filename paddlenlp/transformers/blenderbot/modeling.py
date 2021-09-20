@@ -460,12 +460,6 @@ class BlenderbotDecoder(BlenderbotPretrainedModel):
         """
         Please refer to :class:`~paddlenlp.transformers.Blenderbot.BlenderbotModel` for more
         information regarding the arguments.
-        Returns:
-            Tensor|tuple:
-                If ``use_cache=False``, the return will be the last hidden state of decoder with shape
-                of [batch_size, seq_lens, hidden_size]. ``seq_lens`` corresponds to the length of input sequence.
-                Otherwise, the return will be a tuple of ``(decoder_output, cache)``. Please refer to
-                class :class:`paddle.nn.TransformerDecoder` for more information regarding ``cache``.
         """
         if decoder_input_ids is None:
             raise ValueError("Decoder_input_ids cannot be None.")
@@ -688,7 +682,11 @@ class BlenderbotModel(BlenderbotPretrainedModel):
                 `paddle.nn.TransformerDecoder.gen_cache` for more details. It is only
                 used for inference and should be None for training. Default None.
         Returns:
-            tuple: A tuple of `decoder_output` and `encoder_output`.
+            Tensor|tuple:
+                If ``use_cache=False``, the return will be the last hidden state of decoder with shape
+                of [batch_size, seq_lens, hidden_size]. ``seq_lens`` corresponds to the length of input sequence.
+                Otherwise, the return will be a tuple of ``(decoder_output, cache)``. Please refer to
+                class :class:`paddle.nn.TransformerDecoder` for more information regarding ``cache``.
 
         Example:
             .. code-block::
@@ -706,7 +704,7 @@ class BlenderbotModel(BlenderbotPretrainedModel):
                 sample_text = "My friends are cool but they eat too many carbs."
                 inputs = tokenizer(sample_text, return_attention_mask=True, return_token_type_ids=False)
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                decoder_output, encoder_output = model(**inputs)
+                decoder_output = model(**inputs)
         """
         if decoder_input_ids is None:
             decoder_input_ids = shift_tokens_right(
@@ -715,16 +713,19 @@ class BlenderbotModel(BlenderbotPretrainedModel):
         if encoder_output is None:
             encoder_output = self.encoder(
                 input_ids=input_ids, attention_mask=attention_mask)
-            # initialize cache for decoding ONLY at 1st time step.
-            if use_cache and cache is None:
-                cache = self.decoder.decoder.gen_cache(memory=encoder_output)
-        if use_cache and cache is None:
-            raise ValueError("Please specify cache when use_cache is True")
+        if use_cache:
+            if cache is None:
+                cache = self.decoder.decoder.gen_cache(encoder_output)
+        else:
+            cache = None
 
-        memory_mask = paddle.cast(
-            input_ids == self.pad_token_id,
-            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
-        memory_mask.stop_gradient = True
+        if input_ids is not None:
+            memory_mask = paddle.cast(
+                input_ids == self.pad_token_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+            memory_mask.stop_gradient = True
+        else:
+            memory_mask = attention_mask
 
         decoder_output = self.decoder(
             decoder_input_ids=decoder_input_ids,
@@ -733,8 +734,12 @@ class BlenderbotModel(BlenderbotPretrainedModel):
             memory_mask=memory_mask,
             use_cache=use_cache,
             cache=cache)
-        # return encoder output for decoder to generate sequence.
-        return decoder_output, encoder_output
+        return decoder_output
+
+    def get_encoder(self):
+        """This method is required for model with encoder-decoder architecture.
+        """
+        return self.encoder
 
 
 class BlenderbotForConditionalGeneration(BlenderbotPretrainedModel):
@@ -777,20 +782,30 @@ class BlenderbotForConditionalGeneration(BlenderbotPretrainedModel):
         Example:
             .. code-block::
 
-                import paddle
-                from paddlenlp.transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
+            import paddle
+            from paddlenlp.transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
 
-                pretrained_model_name = "blenderbot-400M-distill"
-                tokenizer = BlenderbotTokenizer.from_pretrained(pretrained_model_name)
-                model = BlenderbotForConditionalGeneration.from_pretrained(pretrained_model_name)
+            pretrained_model_name = "blenderbot-400M-distill"
+            tokenizer = BlenderbotTokenizer.from_pretrained(pretrained_model_name)
+            model = BlenderbotForConditionalGeneration.from_pretrained(pretrained_model_name)
 
-                sample_text = "My friends are cool but they eat too many carbs."
-                inputs = tokenizer(sample_text, return_attention_mask=True, return_token_type_ids=False)
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                outputs = model(**inputs, use_cache=True)
-                # outputs is a tuple of (lm_logits, cache) if ``use_cache=True``.
+            sample_text = "My friends are cool but they eat too many carbs."
+            inputs = tokenizer(sample_text, return_attention_mask=True, return_token_type_ids=False)
+            inputs = {k: paddle.to_tensor([v]) for (k, v) in inputs.items()}
+
+            # Generate response using beam search
+            result_ids, scores = model.generate(input_ids=inputs['input_ids'],
+                                                max_length=60,
+                                                min_length=20,
+                                                decode_strategy='beam_search',
+                                                num_beams=10,
+                                                length_penalty=0.65)
+            for sequence_ids in result_ids.numpy().tolist():
+                print("User:\t", sample_text)
+                print("bot:\t", tokenizer.convert_ids_to_string(sequence_ids))
+                # "bot:	  That's unfortunate. Are they trying to lose weight?"
         """
-        decoder_outputs, encoder_output = self.blenderbot(
+        decoder_outputs = self.blenderbot(
             input_ids=input_ids,
             attention_mask=attention_mask,
             decoder_input_ids=decoder_input_ids,
@@ -821,8 +836,18 @@ class BlenderbotForConditionalGeneration(BlenderbotPretrainedModel):
         Return:
             dict: A dictionary containing necessary inputs for generating next token.
         """
+
+        if encoder_output is not None:
+            expand_size = int(decoder_input_ids.shape[0] /
+                              encoder_output.shape[0])
+            if expand_size > 1:
+                index = paddle.tile(
+                    paddle.arange(encoder_output.shape[0]).unsqueeze(-1),
+                    [1, expand_size]).reshape([-1])
+                encoder_output = paddle.index_select(encoder_output, index)
+
         if cache is not None:
-            decoder_input_ids = decoder_input_ids[:, -1:].unsqueeze(-1)
+            decoder_input_ids = decoder_input_ids[:, -1:]
 
         return {
             "input_ids":
@@ -833,6 +858,23 @@ class BlenderbotForConditionalGeneration(BlenderbotPretrainedModel):
             "use_cache": use_cache,
             "cache": cache
         }
+
+    def get_encoder(self):
+        """This method is required for model with encoder-decoder architecture.
+        """
+        return self.encoder
+
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError as e:
+            try:
+                return getattr(getattr(self, self.base_model_prefix), name)
+            except AttributeError:
+                try:
+                    return getattr(self, self.base_model_prefix).config[name]
+                except KeyError:
+                    raise e
 
 
 class BlenderbotForCausalLM(BlenderbotPretrainedModel):

@@ -210,13 +210,52 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
         """
         return " ".join(tokens).replace("@@ ", "").strip()
 
-    def convert_ids_to_string(self, ids):
+    def convert_ids_to_string(self,
+                              ids,
+                              skip_special_tokens=True,
+                              clean_up_tokenization_spaces=True):
         """
         Converts a sequence of ids (list of integers) to a single string.
         Args:
-            ids (list[int]): A sequence of ids corresponding to tokens.
-
+            ids (list[int]):
+                A sequence of ids corresponding to tokens.
+            skip_special_tokens (bool, optional):
+                Whether to skip and not decode special tokens when converting. Defaults to `False`.
+            clean_up_tokenization_spaces (bool, optional):
+                Whether to Clean up a list of simple English tokenization artifacts
+                like spaces before punctuations and abbreviated forms.
         Returns:
             str: Converted string.
         """
-        return self.convert_tokens_to_string(self.convert_ids_to_tokens(ids))
+        tokens = self.convert_ids_to_tokens(
+            ids, skip_special_tokens=skip_special_tokens)
+        output_string = self.convert_tokens_to_string(tokens)
+        if clean_up_tokenization_spaces:
+            output_string = (output_string.replace(" .", ".").replace(" ?", "?")
+                             .replace(" !", "!").replace(" ,", ",")
+                             .replace(" ' ", "'").replace(" n't", "n't")
+                             .replace(" 'm", "'m").replace(" 's", "'s")
+                             .replace(" 've", "'ve").replace(" 're", "'re"))
+        return output_string
+
+    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
+        """
+        Converts a token id or a sequence of token ids (integer) to a token or
+        a sequence of tokens (str) by using the `vocab` attribute (an instance
+        of `Vocab`).
+
+        Args:
+            ids (int` or `list[int]):
+                A token id or a sequence of token ids.
+            skip_special_tokens (bool, optional):
+                Whether to skip and not decode special tokens when converting. Defaults to `False`.
+        Returns:
+            str: Converted token or token sequence.
+        """
+        tokens = [self.decoder[i] for i in ids]
+        if skip_special_tokens and isinstance(tokens, list):
+            tokens = [
+                token for token in tokens
+                if token not in self.all_special_tokens
+            ]
+        return tokens
