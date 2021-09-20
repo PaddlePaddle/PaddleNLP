@@ -968,8 +968,8 @@ class VisualBertForPreTraining(VisualBertPreTrainedModel):
             loss=total_loss,
             prediction_logits=prediction_scores,
             seq_relationship_logits=seq_relationship_score,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
+            hidden_states=outputs["hidden_states"],
+            attentions=outputs["attentions"],
         )
 
 
@@ -1235,8 +1235,8 @@ class VisualBertForVisualReasoning(VisualBertPreTrainedModel):
         return OrderedDict(
             loss=loss,
             logits=reshaped_logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
+            hidden_states=outputs["hidden_states"],
+            attentions=outputs["attentions"],
         )
 
         
@@ -1386,6 +1386,6 @@ class VisualBertForMultipleChoice(VisualBertPreTrainedModel):
         return OrderedDict(
             loss=loss,
             logits=reshaped_logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
+            hidden_states=outputs["hidden_states"],
+            attentions=outputs["attentions"],
         )
