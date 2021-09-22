@@ -58,9 +58,13 @@ ACT2FN = {
 
 
 class NeZhaAttention(nn.Layer):
-    def __init__(self, hidden_size, num_attention_heads, hidden_dropout_prob,
-                 attention_probs_dropout_prob, max_relative_position,
-                 layer_norm_eps):
+    def __init__(self,
+                 hidden_size=768,
+                 num_attention_heads=12,
+                 hidden_dropout_prob=0.1,
+                 attention_probs_dropout_prob=0.1,
+                 max_relative_position=64,
+                 layer_norm_eps=1e-12):
         super(NeZhaAttention, self).__init__()
         if hidden_size % num_attention_heads != 0:
             raise ValueError(
@@ -195,9 +199,15 @@ class NeZhaAttention(nn.Layer):
 
 
 class NeZhaLayer(nn.Layer):
-    def __init__(self, hidden_size, num_attention_heads, intermediate_size,
-                 hidden_act, hidden_dropout_prob, attention_probs_dropout_prob,
-                 max_relative_position, layer_norm_eps):
+    def __init__(self,
+                 hidden_size=768,
+                 num_attention_heads=12,
+                 intermediate_size=3072,
+                 hidden_act="gelu",
+                 hidden_dropout_prob=0.1,
+                 attention_probs_dropout_prob=0.1,
+                 max_relative_position=64,
+                 layer_norm_eps=1e-12):
         super(NeZhaLayer, self).__init__()
         self.seq_len_dim = 1
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
@@ -224,10 +234,16 @@ class NeZhaLayer(nn.Layer):
 
 
 class NeZhaEncoder(nn.Layer):
-    def __init__(self, hidden_size, num_hidden_layers, num_attention_heads,
-                 intermediate_size, hidden_act, hidden_dropout_prob,
-                 attention_probs_dropout_prob, max_relative_position,
-                 layer_norm_eps):
+    def __init__(self,
+                 hidden_size=768,
+                 num_hidden_layers=12,
+                 num_attention_heads=12,
+                 intermediate_size=3072,
+                 hidden_act="gelu",
+                 hidden_dropout_prob=0.1,
+                 attention_probs_dropout_prob=0.1,
+                 max_relative_position=64,
+                 layer_norm_eps='1e-12'):
         super(NeZhaEncoder, self).__init__()
         layer = NeZhaLayer(hidden_size, num_attention_heads, intermediate_size,
                            hidden_act, hidden_dropout_prob,
