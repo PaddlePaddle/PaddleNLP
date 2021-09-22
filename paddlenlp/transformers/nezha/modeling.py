@@ -212,8 +212,12 @@ class NeZhaLayer(nn.Layer):
         self.seq_len_dim = 1
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
         self.attention = NeZhaAttention(
-            hidden_size, num_attention_heads, hidden_dropout_prob,
-            attention_probs_dropout_prob, max_relative_position, layer_norm_eps)
+            hidden_size=hidden_size,
+            num_attention_heads=num_attention_heads,
+            hidden_dropout_prob=hidden_dropout_prob,
+            attention_probs_dropout_prob=attention_probs_dropout_prob,
+            max_relative_position=max_relative_position,
+            layer_norm_eps=layer_norm_eps)
         self.ffn = nn.Linear(hidden_size, intermediate_size)
         self.ffn_output = nn.Linear(intermediate_size, hidden_size)
         self.activation = ACT2FN[hidden_act]
@@ -245,10 +249,15 @@ class NeZhaEncoder(nn.Layer):
                  max_relative_position=64,
                  layer_norm_eps='1e-12'):
         super(NeZhaEncoder, self).__init__()
-        layer = NeZhaLayer(hidden_size, num_attention_heads, intermediate_size,
-                           hidden_act, hidden_dropout_prob,
-                           attention_probs_dropout_prob, max_relative_position,
-                           layer_norm_eps)
+        layer = NeZhaLayer(
+            hidden_size=hidden_size,
+            num_attention_heads=num_attention_heads,
+            intermediate_size=intermediate_size,
+            hidden_act=hidden_act,
+            hidden_dropout_prob=hidden_dropout_prob,
+            attention_probs_dropout_prob=attention_probs_dropout_prob,
+            max_relative_position=max_relative_position,
+            layer_norm_eps=layer_norm_eps)
         self.layer = nn.LayerList(
             [copy.deepcopy(layer) for _ in range(num_hidden_layers)])
 
