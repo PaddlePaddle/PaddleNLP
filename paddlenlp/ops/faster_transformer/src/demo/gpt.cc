@@ -1,5 +1,4 @@
 #include <pthread.h>
-#include <sentencepiece_processor.h>
 #include <algorithm>
 #include <atomic>
 #include <codecvt>
@@ -11,6 +10,10 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+
+#ifdef GPT_ON_SENTENCEPIECE
+#include <sentencepiece_processor.h>
+#endif
 
 #include "helper.h"
 
@@ -191,7 +194,8 @@ private:
                        std::vector<DataInput>& data_input_vec,
                        int max_len,
                        int batch_size) {
-    auto ids_t = predictor->GetInputHandle("ids");
+    auto ids_name = predictor->GetInputNames();
+    auto ids_t = predictor->GetInputHandle(ids_name[0]);
     std::vector<int> ids_vec;
     ids_vec.resize(max_len * batch_size);
     for (int i = 0; i < batch_size; ++i) {

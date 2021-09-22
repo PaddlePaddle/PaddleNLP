@@ -277,11 +277,14 @@ class GenerationMixin(object):
     """
 
     @staticmethod
-    def prepare_input_ids_for_generation(bos_token_id):
+    def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
+        batch_size = 1
         if bos_token_id is None:
             raise ValueError("`bos_token_id` should be defined when no "
                              "`input_ids` are provided.")
-        return paddle.ones([1, 1]) * bos_token_id
+        if encoder_output is not None:
+            batch_size = encoder_output.shape[0]
+        return paddle.ones([batch_size, 1], dtype="int64") * bos_token_id
 
     @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id,
@@ -338,10 +341,17 @@ class GenerationMixin(object):
             seq_len = model_kwargs["seq_len"]
             model_kwargs["seq_len"] = paddle.index_select(seq_len, index)
 
+        if "encoder_output" in model_kwargs:
+            encoder_output = model_kwargs["encoder_output"]
+            model_kwargs["encoder_output"] = paddle.index_select(encoder_output,
+                                                                 index)
+
         return input_ids, model_kwargs
 
     @staticmethod
-    def update_model_kwargs_for_generation(outputs, model_kwargs):
+    def update_model_kwargs_for_generation(outputs,
+                                           model_kwargs,
+                                           is_encoder_decoder=False):
         # Update the model inputs during generation. 
         # Note that If `token_type_ids` and `attention_mask` in `model_kwargs` 
         # and they contain pad value, the result vectors updated by this method 
@@ -366,7 +376,7 @@ class GenerationMixin(object):
                 axis=-1)
 
         # update attention_mask
-        if "attention_mask" in model_kwargs:
+        if not is_encoder_decoder and "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
             # nn.Pad2D don't support the data type `bool`
             if convert_dtype(attention_mask.dtype) == 'bool':
@@ -394,6 +404,22 @@ class GenerationMixin(object):
         unfinished_scores = (scores * length + next_scores) / (length + 1)
         scores = paddle.where(unfinished_flag, unfinished_scores, scores)
         return scores
+
+    def prepare_encoder_decoder_kwargs_for_generation(self, input_ids,
+                                                      model_kwargs):
+        if "encoder_output" not in model_kwargs:
+            # retrieve encoder hidden states
+            encoder = self.get_encoder()
+            encoder_kwargs = {
+                argument: value
+                for argument, value in model_kwargs.items()
+                if not (argument.startswith("decoder_") or argument.startswith(
+                    "cross_attn"))
+            }
+
+            model_kwargs["encoder_output"] = encoder(input_ids,
+                                                     **encoder_kwargs)
+        return model_kwargs
 
     def prepare_inputs_for_generation(self, input_ids, **kwargs):
         # Implement in subclasses for custom behavior to prepare inputs in the
@@ -423,6 +449,7 @@ class GenerationMixin(object):
                  eos_token_id=None,
                  pad_token_id=None,
                  num_return_sequences=1,
+                 diversity_rate=0.0,
                  use_cache=True,
                  **model_kwargs):
         r"""
@@ -471,6 +498,9 @@ class GenerationMixin(object):
                 None.
             num_return_sequences (int, optional): The number of returned 
                 sequences for each sequence in the batch. Default to 1.
+            diversity_rate (float, optional): The diversity_rate for diverse 
+                siblings search. See this paper for more details. 
+                `https://arxiv.org/abs/1611.08562`.
             use_cache: (bool, optional): Whether or not use the model cache to 
                 speed up decoding. Default to True.
             model_kwargs (dict): It can be used to specify additional kwargs 
@@ -590,13 +620,22 @@ class GenerationMixin(object):
             model_kwargs[
                 "attention_mask"] = self.prepare_attention_mask_for_generation(
                     input_ids, pad_token_id, eos_token_id)
+        self.is_encoder_decoder = hasattr(self, 'encoder') and hasattr(
+            self, 'decoder')
+        if self.is_encoder_decoder:
+            model_kwargs = self.prepare_encoder_decoder_kwargs_for_generation(
+                input_ids, model_kwargs)
+            # set input_ids as decoder_input_ids
+            if "decoder_input_ids" in model_kwargs:
+                input_ids = model_kwargs.pop("decoder_input_ids")
+            else:
+                input_ids = self.prepare_input_ids_for_generation(
+                    bos_token_id, model_kwargs["encoder_output"])
 
         if pad_token_id is None and eos_token_id is not None:
             print("Setting `pad_token_id` to `eos_token_id`:{} for "
                   "open-end generation.".format(eos_token_id))
             pad_token_id = eos_token_id
-
-        # TODO Add relevant processing for encoder_decoder model.
 
         model_kwargs["use_cache"] = use_cache
         max_length += input_ids.shape[-1]
@@ -647,8 +686,8 @@ class GenerationMixin(object):
                 input_ids, expand_size=num_beams, **model_kwargs)
 
             return self.beam_search(input_ids, beam_scorer, logits_processors,
-                                    max_length, pad_token_id, eos_token_id,
-                                    **model_kwargs)
+                                    max_length, diversity_rate, pad_token_id,
+                                    eos_token_id, **model_kwargs)
 
         else:
             raise ValueError(
@@ -671,7 +710,6 @@ class GenerationMixin(object):
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
-
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
             logits = logits_processors(input_ids, logits)
@@ -700,8 +738,10 @@ class GenerationMixin(object):
             if not paddle.any(unfinished_flag):
                 break
 
-            model_kwargs = self.update_model_kwargs_for_generation(outputs,
-                                                                   model_kwargs)
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs,
+                model_kwargs,
+                is_encoder_decoder=self.is_encoder_decoder)
         return input_ids[:, origin_len:], scores
 
     def sample(self,
@@ -801,12 +841,14 @@ class GenerationMixin(object):
             # Stop when there is a </s> in all sentences
             if not paddle.any(unfinished_flag):
                 break
-            model_kwargs = self.update_model_kwargs_for_generation(outputs,
-                                                                   model_kwargs)
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs,
+                model_kwargs,
+                is_encoder_decoder=self.is_encoder_decoder)
         return input_ids[:, origin_len:], scores
 
     def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
-                    pad_token_id, eos_token_id, **model_kwargs):
+                    diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
         batch_size = len(beam_scorer._beam_hyps)
         num_beams = beam_scorer.num_beams
 
@@ -842,15 +884,50 @@ class GenerationMixin(object):
             next_scores = paddle.log(next_scores)
 
             next_scores = next_scores + beam_scores.unsqueeze(-1)
-            # reshape for beam search
+
             vocab_size = next_scores.shape[-1]
-            next_scores = next_scores.reshape(
-                [batch_size, num_beams * vocab_size])
+            if diversity_rate == 0.0:
+                # reshape for beam search
+                next_scores = next_scores.reshape(
+                    [batch_size, num_beams * vocab_size])
 
-            next_scores, next_tokens = paddle.topk(
-                next_scores, 2 * num_beams, axis=1)
+                next_scores, next_tokens = paddle.topk(
+                    next_scores, 2 * num_beams, axis=1)
 
-            next_indices = next_tokens // vocab_size
+                next_indices = next_tokens // vocab_size
+
+            else:
+                next_scores, next_tokens = paddle.topk(
+                    next_scores, 2 * num_beams, axis=1)
+
+                sibling_score = paddle.tile(
+                    paddle.arange(1, 2 * num_beams + 1),
+                    repeat_times=[batch_size * num_beams, 1]) * diversity_rate
+
+                diversed_score = next_scores - sibling_score
+                next_scores = next_scores.reshape(
+                    [batch_size, 2 * num_beams * num_beams])
+                next_tokens = next_tokens.reshape(
+                    [batch_size, 2 * num_beams * num_beams])
+
+                diversed_score = diversed_score.reshape(
+                    [batch_size, 2 * num_beams * num_beams])
+                diversed_score, diversed_tokens = paddle.topk(
+                    diversed_score, 2 * num_beams, axis=1)
+
+                # TODO
+                # Use gather_nd() to select origan token and score
+                next_scores = paddle.stack([
+                    paddle.index_select(next_scores[i], diversed_tokens[i])
+                    for i in range(next_scores.shape[0])
+                ])
+                next_tokens = paddle.stack([
+                    paddle.index_select(next_tokens[i], diversed_tokens[i])
+                    for i in range(next_tokens.shape[0])
+                ])
+
+                next_indices = next_tokens // (2 * num_beams)
+
             next_tokens = next_tokens % vocab_size
 
             # stateless
@@ -876,8 +953,10 @@ class GenerationMixin(object):
 
             if beam_scorer.is_done:
                 break
-            model_kwargs = self.update_model_kwargs_for_generation(outputs,
-                                                                   model_kwargs)
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs,
+                model_kwargs,
+                is_encoder_decoder=self.is_encoder_decoder)
             if model_kwargs["cache"] is not None:
                 # reorder the cache
                 model_kwargs["cache"] = map_structure(

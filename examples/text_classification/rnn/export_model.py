@@ -15,8 +15,9 @@
 import argparse
 
 import paddle
-import paddlenlp as ppnlp
 from paddlenlp.data import Vocab
+
+from model import BoWModel, BiLSTMAttentionModel, CNNModel, LSTMModel, GRUModel, RNNModel, SelfInteractiveAttention
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
@@ -56,7 +57,7 @@ def main():
             padding_idx=pad_token_id)
     elif network == 'bilstm_attn':
         lstm_hidden_size = 196
-        attention = SelfInteractiveAttention(hidden_size=2 * stm_hidden_size)
+        attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
         model = BiLSTMAttentionModel(
             attention_layer=attention,
             vocab_size=vocab_size,
