@@ -378,8 +378,8 @@ class ErnieModel(ErniePretrainedModel):
 
 class ErnieForSequenceClassification(ErniePretrainedModel):
     r"""
-    Ernie Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
-    for GLUE tasks.
+    Ernie Model with a linear layer on top of the output layer,
+    designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
         ernie (ErnieModel): 
@@ -449,9 +449,9 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
 
 class ErnieForQuestionAnswering(ErniePretrainedModel):
     """
-    Ernie Model with a span classification head on top for extractive question-answering tasks like
-    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
-    `span end logits`).
+    Ernie Model with a linear layer on top of the hidden-states
+    output to compute `span_start_logits` and `span_end_logits`,
+    designed for question-answering tasks like SQuAD.
 
     Args:
         ernie (`ErnieModel`): 
@@ -523,9 +523,8 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
 
 class ErnieForTokenClassification(ErniePretrainedModel):
     r"""
-    ERNIE Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
-    for Named-Entity-Recognition (NER) tasks.
-
+    ERNIE Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         ernie (`ErnieModel`): 

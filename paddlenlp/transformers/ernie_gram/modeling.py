@@ -128,7 +128,7 @@ class ErnieGramPretrainedModel(PretrainedModel):
 @register_base_model
 class ErnieGramModel(ErnieGramPretrainedModel):
     r"""
-    The bare ERNIE-Gram Model transformer outputting raw hidden-states without any specific head on top.
+    The bare ERNIE-Gram Model transformer outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -298,8 +298,8 @@ class ErnieGramModel(ErnieGramPretrainedModel):
 
 class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
     r"""
-    ERNIE-Gram Model transformer with a sequence classification/regression head on top 
-    (a linear layer on top of the pooledoutput) e.g. for GLUE tasks.
+    ERNIE-Gram Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         ernie_gram (`ErnieGramModel`): 
@@ -374,7 +374,9 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
 
 class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
     """
-    Model for Question and Answering task with ERNIE-Gram.
+    ERNIE-Gram Model with a linear layer on top of the hidden-states
+    output to compute `span_start_logits` and `span_end_logits`,
+    designed for question-answering tasks like SQuAD..
 
     Args:
         ernie_gram (`ErnieGramModel`): 
@@ -446,7 +448,8 @@ class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
 
 class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
     r"""
-    Model for sentence (pair) classification task with ERNIE-Gram.
+    ERNIE-Gram Model with a linear layer on top of the output layer,
+    designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
         ernie_gram (ErnieGramModel): 

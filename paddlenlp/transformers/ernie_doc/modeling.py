@@ -433,7 +433,7 @@ class ErnieDocPooler(nn.Layer):
 @register_base_model
 class ErnieDocModel(ErnieDocPretrainedModel):
     """
-    The bare ERNIE-Doc Model outputting raw hidden-states without any specific head on top.
+    The bare ERNIE-Doc Model outputting raw hidden-states.
     
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -636,7 +636,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
                 model = ErnieDocModel.from_pretrained('ernie-doc-base-zh')
 
-                inputs = tokenizer("欢迎使用百度飞浆！")
+                inputs = tokenizer("欢迎使用百度飞桨！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
                 
                 memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
@@ -674,8 +674,8 @@ class ErnieDocModel(ErnieDocPretrainedModel):
 
 class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
     """
-    ErnieDoc Model with a sequence classification/regression head on top
-    (a linear layer on top of the pooled output) e.g. for GLUE tasks.
+    ErnieDoc Model with a linear layer on top of the output layer,
+    designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
         ernie_doc (:class:`ErnieDocModel`):
@@ -742,7 +742,7 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
                 model = ErnieDocForSequenceClassification.from_pretrained('ernie-doc-base-zh', num_classes=2)
 
-                inputs = tokenizer("欢迎使用百度飞浆！")
+                inputs = tokenizer("欢迎使用百度飞桨！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
                 
                 memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
@@ -768,8 +768,8 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
 
 class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
     """
-    ErnieDoc Model with a token classification/regression head on top
-    (a linear layer on top of the pooled output) e.g. for Named-Entity-Recognition (NER) tasks.
+    ErnieDoc Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         ernie_doc (:class:`ErnieDocModel`):
@@ -838,7 +838,7 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
                 model = ErnieDocForTokenClassification.from_pretrained('ernie-doc-base-zh', num_classes=2)
 
-                inputs = tokenizer("欢迎使用百度飞浆！")
+                inputs = tokenizer("欢迎使用百度飞桨！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
                 
                 memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
@@ -864,8 +864,9 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
 
 class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
     """
-    ErnieDoc Model with a qusestion head on top
-    (a linear layer on top of the pooled output) e.g. for Dureader.
+    ErnieDoc Model with a linear layer on top of the hidden-states
+    output to compute `span_start_logits` and `span_end_logits`,
+    designed for question-answering tasks like SQuAD.
     
     Args:
         ernie_doc (:class:`ErnieDocModel`):
@@ -933,7 +934,7 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
                 model = ErnieDocForQuestionAnswering.from_pretrained('ernie-doc-base-zh')
 
-                inputs = tokenizer("欢迎使用百度飞浆！")
+                inputs = tokenizer("欢迎使用百度飞桨！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
                 
                 memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
