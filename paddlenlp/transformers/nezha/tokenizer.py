@@ -45,9 +45,9 @@ class NeZhaTokenizer(PretrainedTokenizer):
         .. code-block::
 
             from paddlenlp.transformers import NeZhaTokenizer
-            nezhatokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
+            tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
 
-            inputs = nezhatokenizer('欢迎使用百度飞桨！')
+            inputs = tokenizer('欢迎使用百度飞桨！')
             print(inputs)
 
             '''
@@ -145,8 +145,8 @@ class NeZhaTokenizer(PretrainedTokenizer):
 
                 from paddlenlp.transformers import NeZhaokenizer
 
-                nezhatokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
-                tokens = nezhatokenizer.tokenize('欢迎使用百度飞桨！')
+                tokenizer = NeZhaTokenizer.from_pretrained('nezha-base-chinese')
+                tokens = tokenizer.tokenize('欢迎使用百度飞桨！')
 
                 '''
                 ['欢', '迎', '使', '用', '百', '度', '飞', '桨', '！']
@@ -172,12 +172,12 @@ class NeZhaTokenizer(PretrainedTokenizer):
 
                 from paddlenlp.transformers import NeZhaTokenizer
 
-                nezhatokenizer = NeZhaTokenizer.from_pretrained('bert-base-uncased')
-                tokens = nezhatokenizer.tokenize('欢迎使用百度飞桨！')
+                tokenizer = NeZhaTokenizer.from_pretrained('bert-base-uncased')
+                tokens = tokenizer.tokenize('欢迎使用百度飞桨！')
                 '''
                 ['欢', '迎', '使', '用', '百', '度', '飞', '桨', '！']
                 '''
-                strings = nezhatokenizer.convert_tokens_to_string(tokens)
+                strings = tokenizer.convert_tokens_to_string(tokens)
                 '''
                 欢 迎 使 用 百 度 飞 桨 ！
                 '''

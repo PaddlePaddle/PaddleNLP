@@ -414,7 +414,7 @@ class NeZhaPretrainedModel(PretrainedModel):
 @register_base_model
 class NeZhaModel(NeZhaPretrainedModel):
     """
-    The bare NeZha Model transformer outputting raw hidden-states without any specific head on top.
+    The bare NeZha Model transformer outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -428,7 +428,7 @@ class NeZhaModel(NeZhaPretrainedModel):
             Vocabulary size of `inputs_ids` in `DistilBertModel`. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling `DistilBertModel`.
         hidden_size (int, optional):
-            Dimensionality of the embedding layers, encoder layers and the pooler layer. Defaults to `768`.
+            Dimensionality of the embedding layer, encoder layers and the pooler layer. Defaults to `768`.
         num_hidden_layers (int, optional):
             Number of hidden layers in the Transformer encoder. Defaults to `12`.
         num_attention_heads (int, optional):
@@ -455,7 +455,6 @@ class NeZhaModel(NeZhaPretrainedModel):
         type_vocab_size (int, optional):
             The vocabulary size of `token_type_ids`.
             Defaults to `16`.
-
         initializer_range (float, optional):
             The standard deviation of the normal initializer.
             Defaults to `0.02`.
@@ -465,13 +464,12 @@ class NeZhaModel(NeZhaPretrainedModel):
                 See :meth:`NeZhaPretrainedModel.init_weights()` for how weights are initialized in `NeZhaModel`.
 
         max_relative_embeddings (int, optional):
-            The maximum value of the dimensionality of relative encoding.
+            The maximum value of the dimensionality of relative encoding, which dictates the maximum supported
+            relative distance of two sentences.
             Defaults to `64`.
-
         layer_norm_eps (float, optional):
             The small value added to the variance in `LayerNorm` to prevent division by zero.
             Defaults to `1e-12`.
-
         use_relative_position (bool, optional):
             Whether or not to use relative position embedding. Defaults to `True`.
 
@@ -1008,7 +1006,6 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
         Returns:
             Tensor: Returns tensor `reshaped_logits`, a tensor of the input multiple choice classification logits.
             Shape as `[batch_size, num_classes]` and dtype as `float32`.
-
         """
 
         # input_ids: [bs, num_choice, seq_l]

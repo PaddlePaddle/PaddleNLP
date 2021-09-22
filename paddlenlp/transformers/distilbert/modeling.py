@@ -146,7 +146,7 @@ class DistilBertModel(DistilBertPretrainedModel):
             Vocabulary size of `inputs_ids` in `DistilBertModel`. Defines the number of different tokens that can
             be represented by the `inputs_ids` passed when calling `DistilBertModel`.
         hidden_size (int, optional):
-            Dimensionality of the embedding layers, encoder layers and the pooler layer. Defaults to `768`.
+            Dimensionality of the embedding layer, encoder layers and the pooler layer. Defaults to `768`.
         num_hidden_layers (int, optional):
             Number of hidden layers in the Transformer encoder. Defaults to `12`.
         num_attention_heads (int, optional):
@@ -173,7 +173,6 @@ class DistilBertModel(DistilBertPretrainedModel):
         type_vocab_size (int, optional):
             The vocabulary size of `token_type_ids`.
             Defaults to `16`.
-
         initializer_range (float, optional):
             The standard deviation of the normal initializer.
             Defaults to `0.02`.
