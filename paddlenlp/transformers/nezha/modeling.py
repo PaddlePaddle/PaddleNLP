@@ -519,13 +519,23 @@ class NeZhaModel(NeZhaPretrainedModel):
         self.initializer_range = initializer_range
 
         self.embeddings = NeZhaEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, use_relative_position)
+            vocab_size=vocab_size,
+            hidden_size=hidden_size,
+            hidden_dropout_prob=hidden_dropout_prob,
+            max_position_embeddings=max_position_embeddings,
+            type_vocab_size=type_vocab_size,
+            use_relative_position=use_relative_position)
 
         self.encoder = NeZhaEncoder(
-            hidden_size, num_hidden_layers, num_attention_heads,
-            intermediate_size, hidden_act, hidden_dropout_prob,
-            attention_probs_dropout_prob, max_relative_position, layer_norm_eps)
+            hidden_size=hidden_size,
+            num_hidden_layers=num_hidden_layers,
+            num_attention_heads=num_attention_heads,
+            intermediate_size=intermediate_size,
+            hidden_act=hidden_act,
+            hidden_dropout_prob=hidden_dropout_prob,
+            attention_probs_dropout_prob=attention_probs_dropout_prob,
+            max_relative_position=max_relative_position,
+            layer_norm_eps=layer_norm_eps)
 
         self.pooler = NeZhaPooler(hidden_size)
         self.apply(self.init_weights)
