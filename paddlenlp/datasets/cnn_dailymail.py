@@ -178,7 +178,7 @@ class CnnDailymail(DatasetBuilder):
         dl_paths = {}
         version = self.config.get("version", "3.0.0")
         if version not in ["1.0.0", "2.0.0", "3.0.0"]:
-            raise ValueError("Unsupported version: %s", version)
+            raise ValueError("Unsupported version: %s" % version)
         dl_paths["version"] = version
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
         for k, v in self.cnn_dailymail.items():
