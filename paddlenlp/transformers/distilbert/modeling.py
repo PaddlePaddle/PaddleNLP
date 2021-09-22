@@ -269,8 +269,8 @@ class DistilBertModel(DistilBertPretrainedModel):
 
 class DistilBertForSequenceClassification(DistilBertPretrainedModel):
     """
-    DistilBert Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
-    for GLUE tasks.
+    DistilBert Model with a linear layer on top of the output layer, designed for
+    sequence classification/regression tasks like GLUE tasks.
 
     Args:
         distilbert (:class:`DistilBertModel`):
@@ -342,9 +342,8 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
 
 class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
     """
-    DistilBert Model with a span classification head on top for extractive question-answering tasks like
-    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
-    `span end logits`).
+    DistilBert Model with a linear layer on top of the hidden-states output to
+    compute `span_start_logits` and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
         distilbert (:class:`DistilBertModel`):
@@ -415,8 +414,8 @@ class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
 
 class DistilBertForTokenClassification(DistilBertPretrainedModel):
     """
-    DistilBert Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
-    for Named-Entity-Recognition (NER) tasks.
+    DistilBert Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         distilbert (:class:`DistilBertModel`):

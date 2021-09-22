@@ -535,6 +535,8 @@ class NeZhaModel(NeZhaPretrainedModel):
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
                 [batch_size, num_attention_heads, sequence_length, sequence_length].
+                We use whole-word-mask in NeZha, so the whole word will have the same value. For example, "使用" as a word,
+                "使" and "用" will have the same value.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
 
         Returns:
@@ -709,8 +711,8 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
                 The labels of the masked language modeling, its dimensionality is equal to `prediction_scores`.
                 Its data type should be int64 and its shape is [batch_size, sequence_length, 1].
             next_sentence_label (Tensor, optional):
-                The labels of the next sentence prediction task.
-                Its data type should be int64 and its shape is [batch_size, 1].
+                The labels of the next sentence prediction task, the dimensionality of `next_sentence_labels`
+                is equal to `seq_relation_labels`. Its data type should be int64 and its shape is [batch_size, 1].
 
         Returns:
             Tensor or tuple: Returns Tensor ``total_loss`` if `masked_lm_labels` is not None.
@@ -835,8 +837,8 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
 
 class NeZhaForSequenceClassification(NeZhaPretrainedModel):
     """
-    NeZha Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
-    for GLUE tasks.
+    NeZha Model with a linear layer on top of the output layer, designed for
+    sequence classification/regression tasks like GLUE tasks.
 
     Args:
         nezha (:class:`NeZhaModel`):
@@ -902,8 +904,8 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
 
 class NeZhaForTokenClassification(NeZhaPretrainedModel):
     """
-    NeZha Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
-    for Named-Entity-Recognition (NER) tasks.
+    NeZha Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         nezha (:class:`NeZhaModel`):
