@@ -14,21 +14,16 @@
 
 import paddle
 import paddle.nn as nn
-import paddle.tensor as tensor
 import paddle.nn.functional as F
-from paddle.nn import TransformerEncoder, Linear, Layer, Embedding, LayerNorm, Tanh
+from paddle.nn import Layer
 
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'BertModel',
-    "BertPretrainedModel",
-    'BertForPretraining',
-    'BertPretrainingCriterion',
-    'BertPretrainingHeads',
-    'BertForSequenceClassification',
-    'BertForTokenClassification',
-    'BertForQuestionAnswering',
+    'BertModel', "BertPretrainedModel", 'BertForPretraining',
+    'BertPretrainingCriterion', 'BertPretrainingHeads',
+    'BertForSequenceClassification', 'BertForTokenClassification',
+    'BertForQuestionAnswering', 'BertForMultipleChoice', "BertForMaskedLM"
 ]
 
 
@@ -270,6 +265,76 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
         },
+        "tbs17-MathBERT": {
+            "vocab_size": 30522,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
+        "nlptown-bert-base-multilingual-uncased-sentiment": {
+            "vocab_size": 105879,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
+        "ckiplab-bert-base-chinese-ws": {
+            "vocab_size": 21128,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
+        "ckiplab-bert-base-chinese-pos": {
+            "vocab_size": 21128,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
+        "ckiplab-bert-base-chinese-ner": {
+            "vocab_size": 21128,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 512,
+            "type_vocab_size": 2,
+            "initializer_range": 0.02,
+            "pad_token_id": 0,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -298,6 +363,16 @@ class BertPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/macbert/macbert-large-chinese.pdparams",
             "simbert-base-chinese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/simbert-base-chinese-v1.pdparams",
+            "tbs17-MathBERT":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/tbs17/MathBERT.pdparams",
+            "nlptown-bert-base-multilingual-uncased-sentiment":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/nlptown/bert-base-multilingual-uncased-sentiment.pdparams",
+            "ckiplab-bert-base-chinese-ws":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ckiplab/bert-base-chinese-ws.pdparams",
+            "ckiplab-bert-base-chinese-pos":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ckiplab/bert-base-chinese-pos.pdparams",
+            "ckiplab-bert-base-chinese-ner":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ckiplab/bert-base-chinese-ner.pdparams",
         }
     }
     base_model_prefix = "bert"
@@ -494,6 +569,11 @@ class BertModel(BertPretrainedModel):
                 (input_ids == self.pad_token_id
                  ).astype(self.pooler.dense.weight.dtype) * -1e9,
                 axis=[1, 2])
+
+        if attention_mask.ndim == 2:
+            attention_mask = attention_mask.unsqueeze(axis=[1, 2])
+            attention_mask = (1.0 - attention_mask) * -1e9
+
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
@@ -968,3 +1048,156 @@ class BertPretrainingCriterion(paddle.nn.Layer):
             next_sentence_loss = F.cross_entropy(
                 seq_relationship_score, next_sentence_labels, reduction='none')
         return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)
+
+
+class BertForMultipleChoice(BertPretrainedModel):
+    """
+    Bert Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
+    softmax) e.g. for RocStories/SWAG tasks.
+    Args:
+        bert (:class:`BertModel`):
+            An instance of BertModel.
+        num_choices (int, optional):
+            The number of choices. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of Bert.
+            If None, use the same value as `hidden_dropout_prob` of `BertModel`
+            instance `bert`. Defaults to None.
+    """
+
+    def __init__(self, bert, num_choices=2, dropout=None):
+        super(BertForMultipleChoice, self).__init__()
+        self.num_choices = num_choices
+        self.bert = bert
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.bert.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.bert.config["hidden_size"], 1)
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, position_ids=None, attention_mask=None):
+        r"""
+        The BertForMultipleChoice forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`BertModel` and shape as [batch_size, num_choice, sequence_length].
+            position_ids(Tensor, optional):
+                See :class:`BertModel` and shape as [batch_size, num_choice, sequence_length].
+            attention_mask (list, optional):
+                See :class:`BertModel` and shape as [batch_size, num_choice, sequence_length].
+
+        Returns:
+            Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
+            Shape as `[batch_size, num_choice]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+                import paddle
+                from paddlenlp.transformers import BertForMultipleChoice, BertTokenizer
+
+                tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+                model = BertForMultipleChoice.from_pretrained('bert-base-uncased')
+                
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                
+                logits = model(**inputs)
+
+        """
+        # input_ids: [bs, num_choice, seq_l]
+        input_ids = input_ids.reshape(shape=(
+            -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+
+        if position_ids is not None:
+            position_ids = position_ids.reshape(shape=(-1,
+                                                       position_ids.shape[-1]))
+
+        if attention_mask is not None:
+            attention_mask = attention_mask.reshape(
+                shape=(-1, attention_mask.shape[-1]))
+
+        _, pooled_output = self.bert(
+            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        pooled_output = self.dropout(pooled_output)
+
+        logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
+        reshaped_logits = logits.reshape(
+            shape=(-1, self.num_choices))  # logits: (bs, num_choice)
+
+        return reshaped_logits
+
+
+class BertOnlyMLMHead(nn.Layer):
+    def __init__(self, hidden_size, vocab_size, activation, embedding_weights):
+        super().__init__()
+        self.predictions = BertLMPredictionHead(
+            hidden_size=hidden_size,
+            vocab_size=vocab_size,
+            activation=activation,
+            embedding_weights=embedding_weights)
+
+    def forward(self, sequence_output, masked_positions=None):
+        prediction_scores = self.predictions(sequence_output, masked_positions)
+        return prediction_scores
+
+
+class BertForMaskedLM(BertPretrainedModel):
+    """
+    Bert Model with a MLM tasks on top.
+
+    Args:
+        bert (:class:`BertModel`):
+            An instance of :class:`BertModel`.
+
+    """
+
+    def __init__(self, bert):
+        super(BertForMaskedLM, self).__init__()
+        self.bert = bert
+        self.cls = BertOnlyMLMHead(
+            self.bert.config["hidden_size"],
+            self.bert.config["vocab_size"],
+            self.bert.config["hidden_act"],
+            embedding_weights=self.bert.embeddings.word_embeddings.weight)
+
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None,
+                masked_positions=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`BertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`BertModel`.
+            position_ids (Tensor, optional):
+                See :class:`BertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`BertModel`.
+            masked_positions(Tensor, optional):
+                See :class:`BertPretrainingHeads`.
+
+        Returns:
+            tuple: Returns ``prediction_scores``.
+
+        Returns:
+            Tensor: Returns tensor `prediction_scores`, The scores of masked token prediction.
+            Its data type should be float32.
+            If `masked_positions` is None, its shape is [batch_size, sequence_length, vocab_size].
+            Otherwise, its shape is [batch_size, mask_token_num, vocab_size].
+
+        """
+        with paddle.static.amp.fp16_guard():
+            outputs = self.bert(
+                input_ids,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask)
+            sequence_output = outputs[0]
+            prediction_scores = self.cls(sequence_output, masked_positions)
+            return prediction_scores

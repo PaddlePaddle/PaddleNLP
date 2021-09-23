@@ -327,6 +327,16 @@ class BertTokenizer(PretrainedTokenizer):
             "https://paddle-hapi.bj.bcebos.com/models/bert/bert-base-chinese-vocab.txt",
             "simbert-base-chinese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/vocab.txt",
+            "tbs17-MathBERT":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/tbs17/MathBERT-vocab.txt",
+            "nlptown-bert-base-multilingual-uncased-sentiment":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/nlptown/bert-base-multilingual-uncased-sentiment-vocab.txt",
+            "ckiplab-bert-base-chinese-ws":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ckiplab/bert-base-chinese-ws-vocab.txt",
+            "ckiplab-bert-base-chinese-pos":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ckiplab/bert-base-chinese-pos-vocab.txt",
+            "ckiplab-bert-base-chinese-ner":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ckiplab/bert-base-chinese-ner-vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -364,6 +374,21 @@ class BertTokenizer(PretrainedTokenizer):
             "do_lower_case": False
         },
         "simbert-base-chinese": {
+            "do_lower_case": True
+        },
+        "tbs17-MathBERT": {
+            "do_lower_case": True
+        },
+        "nlptown-bert-base-multilingual-uncased-sentiment": {
+            "do_lower_case": True
+        },
+        "ckiplab-bert-base-chinese-ws": {
+            "do_lower_case": True
+        },
+        "ckiplab-bert-base-chinese-pos": {
+            "do_lower_case": True
+        },
+        "ckiplab-bert-base-chinese-ner": {
             "do_lower_case": True
         },
     }

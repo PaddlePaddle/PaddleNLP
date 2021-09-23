@@ -18,8 +18,8 @@ import unittest
 import paddle
 import copy
 
-from paddlenlp.transformers import BertModel, BertForPretraining, BertPretrainingCriterion
-from paddlenlp.transformers import BertForQuestionAnswering, BertForSequenceClassification, BertForTokenClassification
+from paddlenlp.transformers import BertModel, BertForPretraining, BertPretrainingCriterion, BertForMaskedLM
+from paddlenlp.transformers import BertForQuestionAnswering, BertForSequenceClassification, BertForTokenClassification, BertForMultipleChoice
 
 from common_test import CommonTest
 from util import softmax_with_cross_entropy, slow
@@ -105,7 +105,7 @@ class TestBertForSequenceClassification(CommonTest):
 
         bert = BertModel(**config)
         model = self.TEST_MODEL_CLASS(bert)
-        input_ids = paddle.to_tensor(self.input_ids)
+        input_ids = paddle.to_tensor(self.input_ids, dtype="int64")
         self.output = model(input_ids)
         self.check_testcase()
 
@@ -135,8 +135,9 @@ class TestBertForPretraining(TestBertForSequenceClassification):
 
         bert = BertModel(**config)
         model = self.TEST_MODEL_CLASS(bert)
-        input_ids = paddle.to_tensor(self.input_ids)
-        masked_lm_positions = paddle.to_tensor(self.masked_lm_positions)
+        input_ids = paddle.to_tensor(self.input_ids, dtype="int64")
+        masked_lm_positions = paddle.to_tensor(
+            self.masked_lm_positions, dtype="int64")
         self.output = model(input_ids, masked_positions=masked_lm_positions)
         self.check_testcase()
 
@@ -145,6 +146,32 @@ class TestBertForPretraining(TestBertForSequenceClassification):
                                 self.expected_seq_shape)
         self.check_output_equal(self.output[1].numpy().shape,
                                 self.expected_pooled_shape)
+
+
+class TestBertForMaskedLM(TestBertForSequenceClassification):
+    def set_model_class(self):
+        self.TEST_MODEL_CLASS = BertForMaskedLM
+
+    def set_output(self):
+        self.expected_seq_shape = (self.masked_lm_positions.shape[0],
+                                   self.config['vocab_size'])
+
+    def test_forward(self):
+        config = copy.deepcopy(self.config)
+        del config['batch_size']
+        del config['seq_len']
+
+        bert = BertModel(**config)
+        model = self.TEST_MODEL_CLASS(bert)
+        input_ids = paddle.to_tensor(self.input_ids, dtype="int64")
+        masked_lm_positions = paddle.to_tensor(
+            self.masked_lm_positions, dtype="int64")
+        self.output = model(input_ids, masked_positions=masked_lm_positions)
+        self.check_testcase()
+
+    def check_testcase(self):
+        self.check_output_equal(self.output.numpy().shape,
+                                self.expected_seq_shape)
 
 
 class TestBertForQuestionAnswering(TestBertForSequenceClassification):
@@ -162,6 +189,51 @@ class TestBertForQuestionAnswering(TestBertForSequenceClassification):
                                 self.expected_start_logit_shape)
         self.check_output_equal(self.output[1].numpy().shape,
                                 self.expected_end_logit_shape)
+
+
+class TestBertForMultipleChoice(TestBertForSequenceClassification):
+    def set_input(self):
+        self.config = copy.deepcopy(BertModel.pretrained_init_configuration[
+            'bert-base-uncased'])
+        self.config['num_hidden_layers'] = 2
+        self.config['vocab_size'] = 512
+        self.config['attention_probs_dropout_prob'] = 0.0
+        self.config['hidden_dropout_prob'] = 0.0
+        self.config['intermediate_size'] = 1024
+        self.config['seq_len'] = 64
+        self.config['batch_size'] = 4
+        self.config['num_choices'] = 2
+        self.config['max_position_embeddings'] = 512
+        self.input_ids, _ = create_input_data(self.config)
+        # [bs*num_choice,seq_l] -> [bs,num_choice,seq_l]
+        self.input_ids = np.reshape(self.input_ids, [
+            self.config['batch_size'] // self.config['num_choices'],
+            self.config['num_choices'], -1
+        ])
+
+    def set_model_class(self):
+        self.TEST_MODEL_CLASS = BertForMultipleChoice
+
+    def set_output(self):
+        self.expected_logit_shape = (self.config['batch_size'] //
+                                     self.config['num_choices'],
+                                     self.config['num_choices'])
+
+    def check_testcase(self):
+        self.check_output_equal(self.output.numpy().shape,
+                                self.expected_logit_shape)
+
+    def test_forward(self):
+        config = copy.deepcopy(self.config)
+        del config["num_choices"]
+        del config['batch_size']
+        del config['seq_len']
+
+        bert = BertModel(**config)
+        model = self.TEST_MODEL_CLASS(bert)
+        input_ids = paddle.to_tensor(self.input_ids, dtype="int64")
+        self.output = model(input_ids)
+        self.check_testcase()
 
 
 class TestBertPretrainingCriterion(CommonTest):
@@ -190,8 +262,9 @@ class TestBertPretrainingCriterion(CommonTest):
 
         prediction_score = paddle.to_tensor(np_prediction_score)
         seq_relationship_score = paddle.to_tensor(np_seq_relationship_score)
-        masked_lm_labels = paddle.to_tensor(np_masked_lm_labels)
-        next_sentence_labels = paddle.to_tensor(np_next_sentence_labels)
+        masked_lm_labels = paddle.to_tensor(np_masked_lm_labels, dtype="int64")
+        next_sentence_labels = paddle.to_tensor(
+            np_next_sentence_labels, dtype="int64")
         masked_lm_weights = paddle.to_tensor(np_masked_lm_weights)
 
         np_loss = self.np_criterion(
@@ -210,7 +283,7 @@ class TestBertFromPretrain(CommonTest):
             'bert-base-uncased',
             attention_probs_dropout_prob=0.0,
             hidden_dropout_prob=0.0)
-        self.config = copy.deepcopy(model.config)
+        self.config = copy.deepcopy(model.bert.config)
         self.config['seq_len'] = 32
         self.config['batch_size'] = 3
 
@@ -237,6 +310,33 @@ class TestBertFromPretrain(CommonTest):
              [-0.74019802, -0.10187808, 0.95353240]])
         self.check_output_equal(
             output[1].numpy()[0:3, 0:3], expected_pooled_slice, atol=1e-6)
+
+
+class TestBertFromMaskedLM(CommonTest):
+    @slow
+    def test_bert_base_uncased(self):
+        model = BertForMaskedLM.from_pretrained(
+            'bert-base-uncased',
+            attention_probs_dropout_prob=0.0,
+            hidden_dropout_prob=0.0)
+        self.config = copy.deepcopy(model.bert.config)
+
+        self.config['seq_len'] = 32
+        self.config['batch_size'] = 3
+
+        input_ids, _ = create_input_data(self.config, 102)
+        input_ids = paddle.to_tensor(input_ids)
+        output = model(input_ids)
+
+        expected_seq_shape = (self.config['batch_size'], self.config['seq_len'],
+                              self.config['hidden_size'])
+        self.check_output_equal(output.numpy().shape, expected_seq_shape)
+        expected_seq_slice = np.array([[0.17383946, 0.09206937, 0.45788339],
+                                       [-0.28287640, 0.06244858, 0.54864359],
+                                       [-0.54589444, 0.04811822, 0.50559914]])
+        # There's output diff about 1e-6 between cpu and gpu
+        self.check_output_equal(
+            output.numpy()[0, 0:3, 0:3], expected_seq_slice, atol=1e-6)
 
 
 if __name__ == "__main__":
