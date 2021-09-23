@@ -1047,7 +1047,8 @@ class FasterBART(nn.Layer):
         mem_seq_lens = paddle.sum(paddle.cast(
             input_ids != self.pad_id, dtype="int32"),
                                   axis=-1,
-                                  keepdim=True)
+                                  keepdim=True,
+                                  dtype="int32")
         if self.use_fp16_decoding:
             encoder_output = paddle.cast(encoder_output, "float16")
         return self.decoding(encoder_output, mem_seq_lens)
