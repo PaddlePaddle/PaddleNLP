@@ -130,16 +130,10 @@ def parse_args(MODEL_CLASSES):
 
     # Training steps config
     parser.add_argument(
-        "--num_train_epochs",
-        default=1,
-        type=int,
-        help="Total number of training epochs to perform.", )
-    parser.add_argument(
         "--max_steps",
         default=500000,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs."
-    )
+        help="set total number of training steps to perform.")
     parser.add_argument(
         "--save_steps",
         type=int,

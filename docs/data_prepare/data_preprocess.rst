@@ -199,11 +199,11 @@ PaddleNLP内置了多种collate function，配合 :class:`paddle.io.BatchSampler
     from paddlenlp.data import Tuple, Stack, Pad 
 
     # 使用Tuple函数将Pad，Stack等函数与数据中的键值相匹配
-    train_batchify_fn = lambda samples, fn=Tuple({
+    train_batchify_fn = lambda samples, fn=Tuple((
         Pad(axis=0, pad_val=vocab.token_to_idx.get('[PAD]', 0)),  # input_ids
         Stack(dtype="int64"),  # seq len
         Stack(dtype="int64")  # label
-    }): fn(samples)
+    )): fn(samples)
 
 可以看到，:func:`Dict` 函数是将单条数据中的键值与 :func:`Pad` 等函数进行对应，适用于单条数据是字典的情况。而 :func:`Tuple` 是通过单条数据中不同部分的index进行对应的。
 

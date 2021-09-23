@@ -26,7 +26,8 @@ import paddle.nn as nn
 from ..datasets import MapDataset, load_dataset
 from ..data import Stack, Pad, Tuple
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .utils import download_file, add_docstrings
+from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
+from .utils import TermTree
 from .task import Task
 
 LABEL_TO_SCHEMA = {
@@ -95,34 +96,30 @@ LABEL_TO_SCHEMA = {
 }
 
 URLS = {
-    "TermTree.V1.0":
-    ["https://kg-concept.bj.bcebos.com/TermTree/TermTree.V1.0.tar.gz", None],
+    "TermTree.V1.0": [
+        "https://kg-concept.bj.bcebos.com/TermTree/TermTree.V1.0.tar.gz",
+        "3514221be5017b3b4349daa6435f7b5e"
+    ],
     "termtree_type": [
         "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_type.csv",
-        None
+        "062cb9ac24f4135bf836e2a2fc5a1209"
     ],
     "termtree_tags_pos": [
         "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_ctm/termtree_tags_pos.txt",
-        None
+        "87db06ae6ca42565157045ab3e9a996f"
     ],
 }
 
 usage = r"""
-          from paddlenlp.taskflow import TaskFlow 
+          from paddlenlp import Taskflow 
 
-          task = TaskFlow("text2knowledge")
+          task = Taskflow("text2knowledge")
           task("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
           '''
           [{'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5, 'termid': '时间阶段_cb_2010年'}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5, 'termid': '组织机构_eb_九州出版社'}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_出版'}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '小说_cb_小说'}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2, 'termid': '人物_cb_作者'}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
           '''
 
-          task = TaskFlow("text2knowledge", lazy_load=True)
-          task("热梅茶是一道以梅子为主要原料制作的茶饮")
-          '''
-          [{'text': '热梅茶是一道以梅子为主要原料制作的茶饮', 'items': [{'item': '热梅茶', 'offset': 0, 'wordtag_label': '饮食类_饮品', 'length': 3}, {'item': '是', 'offset': 3, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '一道', 'offset': 4, 'wordtag_label': '数量词', 'length': 2}, {'item': '以', 'offset': 6, 'wordtag_label': '介词', 'length': 1, 'termid': '介词_cb_以'}, {'item': '梅子', 'offset': 7, 'wordtag_label': '饮食类', 'length': 2, 'termid': '饮食_cb_梅'}, {'item': '为', 'offset': 9, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_为'}, {'item': '主要原料', 'offset': 10, 'wordtag_label': '物体类', 'length': 4, 'termid': '物品_cb_主要原料'}, {'item': '制作', 'offset': 14, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_制作'}, {'item': '的', 'offset': 16, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '茶饮', 'offset': 17, 'wordtag_label': '饮食类_饮品', 'length': 2, 'termid': '饮品_cb_茶饮'}]}]
-          '''
-
-          task = TaskFlow("text2knowledge", batch_size=2)
+          task = Taskflow("text2knowledge", batch_size=2)
           task(["热梅茶是一道以梅子为主要原料制作的茶饮",
                 "《孤女》是2010年九州出版社出版的小说，作者是余兼羽",
                 "中山中环广场，位于广东省中山市东区，地址是东区兴政路1号",
@@ -147,37 +144,27 @@ class WordTagTask(Task):
 
     def __init__(self, model, task, **kwargs):
         super().__init__(model=model, task=task, **kwargs)
+        self._static_mode = False
         term_schema_path = download_file(
-            self.model, "termtree_type.csv", URLS['termtree_type'][0],
+            self._task_path, "termtree_type.csv", URLS['termtree_type'][0],
             URLS['termtree_type'][1], "text2knowledge")
-        term_data_path = download_file(self.model, "TermTree.V1.0",
+        term_data_path = download_file(self._task_path, "TermTree.V1.0",
                                        URLS['TermTree.V1.0'][0],
                                        URLS['TermTree.V1.0'][1])
-        tag_path = download_file(self.model, "termtree_tags_pos.txt",
+        tag_path = download_file(self._task_path, "termtree_tags_pos.txt",
                                  URLS['termtree_tags_pos'][0],
                                  URLS['termtree_tags_pos'][1])
         self._tags_to_index, self._index_to_tags = self._load_labels(tag_path)
 
-        if term_schema_path is not None:
-            self._term_schema = self._load_schema(term_schema_path)
-        if term_data_path is not None:
-            self._term_dict = self._load_term_tree_data(term_data_path)
-        if term_data_path is not None and term_schema_path is not None:
-            self._linking = True
-        else:
-            self._linking = False
-        self._tokenizer = self._construct_tokenizer(model)
-        self._model = self._construct_model(model)
-        self._summary_num = self._model.ernie_ctm.content_summary_index + 1
+        self._termtree = TermTree.from_dir(term_schema_path, term_data_path)
+        self._linking = True
+        self._construct_tokenizer(model)
         self._usage = usage
-
-    def _download_termtree(self, filename):
-        default_root = os.path.join(MODEL_HOME, 'ernie-ctm')
-        fullname = os.path.join(default_root, filename)
-        url = URLS[filename]
-        if not os.path.exists(fullname):
-            get_path_from_url(url, default_root)
-        return fullname
+        self._summary_num = 2
+        if self._static_mode:
+            self._get_inference_model()
+        else:
+            self._construct_model(model)
 
     @property
     def summary_num(self):
@@ -205,63 +192,12 @@ class WordTagTask(Task):
         idx_to_tags = dict(zip(*(tags_to_idx.values(), tags_to_idx.keys())))
         return tags_to_idx, idx_to_tags
 
-    @staticmethod
-    def _load_schema(schema_path):
-        schema = {}
-        with open(schema_path, encoding="utf8") as f:
-            reader = csv.reader(f)
-            first_line = True
-            for line in reader:
-                if first_line:
-                    first_line = False
-                    continue
-                items = line[0].split("\t")
-                if len(items[0]):
-                    schema[items[0]] = "root"
-                if len(items[1]):
-                    schema[items[1]] = items[0]
-                if len(items[2]):
-                    schema[items[2]] = items[1]
-        return schema
-
-    @staticmethod
-    def _load_term_tree_data(term_tree_name_or_path):
-        if os.path.isdir(term_tree_name_or_path):
-            fn_list = glob.glob(f"{term_tree_name_or_path}/*", recursive=True)
-        else:
-            fn_list = [term_tree_name_or_path]
-        term_dict = {}
-        for fn in fn_list:
-            with open(fn, encoding="utf-8") as fp:
-                for line in fp:
-                    data = json.loads(line)
-                    if data["term"] not in term_dict:
-                        term_dict[data["term"]] = {}
-                    if data["termtype"] not in term_dict[data["term"]]:
-                        term_dict[data["term"]][data["termtype"]] = []
-                    term_dict[data["term"]][data["termtype"]].append(data[
-                        "termid"])
-                    for alia in data["alias"]:
-                        if alia not in term_dict:
-                            term_dict[alia] = {}
-                        if data["termtype"] not in term_dict[alia]:
-                            term_dict[alia][data["termtype"]] = []
-                        term_dict[alia][data["termtype"]].append(data["termid"])
-                    for alia in data["alias_ext"]:
-                        if alia not in term_dict:
-                            term_dict[alia] = {}
-                        if data["termtype"] not in term_dict[alia]:
-                            term_dict[alia][data["termtype"]] = []
-                        term_dict[alia][data["termtype"]].append(data["termid"])
-        return term_dict
-
     def _split_long_text_input(self, input_texts, max_text_len):
         """
         Split the long text to list of short text, the max_seq_len of input text is 512,
         if the text length greater than 512, will this function that spliting the long text.
         """
         short_input_texts = []
-        short_input_texts_lens = []
         for text in input_texts:
             if len(text) <= max_text_len:
                 short_input_texts.append(text)
@@ -279,13 +215,35 @@ class WordTagTask(Task):
                     ]
                     short_input_texts.extend(temp_text_list)
                 else:
-                    count = 0
-                    for temp_text in temp_text_list:
-                        if len(temp_text) + count < lens:
-                            temp_text = text[:len(temp_text) + count + 1]
-                        count += len(temp_text)
+                    list_len = len(temp_text_list)
+                    start = 0
+                    end = 0
+                    for i in range(0, list_len):
+                        if len(temp_text_list[i]) + 1 >= max_text_len:
+                            if start != end:
+                                short_input_texts.extend(
+                                    self._split_long_text_input(
+                                        [text[start:end]], max_text_len))
+                            short_input_texts.extend(
+                                self._split_long_text_input([
+                                    text[end:end + len(temp_text_list[i]) + 1]
+                                ], max_text_len))
+                            start = end + len(temp_text_list[i]) + 1
+                            end = start
+                        else:
+                            if start + len(temp_text_list[
+                                    i]) + 1 > max_text_len:
+                                short_input_texts.extend(
+                                    self._split_long_text_input(
+                                        [text[start:end]], max_text_len))
+                                start = end
+                                end = end + len(temp_text_list[i]) + 1
+                            else:
+                                end = len(temp_text_list[i]) + 1
+                    if start != end:
                         short_input_texts.extend(
-                            self._split_long_text2short_text_list([temp_text]))
+                            self._split_long_text_input([text[start:end]],
+                                                        max_text_len))
         return short_input_texts
 
     def _concat_short_text_reuslts(self, input_texts, results):
@@ -318,7 +276,6 @@ class WordTagTask(Task):
             pred_words = result['items']
             pred_words = self._reset_offset(pred_words)
             result['items'] = pred_words
-
         return concat_results
 
     def _preprocess_text(self, input_texts):
@@ -330,14 +287,19 @@ class WordTagTask(Task):
             'batch_size'] if 'batch_size' in self.kwargs else 1
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
-        lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
 
-        max_seq_length = 128
-        if 'max_position_embedding' in self.kwargs:
-            max_seq_length = self.kwargs['max_position_embedding']
+        max_seq_length = 512
+        if 'max_seq_length' in self.kwargs:
+            max_seq_length = self.kwargs['max_seq_length']
         infer_data = []
         max_predict_len = max_seq_length - self.summary_num - 1
+        filter_input_texts = []
+        for input_text in input_texts:
+            if not (isinstance(input_text, str) and len(input_text) > 0):
+                continue
+            filter_input_texts.append(input_text)
+        input_texts = filter_input_texts
+
         short_input_texts = self._split_long_text_input(input_texts,
                                                         max_predict_len)
 
@@ -351,7 +313,7 @@ class WordTagTask(Task):
                 yield tokenized_output['input_ids'], tokenized_output[
                     'token_type_ids'], tokenized_output['seq_len']
 
-        infer_ds = load_dataset(read, inputs=short_input_texts, lazy=lazy_load)
+        infer_ds = load_dataset(read, inputs=short_input_texts, lazy=False)
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self._tokenizer.pad_token_id,dtype='int64'),  # input_ids
             Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id,dtype='int64'),  # token_type_ids
@@ -369,6 +331,7 @@ class WordTagTask(Task):
         outputs = {}
         outputs['data_loader'] = infer_data_loader
         outputs['short_input_texts'] = short_input_texts
+        outputs['inputs'] = input_texts
         return outputs
 
     def _reset_offset(self, pred_words):
@@ -417,58 +380,51 @@ class WordTagTask(Task):
         for item in wordtag_res["items"]:
             if item["wordtag_label"] not in LABEL_TO_SCHEMA:
                 continue
-            if item["item"] not in self._term_dict:
+            flag, _ = self._termtree.find_term(item["item"])
+            if flag is False:
                 continue
-            target_type = LABEL_TO_SCHEMA[item["wordtag_label"]]
-            matched_type = list(self._term_dict[item["item"]].keys())
-            matched = False
-            term_id = None
-            target_idx = math.inf
-            for mt in matched_type:
-                tmp_type = mt
-                while tmp_type != "root":
-                    if tmp_type not in self._term_schema:
-                        break
-                    for i, target in enumerate(target_type):
-                        if target.startswith(tmp_type):
-                            target_src = target.split("|")
-                            for can_term_id in self._term_dict[item["item"]][
-                                    mt]:
-                                tmp_term_id = can_term_id
-                                if len(target_src) == 1:
-                                    matched = True
-                                    if target.startswith(mt):
-                                        target_idx = -1
-                                        term_id = tmp_term_id
-                                    if i < target_idx:
-                                        target_idx = i
-                                        term_id = tmp_term_id
-                                else:
-                                    if target_src[
-                                            1] == "C" and "_cb_" in tmp_term_id:
-                                        matched = True
-                                        if target.startswith(mt):
-                                            target_idx = -1
-                                            term_id = tmp_term_id
-                                        if i < target_idx:
-                                            target_idx = i
-                                            term_id = tmp_term_id
-                                    if target_src[
-                                            1] == "E" and "_eb_" in tmp_term_id:
-                                        matched = True
-                                        if target.startswith(mt):
-                                            target_idx = -1
-                                            term_id = tmp_term_id
-                                        if i < target_idx:
-                                            target_idx = i
-                                            term_id = tmp_term_id
-                    tmp_type = self._term_schema[tmp_type]
-                    if matched is True:
-                        break
+            target_type_can = LABEL_TO_SCHEMA[item["wordtag_label"]]
+            for target_type_raw in target_type_can:
+                target_type_ = target_type_raw.split("|")
+                target_src = None
+                if len(target_type_) == 2:
+                    target_src = target_type_[1]
+                target_type = target_type_[0]
+                flag, term_id = self._termtree.find_term(item["item"],
+                                                         target_type)
+                if flag is False:
+                    continue
+                term_id = list(
+                    filter(lambda d: self._termtree[d].node_type == "term",
+                           term_id))
+                if len(term_id) == 0:
+                    continue
+                if target_src is not None:
+                    term_id = list(
+                        filter(
+                            lambda d: self._termtree[d].base.startswith(target_src.lower()),
+                            term_id))
+                    if len(term_id) == 0:
+                        continue
+                term_id.sort(
+                    key=lambda d: (self._termtree[d].termtype == target_type or target_type in self._termtree[d].subtype, self._termtree[d].term == item["item"]),
+                    reverse=True)
+                item["termid"] = term_id[0]
 
-            if matched is True:
-                item["termid"] = term_id
-        pass
+    def _construct_input_spec(self):
+        """
+        Construct the input spec for the convert dygraph model to static model.
+        """
+        self._input_spec = [
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64",
+                name="input_ids"),  # input_ids
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64",
+                name="token_type_ids"),  # segment_ids
+            paddle.static.InputSpec(
+                shape=[None], dtype="int64", name="lengths")
+        ]  # seq_len 
 
     def _construct_model(self, model):
         """
@@ -483,14 +439,14 @@ class WordTagTask(Task):
             self.model]
         self.kwargs.update(config_keys)
         model_instance.eval()
-        return model_instance
+        self._model = model_instance
 
     def _construct_tokenizer(self, model):
         """
         Construct the tokenizer for the predictor.
         """
         tokenizer_instance = ErnieCtmTokenizer.from_pretrained(model)
-        return tokenizer_instance
+        self._tokenizer = tokenizer_instance
 
     def _preprocess(self, inputs, padding=True, add_special_tokens=True):
         """
@@ -498,16 +454,8 @@ class WordTagTask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        inputs = inputs[0]
-
-        if isinstance(inputs, str):
-            inputs = [inputs]
-        if not isinstance(inputs, str) and not isinstance(inputs, list):
-            raise TypeError(
-                f"Bad inputs, input text should be str or list of str, {type(inputs)} found!"
-            )
+        inputs = self._check_input_text(inputs)
         outputs = self._preprocess_text(inputs)
-        outputs['inputs'] = inputs
         return outputs
 
     def _run_model(self, inputs):
@@ -515,25 +463,37 @@ class WordTagTask(Task):
         Run the task model from the outputs of the `_tokenize` function. 
         """
         all_pred_tags = []
-        with paddle.no_grad():
-            for batch in inputs['data_loader']:
-                input_ids, token_type_ids, seq_len = batch
-                seq_logits, cls_logits = self._model(
-                    input_ids, token_type_ids, lengths=seq_len)
-                score, pred_tags = self._model.viterbi_decoder(seq_logits,
-                                                               seq_len)
-                all_pred_tags.extend(pred_tags.numpy().tolist())
-
+        if not self._static_mode:
+            with dygraph_mode_guard():
+                with paddle.no_grad():
+                    for batch in inputs['data_loader']:
+                        input_ids, token_type_ids, seq_len = batch
+                        seq_logits, cls_logits = self._model(
+                            input_ids, token_type_ids, lengths=seq_len)
+                        score, pred_tags = self._model.viterbi_decoder(
+                            seq_logits, seq_len)
+                        all_pred_tags.extend(pred_tags.numpy().tolist())
+        else:
+            with static_mode_guard():
+                for batch in inputs['data_loader']:
+                    data_dict = dict()
+                    for name, value in zip(self._static_feed_names, batch):
+                        data_dict[name] = value
+                    results = self._exe.run(
+                        self._static_program,
+                        feed=data_dict,
+                        fetch_list=self._static_fetch_targets)
+                    all_pred_tags.extend(results[1].tolist())
         inputs['all_pred_tags'] = all_pred_tags
         return inputs
 
     def _postprocess(self, inputs):
         """
-        The model output is allways the logits and pros, this function will convert the model output to raw text.
+        The model output is the tag ids, this function will convert the model output to raw text.
         """
         results = self._decode(inputs['short_input_texts'],
                                inputs['all_pred_tags'])
-        resulte = self._concat_short_text_reuslts(inputs['inputs'], results)
+        results = self._concat_short_text_reuslts(inputs['inputs'], results)
         if self.linking is True:
             for res in results:
                 self._term_linking(res)

@@ -14,43 +14,34 @@
 
 import argparse
 import os
+import sys
 
 import numpy as np
 import paddle
 import paddlenlp as ppnlp
 from scipy.special import softmax
 from paddle import inference
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
 
+sys.path.append('./')
+
+from utils import convert_example
+
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_dir", type=str, required=True,
-    help="The directory to static model.")
-
-parser.add_argument("--max_seq_length", default=128, type=int,
-    help="The maximum total input sequence length after tokenization. Sequences "
-    "longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=1, type=int,
-    help="Batch size per GPU/CPU for training.")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu",
-    help="Select which device to train model, defaults to gpu.")
-
-parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False],
-    help='Enable to use tensorrt to speed up.')
-parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"],
-    help='The tensorrt precision.')
-
-parser.add_argument('--cpu_threads', default=50, type=int,
-    help='Number of threads to predict when using cpu.')
-parser.add_argument('--enable_mkldnn', default=False, type=eval, choices=[True, False],
-    help='Enable to use mkldnn to speed up when using cpu.')
-
-parser.add_argument("--benchmark", type=eval, default=False,
-    help="To log some information about environment and running.")
-parser.add_argument("--save_log_path", type=str, default="./log_output/",
-    help="The file path to save log.")
+parser.add_argument("--model_dir", type=str, required=True, default="./export/", help="The directory to static model.")
+parser.add_argument("--max_seq_length", type=int, default=128, help="The maximum total input sequence length after tokenization. "
+    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--batch_size", type=int, default=2, help="Batch size per GPU/CPU for training.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--use_tensorrt', type=eval, default=False, choices=[True, False], help='Enable to use tensorrt to speed up.')
+parser.add_argument("--precision", type=str, default="fp32", choices=["fp32", "fp16", "int8"], help='The tensorrt precision.')
+parser.add_argument('--cpu_threads', type=int, default=10, help='Number of threads to predict when using cpu.')
+parser.add_argument('--enable_mkldnn', type=eval, default=False, choices=[True, False], help='Enable to use mkldnn to speed up when using cpu.')
+parser.add_argument("--benchmark", type=eval, default=False, help="To log some information about environment and running.")
+parser.add_argument("--save_log_path", type=str, default="./log_output/", help="The file path to save log.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -79,16 +70,31 @@ class Predictor(object):
         if device == "gpu":
             # set GPU configs accordingly
             # such as intialize the gpu memory, enable tensorrt
-            config.enable_use_gpu(100, 6)
+            config.enable_use_gpu(100, 0)
+            precision_map = {
+                "fp16": inference.PrecisionType.Half,
+                "fp32": inference.PrecisionType.Float32,
+                "int8": inference.PrecisionType.Int8
+            }
+            precision_mode = precision_map[precision]
+
+            if use_tensorrt:
+                config.enable_tensorrt_engine(
+                    max_batch_size=batch_size,
+                    min_subgraph_size=30,
+                    precision_mode=precision_mode)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             config.disable_gpu()
-            if args.enable_mkldnn:
+            if enable_mkldnn:
                 # cache 10 different shapes for mkldnn to avoid memory leak
                 config.set_mkldnn_cache_capacity(10)
                 config.enable_mkldnn()
-            config.set_cpu_math_library_num_threads(args.cpu_threads)
+            config.set_cpu_math_library_num_threads(cpu_threads)
+        elif device == "xpu":
+            # set XPU configs accordingly
+            config.enable_xpu(100)
 
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)

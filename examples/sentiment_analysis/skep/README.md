@@ -87,6 +87,10 @@ skep/
 句子级情感分类数据集，本示例采用常用开源数据集ChnSenticorp中文数据集、GLUE-SST2英文数据集。这两个数据集PaddleNLP已经内置。
 通过以下方式即可实现加载。
 
+```python
+train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
+train_ds, dev_ds = load_dataset("glue", "sst-2", splits=["train", "dev"])
+```
 
 ### 模型训练
 
@@ -174,4 +178,32 @@ python predict_sentence.py --model_name "skep_ernie_1.0_large_ch" --device 'gpu'
 Data: 这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般      Label: negative
 Data: 怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片      Label: negative
 Data: 作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。      Label: positive
+```
+
+### Taskflow一键预测
+可以使用PaddleNLP提供的Taskflow工具来对输入的文本进行一键情感分析，具体使用方法如下:
+
+```python
+
+from paddlenlp import Taskflow
+
+senta = Taskflow("sentiment_analysis")
+senta("怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片")
+'''
+[{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'}]
+'''
+senta(["怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片",
+       "作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间"])
+'''
+[{'text': '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片', 'label': 'negative'},
+ {'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间', 'label': 'positive'}
+]
+'''
+
+# 使用skep_ernie_1.0_large_ch模型进行情感分析
+senta = Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")
+senta("作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。")
+'''
+[{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive'}]
+'''
 ```

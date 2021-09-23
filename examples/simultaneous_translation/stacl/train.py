@@ -118,11 +118,8 @@ def do_train(args):
         batch_id = 0
         batch_start = time.time()
         for input_data in train_loader:
-            if args.max_iter and step_idx == args.max_iter:
-                return
             train_reader_cost = time.time() - batch_start
             (src_word, trg_word, lbl_word) = input_data
-
             if args.use_amp:
                 scaler = paddle.amp.GradScaler(
                     init_loss_scaling=args.scale_loss)
@@ -143,6 +140,9 @@ def do_train(args):
 
                 optimizer.step()
                 optimizer.clear_grad()
+
+            if args.max_iter and step_idx + 1 == args.max_iter:
+                return
 
             tokens_per_cards = token_num.numpy()
 

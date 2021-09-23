@@ -147,7 +147,7 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
     # that the "next sentence prediction" task doesn't span between documents.
     for input_file in input_files:
         print("creating instance from {}".format(input_file))
-        with open(input_file, "r") as reader:
+        with open(input_file, "r", encoding="UTF-8") as reader:
             while True:
                 line = convert_to_unicode(reader.readline())
                 if not line:
@@ -477,8 +477,8 @@ def main():
         input_files = [
             os.path.join(args.input_file, f)
             for f in os.listdir(args.input_file)
-            if (os.path.isfile(os.path.join(args.input_file, f)) and
-                f.endswith('.txt'))
+            if (os.path.isfile(os.path.join(args.input_file, f)) and f.endswith(
+                '.txt'))
         ]
     else:
         raise ValueError("{} is not a valid path".format(args.input_file))
