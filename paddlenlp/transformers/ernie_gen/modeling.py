@@ -475,28 +475,50 @@ class ErnieModel(nn.Layer, ErnieGenPretrainedModel):
                 use_causal_mask=False):
         """
         Args:
-            src_ids (`Variable` of shape `[batch_size, seq_len]`):
+            src_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary.
-            sent_ids (optional, `Variable` of shape `[batch_size, seq_len]`):
-                aka token_type_ids, Segment token indices to indicate first and second portions of the inputs.
-                if None, assume all tokens come from `segment_a`
-            pos_ids(optional, `Variable` of shape `[batch_size, seq_len]`):
-                Indices of positions of each input sequence tokens in the position embeddings.
-            input_mask(optional `Variable` of shape `[batch_size, seq_len]`):
-                Mask to avoid performing attention on the padding token indices of the encoder input.
-            attn_bias(optional, `Variable` of shape `[batch_size, seq_len, seq_len] or False`):
-                3D version of `input_mask`, if set, overrides `input_mask`; if set not False, will not apply attention mask
-            past_cache(optional, tuple of two lists: cached key and cached value,
-                each is a list of `Variable`s of shape `[batch_size, seq_len, hidden_size]`):
+                They are numerical representations of tokens that build the input sequence.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+            sent_ids (Tensor, optional):
+                Segment token indices to indicate different portions of the inputs.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            pos_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                max_position_embeddings - 1]``.
+                Shape as `[batch_size, num_tokens]` and dtype as int64. Defaults to `None`.
+            input_mask(Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
+                [batch_size, num_attention_heads, sequence_length, sequence_length].
+                We use whole-word-mask in ERNIE, so the whole word will have the same value. For example, "使用" as a word,
+                "使" and "用" will have the same value.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+            attn_bias(Tensor, optional):
+                3D version of `input_mask`, if set, overrides `input_mask`;
+                if set not False, attention mask willed not be applied.
+            past_cache(Tensor, optional, tuple of two lists: cached key and cached value,
+                Each is a list of `Variable`s of shape `[batch_size, seq_len, hidden_size]`:
                 cached key/value tensor that will be concated to generated key/value when performing self attention.
                 if set, `attn_bias` should not be None.
+
         Returns:
-            pooled (`Variable` of shape `[batch_size, hidden_size]`):
-                output logits of pooler classifier
-            encoded(`Variable` of shape `[batch_size, seq_len, hidden_size]`):
-                output logits of transformer stack
-            info (Dictionary):
-                addtional middle level info, inclues: all hidden stats, k/v caches.
+            tuple: Returns tuple (`encoded`, `additional_info`).
+
+            With the fields:
+
+            - `encoded`(Tensor):
+                The output logits of transformer stack.
+                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+
+            - `additional_info` (dict):
+                Additional middle level info, inclues all hidden stats and k/v caches.
         """
         assert len(
             src_ids.
@@ -583,35 +605,44 @@ class ErnieForGeneration(ErnieModel):
 
     def forward(self, *args, **kwargs):
         """
-        Args
-            tgt_labels(`Variable` of shape [batch_size, seqlen] or [batch, seqlen, vocab_size]):
-                ground trouth target sequence id (hard label) or distribution (soft label)
-            tgt_pos(`Variable` of shape [n_targets, 2]):
-                index of tgt_labels in `src_ids`, can be obtained from `fluid.layers.where(src_ids==mask_id)`
-            encoder_only(Bool):
-                If `encoder_only` is `False`,  `loss` and `logits_2d` will not be returned.
+        Args:
+            tgt_labels(Tensor, optional):
+                The ground truth target sequence id (hard label) or distribution (soft label).
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length] or
+                [batch_size, sequence_length, sequence_length].
+            tgt_pos(Tensor, optional):
+                Index of tgt_labels in `src_ids`.
+                It's data type should be `int64` and has a shape of [n_targets, 2]).
+            encode_only(bool, optional):
+                Whether the model will output the logits or only encode the inputs.
+                If `encode_only` is `True`, `loss` and `logits_2d` will not be returned.
 
         Returns:
-            tuple: Returns tuple (`None`, `None`, `info`) or (`output_ids`, `logits`, `info`) or (`loss`, `logits_2d`, `info`).
+            tuple: Returns tuple (`None`, `None`, `info`) if `encode_only` is `True`,
+            returns (`output_ids`, `logits`, `info`) if `tgt_labels` or `tgt_pos` is `None`,
+            else, returns (`loss`, `logits_2d`, `info`).
 
             With the fields:
 
-            - info(Dict):
-                See :class:`ErnieModel`.
+            - `info`(dict):
+                 Middle level info, includes all hidden stats and k/v caches.
 
-            - output_ids(Tensor):
+            - `output_ids`(Tensor):
+                The output index. Its data type should be float32 and its shape is [batch_size].
+                If `encode_only`, returns None.
 
-            - logits(Tensor):
+            - `logits`(Tensor):
                 Logits for every targets.
                 Its data type should be float32 and its shape is [batch_size, sequence_length].
                 If `encode_only`, returns None.
 
-            - loss(Tensor):
+            - `loss`(Tensor):
                 Cross entropy loss mean over every target label.
                 If `encode_only`, returns None.
 
-            - logits_2d(Tensor):
-
+            - `logits_2d`(Tensor):
+                Logits for every targets if `tgt_labels` or `tgt_pos` is not `None` .
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
 
         """
         tgt_labels = kwargs.pop('tgt_labels', None)
