@@ -76,11 +76,6 @@
    如何贡献文档案例 <community/contribute_docs>
    如何加入兴趣小组 <community/join_in_PaddleNLP-SIG>
 
-.. toctree::
-   :maxdepth: 2
-   :caption: 常见问题
-
-   FAQ <FAQ/FAQ.md>
 
 .. toctree::
    :maxdepth: 2
