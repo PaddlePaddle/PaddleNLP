@@ -262,7 +262,7 @@ class TermTree(object):
         return self._root
 
     def __load_type(self, file_path: str):
-        with open(file_path, "rt", newline="") as csvfile:
+        with open(file_path, "rt", newline="", encoding="utf8") as csvfile:
             file_handler = csv.DictReader(csvfile, delimiter="\t")
             for row in file_handler:
                 if row["type-1"] not in self:
