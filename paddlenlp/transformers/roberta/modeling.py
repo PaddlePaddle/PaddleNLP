@@ -199,7 +199,7 @@ class RobertaModel(RobertaPretrainedModel):
             Vocabulary size of `inputs_ids` in `RobertaModel`. Also is the vocab size of token embedding matrix.
             Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `RobertaModel`.
         hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layer and pooler layer. Defaults to `768`.
+            Dimensionality of the embedding layer, encoder layers and pooler layer. Defaults to `768`.
         num_hidden_layers (int, optional):
             Number of hidden layers in the Transformer encoder. Defaults to `12`.
         num_attention_heads (int, optional):
@@ -236,7 +236,6 @@ class RobertaModel(RobertaPretrainedModel):
         pad_token_id(int, optional):
             The non-linear activation function in the pooling layer.
             Defaults to `"tanh"`.
-
     """
 
     def __init__(self,

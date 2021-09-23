@@ -424,9 +424,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
             .. code-block::
 
                 from paddlenlp.transformers import UNIMOTokenizer
-
                 tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
-
                 inputs = tokenizer.gen_encode('He was a puppeteer')
 
         """

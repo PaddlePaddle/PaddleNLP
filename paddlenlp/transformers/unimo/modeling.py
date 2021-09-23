@@ -30,9 +30,9 @@ __all__ = [
 class UNIMOPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained UNIMO models. It provides UNIMO related
-    `model_config_file`, `pretrained_resource_files_map`, `resource_files_names`,
-    `pretrained_init_configuration`, `base_model_prefix` for downloading and
-    loading pretrained models.
+    `model_config_file`, `pretrained_init_configuration`,
+    `resource_files_names`, `pretrained_resource_files_map`,
+    `base_model_prefix` for downloading and loading pretrained models.
     Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
@@ -204,7 +204,6 @@ class UNIMOModel(UNIMOPretrainedModel):
         bos_token (str, optional):
             A special token representing the beginning of a sequence that was used during pretraining.
             Defaults to `"<s>"`.
-
     """
 
     def __init__(
@@ -263,8 +262,7 @@ class UNIMOModel(UNIMOPretrainedModel):
                 use_cache=False,
                 cache=None):
         r"""
-        The UNIMOModel forward method, overrides the special 
-        :meth:`__call__` method.
+        The UNIMOModel forward method, overrides the special :meth:`__call__` method.
 
         Args:
             input_ids (Tensor):

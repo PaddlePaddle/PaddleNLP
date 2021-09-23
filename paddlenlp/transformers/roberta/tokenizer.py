@@ -22,7 +22,7 @@ __all__ = ['RobertaTokenizer', ]
 
 class RobertaTokenizer(PretrainedTokenizer):
     """
-    Constructs a RoBerTa tokenizer. It uses a basic tokenizer to do punctuation
+    Constructs a RoBerta tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
 
@@ -59,7 +59,8 @@ class RobertaTokenizer(PretrainedTokenizer):
 
             tokens = tokenizer('He was a puppeteer')
             #{'input_ids': [101, 9245, 9947, 143, 11227, 9586, 8418, 8854, 8180, 102],
-            #'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
+            #'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}、
+
     """
 
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
@@ -124,6 +125,7 @@ class RobertaTokenizer(PretrainedTokenizer):
     def _tokenize(self, text):
         """
         End-to-end tokenization for RoBERTa models.
+
         Args:
             text (str): The text to be tokenized.
         
@@ -181,6 +183,7 @@ class RobertaTokenizer(PretrainedTokenizer):
                 '''
                 he was a puppeteer
                 '''
+
         """
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
