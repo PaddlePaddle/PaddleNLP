@@ -151,7 +151,11 @@ class PretrainedModel(Layer, GenerationMixin):
         return None  # Overwrite for models with output embeddings
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+    def from_pretrained(cls,
+                        pretrained_model_name_or_path,
+                        accelerate_mode=False,
+                        *args,
+                        **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
@@ -265,7 +269,17 @@ class PretrainedModel(Layer, GenerationMixin):
         # Check if the loaded config matches the current model class's __init__
         # arguments. If not match, the loaded config is for the base model class.
         init_kwargs["vocab_file"] = vocab_file
-        accelerate_mode = init_kwargs.get("accelerate_mode", False)
+        if accelerate_mode:
+            if init_kwargs.get("accelerate_mode", False):
+                accelerate_mode = True
+                logger.info(
+                    "The tokenizer will be started as accelerated mode.")
+            else:
+                logger.warning(
+                    "The tokenizer has not been accelerated yet. Please wait a moment."
+                )
+        init_kwargs["accelerate_mode"] = accelerate_mode
+
         if init_class == cls.base_model_class.__name__:
             base_args = init_args
             base_kwargs = init_kwargs
@@ -367,13 +381,15 @@ class PretrainedModel(Layer, GenerationMixin):
 
     def to_static_model(self, output_path):
         if self.accelerate_mode:
+            # When using accelerated mode, 
+            # the converted static model only needs the text.
             static_model = paddle.jit.to_static(
                 self,
                 input_spec=[
-                    None,
-                    None,
-                    None,
-                    None,
+                    None,  # input_ids 
+                    None,  # token_type_ids
+                    None,  # position_ids
+                    None,  # attention_mask
                     paddle.static.InputSpec(
                         shape=[None],
                         dtype=core.VarDesc.VarType.STRINGS),  # texts
@@ -382,18 +398,19 @@ class PretrainedModel(Layer, GenerationMixin):
             save_path = os.path.join(output_path, "inference")
             paddle.jit.save(static_model, save_path)
         else:
-            # Convert to static graph with specific input description
+            # When using normal mode as not accelerated, 
+            # the converted static model only needs the text.
             static_model = paddle.jit.to_static(
                 self,
-                input_spec=[                                  # texts
+                input_spec=[
                     paddle.static.InputSpec(
                         shape=[None, None], dtype="int64"),  # input_ids
                     paddle.static.InputSpec(
-                        shape=[None, None], dtype="int64")   # segment_ids
+                        shape=[None, None], dtype="int64")  # token_type_ids
                 ])
             # Save in static graph model.
-            save_path = os.path.join(args.output_path, "inference")
-            paddle.jit.save(model, save_path)
+            save_path = os.path.join(output_path, "inference")
+            paddle.jit.save(static_model, save_path)
 
     def save_model_config(self, save_dir):
         """

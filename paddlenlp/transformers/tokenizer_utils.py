@@ -540,12 +540,16 @@ class PretrainedTokenizer(object):
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())
         init_kwargs.pop("init_class", None)
-        model_accelerate_mode = init_kwargs.pop("accelerate_mode", False)
-        if accelerate_mode and model_accelerate_mode:
-            accelerate_mode = True
-        else:
-            accelerate_mode = False
-        init_kwargs['accelerate_mode'] = accelerate_mode
+        if accelerate_mode:
+            if init_kwargs.get("accelerate_mode", False):
+                accelerate_mode = True
+                logger.info(
+                    "The tokenizer will be started as accelerated mode.")
+            else:
+                logger.warning(
+                    "The tokenizer has not been accelerated yet. Please wait a moment."
+                )
+        init_kwargs["accelerate_mode"] = accelerate_mode
 
         # Update with newly provided args and kwargs
         init_args = init_args if not args else args
@@ -569,7 +573,6 @@ class PretrainedTokenizer(object):
                     file_path):
                 init_kwargs[args_name] = file_path
         # TODO(guosheng): avoid reduplication of position args and key word args
-        print(init_kwargs)
         tokenizer = cls(*init_args, **init_kwargs)
         return tokenizer
 

@@ -31,7 +31,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--batch_size", default=64, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
@@ -131,7 +131,7 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
 
 
 def do_train():
-    paddle.set_device("gpu:6")
+    paddle.set_device("gpu:3")
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -142,11 +142,13 @@ def do_train():
 
     # If you wanna use bert/roberta/electra pretrained model,
     model = ppnlp.transformers.BertForSequenceClassification.from_pretrained(
-        'bert-base-chinese', num_class=2)
+        'bert-base-chinese', num_classes=2, accelerate_mode=True)
+    print("model.accelerate_mode ", model.accelerate_mode)
 
     # If you wanna use bert/roberta/electra pretrained model,
     tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
-        'bert-base-chinese')
+        'bert-base-chinese', accelerate_mode=True)
+    print("tokenizer.accelerate_mode ", tokenizer.accelerate_mode)
 
     trans_func = partial(
         convert_example,
