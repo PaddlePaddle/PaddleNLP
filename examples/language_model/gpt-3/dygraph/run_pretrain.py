@@ -111,7 +111,7 @@ def do_train(args):
     worker_index = dp_rank * sharding_size + sharding_rank
     worker_num = args.dp_degree * args.sharding_degree
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
-    print(worker_index)
+
     # seed control in hybrid parallel
     set_hyrbid_parallel_seed(args.seed, worker_index)
 
