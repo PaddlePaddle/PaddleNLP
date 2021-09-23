@@ -30,6 +30,7 @@ from args import parse_args
 import lr
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import DygraphShardingOptimizer
 
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
@@ -37,19 +38,12 @@ MODEL_CLASSES = {
 }
 
 
-def set_hyrbid_parallel_seed(basic_seed, dp_rank, mp_rank, pp_rank):
+def set_hyrbid_parallel_seed(basic_seed, idx):
     assert args.device != "cpu"
 
-    random.seed(basic_seed + dp_rank)
-    np.random.seed(basic_seed + dp_rank)
-    paddle.seed(basic_seed + dp_rank)
-
-    # local_seed/ global_seed is used to control dropout in ModelParallel
-    local_seed = basic_seed + 123 + mp_rank * 10 + pp_rank * 1000
-    global_seed = basic_seed + dp_rank
-    tracker = get_rng_state_tracker()
-    tracker.add('global_seed', global_seed)
-    tracker.add('local_seed', local_seed)
+    random.seed(basic_seed + idx)
+    np.random.seed(basic_seed + idx)
+    paddle.seed(basic_seed + idx)
 
 
 @paddle.no_grad()
@@ -92,13 +86,16 @@ def do_train(args):
     strategy.hybrid_configs = {
         "dp_degree": args.dp_degree,
         "mp_degree": args.mp_degree,
-        "pp_degree": args.pp_degree
+        "pp_degree": args.pp_degree,
+        "sharding_degree": args.sharding_degree
     }
 
     strategy.pipeline_configs = {
         "accumulate_steps": args.local_batch_size // args.micro_batch_size,
         "micro_batch_size": args.micro_batch_size
     }
+
+    strategy.tensor_parallel_configs = {"tensor_init_seed": 123, }
 
     fleet.init(is_collective=True, strategy=strategy)
 
@@ -108,10 +105,23 @@ def do_train(args):
     mp_rank = hcg.get_model_parallel_rank()
     pp_rank = hcg.get_stage_id()
     dp_rank = hcg.get_data_parallel_rank()
-    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+    sharding_rank = hcg.get_sharding_parallel_rank()
 
+    sharding_size = hcg.get_sharding_parallel_world_size()
+    worker_index = dp_rank * sharding_size + sharding_rank
+    worker_num = args.dp_degree * args.sharding_degree
+    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+    print(worker_index)
     # seed control in hybrid parallel
-    set_hyrbid_parallel_seed(args.seed, dp_rank, mp_rank, pp_rank)
+    set_hyrbid_parallel_seed(args.seed, worker_index)
+
+    # local_seed/ global_seed is used to control dropout in ModelParallel
+    local_seed = args.seed + 123 + mp_rank * 10 + pp_rank * 1000
+    global_seed = args.seed + worker_index
+
+    tracker = get_rng_state_tracker()
+    tracker.add('global_seed', global_seed)
+    tracker.add('local_seed', local_seed)
 
     default_global_tokens_num = args.global_batch_size * args.max_seq_len
 
@@ -174,7 +184,7 @@ def do_train(args):
 
     clip = None
     if args.grad_clip > 0:
-        clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.grad_clip)
+        clip = paddle.nn.ClipGradByNorm(clip_norm=args.grad_clip)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
@@ -183,15 +193,31 @@ def do_train(args):
         if not any(nd in n for nd in ["bias", "norm"])
     ]
 
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
-        beta1=args.adam_beta1,
-        beta2=args.adam_beta2,
-        epsilon=args.adam_epsilon,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        grad_clip=clip,
-        apply_decay_param_fun=lambda x: x in decay_params)
+    if args.sharding_degree > 1:
+        optimizer = DygraphShardingOptimizer(
+            hcg=fleet.get_hybrid_communicate_group(),
+            user_defined_strategy=strategy,
+            params=model.parameters(),
+            inner_optimizer_class=paddle.optimizer.AdamW,
+            learning_rate=lr_scheduler
+            if lr_scheduler is not None else args.max_lr,
+            beta1=args.adam_beta1,
+            beta2=args.adam_beta2,
+            epsilon=args.adam_epsilon,
+            weight_decay=args.weight_decay,
+            grad_clip=clip,
+            apply_decay_param_fun=lambda x: x in decay_params)
+    else:
+        optimizer = paddle.optimizer.AdamW(
+            learning_rate=lr_scheduler
+            if lr_scheduler is not None else args.max_lr,
+            beta1=args.adam_beta1,
+            beta2=args.adam_beta2,
+            epsilon=args.adam_epsilon,
+            parameters=model.parameters(),
+            weight_decay=args.weight_decay,
+            grad_clip=clip,
+            apply_decay_param_fun=lambda x: x in decay_params)
 
     if paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
@@ -227,8 +253,8 @@ def do_train(args):
                 args,
                 data_file,
                 local_rank=local_rank,
-                data_world_size=args.dp_degree,
-                data_world_rank=dp_rank,
+                data_world_size=worker_num,
+                data_world_rank=worker_index,
                 eos_id=tokenizer.eos_token_id)
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.
@@ -309,9 +335,9 @@ def do_train(args):
                                  args.eval_iters, log_writer, global_step,
                                  epoch, "valid")
 
-                # only dp_rank = 0 save model
+                # only worker_index = 0 save model
                 if (global_step % args.save_steps == 0 or
-                        global_step >= args.max_steps) and dp_rank == 0:
+                        global_step >= args.max_steps) and worker_index == 0:
 
                     model_to_save = model._layers if paddle.distributed.get_world_size(
                     ) > 1 else model
