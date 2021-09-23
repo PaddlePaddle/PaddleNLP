@@ -57,15 +57,11 @@ def write_sighan_result_to_file(args, corr_preds, det_preds, lengths,
                                            lengths[i], tokenizer,
                                            args.max_seq_length)
                 words = list(words)
-                if len(words) > args.max_seq_length - 2:
-                    words = words[:args.max_seq_length - 2]
-                words = ''.join(words)
-
+                pred_result = list(pred_result)
                 result = ids
                 if pred_result == words:
                     result += ', 0'
                 else:
-                    pred_result = list(pred_result)
                     assert len(pred_result) == len(
                         words), "pred_result: {}, words: {}".format(pred_result,
                                                                     words)
@@ -98,9 +94,9 @@ def do_predict(args):
         max_seq_length=args.max_seq_length,
         is_test=True)
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Pad(axis=0, pad_val=pinyin_vocab.token_to_idx[pinyin_vocab.pad_token]),  # pinyin
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # segment
+        Pad(axis=0, pad_val=pinyin_vocab.token_to_idx[pinyin_vocab.pad_token], dtype='int64'),  # pinyin
         Stack(axis=0, dtype='int64'),  # length
     ): [data for data in fn(samples)]
 

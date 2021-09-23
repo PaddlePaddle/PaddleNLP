@@ -286,10 +286,10 @@ def create_pretrained_dataset(args,
             places=places,
             feed_list=data_holders,
             batch_sampler=batch_sampler,
-            num_workers=0,
+            num_workers=1,
             worker_init_fn=worker_init,
             # collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
-            collate_fn=Tuple(Stack(), Stack(), Stack()),
+            collate_fn=Tuple(Stack(), Stack(), Stack(), Stack()),
             return_list=False)
         return data_loader
 
@@ -349,12 +349,12 @@ class GPTDataset(paddle.io.Dataset):
         # The pad and eos tokens do not contribute the loss
         loss_mask = np.ones(seq_length, dtype="float32")
         loss_mask[np.where(np.array(tokens) == self.eos_id)] = 0.0
-        # position_ids = np.arange(0, seq_length, dtype="int64")
+        position_ids = np.arange(0, seq_length, dtype="int64")
 
         # attention_mask = (attention_mask - 1.0) * 1e9
         # attention_mask = attention_mask.astype("float32")
         # return [tokens, loss_mask, attention_mask, position_ids, labels]
-        return [tokens, loss_mask, labels]
+        return [tokens, loss_mask, position_ids, labels]
 
     def _get_single_sample_from_idx(self, doc_index_f, doc_index_l, offset_f,
                                     offset_l):
