@@ -283,7 +283,7 @@ class TestBertFromPretrain(CommonTest):
             'bert-base-uncased',
             attention_probs_dropout_prob=0.0,
             hidden_dropout_prob=0.0)
-        self.config = copy.deepcopy(model.bert.config)
+        self.config = copy.deepcopy(model.config)
         self.config['seq_len'] = 32
         self.config['batch_size'] = 3
 
@@ -310,33 +310,6 @@ class TestBertFromPretrain(CommonTest):
              [-0.74019802, -0.10187808, 0.95353240]])
         self.check_output_equal(
             output[1].numpy()[0:3, 0:3], expected_pooled_slice, atol=1e-6)
-
-
-class TestBertFromMaskedLM(CommonTest):
-    @slow
-    def test_bert_base_uncased(self):
-        model = BertForMaskedLM.from_pretrained(
-            'bert-base-uncased',
-            attention_probs_dropout_prob=0.0,
-            hidden_dropout_prob=0.0)
-        self.config = copy.deepcopy(model.bert.config)
-
-        self.config['seq_len'] = 32
-        self.config['batch_size'] = 3
-
-        input_ids, _ = create_input_data(self.config, 102)
-        input_ids = paddle.to_tensor(input_ids)
-        output = model(input_ids)
-
-        expected_seq_shape = (self.config['batch_size'], self.config['seq_len'],
-                              self.config['hidden_size'])
-        self.check_output_equal(output.numpy().shape, expected_seq_shape)
-        expected_seq_slice = np.array([[0.17383946, 0.09206937, 0.45788339],
-                                       [-0.28287640, 0.06244858, 0.54864359],
-                                       [-0.54589444, 0.04811822, 0.50559914]])
-        # There's output diff about 1e-6 between cpu and gpu
-        self.check_output_equal(
-            output.numpy()[0, 0:3, 0:3], expected_seq_slice, atol=1e-6)
 
 
 if __name__ == "__main__":
