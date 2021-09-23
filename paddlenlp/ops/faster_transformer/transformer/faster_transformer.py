@@ -795,7 +795,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             temperature=temperature)
 
     def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
-                    pad_token_id, eos_token_id, **model_kwargs):
+                    diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
         max_length -= input_ids.shape[-1]
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
@@ -805,6 +805,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             model_inputs=model_inputs,
             max_length=max_length,
             num_beams=beam_scorer.num_beams,
+            diversity_rate=diversity_rate,
             temperature=temperature)
 
     def forward(self,
@@ -813,6 +814,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 top_k=4,
                 top_p=0.0,
                 num_beams=4,
+                diversity_rate=0.0,
                 temperature=1.0,
                 model_inputs=None,
                 **model_kwargs):
@@ -832,6 +834,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             cache_v=cache_v,
             memory_seq_lens=seq_len,
             beam_size=num_beams,
+            diversity_rate=diversity_rate,
             topk=top_k,
             topp=top_p,
             max_out_len=max_length,
@@ -955,7 +958,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             temperature=temperature)
 
     def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
-                    pad_token_id, eos_token_id, **model_kwargs):
+                    diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
         max_length -= input_ids.shape[-1]
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
@@ -965,6 +968,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             model_inputs=model_inputs,
             max_length=max_length,
             num_beams=beam_scorer.num_beams,
+            diversity_rate=diversity_rate,
             temperature=temperature)
 
     def forward(self,
@@ -973,6 +977,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 top_k=4,
                 top_p=0.0,
                 num_beams=4,
+                diversity_rate=0.0,
                 temperature=1.0,
                 model_inputs=None,
                 **model_kwargs):
@@ -992,6 +997,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             cache_v=cache_v,
             memory_seq_lens=seq_len,
             beam_size=num_beams,
+            diversity_rate=diversity_rate,
             topk=top_k,
             topp=top_p,
             max_out_len=max_length,

@@ -40,7 +40,6 @@ def preprocess_examples(examples, mode='train'):
         for i in range(0, len(conversation), 2):
             new_examples.append({
                 'goal': example['goal'],
-                'knowledge': example['knowledge'],
                 'history': conversation[:i],
                 'response': conversation[i]
             })
@@ -51,22 +50,16 @@ def convert_example(example,
                     tokenizer,
                     max_seq_len=512,
                     max_response_len=128,
-                    max_knowledge_len=256,
                     mode='train'):
     """Convert all examples into necessary features."""
     goal = example['goal']
-    knowledge = example['knowledge']
-    goal_knowledge = ' '.join([' '.join(lst) for lst in goal + knowledge])
 
     if mode != 'test':
         tokenized_example = tokenizer.dialogue_encode(
             example['history'],
             response=example['response'],
-            knowledge=goal_knowledge,
-            task_type='knowledge',
             max_seq_len=max_seq_len,
             max_response_len=max_response_len,
-            max_knowledge_len=max_knowledge_len,
             return_length=True)
         response_start = tokenized_example['input_ids'].index(
             tokenizer.cls_token_id, 1)
@@ -80,10 +73,7 @@ def convert_example(example,
     else:
         tokenized_example = tokenizer.dialogue_encode(
             example['history'],
-            knowledge=goal_knowledge,
-            task_type='knowledge',
             max_seq_len=max_seq_len,
-            max_knowledge_len=max_knowledge_len,
             add_start_token_as_response=True,
             return_length=True)
 
@@ -143,7 +133,6 @@ def create_data_loader(dataset, tokenizer, args, mode):
         tokenizer=tokenizer,
         max_seq_len=args.max_seq_len,
         max_response_len=args.max_response_len,
-        max_knowledge_len=args.max_knowledge_len,
         mode=mode)
     dataset = dataset.map(trans_func1, batched=True).map(trans_func2, lazy=True)
     if mode == 'train':
