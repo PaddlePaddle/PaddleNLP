@@ -251,6 +251,8 @@ class ErnieGramModel(ErnieGramPretrainedModel):
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
                 [batch_size, num_attention_heads, sequence_length, sequence_length].
+                We use whole-word-mask in ERNIE, so the whole word will have the same value. For example, "使用" as a word,
+                "使" and "用" will have the same value.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
 
         Returns:
