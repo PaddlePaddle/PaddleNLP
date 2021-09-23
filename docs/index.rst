@@ -78,9 +78,9 @@
 
 .. toctree::
    :maxdepth: 2
-   :caption: FAQ
+   :caption: 常见问题
 
-   FAQ <FAQ.md>
+   FAQ <FAQ/FAQ.md>
 
 .. toctree::
    :maxdepth: 2
