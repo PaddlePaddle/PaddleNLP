@@ -91,7 +91,7 @@ class FasterTransformer(TransformerModel):
             `topp` are kept for top-p sampling. Defaults to 4. 
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
-        beam_search_diversity_rate (float, optional):
+        diversity_rate (float, optional):
             The diversity rate for beam search. Defaults to 0.0.
         use_fp16_decoding(bool, optional): Whether to use fp16 for decoding. 
         rel_len(bool, optional):
@@ -125,7 +125,7 @@ class FasterTransformer(TransformerModel):
                  topk=1,
                  topp=0.0,
                  max_out_len=256,
-                 beam_search_diversity_rate=0.0,
+                 diversity_rate=0.0,
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  rel_len=False,
@@ -144,7 +144,7 @@ class FasterTransformer(TransformerModel):
         self.topk = args.pop("topk")
         self.topp = args.pop("topp")
         self.max_out_len = args.pop("max_out_len")
-        self.beam_search_diversity_rate = args.pop("beam_search_diversity_rate")
+        self.diversity_rate = args.pop("diversity_rate")
         self.decoding_lib = args.pop("decoding_lib")
         self.use_fp16_decoding = args.pop("use_fp16_decoding")
         self.rel_len = args.pop("rel_len")
@@ -181,7 +181,7 @@ class FasterTransformer(TransformerModel):
             topk=topk,
             topp=topp,
             max_out_len=max_out_len,
-            beam_search_diversity_rate=self.beam_search_diversity_rate,
+            diversity_rate=self.diversity_rate,
             decoding_lib=self.decoding_lib,
             use_fp16_decoding=self.use_fp16_decoding,
             rel_len=self.rel_len,
@@ -487,8 +487,7 @@ class TransformerGenerator(paddle.nn.Layer):
         self.output_time_major = kwargs.pop("output_time_major", True)
         # Only works for Faster Transformer.
         # TODO: original version supports diversity rate.
-        beam_search_diversity_rate = kwargs.pop("beam_search_diversity_rate",
-                                                0.0)
+        diversity_rate = kwargs.pop("diversity_rate", 0.0)
         use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
         use_ft = kwargs.pop("use_ft", True)
         beam_search_version = kwargs.pop("beam_search_version", "v1")
@@ -516,7 +515,7 @@ class TransformerGenerator(paddle.nn.Layer):
                     eos_id=eos_id,
                     beam_size=beam_size,
                     max_out_len=max_out_len,
-                    beam_search_diversity_rate=beam_search_diversity_rate,
+                    diversity_rate=diversity_rate,
                     decoding_strategy=decoding_strategy,
                     use_fp16_decoding=use_fp16_decoding,
                     rel_len=rel_len,
@@ -1011,7 +1010,7 @@ class FasterBART(nn.Layer):
                  topk=1,
                  topp=0.0,
                  max_out_len=256,
-                 beam_search_diversity_rate=0.0,
+                 diversity_rate=0.0,
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  rel_len=False,
@@ -1033,7 +1032,7 @@ class FasterBART(nn.Layer):
             topk=topk,
             topp=topp,
             max_out_len=max_out_len,
-            beam_search_diversity_rate=beam_search_diversity_rate,
+            diversity_rate=diversity_rate,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding)
 
