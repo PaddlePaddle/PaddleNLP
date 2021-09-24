@@ -840,6 +840,7 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
                                             masked_lm_labels.unsqueeze(2))
 
         loss_mask = loss_mask.reshape([-1])
+        masked_lm_loss = masked_lm_loss.cast(dtype='flaot32')
         masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
         loss = masked_lm_loss / loss_mask.sum()
         return loss

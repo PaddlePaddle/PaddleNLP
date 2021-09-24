@@ -174,7 +174,8 @@ def do_train(args):
 
     clip = None
     if args.grad_clip > 0:
-        clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.grad_clip)
+        #clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.grad_clip)
+        clip= paddle.nn.ClipGradByNorm(clip_norm=args.grad_clip)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
@@ -210,6 +211,8 @@ def do_train(args):
         else:
             logger.warning("No optimizer checkpoint file found in %s." %
                            opt_path)
+    
+    model, optimizer = paddle.amp.decorate(models=model, optimizers=optimizer, level='02', master_weight=True)
 
     global_step = 0
     tic_train = time.time()
@@ -252,7 +255,8 @@ def do_train(args):
                             custom_black_list=[
                                 "reduce_sum", "c_softmax_with_cross_entropy",
                                 "c_embedding"
-                            ]):
+                            ],
+                            level='O2'):
                         preds = model(tokens, position_ids)
                         loss = criterion(preds, labels, loss_mask)
 
