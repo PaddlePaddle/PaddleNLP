@@ -11,14 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import time
-from typing import Optional, Tuple
-from collections import OrderedDict
 
 import paddle
 import paddle.nn as nn
-import paddle.tensor as tensor
 import paddle.nn.functional as F
 
 from .. import PretrainedModel, register_base_model
@@ -27,7 +22,8 @@ __all__ = [
     'ElectraModel', 'ElectraPretrainedModel', 'ElectraForTotalPretraining',
     'ElectraDiscriminator', 'ElectraGenerator', 'ElectraClassificationHead',
     'ElectraForSequenceClassification', 'ElectraForTokenClassification',
-    'ElectraPretrainingCriterion'
+    'ElectraPretrainingCriterion', 'ElectraForMultipleChoice',
+    'ElectraForQuestionAnswering', 'ElectraForMaskedLM'
 ]
 
 
@@ -225,20 +221,54 @@ class ElectraPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 21128,
         },
+        "hfl-chinese-electra-180g-base": {
+            "attention_probs_dropout_prob": 0.1,
+            "embedding_size": 768,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "pad_token_id": 0,
+            "type_vocab_size": 2,
+            "vocab_size": 21128,
+        },
+        "hfl-chinese-electra-180g-small-ex": {
+            "attention_probs_dropout_prob": 0.1,
+            "embedding_size": 256,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 256,
+            "initializer_range": 0.02,
+            "intermediate_size": 1024,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 4,
+            "num_hidden_layers": 24,
+            "pad_token_id": 0,
+            "type_vocab_size": 2,
+            "vocab_size": 21128,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "electra-small":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/electra/electra-small.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/electra/electra-small.pdparams",
             "electra-base":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/electra/electra-base.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/electra/electra-base.pdparams",
             "electra-large":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/electra/electra-large.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/electra/electra-large.pdparams",
             "chinese-electra-small":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/chinese-electra-small/chinese-electra-small.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese-electra-small/chinese-electra-small.pdparams",
             "chinese-electra-base":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/chinese-electra-base/chinese-electra-base.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/chinese-electra-base/chinese-electra-base.pdparams",
+            "hfl-chinese-electra-180g-base":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/hfl-chinese-electra-180g-base-discriminator/model_state.pdparams",
+            "hfl-chinese-electra-180g-small-ex":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/hfl-chinese-electra-180g-small-ex/model_state.pdparams",
         }
     }
 
@@ -305,11 +335,79 @@ class ElectraPretrainedModel(PretrainedModel):
 
 @register_base_model
 class ElectraModel(ElectraPretrainedModel):
-    def __init__(self, vocab_size, embedding_size, hidden_size,
-                 num_hidden_layers, num_attention_heads, intermediate_size,
-                 hidden_act, hidden_dropout_prob, attention_probs_dropout_prob,
-                 max_position_embeddings, type_vocab_size, initializer_range,
-                 pad_token_id):
+    """
+    The bare ElectraModel Model transformer outputting raw hidden-states without any specific head on top.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in `ElectraModel`. Also is the vocab size of token embedding matrix.
+            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `ElectraModel`.
+        embedding_size (int, optional):
+            Dimensionality of the embedding layer. Defaults to `768`.
+        hidden_size (int, optional):
+            Dimensionality of the encoder layer and pooler layer. Defaults to `768`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in the Transformer encoder. Defaults to `12`.
+        num_attention_heads (int, optional):
+            Number of attention heads for each attention layer in the Transformer encoder.
+            Defaults to `12`.
+        intermediate_size (int, optional):
+            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
+            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
+            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
+            Defaults to `3072`.
+        hidden_act (str, optional):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported. Defaults to `"gelu"`.
+        hidden_dropout_prob (float, optional):
+            The dropout probability for all fully connected layers in the embeddings and encoder.
+            Defaults to `0.1`.
+        attention_probs_dropout_prob (float, optional):
+            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
+            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
+            sequence. Defaults to `512`.
+        type_vocab_size (int, optional):
+            The vocabulary size of `token_type_ids`.
+            Defaults to `2`.
+
+        initializer_range (float, optional):
+            The standard deviation of the normal initializer.
+            Defaults to 0.02.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`ElectraPretrainedModel.init_weights()` for how weights are initialized in `ElectraModel`.
+
+        pad_token_id (int, optional):
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
+
+    """
+
+    def __init__(self,
+                 vocab_size,
+                 embedding_size=768,
+                 hidden_size=768,
+                 num_hidden_layers=12,
+                 num_attention_heads=12,
+                 intermediate_size=3072,
+                 hidden_act="gelu",
+                 hidden_dropout_prob=0.1,
+                 attention_probs_dropout_prob=0.1,
+                 max_position_embeddings=512,
+                 type_vocab_size=2,
+                 initializer_range=0.02,
+                 pad_token_id=0):
         super(ElectraModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -343,12 +441,67 @@ class ElectraModel(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r'''
+        The ElectraModel forward method, overrides the `__call__()` special method.
 
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                max_position_embeddings - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                If its data type is int, the values should be either 0 or 1.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+
+        Returns:
+            Tensor: Returns Tensor `sequence_output`, sequence of hidden-states at the last layer of the model.
+            Shape as `[batch_size, sequence_length, hidden_size]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ElectraModel, ElectraTokenizer
+
+                tokenizer = ElectraTokenizer.from_pretrained('electra-base')
+                model = ElectraModel.from_pretrained('electra-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        '''
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
                  ).astype(paddle.get_default_dtype()) * -1e9,
                 axis=[1, 2])
+
+        if attention_mask.ndim == 2:
+            attention_mask = attention_mask.unsqueeze(axis=[1, 2])
+            attention_mask = (1.0 - attention_mask) * -1e9
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
@@ -364,6 +517,14 @@ class ElectraModel(ElectraPretrainedModel):
 
 
 class ElectraDiscriminator(ElectraPretrainedModel):
+    """
+    Electra Model with a discriminator prediction head on top.
+
+    Args:
+        electra (:class:`ElectraModel`):
+            An instance of ElectraModel.
+    """
+
     def __init__(self, electra):
         super(ElectraDiscriminator, self).__init__()
 
@@ -378,6 +539,58 @@ class ElectraDiscriminator(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r'''
+        The ElectraDiscriminator forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                max_position_embeddings - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                If its data type is int, the values should be either 0 or 1.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the discriminator prediction logits.
+            Shape as `[batch_size, sequence_length]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ElectraDiscriminatorPredictions, ElectraTokenizer
+
+                tokenizer = ElectraTokenizer.from_pretrained('electra-base')
+                model = ElectraDiscriminatorPredictions.from_pretrained('electra-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+        '''
 
         discriminator_sequence_output = self.electra(
             input_ids, token_type_ids, position_ids, attention_mask)
@@ -388,6 +601,14 @@ class ElectraDiscriminator(ElectraPretrainedModel):
 
 
 class ElectraGenerator(ElectraPretrainedModel):
+    """
+    Electra Model with a generator prediction head on top.
+
+    Args:
+        electra (:class:`ElectraModel`):
+            An instance of ElectraModel.
+    """
+
     def __init__(self, electra):
         super(ElectraGenerator, self).__init__()
 
@@ -402,7 +623,7 @@ class ElectraGenerator(ElectraPretrainedModel):
                 self.electra.config["embedding_size"],
                 self.electra.config["vocab_size"])
         else:
-            self.generator_lm_head_bias = paddle.fluid.layers.create_parameter(
+            self.generator_lm_head_bias = paddle.create_parameter(
                 shape=[self.electra.config["vocab_size"]],
                 dtype=paddle.get_default_dtype(),
                 is_bias=True)
@@ -416,6 +637,58 @@ class ElectraGenerator(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r'''
+        The ElectraGenerator forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                max_position_embeddings - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                If its data type is int, the values should be either 0 or 1.
+
+                - **1** for tokens that **not masked**,
+                - **0** for tokens that **masked**.
+
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+
+        Returns:
+            Tensor: Returns tensor `prediction_scores`, a tensor of the generator prediction scores.
+            Shape as `[batch_size, sequence_length, vocab_size]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ElectraGenerator, ElectraTokenizer
+
+                tokenizer = ElectraTokenizer.from_pretrained('electra-base')
+                model = ElectraGenerator.from_pretrained('electra-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                prediction_scores = model(**inputs)
+        '''
 
         generator_sequence_output = self.electra(input_ids, token_type_ids,
                                                  position_ids, attention_mask)
@@ -456,14 +729,30 @@ class ElectraClassificationHead(nn.Layer):
 
 
 class ElectraForSequenceClassification(ElectraPretrainedModel):
-    def __init__(self, electra, num_classes):
+    """
+    Electra Model with a sequence classification/regression head on top (a linear layer on top of the hidden-states output) e.g.
+    for GLUE tasks.
+
+    Args:
+        electra (:class:`ElectraModel`):
+            An instance of ElectraModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of Electra.
+            If None, use the same value as `hidden_dropout_prob` of `ElectraModel`
+            instance `electra`. Defaults to None.
+    """
+
+    def __init__(self, electra, num_classes=2, dropout=None):
         super(ElectraForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.electra = electra
         self.classifier = ElectraClassificationHead(
-            self.electra.config["hidden_size"],
-            self.electra.config["hidden_dropout_prob"], self.num_classes)
-
+            hidden_size=self.electra.config["hidden_size"],
+            hidden_dropout_prob=dropout if dropout is not None else
+            self.electra.config["hidden_dropout_prob"],
+            num_classes=self.num_classes, )
         self.init_weights()
 
     def forward(self,
@@ -471,6 +760,36 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r"""
+        The ElectraForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ElectraModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            position_ids(Tensor, optional):
+                See :class:`ElectraModel`.
+            attention_mask (list, optional):
+                See :class:`ElectraModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Shape as `[batch_size, num_classes]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
+
+                tokenizer = ElectraTokenizer.from_pretrained('electra-base')
+                model = ElectraForSequenceClassification.from_pretrained('electra-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+        """
 
         sequence_output = self.electra(input_ids, token_type_ids, position_ids,
                                        attention_mask)
@@ -481,11 +800,27 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
 
 
 class ElectraForTokenClassification(ElectraPretrainedModel):
-    def __init__(self, electra, num_classes):
+    """
+    Electra Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        electra (:class:`ElectraModel`):
+            An instance of ElectraModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of Electra.
+            If None, use the same value as `hidden_dropout_prob` of `ElectraModel`
+            instance `electra`. Defaults to None.
+    """
+
+    def __init__(self, electra, num_classes=2, dropout=None):
         super(ElectraForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.electra = electra
-        self.dropout = nn.Dropout(self.electra.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.electra.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.electra.config["hidden_size"],
                                     self.num_classes)
         self.init_weights()
@@ -495,6 +830,36 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
+        r"""
+        The ElectraForTokenClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ElectraModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            position_ids(Tensor, optional):
+                See :class:`ElectraModel`.
+            attention_mask (list, optional):
+                See :class:`ElectraModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ElectraForTokenClassification, ElectraTokenizer
+
+                tokenizer = ElectraTokenizer.from_pretrained('electra-base')
+                model = ElectraForTokenClassification.from_pretrained('electra-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+        """
 
         sequence_output = self.electra(input_ids, token_type_ids, position_ids,
                                        attention_mask)
@@ -506,6 +871,9 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
 
 
 class ElectraForTotalPretraining(ElectraPretrainedModel):
+    """
+    Combine generator with discriminator for Replaced Token Detection (RTD) pretraining.
+    """
     pretrained_init_configuration = {
         "electra-small-generator": {
             "attention_probs_dropout_prob": 0.1,
@@ -597,6 +965,51 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 30522
         },
+        "hfl-chinese-electra-180g-base-discriminator": {
+            "attention_probs_dropout_prob": 0.1,
+            "embedding_size": 768,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "pad_token_id": 0,
+            "type_vocab_size": 2,
+            "vocab_size": 21128,
+        },
+        "hfl-chinese-electra-180g-small-ex-discriminator": {
+            "attention_probs_dropout_prob": 0.1,
+            "embedding_size": 256,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 256,
+            "initializer_range": 0.02,
+            "intermediate_size": 1024,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 4,
+            "num_hidden_layers": 24,
+            "pad_token_id": 0,
+            "type_vocab_size": 2,
+            "vocab_size": 21128,
+        },
+        "hfl-chinese-legal-electra-small-generator": {
+            "attention_probs_dropout_prob": 0.1,
+            "embedding_size": 128,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 64,
+            "initializer_range": 0.02,
+            "intermediate_size": 256,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 1,
+            "num_hidden_layers": 12,
+            "pad_token_id": 0,
+            "type_vocab_size": 2,
+            "vocab_size": 21128,
+        },
     }
 
     def __init__(self, generator, discriminator):
@@ -675,6 +1088,39 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
                 attention_mask=None,
                 raw_input_ids=None,
                 gen_labels=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ElectraModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            position_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ElectraModel`.
+            raw_input_ids(Tensor, optional):
+                The raw input_ids. Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            gen_labels(Tensor, optional):
+                The generator labels. Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+
+        Returns:
+            tuple: Returns tuple (``gen_logits``, ``disc_logits``, ``disc_labels``, ``attention_mask``).
+
+            With the fields:
+
+            - `gen_logits` (Tensor):
+                a tensor of the generator prediction logits. Shape as `[batch_size, sequence_length, vocab_size]` and dtype as float32.
+
+            - `disc_logits` (Tensor):
+                a tensor of the discriminator prediction logits. Shape as `[batch_size, sequence_length]` and dtype as float32.
+
+            - `disc_labels` (Tensor):
+                a tensor of the discriminator prediction labels. Shape as `[batch_size, sequence_length]` and dtype as int64.
+
+            - `attention_mask` (Tensor):
+                See :class:`ElectraModel`.
+        """
 
         assert (
             gen_labels is not None
@@ -699,7 +1145,121 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
         return gen_logits, disc_logits, disc_labels, attention_mask
 
 
+class ElectraPooler(nn.Layer):
+    def __init__(self, hidden_size, pool_act="tanh"):
+        super(ElectraPooler, self).__init__()
+        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.activation = nn.Tanh()
+        self.pool_act = pool_act
+
+    def forward(self, hidden_states):
+        # We "pool" the model by simply taking the hidden state corresponding
+        # to the first token.
+        first_token_tensor = hidden_states[:, 0]
+        pooled_output = self.dense(first_token_tensor)
+        if self.pool_act == "tanh":
+            pooled_output = self.activation(pooled_output)
+        return pooled_output
+
+
+class ElectraForMultipleChoice(ElectraPretrainedModel):
+    """
+    Electra Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
+    softmax) e.g. for RocStories/SWAG tasks.
+
+    Args:
+        electra (:class:`ElectraModel`):
+            An instance of ElectraModel.
+        num_choices (int, optional):
+            The number of choices. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of Electra.
+            If None, use the same value as `hidden_dropout_prob` of `ElectraModel`
+            instance `electra`. Defaults to None.
+    """
+
+    def __init__(self, electra, num_choices=2, dropout=None):
+        super(ElectraForMultipleChoice, self).__init__()
+        self.num_choices = num_choices
+        self.electra = electra
+        self.pooler = ElectraPooler(self.electra.config["hidden_size"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.electra.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.electra.config["hidden_size"], 1)
+        self.init_weights()
+
+    def forward(self,
+                input_ids=None,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        r"""
+        The ElectraForMultipleChoice forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ElectraModel` and shape as [batch_size,num_choice, sequence_length].
+            token_type_ids (Tensor, optional):
+                See :class:`ElectraModel` and shape as [batch_size,num_choice, sequence_length].
+            position_ids(Tensor, optional):
+                See :class:`ElectraModel` and shape as [batch_size,num_choice, sequence_length].
+            attention_mask (list, optional):
+                See :class:`ElectraModel` and shape as [batch_size,num_choice, sequence_length].
+
+        Returns:
+            Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
+            Shape as `[batch_size, num_choice]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ElectraForMultipleChoice, ElectraTokenizer
+
+                tokenizer = ElectraTokenizer.from_pretrained('electra-base')
+                model = ElectraForMultipleChoice.from_pretrained('electra-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+        """
+        input_ids = input_ids.reshape(
+            (-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids.reshape(
+                (-1, token_type_ids.shape[-1]))
+        if position_ids is not None:
+            position_ids = position_ids.reshape((-1, position_ids.shape[-1]))
+        if attention_mask is not None:
+            attention_mask = attention_mask.reshape(
+                (-1, attention_mask.shape[-1]))
+
+        sequence_output = self.electra(input_ids, token_type_ids, position_ids,
+                                       attention_mask)
+        pooled_output = self.pooler(sequence_output)
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
+        reshaped_logits = logits.reshape(
+            (-1, self.num_choices))  # logits: (bs, num_choice)
+
+        return reshaped_logits
+
+
 class ElectraPretrainingCriterion(paddle.nn.Layer):
+    """
+
+    Args:
+        vocab_size(int):
+            Vocabulary size of `inputs_ids` in `ElectraModel`. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling `ElectraModel`.
+        gen_weight(float):
+            This is the generator weight.
+        disc_weight(float):
+            This is the discriminator weight.
+
+    """
+
     def __init__(self, vocab_size, gen_weight, disc_weight):
         super(ElectraPretrainingCriterion, self).__init__()
 
@@ -749,3 +1309,83 @@ class ElectraPretrainingCriterion(paddle.nn.Layer):
             disc_loss = disc_loss.sum() / total_positions.sum()
 
         return self.gen_weight * gen_loss + self.disc_weight * disc_loss
+
+
+class ElectraForQuestionAnswering(ElectraPretrainedModel):
+    """
+    Electra Model with a span classification head on top for extractive question-answering tasks like
+    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
+    `span end logits`).
+
+    Args:
+        electra (:class:`ElectraModel`):
+            An instance of ElectraModel.
+            
+    """
+
+    def __init__(self, electra):
+        super(ElectraForQuestionAnswering, self).__init__()
+        self.electra = electra
+        self.classifier = nn.Linear(self.electra.config["hidden_size"], 2)
+        self.init_weights()
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        r"""
+        The ElectraForQuestionAnswering forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ElectraModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            position_ids(Tensor, optional):
+                See :class:`ElectraModel`.
+            attention_mask (list, optional):
+                See :class:`ElectraModel`.
+        Returns:
+            tuple: Returns tuple (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import ElectraForQuestionAnswering, ElectraTokenizer
+
+                tokenizer = ElectraTokenizer.from_pretrained('electra-base')
+                model = ElectraForQuestionAnswering.from_pretrained('electra-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                start_logits = outputs[0]
+                end_logits  = outputs[1]
+
+        """
+        sequence_output = self.electra(
+            input_ids,
+            token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+        logits = self.classifier(sequence_output)
+        logits = paddle.transpose(logits, perm=[2, 0, 1])
+        start_logits, end_logits = paddle.unstack(x=logits, axis=0)
+
+        return start_logits, end_logits
+
+
+ElectraForMaskedLM = ElectraGenerator
