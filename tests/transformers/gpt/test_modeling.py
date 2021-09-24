@@ -75,7 +75,7 @@ class TestElectraForSequenceClassification(CommonTest):
         # we need to test sentence with `eos_token_id`.
         for i in range(batch_size):
             index = random.randint(0, 10)
-            input_ids[:, -index:] = self.config["eos_token_id"]
+            input_ids[i, -index:] = self.config["eos_token_id"]
         input_ids = paddle.to_tensor(input_ids, dtype="int64")
         self.output = model(input_ids)
         self.check_testcase()
