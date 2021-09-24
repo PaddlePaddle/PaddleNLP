@@ -546,7 +546,6 @@ class BertModel(BertPretrainedModel):
         if text is not None and self.accelerate_mode:
             input_ids, token_type_ids = self.tokenizer(
                 text, max_seq_len=max_seq_len)
-                output_hidden_states=False):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
@@ -678,7 +677,6 @@ class BertForSequenceClassification(BertPretrainedModel):
                                     num_classes)
         self.apply(self.init_weights)
 
-<<<<<<< HEAD
     def forward(
             self,
             input_ids=None,
@@ -686,12 +684,6 @@ class BertForSequenceClassification(BertPretrainedModel):
             position_ids=None,
             attention_mask=None,
             text=None, ):
-=======
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
         r"""
         The BertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -726,7 +718,6 @@ class BertForSequenceClassification(BertPretrainedModel):
                 logits = outputs[0]
         """
 
->>>>>>> bca4e2225dfb9ce2e4241624c93bbb05449e4a40
         _, pooled_output = self.bert(
             text=text,
             input_ids=input_ids,

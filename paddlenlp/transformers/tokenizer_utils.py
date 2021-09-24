@@ -338,25 +338,34 @@ class PretrainedTokenizer(object):
                   feature is generated. Included when `stride` works.
         """
         if self.accelerate_mode:
-            assert isinstance(text, str)
+            is_batched = False
             if isinstance(text, str):
                 text = [text]
             elif isinstance(text, list) and isinstance(text[0], str):
+                is_batched = (len(text) > 1)
                 pass
             else:
                 raise ValueError(
                     "text input must be of type `str` (single example), "
                     ", `List[str]` (batch or single pretokenized example) ")
-            text_tensor = paddlenlp.ops.to_strings_tensor(text, "text")
-            text_pair = None
+            text_tensor = paddlenlp.ops.to_string_tensor(text, "text")
+
+            text_pair = paddlenlp.ops.to_string_tensor(
+                text_pair, "text_pair") if text_pair else None
             input_ids, seg_ids = core.ops.tokenizer(
                 self.vocab_tensor, text_tensor, text_pair, "max_seq_len",
                 max_seq_len, "pad_to_max_seq_len", pad_to_max_seq_len,
                 "is_split_into_words", is_split_into_words)
-            res = {
-                "input_ids": input_ids.numpy()[0],
-                "token_type_ids": seg_ids.numpy()[0]
-            }
+            if is_batched:
+                res = {
+                    "input_ids": input_ids.numpy(),
+                    "token_type_ids": seg_ids.numpy()
+                }
+            else:
+                res = {
+                    "input_ids": input_ids.numpy()[0],
+                    "token_type_ids": seg_ids.numpy()[0]
+                }
             return res
 
         # Input type checking for clearer error

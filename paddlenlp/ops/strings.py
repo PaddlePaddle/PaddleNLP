@@ -15,10 +15,10 @@
 import paddle
 import paddle.fluid.core as core
 
-__all__ = ['to_strings_tensor', 'to_map_tensor']
+__all__ = ['to_string_tensor', 'to_map_tensor']
 
 
-def to_strings_tensor(string_values, name):
+def to_string_tensor(string_values, name):
     """
     Create the tensor that the value holds the list of string.
     NOTICE: The value will be holded in the cpu place. 

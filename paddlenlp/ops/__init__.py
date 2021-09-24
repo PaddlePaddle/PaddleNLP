@@ -19,7 +19,7 @@ from .faster_transformer.transformer.encoder import *
 from .einsum import *
 from .distributed import *
 from . import optimizer
-from .strings import to_strings_tensor, to_map_tensor
+from .strings import *
 
 paddle.nn.TransformerEncoderLayer._ft_forward = encoder_layer_forward
 paddle.nn.TransformerEncoder._ft_forward = encoder_forward
