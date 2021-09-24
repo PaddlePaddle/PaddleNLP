@@ -13,28 +13,19 @@
 # limitations under the License.
 
 import collections
-import math
-
-import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.fluid import layers
-from paddle.fluid.framework import in_dygraph_mode
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
-from paddle.fluid.initializer import Normal, Constant, NumpyArrayInitializer
 
 from .. import PretrainedModel, register_base_model
-import paddlenlp
 
 __all__ = [
-    'GPTModel',
-    "GPTPretrainedModel",
-    'GPTForPretraining',
-    'GPTPretrainingCriterion',
-    'GPTForGreedyGeneration',
-    'GPTLMHeadModel',
+    'GPTModel', "GPTPretrainedModel", 'GPTForPretraining',
+    'GPTPretrainingCriterion', 'GPTForGreedyGeneration', 'GPTLMHeadModel',
+    'GPTForTokenClassification', 'GPTForSequenceClassification'
 ]
 
 
@@ -238,7 +229,7 @@ class TransformerDecoder(nn.Layer):
         self.layers = decoder_layers
         self.norm = norm
         if norm == "LayerNorm":
-            self.norm = nn.LayerNorm(hidden_size)
+            self.norm = nn.LayerNorm(hidden_size, epsilon=1e-5)
         elif norm is not None:
             raise ValueError("Only support LayerNorm")
         self.checkpoints = []
@@ -402,18 +393,14 @@ class GPTEmbeddings(nn.Layer):
         self.word_embeddings = nn.Embedding(
             vocab_size,
             hidden_size,
-            weight_attr=paddle.ParamAttr(
-                name="word_embeddings",
-                initializer=nn.initializer.Normal(
-                    mean=0.0, std=initializer_range)))
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
+                mean=0.0, std=initializer_range)))
 
         self.position_embeddings = nn.Embedding(
             max_position_embeddings,
             hidden_size,
-            weight_attr=paddle.ParamAttr(
-                name="pos_embeddings",
-                initializer=nn.initializer.Normal(
-                    mean=0.0, std=initializer_range)))
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
+                mean=0.0, std=initializer_range)))
 
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
@@ -549,8 +536,48 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
         },
-
-
+        "uer-gpt2-chinese-poem": {
+            "vocab_size": 22557,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 1,
+            "initializer_range": 0.02,
+            "eos_token_id": 102,
+        },
+        "microsoft-DialoGPT-small": {
+            "vocab_size": 50257,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 1,
+            "initializer_range": 0.02,
+            "eos_token_id": 50256,
+        },
+        "distilgpt2": {
+            "vocab_size": 50257,
+            "hidden_size": 768,
+            "num_hidden_layers": 6,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 1,
+            "initializer_range": 0.02,
+            "eos_token_id": 50256,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -561,6 +588,12 @@ class GPTPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
             "gpt2-medium-en":
             "https://paddlenlp.bj.bcebos.com/models/transformers/gpt/gpt2-medium-en.pdparams",
+            "uer-gpt2-chinese-poem":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/uer-gpt2-chinese-poem/model_state.pdparams",
+            "microsoft-DialoGPT-small":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/microsoft-DialoGPT-small/model_state.pdparams",
+            "distilgpt2":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/distilgpt2/model_state.pdparams",
         }
     }
     base_model_prefix = "gpt"
@@ -1120,3 +1153,135 @@ class GPTLMHeadModel(GPTPretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+
+class GPTForTokenClassification(GPTPretrainedModel):
+    """
+    GPT Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        gpt (:class:`GPTModel`):
+            An instance of GPTModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of GPT.
+            If None, use the same value as `hidden_dropout_prob` of `GPTModel`
+            instance `gpt`. Defaults to None.
+    """
+
+    def __init__(self, gpt, num_classes=2, dropout=None):
+        super(GPTForTokenClassification, self).__init__()
+        self.num_classes = num_classes
+        self.gpt = gpt  # allow gpt to be config
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.gpt.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.gpt.config["hidden_size"], num_classes)
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, position_ids=None, attention_mask=None):
+        r"""
+        The GPTForTokenClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`GPTModel`.
+            position_ids(Tensor, optional):
+                See :class:`GPTModel`.
+            attention_mask (list, optional):
+                See :class:`GPTModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import GPTForTokenClassification, GPTTokenizer
+
+                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
+                model = GPTForTokenClassification.from_pretrained('gpt2-medium-en')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+
+        """
+        sequence_output = self.gpt(input_ids,
+                                   position_ids=position_ids,
+                                   attention_mask=attention_mask)
+
+        sequence_output = self.dropout(sequence_output)
+        logits = self.classifier(sequence_output)
+        return logits
+
+
+class GPTForSequenceClassification(GPTPretrainedModel):
+    """
+    GPT Model with a sequence classification/regression head on top (a linear layer on top of the pooled output) e.g.
+    for GLUE tasks.
+
+    Args:
+        gpt (:class:`GPTModel`):
+            An instance of GPTModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+            
+    """
+
+    def __init__(self, gpt, num_classes=2):
+        super(GPTForSequenceClassification, self).__init__()
+        self.num_classes = num_classes
+        self.gpt = gpt  # allow gpt to be config
+        self.score = nn.Linear(
+            self.gpt.config["hidden_size"], num_classes, bias_attr=False)
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, position_ids=None, attention_mask=None):
+        r"""
+        The GPTForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`GPTModel`.
+            position_ids(Tensor, optional):
+                See :class:`GPTModel`.
+            attention_mask (list, optional):
+                See :class:`GPTModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Shape as `[batch_size, num_classes]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import GPTForSequenceClassification, GPTTokenizer
+
+                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
+                model = GPTForSequenceClassification.from_pretrained('gpt2-medium-en')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+
+        """
+
+        sequence_output = self.gpt(input_ids,
+                                   position_ids=position_ids,
+                                   attention_mask=attention_mask)
+        logits = self.score(sequence_output)
+        # padding index maybe 0
+        eos_token_id = self.gpt.config.get("eos_token_id", 0)
+        sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(
+            axis=-1) - 1
+        pooled_logits = logits.gather_nd(
+            paddle.stack(
+                [paddle.arange(sequence_output.shape[0]), sequence_lengths],
+                axis=-1))
+
+        return pooled_logits

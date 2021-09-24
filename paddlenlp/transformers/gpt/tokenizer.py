@@ -14,18 +14,15 @@
 
 import os
 from functools import lru_cache
-from collections import namedtuple
 
 import json
 import jieba
 import shutil
 from paddle.utils import try_import
-from paddlenlp.data import Vocab
+
 from paddlenlp.utils.log import logger
 
 from .. import PretrainedTokenizer
-from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize,\
-    _is_whitespace, _is_control, _is_punctuation
 
 __all__ = [
     'GPTTokenizer',
@@ -343,6 +340,10 @@ class GPTTokenizer(PretrainedTokenizer):
             "gpt2-medium-en": gpt_vocab_link,
             "gpt2-en": gpt_vocab_link,
             "gpt2-small-en": gpt_vocab_link,
+            "distilgpt2":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/distilgpt2/vocab.json",
+            "microsoft-DialoGPT-small":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/microsoft-DialoGPT-small/vocab.json",
         },
         "merges_file": {
             "gpt3-13B-en": gpt_merges_link,
@@ -350,6 +351,10 @@ class GPTTokenizer(PretrainedTokenizer):
             "gpt2-medium-en": gpt_merges_link,
             "gpt2-en": gpt_merges_link,
             "gpt2-small-en": gpt_merges_link,
+            "distilgpt2":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/distilgpt2/merges.txt",
+            "microsoft-DialoGPT-small":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/microsoft-DialoGPT-small/merges.txt",
         }
     }
     pretrained_init_configuration = {
@@ -358,6 +363,8 @@ class GPTTokenizer(PretrainedTokenizer):
         "gpt2-medium-en": {},
         "gpt2-en": {},
         "gpt2-small-en": {},
+        "distilgpt2": {},
+        "microsoft-DialoGPT-small": {},
     }
 
     def __init__(
