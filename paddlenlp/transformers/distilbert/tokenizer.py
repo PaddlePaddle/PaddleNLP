@@ -19,9 +19,9 @@ __all__ = ['DistilBertTokenizer']
 
 class DistilBertTokenizer(BertTokenizer):
     """
-    Constructs a DistilBERT tokenizer. It uses a basic tokenizer to do punctuation
-    splitting, lower casing and so on, and follows a WordPiece tokenizer to
-    tokenize as subwords.
+    Constructs a DistilBertTokenizer.
+    The usage of DistilBertTokenizer is the same as
+    `BertTokenizer <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.bert.tokenizer.html>`__.
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {

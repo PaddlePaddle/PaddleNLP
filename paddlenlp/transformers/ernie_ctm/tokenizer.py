@@ -315,4 +315,4 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                 tokens = tokenizer.tokenize('He was a puppeteer')
 
         """
-        return self._tokenize(text, kwargs)
+        return self._tokenize(text, **kwargs)

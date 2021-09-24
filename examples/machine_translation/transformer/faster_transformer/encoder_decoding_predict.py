@@ -46,6 +46,11 @@ def parse_args():
     )
     parser.add_argument("--beam_size", default=5, type=int, help="Beam size. ")
     parser.add_argument(
+        "--diversity_rate",
+        default=0.0,
+        type=float,
+        help="The diversity rate for beam search. ")
+    parser.add_argument(
         "--topk",
         default=4,
         type=int,
@@ -69,6 +74,33 @@ def parse_args():
         type=str,
         help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
     )
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+    )
+    parser.add_argument(
+        "--vocab_file",
+        default=None,
+        type=str,
+        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+    )
+    parser.add_argument(
+        "--unk_token",
+        default=None,
+        type=str,
+        help="The unknown token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--bos_token",
+        default=None,
+        type=str,
+        help="The bos token. It should be provided when use custom vocab_file. ")
+    parser.add_argument(
+        "--eos_token",
+        default=None,
+        type=str,
+        help="The eos token. It should be provided when use custom vocab_file. ")
     args = parser.parse_args()
     return args
 
@@ -117,6 +149,7 @@ def do_predict(args):
         decoding_strategy=args.decoding_strategy,
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
+        diversity_rate=args.diversity_rate,
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding)
 
@@ -179,13 +212,18 @@ if __name__ == "__main__":
     args.use_fp16_decoding = ARGS.use_fp16_decoding
     args.decoding_strategy = ARGS.decoding_strategy
     args.beam_size = ARGS.beam_size
+    args.diversity_rate = ARGS.diversity_rate
     args.topk = ARGS.topk
     args.topp = ARGS.topp
     args.profile = ARGS.profile
-    args.benchmark = False
+    args.benchmark = ARGS.benchmark
     if ARGS.batch_size:
         args.infer_batch_size = ARGS.batch_size
     args.test_file = ARGS.test_file
+    args.vocab_file = ARGS.vocab_file
+    args.unk_token = ARGS.unk_token
+    args.bos_token = ARGS.bos_token
+    args.eos_token = ARGS.eos_token
     pprint(args)
 
     do_predict(args)

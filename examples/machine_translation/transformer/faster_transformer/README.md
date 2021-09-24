@@ -1,6 +1,6 @@
 # Faster Transformer 预测
 
-在这里我们集成了 Nvidia [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。同时集成了 Faster Transformer float32 以及 float16 预测。以下是使用 Faster Transformer 的说明。
+在这里我们集成了 NVIDIA [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。同时集成了 Faster Transformer float32 以及 float16 预测。以下是使用 Faster Transformer 的说明。
 
 ## 使用环境说明
 
@@ -109,11 +109,11 @@ datasets = load_dataset('wmt14ende', splits=('test'))
 
 使用模型推断前提是需要指定一个合适的 checkpoint，需要在对应的 `../configs/transformer.base.yaml` 中修改对应的模型载入的路径参数 `init_from_params`。
 
-我们提供一个已经训练好的动态图的 base model 的 checkpoint 以供使用，可以通过[tranformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz)下载。
+我们提供一个已经训练好的动态图的 base model 的 checkpoint 以供使用，可以通过[transformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz)下载。
 
 ``` sh
-wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz
-tar -zxf tranformer-base-wmt_ende_bpe.tar.gz
+wget https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
+tar -zxf transformer-base-wmt_ende_bpe.tar.gz
 ```
 
 然后，需要修改对应的 `../configs/transformer.base.yaml` 配置文件中的 `init_from_params` 的值为 `./base_trained_models/step_final/`。
@@ -126,7 +126,7 @@ tar -zxf tranformer-base-wmt_ende_bpe.tar.gz
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
-cp -rf ../../../../paddlenlp/ops/build/third-party/build/bin/decoding_gemm ./
+cp -rf ../../../../paddlenlp/ops/build/third-party/build/fastertransformer/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 0
 python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --decoding_strategy beam_search --beam_size 5
 ```
@@ -139,6 +139,7 @@ python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --d
   * 当使用 `topk_sampling` 的时候，需要指定 `--topk` 的值
   * 当使用 `topp_sampling` 的时候，需要指定 `topp` 的值，并且需要保证 `--topk` 的值为 0
 * `--beam_size`: 解码策略是 `beam_search` 的时候，beam size 的大小，数据类型是 `int`
+* `--diversity_rate`: 解码策略是 `beam_search` 的时候，设置 diversity rate 的大小，数据类型是 `float`。当设置的 `diversity_rate` 大于 0 的时候，FasterTransformer 仅支持 beam size 为 1，4，16，64
 * `--topk`: 解码策略是 `topk_sampling` 的时候，topk 计算的 k 值的大小，数据类型是 `int`
 * `--topp`: 解码策略是 `topp_sampling` 的时候，p 的大小，数据类型是 `float`
 
@@ -153,7 +154,7 @@ float16 与 float32 预测的基本流程相同，不过在使用 float16 的 de
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
-cp -rf ../../../../paddlenlp/ops/build/third-party/build/bin/decoding_gemm ./
+cp -rf ../../../../paddlenlp/ops/build/third-party/build/fastertransformer/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 1
 python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --use_fp16_decoding --decoding_strategy beam_search --beam_size 5
 ```
@@ -213,7 +214,7 @@ cd PaddleNLP/paddlenlp/ops/
 ``` sh
 mkdir build
 cd build/
-cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DWITH_STATIC_LIB=OFF -DON_INFER=ON -DWITH_MKL=ON
+cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON
 make -j
 cd ../
 ```
@@ -240,7 +241,7 @@ cd ../
 
 ### 导出基于 Faster Transformer 自定义 op 的预测库可使用模型文件
 
-我们提供一个已经基于动态图训练好的 base model 的 checkpoint 以供使用，当前 checkpoint 是基于 WMT 英德翻译的任务训练。可以通过[tranformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz)下载。
+我们提供一个已经基于动态图训练好的 base model 的 checkpoint 以供使用，当前 checkpoint 是基于 WMT 英德翻译的任务训练。可以通过[transformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz)下载。
 
 使用 C++ 预测库，首先，我们需要做的是将动态图的 checkpoint 导出成预测库能使用的模型文件和参数文件。可以执行 `export_model.py` 实现这个过程。
 
@@ -256,8 +257,10 @@ python export_model.py --config ../configs/transformer.base.yaml --decoding_lib 
   ```text
   └── infer_model/
     ├── transformer.pdiparams
+    ├── transformer.pdiparams.info
     └── transformer.pdmodel
   ```
+
 
 ### 使用 PaddlePaddle 预测库预测
 
@@ -265,7 +268,7 @@ python export_model.py --config ../configs/transformer.base.yaml --decoding_lib 
 
 ``` sh
 cd bin/
-./transformer_e2e -batch_size <batch_size> -beam_size <beam_size> -gpu_id <gpu_id> -model_dir <model_directory> -vocab_dir <dict_directory> -data_dir <input_data>
+./transformer_e2e -batch_size <batch_size> -gpu_id <gpu_id> -model_dir <model_directory> -vocab_dir <dict_directory> -data_dir <input_data>
 ```
 
 这里的 `<model_directory>` 即是上文说到导出的 paddle inference 模型。
@@ -274,8 +277,8 @@ cd bin/
 
 ``` sh
 cd bin/
-../third-party/build/bin/decoding_gemm 8 5 8 64 38512 256 512 0
-./transformer_e2e -batch_size 8 -beam_size 5 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
+../third-party/build/fastertransformer/bin/decoding_gemm 8 5 8 64 38512 256 512 0
+./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```
 
 其中：

@@ -424,14 +424,23 @@ def do_train(args):
     # Loads or initializes a model.
     pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys(
     ))
+
+    def get_opt_config(model_cls, name):
+        config = model_cls.pretrained_init_configuration[name]
+        # Optimize for AMP.
+        if "vocab_size" in config:
+            if config["vocab_size"] % 8 != 0:
+                config["vocab_size"] += 8 - (config["vocab_size"] % 8)
+        return config
+
     if args.model_name_or_path in pretrained_models:
         tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
         generator = ElectraGenerator(
-            ElectraModel(**model_class.pretrained_init_configuration[
-                args.model_name_or_path + "-generator"]))
+            ElectraModel(**get_opt_config(model_class, args.model_name_or_path +
+                                          "-generator")))
         discriminator = ElectraDiscriminator(
-            ElectraModel(**model_class.pretrained_init_configuration[
-                args.model_name_or_path + "-discriminator"]))
+            ElectraModel(**get_opt_config(model_class, args.model_name_or_path +
+                                          "-discriminator")))
         model = model_class(generator, discriminator)
         args.init_from_ckpt = False
     else:
@@ -445,11 +454,11 @@ def do_train(args):
                 model_name = config_dict["model_name"]
             if model_name in pretrained_models:
                 generator = ElectraGenerator(
-                    ElectraModel(**model_class.pretrained_init_configuration[
-                        model_name + "-generator"]))
+                    ElectraModel(**get_opt_config(model_class, model_name +
+                                                  "-generator")))
                 discriminator = ElectraDiscriminator(
-                    ElectraModel(**model_class.pretrained_init_configuration[
-                        model_name + "-discriminator"]))
+                    ElectraModel(**get_opt_config(model_class, model_name +
+                                                  "-discriminator")))
                 model = model_class(generator, discriminator)
                 model.set_state_dict(
                     paddle.load(
