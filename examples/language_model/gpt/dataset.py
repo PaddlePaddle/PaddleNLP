@@ -355,7 +355,7 @@ def create_pretrained_dataset(
                 places=places,
                 feed_list=data_holders,
                 batch_sampler=batch_sampler,
-                num_workers=0,
+                num_workers=2,
                 worker_init_fn=worker_init,
                 collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
                 return_list=False)
