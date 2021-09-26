@@ -23,6 +23,8 @@ class VQA2(DatasetBuilder):
             os.path.join('annotations', 'imdb_train2014.npy'), '27b9fc1c2393e1e62839ef65f255c645'),
         'val': META_INFO(
             os.path.join('annotations', 'imdb_val2014.npy'), 'd51bec47b76d1efb8bfeac8f0fd1dabc'),
+        'trainval': META_INFO(
+            os.path.join('annotations', 'imdb_trainval2014.npy'), 'd51bec47b76d1efb8bfeac8f0fd1dabc'),
         'minival': META_INFO(
             os.path.join('annotations', 'imdb_minival2014.npy'), 'dd982ed6d924724482aee42c72d324ce'),
         'test': META_INFO(
@@ -59,6 +61,8 @@ class VQA2(DatasetBuilder):
                 raise TypeError("'iminfo' passed to _read must be a dict")
             
             sample = {}
+            if 'image_name' not in iminfo.keys():
+                continue
             image_name = iminfo['image_name']
             image_id = iminfo['image_id']
             question_id = iminfo['question_id']
