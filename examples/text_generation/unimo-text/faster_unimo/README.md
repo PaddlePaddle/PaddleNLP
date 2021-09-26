@@ -8,7 +8,7 @@
 
 * 本项目依赖于 PaddlePaddle 2.1.2 或是最新的 develop 版本，可能需要自行编译 PaddlePaddle
 * CMake >= 3.10
-* CUDA 10.1（需要 PaddlePaddle 框架一致）
+* CUDA 10.1 或 10.2（需要 PaddlePaddle 框架一致）
 * gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
 * 推荐使用 Python3
 * [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#setup) 使用必要的环境
@@ -23,7 +23,7 @@
 
 在 Python 动态图下使用自定义 OP 需要将实现的 C++、CUDA 代码编译成动态库，我们已经提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。同样的自定义 op 编译的说明也可以在自定义 op 对应的路径 `PaddleNLP/paddlenlp/ops/` 下面找到。
 
-#### 克隆 PaddleNLP
+#### PaddleNLP 准备
 
 首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterUNIMOText 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译。
 

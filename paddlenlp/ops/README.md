@@ -15,7 +15,7 @@
 
 * 本项目依赖于 PaddlePaddle 2.1.0 及以上版本或适当的 develop 版本
 * CMake >= 3.10
-* CUDA 10.1（需要 PaddlePaddle 框架一致）
+* CUDA 10.1 或 10.2（需要 PaddlePaddle 框架一致）
 * gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
 * 推荐使用 Python3
 * [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#setup) 使用必要的环境
@@ -30,9 +30,11 @@
 
 在 Python 动态图下使用自定义 OP 需要将实现的 C++、CUDA 代码编译成动态库，我们已经提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。
 
-#### 克隆 PaddleNLP
+#### PaddleNLP 准备
 
-首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 Faster Transformer 相关 lib，需要克隆一个 PaddleNLP，并重新编译:
+首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterUNIMOText 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
+
+以下以从 github 上 clone 一个新版 PaddleNLP 为例:
 
 ``` sh
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
@@ -47,7 +49,7 @@ cd PaddleNLP/paddlenlp/ops/
 
 #### 编译
 
-编译之前，请确保安装的 PaddlePaddle 的版本是基于最新的 develop 分支的代码编译，并且正常可用。
+编译之前，请确保安装的 PaddlePaddle 的版本高于 2.1.0 或是基于最新的 develop 分支的代码编译，并且正常可用。
 
 编译自定义 OP 可以参照一下步骤：
 
@@ -59,11 +61,14 @@ make -j
 cd ../
 ```
 
-注意：
-* `xx` 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
-* 若未指定 `-DPY_CMD` 将会默认使用系统命令 `python` 对应的 Python。
-* 若使用 GPT-2 高性能推理，需要加上 -DWITH_GPT=ON。
-
+可以使用的编译选项包括：
+* `-DSM`: 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
+* `-DPY_CMD`: 指定当前装有 PaddlePaddle 版本的 python 环境，比如 `-DPY_CMD=python3.7`。若未指定 `-DPY_CMD` 将会默认使用系统命令 `python` 对应的 Python。
+* `-DWITH_GPT`: 是否编译带有 GPT 相关的 lib。若使用 GPT-2 高性能推理，需要加上 `-DWITH_GPT=ON`。默认为 OFF。
+* `-DWITH_UNIFIED`: 是否编译带有 Unified Transformer 或是 UNIMOText 相关的 lib。若使用，需要加上 `-DWITH_UNIFIED=ON`。默认为 ON。
+* `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
+* `-DWITH_DECODER`: 是否编译带有 decoder 优化的 lib。默认为 ON。
+* `-DWITH_ENCODER`: 是否编译带有 encoder 优化的 lib。默认为 ON。
 
 最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 Faster Transformer decoding 执行的库。
 
@@ -120,7 +125,7 @@ export FLAGS_fraction_of_gpu_memory_to_use=0.1
 python ./faster_transformer/sample/decoding_sample.py --config ./faster_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so --use_fp16_decoding
 ```
 
-其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。
+其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
 
 ### 使用 GPT-2 decoding 高性能推理
 
@@ -183,9 +188,11 @@ python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-mediu
 
 在 C++ 预测库使用自定义 OP 需要将实现的 C++、CUDA 代码**以及 C++ 预测的 demo**编译成一个可执行文件。因预测库支持方式与 Python 不同，这个过程将不会产生自定义 op 的动态库，将直接得到可执行文件。我们已经提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。并获取执行 demo。
 
-#### 克隆 PaddleNLP
+#### PaddleNLP 准备
 
-首先，仍然是需要克隆一个 PaddleNLP:
+首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterUNIMOText 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
+
+以下以从 github 上 clone 一个新版 PaddleNLP 为例:
 
 ``` sh
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
@@ -199,7 +206,7 @@ cd PaddleNLP/paddlenlp/ops/
 
 #### 编译
 
-编译之前，请确保安装的 PaddlePaddle 预测库的版本是基于最新的 develop 分支的代码编译，并且正常可用。
+编译之前，请确保安装的 PaddlePaddle 的版本高于 2.1.0 或是基于最新的 develop 分支的代码编译，并且正常可用。
 
 编译自定义 OP 可以参照一下步骤：
 
@@ -212,8 +219,8 @@ cd ../
 ```
 
 注意：
-* `xx` 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)。
-* `-DPADDLE_LIB` 需要指明使用的 PaddlePaddle 预测库的路径 `/path/to/paddle_inference_install_dir/`，并且在该路径下，预测库的组织结构满足：
+* `-DSM`: 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
+* `-DPADDLE_LIB`: 需要指明使用的 PaddlePaddle 预测库的路径 `/path/to/paddle_inference_install_dir/`，并且在该路径下，预测库的组织结构满足：
   ```text
   .
   ├── CMakeCache.txt
@@ -226,10 +233,14 @@ cd ../
     └── threadpool/
   └── version.txt
   ```
-* `-DDEMO` 说明预测库使用 demo 的位置。比如指定 -DDEMO=./demo/transformer_e2e.cc 或是 -DDEMO=./demo/gpt.cc。最好使用绝对路径，若使用相对路径，需要是相对于 `PaddleNLP/paddlenlp/ops/faster_transformer/src/` 的相对路径。
-* `-DWITH_GPT`，如果是编译 GPT 的预测库可执行文件，需要加上 `-DWITH_GPT=ON`。
-* `-DWITH_MKL`，若当前是使用的 mkl 的 Paddle lib，那么需要打开 MKL 以引入 MKL 相关的依赖。
-* `-DON_INFER`，是否编译 paddle inference 预测库。
+* `-DDEMO`: 说明预测库使用 demo 的位置。比如指定 -DDEMO=./demo/transformer_e2e.cc 或是 -DDEMO=./demo/gpt.cc。最好使用绝对路径，若使用相对路径，需要是相对于 `PaddleNLP/paddlenlp/ops/faster_transformer/src/` 的相对路径。
+* `-DWITH_GPT`: 是否编译带有 GPT 相关的 lib。若使用 GPT-2 高性能推理，需要加上 `-DWITH_GPT=ON`。默认为 OFF。
+* `-DWITH_UNIFIED`: 是否编译带有 Unified Transformer 或是 UNIMOText 相关的 lib。若使用，需要加上 `-DWITH_UNIFIED=ON`。默认为 ON。
+* `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
+* `-DWITH_DECODER`: 是否编译带有 decoder 优化的 lib。默认为 ON。
+* `-DWITH_ENCODER`: 是否编译带有 encoder 优化的 lib。默认为 ON。
+* `-DWITH_MKL`: 若当前是使用的 mkl 的 Paddle lib，那么需要打开 MKL 以引入 MKL 相关的依赖。
+* `-DON_INFER`: 是否编译 paddle inference 预测库。
 * **当使用预测库的自定义 op 的时候，请务必开启 `-DON_INFER=ON` 选项，否则，不会得到预测库的可执行文件。**
 
 #### 执行 Transformer decoding on PaddlePaddle
@@ -250,7 +261,7 @@ cd bin/
 ```
 
 其中：
-* `decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。
+* `decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
 * `DATA_HOME` 则是 `paddlenlp.utils.env.DATA_HOME` 返回的路径。
 
 预测所需要的模型文件，可以通过 `PaddleNLP/examples/machine_translation/transformer/faster_transformer/README.md` 文档中所记述的方式导出。
