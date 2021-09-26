@@ -23,6 +23,8 @@ class VQA2(DatasetBuilder):
             os.path.join('annotations', 'imdb_train2014.npy'), '27b9fc1c2393e1e62839ef65f255c645'),
         'val': META_INFO(
             os.path.join('annotations', 'imdb_val2014.npy'), 'd51bec47b76d1efb8bfeac8f0fd1dabc'),
+        'minival': META_INFO(
+            os.path.join('annotations', 'imdb_minival2014.npy'), 'dd982ed6d924724482aee42c72d324ce'),
         'test': META_INFO(
             os.path.join('annotations', 'imdb_test2015.npy'), '5acad6cf0839c01c64e056506ffb18c5'),
     }
@@ -63,12 +65,17 @@ class VQA2(DatasetBuilder):
             feature_path = iminfo['feature_path']
             question_str = iminfo['question_str']
             question_tokens = iminfo['question_tokens']
-            ocr_tokens = iminfo['ocr_tokens']
+            # ocr_tokens = iminfo['ocr_tokens']
 
             if split == "test":
                 answers = None
             else:
-               answers = iminfo['answers']
+                if 'answers' in iminfo.keys():
+                    answers = iminfo['answers']
+                elif 'valid_answers' in iminfo.keys():
+                    answers = iminfo['valid_answers']
+                else:
+                    raise NotImplementedError("`answers` not found in annatation file: {}".format(filename))
                 
             if answers is not None:
                 sample['image_name'] = image_name
@@ -77,7 +84,7 @@ class VQA2(DatasetBuilder):
                 sample['feature_path'] = feature_path
                 sample['question_str'] = question_str
                 sample['question_tokens'] = question_tokens
-                sample['ocr_tokens'] = ocr_tokens
+                # sample['ocr_tokens'] = ocr_tokens
                 sample['answers'] = answers
                 sample['split_name'] = split
             else:
@@ -87,7 +94,7 @@ class VQA2(DatasetBuilder):
                 sample['feature_path'] = feature_path
                 sample['question_str'] = question_str
                 sample['question_tokens'] = question_tokens
-                sample['ocr_tokens'] = ocr_tokens
+                # sample['ocr_tokens'] = ocr_tokens
                 sample['split_name'] = split
                 
             yield sample

@@ -11,14 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import warnings
 from collections import OrderedDict
+
 import paddle
 import paddle.nn as nn
-from paddle import tensor
-from paddle.nn import TransformerEncoder, Linear, Layer, Embedding, LayerNorm, Tanh
-# from ..electra.modeling import get_activation
+from paddle.nn import (Embedding, Layer, LayerNorm, Linear, Tanh,
+                       TransformerEncoder)
+
 from .. import PretrainedModel, register_base_model
-import warnings
 
 __all__ = [
     "VisualBertModel",
@@ -612,7 +613,12 @@ class VisualBertPreTrainedModel(PretrainedModel):
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
+            # weight 1.0, bias 0.0
+        
+        # if isinstance(layer, nn.Linear) and layer.bias is not None:
+        #     # bias 0.0
 
+    
 @register_base_model
 class VisualBertModel(VisualBertPreTrainedModel):
     """
