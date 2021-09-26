@@ -15,7 +15,7 @@ rm -rf output/$task_name/log
 rm -rf output/$task_name/program_desc
 
 python3.8 -u  -m paddle.distributed.fleet.launch \
-    --gpus "6" \
+    --gpus "7" \
     --log_dir "output/$task_name/log" run_pretrain_static.py \
     --model_type "gpt" \
     --model_name_or_path "gpt2-en" \

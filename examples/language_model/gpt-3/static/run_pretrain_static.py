@@ -94,10 +94,12 @@ def dist_optimizer(args, topo):
                 'layer_norm',
                 'gelu',
             ],
-            "custom_black_list": ['c_softmax_with_cross_entropy'],
+            #"custom_black_list": ['c_softmax_with_cross_entropy'],
+            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding", "elementwise_div"],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
-            "use_pure_fp16": args.use_fp16
+            "use_pure_fp16": args.use_fp16,
+            "use_fp16_guard": False
         }
     if args.use_sharding:
         dist_strategy.sharding = True
@@ -284,13 +286,12 @@ def do_train(args):
                         attention_probs_dropout_prob=args.
                         attention_probs_dropout_prob,
                         topo=topo)
-                with paddle.static.amp.fp16_guard():
-                    # Create the model for the gpt pretrain
-                    preds = model(tokens, position_ids, attention_mask)
+                # Create the model for the gpt pretrain
+                preds = model(tokens, position_ids, attention_mask)
 
-                    criterion = guard(f'gpu:{args.pp_degree -1}')(
-                        GPTPretrainingCriterion)(topo)
-                    loss = criterion(preds, labels, loss_mask)
+                criterion = guard(f'gpu:{args.pp_degree -1}')(
+                    GPTPretrainingCriterion)(topo)
+                loss = criterion(preds, labels, loss_mask)
 
             # Create the learning_rate sheduler and optimizer
             if args.decay_steps is None:
@@ -352,10 +353,15 @@ def do_train(args):
               'w') as f:
         f.write(str(startup_program))
 
+    paddle.save(main_program, "./lenet.pdmodel")
+
     # Define the Executor for running the static model
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
     test_program = main_program.clone(for_test=True)
+
+    if args.use_amp and args.use_fp16:
+        optimizer.amp_init(place)
 
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from %s " % args.model_name_or_path)

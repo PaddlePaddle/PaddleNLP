@@ -729,33 +729,32 @@ class GPTModel(GPTPretrainedModel):
                 attention_mask=None,
                 use_cache=False,
                 cache=None):
-        with paddle.static.amp.fp16_guard():
-            self.checkpoints = []
-            if position_ids is None:
-                past_length = 0
-                if cache is not None:
-                    past_length = paddle.shape(cache[0].k)[-2]
-                position_ids = paddle.arange(
-                    past_length,
-                    paddle.shape(input_ids)[-1] + past_length,
-                    dtype='int64')
-                position_ids = position_ids.unsqueeze(0)
-                # .expand_as(input_ids)
-                position_ids = paddle.fluid.layers.expand_as(position_ids,
-                                                            input_ids)
-            embedding_output = self.embeddings(
-                input_ids=input_ids, position_ids=position_ids)
+        self.checkpoints = []
+        if position_ids is None:
+            past_length = 0
+            if cache is not None:
+                past_length = paddle.shape(cache[0].k)[-2]
+            position_ids = paddle.arange(
+                past_length,
+                paddle.shape(input_ids)[-1] + past_length,
+                dtype='int64')
+            position_ids = position_ids.unsqueeze(0)
+            # .expand_as(input_ids)
+            position_ids = paddle.fluid.layers.expand_as(position_ids,
+                                                        input_ids)
+        embedding_output = self.embeddings(
+            input_ids=input_ids, position_ids=position_ids)
 
-            attention_mask.stop_gradient = True
+        attention_mask.stop_gradient = True
 
-            encoder_outputs = self.decoder(
-                embedding_output,
-                memory=None,
-                tgt_mask=attention_mask,
-                use_cache=use_cache,
-                cache=cache)
-            self.checkpoints.extend(self.decoder.checkpoints)
-            return encoder_outputs
+        encoder_outputs = self.decoder(
+            embedding_output,
+            memory=None,
+            tgt_mask=attention_mask,
+            use_cache=use_cache,
+            cache=cache)
+        self.checkpoints.extend(self.decoder.checkpoints)
+        return encoder_outputs
 
 
 class GPTForPretraining(GPTPretrainedModel):
@@ -793,24 +792,24 @@ class GPTForPretraining(GPTPretrainedModel):
                 masked_positions=None,
                 use_cache=False,
                 cache=None):
-        with paddle.static.amp.fp16_guard():
-            outputs = self.gpt(input_ids,
-                            position_ids=position_ids,
-                            attention_mask=attention_mask,
-                            use_cache=use_cache,
-                            cache=cache)
-            if use_cache:
-                encoder_outputs, cached_kvs = outputs[:2]
-            else:
-                encoder_outputs = outputs
-            logits = self.parallel_matmul(
-                encoder_outputs, self.gpt.embeddings.word_embeddings.weight, True,
-                self.gpt.topo)
+        #with paddle.static.amp.fp16_guard():
+        outputs = self.gpt(input_ids,
+                        position_ids=position_ids,
+                        attention_mask=attention_mask,
+                        use_cache=use_cache,
+                        cache=cache)
+        if use_cache:
+            encoder_outputs, cached_kvs = outputs[:2]
+        else:
+            encoder_outputs = outputs
+        logits = self.parallel_matmul(
+            encoder_outputs, self.gpt.embeddings.word_embeddings.weight, True,
+            self.gpt.topo)
 
-            if use_cache:
-                return logits, cached_kvs
-            else:
-                return logits
+        if use_cache:
+            return logits, cached_kvs
+        else:
+            return logits
 
 
 class GPTPretrainingCriterion(paddle.nn.Layer):
@@ -828,11 +827,11 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
             self.loss_func = paddle.distributed.collective._c_softmax_with_cross_entropy
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
-        with paddle.static.amp.fp16_guard():
-            masked_lm_loss = self.loss_func(prediction_scores,
-                                            masked_lm_labels.unsqueeze(2))
+        #with paddle.static.amp.fp16_guard():
+        masked_lm_loss = self.loss_func(prediction_scores,
+                                        masked_lm_labels.unsqueeze(2))
 
-            loss_mask = loss_mask.reshape([-1])
-            masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
-            loss = masked_lm_loss / loss_mask.sum()
-            return loss
+        loss_mask = loss_mask.reshape([-1])
+        masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+        loss = masked_lm_loss / loss_mask.sum()
+        return loss
