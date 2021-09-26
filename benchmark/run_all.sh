@@ -3,16 +3,15 @@
 # Use docker： paddlepaddle/paddle:latest-gpu-cuda10.1-cudnn7  paddle=2.1.2  py=37
 
 # Usage:
-#   git clone git clone https://github.com/PaddlePaddle/PaddleSeg.git
-#   cd PaddleSeg
+#   git clone https://github.com/PaddlePaddle/PaddleNLP.git
+#   cd PaddleNLP
 #   bash benchmark/run_all.sh
 
 pip install -r requirements.txt
 pip install regex sentencepiece tqdm visualdl
 pip install -e ./
 
-# Download test dataset and save it to PaddleSeg/data
-# It automatic downloads the pretrained models saved in ~/.paddleseg
+# Download test dataset and save it to PaddleNLP/data
 
 mkdir -p data && cd data
 wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
@@ -20,10 +19,9 @@ wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/data/gpt_en_dataset
 cd -
 
 model_name_list=(gpt2-en)
-fp_item_list=(fp16 fp32)     # set fp32 or fp16, segformer_b0 doesn't support fp16 with Paddle2.1.2
+fp_item_list=(fp16 fp32) # set fp32 or fp16
 bs_list=(8) # FP16 could use bs=16 for 32G v100
 max_iters=200 # control the test time
-
 
 for model_name in ${model_name_list[@]}; do
       for fp_item in ${fp_item_list[@]}; do

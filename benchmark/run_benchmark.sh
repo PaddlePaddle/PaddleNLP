@@ -2,7 +2,6 @@
 set -xe
 
 # Test training benchmark for a model.
-
 # Usage：CUDA_VISIBLE_DEVICES=0 bash run_benchmark.sh ${run_mode} ${bs_item} ${fp_item} ${max_iter} ${model_name}
 
 function _set_params(){
