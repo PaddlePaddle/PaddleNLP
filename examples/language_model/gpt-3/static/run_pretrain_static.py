@@ -20,6 +20,7 @@ import os
 import random
 import time
 import sys
+from paddle.fluid import core
 
 os.path.expandvars('$HOME')
 os.path.expanduser('~')
@@ -410,6 +411,23 @@ def do_train(args):
 
         for step, batch in enumerate(train_data_loader()):
             global_step += 1
+
+            """
+            # add nsight test
+            if step == 20:
+                core.nvprof_start()
+                core.nvprof_enable_record_event()
+                core.nvprof_nvtx_push(str(step))
+            if step == 25:
+                core.nvprof_nvtx_pop()
+                core.nvprof_stop()
+                sys.exit()
+            if step >= 20 and step < 25:
+                core.nvprof_nvtx_pop()
+                core.nvprof_nvtx_push(str(step))
+            #-----------------
+            """
+            
             ret = exe.run(main_program,
                           feed=batch,
                           fetch_list=fetchs,

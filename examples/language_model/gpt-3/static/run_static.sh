@@ -15,7 +15,7 @@ rm -rf output/$task_name/log
 rm -rf output/$task_name/program_desc
 
 python3.8 -u  -m paddle.distributed.fleet.launch \
-    --gpus "7" \
+    --gpus "6" \
     --log_dir "output/$task_name/log" run_pretrain_static.py \
     --model_type "gpt" \
     --model_name_or_path "gpt2-en" \
@@ -29,8 +29,8 @@ python3.8 -u  -m paddle.distributed.fleet.launch \
     --dp_degree 1 \
     --pp_degree 1 \
     --use_sharding true \
-    --use_amp true \
-    --use_fp16 true \
+    --use_amp false \
+    --use_fp16 false \
     --use_recompute true \
     --max_lr 0.00015 \
     --min_lr 0.00001 \
