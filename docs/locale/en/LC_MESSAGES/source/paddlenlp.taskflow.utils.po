@@ -1,0 +1,55 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.taskflow.utils.rst:2
+msgid "utils"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.download_file:1
+msgid ""
+"Download the file from the url to specified directory. Check md5 value "
+"when the file is exists, if the md5 value is the same as the existed "
+"file, just use the older file, if not, will download the file from the "
+"url."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.download_file
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.download_file:5
+msgid "The specified directory saving the file."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.download_file:7
+msgid "The specified filename saveing the file."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.download_file:9
+msgid "The url downling the file."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.download_file:11
+msgid "The md5 value that checking the version downloaded."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.add_docstrings:1
+msgid "The function that add the doc string to doc of class."
+msgstr ""
+

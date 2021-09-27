@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.transformers.roberta.tokenizer.rst:2
+#: ../source/paddlenlp.transformers.roberta.tokenizer.rst:2
 msgid "tokenizer"
 msgstr ""
 
@@ -192,7 +192,7 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_offset_mapping_with_special_tokens:3
-msgid "A ERNIE offset_mapping has the following format: ::"
+msgid "A RoBERTa offset_mapping has the following format: ::"
 msgstr ""
 
 #: of

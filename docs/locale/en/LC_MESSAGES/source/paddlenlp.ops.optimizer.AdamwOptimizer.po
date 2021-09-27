@@ -1,0 +1,137 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.ops.optimizer.AdamwOptimizer.rst:2
+msgid "AdamwOptimizer"
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:1
+msgid ""
+"The AdamW optimizer is implemented based on the AdamW Optimization in "
+"paper `DECOUPLED WEIGHT DECAY REGULARIZATION "
+"<https://arxiv.org/pdf/1711.05101.pdf>`_. it can resolves the problem of "
+"L2 regularization failure in the Adam optimizer. .. math::"
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:12
+msgid ""
+"The learning rate used to update ``Parameter``. It can be a float value "
+"or a ``Variable`` with a float type. The default value is 0.001."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:15
+msgid ""
+"The exponential decay rate for the 1st moment estimates. It should be a "
+"float number or a Variable with shape [1] and data type as float32. The "
+"default value is 0.9."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:19
+msgid ""
+"The exponential decay rate for the 2nd moment estimates. It should be a "
+"float number or a Variable with shape [1] and data type as float32. The "
+"default value is 0.999."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:23
+msgid "A small float value for numerical stability. The default value is 1e-08."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:26
+msgid ""
+"Iterable of ``Variable`` names to update to minimize ``loss``. \\ This "
+"parameter is required in dygraph mode. \\ The default value is None in "
+"static mode, at this time all parameters will be updated."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:30
+msgid ""
+"The weight decay coefficient, it can be float or Tensor. The default "
+"value is 0.01."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:32
+msgid ""
+"If it is not None, only tensors that makes "
+"apply_decay_param_fun(Tensor.name)==True will be updated. It only works "
+"when we want to specify tensors. Default: None."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:37
+msgid ""
+"The strategy of regularization. There are two method: \\  "
+":ref:`api_fluid_regularizer_L1Decay` , "
+":ref:`api_fluid_regularizer_L2Decay` . If a parameter has set \\ "
+"regularizer using :ref:`api_fluid_ParamAttr` already, the regularization "
+"setting here in optimizer will be \\ ignored for this parameter. "
+"Otherwise, the regularization setting here in optimizer will take effect."
+"  \\ Default None, meaning there is no regularization."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:38
+msgid "The strategy of regularization. There are two method: \\"
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:39
+msgid ""
+":ref:`api_fluid_regularizer_L1Decay` , "
+":ref:`api_fluid_regularizer_L2Decay` . If a parameter has set \\"
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:40
+msgid ""
+"regularizer using :ref:`api_fluid_ParamAttr` already, the regularization "
+"setting here in optimizer will be \\ ignored for this parameter. "
+"Otherwise, the regularization setting here in optimizer will take effect."
+"  \\ Default None, meaning there is no regularization."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:44
+msgid ""
+"Gradient cliping strategy, it's an instance of some derived class of "
+"``GradientClipBase`` . There are three cliping strategies ( "
+":ref:`api_fluid_clip_GradientClipByGlobalNorm` , "
+":ref:`api_fluid_clip_GradientClipByNorm` , "
+":ref:`api_fluid_clip_GradientClipByValue` ). Default None, meaning there "
+"is no gradient clipping."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:49
+msgid ""
+"Normally there is no need for user to set this property. For more "
+"information, please refer to :ref:`api_guide_Name`. The default value is "
+"None."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.AdamwOptimizer.AdamwOptimizer:53
+msgid ""
+"The official Adam algorithm has two moving-average accumulators. The "
+"accumulators are updated at every step. Every element of the two moving-"
+"average is updated in both dense mode and sparse mode. If the size of "
+"parameter is very large, then the update may be very slow. The lazy mode "
+"only update the element that has gradient in current mini-batch, so it "
+"will be much more faster. But this mode has different semantics with the "
+"original Adam algorithm and may lead to different result. The default "
+"value is False."
+msgstr ""
+

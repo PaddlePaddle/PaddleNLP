@@ -1,0 +1,163 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.gpt.tokenizer.rst:2
+msgid "tokenizer"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer:1
+#: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer:1
+msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.set_special_tokens:1
+msgid ""
+"Add a list of additional tokens to the encoder. The additional tokens are"
+" indexed starting from the last index of the current vocabulary in the "
+"order of the `special_tokens` list."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.tokenize:1
+msgid "Tokenize a string."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.convert_tokens_to_ids:1
+msgid "Converts a sequence of tokens into ids using the vocab."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_ids_to_tokens:1
+#: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.convert_ids_to_tokens:1
+msgid ""
+"Converts a token id or a sequence of token ids (integer) to a token or a "
+"sequence of tokens (str) by using the `vocab` attribute (an instance of "
+"`Vocab`)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_ids_to_tokens
+#: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.convert_ids_to_tokens
+msgid "参数"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_ids_to_tokens:5
+#: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.convert_ids_to_tokens:5
+msgid "A token id or a sequence of token ids."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_ids_to_tokens:7
+#: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.convert_ids_to_tokens:7
+msgid ""
+"Whether to skip and not decode special tokens when converting. Defaults "
+"to `False`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_ids_to_string
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_ids_to_tokens
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_tokens_to_ids
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.tokenize
+#: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.convert_ids_to_tokens
+msgid "返回"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_ids_to_tokens:11
+#: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.convert_ids_to_tokens:11
+msgid "Converted token or token sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_ids_to_string
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_ids_to_tokens
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_tokens_to_ids
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.tokenize
+#: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.convert_ids_to_tokens
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.save_resources:1
+#: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.save_resources:1
+msgid ""
+"Save tokenizer related resources to files under `save_directory`. :param "
+"save_directory: Directory to save files into. :type save_directory: str"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer:1
+msgid ""
+"Constructs a GPT Chinese tokenizer. It uses a basic tokenizer to do "
+"punctuation splitting, lower casing and so on, and follows a WordPiece "
+"tokenizer to tokenize as subwords."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.tokenize:1
+msgid ""
+"End-to-end tokenization for GPT models. :param text: The text to be "
+"tokenized. :type text: str"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.tokenize:5
+msgid "A list of string representing converted tokens."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.tokenize:9
+msgid "示例"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_tokens_to_ids:1
+msgid ""
+"Converts a sequence of tokens into ids using the `vocab` attribute (an "
+"instance of `Vocab`). Override it if needed."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_tokens_to_ids:5
+msgid "Args："
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_tokens_to_ids:5
+msgid "tokens (list[int]): List of token ids."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_tokens_to_ids:7
+msgid "Converted id list."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.vocab_size:1
+msgid "Returns the size of vocabulary. .. rubric:: 示例"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_ids_to_string:1
+msgid ""
+"Converts a single index or a sequence of indices to a token or a sequence"
+" of tokens. :param ids: The token id (or token ids) to be converted to "
+"token(s). :type ids: int|list[int]"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_ids_to_string:6
+msgid "The decoded token(s)."
+msgstr ""
+

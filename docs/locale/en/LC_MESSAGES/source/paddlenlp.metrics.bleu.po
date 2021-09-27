@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.metrics.bleu.rst:2
+#: ../source/paddlenlp.metrics.bleu.rst:2
 msgid "bleu"
 msgstr ""
 
@@ -96,19 +96,10 @@ msgid "实际案例"
 msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEU:47
-msgid "1. Using as a general evaluation object. .. code-block:: python"
+msgid "Using as a general evaluation object."
 msgstr ""
 
-#: of paddlenlp.metrics.bleu.BLEU:50
-msgid ""
-"from paddlenlp.metrics import BLEU bleu = BLEU() cand = "
-"[\"The\",\"cat\",\"The\",\"cat\",\"on\",\"the\",\"mat\"] ref_list = "
-"[[\"The\",\"cat\",\"is\",\"on\",\"the\",\"mat\"], "
-"[\"There\",\"is\",\"a\",\"cat\",\"on\",\"the\",\"mat\"]] "
-"bleu.add_inst(cand, ref_list) print(bleu.score()) # 0.4671379777282001"
-msgstr ""
-
-#: of paddlenlp.metrics.bleu.BLEU:57
+#: of paddlenlp.metrics.bleu.BLEU:58
 msgid "Using as an instance of `paddle.metric.Metric`."
 msgstr ""
 

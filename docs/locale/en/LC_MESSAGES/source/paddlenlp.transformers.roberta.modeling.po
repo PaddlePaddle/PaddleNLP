@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.transformers.roberta.modeling.rst:2
+#: ../source/paddlenlp.transformers.roberta.modeling.rst:2
 msgid "modeling"
 msgstr ""
 
@@ -28,14 +28,242 @@ msgstr ""
 msgid "基类：:class:`paddlenlp.transformers.roberta.modeling.RobertaPretrainedModel`"
 msgstr ""
 
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:1
+msgid ""
+"The bare RoBERTa Model transformer outputting raw hidden-states without "
+"any specific head on top."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Refer to "
+"the superclass documentation for the generic methods."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward
+#: paddlenlp.transformers.roberta.modeling.RobertaModel
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:10
+msgid ""
+"Vocabulary size of the RoBERTa model. Also is the vocab size of token "
+"embedding matrix."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:12
+msgid "Dimension of the encoder layers and the pooler layer. Defaults to ``768``."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:14
+msgid "Number of hidden layers in the Transformer encoder. Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:16
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"encoder. Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:19
+msgid ""
+"Dimension of the \"intermediate\" (often named feed-forward) layer in the"
+" Transformer encoder. Defaults to ``3072``."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:22
+msgid ""
+"The non-linear activation function in the feed-forward layer. "
+"``\"gelu\"``, ``\"relu\"`` and any other paddle supported activation "
+"functions are supported. Defaults to ``\"gelu\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:26
+msgid ""
+"The dropout probability for all fully connected layers in the embeddings "
+"and encoder. Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:29
+msgid ""
+"The dropout probability for all fully connected layers in the pooler. "
+"Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:32
+msgid "The max position index of an input sequence. Defaults to ``512``."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:34
+msgid ""
+"The vocabulary size of the `token_type_ids` passed when calling "
+"`~transformers.RobertaModel`. Defaults to ``2``."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:37
+msgid ""
+"The standard deviation of the normal initializer. Defaults to 0.02.  .. "
+"note::     A normal_initializer initializes weight matrices as normal "
+"distributions.     See :meth:`RobertaPretrainedModel._init_weights()` for"
+" how weights are initialized in `RobertaModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:37
+msgid "The standard deviation of the normal initializer. Defaults to 0.02."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:40
+msgid ""
+"A normal_initializer initializes weight matrices as normal distributions."
+" See :meth:`RobertaPretrainedModel._init_weights()` for how weights are "
+"initialized in `RobertaModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:43
+msgid "The pad token index in the token vocabulary."
+msgstr ""
+
 #: of
 #: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:1
 #: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:1
 #: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:1
 #: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:1
 msgid ""
-"Defines the computation performed at every call. Should be overridden by "
-"all subclasses."
+"Indices of input sequence tokens in the vocabulary. They are numerical "
+"representations of tokens that build the input sequence. It's data type "
+"should be `int64` and has a shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:5
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:5
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:5
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:5
+msgid ""
+"Segment token indices to indicate first and second portions of the "
+"inputs. Indices can be either 0 or 1:  - 0 corresponds to a **sentence "
+"A** token, - 1 corresponds to a **sentence B** token.  It's data type "
+"should be `int64` and has a shape of [batch_size, sequence_length]. "
+"Defaults to None, which means no segment embeddings is added to token "
+"embeddings."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:5
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:5
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:5
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:5
+msgid ""
+"Segment token indices to indicate first and second portions of the "
+"inputs. Indices can be either 0 or 1:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:8
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:8
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:8
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:8
+msgid "0 corresponds to a **sentence A** token,"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:9
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:9
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:9
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:9
+msgid "1 corresponds to a **sentence B** token."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:11
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:11
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:11
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:11
+msgid ""
+"It's data type should be `int64` and has a shape of [batch_size, "
+"sequence_length]. Defaults to None, which means no segment embeddings is "
+"added to token embeddings."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:14
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:14
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:14
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:14
+msgid ""
+"Indices of positions of each input sequence tokens in the position "
+"embeddings. Selected in the range ``[0, config.max_position_embeddings - "
+"1]``. Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as"
+" `int32` or `int64`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:18
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:18
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:18
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:18
+msgid ""
+"Mask to indicate whether to perform attention on each input token or not."
+" The values should be either 0 or 1. The attention scores will be set to "
+"**-infinity** for any positions in the mask that are **0**, and will be "
+"**unchanged** for positions that are **1**.  - **1** for tokens that are "
+"**not masked**, - **0** for tokens that are **masked**.  It's data type "
+"should be `float32` and has a shape of [batch_size, sequence_length]. "
+"Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:18
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:18
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:18
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:18
+msgid ""
+"Mask to indicate whether to perform attention on each input token or not."
+" The values should be either 0 or 1. The attention scores will be set to "
+"**-infinity** for any positions in the mask that are **0**, and will be "
+"**unchanged** for positions that are **1**."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:23
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:23
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:23
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:23
+msgid "**1** for tokens that are **not masked**,"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:24
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:24
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:24
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:24
+msgid "**0** for tokens that are **masked**."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:26
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:26
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:26
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:26
+msgid ""
+"It's data type should be `float32` and has a shape of [batch_size, "
+"sequence_length]. Defaults to `None`."
 msgstr ""
 
 #: of
@@ -43,23 +271,54 @@ msgstr ""
 #: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward
 #: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward
 #: paddlenlp.transformers.roberta.modeling.RobertaModel.forward
-msgid "参数"
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:30
+msgid ""
+"A tuple of shape (``sequence_output``, ``pooled_output``).  With the "
+"fields: - sequence_output (Tensor):     Sequence of hidden-states at the "
+"last layer of the model.     It's data type should be `float` and has a "
+"shape of `(batch_size, seq_lens, hidden_size)`.     ``seq_lens`` "
+"corresponds to the length of input sequence. - pooled_output (Tensor):"
+"     A Tensor of the first token representation.     It's data type "
+"should be `float` and has a shape of `(batch_size, hidden_size]`.     We "
+"\"pool\" the model by simply taking the hidden state corresponding to the"
+" first token."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:30
+msgid "A tuple of shape (``sequence_output``, ``pooled_output``)."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:32
+msgid "With the fields: - sequence_output (Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:34
+msgid ""
+"Sequence of hidden-states at the last layer of the model. It's data type "
+"should be `float` and has a shape of `(batch_size, seq_lens, "
+"hidden_size)`. ``seq_lens`` corresponds to the length of input sequence."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:40
+msgid "pooled_output (Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:38
+msgid ""
+"A Tensor of the first token representation. It's data type should be "
+"`float` and has a shape of `(batch_size, hidden_size]`. We \"pool\" the "
+"model by simply taking the hidden state corresponding to the first token."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:4
-#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:4
-#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:4
-#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:4
-msgid "unpacked tuple arguments"
-msgstr ""
-
-#: of
-#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:6
-#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:6
-#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:6
-#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:6
-msgid "unpacked dict arguments"
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:35
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:35
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:35
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:43
+msgid "示例"
 msgstr ""
 
 #: of paddlenlp.transformers.roberta.modeling.RobertaPretrainedModel:1
@@ -71,8 +330,9 @@ msgid ""
 "An abstract class for pretrained RoBERTa models. It provides RoBERTa "
 "related `model_config_file`, `resource_files_names`, "
 "`pretrained_resource_files_map`, `pretrained_init_configuration`, "
-"`base_model_prefix` for downloading and loading pretrained models. See "
-"`PretrainedModel` for more details."
+"`base_model_prefix` for downloading and loading pretrained models. Refer "
+"to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more "
+"details."
 msgstr ""
 
 #: of
@@ -82,18 +342,68 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification:1
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification:1
 msgid ""
-"Model for sentence (pair) classification task with RoBERTa. :param "
-"roberta: An instance of `RobertaModel`. :type roberta: RobertaModel "
-":param num_classes: The number of classes. Default 2 :type num_classes: "
-"int, optional :param dropout: The dropout probability for output of "
-"RoBERTa."
+"RoBERTa Model transformer with a sequence classification/regression head "
+"on top (a linear layer on top of the pooledoutput) e.g. for GLUE tasks."
 msgstr ""
 
 #: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification:5
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification:5
+msgid "An instance of `RobertaModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering:5
 #: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification:7
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification:7
+msgid "The number of classes. Default to `2`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification:9
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification:9
 msgid ""
-"If None, use the same value as `hidden_dropout_prob` of `RobertaModel` "
-"instance `Roberta`. Default None"
+"The dropout probability for output of RoBERTa. If None, use the same "
+"value as `hidden_dropout_prob` of `RobertaModel` instance `roberta`. "
+"Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:30
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:30
+msgid ""
+"A Tensor of the input text classification logits. Shape as `(batch_size, "
+"num_classes)` and dtype as `float`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:30
+msgid ""
+"A Tensor of the input text classification logits, shape as (batch_size, "
+"seq_lens, `num_classes`). seq_lens mean the number of tokens of the input"
+" sequence."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering:1
+msgid "Model for sentence (pair) classification task with RoBERTa."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering:3
+msgid "An instance of `paddlenlp.transformers.RobertaModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering:7
+msgid ""
+"The dropout probability for output of RoBERTa. If None, use the same "
+"value as `hidden_dropout_prob` of `paddlenlp.transformers.RobertaModel` "
+"instance. Defaults to `None`."
 msgstr ""
 

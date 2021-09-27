@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.transformers.bigbird.modeling.rst:2
+#: ../source/paddlenlp.transformers.bigbird.modeling.rst:2
 msgid "modeling"
 msgstr ""
 
@@ -27,14 +27,179 @@ msgstr ""
 msgid "基类：:class:`paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel`"
 msgstr ""
 
-#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:1
-#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:1
-#: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:1
-#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:1
-#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:1
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:1
 msgid ""
-"Defines the computation performed at every call. Should be overridden by "
-"all subclasses."
+"The bare BigBird Model transformer outputting raw hidden-states without "
+"any specific head on top."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Check the "
+"superclass documentation for the generic methods and the library "
+"implements for all its model."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward
+#: paddlenlp.transformers.bigbird.modeling.BigBirdModel
+#: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:10
+msgid "Number of hidden layers in the Transformer encoder."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:12
+msgid ""
+"Vocabulary size of the BigBird model. Defines the number of different "
+"tokens that can be represented by the `inputs_ids` passed when calling "
+"BigBirdModel."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:15
+msgid "Number of heads in attention part."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:17
+msgid "The dropout probability for all attention layers. Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:20
+msgid ""
+"Dimensionality of the \"intermediate\" (often named feed-forward) layer "
+"in the Transformer encoder. Defaults to ``3072``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:23
+msgid ""
+"The non-linear activation function in the feed-forward layer. "
+"``\"gelu\"``, ``\"relu\"``, ``\"silu\"`` and ``\"gelu_new\"`` are "
+"supported. Defaults to ``\"gelu\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:27
+msgid ""
+"Indicates whether to put layer normalization into preprocessing of MHA "
+"and FFN sub-layers. If True, pre-process is layer normalization and post-"
+"precess includes dropout, residual connection. Otherwise, no pre-process "
+"and post-precess includes dropout, residual connection, layer "
+"normalization. Defaults to ``False``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:33
+msgid "The block size for the attention mask. Defaults to ``1``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:36
+msgid "The number of block in a window. Defaults to ``3``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:39
+msgid "Number of global blocks per sequence. Defaults to ``1``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:42
+msgid "Number of random blocks per row. Defaults to ``2``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:45
+msgid "The random seed for generating random block id. Defaults to ``None``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:48
+msgid "The index of padding token for BigBird embedding. Defaults to ``0``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:51
+msgid ""
+"Dimensionality of the encoder layers and the pooler layer. Defaults to "
+"``768``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:54
+msgid ""
+"The dropout probability for all fully connected layers in the embeddings "
+"and encoder. Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:57
+msgid ""
+"The size position embeddings of matrix, which dictates the maximum length"
+" for which the model can be run. Defaults to ``512``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:61
+msgid "The vocabulary size of the `token_type_ids`. Defaults to ``2``."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:1
+msgid "The BigBirdModel forward method, overrides the __call__() special method."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:3
+msgid ""
+"Indices of input sequence tokens in the vocabulary. Its data type should "
+"be `int64` and it has a shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:6
+msgid ""
+"Segment token indices to indicate first and second portions of the "
+"inputs. Indices can either be 0 or 1:  - 0 corresponds to a *sentence A* "
+"token, - 1 corresponds to a *sentence B* token.  Its data type should be "
+"`int64` and it has a shape of [batch_size, sequence_length]. Defaults to "
+"``None``, which means we don't add segment embeddings."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:6
+msgid ""
+"Segment token indices to indicate first and second portions of the "
+"inputs. Indices can either be 0 or 1:"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:9
+msgid "0 corresponds to a *sentence A* token,"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:10
+msgid "1 corresponds to a *sentence B* token."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:12
+msgid ""
+"Its data type should be `int64` and it has a shape of [batch_size, "
+"sequence_length]. Defaults to ``None``, which means we don't add segment "
+"embeddings."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:15
+msgid ""
+"A list which contains some tensors used in multi-head attention to "
+"prevents attention to some unwanted positions, usually the paddings or "
+"the subsequent positions. The tensors' shape will be broadcasted to "
+"`[batch_size, n_head, sequence_length, sequence_length]`"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:20
+msgid "A list which contains some tensors used in bigbird random block."
 msgstr ""
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward
@@ -42,23 +207,67 @@ msgstr ""
 #: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward
-msgid "参数"
+msgid "返回"
 msgstr ""
 
-#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:4
-#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:4
-#: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:4
-#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:4
-#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:4
-msgid "unpacked tuple arguments"
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:23
+msgid ""
+"(``encoder_output``, ``pooled_output``).  With the fields:  - "
+"encoder_output (`Tensor`):     Sequence of output at the last layer of "
+"the model. Its data type should be float32 and     has a shape of "
+"[batch_size, sequence_length, hidden_size].  - pooled_output (`Tensor`):"
+"     The output of first token (`[CLS]`) in sequence. Its data type "
+"should be float32 and     has a shape of [batch_size, hidden_size]."
 msgstr ""
 
-#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:6
-#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:6
-#: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:6
-#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:6
-#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:6
-msgid "unpacked dict arguments"
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:23
+msgid "(``encoder_output``, ``pooled_output``)."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:16
+#: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:25
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:15
+msgid "With the fields:"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:29
+msgid "encoder_output (`Tensor`):"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:28
+msgid ""
+"Sequence of output at the last layer of the model. Its data type should "
+"be float32 and has a shape of [batch_size, sequence_length, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:32
+msgid "pooled_output (`Tensor`):"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:32
+msgid ""
+"The output of first token (`[CLS]`) in sequence. Its data type should be "
+"float32 and has a shape of [batch_size, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward
+#: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:24
+#: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:34
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:23
+msgid "`Tuple`"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:27
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:16
+#: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:37
+msgid "实际案例"
 msgstr ""
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel:1
@@ -71,16 +280,231 @@ msgid ""
 "related `model_config_file`, `resource_files_names`, "
 "`pretrained_resource_files_map`, `pretrained_init_configuration`, "
 "`base_model_prefix` for downloading and loading pretrained models. See "
-"`PretrainedModel` for more details."
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more "
+"details."
 msgstr ""
 
-#: of
-#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel.init_weights:1
-msgid "Initialization hook"
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining:1
+msgid "BigBird Model for a pretraiing task on top."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining:3
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification:4
+msgid "An instance of :class:`BigBirdModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:1
+msgid ""
+"The BigBirdForPretraining forward method, overrides the __call__() "
+"special method."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:3
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:5
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:7
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:9
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:3
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:5
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:7
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:9
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion:3
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads:3
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads:5
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads:7
+msgid "See :class:`BigBirdModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:11
+msgid "The list of masked positions."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:14
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:13
+msgid ""
+"(``prediction_scores``, ``seq_relationship_score``).  With the fields:  -"
+" prediction_scores (`Tensor`):     The prediction score of masked tokens."
+" Its data type should be float32 and     has a shape of [batch_size, "
+"sequence_length, vocab_size]. - seq_relationship_score (`Tensor`):     "
+"The logits whether 2 sequences are NSP relationship. Its data type should"
+" be float32 and     has a shape of [batch_size, 2]."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:14
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:13
+msgid "(``prediction_scores``, ``seq_relationship_score``)."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:19
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:18
+msgid "prediction_scores (`Tensor`):"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:19
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:18
+msgid ""
+"The prediction score of masked tokens. Its data type should be float32 "
+"and has a shape of [batch_size, sequence_length, vocab_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:22
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:21
+msgid "seq_relationship_score (`Tensor`):"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:22
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:21
+msgid ""
+"The logits whether 2 sequences are NSP relationship. Its data type should"
+" be float32 and has a shape of [batch_size, 2]."
 msgstr ""
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion:1
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion:1
+msgid "BigBird Criterion for a pretraiing task on top."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion:5
+msgid "It decides whether it considers NSP loss. Defaults: False"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion:8
+msgid ""
+"Specifies a target value that is ignored and does not contribute to the "
+"input gradient. Only valid if :attr:`soft_label` is set to :attr:`False`."
+" Defaults to `0`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:1
+msgid ""
+"The BigBirdPretrainingCriterion forward method, overrides the __call__() "
+"special method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:3
+msgid ""
+"The logits of masked token prediction. Its data type should be float32 "
+"and its shape is [batch_size, sequence_len, vocab_size]"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:6
+msgid ""
+"The logits whether 2 sequences are NSP relationship. Its data type should"
+" be float32 and its shape is [batch_size, 2]"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:9
+msgid ""
+"The masked token labels. Its data type should be int64 and its shape is "
+"[mask_token_num, 1]"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:12
+msgid ""
+"The labels of NSP tasks.  Its data type should be int64 and its shape is "
+"[batch_size, 1]"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:15
+msgid ""
+"The scale of masked tokens. If it is a `Tensor`, its data type should be "
+"int64 and its shape is [mask_token_num, 1]"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:18
+msgid ""
+"The weight of masked tokens. Its data type should be float32 and its "
+"shape is [mask_token_num, 1]"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:22
+msgid "The pretraining loss."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:23
+msgid "`Float`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:26
+msgid "示例"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification:1
+msgid ""
+"BigBird Model with a sequence classification/regression head on top (a "
+"linear layer on top of the pooled output) e.g. for GLUE tasks."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification:6
+msgid "The number of classes. Defaults to ``None``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:1
+msgid ""
+"The BigBirdForSequenceClassification forward method, overrides the "
+"__call__() special method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:12
+msgid ""
+"Probability of each class. Its data type should be float32 and it has a "
+"shape of [batch_size, num_classes]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:13
+msgid "`Tensor`"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads:1
+msgid "The BigBird pretraining heads for a pretraiing task on top."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads:9
+msgid ""
+"The weight of pretraining embedding layer. Its data type should be "
+"float32 and its shape is [hidden_size, vocab_size]. If set to `None`, use"
+" normal distribution to initialize weight. Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:1
+msgid ""
+"The BigBirdPretrainingHeads forward method, overrides the __call__() "
+"special method."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:3
+msgid ""
+"The sequence output of BigBirdModel. Its data type should be float32 and "
+"has a shape of [batch_size, sequence_length, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:6
+msgid ""
+"The pooled output of BigBirdModel. Its data type should be float32 and "
+"has a shape of [batch_size, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward:9
+msgid ""
+"The list of masked positions. Its data type should be int64 and has a "
+"shape of [mask_token_num, hidden_size]. Defaults to `None`."
 msgstr ""
 

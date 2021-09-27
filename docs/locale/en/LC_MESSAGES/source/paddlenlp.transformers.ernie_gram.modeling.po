@@ -1,0 +1,424 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.ernie_gram.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering:1
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification:1
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification:1
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:1
+msgid "基类：:class:`paddlenlp.transformers.ernie_gram.modeling.ErnieGramPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:1
+msgid ""
+"The bare ERNIE-Gram Model transformer outputting raw hidden-states "
+"without any specific head on top."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Refer to "
+"the superclass documentation for the generic methods."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:10
+msgid ""
+"Vocabulary size of the ERNIE-Gram model. Also is the vocab size of token "
+"embedding matrix."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:12
+msgid "Dimension of the encoder layers and the pooler layer. Defaults to ``768``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:14
+msgid "Number of hidden layers in the Transformer encoder. Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:16
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"encoder. Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:19
+msgid ""
+"Dimension of the \"intermediate\" (often named feed-forward) layer in the"
+" Transformer encoder. Defaults to ``3072``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:22
+msgid ""
+"The non-linear activation function in the feed-forward layer. "
+"``\"gelu\"``, ``\"relu\"`` and any other paddle supported activation "
+"functions are supported. Defaults to ``\"gelu\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:26
+msgid ""
+"The dropout probability for all fully connected layers in the embeddings "
+"and encoder. Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:29
+msgid ""
+"The dropout probability for all fully connected layers in the pooler. "
+"Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:32
+msgid "The max position index of an input sequence. Defaults to ``512``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:34
+msgid ""
+"The vocabulary size of the `token_type_ids` passed when calling "
+"`~transformers.ErnieGramModel`. Defaults to ``2``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:37
+msgid "The standard deviation of the normal initializer. Defaults to 0.02."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:39
+msgid ""
+"The relative position size just for ERNIE-Gram English model. Defaults to"
+" None.  .. note::     A normal_initializer initializes weight matrices as"
+" normal distributions.     See "
+":meth:`ErnieGramPretrainedModel._init_weights()` for how weights are "
+"initialized in `ErnieGramModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:39
+msgid ""
+"The relative position size just for ERNIE-Gram English model. Defaults to"
+" None."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:42
+msgid ""
+"A normal_initializer initializes weight matrices as normal distributions."
+" See :meth:`ErnieGramPretrainedModel._init_weights()` for how weights are"
+" initialized in `ErnieGramModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel:45
+msgid "The pad token index in the token vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:1
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:1
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:1
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:1
+msgid ""
+"Indices of input sequence tokens in the vocabulary. They are numerical "
+"representations of tokens that build the input sequence. It's data type "
+"should be `int64` and has a shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:5
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:5
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:5
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:5
+msgid ""
+"Segment token indices to indicate first and second portions of the "
+"inputs. Indices can be either 0 or 1:  - 0 corresponds to a **sentence "
+"A** token, - 1 corresponds to a **sentence B** token.  It's data type "
+"should be `int64` and has a shape of [batch_size, sequence_length]. "
+"Defaults to None, which means no segment embeddings is added to token "
+"embeddings."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:5
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:5
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:5
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:5
+msgid ""
+"Segment token indices to indicate first and second portions of the "
+"inputs. Indices can be either 0 or 1:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:8
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:8
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:8
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:8
+msgid "0 corresponds to a **sentence A** token,"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:9
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:9
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:9
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:9
+msgid "1 corresponds to a **sentence B** token."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:11
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:11
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:11
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:11
+msgid ""
+"It's data type should be `int64` and has a shape of [batch_size, "
+"sequence_length]. Defaults to None, which means no segment embeddings is "
+"added to token embeddings."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:14
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:14
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:14
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:14
+msgid ""
+"Indices of positions of each input sequence tokens in the position "
+"embeddings. Selected in the range ``[0, config.max_position_embeddings - "
+"1]``. Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as"
+" `int32` or `int64`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:18
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:18
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:18
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:18
+msgid ""
+"Mask to indicate whether to perform attention on each input token or not."
+" The values should be either 0 or 1. The attention scores will be set to "
+"**-infinity** for any positions in the mask that are **0**, and will be "
+"**unchanged** for positions that are **1**.  - **1** for tokens that are "
+"**not masked**, - **0** for tokens that are **masked**.  It's data type "
+"should be `float32` and has a shape of [batch_size, sequence_length]. "
+"Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:18
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:18
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:18
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:18
+msgid ""
+"Mask to indicate whether to perform attention on each input token or not."
+" The values should be either 0 or 1. The attention scores will be set to "
+"**-infinity** for any positions in the mask that are **0**, and will be "
+"**unchanged** for positions that are **1**."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:23
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:23
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:23
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:23
+msgid "**1** for tokens that are **not masked**,"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:24
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:24
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:24
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:24
+msgid "**0** for tokens that are **masked**."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:26
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:26
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:26
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:26
+msgid ""
+"It's data type should be `float32` and has a shape of [batch_size, "
+"sequence_length]. Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:30
+msgid ""
+"A tuple of shape (``sequence_output``, ``pooled_output``).  With the "
+"fields: - sequence_output (Tensor):     Sequence of hidden-states at the "
+"last layer of the model.     It's data type should be `float` and has a "
+"shape of `(batch_size, seq_lens, hidden_size)`.     ``seq_lens`` "
+"corresponds to the length of input sequence. - pooled_output (Tensor):"
+"     A Tensor of the first token representation.     It's data type "
+"should be `float` and has a shape of `(batch_size, hidden_size]`.     We "
+"\"pool\" the model by simply taking the hidden state corresponding to the"
+" first token."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:30
+msgid "A tuple of shape (``sequence_output``, ``pooled_output``)."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:32
+msgid "With the fields: - sequence_output (Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:34
+msgid ""
+"Sequence of hidden-states at the last layer of the model. It's data type "
+"should be `float` and has a shape of `(batch_size, seq_lens, "
+"hidden_size)`. ``seq_lens`` corresponds to the length of input sequence."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:40
+msgid "pooled_output (Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:38
+msgid ""
+"A Tensor of the first token representation. It's data type should be "
+"`float` and has a shape of `(batch_size, hidden_size]`. We \"pool\" the "
+"model by simply taking the hidden state corresponding to the first token."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:37
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:35
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:35
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramModel.forward:43
+msgid "示例"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification:1
+msgid "Model for sentence (pair) classification task with ERNIE-Gram."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification:3
+msgid "An instance of `paddlenlp.transformers.ErnieGramModel`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification:5
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification:7
+msgid "The number of classes. Default to `2`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification:7
+msgid ""
+"The dropout probability for output of ERNIE-Gram. If None, use the same "
+"value as `hidden_dropout_prob` of `paddlenlp.transformers.ErnieGramModel`"
+" instance. Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward:30
+msgid ""
+"A Tensor of the input text classification logits. Shape as `(batch_size, "
+"num_classes)` and dtype as `float`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForSequenceClassification.forward
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification:1
+msgid ""
+"ERNIE-Gram Model transformer with a sequence classification/regression "
+"head on top (a linear layer on top of the pooledoutput) e.g. for GLUE "
+"tasks."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering:4
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification:5
+msgid "An instance of `ErnieGramModel`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification:9
+msgid ""
+"The dropout probability for output of ERNIE-Gram. If None, use the same "
+"value as `hidden_dropout_prob` of `ErnieGramModel` instance `ernie_gram`."
+" Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForTokenClassification.forward:30
+msgid ""
+"A Tensor of the input text classification logits, shape as (batch_size, "
+"seq_lens, `num_classes`). seq_lens mean the number of tokens of the input"
+" sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering:1
+msgid "Model for Question and Answering task with ERNIE-Gram."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:30
+msgid ""
+"A tuple of shape (``start_logits``, ``end_logits``).  With the fields: - "
+"start_logits(Tensor): The logits of start position of prediction answer. "
+"- end_logits(Tensor): The logits of end position of prediction answer."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:30
+msgid "A tuple of shape (``start_logits``, ``end_logits``)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_gram.modeling.ErnieGramForQuestionAnswering.forward:32
+msgid ""
+"With the fields: - start_logits(Tensor): The logits of start position of "
+"prediction answer. - end_logits(Tensor): The logits of end position of "
+"prediction answer."
+msgstr ""
+

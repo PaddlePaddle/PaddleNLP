@@ -1,0 +1,296 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.skep.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepForSequenceClassification:1
+#: paddlenlp.transformers.skep.modeling.SkepForTokenClassification:1
+#: paddlenlp.transformers.skep.modeling.SkepModel:1
+msgid "基类：:class:`paddlenlp.transformers.skep.modeling.SkepPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:1
+msgid ""
+"The bare SKEP Model transformer outputting raw hidden-states without any "
+"specific head on top."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Check the "
+"superclass documentation for the generic methods and the library "
+"implements for all its model."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:10
+msgid ""
+"More details refer to `SKEP <https://www.aclweb.org/anthology/2020.acl-"
+"main.374>`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.skep.modeling.SkepCrfForTokenClassification.forward
+#: paddlenlp.transformers.skep.modeling.SkepForSequenceClassification
+#: paddlenlp.transformers.skep.modeling.SkepForSequenceClassification.forward
+#: paddlenlp.transformers.skep.modeling.SkepForTokenClassification.forward
+#: paddlenlp.transformers.skep.modeling.SkepModel
+#: paddlenlp.transformers.skep.modeling.SkepModel.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:12
+msgid ""
+"Vocabulary size of the SKEP model. Defines the number of different tokens"
+" that can be represented by the `inputs_ids` passed when calling SKEP."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:15
+msgid "Dimension of the encoder layers and the pooler layer. Defaults to ``768``."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:17
+msgid "Number of hidden layers in the Transformer encoder. Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:19
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"encoder. Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:22
+msgid ""
+"Dimension of the \"intermediate\" (often named feed-forward) layer in the"
+" Transformer encoder. Defaults to ``3072``."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:25
+msgid ""
+"The non-linear activation function in the feed-forward layer. "
+"``\"gelu\"``, ``\"relu\"`` and any other paddle supported activation "
+"functions are supported. Defaults to ``\"gelu\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:29
+msgid ""
+"The dropout probability for all fully connected layers in the embeddings "
+"and encoder. Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:32
+msgid ""
+"The dropout probability for all fully connected layers in the pooler. "
+"Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:35
+msgid "The max position index of an input sequence. Defaults to ``512``."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:37
+msgid ""
+"The vocabulary size of the `token_type_ids` passed when calling "
+"`~transformers.ErnieModel`. Defaults to 2"
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:40
+msgid ""
+"The standard deviation of the truncated_normal_initializer for "
+"initializing all weight matrices. Defaults to ``0.02``."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel:43
+msgid "The pad token index in the token vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.skep.modeling.SkepForSequenceClassification.forward:1
+#: paddlenlp.transformers.skep.modeling.SkepModel.forward:1
+msgid ""
+"Indices of input sequence tokens in the vocabulary. Indices can be "
+"obtained using :class:`~transformers.BertTokenizer`. See "
+":meth:`paddlenlp.transformers.PreTrainedTokenizer.tokenize` and "
+":meth:`transformers.PreTrainedTokenizer.__call__` for details."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.skep.modeling.SkepForSequenceClassification.forward:6
+#: paddlenlp.transformers.skep.modeling.SkepModel.forward:6
+msgid ""
+"Segment token indices to indicate first and second portions of the "
+"inputs. Indices are selected in ``[0, 1]``: - 0 corresponds to a "
+"`sentence A` token, - 1 corresponds to a `sentence B` token. Defaults to "
+"`None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.skep.modeling.SkepForSequenceClassification.forward:12
+#: paddlenlp.transformers.skep.modeling.SkepModel.forward:12
+msgid ""
+"Indices of positions of each input sequence tokens in the position "
+"embeddings. Selected in the range ``[0, config.max_position_embeddings - "
+"1]``. Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.skep.modeling.SkepForSequenceClassification.forward:16
+#: paddlenlp.transformers.skep.modeling.SkepModel.forward:16
+msgid ""
+"Mask to avoid performing attention on padding token indices. Mask values "
+"selected in ``[0, 1]``: - 1 for tokens that are **not masked**, - 0 for "
+"tokens that are **masked**. Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.skep.modeling.SkepForSequenceClassification.forward
+#: paddlenlp.transformers.skep.modeling.SkepModel.forward
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel.forward:22
+msgid ""
+"A tuple of shape (``sequence_output``, ``pooled_output``).  With the "
+"fields: - sequence_output (`Tensor`):     Sequence of hidden-states at "
+"the last layer of the model.     It's data type should be float32 and has"
+" a shape of (batch_size, seq_lens, hidden_size].     ``seq_lens`` "
+"corresponds to the length of input sequence. - pooled_output (`Tensor`):"
+"     A Tensor of the first token representation.     We \"pool\" the "
+"model by simply taking the hidden state corresponding to the first token."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel.forward:22
+msgid "A tuple of shape (``sequence_output``, ``pooled_output``)."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel.forward:24
+msgid "With the fields: - sequence_output (`Tensor`):"
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel.forward:26
+msgid ""
+"Sequence of hidden-states at the last layer of the model. It's data type "
+"should be float32 and has a shape of (batch_size, seq_lens, hidden_size]."
+" ``seq_lens`` corresponds to the length of input sequence."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel.forward:31
+msgid "pooled_output (`Tensor`):"
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepModel.forward:30
+msgid ""
+"A Tensor of the first token representation. We \"pool\" the model by "
+"simply taking the hidden state corresponding to the first token."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.skep.modeling.SkepForSequenceClassification.forward:26
+#: paddlenlp.transformers.skep.modeling.SkepModel.forward:34
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepPretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepPretrainedModel:1
+msgid ""
+"An abstract class for pretrained Skep models. It provides SKEP related "
+"`model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+"`PretrainedModel` for more details."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepPretrainedModel.init_weights:1
+msgid "Initialization hook"
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepForSequenceClassification:1
+msgid "Model for sentence (pair) classification task with SKEP."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepForSequenceClassification:3
+msgid "An instance of `SkepModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepForSequenceClassification:5
+msgid "The number of classes. Default to `2`."
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepForSequenceClassification:7
+msgid ""
+"The dropout probability for output of SKEP. If None, use the same value "
+"as `hidden_dropout_prob` of `SkepModel` instance `Ernie`. Defaults to "
+"`None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.skep.modeling.SkepForSequenceClassification.forward:22
+msgid ""
+"A Tensor of the input text classification logits, shape as (batch_size, "
+"`num_classes`)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.skep.modeling.SkepForSequenceClassification.forward
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.skep.modeling.SkepForSequenceClassification.forward:23
+msgid "logits (`Tensor`)"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.skep.modeling.SkepCrfForTokenClassification.forward:1
+#: paddlenlp.transformers.skep.modeling.SkepForTokenClassification.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.skep.modeling.SkepCrfForTokenClassification.forward:4
+#: paddlenlp.transformers.skep.modeling.SkepForTokenClassification.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.skep.modeling.SkepCrfForTokenClassification.forward:6
+#: paddlenlp.transformers.skep.modeling.SkepForTokenClassification.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.skep.modeling.SkepCrfForTokenClassification:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+

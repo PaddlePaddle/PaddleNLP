@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.transformers.bigbird.tokenizer.rst:2
+#: ../source/paddlenlp.transformers.bigbird.tokenizer.rst:2
 msgid "tokenizer"
 msgstr ""
 
@@ -29,50 +29,84 @@ msgstr ""
 msgid ""
 "Constructs a BigBird tokenizer. It uses a basic tokenizer to do "
 "punctuation splitting, lower casing and so on, and follows a WordPiece "
-"tokenizer to tokenize as subwords. :param sentencepiece_model_file: file "
-"path of the vocabulary :type sentencepiece_model_file: str :param "
-"do_lower_case: Whether the text strips accents and convert to"
+"tokenizer to tokenize as subwords."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.encode
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.num_special_tokens_to_add
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:5
+msgid "File path of the vocabulary"
 msgstr ""
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:7
 msgid ""
-"lower case. If you use the BigBird pretrained model, lower is set to "
-"False when using the cased model, otherwise it is set to True. Default: "
-"True."
+"Whether the text strips accents and convert to lower case. If you use the"
+" BigBird pretrained model, lower is set to False when using the cased "
+"model, otherwise it is set to True. Defaults to True."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:12
+msgid "The special token for unkown words. Defaults to `[UNK]`."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:14
+msgid "The special token for separator token . Defaults to `[SEP]`."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:16
+msgid "The special token for padding. Defaults to `[PAD]`."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:18
+msgid "The special token for cls. Defaults to `[CLS]`."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:20
+msgid "The special token for mask. Defaults to `[MASK]`."
 msgstr ""
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer
-msgid "参数"
+msgid "引发"
 msgstr ""
 
-#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:11
-msgid "The special token for unkown words. Default: \"[UNK]\"."
-msgstr ""
-
-#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:13
-msgid "The special token for separator token . Default: \"[SEP]\"."
-msgstr ""
-
-#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:15
-msgid "The special token for padding. Default: \"[PAD]\"."
-msgstr ""
-
-#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:17
-msgid "The special token for cls. Default: \"[CLS]\"."
-msgstr ""
-
-#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:19
-msgid "The special token for mask. Default: \"[MASK]\"."
-msgstr ""
-
-#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:22
-msgid "Examples:"
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:23
+msgid "If file sentencepiece_model_file doesn't exist."
 msgstr ""
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.vocab_size:1
-msgid ""
-"return the size of vocabulary. :returns: the size of vocabulary. :rtype: "
-"int"
+msgid "Returns the size of vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.vocab_size
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.vocab_size:3
+msgid "The size of vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.vocab_size
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.num_special_tokens_to_add:13
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.vocab_size:4
+msgid "`Int`"
 msgstr ""
 
 #: of
@@ -80,22 +114,114 @@ msgstr ""
 msgid ""
 "Converts a sequence of tokens (list of string) in a single string. Since "
 "the usage of WordPiece introducing `##` to concat subwords, also remove "
-"`##` when converting. :param tokens: A list of string representing tokens"
-" to be converted. :type tokens: list"
+"`##` when converting."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string
-msgid "返回"
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string:5
+msgid "A list of string representing tokens to be converted."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string:7
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string:8
 msgid "Converted string from tokens."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string
-msgid "返回类型"
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string:9
+msgid "`Str`"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.encode:1
+msgid "Returns a tuple containing the encoded sequence and mask information."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.encode:3
+msgid ""
+"The first sequence to be encoded. This can be a string, a list of strings"
+" (tokenized string using the `tokenize` method) or a list of integers "
+"(tokenized string ids using the `convert_tokens_to_ids` method)"
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.encode:7
+msgid ""
+"If set to a number, will limit the total sequence returned so that it has"
+" a maximum length. If set to None, will not limit the total sequence."
+msgstr ""
+
+#: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.encode:10
+msgid ""
+"If set to a number, will limit the mask sequence returned so that it has "
+"a maximum prediction length. If set to None, will not limit the mask "
+"sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.num_special_tokens_to_add:1
+msgid ""
+"Returns the number of added tokens when encoding a sequence with special "
+"tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.num_special_tokens_to_add:5
+msgid ""
+"This encodes inputs and checks the number of added tokens, and is "
+"therefore not efficient. Do not put this inside your training loop."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.num_special_tokens_to_add:8
+msgid ""
+"Returns the number of added tokens in the case of a sequence pair if set "
+"to True, returns the number of added tokens in the case of a single "
+"sequence if set to False."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.num_special_tokens_to_add:12
+msgid "Number of tokens added to sequences"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.build_inputs_with_special_tokens:1
+msgid ""
+"Build model inputs from a sequence or a pair of sequence for sequence "
+"classification tasks by concatenating and adding special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.build_inputs_with_special_tokens:4
+msgid "A BERT sequence has the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.build_inputs_with_special_tokens:6
+msgid "single sequence: `[CLS] X [SEP]`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.build_inputs_with_special_tokens:7
+msgid "pair of sequences: `[CLS] A [SEP] B [SEP]`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.build_inputs_with_special_tokens:9
+msgid "List of IDs to which the special tokens will be added."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.build_inputs_with_special_tokens:11
+msgid "Optional second list of IDs for sequence pairs."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.build_inputs_with_special_tokens:14
+msgid "List of input_id with the appropriate special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.build_inputs_with_special_tokens:15
+msgid "`List[int]`"
 msgstr ""
 

@@ -1,0 +1,201 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.roformer.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForPretraining:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerModel:1
+msgid "基类：:class:`paddlenlp.transformers.roformer.modeling.RoFormerPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:1
+msgid ""
+"The bare RoFormer Model transformer outputting raw hidden-states without "
+"any specific head on top."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Check the "
+"superclass documentation for the generic methods and the library "
+"implements for all its model."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerModel
+#: paddlenlp.transformers.roformer.modeling.RoFormerModel.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:10
+msgid ""
+"Vocabulary size of the RoFormerModel. Defines the number of different "
+"tokens that can be represented by the `inputs_ids` passed when calling "
+"RoFormerModel."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:13
+msgid "Dimensionality of the embedding size. Defaults to ``768`` if not provided."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:15
+msgid ""
+"Dimensionality of the encoder layers and the pooler layer. Defaults to "
+"``768``."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:17
+msgid "Number of hidden layers in the Transformer encoder. Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:19
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"encoder. Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:22
+msgid ""
+"Dimensionality of the \"intermediate\" (often named feed-forward) layer "
+"in the Transformer encoder. Defaults to ``3072``."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:25
+msgid ""
+"The non-linear activation function in the feed-forward layer. "
+"``\"gelu\"``, ``\"relu\"`` and any other paddle supported activation "
+"functions are supported. Defaults to ``\"gelu\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:29
+msgid ""
+"The dropout probability for all fully connected layers in the embeddings "
+"and encoder. Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:32
+msgid ""
+"The dropout probability for all fully connected layers in the pooler. "
+"Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:35
+msgid ""
+"The standard deviation of the truncated_normal_initializer for "
+"initializing all weight matrices. Defaults to ``0.02``."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:38
+msgid ""
+"whether or not apply rotay position embeddings to value. Defaults to "
+"``False``."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification.forward:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification.forward:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:4
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:4
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification.forward:4
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification.forward:4
+#: paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:4
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward:4
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:6
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:6
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification.forward:6
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification.forward:6
+#: paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:6
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward:6
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainedModel:1
+msgid ""
+"An abstract class for pretrained RoFormer models. It provides RoFormer "
+"related `model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+"`PretrainedModel` for more details."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainedModel.init_weights:1
+msgid "Initialization hook"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification:1
+msgid ""
+"Model for sentence (pair) classification task with RoFormer. :param "
+"roformer: An instance of RoFormerModel. :type roformer: RoFormerModel "
+":param num_classes: The number of classes. Default 2 :type num_classes: "
+"int, optional :param dropout: The dropout probability for output of "
+"RoFormer."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification:7
+msgid ""
+"If None, use the same value as `hidden_dropout_prob` of `RoFormerModel` "
+"instance `roformer`. Default None"
+msgstr ""
+

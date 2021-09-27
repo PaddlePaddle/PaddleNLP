@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.layers.sequence.rst:2
+#: ../source/paddlenlp.layers.sequence.rst:2
 msgid "sequence"
 msgstr ""
 
@@ -33,12 +33,12 @@ msgstr ""
 
 #: of paddlenlp.layers.sequence.sequence_mask:3
 msgid ""
-"The whole sequence index, a tensor with shape `[batch_size, "
-"sequence_length]`."
+"The whole sequence index, a tensor with a shape of [batch_size, "
+"sequence_length]."
 msgstr ""
 
 #: of paddlenlp.layers.sequence.sequence_mask:5
-msgid "The valid length of every sequence, a tensor with shape `[batch_size]`"
+msgid "The valid length of every sequence, a tensor with a shape of [batch_size]."
 msgstr ""
 
 #: of paddlenlp.layers.sequence.sequence_mask
@@ -46,10 +46,16 @@ msgid "返回"
 msgstr ""
 
 #: of paddlenlp.layers.sequence.sequence_mask:8
-msgid "The output sequence mask."
+msgid ""
+"The output sequence mask. Its dtype is ``bool`` and has a shpe of "
+"[batch_size, sequence_length]."
 msgstr ""
 
 #: of paddlenlp.layers.sequence.sequence_mask
 msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.layers.sequence.sequence_mask:9
+msgid "mask (`Tensor`)"
 msgstr ""
 

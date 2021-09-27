@@ -1,0 +1,111 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.gpt.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration:1
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining:1
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel:1
+#: paddlenlp.transformers.gpt.modeling.GPTModel:1
+msgid "基类：:class:`paddlenlp.transformers.gpt.modeling.GPTPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:1
+msgid "The base model of gpt."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.forward:1
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward:1
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel.forward:1
+#: paddlenlp.transformers.gpt.modeling.GPTModel.forward:1
+#: paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.forward
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel.forward
+#: paddlenlp.transformers.gpt.modeling.GPTModel.forward
+#: paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.forward:4
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward:4
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel.forward:4
+#: paddlenlp.transformers.gpt.modeling.GPTModel.forward:4
+#: paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.forward:6
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward:6
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel.forward:6
+#: paddlenlp.transformers.gpt.modeling.GPTModel.forward:6
+#: paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainedModel:1
+msgid ""
+"An abstract class for pretrained GPT models. It provides GPT related "
+"`model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+"`PretrainedModel` for more details."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainedModel.init_weights:1
+msgid "Initialization hook"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForPretraining:1
+msgid "The pretraining model of GPT."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForPretraining:3
+msgid "It returns some logits and cached_kvs."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion:1
+msgid "Criterion for GPT."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion:3
+msgid "It calculates the final loss."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration:1
+msgid ""
+"The generate model for GPT-2. It use the greedy stategy and generate the "
+"next word with highest probablity."
+msgstr ""
+

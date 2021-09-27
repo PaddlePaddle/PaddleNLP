@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.transformers.bert.modeling.rst:2
+#: ../source/paddlenlp.transformers.bert.modeling.rst:2
 msgid "modeling"
 msgstr ""
 
@@ -27,6 +27,94 @@ msgstr ""
 #: paddlenlp.transformers.bert.modeling.BertForTokenClassification:1
 #: paddlenlp.transformers.bert.modeling.BertModel:1
 msgid "基类：:class:`paddlenlp.transformers.bert.modeling.BertPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.bert.modeling.BertModel:1
+msgid ""
+"The bare BERT Model transformer outputting raw hidden-states without any "
+"specific head on top."
+msgstr ""
+
+#: of paddlenlp.transformers.bert.modeling.BertModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Check the "
+"superclass documentation for the generic methods and the library "
+"implements for all its model."
+msgstr ""
+
+#: of paddlenlp.transformers.bert.modeling.BertModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of paddlenlp.transformers.bert.modeling.BertForPretraining.forward
+#: paddlenlp.transformers.bert.modeling.BertForQuestionAnswering.forward
+#: paddlenlp.transformers.bert.modeling.BertForSequenceClassification.forward
+#: paddlenlp.transformers.bert.modeling.BertForTokenClassification.forward
+#: paddlenlp.transformers.bert.modeling.BertModel
+#: paddlenlp.transformers.bert.modeling.BertModel.forward
+#: paddlenlp.transformers.bert.modeling.BertPretrainingCriterion.forward
+#: paddlenlp.transformers.bert.modeling.BertPretrainingHeads.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.bert.modeling.BertModel:10
+msgid ""
+"Vocabulary size of the XLNet model. Defines the number of different "
+"tokens that can be represented by the `inputs_ids` passed when calling "
+"XLNetModel."
+msgstr ""
+
+#: of paddlenlp.transformers.bert.modeling.BertModel:13
+msgid ""
+"Dimensionality of the encoder layers and the pooler layer. Defaults to "
+"``768``."
+msgstr ""
+
+#: of paddlenlp.transformers.bert.modeling.BertModel:15
+msgid "Number of hidden layers in the Transformer encoder. Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.bert.modeling.BertModel:17
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"encoder. Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.bert.modeling.BertModel:20
+msgid ""
+"Dimensionality of the \"intermediate\" (often named feed-forward) layer "
+"in the Transformer encoder. Defaults to ``3072``."
+msgstr ""
+
+#: of paddlenlp.transformers.bert.modeling.BertModel:23
+msgid ""
+"The non-linear activation function in the feed-forward layer. "
+"``\"gelu\"``, ``\"relu\"`` and any other paddle supported activation "
+"functions are supported. Defaults to ``\"gelu\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.bert.modeling.BertModel:27
+msgid ""
+"The dropout probability for all fully connected layers in the embeddings "
+"and encoder. Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.bert.modeling.BertModel:30
+msgid ""
+"The dropout probability for all fully connected layers in the pooler. "
+"Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.bert.modeling.BertModel:33
+msgid ""
+"The standard deviation of the truncated_normal_initializer for "
+"initializing all weight matrices. Defaults to ``0.02``."
 msgstr ""
 
 #: of paddlenlp.transformers.bert.modeling.BertForPretraining.forward:1
@@ -39,16 +127,6 @@ msgstr ""
 msgid ""
 "Defines the computation performed at every call. Should be overridden by "
 "all subclasses."
-msgstr ""
-
-#: of paddlenlp.transformers.bert.modeling.BertForPretraining.forward
-#: paddlenlp.transformers.bert.modeling.BertForQuestionAnswering.forward
-#: paddlenlp.transformers.bert.modeling.BertForSequenceClassification.forward
-#: paddlenlp.transformers.bert.modeling.BertForTokenClassification.forward
-#: paddlenlp.transformers.bert.modeling.BertModel.forward
-#: paddlenlp.transformers.bert.modeling.BertPretrainingCriterion.forward
-#: paddlenlp.transformers.bert.modeling.BertPretrainingHeads.forward
-msgid "参数"
 msgstr ""
 
 #: of paddlenlp.transformers.bert.modeling.BertForPretraining.forward:4

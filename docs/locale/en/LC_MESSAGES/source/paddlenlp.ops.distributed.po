@@ -1,0 +1,61 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.ops.distributed.rst:2
+msgid "distributed"
+msgstr ""
+
+#: of paddlenlp.ops.distributed.parallel.ParallelEmbedding:1
+msgid "Parallel Embedding"
+msgstr ""
+
+#: of paddlenlp.ops.distributed.parallel.ColumnParallelLiner.forward:1
+#: paddlenlp.ops.distributed.parallel.ParallelEmbedding.forward:1
+#: paddlenlp.ops.distributed.parallel.RowParallelLiner.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of paddlenlp.ops.distributed.parallel.ColumnParallelLiner.forward
+#: paddlenlp.ops.distributed.parallel.ParallelEmbedding.forward
+#: paddlenlp.ops.distributed.parallel.RowParallelLiner.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.ops.distributed.parallel.ColumnParallelLiner.forward:4
+#: paddlenlp.ops.distributed.parallel.ParallelEmbedding.forward:4
+#: paddlenlp.ops.distributed.parallel.RowParallelLiner.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of paddlenlp.ops.distributed.parallel.ColumnParallelLiner.forward:6
+#: paddlenlp.ops.distributed.parallel.ParallelEmbedding.forward:6
+#: paddlenlp.ops.distributed.parallel.RowParallelLiner.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of paddlenlp.ops.distributed.parallel.ColumnParallelLiner:1
+msgid "Parallel Linear, axis=1"
+msgstr ""
+
+#: of paddlenlp.ops.distributed.parallel.RowParallelLiner:1
+msgid "Parallel Linear, axis=0"
+msgstr ""
+

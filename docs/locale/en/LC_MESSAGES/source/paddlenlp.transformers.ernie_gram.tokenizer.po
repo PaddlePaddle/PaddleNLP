@@ -1,0 +1,72 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.ernie_gram.tokenizer.rst:2
+msgid "tokenizer"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:1
+msgid "基类：:class:`paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:1
+msgid ""
+"Constructs an ERNIE-Gram tokenizer. It uses a basic tokenizer to do "
+"punctuation splitting, lower casing and so on, and follows a WordPiece "
+"tokenizer to tokenize as subwords."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:5
+msgid "file path of the vocabulary."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:7
+msgid ""
+"Whether the text strips accents and convert to lower case. Defaults to "
+"`True`."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:10
+msgid "The special token for unknown words. Defaults to \"[UNK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:13
+msgid "The special token for separator token. Defaults to \"[SEP]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:16
+msgid "The special token for padding. Defaults to \"[PAD]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:19
+msgid "The special token for cls. Defaults to \"[CLS]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:22
+msgid "The special token for mask. Defaults to \"[MASK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:27
+msgid "实际案例"
+msgstr ""
+

@@ -1,0 +1,96 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.bart.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.bart.modeling.BartDecoder:1
+#: paddlenlp.transformers.bart.modeling.BartEncoder:1
+#: paddlenlp.transformers.bart.modeling.BartForConditionalGeneration:1
+#: paddlenlp.transformers.bart.modeling.BartForQuestionAnswering:1
+#: paddlenlp.transformers.bart.modeling.BartForSequenceClassification:1
+#: paddlenlp.transformers.bart.modeling.BartModel:1
+msgid "基类：:class:`paddlenlp.transformers.bart.modeling.BartPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.bart.modeling.BartClassificationHead.forward:1
+#: paddlenlp.transformers.bart.modeling.BartDecoder.forward:1
+#: paddlenlp.transformers.bart.modeling.BartEncoder.forward:1
+#: paddlenlp.transformers.bart.modeling.BartForConditionalGeneration.forward:1
+#: paddlenlp.transformers.bart.modeling.BartForQuestionAnswering.forward:1
+#: paddlenlp.transformers.bart.modeling.BartForSequenceClassification.forward:1
+#: paddlenlp.transformers.bart.modeling.BartModel.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.modeling.BartClassificationHead.forward
+#: paddlenlp.transformers.bart.modeling.BartDecoder.forward
+#: paddlenlp.transformers.bart.modeling.BartEncoder.forward
+#: paddlenlp.transformers.bart.modeling.BartForConditionalGeneration.forward
+#: paddlenlp.transformers.bart.modeling.BartForQuestionAnswering.forward
+#: paddlenlp.transformers.bart.modeling.BartForSequenceClassification.forward
+#: paddlenlp.transformers.bart.modeling.BartModel.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.bart.modeling.BartClassificationHead.forward:4
+#: paddlenlp.transformers.bart.modeling.BartDecoder.forward:4
+#: paddlenlp.transformers.bart.modeling.BartEncoder.forward:4
+#: paddlenlp.transformers.bart.modeling.BartForConditionalGeneration.forward:4
+#: paddlenlp.transformers.bart.modeling.BartForQuestionAnswering.forward:4
+#: paddlenlp.transformers.bart.modeling.BartForSequenceClassification.forward:4
+#: paddlenlp.transformers.bart.modeling.BartModel.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.bart.modeling.BartClassificationHead.forward:6
+#: paddlenlp.transformers.bart.modeling.BartDecoder.forward:6
+#: paddlenlp.transformers.bart.modeling.BartEncoder.forward:6
+#: paddlenlp.transformers.bart.modeling.BartForConditionalGeneration.forward:6
+#: paddlenlp.transformers.bart.modeling.BartForQuestionAnswering.forward:6
+#: paddlenlp.transformers.bart.modeling.BartForSequenceClassification.forward:6
+#: paddlenlp.transformers.bart.modeling.BartModel.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.bart.modeling.BartPretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.bart.modeling.BartPretrainedModel:1
+msgid ""
+"An abstract class to handle weights initialization and a simple interface"
+" for downloading and loading pretrained models."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.modeling.BartPretrainedModel.init_weights:1
+msgid "Initialization hook"
+msgstr ""
+
+#: of paddlenlp.transformers.bart.modeling.BartClassificationHead:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+
+#: of paddlenlp.transformers.bart.modeling.BartClassificationHead:1
+msgid "Head for sentence-level classification tasks."
+msgstr ""
+

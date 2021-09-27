@@ -1,0 +1,275 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-09-24 16:20+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.ernie_ctm.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmForTokenClassification:1
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:1
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmWordtagModel:1
+msgid "基类：:class:`paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:1
+msgid ""
+"The bare ErnieCtm Model transformer outputting raw hidden-states without "
+"any specific head on top."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Check the "
+"superclass documentation for the generic methods and the library "
+"implements for all its model."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmForTokenClassification.forward
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmWordtagModel
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmWordtagModel.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:10
+msgid ""
+"Vocabulary size of the ErnieCtm model. Defines the number of different "
+"tokens that can be represented by the `inputs_ids` passed when calling "
+"ErnieCtmModel."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:13
+msgid "Dimensionality of the embedding layer. Defaults to ``128``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:16
+msgid ""
+"Dimensionality of the encoder layers and the pooler layer. Defaults to "
+"``768``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:19
+msgid "The number of encoder layers to be stacked. Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:22
+msgid "The number of heads in multi-head attention(MHA). Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:25
+msgid ""
+"The hidden layer size in the feedforward network(FFN). Defaults to "
+"``3072``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:28
+msgid ""
+"The dropout probability for all fully connected layers in the embeddings "
+"and encoder. Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:31
+msgid ""
+"The dropout probability used in MHA to drop some attention target. "
+"Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:34
+msgid ""
+"The size position embeddings of matrix, which dictates the maximum length"
+" for which the model can be run. Defaults to ``512``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:38
+msgid "The vocabulary size of the `token_type_ids`. Defaults to ``16``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:41
+msgid ""
+"The standard deviation of the truncated_normal_initializer for "
+"initializing all weight matrices. Defaults to ``0.02``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:44
+msgid "The index of padding token for BigBird embedding. Defaults to ``0``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:47
+msgid "If adding content summary tokens. Defaults to ``True``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:50
+msgid ""
+"The number of the content summary tokens. Only valid when "
+"use_content_summary is True. Defaults to ``1``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel:53
+msgid ""
+"The number of the CLS tokens. Only valid when use_content_summary is "
+"True. Defaults to ``2``."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward:1
+msgid "The ErnieCtmModel forward method, overrides the __call__() special method."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward:3
+msgid ""
+"Indices of input sequence tokens in the vocabulary. Its data type should "
+"be `int64` and it has a shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward:6
+msgid ""
+"Segment token indices to indicate first and second portions of the "
+"inputs. Indices can either be 0 or 1: - 0 corresponds to a *sentence A* "
+"token, - 1 corresponds to a *sentence B* token. Its data type should be "
+"`int64` and it has a shape of [batch_size, sequence_length]. Defaults to "
+"``None``, which means we don't add segment embeddings."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward:13
+msgid ""
+"A list which contains some tensors used in multi-head attention to "
+"prevents attention to some unwanted positions, usually the paddings or "
+"the subsequent positions. The tensors' shape will be broadcasted to "
+"`[batch_size, n_head, sequence_length, sequence_length]`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward:18
+msgid ""
+"Whether the content_output is clone from sequence_output. If set to "
+"`True`, the content_output is clone from sequence_output, which may cause"
+" the classification task impact on the sequence labeling task."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward:22
+msgid ""
+"A tuple of shape (``sequence_output``, ``pooled_output``, "
+"``content_output``).  With the fields: - sequence_output (`Tensor`):     "
+"Sequence of output at the last layer of the model. Its data type should "
+"be float32 and     has a shape of [batch_size, sequence_length, "
+"hidden_size]. - pooled_output (`Tensor`):     The output of first token "
+"(`[CLS]`) in sequence. Its data type should be float32 and     has a "
+"shape of [batch_size, hidden_size]. - content_output (`Tensor`):     The "
+"output of content summary token (`[CLS1]` in sequence). Its data type "
+"should be float32 and     has a shape of [batch_size, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward:22
+msgid ""
+"A tuple of shape (``sequence_output``, ``pooled_output``, "
+"``content_output``)."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward:24
+msgid "With the fields: - sequence_output (`Tensor`):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward:26
+msgid ""
+"Sequence of output at the last layer of the model. Its data type should "
+"be float32 and has a shape of [batch_size, sequence_length, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward:29
+msgid "pooled_output (`Tensor`):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward:29
+msgid ""
+"The output of first token (`[CLS]`) in sequence. Its data type should be "
+"float32 and has a shape of [batch_size, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward:32
+msgid "content_output (`Tensor`):"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmModel.forward:32
+msgid ""
+"The output of content summary token (`[CLS1]` in sequence). Its data type"
+" should be float32 and has a shape of [batch_size, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmWordtagModel:1
+msgid ""
+"ErnieCtmWordtag Model with a token classification head on top (a crf "
+"layer on top of the hidden-states output) . e.g. for Named-Entity-"
+"Recognition (NER) tasks."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmWordtagModel:4
+msgid "An instance of :class:`ErnieCtmModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmWordtagModel:6
+msgid "The number of tags."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmWordtagModel:8
+msgid "The number of sentence classification label."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmWordtagModel:10
+msgid "The learning rate of the crf."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmWordtagModel:12
+msgid "The ignore prediction index when calculating the cross entropy loss."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmForTokenClassification.forward:1
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmWordtagModel.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmForTokenClassification.forward:4
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmWordtagModel.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmForTokenClassification.forward:6
+#: paddlenlp.transformers.ernie_ctm.modeling.ErnieCtmWordtagModel.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
