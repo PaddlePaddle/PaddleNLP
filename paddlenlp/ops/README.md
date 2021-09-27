@@ -2,6 +2,8 @@
 
 ## 子目录结构
 
+以下是 FasterTransformer 的自定义 op 相关文件的目录结构。
+
 ```text
 .
 ├── faster_transformer/       # 基于自定义 op Faster Transformer 子路径
@@ -19,12 +21,32 @@
 * gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
 * 推荐使用 Python3
 * [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#setup) 使用必要的环境
+* 环境依赖
+  - attrdict
+  - pyyaml
+  ```shell
+  pip install attrdict pyyaml
+  ```
 
 ## 快速开始
 
 我们实现了基于 GPU 的 Faster Transformer 的自定义 op 的接入。接下来，我们将分别介绍基于 Python 动态图和预测库使用 Faster Transformer 自定义 op 的方式，包括 op 的编译与使用。
 
 ## Python 动态图使用自定义 op
+
+### JIT 自动编译
+
+目前当基于动态图使用 FasterTransformer 预测加速自定义 op 时，PaddleNLP 提供了 Just In Time 的自动编译，在一些 API 上，用户无需关注编译流程，可以直接执行对应的 API，程序会自动编译需要的第三方库。
+
+以 Transformer 为例，可以直接调用 `TransformerGenerator()` 这个 API，程序会自动编译。
+
+目前支持 JIT 的预测加速 API 有：
+* `FasterTransformer()/TransformerGenerator()`: 支持 Transformer 模型的预测加速功能。使用示例可以参考 [Transformer 预测加速使用示例-sample]()，[Transformer 预测加速使用示例-机器翻译]()。
+* `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 [GPT 预测加速使用示例](../../examples/language_model/gpt/faster_gpt/)。
+* `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 [UnifiedTransformer 预测加速使用示例](../../examples/dialogue/unified_transformer/)。
+* `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。使用示例可以参考 [UNIMOText 预测加速使用示例](../../examples/text_generation/unimo-text/faster_unimo/)。
+* `FasterBart()`: 支持 BART 模型预测加速功能。使用示例可以参考 [BART 预测加速使用示例](./faster_transformer/sample/bart_decoding_sample.py)。
+具体使用方法可以参考 API 文档或是使用示例。
 
 ### 编译自定义OP
 
@@ -68,7 +90,6 @@ cd ../
 * `-DWITH_UNIFIED`: 是否编译带有 Unified Transformer 或是 UNIMOText 相关的 lib。若使用，需要加上 `-DWITH_UNIFIED=ON`。默认为 ON。
 * `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
 * `-DWITH_DECODER`: 是否编译带有 decoder 优化的 lib。默认为 ON。
-* `-DWITH_ENCODER`: 是否编译带有 encoder 优化的 lib。默认为 ON。
 
 最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 Faster Transformer decoding 执行的库。
 
@@ -104,7 +125,7 @@ transformer = FasterTransformer(
 
 更详细的例子可以参考 `./faster_transformer/sample/decoding_sample.py` 以及 `./sample/encoder_decoding_sample.py`，我们提供了更详细用例。
 
-#### 执行 Transformer decoding on PaddlePaddle
+#### Transformer decoding 示例代码
 
 使用 PaddlePaddle 仅执行 decoding 测试（float32）：
 
@@ -160,7 +181,7 @@ gpt = FasterGPT(
 
 更详细的例子可以参考 `./faster_transformer/sample/gpt_sample.py`，我们提供了更详细用例。
 
-#### 执行 GPT-2 decoding on PaddlePaddle
+#### GPT-2 decoding 示例代码
 
 使用 PaddlePaddle 仅执行 decoding 测试（float32）：
 

@@ -4,7 +4,7 @@
 
 ## 使用环境说明
 
-* 本项目依赖于 PaddlePaddle 最新的 develop 版本，可能需要自行编译 PaddlePaddle
+* 本项目依赖于 PaddlePaddle 2.1.0 及以上版本或适当的 develop 版本
 * CMake >= 3.10
 * CUDA 10.1 或 10.2（需要 PaddlePaddle 框架一致）
 * gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
