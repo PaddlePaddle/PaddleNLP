@@ -96,11 +96,11 @@ def dist_optimizer(args, topo):
                 'gelu',
             ],
             #"custom_black_list": ['c_softmax_with_cross_entropy'],
-            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding", "elementwise_div"],
+            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding"],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
-            "use_pure_fp16": args.use_fp16,
-            "use_fp16_guard": False
+            #"use_pure_fp16": args.use_fp16,
+            #"use_fp16_guard": False
         }
     if args.use_sharding:
         dist_strategy.sharding = True
@@ -315,7 +315,6 @@ def do_train(args):
                 p.name for n, p in model.named_parameters()
                 if not any(nd in n for nd in ["bias", "norm"])
             ]
-
             optimizer = paddle.optimizer.AdamW(
                 learning_rate=lr_scheduler,
                 beta1=args.adam_beta1,
@@ -360,9 +359,11 @@ def do_train(args):
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
     test_program = main_program.clone(for_test=True)
-
+    
+    """
     if args.use_amp and args.use_fp16:
         optimizer.amp_init(place)
+    """
 
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from %s " % args.model_name_or_path)

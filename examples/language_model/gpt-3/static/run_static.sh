@@ -1,7 +1,7 @@
 set -x
 export PADDLE_WITH_GLOO=0
 export FLAGS_call_stack_level=2
-export FLAGS_allocator_strategy=naive_best_fit
+#export FLAGS_allocator_strategy=naive_best_fit
 unset CUDA_VISIBLE_DEVICES
 export PYTHONPATH=$PYTHONPATH:../../../../
 
@@ -31,7 +31,7 @@ python3.8 -u  -m paddle.distributed.fleet.launch \
     --use_sharding true \
     --use_amp false \
     --use_fp16 false \
-    --use_recompute true \
+    --use_recompute false \
     --max_lr 0.00015 \
     --min_lr 0.00001 \
     --max_steps 5000 \

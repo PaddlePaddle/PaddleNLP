@@ -23,6 +23,7 @@ import paddle.tensor as tensor
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from paddle.distributed.fleet import fleet
+import paddle.incubate as incubate
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
 import paddlenlp
@@ -227,11 +228,20 @@ class MultiHeadAttention(nn.Layer):
         # scale dot product attention
         product = layers.matmul(
             x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
-
+        
+        fuse = True
+        if fuse:
+            weights = incubate.softmax_mask_fuse_upper_triangle(product)
+        else:
+            if attn_mask is not None:
+                product = product + attn_mask
+            weights = F.softmax(product)
+        """
         if attn_mask is not None:
             product = product + attn_mask
 
         weights = F.softmax(product)
+        """
         if self.dropout:
             weights = F.dropout(
                 weights,
