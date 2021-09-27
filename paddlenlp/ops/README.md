@@ -260,7 +260,6 @@ cd ../
 * `-DWITH_UNIFIED`: 是否编译带有 Unified Transformer 或是 UNIMOText 相关的 lib。若使用，需要加上 `-DWITH_UNIFIED=ON`。默认为 ON。
 * `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
 * `-DWITH_DECODER`: 是否编译带有 decoder 优化的 lib。默认为 ON。
-* `-DWITH_ENCODER`: 是否编译带有 encoder 优化的 lib。默认为 ON。
 * `-DWITH_MKL`: 若当前是使用的 mkl 的 Paddle lib，那么需要打开 MKL 以引入 MKL 相关的依赖。
 * `-DON_INFER`: 是否编译 paddle inference 预测库。
 * **当使用预测库的自定义 op 的时候，请务必开启 `-DON_INFER=ON` 选项，否则，不会得到预测库的可执行文件。**
