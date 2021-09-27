@@ -157,6 +157,7 @@ python infer.py \
 - `decode_strategy` 表示预测解码时采取的策略，可选"sampling"、"greedy_search"和"beam_search"之一。
 - `top_k` 表示采用"sampling"解码策略时，token的概率按从大到小排序，生成的token只从前`top_k`个中进行采样。
 - `device` 表示使用的设备。
+
 同时，我们提供了开启高性能预测的选项：
 - `faster` 表示是否开启高性能预测。设置 `--faster` 即表示开启。
 - `decoding_lib` 表示编译出的高性能自定义 op 的动态库的位置。
