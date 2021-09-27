@@ -354,7 +354,6 @@ class ElectraModel(ElectraPretrainedModel):
 
         pad_token_id (int, optional):
             The index of padding token in the token vocabulary.
-
     """
 
     def __init__(self, vocab_size, embedding_size, hidden_size,
@@ -466,6 +465,8 @@ class ElectraModel(ElectraPretrainedModel):
 
 class ElectraDiscriminator(ElectraPretrainedModel):
     """
+    The Electra Discriminator can detect the tokens that are replaced by the Electra Generator.
+
     Args:
          electra (:class:`ElectraModel`):
              An instance of :class:`ElectraModel`.
@@ -499,7 +500,9 @@ class ElectraDiscriminator(ElectraPretrainedModel):
                 See :class:`ElectraModel`.
 
         Returns:
-            Tensor: Returns tensor `logits`, the prediction of the electra discriminator.
+            Tensor: Returns tensor `logits`, the prediction result of replaced tokens.
+            Its data type should be float32 and if batch_size>1, its shape is [batch_size, sequence_length],
+            if batch_size=1, its shape is [sequence_lenght].
 
         Example:
             .. code-block::
@@ -525,10 +528,12 @@ class ElectraDiscriminator(ElectraPretrainedModel):
 
 class ElectraGenerator(ElectraPretrainedModel):
     """
+    The Electra Generator will replace some tokens of the given sequence, it is trained as
+    a masked language model.
+
     Args:
          electra (:class:`ElectraModel`):
              An instance of :class:`ElectraModel`.
-
      """
 
     def __init__(self, electra):
@@ -572,7 +577,7 @@ class ElectraGenerator(ElectraPretrainedModel):
                 See :class:`ElectraModel`.
 
         Returns:
-            Tensor: Returns tensor `prediction_scores`, the scores of electra generator.
+            Tensor: Returns tensor `prediction_scores`, the scores of Electra Generator.
             Its data type should be int64 and its shape is [batch_size, sequence_length, vocab_size].
 
         Example:
@@ -971,6 +976,19 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
 
 
 class ElectraPretrainingCriterion(paddle.nn.Layer):
+    '''
+
+    Args:
+        vocab_size(int):
+            Vocabulary size of `inputs_ids` in `ElectraModel`. Defines the number of different tokens that can
+            be represented by the `inputs_ids` passed when calling `ElectraModel`.
+        gen_weight(float):
+            The weight of the Electra Generator.
+        disc_weight(float):
+            The weight of the Electra Discriminator.
+
+    '''
+
     def __init__(self, vocab_size, gen_weight, disc_weight):
         super(ElectraPretrainingCriterion, self).__init__()
 
@@ -983,6 +1001,29 @@ class ElectraPretrainingCriterion(paddle.nn.Layer):
     def forward(self, generator_prediction_scores,
                 discriminator_prediction_scores, generator_labels,
                 discriminator_labels, attention_mask):
+        """
+        Args:
+            generator_prediction_scores(Tensor):
+                The scores of masked token prediction. Its data type should be float32.
+                and its shape is [batch_size, sequence_length, vocab_size].
+            discriminator_prediction_scores(Tensor):
+                The scores of masked token prediction. Its data type should be float32.
+                and its shape is [batch_size, sequence_length] or [sequence length] if batch_size=1.
+            generator_labels(Tensor):
+                The labels of the generator, its dimensionality is equal to `generator_prediction_scores`.
+                Its data type should be int64 and its shape is [batch_size, sequence_size, 1].
+            discriminator_labels(Tensor):
+                The labels of the discriminator, its dimensionality is equal to `discriminator_prediction_scores`.
+                The labels should be numbers between 0 and 1.
+                Its data type should be float32 and its shape is [batch_size, sequence_size] or [sequence length] if batch_size=1.
+            attention_mask(Tensor):
+                See :class:`ElectraModel`.
+
+        Returns:
+            Tensor: The pretraining loss, equals to weighted generator loss plus the weighted discriminator loss.
+            Its data type should be float32 and its shape is [1].
+
+        """
         # generator loss
         gen_loss = self.gen_loss_fct(
             paddle.reshape(generator_prediction_scores, [-1, self.vocab_size]),
