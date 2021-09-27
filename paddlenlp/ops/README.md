@@ -41,7 +41,7 @@
 以 Transformer 为例，可以直接调用 `TransformerGenerator()` 这个 API，程序会自动编译。
 
 目前支持 JIT 的预测加速 API 有：
-* `FasterTransformer()/TransformerGenerator()`: 支持 Transformer 模型的预测加速功能。使用示例可以参考 [Transformer 预测加速使用示例-sample]()，[Transformer 预测加速使用示例-机器翻译]()。
+* `FasterTransformer()/TransformerGenerator()`: 支持 Transformer 模型的预测加速功能。使用示例可以参考 [Transformer 预测加速使用示例-sample](./faster_transformer/sample/decoding_sample.py)，[Transformer 预测加速使用示例-机器翻译](../../examples/machine_translation/transformer/faster_transformer/)。
 * `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 [GPT 预测加速使用示例](../../examples/language_model/gpt/faster_gpt/)。
 * `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 [UnifiedTransformer 预测加速使用示例](../../examples/dialogue/unified_transformer/)。
 * `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。使用示例可以参考 [UNIMOText 预测加速使用示例](../../examples/text_generation/unimo-text/faster_unimo/)。
