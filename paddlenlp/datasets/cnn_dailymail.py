@@ -18,7 +18,7 @@ import os
 import hashlib
 
 from paddle.dataset.common import md5file
-from paddle.utils.download import get_path_from_url
+from paddlenlp.utils.downloader import get_path_from_url, _decompress
 from paddlenlp.utils.env import DATA_HOME
 from paddlenlp.utils.log import logger
 from . import DatasetBuilder
@@ -59,16 +59,20 @@ class CnnDailymail(DatasetBuilder):
         "test": META_INFO(
             "all_test.txt",
             "https://paddlenlp.bj.bcebos.com/datasets/cnn_dailymail/all_test.txt",
-            "4f3ac04669934dbc746b7061e68a0258")}
+            "4f3ac04669934dbc746b7061e68a0258")
+    }
     cnn_dailymail = {
         "cnn": {
             "url":
-                "https://paddlenlp.bj.bcebos.com/datasets/cnn_dailymail/cnn_stories.tgz",
+            "https://paddlenlp.bj.bcebos.com/datasets/cnn_dailymail/cnn_stories.tgz",
             "md5": "85ac23a1926a831e8f46a6b8eaf57263",
+            "file_num": 92579
         },
         "dailymail": {
-            "url": "https://paddlenlp.bj.bcebos.com/datasets/cnn_dailymail/dailymail_stories.tgz",
+            "url":
+            "https://paddlenlp.bj.bcebos.com/datasets/cnn_dailymail/dailymail_stories.tgz",
             "md5": "f9c5f565e8abe86c38bfa4ae8f96fd72",
+            "file_num": 219506
         }
     }
 
@@ -97,7 +101,7 @@ class CnnDailymail(DatasetBuilder):
     def _get_hash_from_path(self, p):
         """Extract hash from path."""
         basename = os.path.basename(p)
-        return basename[0: basename.find(".story")]
+        return basename[0:basename.find(".story")]
 
     def _find_files(self, dl_paths, publisher, url_dict):
         """Find files corresponding to urls."""
@@ -123,7 +127,7 @@ class CnnDailymail(DatasetBuilder):
         dm = self._find_files(dl_paths, "dailymail", urls)
         return cnn + dm
 
-    def _get_art_abs(self, story_file, tfds_version):
+    def _get_art_abs(self, story_file, version):
         """Get abstract (highlights) and article from a story file path."""
         # Based on https://github.com/abisee/cnn-dailymail/blob/master/
         #     make_datafiles.py
@@ -142,8 +146,9 @@ class CnnDailymail(DatasetBuilder):
                 return line
             if not line:
                 return line
-            if line[-1] in [".", "!", "?", "...", "'",
-                            "`", '"', "\u2019", "\u201d", ")"]:
+            if line[-1] in [
+                    ".", "!", "?", "...", "'", "`", '"', "\u2019", "\u201d", ")"
+            ]:
                 return line
             return line + " ."
 
@@ -166,7 +171,7 @@ class CnnDailymail(DatasetBuilder):
         # Make article into a single string
         article = " ".join(article_lines)
 
-        if tfds_version >= "2.0.0":
+        if version >= "2.0.0":
             abstract = "\n".join(highlights)
         else:
             abstract = " ".join(highlights)
@@ -185,11 +190,18 @@ class CnnDailymail(DatasetBuilder):
             dir_path = os.path.join(default_root, k)
             if not os.path.exists(dir_path):
                 get_path_from_url(v["url"], default_root, v["md5"])
+            file_num = len(os.listdir(os.path.join(dir_path, "stories")))
+            if file_num != v["file_num"]:
+                logger.warning(
+                    "Number of %s stories is %d != %d, decompress again." %
+                    (k, file_num, v["file_num"]))
+                _decompress(
+                    os.path.join(default_root, os.path.basename(v["url"])))
             dl_paths[k] = dir_path
         filename, url, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
-        if not os.path.exists(fullname) or (
-                data_hash and not md5file(fullname) == data_hash):
+        if not os.path.exists(fullname) or (data_hash and
+                                            not md5file(fullname) == data_hash):
             get_path_from_url(url, default_root, data_hash)
         dl_paths[mode] = fullname
         return dl_paths
