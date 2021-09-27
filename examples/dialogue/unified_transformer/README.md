@@ -160,7 +160,7 @@ python infer.py \
 
 同时，我们提供了开启高性能预测的选项：
 - `faster` 表示是否开启高性能预测。设置 `--faster` 即表示开启。
-- `decoding_lib` 表示编译出的高性能自定义 op 的动态库的位置。
+- `decoding_lib` 表示编译出的高性能自定义 op 的动态库的位置。若为空，将使用 JIT 自动编译所需的动态库。
 - `use_fp16_decoding` 表示在开启高性能预测的时候，是否使用 fp16 来完成预测过程。设置 `--use_fp16_decoding` 即表示使用 fp16 进行预测，否则使用 fp32。
 
 程序运行结束后会将预测生成的response保存在`output_path`中。同时终端中会输出评估结果。
