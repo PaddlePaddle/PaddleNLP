@@ -54,15 +54,17 @@ def create_data_holder(args):
         name="tokens", shape=[-1, args.max_seq_len], dtype="int64")
     loss_mask = paddle.static.data(
         name="loss_mask", shape=[-1, args.max_seq_len], dtype="float32")
+    """
     attention_mask = paddle.static.data(
         name="attention_mask",
         shape=[-1, 1, args.max_seq_len, args.max_seq_len],
         dtype="float32")
+    """
     position_ids = paddle.static.data(
         name="position_ids", shape=[-1, args.max_seq_len], dtype="int64")
     labels = paddle.static.data(
         name="labels", shape=[-1, args.max_seq_len], dtype="int64")
-    return [tokens, loss_mask, attention_mask, position_ids, labels]
+    return [tokens, loss_mask, position_ids, labels]
 
 
 def dist_optimizer(args, topo):
@@ -92,7 +94,7 @@ def dist_optimizer(args, topo):
         dist_strategy.amp_configs = {
             "custom_white_list": ['softmax', 'layer_norm', 'gelu', "fused_softmax_mask_upper_triangle"],
             #"custom_black_list": ['c_softmax_with_cross_entropy'],
-            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding", "elementwise_div"],
+            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding"],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
             "use_pure_fp16": args.use_fp16,
@@ -244,7 +246,7 @@ def do_train(args):
         with paddle.utils.unique_name.guard():
             with paddle.static.device_guard('gpu:0'):
                 data_holders = create_data_holder(args)
-                [tokens, loss_mask, attention_mask, position_ids,
+                [tokens, loss_mask, position_ids,
                  labels] = data_holders
 
                 tokenizer = tokenizer_class.from_pretrained(
@@ -284,7 +286,7 @@ def do_train(args):
                         attention_probs_dropout_prob,
                         topo=topo)
                 # Create the model for the gpt pretrain
-                preds = model(tokens, position_ids, attention_mask)
+                preds = model(tokens, position_ids)
 
                 criterion = guard(f'gpu:{args.pp_degree -1}')(
                     GPTPretrainingCriterion)(topo)
