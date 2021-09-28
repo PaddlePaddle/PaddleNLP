@@ -94,7 +94,7 @@ def dist_optimizer(args, topo):
         dist_strategy.amp_configs = {
             "custom_white_list": ['softmax', 'layer_norm', 'gelu', "fused_softmax_mask_upper_triangle"],
             #"custom_black_list": ['c_softmax_with_cross_entropy'],
-            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding"],
+            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding", "elementwise_div"],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
             "use_pure_fp16": args.use_fp16,
@@ -306,12 +306,13 @@ def do_train(args):
 
             clip = None
             if args.grad_clip > 0:  
-                """  
+                """
                 clip = paddle.fluid.clip.GradientClipByGlobalNorm(
                     clip_norm=args.grad_clip)
                 """
                 clip = paddle.fluid.clip.GradientClipByNorm(
                     clip_norm=args.grad_clip)
+                
 
             decay_param = [
                 p.name for n, p in model.named_parameters()
