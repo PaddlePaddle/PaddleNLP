@@ -645,7 +645,7 @@ class ElectraClassificationHead(nn.Layer):
 
 class ElectraForSequenceClassification(ElectraPretrainedModel):
     """
-    Electra  Model with a linear layer on top of the output layer,
+    Electra Model with a linear layer on top of the output layer,
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
@@ -692,8 +692,8 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
             .. code-block::
 
                 import paddle
-                from paddlenlp.transformers.bert.modeling import ElectraForSequenceClassification
-                from paddlenlp.transformers.bert.tokenizer import ElectraTokenizer
+                from paddlenlp.transformers import ElectraForSequenceClassification
+                from paddlenlp.transformers import ElectraTokenizer
 
                 tokenizer = ElectraTokenizer.from_pretrained('electra-small')
                 model = ElectraForSequenceClassification.from_pretrained('electra-small')
@@ -760,8 +760,8 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
             .. code-block::
 
                 import paddle
-                from paddlenlp.transformers.bert.modeling import ElectraForTokenClassification
-                from paddlenlp.transformers.bert.tokenizer import ElectraTokenizer
+                from paddlenlp.transformers import ElectraForTokenClassification
+                from paddlenlp.transformers import ElectraTokenizer
 
                 tokenizer = ElectraTokenizer.from_pretrained('electra-small')
                 model = ElectraForTokenClassification.from_pretrained('electra-small')
