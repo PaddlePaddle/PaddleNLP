@@ -193,7 +193,7 @@ def do_train():
                 prediction_scores_2 = model(
                     input_ids=src_ids,
                     token_type_ids=token_type_ids,
-                    masked_positions=new_masked_positions)
+                    masked_positions=masked_positions)
                 ce_loss = (mlm_loss_fn(prediction_scores, masked_lm_labels) + mlm_loss_fn(prediction_scores_2, masked_lm_labels)) * 0.5
                 kl_loss = rdrop_loss(prediction_scores, prediction_scores_2)
                 loss = ce_loss + kl_loss * args.rdrop_coef

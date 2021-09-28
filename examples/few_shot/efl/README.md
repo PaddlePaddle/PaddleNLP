@@ -39,7 +39,8 @@ python -u -m paddle.distributed.launch --gpus "0" \
     --batch_size 32 \
     --learning_rate 5E-5 \
     --epochs 10 \
-    --max_seq_length 512
+    --max_seq_length 512 \
+    --rdrop_coef 0.5 \
 ```
 参数含义说明
 - `task_name`: FewCLUE 中的数据集名字
@@ -47,6 +48,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
 - `device`: 使用 cpu/gpu 进行训练
 - `save_dir`: 模型存储路径
 - `max_seq_length`: 文本的最大截断长度
+- `rdrop_coef`: rdrop参数，默认为0，若为0则不使用rdrop
 
 模型每训练 1 个 epoch,  会在验证集上进行评估，并针对测试集进行预测存储到预测结果文件。
 
