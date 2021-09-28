@@ -32,7 +32,7 @@ class ElectraTokenizer(PretrainedTokenizer):
             a `WordpieceTokenizer`.
         do_lower_case (bool):
             Whether or not to lowercase the input when tokenizing.
-            Defaults to`True`.
+            Defaults to `True`.
         unk_token (str):
             A special token representing the *unknown (out-of-vocabulary)* token.
             An unknown token is set to be `unk_token` inorder to be converted to an ID.
