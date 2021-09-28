@@ -502,7 +502,7 @@ class ElectraDiscriminator(ElectraPretrainedModel):
         Returns:
             Tensor: Returns tensor `logits`, the prediction result of replaced tokens.
             Its data type should be float32 and if batch_size>1, its shape is [batch_size, sequence_length],
-            if batch_size=1, its shape is [sequence_lenght].
+            if batch_size=1, its shape is [sequence_length].
 
         Example:
             .. code-block::
@@ -634,6 +634,18 @@ class ElectraClassificationHead(nn.Layer):
         self.act = get_activation("gelu")
 
     def forward(self, features, **kwargs):
+        r"""
+         The ElectraClassificationHead forward method, overrides the __call__() special method.
+
+         Args:
+             features(Tensor):
+                Input sequence, usually the `sequence_output` of electra model.
+                Its data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+
+         Returns:
+             Tensor: Returns a tensor of the input text classification logits.
+             Shape as `[batch_size, num_classes]` and dtype as float32.
+         """
         x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
         x = self.dropout(x)
         x = self.dense(x)
@@ -782,6 +794,16 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
 
 
 class ElectraForTotalPretraining(ElectraPretrainedModel):
+    """
+    Electra Model for pretraining tasks.
+
+    Args:
+        generator (:class:`ElectraGenerator`):
+            An instance of :class:`ElectraGenerator`.
+        discriminator (:class:`ElectraDiscriminator`):
+            An instance of :class:`ElectraDiscriminator`.
+
+    """
     pretrained_init_configuration = {
         "electra-small-generator": {
             "attention_probs_dropout_prob": 0.1,
@@ -897,7 +919,6 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
 
     def get_discriminator_inputs(self, inputs, raw_inputs, gen_logits,
                                  gen_labels, use_softmax_sample):
-        """Sample from the generator to create discriminator input."""
         # get generator token result
         sampled_tokens = (self.sample_from_softmax(gen_logits,
                                                    use_softmax_sample)).detach()
@@ -951,6 +972,48 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
                 attention_mask=None,
                 raw_input_ids=None,
                 gen_labels=None):
+        r"""
+        The ElectraForPretraining forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`ElectraModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ElectraModel`.
+            position_ids(Tensor, optional):
+                See :class:`ElectraModel`.
+            attention_mask (list, optional):
+                See :class:`AlbertModel`.
+            raw_input_ids(Tensor, optional):
+                Raw inputs used to get discriminator labels.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            gen_labels(Tensor, optional):
+                Labels to compute the discriminator inputs.
+                Its data type should be int64 and its shape is [batch_size, sequence_length].
+                The value for unmasked tokens should be -100 and value for masked tokens should be 0.
+
+        Returns:
+            tuple: Returns tuple (gen_logits, disc_logits, disc_labels, attention_mask).
+
+            With the fields:
+
+            - `gen_logits` (Tensor):
+                The scores of Electra Generator.
+                Its data type should be int64 and its shape is [batch_size, sequence_length, vocab_size].
+
+            - `disc_logits` (Tensor):
+                The the prediction result of replaced tokens.
+                Its data type should be float32 and if batch_size>1, its shape is [batch_size, sequence_length],
+                if batch_size=1, its shape is [sequence_length].
+
+            - `disc_labels` (Tensor):
+                The labels of electra discriminator. Its data type should be int32,
+                and its shape is [batch_size, sequence_length].
+
+            - `attention_mask` (Tensor):
+                See :class:`AlbertModel`. Its data type should be bool.
+
+        """
 
         assert (
             gen_labels is not None
