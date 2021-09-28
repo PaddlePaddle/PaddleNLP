@@ -39,6 +39,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
 	--epochs 10 \
 	--max_seq_length 512 \
 	--language_model "ernie-1.0" \
+    --rdrop_coef 0.5 \
 ```
 参数含义说明
 - `task_name`: FewCLUE 中的数据集名字
@@ -46,6 +47,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
 - `pattern_id` 完形填空的模式
 - `save_dir`: 模型存储路径
 - `max_seq_length`: 文本的最大截断长度
+- `rdrop_coef`: rdrop参数，默认为0，若为0则不使用rdrop
 
 模型每训练 1 个 epoch,  会在验证集上进行评估
 
