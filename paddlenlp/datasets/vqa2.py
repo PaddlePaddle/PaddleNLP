@@ -20,15 +20,15 @@ class VQA2(DatasetBuilder):
 
     SPLITS = {
         'train': META_INFO(
-            os.path.join('annotations', 'imdb_train2014.npy'), '27b9fc1c2393e1e62839ef65f255c645'),
+            os.path.join('annotations', 'imdb_train2014.npy'), '6f9c4610a576bf3b672cc830f9d77dca'),
         'val': META_INFO(
-            os.path.join('annotations', 'imdb_val2014.npy'), 'd51bec47b76d1efb8bfeac8f0fd1dabc'),
+            os.path.join('annotations', 'imdb_val2014.npy'), '1ed358ccf50c783859fbb67f324a23a8'),
         'trainval': META_INFO(
-            os.path.join('annotations', 'imdb_trainval2014.npy'), 'd51bec47b76d1efb8bfeac8f0fd1dabc'),
+            os.path.join('annotations', 'imdb_trainval2014.npy'), 'bb0eb9422e48696d3d30ab099330ab23'),
         'minival': META_INFO(
             os.path.join('annotations', 'imdb_minival2014.npy'), 'dd982ed6d924724482aee42c72d324ce'),
         'test': META_INFO(
-            os.path.join('annotations', 'imdb_test2015.npy'), '5acad6cf0839c01c64e056506ffb18c5'),
+            os.path.join('annotations', 'imdb_test2015.npy'), 'a6d2814a6903ff364d07f7b7d0e379f6'),
     }
     
     VOCAB_INFO = META_INFO(os.path.join('extras', 'vocabs', 'answers_vqa.txt'), '971cad957919ff2cf1f5f1c70bef4d90')
@@ -40,7 +40,8 @@ class VQA2(DatasetBuilder):
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-            get_path_from_url(self.URL_ANNO, os.path.join(default_root, 'annotations'), self.MD5_ANNO)
+            # get_path_from_url(self.URL_ANNO, os.path.join(default_root, 'annotations'), self.MD5_ANNO)
+            get_path_from_url(self.URL_ANNO, os.path.join(default_root), self.MD5_ANNO)
 
         # VQA vocab
         answers_vqa_filename, answers_vqa_data_hash = self.VOCAB_INFO
