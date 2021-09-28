@@ -388,7 +388,7 @@ class VisualBertPreTrainedModel(PretrainedModel):
     models.
     """
 
-    base_model_prefix = "visual_bert"
+    base_model_prefix = "visualbert"
     model_config_file = "model_config.json"
 
     # pretrained general configuration
@@ -578,23 +578,23 @@ class VisualBertPreTrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "visualbert-vqa":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visual_bert/visualbert-vqa.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vqa.pdparams",
             "visualbert-vqa-pre":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visual_bert/visualbert-vqa-pre.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vqa-pre.pdparams",
             "visualbert-vqa-coco-pre":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visual_bert/visualbert-vqa-coco-pre.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vqa-coco-pre.pdparams",
             "visualbert-vcr":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visual_bert/visualbert-vcr.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vcr.pdparams",
             "visualbert-vcr-pre":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visual_bert/visualbert-vcr-pre.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vcr-pre.pdparams",
             "visualbert-vcr-coco-pre":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visual_bert/visualbert-vcr-coco-pre.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-vcr-coco-pre.pdparams",
             "visualbert-nlvr2":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visual_bert/visualbert-nlvr2.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-nlvr2.pdparams",
             "visualbert-nlvr2-pre":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visual_bert/visualbert-nlvr2-pre.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-nlvr2-pre.pdparams",
             "visualbert-nlvr2-coco-pre":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/visual_bert/visualbert-nlvr2-coco-pre.pdparams",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/visualbert/visualbert-nlvr2-coco-pre.pdparams",
         }
     }
 
@@ -849,12 +849,12 @@ class VisualBertForPreTraining(VisualBertPreTrainedModel):
         
         self.apply(self.init_weights)
     
-    def get_output_embeddings(self):
-        return self.cls.predictions.decoder
-
-    def set_output_embeddings(self, new_embeddings):
-        self.cls.predictions.decoder = new_embeddings
-
+    def get_predctions_decoder_weight(self):
+        return self.cls.predictions.decoder_weight
+    
+    def get_predctions_decoder_bias(self):
+        return self.cls.predictions.decoder_weight
+    
     def forward(
         self,
         input_ids=None,
