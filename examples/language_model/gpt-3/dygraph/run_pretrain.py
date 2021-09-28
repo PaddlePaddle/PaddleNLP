@@ -30,6 +30,8 @@ from args import parse_args
 import lr
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+from paddle.fluid import core
+import sys
 
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
@@ -212,7 +214,7 @@ def do_train(args):
             logger.warning("No optimizer checkpoint file found in %s." %
                            opt_path)
     
-    model, optimizer = paddle.amp.decorate(models=model, optimizers=optimizer, level='02', master_weight=True)
+    model, optimizer = paddle.amp.decorate(models=model, optimizers=optimizer, level='O1', master_weight=True)
 
     global_step = 0
     tic_train = time.time()
@@ -240,6 +242,22 @@ def do_train(args):
 
             for step, batch in enumerate(train_data_loader()):
                 global_step += 1
+                """
+                # add nsight test
+                if step == 20:
+                    core.nvprof_start()
+                    core.nvprof_enable_record_event()
+                    core.nvprof_nvtx_push(str(step))
+                if step == 25:
+                    core.nvprof_nvtx_pop()
+                    core.nvprof_stop()
+                    sys.exit()
+                if step >= 20 and step < 25:
+                    core.nvprof_nvtx_pop()
+                    core.nvprof_nvtx_push(str(step))
+                #-----------------
+                """
+
                 tokens, loss_mask, position_ids, labels = batch
 
                 loss_mask.stop_gradient = True
@@ -249,14 +267,9 @@ def do_train(args):
                 if args.pp_degree == 1:
                     with paddle.amp.auto_cast(
                             args.use_amp,
-                            custom_white_list=[
-                                "layer_norm", "softmax", "gelu"
-                            ],
-                            custom_black_list=[
-                                "reduce_sum", "c_softmax_with_cross_entropy",
-                                "c_embedding"
-                            ],
-                            level='O2'):
+                            custom_white_list=["layer_norm", "softmax", "gelu", "softmax_mask_fuse_upper_triangle"],
+                            custom_black_list=["reduce_sum", "c_softmax_with_cross_entropy","c_embedding"],
+                            level='O1'):
                         preds = model(tokens, position_ids)
                         loss = criterion(preds, labels, loss_mask)
 

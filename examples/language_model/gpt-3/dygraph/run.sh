@@ -1,5 +1,6 @@
 log_dir=dp2_pp2_mp2
 rm -rf $log_dir
+export PYTHONPATH=$PYTHONPATH:../../../../
 
 '''
 python -m paddle.distributed.launch --log_dir $log_dir --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
@@ -41,9 +42,9 @@ python3.8 -m paddle.distributed.launch --log_dir $log_dir --gpus "6" run_pretrai
     --warmup_rate 0.01\
     --scale_loss 32768\
     --global_batch_size 8\
-    --micro_batch_size 2\
+    --micro_batch_size 8\
     --dp_degree 1\
     --mp_degree 1\
     --pp_degree 1\
-    --use_amp False\
+    --use_amp true\
     --use_recompute False
