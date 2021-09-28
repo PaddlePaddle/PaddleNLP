@@ -214,7 +214,7 @@ def do_train(args):
             logger.warning("No optimizer checkpoint file found in %s." %
                            opt_path)
     
-    model, optimizer = paddle.amp.decorate(models=model, optimizers=optimizer, level='O2', master_weight=True)
+    #model, optimizer = paddle.amp.decorate(models=model, optimizers=optimizer, level='O2', master_weight=True)
 
     global_step = 0
     tic_train = time.time()
@@ -268,8 +268,8 @@ def do_train(args):
                     with paddle.amp.auto_cast(
                             args.use_amp,
                             custom_white_list=["layer_norm", "softmax", "gelu", "softmax_mask_fuse_upper_triangle"],
-                            custom_black_list=["reduce_sum", "c_softmax_with_cross_entropy","c_embedding","elementwise_div"],
-                            level='O2'):
+                            custom_black_list=["reduce_sum", "c_softmax_with_cross_entropy","c_embedding"],
+                            level='O1'):
                         preds = model(tokens, position_ids)
                         loss = criterion(preds, labels, loss_mask)
 
