@@ -305,8 +305,12 @@ def do_train(args):
                 decay_step=args.decay_steps)
 
             clip = None
-            if args.grad_clip > 0:
+            if args.grad_clip > 0:  
+                """  
                 clip = paddle.fluid.clip.GradientClipByGlobalNorm(
+                    clip_norm=args.grad_clip)
+                """
+                clip = paddle.fluid.clip.GradientClipByNorm(
                     clip_norm=args.grad_clip)
 
             decay_param = [
