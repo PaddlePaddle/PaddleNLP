@@ -167,7 +167,7 @@ def do_train(args):
         print("warmup from:{}".format(args.init_from_ckpt))
 
     mlm_loss_fn = ErnieMLMCriterion()
-    cross_loss_fn = paddle.nn.CrossEntropyLoss()
+    rdrop_loss = ppnlp.losses.RDropLoss()
     max_test_acc = 0.0
     global_step = 0
     tic_train = time.time()
@@ -195,7 +195,16 @@ def do_train(args):
                 input_ids=src_ids,
                 token_type_ids=token_type_ids,
                 masked_positions=new_masked_positions)
-            loss = mlm_loss_fn(prediction_scores, masked_lm_labels)
+            if args.rdrop_coef > 0:
+                prediction_scores_2 = model(
+                    input_ids=src_ids,
+                    token_type_ids=token_type_ids,
+                    masked_positions=new_masked_positions)
+                ce_loss = (mlm_loss_fn(prediction_scores, masked_lm_labels) + mlm_loss_fn(prediction_scores_2, masked_lm_labels)) * 0.5
+                kl_loss = rdrop_loss(prediction_scores, prediction_scores_2)
+                loss = ce_loss + kl_loss * args.rdrop_coef
+            else:
+                loss = mlm_loss_fn(prediction_scores, masked_lm_labels)
 
             global_step += 1
             if global_step % 10 == 0 and rank == 0:
@@ -307,5 +316,11 @@ if __name__ == "__main__":
         default='ernie-1.0',
         choices=['ernie-1.0'],
         help="Language model")
+    parser.add_argument(
+        "--rdrop_coef", 
+        default=0.0, 
+        type=float, 
+        help="The coefficient of KL-Divergence loss in R-Drop paper, for more detail please refer to https://arxiv.org/abs/2106.14448), if rdrop_coef > 0 then R-Drop works")
+
     args = parser.parse_args()
     do_train(args)
