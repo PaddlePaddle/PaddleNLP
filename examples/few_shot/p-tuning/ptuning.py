@@ -51,6 +51,7 @@ parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path o
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--save_steps', type=int, default=10000, help="Inteval steps to save checkpoint")
+parser.add_argument("--rdrop_coef", default=0.0, type=float, help="The coefficient of KL-Divergence loss in R-Drop paper, for more detail please refer to https://arxiv.org/abs/2106.14448), if rdrop_coef > 0 then R-Drop works")
 
 args = parser.parse_args()
 # yapf: enable
@@ -153,6 +154,7 @@ def do_train():
         print("warmup from:{}".format(args.init_from_ckpt))
 
     mlm_loss_fn = ErnieMLMCriterion()
+    rdrop_loss = ppnlp.losses.RDropLoss()
 
     num_training_steps = len(train_data_loader) * args.epochs
 
@@ -187,7 +189,16 @@ def do_train():
                 token_type_ids=token_type_ids,
                 masked_positions=masked_positions)
 
-            loss = mlm_loss_fn(prediction_scores, masked_lm_labels)
+            if args.rdrop_coef > 0:
+                prediction_scores_2 = model(
+                    input_ids=src_ids,
+                    token_type_ids=token_type_ids,
+                    masked_positions=new_masked_positions)
+                ce_loss = (mlm_loss_fn(prediction_scores, masked_lm_labels) + mlm_loss_fn(prediction_scores_2, masked_lm_labels)) * 0.5
+                kl_loss = rdrop_loss(prediction_scores, prediction_scores_2)
+                loss = ce_loss + kl_loss * args.rdrop_coef
+            else:
+                loss = mlm_loss_fn(prediction_scores, masked_lm_labels)
 
             global_step += 1
             if global_step % 10 == 0 and rank == 0:
