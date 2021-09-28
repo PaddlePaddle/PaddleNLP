@@ -24,14 +24,12 @@ __all__ = ["RoFormerTokenizer", "JiebaBasicTokenizer"]
 
 class JiebaBasicTokenizer(BasicTokenizer):
     """
-    Runs basic tokenization with jieba (punctuation splitting, lower casing, jieba pretokenizer etc).
-
+    Runs basic tokenization with jieba (punctuation splitting, lower casing, jieba pretokenizer etc.).
     Args:
-        do_lower_case (bool):
-            Whether the text strips accents and convert to lower case.
-            If you use the RoFormer Pretrained model, lower is set to
-            False when using the cased model, otherwise it is set to True.
-            Defaults to `True`.
+        do_lower_case (bool): Whether the text strips accents and convert to
+            lower case. If you use the RoFormer Pretrained model, lower is set to
+            Flase when using the cased model, otherwise it is set to True.
+            Default: True.
     """
 
     def __init__(self, vocab, do_lower_case=True):
@@ -63,48 +61,27 @@ class RoFormerTokenizer(PretrainedTokenizer):
     Constructs a RoFormer tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing, jieba pretokenizer and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
-
     Args:
-        vocab_file (str):
-            The vocabulary file path (ends with '.txt') required to instantiate
-            a `WordpieceTokenizer`.
-        do_lower_case (bool,optional):
-            Whether or not to lowercase the input when tokenizing.
-            If you use the RoFormer pretrained model, lower is set to
-            False when using the cased model, otherwise it is set to True.
-            Defaults to`True`.
-        use_jieba (bool,optional):
-            Whether or not to tokenize the text with jieba. Default: False.
-        unk_token (str,optional):
-            A special token representing the *unknown (out-of-vocabulary)* token.
-            An unknown token is set to be `unk_token` inorder to be converted to an ID.
-            Defaults to "[UNK]".
-        sep_token (str,optional):
-            A special token separating two different sentences in the same input.
-            Defaults to "[SEP]".
-        pad_token (str,optional):
-            A special token used to make arrays of tokens the same size for batching purposes.
-            Defaults to "[PAD]".
-        cls_token (str,optional):
-            A special token used for sequence classification. It is the last token
-            of the sequence when built with special tokens. Defaults to "[CLS]".
-        mask_token (str,optional):
-            A special token representing a masked token. This is the token used
-            in the masked language modeling task which the model tries to predict the original unmasked ones.
-            Defaults to "[MASK]".
+        vocab_file (str): file path of the vocabulary
+        do_lower_case (bool): Whether the text strips accents and convert to
+            lower case. If you use the RoFormer pretrained model, lower is set to
+            Flase when using the cased model, otherwise it is set to True.
+            Default: True.
+        use_jieba (bool): Whether or not to tokenize the text with jieba. Default: False.
+        unk_token (str): The special token for unkown words. Default: "[UNK]".
+        sep_token (str): The special token for separator token . Default: "[SEP]".
+        pad_token (str): The special token for padding. Default: "[PAD]".
+        cls_token (str): The special token for cls. Default: "[CLS]".
+        mask_token (str): The special token for mask. Default: "[MASK]".
 
     Examples:
-        .. code-block::
-
-            from paddlenlp.transformers import RoFormerTokenizer
+        .. code-block:: python
+            from paddlenlp.transformers.roformer import RoFormerTokenizer
             tokenizer = RoFormerTokenizer.from_pretrained('roformer-chinese-base')
-
-            tokens = tokenizer('欢迎使用百度飞桨')
-            '''
-            {'input_ids': [101, 22355, 8994, 25854, 5438, 2473, 102],
-             'token_type_ids': [0, 0, 0, 0, 0, 0, 0]}
-            '''
-
+            # the following line get: ['今天', '的', '天气', '非常', '好', '！']
+            tokens = tokenizer.tokenize('今天的天气非常好！')
+            # the following line get: '今天 的 天气 非常 好 ！'
+            tokenizer.convert_tokens_to_string(tokens)
     """
 
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
@@ -208,10 +185,9 @@ class RoFormerTokenizer(PretrainedTokenizer):
     @property
     def vocab_size(self):
         """
-        Return the size of vocabulary.
-
+        return the size of vocabulary.
         Returns:
-            int: The size of vocabulary.
+            int: the size of vocabulary.
         """
         return len(self.vocab)
 
@@ -233,47 +209,24 @@ class RoFormerTokenizer(PretrainedTokenizer):
 
     def tokenize(self, text):
         """
-        Converts a string to a list of tokens.
-
+        End-to-end tokenization for RoFormer models.
         Args:
             text (str): The text to be tokenized.
 
         Returns:
-            List(str): A list of string representing converted tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import RoFormerTokenizer
-
-                tokenizer = RoFormerTokenizer.from_pretrained('roformer-chinese-base')
-                tokens = tokenizer.tokenize('欢迎使用百度飞桨')
-                #['欢迎', '使用', '百度', '飞', '桨']
-
+            list: A list of string representing converted tokens.
         """
         return self._tokenize(text)
 
     def convert_tokens_to_string(self, tokens):
         """
-        Converts a sequence of tokens (list of string) in a single string.
-
+        Converts a sequence of tokens (list of string) in a single string. Since
+        the usage of WordPiece introducing `##` to concat subwords, also remove
+        `##` when converting.
         Args:
             tokens (list): A list of string representing tokens to be converted.
-
         Returns:
             str: Converted string from tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import RoFormerTokenizer
-
-                tokenizer = RoFormerTokenizer.from_pretrained('roformer-chinese-base')
-                tokens = tokenizer.tokenize('欢迎使用百度飞桨')
-                #['欢迎', '使用', '百度', '飞', '桨']
-                strings = tokenizer.convert_tokens_to_string(tokens)
-                #'欢迎 使用 百度 飞 桨'
-
         """
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
@@ -282,13 +235,16 @@ class RoFormerTokenizer(PretrainedTokenizer):
         """
         Returns the number of added tokens when encoding a sequence with special tokens.
 
+        Note:
+            This encodes inputs and checks the number of added tokens, and is therefore not efficient. Do not put this
+            inside your training loop.
+
         Args:
-            pair(bool):
-                Whether the input is a sequence pair or a single sequence.
-                Defaults to `False` and the input is a single sequence.
+            pair: Returns the number of added tokens in the case of a sequence pair if set to True, returns the
+                number of added tokens in the case of a single sequence if set to False.
 
         Returns:
-            int: Number of tokens added to sequences.
+            Number of tokens added to sequences
         """
         token_ids_0 = []
         token_ids_1 = []
@@ -302,18 +258,18 @@ class RoFormerTokenizer(PretrainedTokenizer):
         adding special tokens.
 
         A Roformer sequence has the following format:
-
-        - single sequence:      ``[CLS] X [SEP]``
-        - pair of sequences:        ``[CLS] A [SEP] B [SEP]``
+        ::
+            - single sequence: ``[CLS] X [SEP]``
+            - pair of sequences: ``[CLS] A [SEP] B [SEP]``
 
         Args:
-            token_ids_0 (List[int]):
+            token_ids_0 (:obj:`List[int]`):
                 List of IDs to which the special tokens will be added.
-            token_ids_1 (List[int], optional):
-                Optional second list of IDs for sequence pairs. Defaults to None.
+            token_ids_1 (:obj:`List[int]`, `optional`):
+                Optional second list of IDs for sequence pairs.
 
         Returns:
-            List[int]: List of input_id with the appropriate special tokens.
+            :obj:`List[int]`: List of input_id with the appropriate special tokens.
         """
         if token_ids_1 is None:
             return [self.cls_token_id] + token_ids_0 + [self.sep_token_id]
@@ -328,18 +284,18 @@ class RoFormerTokenizer(PretrainedTokenizer):
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
 
         A RoFormer offset_mapping has the following format:
-
-        - single sequence: ``(0,0) X (0,0)``
-        - pair of sequences: `(0,0) A (0,0) B (0,0)``
+        ::
+            - single sequence: ``(0,0) X (0,0)``
+            - pair of sequences: `(0,0) A (0,0) B (0,0)``
 
         Args:
-            offset_mapping_ids_0 (List[tuple]):
-                List of wordpiece offsets to which the special tokens will be added.
-            offset_mapping_ids_1 (List[tuple], optional):
-                Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
+            offset_mapping_ids_0 (:obj:`List[tuple]`):
+                List of char offsets to which the special tokens will be added.
+            offset_mapping_ids_1 (:obj:`List[tuple]`, `optional`):
+                Optional second list of char offsets for offset mapping pairs.
 
         Returns:
-            List[tuple]: List of wordpiece offsets with the appropriate offsets of special tokens.
+            :obj:`List[tuple]`: List of char offsets with the appropriate offsets of special tokens.
         """
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
@@ -362,13 +318,13 @@ class RoFormerTokenizer(PretrainedTokenizer):
         If :obj:`token_ids_1` is :obj:`None`, this method only returns the first portion of the mask (0s).
 
         Args:
-            token_ids_0 (List[int]):
-                A list of `inputs_ids` for the first sequence.
-            token_ids_1 (List[int], optional):
-                Optional second list of IDs for sequence pairs. Defaults to None.
+            token_ids_0 (:obj:`List[int]`):
+                List of IDs.
+            token_ids_1 (:obj:`List[int]`, `optional`):
+                Optional second list of IDs for sequence pairs.
 
         Returns:
-            List[int]: List of token_type_id according to the given sequence(s).
+            :obj:`List[int]`: List of token_type_id according to the given sequence(s).
         """
         _sep = [self.sep_token_id]
         _cls = [self.cls_token_id]
@@ -386,15 +342,13 @@ class RoFormerTokenizer(PretrainedTokenizer):
         special tokens using the tokenizer ``encode`` methods.
 
         Args:
-            token_ids_0 (List[int]):
-                A list of `inputs_ids` for the first sequence.
-            token_ids_1 (List[int], optional):
-                Optional second list of IDs for sequence pairs. Defaults to None.
+            token_ids_0 (List[int]): List of ids of the first sequence.
+            token_ids_1 (List[int], optinal): List of ids of the second sequence.
             already_has_special_tokens (bool, optional): Whether or not the token list is already
                 formatted with special tokens for the model. Defaults to None.
 
         Returns:
-            List[int]: The list of integers either be 0 or 1: 1 for a special token, 0 for a sequence token.
+            results (List[int]): The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
         """
 
         if already_has_special_tokens:
