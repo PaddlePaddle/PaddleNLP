@@ -92,6 +92,7 @@ PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据�
 |  [DuReaderQG](https://github.com/PaddlePaddle/Research/tree/master/NLP/DuReader-Robust-BASELINE) | 基于DuReader的问题生成数据集| `paddlenlp.datasets.load_dataset('dureader_qg')`|
 |  [AdvertiseGen](https://github.com/ZhihongShao/Planning-based-Hierarchical-Variational-Model) | 中文文案生成数据集| `paddlenlp.datasets.load_dataset('advertisegen')`|
 |  [LCSTS_new](https://aclanthology.org/D15-1229.pdf) | 中文摘要生成数据集| `paddlenlp.datasets.load_dataset('lcsts_new')`|
+|  [CNN/Dailymail](https://github.com/abisee/cnn-dailymail) | 英文摘要生成数据集| `paddlenlp.datasets.load_dataset('cnn_dailymail')`|
 
 ## 语料库
 
