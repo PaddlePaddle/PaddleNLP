@@ -977,25 +977,25 @@ class AlbertModel(AlbertPretrainedModel):
 
              With the fields:
 
-            - `sequence_output` (Tensor):
+             - `sequence_output` (Tensor):
                 Sequence of hidden-states at the last layer of the model.
                 It's data type should be float32 and has a shape of [`batch_size, sequence_length, hidden_size`].
 
-            - `pooled_output` (Tensor):
+             - `pooled_output` (Tensor):
                 The output of first token (`[CLS]`) in sequence.
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
                 Its data type should be float32 and
                 has a shape of [batch_size, hidden_size].
 
-            - `last_hidden_state` (Tensor):
+             - `last_hidden_state` (Tensor):
                 The output of the last encoder layer, it is also the `sequence_output`.
                 It's data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
 
-            - `all_hidden_states` (Tensor):
-                `hidden_states` of all layers in the Transformer encoder. The length of `all_hidden_states` is `num_hidden_layers + 1`.
+             - `all_hidden_states` (Tensor):
+                Hidden_states of all layers in the Transformer encoder. The length of `all_hidden_states` is `num_hidden_layers + 1`.
                 For all element in the tuple, its data type should be float32 and its shape is [`batch_size, sequence_length, hidden_size`].
 
-            - `all_attentions` (Tensor):
+             - `all_attentions` (Tensor):
                 Attentions of all layers of in the Transformer encoder. The length of `all_attentions` is `num_hidden_layers`.
                 For all element in the tuple, its data type should be float32 and its shape is
                 [`batch_size, num_attention_heads, sequence_length, sequence_length`].
@@ -1012,6 +1012,7 @@ class AlbertModel(AlbertPretrainedModel):
                  inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                  inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                  output = model(**inputs)
+
          '''
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError(
@@ -1134,9 +1135,9 @@ class AlbertForPretraining(AlbertPretrainedModel):
 
         Returns:
             tuple or Dict: Returns tuple (`prediction_scores`, `sop_scores`) or a dict with
-             `prediction_logits`, `sop_logits`, `pooled_output`, `hidden_states`, `attentions` fields.
+            `prediction_logits`, `sop_logits`, `pooled_output`, `hidden_states`, `attentions` fields.
 
-             With the fields:
+            With the fields:
 
             - `prediction_scores` (Tensor):
                 The scores of masked token prediction. Its data type should be float32.
@@ -1155,7 +1156,7 @@ class AlbertForPretraining(AlbertPretrainedModel):
                 Its data type should be float32 and its shape is [batch_size, 2].
 
             - `hidden_states` (Tensor):
-                `hidden_states` of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
+                Hidden_states of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
                 For all element in the tuple, its data type should be float32 and its shape is [`batch_size, sequence_length, hidden_size`].
 
             - `attentions` (Tensor):
@@ -1239,6 +1240,15 @@ class AlbertSOPHead(Layer):
 
 
 class AlbertForMaskedLM(AlbertPretrainedModel):
+    """
+    Albert Model with a `masked language modeling` head on top during the pretraining.
+
+    Args:
+        albert (:class:`AlbertModel`):
+            An instance of :class:`AlbertModel`.
+
+    """
+
     def __init__(self, albert):
         super(AlbertForMaskedLM, self).__init__()
 
@@ -1269,6 +1279,50 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
             inputs_embeds=None,
             labels=None,
             return_dict=False, ):
+        r"""
+        The AlbertForPretraining forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`AlbertModel`.
+            attention_mask (list, optional):
+                See :class:`AlbertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`AlbertModel`.
+            position_ids(Tensor, optional):
+                See :class:`AlbertModel`.
+            head_mask(Tensor, optional):
+                See :class:`AlbertModel`.
+            inputs_embeds(Tensor, optional):
+                See :class:`AlbertModel`.
+            return_dict(bool, optional):
+                See :class:`AlbertModel`.
+
+        Returns:
+            Tensor or Dict: Returns tensor `prediction_scores` or a dict with `logits`,
+            `hidden_states`, `attentions` fields.
+
+            With the fields:
+
+            - `prediction_scores` (Tensor):
+                The scores of masked token prediction. Its data type should be float32.
+                and its shape is [batch_size, sequence_length, vocab_size].
+
+            - `logits` (Tensor):
+                The scores of masked token prediction. Its data type should be float32.
+                and its shape is [batch_size, sequence_length, vocab_size].
+
+            - `hidden_states` (Tensor):
+                Hidden_states of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
+                For all element in the tuple, its data type should be float32 and its shape is [`batch_size, sequence_length, hidden_size`].
+
+            - `attentions` (Tensor):
+                Attentions of all layers of in the Transformer encoder. The length of `attentions` is `num_hidden_layers`.
+                For all element in the tuple, its data type should be float32 and its shape is
+                [`batch_size, num_attention_heads, sequence_length, sequence_length`].
+
+        """
+
         transformer_outputs = self.transformer(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -1356,7 +1410,7 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
                 Shape as `[batch_size, num_classes]` and dtype as float32.
 
             - `hidden_states` (Tensor):
-                `hidden_states` of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
+                Hidden_states of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
                 For all element in the tuple, its data type should be float32 and its shape is [`batch_size, sequence_length, hidden_size`].
 
             - `attentions` (Tensor):
@@ -1465,7 +1519,7 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
                 Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
 
             - `hidden_states` (Tensor):
-                `hidden_states` of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
+                Hidden_states of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
                 For all element in the tuple, its data type should be float32 and its shape is [`batch_size, sequence_length, hidden_size`].
 
             - `attentions` (Tensor):
@@ -1581,7 +1635,7 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
                 Its data type should be float32 and its shape is [batch_size, sequence_length].
 
             - `hidden_states` (Tensor):
-                `hidden_states` of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
+                Hidden_states of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
                 For all element in the tuple, its data type should be float32 and its shape is [`batch_size, sequence_length, hidden_size`].
 
             - `attentions` (Tensor):
@@ -1695,7 +1749,7 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
                 Shape as `[batch_size, num_classes]` and dtype as `float32`.
 
             - `hidden_states` (Tensor):
-                `hidden_states` of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
+                Hidden_states of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
                 For all element in the tuple, its data type should be float32 and its shape is [`batch_size, sequence_length, hidden_size`].
 
             - `attentions` (Tensor):

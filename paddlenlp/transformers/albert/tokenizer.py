@@ -210,34 +210,172 @@ class AlbertTokenizer(PretrainedTokenizer):
 
     @property
     def vocab_size(self):
+        """
+        Return the size of vocabulary.
+
+        Returns:
+            int: The size of vocabulary.
+        """
         return self.tokenizer.vocab_size()
 
     def _tokenize(self, text):
         return self.tokenizer._tokenize(text)
 
     def tokenize(self, text):
+        """
+        Converts a string to a list of tokens.
+
+        Args:
+            text (str): The text to be tokenized.
+
+        Returns:
+            List(str): A list of string representing converted tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import AlbertTokenizer
+
+                tokenizer = AlbertTokenizer.from_pretrained('bert-base-uncased')
+                tokens = tokenizer.tokenize('He was a puppeteer')
+                '''
+                ['▁he', '▁was', '▁a', '▁puppet', 'eer']
+                '''
+        """
         return self.tokenizer.tokenize(text)
 
     def convert_tokens_to_ids(self, tokens):
+        """
+        Converts a sequence of tokens (list of string) to a list of ids.
+
+        Args:
+            tokens (list): A list of string representing tokens to be converted.
+
+        Returns:
+            list: Converted ids from tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import AlbertTokenizer
+
+                tokenizer = AlbertTokenizer.from_pretrained('bert-base-uncased')
+                tokens = tokenizer.tokenize('He was a puppeteer')
+                #['▁he', '▁was', '▁a', '▁puppet', 'eer']
+
+                ids = tokenizer.convert_tokens_to_ids(tokens)
+                #[24, 23, 21, 10956, 7911]
+        """
         return self.tokenizer.convert_tokens_to_ids(tokens)
 
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
+        """
+        Converts a sequence of tokens (list of string) to a list of ids.
+
+        Args:
+            ids (list): A list of ids to be converted.
+            skip_special_tokens (bool, optional):
+                Whether or not to skip specical tokens. Defaults to `False`.
+
+        Returns:
+            list: A list of converted tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import AlbertTokenizer
+
+                tokenizer = AlbertTokenizer.from_pretrained('bert-base-uncased')
+                ids = [24, 23, 21, 10956, 7911]
+                tokens = tokenizer.convert_ids_to_tokens(ids)
+                #['▁he', '▁was', '▁a', '▁puppet', 'eer']
+        """
         return self.tokenizer.convert_ids_to_tokens(
             ids, skip_special_tokens=skip_special_tokens)
 
     def convert_tokens_to_string(self, tokens):
+        """
+        Converts a sequence of tokens (list of string) to a single string.
+
+        Args:
+            tokens (list): A list of string representing tokens to be converted.
+
+        Returns:
+            str: Converted string from tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import AlbertTokenizer
+
+                tokenizer = AlbertTokenizer.from_pretrained('bert-base-uncased')
+                tokens = tokenizer.tokenize('He was a puppeteer')
+                '''
+                ['▁he', '▁was', '▁a', '▁puppet', 'eer']
+                '''
+                strings = tokenizer.convert_tokens_to_string(tokens)
+                '''
+                he was a puppeteer
+                '''
+        """
         return self.tokenizer.convert_tokens_to_string(tokens)
 
     def num_special_tokens_to_add(self, pair=False):
+        """
+        Returns the number of added tokens when encoding a sequence with special tokens.
+
+        Args:
+            pair(bool):
+                Whether the input is a sequence pair or a single sequence.
+                Defaults to `False` and the input is a single sequence.
+
+        Returns:
+            int: Number of tokens added to sequences.
+        """
         return self.tokenizer.num_special_tokens_to_add(pair=pair)
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        """
+        Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
+        adding special tokens.
+
+        An Albert sequence has the following format:
+
+        - single sequence:      ``[CLS] X [SEP]``
+        - pair of sequences:        ``[CLS] A [SEP] B [SEP]``
+
+        Args:
+            token_ids_0 (List[int]):
+                List of IDs to which the special tokens will be added.
+            token_ids_1 (List[int], optional):
+                Optional second list of IDs for sequence pairs. Defaults to None.
+
+        Returns:
+            List[int]: List of input_id with the appropriate special tokens.
+        """
         return self.tokenizer.build_inputs_with_special_tokens(
             token_ids_0, token_ids_1=token_ids_1)
 
     def build_offset_mapping_with_special_tokens(self,
                                                  offset_mapping_0,
                                                  offset_mapping_1=None):
+        """
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
+        A Albert offset_mapping has the following format:
+
+        - single sequence:      ``(0,0) X (0,0)``
+        - pair of sequences:        ``(0,0) A (0,0) B (0,0)``
+
+        Args:
+            offset_mapping_ids_0 (List[tuple]):
+                List of wordpiece offsets to which the special tokens will be added.
+            offset_mapping_ids_1 (List[tuple], optional):
+                Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
+
+        Returns:
+            List[tuple]: A list of wordpiece offsets with the appropriate offsets of special tokens.
+        """
         return self.tokenizer.build_offset_mapping_with_special_tokens(
             offset_mapping_0, offset_mapping_1=offset_mapping_1)
 
@@ -245,6 +383,21 @@ class AlbertTokenizer(PretrainedTokenizer):
                                 token_ids_0,
                                 token_ids_1=None,
                                 already_has_special_tokens=False):
+        """
+        Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
+        special tokens using the tokenizer ``encode`` methods.
+
+        Args:
+            token_ids_0 (List[int]):
+                A list of `inputs_ids` for the first sequence.
+            token_ids_1 (List[int], optinal):
+                Optional second list of IDs for sequence pairs. Defaults to None.
+            already_has_special_tokens (bool, optional): Whether or not the token list is already
+                formatted with special tokens for the model. Defaults to None.
+
+        Returns:
+            List[int]: The list of integers either be 0 or 1: 1 for a special token, 0 for a sequence token.
+        """
         return self.tokenizer.get_special_tokens_mask(
             token_ids_0,
             token_ids_1=token_ids_1,
