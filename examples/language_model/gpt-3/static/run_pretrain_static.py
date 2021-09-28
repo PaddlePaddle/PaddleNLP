@@ -90,17 +90,13 @@ def dist_optimizer(args, topo):
     if args.use_amp:
         dist_strategy.amp = True
         dist_strategy.amp_configs = {
-            "custom_white_list": [
-                'softmax',
-                'layer_norm',
-                'gelu',
-            ],
+            "custom_white_list": ['softmax', 'layer_norm', 'gelu', "fused_softmax_mask_upper_triangle"],
             #"custom_black_list": ['c_softmax_with_cross_entropy'],
-            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding"],
+            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding", "elementwise_div"],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
-            #"use_pure_fp16": args.use_fp16,
-            #"use_fp16_guard": False
+            "use_pure_fp16": args.use_fp16,
+            "use_fp16_guard": False
         }
     if args.use_sharding:
         dist_strategy.sharding = True
@@ -360,10 +356,10 @@ def do_train(args):
     exe.run(startup_program)
     test_program = main_program.clone(for_test=True)
     
-    """
+    
     if args.use_amp and args.use_fp16:
         optimizer.amp_init(place)
-    """
+    
 
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
