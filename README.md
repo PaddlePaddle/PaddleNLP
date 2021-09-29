@@ -52,7 +52,7 @@ pip install --upgrade paddlenlp
 
 ### Transformer API: 强大的预训练模型生态底座
 
-覆盖**15**个网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。也欢迎开发者进预训练模贡献！🤗
+覆盖**15**个网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。也欢迎开发者贡献更多预训练模型！🤗
 
 ```python
 from paddlenlp.transformers import *
