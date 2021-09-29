@@ -46,5 +46,5 @@ python3.8 -m paddle.distributed.launch --log_dir $log_dir --gpus "6" run_pretrai
     --dp_degree 1\
     --mp_degree 1\
     --pp_degree 1\
-    --use_amp false\
+    --use_amp true\
     --use_recompute False
