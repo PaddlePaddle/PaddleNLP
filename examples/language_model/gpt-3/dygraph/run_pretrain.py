@@ -214,7 +214,7 @@ def do_train(args):
             logger.warning("No optimizer checkpoint file found in %s." %
                            opt_path)
     
-    model, optimizer = paddle.amp.decorate(models=model, optimizers=optimizer, level='O2', master_weight=True)
+    #model, optimizer = paddle.amp.decorate(models=model, optimizers=optimizer, level='O2', master_weight=True)
 
     global_step = 0
     tic_train = time.time()
@@ -242,7 +242,7 @@ def do_train(args):
 
             for step, batch in enumerate(train_data_loader()):
                 global_step += 1
-                
+                """
                 # add nsight test
                 if step == 20:
                     core.nvprof_start()
@@ -256,7 +256,7 @@ def do_train(args):
                     core.nvprof_nvtx_pop()
                     core.nvprof_nvtx_push(str(step))
                 #-----------------
-                
+                """
 
                 tokens, loss_mask, position_ids, labels = batch
 
@@ -267,9 +267,9 @@ def do_train(args):
                 if args.pp_degree == 1:
                     with paddle.amp.auto_cast(
                             args.use_amp,
-                            custom_white_list=["layer_norm", "softmax", "gelu", "softmax_mask_fuse_upper_triangle"],
+                            custom_white_list=["layer_norm", "softmax", "gelu", "softmax_mask_fuse_upper_triangle", "elementwise_add"],
                             custom_black_list=["reduce_sum", "c_softmax_with_cross_entropy","c_embedding"],
-                            level='O2'):
+                            level='O1'):
                         preds = model(tokens, position_ids)
                         loss = criterion(preds, labels, loss_mask)
 
@@ -283,6 +283,7 @@ def do_train(args):
                     if lr_scheduler is not None:
                         lr_scheduler.step()
                     optimizer.clear_grad()
+                    sys.exit()
 
                 else:
                     data = [(tokens, position_ids), (labels, loss_mask)]
