@@ -416,7 +416,7 @@ def do_train(args):
         for step, batch in enumerate(train_data_loader()):
             global_step += 1
 
-            """
+            
             # add nsight test
             if step == 20:
                 core.nvprof_start()
@@ -430,7 +430,7 @@ def do_train(args):
                 core.nvprof_nvtx_pop()
                 core.nvprof_nvtx_push(str(step))
             #-----------------
-            """
+            
             
             ret = exe.run(main_program,
                           feed=batch,
