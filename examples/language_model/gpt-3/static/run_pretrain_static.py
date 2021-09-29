@@ -92,9 +92,9 @@ def dist_optimizer(args, topo):
     if args.use_amp:
         dist_strategy.amp = True
         dist_strategy.amp_configs = {
-            "custom_white_list": ['softmax', 'layer_norm', 'gelu', "fused_softmax_mask_upper_triangle"],
+            "custom_white_list": ['softmax', 'layer_norm', 'gelu', "fused_softmax_mask_upper_triangle", "elementwise_add"],
             #"custom_black_list": ['c_softmax_with_cross_entropy'],
-            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding", "elementwise_div"],
+            "custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy", "c_embedding"],
             "init_loss_scaling": 32768,
             "use_dynamic_loss_scaling": True,
             "use_pure_fp16": args.use_fp16,
