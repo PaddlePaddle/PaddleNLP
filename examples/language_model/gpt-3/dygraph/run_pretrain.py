@@ -30,7 +30,7 @@ from args import parse_args
 import lr
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import DygraphShardingOptimizer
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import DygraphShardingOptimizer
 
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
@@ -38,12 +38,12 @@ MODEL_CLASSES = {
 }
 
 
-def set_hyrbid_parallel_seed(basic_seed, idx):
+def set_hyrbid_parallel_seed(basic_seed, data_world_rank):
     assert args.device != "cpu"
 
-    random.seed(basic_seed + idx)
-    np.random.seed(basic_seed + idx)
-    paddle.seed(basic_seed + idx)
+    random.seed(basic_seed + data_world_rank)
+    np.random.seed(basic_seed + data_world_rank)
+    paddle.seed(basic_seed + data_world_rank)
 
 
 @paddle.no_grad()
@@ -108,16 +108,16 @@ def do_train(args):
     sharding_rank = hcg.get_sharding_parallel_rank()
 
     sharding_size = hcg.get_sharding_parallel_world_size()
-    worker_index = dp_rank * sharding_size + sharding_rank
-    worker_num = args.dp_degree * args.sharding_degree
+    data_world_rank = dp_rank * sharding_size + sharding_rank
+    data_world_size = args.dp_degree * args.sharding_degree
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
     # seed control in hybrid parallel
-    set_hyrbid_parallel_seed(args.seed, worker_index)
+    set_hyrbid_parallel_seed(args.seed, data_world_rank)
 
     # local_seed/ global_seed is used to control dropout in ModelParallel
     local_seed = args.seed + 123 + mp_rank * 10 + pp_rank * 1000
-    global_seed = args.seed + worker_index
+    global_seed = args.seed + data_world_rank
 
     tracker = get_rng_state_tracker()
     tracker.add('global_seed', global_seed)
@@ -184,7 +184,7 @@ def do_train(args):
 
     clip = None
     if args.grad_clip > 0:
-        clip = paddle.nn.ClipGradByNorm(clip_norm=args.grad_clip)
+        clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.grad_clip)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
@@ -253,8 +253,8 @@ def do_train(args):
                 args,
                 data_file,
                 local_rank=local_rank,
-                data_world_size=worker_num,
-                data_world_rank=worker_index,
+                data_world_size=data_world_size,
+                data_world_rank=data_world_rank,
                 eos_id=tokenizer.eos_token_id)
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.
@@ -335,9 +335,9 @@ def do_train(args):
                                  args.eval_iters, log_writer, global_step,
                                  epoch, "valid")
 
-                # only worker_index = 0 save model
+                # only dp_rank = 0 save model
                 if (global_step % args.save_steps == 0 or
-                        global_step >= args.max_steps) and worker_index == 0:
+                        global_step >= args.max_steps) and dp_rank == 0:
 
                     model_to_save = model._layers if paddle.distributed.get_world_size(
                     ) > 1 else model
@@ -355,8 +355,28 @@ def do_train(args):
                             optimizer.state_dict(),
                             os.path.join(
                                 output_dir,
-                                "model_state_mp_{:0>2d}_pp_{:0>2d}.pdopt".
-                                format(mp_rank, pp_rank)))
+                                "model_state_mp_{:0>2d}_sharding_{:0>2d}_pp_{:0>2d}.pdopt".
+                                format(mp_rank, sharding_rank, pp_rank)))
+                    elif args.sharding_degree > 1:
+                        if args.mp_degree > 1:
+                            if mp_rank == 1:
+                                tokenizer.save_pretrained(output_dir)
+                            model_to_save.save_pretrained(output_dir)
+                            paddle.save(
+                                optimizer.state_dict(),
+                                os.path.join(
+                                    output_dir,
+                                    "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".
+                                    format(mp_rank, sharding_rank)))
+                        else:
+                            tokenizer.save_pretrained(output_dir)
+                            model_to_save.save_pretrained(output_dir)
+                            paddle.save(
+                                optimizer.state_dict(),
+                                os.path.join(
+                                    output_dir,
+                                    "model_state_sharding_{:0>2d}.pdopt".format(
+                                        sharding_rank)))
                     else:
                         path = os.path.join(output_dir,
                                             'model_{:0>2d}'.format(mp_rank))
