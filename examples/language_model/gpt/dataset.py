@@ -421,7 +421,7 @@ class GPTDataset(paddle.io.Dataset):
         #                                                         seq_length))
 
         # The pad and eos tokens do not contribute the loss
-        loss_mask = np.ones(seq_length, dtype="float16")
+        loss_mask = np.ones(seq_length, dtype="float32")
         loss_mask[np.where(np.array(tokens) == self.eos_id)] = 0.0
         position_ids = np.arange(0, seq_length, dtype="int64")
 
