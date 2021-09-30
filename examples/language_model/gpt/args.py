@@ -211,7 +211,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument(
         "--scale_loss",
         type=float,
-        default=128,
+        default=32768,
         help="The value of scale_loss for fp16. This is only used for AMP training."
     )
     parser.add_argument(

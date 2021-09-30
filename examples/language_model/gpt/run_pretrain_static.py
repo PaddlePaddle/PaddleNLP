@@ -93,7 +93,7 @@ def dist_optimizer(args, topo):
                 'gelu',
             ],
             "custom_black_list": ['c_softmax_with_cross_entropy'],
-            "init_loss_scaling": 32768,
+            "init_loss_scaling": args.scale_loss,
             "use_dynamic_loss_scaling": True,
         }
     if args.use_sharding:
