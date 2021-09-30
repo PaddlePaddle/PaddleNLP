@@ -40,7 +40,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
     --learning_rate 5E-5 \
     --epochs 10 \
     --max_seq_length 512 \
-    --rdrop_coef 0.5 \
+    --rdrop_coef 0 \
 ```
 参数含义说明
 - `task_name`: FewCLUE 中的数据集名字
@@ -48,7 +48,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
 - `device`: 使用 cpu/gpu 进行训练
 - `save_dir`: 模型存储路径
 - `max_seq_length`: 文本的最大截断长度
-- `rdrop_coef`: rdrop参数，默认为0，若为0则不使用rdrop
+- `rdrop_coef`: R-Drop 策略 Loss 的权重系数，默认为 0， 若为 0 则未使用 R-Drop 策略
 
 模型每训练 1 个 epoch,  会在验证集上进行评估，并针对测试集进行预测存储到预测结果文件。
 
