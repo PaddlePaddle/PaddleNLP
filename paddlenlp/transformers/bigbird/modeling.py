@@ -11,12 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import numpy as np
+import math
 
+import numpy as np
 import paddle
 from paddle.nn import Linear, Dropout, LayerNorm, LayerList, Layer
 import paddle.nn.functional as F
 import paddle.nn as nn
+
 from ..attention_utils import _convert_param_attr_to_list, MultiHeadAttention, \
         AttentionRegistry
 from .. import PretrainedModel, register_base_model
@@ -29,6 +31,39 @@ __all__ = [
     'BigBirdForSequenceClassification',
     'BigBirdPretrainingHeads',
 ]
+
+
+def mish(x):
+    return x * F.tanh(F.softplus(x))
+
+
+def linear_act(x):
+    return x
+
+
+def swish(x):
+    return x * F.sigmoid(x)
+
+
+def gelu_new(x):
+    """
+    Implementation of the GELU activation function currently in Google BERT repo (identical to OpenAI GPT). Also see
+    the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
+    """
+    return 0.5 * x * (1.0 + paddle.tanh(
+        math.sqrt(2.0 / math.pi) * (x + 0.044715 * paddle.pow(x, 3.0))))
+
+
+ACT2FN = {
+    "relu": F.relu,
+    "gelu": F.gelu,
+    "gelu_new": gelu_new,
+    "tanh": F.tanh,
+    "sigmoid": F.sigmoid,
+    "mish": mish,
+    "linear": linear_act,
+    "swish": swish,
+}
 
 
 class TransformerEncoderLayer(Layer):
@@ -876,3 +911,509 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
         next_sentence_loss = F.cross_entropy(
             seq_relationship_score, next_sentence_labels, reduction='none')
         return masked_lm_loss + paddle.mean(next_sentence_loss) * scale
+
+
+class BigBirdIntermediate(nn.Module):
+    def __init__(self, hidden_size, intermediate_size, hidden_act):
+        super().__init__()
+        self.dense = nn.Linear(hidden_size, intermediate_size)
+        if isinstance(hidden_act, str):
+            self.intermediate_act_fn = ACT2FN[hidden_act]
+        else:
+            self.intermediate_act_fn = hidden_act
+
+    def forward(self, hidden_states):
+        hidden_states = self.dense(hidden_states)
+        hidden_states = self.intermediate_act_fn(hidden_states)
+        return hidden_states
+
+
+class BigBirdOutput(nn.Module):
+    def __init__(self, hidden_size, intermediate_size, hidden_dropout_prob):
+        super().__init__()
+        self.dense = nn.Linear(intermediate_size, hidden_size)
+        self.LayerNorm = nn.LayerNorm(hidden_size)
+        self.dropout = nn.Dropout(hidden_dropout_prob)
+
+    def forward(self, hidden_states, input_tensor):
+        hidden_states = self.dense(hidden_states)
+        hidden_states = self.dropout(hidden_states)
+        hidden_states = self.LayerNorm(hidden_states + input_tensor)
+        return hidden_states
+
+
+class BigBirdForQuestionAnsweringHead(nn.Module):
+    """Head for question answering tasks."""
+
+    def __init__(self, hidden_size, intermediate_size, hidden_act,
+                 hidden_dropout_prob, num_labels):
+        super().__init__()
+        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.intermediate = BigBirdIntermediate(hidden_size, intermediate_size,
+                                                hidden_act)
+        self.output = BigBirdOutput(hidden_size, intermediate_size,
+                                    hidden_dropout_prob)
+        self.qa_outputs = nn.Linear(hidden_size, num_labels)
+
+    def forward(self, encoder_output):
+        hidden_states = self.dropout(encoder_output)
+        hidden_states = self.intermediate(hidden_states)
+        hidden_states = self.output(hidden_states, encoder_output)
+        hidden_states = self.qa_outputs(hidden_states)
+        return hidden_states
+
+
+class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
+    """
+    BigBird Model with a span classification head on top for extractive question-answering tasks like
+    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
+    `span end logits`).
+
+    Args:
+        bigbird (:class:`BigBirdModel`):
+            An instance of BigBirdModel.
+        dropout (float, optional):
+            The dropout probability for output of BigBirdModel.
+            If None, use the same value as `hidden_dropout_prob` of `BigBirdModel`
+            instance `bigbird`. Defaults to `None`.
+        """
+
+    def __init__(self, bigbird, dropout=None):
+        super(BigBirdForQuestionAnswering, self).__init__()
+        self.bigbird = bigbird  # allow bigbird to be config
+        dropout = dropout if dropout is not None else self.bigbird.config[
+            "hidden_dropout_prob"]
+        self.qa_classifier = BigBirdForQuestionAnsweringHead(
+            hidden_size=self.bigbird.config["hidden_dropout_prob"],
+            intermediate_size=self.bigbird.config["intermediate_size"],
+            hidden_act=self.bigbird.config["hidden_act"],
+            hidden_dropout_prob=self.bigbird.config["hidden_dropout_prob"],
+            num_labels=self.bigbird.config["num_labels"])
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, token_type_ids=None, question_lengths=None):
+        r"""
+        The BigBirdForQuestionAnswering forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`BigBirdModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`BigBirdModel`.
+            question_lengths (Tensor, optional):
+                See : The question lengths.
+
+        Returns:
+            tuple: Returns tuple (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.bigbird.modeling import BigBirdForQuestionAnswering
+                from paddlenlp.transformers.bigbird.tokenizer import BigBirdTokenizer
+
+                tokenizer = BigBirdTokenizer.from_pretrained('bigbird-base-uncased')
+                model = BigBirdForQuestionAnswering.from_pretrained('bigbird-base-uncased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                start_logits = outputs[0]
+                end_logits  =outputs[1]
+        """
+        seqlen = input_ids.size(1)
+
+        if question_lengths is None and input_ids is not None:
+            # assuming input_ids format: <cls> <question> <sep> context <sep>
+            question_lengths = paddle.argmax(
+                input_ids.eq(self.sep_token_id).int(), dim=-1) + 1
+            question_lengths.unsqueeze_(1)
+
+        logits_mask = None
+        if question_lengths is not None:
+            # setting lengths logits to `-inf`
+            logits_mask = self.prepare_question_mask(question_lengths, seqlen)
+            if token_type_ids is None:
+                token_type_ids = (~logits_mask).long()
+            logits_mask = logits_mask
+            logits_mask[:, 0] = False
+            logits_mask.unsqueeze_(2)
+
+        sequence_output, _ = self.bigbird(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=None,
+            attention_mask=None)
+
+        logits = self.qa_classifier(sequence_output)
+        if logits_mask is not None:
+            # removing question tokens from the competition
+            logits = logits - logits_mask * 1e6
+
+        logits = paddle.transpose(logits, perm=[2, 0, 1])
+        start_logits, end_logits = paddle.unstack(x=logits, axis=0)
+
+        return start_logits, end_logits
+
+    @staticmethod
+    def prepare_question_mask(q_lengths, maxlen):
+        mask = paddle.arange(0, maxlen).unsqueeze_(0)
+        mask = mask < q_lengths
+        return mask
+
+
+class BigBirdForTokenClassification(BigBirdPretrainedModel):
+    """
+    BigBird Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        bigbird (:class:`BigBirdModel`):
+            An instance of BigBirdModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of BIGBIRD.
+            If None, use the same value as `hidden_dropout_prob` of `BigBirdModel`
+            instance `bigbird`. Defaults to None.
+    """
+
+    def __init__(self, bigbird, num_classes=2, dropout=None):
+        super(BigBirdForTokenClassification, self).__init__()
+        self.num_classes = num_classes
+        self.bigbird = bigbird  # allow bigbird to be config
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.bigbird.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.bigbird.config["hidden_size"],
+                                    num_classes)
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        r"""
+        The BigBirdForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`BigBirdModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`BigBirdModel`.
+            position_ids(Tensor, optional):
+                See :class:`BigBirdModel`.
+            attention_mask (list, optional):
+                See :class:`BigBirdModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.bigbird.modeling import BigBirdForTokenClassification
+                from paddlenlp.transformers.bigbird.tokenizer import BigBirdTokenizer
+
+                tokenizer = BigBirdTokenizer.from_pretrained('bigbird-base-uncased')
+                model = BigBirdForTokenClassification.from_pretrained('bigbird-base-uncased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
+        sequence_output, _ = self.bigbird(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+
+        sequence_output = self.dropout(sequence_output)
+        logits = self.classifier(sequence_output)
+        return logits
+
+
+class BigBirdForMultipleChoice(BigBirdPretrainedModel):
+    """
+    BigBird Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+
+    Args:
+        bigbird (:class:`BigBirdModel`):
+            An instance of BigBirdModel.
+        num_classes (int, optional):
+            The number of classes. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of BIGBIRD.
+            If None, use the same value as `hidden_dropout_prob` of `BigBirdModel`
+            instance `bigbird`. Defaults to None.
+    """
+
+    def __init__(self, bigbird, num_classes=2, dropout=None):
+        super(BigBirdForTokenClassification, self).__init__()
+        self.bigbird = bigbird  # allow bigbird to be config
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.bigbird.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.bigbird.config["hidden_size"], 1)
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        r"""
+        The BigBirdForMultipleChoice forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`BigBirdModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`BigBirdModel`.
+            position_ids(Tensor, optional):
+                See :class:`BigBirdModel`.
+            attention_mask (list, optional):
+                See :class:`BigBirdModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Shape as `[batch_size, 1]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers.bigbird.modeling import BigBirdForMultipleChoice
+                from paddlenlp.transformers.bigbird.tokenizer import BigBirdTokenizer
+
+                tokenizer = BigBirdTokenizer.from_pretrained('bigbird-base-uncased')
+                model = BigBirdForTokenClassification.from_pretrained('bigbird-base-uncased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                logits = outputs[0]
+        """
+        # input_ids: [bs, num_choice, seq_l]
+        input_ids = input_ids.reshape(shape=(
+            -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+
+        if position_ids is not None:
+            position_ids = position_ids.reshape(shape=(-1,
+                                                       position_ids.shape[-1]))
+
+        if attention_mask is not None:
+            attention_mask = attention_mask.reshape(
+                shape=(-1, attention_mask.shape[-1]))
+
+        _, pooled_output = self.bigbird(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+
+        pooled_output = self.dropout(pooled_output)
+
+        logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
+        reshaped_logits = logits.reshape(
+            shape=(-1, self.num_choices))  # logits: (bs, num_choice)
+
+        return reshaped_logits
+
+
+class BigBirdLMHead(nn.Layer):
+    """
+    BigBird Model with a `language modeling` head on top.
+    """
+
+    def __init__(
+            self,
+            hidden_size,
+            vocab_size,
+            hidden_act="gelu",
+            embedding_weights=None,
+            layer_norm_eps=1e-5, ):
+        super(BigBirdLMHead, self).__init__()
+        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.activation = ACT2FN[hidden_act]
+        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+
+        self.decoder_weight = embedding_weights
+        self.decoder_bias = self.create_parameter(
+            shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
+
+    def forward(self, hidden_states):
+        hidden_states = self.dense(hidden_states)
+        hidden_states = self.activation(hidden_states)
+        hidden_states = self.layer_norm(hidden_states)
+
+        hidden_states = (paddle.matmul(
+            hidden_states, self.decoder_weight, transpose_y=True) +
+                         self.decoder_bias)
+
+        return hidden_states
+
+
+class BigBirdForMaskedLM(BigBirdPretrainedModel):
+    """
+    BigBird Model with pretraining tasks on top.
+
+    Args:
+        BigBird (:class:`BigBirdModel`):
+            An instance of :class:`BigBirdModel`.
+
+    """
+
+    def __init__(self, bigbird):
+        super(BigBirdForMaskedLM, self).__init__()
+        self.bigbird = bigbird
+        self.lm_head = BigBirdLMHead(
+            self.bigbird.config["hidden_size"],
+            self.bigbird.config["vocab_size"],
+            self.bigbird.config["hidden_act"],
+            self.bigbird.embeddings.word_embeddings.weight,
+            self.bigbird.config["layer_norm_eps"], )
+
+        self.apply(self.init_weights)
+
+    def forward(
+            self,
+            input_ids,
+            position_ids=None,
+            attention_mask=None,
+            labels=None, ):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`BigBirdModel`.
+            position_ids (Tensor, optional):
+                See :class:`BigBirdModel`.
+            attention_mask (Tensor, optional):
+                See :class:`BigBirdModel`.
+            labels (Tensor, optional):
+                The Labels for computing the masked language modeling loss. Indices should be in ``[-100, 0, ..., vocab_size]`` Tokens with indices set to ``-100`` are ignored (masked), the loss is only computed for the tokens with labels in ``[0, ..., vocab_size]`` Its shape is [batch_size, sequence_length].
+
+        Returns:
+            tuple: Returns tuple (`masked_lm_loss`, `prediction_scores`, ``sequence_output`).
+
+            With the fields:
+
+            - `masked_lm_loss` (Tensor):
+                The masked lm loss. Its data type should be float32 and its shape is [1].
+
+            - `prediction_scores` (Tensor):
+                The scores of masked token prediction. Its data type should be float32. Its shape is [batch_size, sequence_length, vocab_size].
+
+            - `sequence_output` (Tensor):
+                Sequence of hidden-states at the last layer of the model. Its data type should be float32. Its shape is `[batch_size, sequence_length, hidden_size]`.
+
+
+        """
+        sequence_output, _ = self.bigbird(
+            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        prediction_scores = self.lm_head(sequence_output)
+
+        masked_lm_loss = None
+
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            masked_lm_loss = loss_fct(
+                prediction_scores.reshape(shape=(
+                    -1, self.bigbird.config["vocab_size"])),
+                labels.reshape(shape=(-1, )), )
+            return masked_lm_loss, prediction_scores, sequence_output
+
+        return prediction_scores, sequence_output
+
+
+class BigBirdForCausalLM(BigBirdPretrainedModel):
+    """
+    BigBird Model for casual language model task.
+
+    Args:
+        BigBird (:class:`BigBirdModel`):
+            An instance of :class:`BigBirdModel`.
+
+    """
+
+    def __init__(self, bigbird):
+        super(BigBirdForMaskedLM, self).__init__()
+        self.bigbird = bigbird
+        self.lm_head = BigBirdLMHead(
+            self.bigbird.config["hidden_size"],
+            self.bigbird.config["vocab_size"],
+            self.bigbird.config["hidden_act"],
+            self.bigbird.embeddings.word_embeddings.weight,
+            self.bigbird.config["layer_norm_eps"], )
+
+        self.apply(self.init_weights)
+
+    def forward(
+            self,
+            input_ids,
+            position_ids=None,
+            attention_mask=None,
+            labels=None, ):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`BigBirdModel`.
+            position_ids (Tensor, optional):
+                See :class:`BigBirdModel`.
+            attention_mask (Tensor, optional):
+                See :class:`BigBirdModel`.
+            labels (Tensor, optional):
+                The Labels for computing the masked language modeling loss. Indices should be in ``[-100, 0, ..., vocab_size]`` Tokens with indices set to ``-100`` are ignored (masked), the loss is only computed for the tokens with labels in ``[0, ..., vocab_size]`` Its shape is [batch_size, sequence_length].
+
+        Returns:
+            tuple: Returns tuple (`masked_lm_loss`, `prediction_scores`, ``sequence_output`).
+
+            With the fields:
+
+            - `masked_lm_loss` (Tensor):
+                The masked lm loss. Its data type should be float32 and its shape is [1].
+
+            - `prediction_scores` (Tensor):
+                The scores of masked token prediction. Its data type should be float32. Its shape is [batch_size, sequence_length, vocab_size].
+
+            - `sequence_output` (Tensor):
+                Sequence of hidden-states at the last layer of the model. Its data type should be float32. Its shape is `[batch_size, sequence_length, hidden_size]`.
+
+
+        """
+        sequence_output, _ = self.bigbird(
+            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        prediction_scores = self.lm_head(sequence_output)
+
+        lm_loss = None
+        if labels is not None:
+            # we are doing next-token prediction; shift prediction scores and input ids by one
+            shifted_prediction_scores = prediction_scores[:, :-1, :]
+            labels = labels[:, 1:]
+            loss_fct = nn.CrossEntropyLoss()
+            lm_loss = loss_fct(
+                shifted_prediction_scores.view(-1, self.config.vocab_size),
+                labels.view(-1))
+
+            return lm_loss, prediction_scores, sequence_output
+
+        return prediction_scores, sequence_output
