@@ -12,18 +12,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
+
 import paddle
 import paddle.nn as nn
+import paddle.nn.functional as F
 
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'RobertaModel',
-    'RobertaPretrainedModel',
-    'RobertaForSequenceClassification',
-    'RobertaForTokenClassification',
-    'RobertaForQuestionAnswering',
+    'RobertaModel', 'RobertaPretrainedModel',
+    'RobertaForSequenceClassification', 'RobertaForTokenClassification',
+    'RobertaForQuestionAnswering', 'RobertaForMultipleChoice',
+    'RobertaForMaskedLM', 'RobertaForCausalLM'
 ]
+
+
+def mish(x):
+    return x * F.tanh(F.softplus(x))
+
+
+def linear_act(x):
+    return x
+
+
+def swish(x):
+    return x * F.sigmoid(x)
+
+
+def gelu_new(x):
+    """
+    Implementation of the GELU activation function currently in Google BERT repo (identical to OpenAI GPT). Also see
+    the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
+    """
+    return 0.5 * x * (1.0 + paddle.tanh(
+        math.sqrt(2.0 / math.pi) * (x + 0.044715 * paddle.pow(x, 3.0))))
+
+
+ACT2FN = {
+    "relu": F.relu,
+    "gelu": F.gelu,
+    "gelu_new": gelu_new,
+    "tanh": F.tanh,
+    "sigmoid": F.sigmoid,
+    "mish": mish,
+    "linear": linear_act,
+    "swish": swish,
+}
 
 
 class RobertaEmbeddings(nn.Layer):
@@ -150,6 +185,104 @@ class RobertaPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0
         },
+        "roberta-base": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 514,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 1,
+            "vocab_size": 50265,
+            "pad_token_id": 1
+        },
+        "roberta-large": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 1024,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 514,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 1,
+            "vocab_size": 50265,
+            "pad_token_id": 1
+        },
+        "roberta-base-squad2": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 514,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 1,
+            "vocab_size": 50265,
+            "pad_token_id": 1
+        },
+        "roberta-base-finetuned-chinanews-chinese": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 1,
+            "vocab_size": 21128,
+            "pad_token_id": 0
+        },
+        "tiny-distilroberta-base": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 2,
+            "initializer_range": 0.02,
+            "intermediate_size": 2,
+            "max_position_embeddings": 514,
+            "num_attention_heads": 2,
+            "num_hidden_layers": 2,
+            "type_vocab_size": 1,
+            "vocab_size": 50265,
+            "pad_token_id": 1
+        },
+        "roberta-base-finetuned-cluener2020-chinese": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 1,
+            "vocab_size": 21128,
+            "pad_token_id": 0
+        },
+        "roberta-base-chinese-extractive-qa": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 1,
+            "vocab_size": 21128,
+            "pad_token_id": 0
+        }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -162,6 +295,17 @@ class RobertaPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbt3/rbt3_chn_large.pdparams",
             "rbtl3":
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
+            "roberta-base": "roberta-base.pdparams",  # 从百度网盘下载
+            "roberta-large": "roberta-large.pdparams",  # 从百度网盘下载
+            "roberta-base-squad2": "roberta-base-squad2.pdparams",  # 从百度网盘下载
+            "roberta-base-finetuned-chinanews-chinese":
+            "roberta-base-finetuned-chinanews-chinese.pdparams",  # 从百度网盘下载
+            "tiny-distilroberta-base":
+            "tiny-distilroberta-base.pdparams",  # 从百度网盘下载
+            "roberta-base-finetuned-cluener2020-chinese":
+            "roberta-base-finetuned-cluener2020-chinese.pdparams",  # 从百度网盘下载
+            "roberta-base-chinese-extractive-qa":
+            "roberta-base-chinese-extractive-qa.pdparams",  # 从百度网盘下载
         }
     }
     base_model_prefix = "roberta"
@@ -616,3 +760,234 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
         return logits
+
+
+class RobertaForMultipleChoice(RobertaPretrainedModel):
+    """
+    Roberta Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g.
+    for Named-Entity-Recognition (NER) tasks.
+    Args:
+        roberta (:class:`RobertaModel`):
+            An instance of RobertaModel.
+        num_choices (int, optional):
+            The number of choices. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of ROBERTA.
+            If None, use the same value as `hidden_dropout_prob` of `RobertaModel`
+            instance `roberta`. Defaults to None.
+    """
+
+    def __init__(self, roberta, num_choices=2, dropout=None):
+        super(RobertaForMultipleChoice, self).__init__()
+        self.roberta = roberta  # allow roberta to be config
+        self.num_choices = num_choices
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.roberta.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.roberta.config["hidden_size"], 1)
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, position_ids=None, attention_mask=None):
+        r"""
+        The RobertaForMultipleChoice forward method, overrides the __call__() special method.
+        Args:
+            input_ids (Tensor):
+                See :class:`RobertaModel` and shape as [batch_size, num_choice, sequence_length].
+            position_ids(Tensor, optional):
+                See :class:`RobertaModel` and shape as [batch_size, num_choice, sequence_length].
+            attention_mask (list, optional):
+                See :class:`RobertaModel` and shape as [batch_size, num_choice, sequence_length].
+
+        Returns:
+            Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
+            Shape as `[batch_size, num_choice]` and dtype as float32.
+        Example:
+            .. code-block::
+                import paddle
+                from paddlenlp.transformers import RobertaForMultipleChoice, RobertaTokenizer
+
+                tokenizer = RobertaTokenizer.from_pretrained('roberta-base-uncased')
+                model = RobertaForTokenClassification.from_pretrained('roberta-base-uncased')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+
+                outputs = model(**inputs)
+        """
+        # input_ids: [bs, num_choice, seq_l]
+        input_ids = input_ids.reshape(shape=(
+            -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+
+        if position_ids is not None:
+            position_ids = position_ids.reshape(shape=(-1,
+                                                       position_ids.shape[-1]))
+
+        if attention_mask is not None:
+            attention_mask = attention_mask.reshape(
+                shape=(-1, attention_mask.shape[-1]))
+
+        _, pooled_output = self.roberta(
+            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+
+        pooled_output = self.dropout(pooled_output)
+
+        logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
+        reshaped_logits = logits.reshape(
+            shape=(-1, self.num_choices))  # logits: (bs, num_choice)
+
+        return reshaped_logits
+
+
+class RobertaLMHead(nn.Layer):
+    """
+    Roberta Model with a `language modeling` head on top.
+    """
+
+    def __init__(self,
+                 hidden_size,
+                 vocab_size,
+                 activation="gelu",
+                 embedding_weights=None):
+        super(RobertaLMHead, self).__init__()
+        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.activation = ACT2FN[activation]
+        self.layer_norm = nn.LayerNorm(hidden_size)
+
+        self.decoder_weight = embedding_weights
+        self.decoder_bias = self.create_parameter(
+            shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
+
+    def forward(self, hidden_states):
+        hidden_states = self.dense(hidden_states)
+        hidden_states = self.activation(hidden_states)
+        hidden_states = self.layer_norm(hidden_states)
+
+        hidden_states = (paddle.matmul(
+            hidden_states, self.decoder_weight, transpose_y=True) +
+                         self.decoder_bias)
+
+        return hidden_states
+
+
+class RobertaForMaskedLM(RobertaPretrainedModel):
+    """
+    Roberta Model with pretraining tasks on top.
+    Args:
+        Roberta (:class:`RobertaModel`):
+            An instance of :class:`RobertaModel`.
+    """
+
+    def __init__(self, roberta):
+        super(RobertaForMaskedLM, self).__init__()
+        self.roberta = roberta
+        self.lm_head = RobertaLMHead(
+            self.roberta.config["hidden_size"],
+            self.roberta.config["vocab_size"],
+            self.roberta.config["hidden_act"],
+            self.roberta.embeddings.word_embeddings.weight)
+
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                position_ids=None,
+                attention_mask=None,
+                labels=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`RobertaModel`.
+            position_ids(Tensor, optional):
+                See :class:`RobertaModel`.
+            attention_mask (list, optional):
+                See :class:`RobertaModel`.
+            labels (Tensor, optional):
+                The Labels for computing the masked language modeling loss. Indices should be in ``[-100, 0, ..., vocab_size]`` Tokens with indices set to ``-100`` are ignored (masked), the loss is only computed for the tokens with labels in ``[0, ..., vocab_size]`` Its shape is [batch_size, sequence_length].
+        Returns:
+            tuple: Returns tuple (`masked_lm_loss`, `prediction_scores`, ``sequence_output`).
+            With the fields:
+            - `masked_lm_loss` (Tensor):
+                The masked lm loss. Its data type should be float32 and its shape is [1].
+            - `prediction_scores` (Tensor):
+                The scores of masked token prediction. Its data type should be float32. Its shape is [batch_size, sequence_length, vocab_size].
+            - `sequence_output` (Tensor):
+                Sequence of hidden-states at the last layer of the model. Its data type should be float32. Its shape is `[batch_size, sequence_length, hidden_size]`.
+        """
+        sequence_output, _ = self.roberta(
+            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        prediction_scores = self.lm_head(sequence_output)
+
+        masked_lm_loss = None
+
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            masked_lm_loss = loss_fct(
+                prediction_scores.reshape(shape=(
+                    -1, self.roberta.config["vocab_size"])),
+                labels.reshape(shape=(-1, )), )
+            return masked_lm_loss, prediction_scores, sequence_output
+
+        return prediction_scores, sequence_output
+
+
+class RobertaForCausalLM(RobertaPretrainedModel):
+    """
+    Roberta Model for casual language model task.
+    Args:
+        Roberta (:class:`RobertaModel`):
+            An instance of :class:`RobertaModel`.
+    """
+
+    def __init__(self, roberta):
+        super(RobertaForCausalLM, self).__init__()
+        self.roberta = roberta
+        self.lm_head = RobertaLMHead(
+            self.roberta.config["hidden_size"],
+            self.roberta.config["vocab_size"],
+            self.roberta.config["hidden_act"],
+            self.roberta.embeddings.word_embeddings.weight)
+
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                position_ids=None,
+                attention_mask=None,
+                labels=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`RobertaModel`.
+            position_ids(Tensor, optional):
+                See :class:`RobertaModel`.
+            attention_mask (list, optional):
+                See :class:`RobertaModel`.
+            labels (Tensor, optional):
+                The Labels for computing the masked language modeling loss. Indices should be in ``[-100, 0, ..., vocab_size]`` Tokens with indices set to ``-100`` are ignored (masked), the loss is only computed for the tokens with labels in ``[0, ..., vocab_size]`` Its shape is [batch_size, sequence_length].
+        Returns:
+            tuple: Returns tuple (`masked_lm_loss`, `prediction_scores`, ``sequence_output`).
+            With the fields:
+            - `masked_lm_loss` (Tensor):
+                The masked lm loss. Its data type should be float32 and its shape is [1].
+            - `prediction_scores` (Tensor):
+                The scores of masked token prediction. Its data type should be float32. Its shape is [batch_size, sequence_length, vocab_size].
+            - `sequence_output` (Tensor):
+                Sequence of hidden-states at the last layer of the model. Its data type should be float32. Its shape is `[batch_size, sequence_length, hidden_size]`.
+        """
+        sequence_output, _ = self.roberta(
+            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        prediction_scores = self.lm_head(sequence_output)
+
+        lm_loss = None
+        if labels is not None:
+            # we are doing next-token prediction; shift prediction scores and input ids by one
+            shifted_prediction_scores = prediction_scores[:, :-1, :]
+            labels = labels[:, 1:]
+            loss_fct = nn.CrossEntropyLoss()
+            lm_loss = loss_fct(
+                paddle.reshape(shifted_prediction_scores,
+                               [-1, self.roberta.config['vocab_size']]),
+                paddle.reshape(labels, [-1]))
+
+            return lm_loss, prediction_scores, sequence_output
+
+        return prediction_scores, sequence_output
