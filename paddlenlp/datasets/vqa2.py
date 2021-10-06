@@ -10,25 +10,23 @@ from . import DatasetBuilder
 __all__ = ['VQA2']
 
 class VQA2(DatasetBuilder):
-    URL_ANNO = "https://dl.fbaipublicfiles.com/mmf/data/datasets/vqa2/defaults/annotations/annotations.tar.gz"
-    MD5_ANNO = 'bb5cd1e9101f8fa78c55bd9c0ec8eaba'
+    URL_ANNO = "https://bj.bcebos.com/v1/ai-studio-online/af70d260aa8841148d136b08d5bf793d56a31024d53b416e90613ae2093e6c51?responseContentDisposition=attachment;filename=imdb.tar.gz"
+    MD5_ANNO = '0d920616e17250ded1d8032dd53d3569'
     URL_EXTRA = "https://dl.fbaipublicfiles.com/mmf/data/datasets/vqa2/defaults/extras.tar.gz"
     MD5_EXTRA = '9baaf3291221fdef49852046a500f731'
-    # URL_FEATURE = "https://dl.fbaipublicfiles.com/pythia/features/detectron_fix_100.tar.gz"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
-    # IMG_FEATURE_META_INFO = collections.namedtuple('META_INFO', ('folder'))
 
     SPLITS = {
         'train': META_INFO(
-            os.path.join('annotations', 'imdb_train2014.npy'), '6f9c4610a576bf3b672cc830f9d77dca'),
+            os.path.join('imdb', 'imdb_train2014.npy'), '6f9c4610a576bf3b672cc830f9d77dca'),
         'val': META_INFO(
-            os.path.join('annotations', 'imdb_val2014.npy'), '1ed358ccf50c783859fbb67f324a23a8'),
+            os.path.join('imdb', 'imdb_val2014.npy'), '1ed358ccf50c783859fbb67f324a23a8'),
         'trainval': META_INFO(
-            os.path.join('annotations', 'imdb_trainval2014.npy'), 'bb0eb9422e48696d3d30ab099330ab23'),
+            os.path.join('imdb', 'imdb_trainval2014.npy'), 'bb0eb9422e48696d3d30ab099330ab23'),
         'minival': META_INFO(
-            os.path.join('annotations', 'imdb_minival2014.npy'), 'dd982ed6d924724482aee42c72d324ce'),
+            os.path.join('imdb', 'imdb_minival2014.npy'), 'dd982ed6d924724482aee42c72d324ce'),
         'test': META_INFO(
-            os.path.join('annotations', 'imdb_test2015.npy'), 'a6d2814a6903ff364d07f7b7d0e379f6'),
+            os.path.join('imdb', 'imdb_test2015.npy'), 'a6d2814a6903ff364d07f7b7d0e379f6'),
     }
     
     VOCAB_INFO = META_INFO(os.path.join('extras', 'vocabs', 'answers_vqa.txt'), '971cad957919ff2cf1f5f1c70bef4d90')
@@ -40,7 +38,6 @@ class VQA2(DatasetBuilder):
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
-            # get_path_from_url(self.URL_ANNO, os.path.join(default_root, 'annotations'), self.MD5_ANNO)
             get_path_from_url(self.URL_ANNO, os.path.join(default_root), self.MD5_ANNO)
 
         # VQA vocab
