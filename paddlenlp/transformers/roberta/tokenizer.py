@@ -20,7 +20,6 @@ from paddle.utils import try_import
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer, GPTTokenizer
 from ..gpt.tokenizer import bytes_to_unicode
 
-
 __all__ = ['RobertaTokenizer', 'RobertaBPETokenizer']
 
 
@@ -322,6 +321,7 @@ class RobertaBPETokenizer(GPTTokenizer):
         "roberta-large": {},
         "sshleifer/tiny-distilroberta-base": {}
     }
+
     def __init__(
             self,
             vocab_file,
@@ -335,8 +335,8 @@ class RobertaBPETokenizer(GPTTokenizer):
             sep_token="</s>",
             unk_token="<unk>",
             pad_token="<pad>",
-            mask_token="<mask>",
-    ):
+            mask_token="<mask>", ):
+
         self._vocab_file = vocab_file
         self._merges_file = merges_file
         self.max_len = max_len if max_len is not None else int(1e12)
@@ -365,7 +365,7 @@ class RobertaBPETokenizer(GPTTokenizer):
         self.special_tokens = {}
         self.special_tokens_decoder = {}
         self.set_special_tokens(special_tokens)
-    
+
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification
@@ -376,21 +376,22 @@ class RobertaBPETokenizer(GPTTokenizer):
         if token_ids_1 is None:
             return _cls + token_ids_0 + _sep
         return _cls + token_ids_0 + _sep + _sep + token_ids_1 + _sep
-    
+
     def get_offset_mapping(self, text):
         tokens = self._tokenize(text)
         offset_mapping = []
         offset = 0
         for token in tokens:
-            if token[0]=='Ġ':
-                offset_mapping.append((offset+1, offset+len(token)))
+            if token[0] == 'Ġ':
+                offset_mapping.append((offset + 1, offset + len(token)))
             else:
-                offset_mapping.append((offset, offset+len(token)))
-            offset+=len(token)
-        
+                offset_mapping.append((offset, offset + len(token)))
+            offset += len(token)
+
         return offset_mapping
 
-    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1):
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0,
+                                                 offset_mapping_1):
         """
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
 
@@ -411,8 +412,8 @@ class RobertaBPETokenizer(GPTTokenizer):
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
-        return [(0, 0)] + offset_mapping_0 + [(0, 0)
-                                              ,(0, 0)] + offset_mapping_1 + [(0, 0)]
+        return [(0, 0)] + offset_mapping_0 + [(0, 0), (0, 0)
+                                              ] + offset_mapping_1 + [(0, 0)]
 
     def get_special_tokens_mask(self,
                                 token_ids_0,
@@ -452,7 +453,7 @@ class RobertaBPETokenizer(GPTTokenizer):
         if token_ids_1 is None:
             return len(cls + token_ids_0 + sep) * [0]
         return len(cls + token_ids_0 + sep + sep + token_ids_1 + sep) * [0]
-    
+
     def convert_tokens_to_string(self, tokens):
         text = ''.join(tokens)
         text = bytearray([self.byte_decoder[c] for c in text]).decode(
