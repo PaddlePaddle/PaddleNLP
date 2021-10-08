@@ -117,7 +117,7 @@ def parse_args():
 
 def do_predict(args):
     place = "gpu"
-    place = paddle.set_device(place)
+    paddle.set_device(place)
 
     tokenizer = BartTokenizer.from_pretrained(args.model_name_or_path)
     logger.info('Loading the model parameters, please wait...')
@@ -151,7 +151,8 @@ def do_predict(args):
         for i in range(100):
             # For warmup.
             if 50 == i:
-                paddle.fluid.core._cuda_synchronize(place)
+                # PaddlePaddle >= 2.2
+                paddle.device.cuda.synchronize()
                 start = time.perf_counter()
             finished_seq = faster_bart.generate(
                 input_ids=input_ids,
@@ -164,7 +165,7 @@ def do_predict(args):
                 diversity_rate=args.diversity_rate,
                 rel_len=args.rel_len,
                 alpha=args.alpha)
-        paddle.fluid.core._cuda_synchronize(place)
+        paddle.device.cuda.synchronize()
         logger.info("Average test time for decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))
 

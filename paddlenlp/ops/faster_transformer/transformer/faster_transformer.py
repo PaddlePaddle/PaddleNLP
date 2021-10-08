@@ -1083,7 +1083,7 @@ class FasterBART(BartPretrainedModel):
                **model_kwargs):
         max_length -= input_ids.shape[-1]
         if self._decoding_strategy in ["sampling", "greedy_search"] and (
-                top_p == 1.0 and top_k > 0):
+                abs(top_p - 1.0) < 1e-6 and top_k > 0):
             top_p = 0.0
         elif self._decoding_strategy == "sampling" and (top_p != 1.0 and
                                                         top_k == 0):

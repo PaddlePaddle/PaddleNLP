@@ -1303,7 +1303,7 @@ class InferBartDecoding(nn.Layer):
                 diversity_rate=0.0,
                 rel_len=False,
                 alpha=0.6):
-        # beam_search/beam_search_v2 shouled be corrected to beam_search_v2
+        # Beam_search/beam_search_v2 should be corrected to beam_search_v2.
         if self._decoding_strategy.startswith("beam_search"):
             memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
                 memory_seq_lens, beam_size)
@@ -1313,7 +1313,7 @@ class InferBartDecoding(nn.Layer):
             top_p = 0.0
             self._decoding_strategy = "topk_sampling"
         elif self._decoding_strategy == "sampling":
-            if top_p == 0.0 and top_k > 0:
+            if abs(top_p - 0.0) < 1e-6 and top_k > 0:
                 self._decoding_strategy = "topk_sampling"
             elif top_p != 1.0 and top_k == 0:
                 self._decoding_strategy = "topp_sampling"

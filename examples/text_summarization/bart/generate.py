@@ -59,7 +59,7 @@ def parse_args():
     )
     parser.add_argument(
         "--min_target_length",
-        default=56,
+        default=0,
         type=int,
         help="The minimum total sequence length for target text when generating. "
     )
@@ -72,7 +72,7 @@ def parse_args():
         "during ``evaluate`` and ``predict``.", )
     parser.add_argument(
         '--decode_strategy',
-        default='beam_search',
+        default='greedy_search',
         type=str,
         help='The decode strategy in generation.')
     parser.add_argument(
@@ -88,7 +88,7 @@ def parse_args():
         help='The cumulative probability for top-p sampling.')
     parser.add_argument(
         '--num_beams',
-        default=4,
+        default=1,
         type=int,
         help='The number of beams for beam search.')
     parser.add_argument(
@@ -174,7 +174,6 @@ def set_seed(args):
 @paddle.no_grad()
 def generate(args):
     paddle.set_device(args.device)
-    paddle.fluid.reader.use_pinned_memory(False)
     set_seed(args)
     tokenizer = BartTokenizer.from_pretrained(args.model_name_or_path)
     model = BartForConditionalGeneration.from_pretrained(
@@ -207,6 +206,7 @@ def generate(args):
         num_workers=0,
         collate_fn=batchify_fn,
         return_list=True)
+    data_loader.pin_memory = False
     if args.faster:
         model = FasterBART(
             model,
@@ -243,10 +243,10 @@ def generate(args):
             total_time = 0.0
 
         if args.faster:
-            if args.decode_strategy.startswith("beam_search"):
+            if args.decode_strategy == "beam_search":
                 preds = preds.numpy().transpose([1, 2, 0])
                 all_preds.extend([item[0] for item in preds])
-            elif args.decode_strategy.endswith("sampling"):
+            elif args.decode_strategy in ["greedy_search", "sampling"]:
                 preds = preds.numpy().transpose([1, 0])
                 all_preds.extend(preds)
         else:

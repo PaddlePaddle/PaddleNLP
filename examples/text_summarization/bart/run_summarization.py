@@ -67,7 +67,7 @@ def parse_args():
     )
     parser.add_argument(
         "--min_target_length",
-        default=56,
+        default=0,
         type=int,
         help="The minimum total sequence length for target text when generating. "
     )
@@ -175,7 +175,7 @@ def set_seed(args):
 
 @paddle.no_grad()
 def evaluate(model, data_loader, tokenizer, ignore_pad_token_for_loss,
-             max_target_length):
+             min_target_length, max_target_length):
     model.eval()
     all_preds = []
     all_labels = []
@@ -183,7 +183,10 @@ def evaluate(model, data_loader, tokenizer, ignore_pad_token_for_loss,
     for batch in tqdm(data_loader, total=len(data_loader), desc="Eval step"):
         input_ids, _, _, labels = batch
         preds = model.generate(
-            input_ids, max_length=max_target_length, use_cache=True)[0]
+            input_ids=input_ids,
+            min_length=min_target_length,
+            max_length=max_target_length,
+            use_cache=True)[0]
         all_preds.extend(preds.numpy())
         all_labels.extend(labels.numpy())
     rouge_result, decoded_preds = compute_metrics(
