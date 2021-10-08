@@ -206,7 +206,7 @@ class ErniePretrainedModel(PretrainedModel):
 @register_base_model
 class ErnieModel(ErniePretrainedModel):
     r"""
-    The bare ERNIE Model transformer outputting raw hidden-states without any specific head on top.
+    The bare ERNIE Model transformer outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -216,43 +216,48 @@ class ErnieModel(ErniePretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-
         vocab_size (int):
-            Vocabulary size of the ERNIE model. Also is the vocab size of token embedding matrix.
+            Vocabulary size of `inputs_ids` in `ErnieModel`. Also is the vocab size of token embedding matrix.
+            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `ErnieModel`.
         hidden_size (int, optional):
-            Dimension of the encoder layers and the pooler layer. Defaults to ``768``.
+            Dimensionality of the embedding layer, encoder layers and pooler layer. Defaults to `768`.
         num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to ``12``.
+            Number of hidden layers in the Transformer encoder. Defaults to `12`.
         num_attention_heads (int, optional):
             Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to ``12``.
+            Defaults to `12`.
         intermediate_size (int, optional):
-            Dimension of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
-            Defaults to ``3072``.
+            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
+            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
+            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
+            Defaults to `3072`.
         hidden_act (str, optional):
             The non-linear activation function in the feed-forward layer.
             ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to ``"gelu"``.
+            are supported. Defaults to `"gelu"`.
         hidden_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to ``0.1``.
+            Defaults to `0.1`.
         attention_probs_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the pooler.
-            Defaults to ``0.1``.
+            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
+            Defaults to `0.1`.
         max_position_embeddings (int, optional):
-            The max position index of an input sequence. Defaults to ``512``.
+            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
+            sequence. Defaults to `512`.
         type_vocab_size (int, optional):
-            The vocabulary size of the `token_type_ids` passed when calling `~transformers.ErnieModel`.
-            Defaults to ``2``.
+            The vocabulary size of the `token_type_ids`.
+            Defaults to `2`.
         initializer_range (float, optional):
-            The standard deviation of the normal initializer. Defaults to 0.02.
+            The standard deviation of the normal initializer for initializing all weight matrices.
+            Defaults to `0.02`.
             
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
                 See :meth:`ErniePretrainedModel._init_weights()` for how weights are initialized in `ErnieModel`.
 
         pad_token_id(int, optional):
-            The pad token index in the token vocabulary.
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
 
     """
 
@@ -302,42 +307,47 @@ class ErnieModel(ErniePretrainedModel):
                 numerical representations of tokens that build the input sequence.
                 It's data type should be `int64` and has a shape of [batch_size, sequence_length].
             token_type_ids (Tensor, optional):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
 
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
 
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-                Defaults to None, which means no segment embeddings is added to token embeddings.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
             position_ids (Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                max_position_embeddings - 1]``.
+                Shape as `[batch_size, num_tokens]` and dtype as int64. Defaults to `None`.
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
-                Defaults to `None`.
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
+                [batch_size, num_attention_heads, sequence_length, sequence_length].
+                We use whole-word-mask in ERNIE, so the whole word will have the same value. For example, "使用" as a word,
+                "使" and "用" will have the same value.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
 
         Returns:
-            A tuple of shape (``sequence_output``, ``pooled_output``).
+            tuple: Returns tuple (``sequence_output``, ``pooled_output``).
 
             With the fields:
-            - sequence_output (Tensor):
+
+            - `sequence_output` (Tensor):
                 Sequence of hidden-states at the last layer of the model.
-                It's data type should be `float` and has a shape of `(batch_size, seq_lens, hidden_size)`.
-                ``seq_lens`` corresponds to the length of input sequence.
-            - pooled_output (Tensor):
-                A Tensor of the first token representation.
-                It's data type should be `float` and has a shape of `(batch_size, hidden_size]`.
+                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
+
+            - `pooled_output` (Tensor):
+                The output of first token (`[CLS]`) in sequence.
                 We "pool" the model by simply taking the hidden state corresponding to the first token.
+                Its data type should be float32 and its shape is [batch_size, hidden_size].
 
         Example:
             .. code-block::
@@ -348,8 +358,8 @@ class ErnieModel(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieModel.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor(v) for (k, v) in inputs.items()}
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 sequence_output, pooled_output = model(**inputs)
 
         """
@@ -370,7 +380,8 @@ class ErnieModel(ErniePretrainedModel):
 
 class ErnieForSequenceClassification(ErniePretrainedModel):
     r"""
-    Model for sentence (pair) classification task with ERNIE.
+    Ernie Model with a linear layer on top of the output layer,
+    designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
         ernie (ErnieModel): 
@@ -401,39 +412,17 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                See :class:`ErnieModel`.
             token_type_ids (Tensor, optional):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
-
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
-
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-                Defaults to None, which means no segment embeddings is added to token embeddings.
+                See :class:`ErnieModel`.
             position_ids (Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
-                Defaults to `None`.
-
+                See :class:`ErnieModel`.
 
         Returns:
-            logits (Tensor):
-                A Tensor of the input text classification logits.
-                Shape as `(batch_size, num_classes)` and dtype as `float`.
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Shape as `[batch_size, num_classes]` and dtype as float32.
 
         Example:
             .. code-block::
@@ -444,7 +433,7 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
 
@@ -462,8 +451,9 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
 
 class ErnieForQuestionAnswering(ErniePretrainedModel):
     """
-    Model for Question and Answering task with ERNIE.
-
+    Ernie Model with a linear layer on top of the hidden-states
+    output to compute `span_start_logits` and `span_end_logits`,
+    designed for question-answering tasks like SQuAD.
 
     Args:
         ernie (`ErnieModel`): 
@@ -484,41 +474,27 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                See :class:`ErnieModel`.
             token_type_ids (Tensor, optional):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
-
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
-
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-                Defaults to None, which means no segment embeddings is added to token embeddings.
+                See :class:`ErnieModel`.
             position_ids (Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
-                Defaults to `None`.
+                See :class:`ErnieModel`.
 
 
         Returns:
-            A tuple of shape (``start_logits``, ``end_logits``).
+            tuple: Returns tuple (`start_logits`, `end_logits`).
 
             With the fields:
-            - start_logits(Tensor): The logits of start position of prediction answer.
-            - end_logits(Tensor): The logits of end position of prediction answer.
+
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
 
         Example:
             .. code-block::
@@ -529,7 +505,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
@@ -549,15 +525,14 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
 
 class ErnieForTokenClassification(ErniePretrainedModel):
     r"""
-    ERNIE Model transformer with a sequence classification/regression head on top 
-    (a linear layer on top of the pooledoutput) e.g. for GLUE tasks.
-
+    ERNIE Model with a linear layer on top of the hidden-states output layer,
+    designed for token classification tasks like NER tasks.
 
     Args:
         ernie (`ErnieModel`): 
             An instance of `ErnieModel`.
         num_classes (int, optional): 
-            The number of classes. Default to `2`.
+            The number of classes. Defaults to `2`.
         dropout (float, optional): 
             The dropout probability for output of ERNIE. 
             If None, use the same value as `hidden_dropout_prob` 
@@ -582,39 +557,17 @@ class ErnieForTokenClassification(ErniePretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                See :class:`ErnieModel`.
             token_type_ids (Tensor, optional):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
-
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
-
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-                Defaults to None, which means no segment embeddings is added to token embeddings.
+                See :class:`ErnieModel`.
             position_ids (Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
-                Defaults to `None`.
-
+                See :class:`ErnieModel`.
 
         Returns:
-            logits (Tensor):
-                A Tensor of the input text classification logits, shape as (batch_size, seq_lens, `num_classes`).
-                seq_lens mean the number of tokens of the input sequence.
+            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
 
         Example:
             .. code-block::
@@ -625,7 +578,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
 
-                inputs = tokenizer("这是个测试样例")
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
@@ -642,7 +595,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
 
 class ErnieLMPredictionHead(nn.Layer):
     r"""
-    Bert Model with a `language modeling` head on top.
+    Ernie Model with a `language modeling` head on top.
     """
 
     def __init__(
@@ -704,7 +657,7 @@ class ErniePretrainingHeads(nn.Layer):
 
 class ErnieForPretraining(ErniePretrainedModel):
     r"""
-    Bert Model with two heads on top as done during the pretraining: 
+    Ernie Model with two heads on top as done during the pretraining:
     a `masked language modeling` head and a `next sentence prediction (classification)` head.
 
     """
@@ -732,54 +685,27 @@ class ErnieForPretraining(ErniePretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                See :class:`ErnieModel`.
             token_type_ids (Tensor, optional):
-                Segment token indices to indicate first and second portions of the inputs.
-                Indices can be either 0 or 1:
-
-                - 0 corresponds to a **sentence A** token,
-                - 1 corresponds to a **sentence B** token.
-
-                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-                Defaults to None, which means no segment embeddings is added to token embeddings.
+                See :class:`ErnieModel`.
             position_ids (Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                config.max_position_embeddings - 1]``.
-                Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as `int32` or `int64`.
+                See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
-                Defaults to `None`.
-
+                See :class:`ErnieModel`.
 
         Returns:
-            A tuple of shape (``prediction_scores``, ``seq_relationship_score``).
+            tuple: Returns tuple (``prediction_scores``, ``seq_relationship_score``).
 
             With the fields:
-            - prediction_scores(Tensor): The scores of prediction on masked token.
-            - seq_relationship_score(Tensor): The scores of next sentence prediction.
 
-        Example:
-            .. code-block::
+            - `prediction_scores` (Tensor):
+                The scores of masked token prediction. Its data type should be float32.
+                If `masked_positions` is None, its shape is [batch_size, sequence_length, vocab_size].
+                Otherwise, its shape is [batch_size, mask_token_num, vocab_size].
 
-                import paddle
-                from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
-
-                tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
-                model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
-
-                inputs = tokenizer("这是个测试样例")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                logits = model(**inputs)
+            - `seq_relationship_score` (Tensor):
+                The scores of next sentence prediction.
+                Its data type should be float32 and its shape is [batch_size, 2].
 
         """
         with paddle.static.amp.fp16_guard():
@@ -796,7 +722,7 @@ class ErnieForPretraining(ErniePretrainedModel):
 
 class ErniePretrainingCriterion(paddle.nn.Layer):
     r"""
-    The loss output of Bert Model during the pretraining: 
+    The loss output of Ernie Model during the pretraining:
     a `masked language modeling` head and a `next sentence prediction (classification)` head.
 
     """
@@ -807,6 +733,30 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
 
     def forward(self, prediction_scores, seq_relationship_score,
                 masked_lm_labels, next_sentence_labels):
+        """
+        Args:
+            prediction_scores(Tensor):
+                The scores of masked token prediction. Its data type should be float32.
+                If `masked_positions` is None, its shape is [batch_size, sequence_length, vocab_size].
+                Otherwise, its shape is [batch_size, mask_token_num, vocab_size]
+            seq_relationship_score(Tensor):
+                The scores of next sentence prediction. Its data type should be float32 and
+                its shape is [batch_size, 2]
+            masked_lm_labels(Tensor):
+                The labels of the masked language modeling, its dimensionality is equal to `prediction_scores`.
+                Its data type should be int64. If `masked_positions` is None, its shape is [batch_size, sequence_length, 1].
+                Otherwise, its shape is [batch_size, mask_token_num, 1]
+            next_sentence_labels(Tensor):
+                The labels of the next sentence prediction task, the dimensionality of `next_sentence_labels`
+                is equal to `seq_relation_labels`. Its data type should be int64 and
+                its shape is [batch_size, 1]
+
+        Returns:
+            Tensor: The pretraining loss, equals to the sum of `masked_lm_loss` plus the mean of `next_sentence_loss`.
+            Its data type should be float32 and its shape is [1].
+
+        """
+
         with paddle.static.amp.fp16_guard():
             masked_lm_loss = F.cross_entropy(
                 prediction_scores,

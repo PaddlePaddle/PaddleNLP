@@ -113,8 +113,8 @@ def do_train():
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
     # If you wanna use bert/roberta/electra pretrained model,
-    # model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_class=2)
-    # model = ppnlp.transformers.RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext', num_class=2)
+    # model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_classes=2)
+    # model = ppnlp.transformers.RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext', num_classes=2)
     # model = ppnlp.transformers.ElectraForSequenceClassification.from_pretrained('chinese-electra-small', num_classes=2)
     model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
         'ernie-tiny', num_classes=len(train_ds.label_list))
