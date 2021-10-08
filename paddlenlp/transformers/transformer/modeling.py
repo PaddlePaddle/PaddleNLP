@@ -232,12 +232,12 @@ class CrossEntropyCriterion(nn.Layer):
                     The average loss of current batch whose data type can be float32, float64.
                     The relation between `sum_cost` and `avg_cost` can be described as:
 
-                    .. math:
+                    .. math::
 
                         avg_cost = sum_cost / token_num
 
                 - `token_num` (Tensor):
-                    The number of tokens of current batch. 
+                    The number of tokens of current batch. Its data type can be float32, float64.
 
         Example:
             .. code-block::
