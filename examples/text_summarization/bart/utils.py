@@ -25,7 +25,9 @@ def convert_example(example,
                     max_target_length,
                     ignore_pad_token_for_loss=True,
                     is_train=True):
-    """convert a example into necessary features"""
+    """
+    Convert a example into necessary features.
+    """
     inputs = example[text_column]
     targets = example[summary_column]
     labels = tokenizer(
@@ -74,7 +76,7 @@ def compute_metrics(preds, labels, tokenizer, ignore_pad_token_for_loss=True):
         }
         return result
 
-    def postprocess_text(preds, labels):
+    def post_process_text(preds, labels):
         preds = [pred.strip() for pred in preds]
         labels = [label.strip() for label in labels]
 
@@ -113,7 +115,7 @@ def compute_metrics(preds, labels, tokenizer, ignore_pad_token_for_loss=True):
                                     tokenizer.eos_token_id)
         decoded_preds.append(tokenizer.convert_ids_to_string(pred_id))
         decoded_labels.append(tokenizer.convert_ids_to_string(label_id))
-    decoded_preds, decoded_labels = postprocess_text(decoded_preds,
-                                                     decoded_labels)
-    result = compute_rouge(decoded_preds, decoded_labels)
-    return result, decoded_preds
+    decoded_preds, decoded_labels = post_process_text(decoded_preds,
+                                                      decoded_labels)
+    rouge_result = compute_rouge(decoded_preds, decoded_labels)
+    return rouge_result, decoded_preds

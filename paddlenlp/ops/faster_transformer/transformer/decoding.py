@@ -1297,25 +1297,25 @@ class InferBartDecoding(nn.Layer):
                 enc_output,
                 memory_seq_lens,
                 beam_size=4,
-                topk=1,
-                topp=0.0,
+                top_k=1,
+                top_p=0.0,
                 max_out_len=256,
                 diversity_rate=0.0,
                 rel_len=False,
                 alpha=0.6):
-        # beam_search/beam_search_v2/greedy_search shouled be corrected to beam_search_v2
+        # beam_search/beam_search_v2 shouled be corrected to beam_search_v2
         if self._decoding_strategy.startswith("beam_search"):
             memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
                 memory_seq_lens, beam_size)
             self._decoding_strategy = "beam_search_v2"
         elif self._decoding_strategy == "greedy_search":
-            topk = 1
-            topp = 0.0
+            top_k = 1
+            top_p = 0.0
             self._decoding_strategy = "topk_sampling"
         elif self._decoding_strategy == "sampling":
-            if topp == 0.0 and topk > 0:
+            if top_p == 0.0 and top_k > 0:
                 self._decoding_strategy = "topk_sampling"
-            elif topp != 1.0 and topk == 0:
+            elif top_p != 1.0 and top_k == 0:
                 self._decoding_strategy = "topp_sampling"
 
         output_ids, parent_ids, sequence_length = infer_bart_decoding(
@@ -1330,7 +1330,7 @@ class InferBartDecoding(nn.Layer):
             self.ffn_inter_weight, self.ffn_inter_bias, self.ffn_out_weight,
             self.ffn_out_bias, self.decoder_ln_weight, self.decoder_ln_bias,
             self.linear_weight, self.linear_bias, self.pos_emb,
-            self._decoding_strategy, beam_size, topk, topp, self._n_head,
+            self._decoding_strategy, beam_size, top_k, top_p, self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
             self._bos_id, self._eos_id, max_out_len, diversity_rate, rel_len,
             alpha)

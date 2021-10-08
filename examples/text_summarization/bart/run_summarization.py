@@ -186,9 +186,9 @@ def evaluate(model, data_loader, tokenizer, ignore_pad_token_for_loss,
             input_ids, max_length=max_target_length, use_cache=True)[0]
         all_preds.extend(preds.numpy())
         all_labels.extend(labels.numpy())
-    res = compute_metrics(all_preds, all_labels, tokenizer,
-                          ignore_pad_token_for_loss)
-    logger.info(res)
+    rouge_result, decoded_preds = compute_metrics(
+        all_preds, all_labels, tokenizer, ignore_pad_token_for_loss)
+    logger.info(rouge_result)
     model.train()
 
 

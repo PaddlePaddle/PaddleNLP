@@ -88,7 +88,7 @@ def parse_args():
         help='The cumulative probability for top-p sampling.')
     parser.add_argument(
         '--num_beams',
-        default=3,
+        default=4,
         type=int,
         help='The number of beams for beam search.')
     parser.add_argument(
@@ -123,7 +123,7 @@ def parse_args():
         help='The decoding lib of faster transformer. ')
     parser.add_argument(
         "--batch_size",
-        default=12,
+        default=64,
         type=int,
         help="Batch size per GPU/CPU for testing or evaluation.")
     parser.add_argument(
@@ -255,9 +255,9 @@ def generate(args):
         all_labels.extend(labels.numpy())
         start_time = time.time()
 
-    result, decoded_preds = compute_metrics(all_preds, all_labels, tokenizer,
-                                            args.ignore_pad_token_for_loss)
-    print("Rouge result: ", result)
+    rouge_result, decoded_preds = compute_metrics(
+        all_preds, all_labels, tokenizer, args.ignore_pad_token_for_loss)
+    print("Rouge result: ", rouge_result)
     with open(args.output_path, 'w', encoding='utf-8') as fout:
         for decoded_pred in decoded_preds:
             fout.write(decoded_pred + '\n')

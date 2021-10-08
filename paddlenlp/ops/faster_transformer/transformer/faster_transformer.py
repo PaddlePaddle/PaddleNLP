@@ -1090,15 +1090,15 @@ class FasterBART(BartPretrainedModel):
             top_k = 0
         else:
             raise ValueError(
-                "Only topk sampling or topp sampling are supported. " \
-                "Topk sampling and topp sampling cannot be both applied. ")
+                "Only top_k sampling or top_p sampling are supported. " \
+                "Top_k sampling and top_p sampling cannot be both applied. ")
         encoder_output = model_kwargs.pop("encoder_output")
         mem_seq_lens = model_kwargs.pop("mem_seq_lens")
         return self.forward(
             encoder_output=encoder_output,
             mem_seq_lens=mem_seq_lens,
-            topk=top_k,
-            topp=top_p,
+            top_k=top_k,
+            top_p=top_p,
             max_out_len=max_length)
 
     def forward(self,
@@ -1106,8 +1106,8 @@ class FasterBART(BartPretrainedModel):
                 encoder_output=None,
                 mem_seq_lens=None,
                 beam_size=4,
-                topk=1,
-                topp=0.0,
+                top_k=1,
+                top_p=0.0,
                 max_out_len=256,
                 diversity_rate=0.0,
                 rel_len=False,
@@ -1128,8 +1128,8 @@ class FasterBART(BartPretrainedModel):
             enc_output=encoder_output,
             memory_seq_lens=mem_seq_lens,
             beam_size=beam_size,
-            topk=topk,
-            topp=topp,
+            top_k=top_k,
+            top_p=top_p,
             max_out_len=max_out_len,
             diversity_rate=diversity_rate,
             rel_len=rel_len,

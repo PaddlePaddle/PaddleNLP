@@ -62,7 +62,7 @@ def parse_args():
         "--decoding_strategy",
         default='greedy_search',
         type=str,
-        help="The decoding strategy. Can be one of [greedy_search, beam_search, topk_sampling, topp_sampling]"
+        help="The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
     )
     parser.add_argument(
         "--beam_size",
@@ -70,13 +70,13 @@ def parse_args():
         type=int,
         help="The parameters for beam search. ")
     parser.add_argument(
-        "--topk",
+        "--top_k",
         default=2,
         type=int,
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
-        "--topp",
-        default=0.0,
+        "--top_p",
+        default=1.0,
         type=float,
         help="The probability threshold to procedure topp sampling. ")
     parser.add_argument(
@@ -158,8 +158,8 @@ def do_predict(args):
                 mem_seq_lens=mem_seq_lens,
                 max_length=args.max_out_len,
                 decode_strategy=args.decoding_strategy,
-                top_k=args.topk,
-                top_p=args.topp,
+                top_k=args.top_k,
+                top_p=args.top_p,
                 num_beams=args.beam_size,
                 diversity_rate=args.diversity_rate,
                 rel_len=args.rel_len,
