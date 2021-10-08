@@ -52,8 +52,13 @@ def convert_pytorch_checkpoint_to_paddle(pytorch_src_base_path,
                                          paddle_dump_base_path):
     for model_name in convert_model_name_list:
         model_state_url = link_template.format(model_name)
-        pytorch_checkpoint_path = get_path_from_url(
-            model_state_url, pytorch_src_base_path, None, False)
+
+        paddle_dump_path = os.path.join(paddle_dump_base_path,
+                                        model_name.split('/')[-1])
+        if not os.path.exists(paddle_dump_path):
+            os.makedirs(paddle_dump_path)
+        pytorch_checkpoint_path = get_path_from_url(model_state_url,
+                                                    paddle_dump_path)
         pytorch_state_dict = torch.load(
             pytorch_checkpoint_path, map_location="cpu")
         paddle_state_dict = OrderedDict()
@@ -77,11 +82,6 @@ def convert_pytorch_checkpoint_to_paddle(pytorch_src_base_path,
             print(f"Converting: {oldk} => {k} | is_transpose {is_transpose}")
             paddle_state_dict[k] = v.data.numpy()
         del pytorch_state_dict
-
-        paddle_dump_path = os.path.join(paddle_dump_base_path,
-                                        model_name.split('/')[-1])
-        if not os.path.exists(paddle_dump_path):
-            os.makedirs(paddle_dump_path)
 
         paddle_dump_path = os.path.join(paddle_dump_path,
                                         'model_state.pdparams')
