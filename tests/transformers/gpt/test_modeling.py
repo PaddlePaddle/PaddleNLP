@@ -36,7 +36,7 @@ def create_input_data(config, seed=None):
     return input_ids
 
 
-class TestElectraForSequenceClassification(CommonTest):
+class TestGPTForSequenceClassification(CommonTest):
     def set_input(self):
         self.config = copy.deepcopy(GPTModel.pretrained_init_configuration[
             'gpt2-medium-en'])
