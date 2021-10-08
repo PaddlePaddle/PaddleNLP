@@ -677,6 +677,20 @@ class RoFormerModel(RoFormerPretrainedModel):
 
 
 class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
+    """
+    RoFormer Model with a span classification head on top for extractive question-answering tasks like
+    SQuAD (a linear layers on top of the hidden-states output to compute `span start logits` and
+    `span end logits`).
+
+    Args:
+        roformer (:class:`RoFormerModel`):
+            An instance of RoFormerModel.
+        dropout (float, optional):
+            The dropout probability for output of RoFormer.
+            If None, use the same value as `hidden_dropout_prob` of `RoFormerModel`
+            instance `roformer`. Defaults to `None`.
+        """
+
     def __init__(self, roformer, dropout=None):
         super(RoFormerForQuestionAnswering, self).__init__()
         self.roformer = roformer  # allow roformer to be config
@@ -684,6 +698,45 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None):
+        r"""
+        The RoFormerForQuestionAnswering forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`RoFormerModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`RoFormerModel`.
+
+        Returns:
+            tuple: Returns tuple (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import RoFormerForQuestionAnswering
+                from paddlenlp.transformers import RoFormerTokenizer
+
+                tokenizer = RoFormerTokenizer.from_pretrained('roformer-chinese-base')
+                model = RoFormerForQuestionAnswering.from_pretrained('roformer-chinese-base')
+
+                inputs = tokenizer("欢迎使用百度飞桨!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                outputs = model(**inputs)
+
+                start_logits = outputs[0]
+                end_logits  =outputs[1]
+        """
         sequence_output, _ = self.roformer(
             input_ids,
             token_type_ids=token_type_ids,

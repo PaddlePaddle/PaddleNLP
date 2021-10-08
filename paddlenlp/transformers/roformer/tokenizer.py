@@ -28,7 +28,7 @@ class JiebaBasicTokenizer(BasicTokenizer):
 
     Args:
         do_lower_case (bool):
-            Whether the text strips accents and convert to lower case.
+            Whether the text strips accents and converts to lower case.
             If you use the RoFormer Pretrained model, lower is set to
             False when using the cased model, otherwise it is set to True.
             Defaults to `True`.
