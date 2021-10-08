@@ -95,7 +95,7 @@ class LacTask(Task):
         self._usage = usage
         word_dict_path = download_file(
             self._task_path, "lac_params" + os.path.sep + "word.dic",
-            URLS['lac_params'][0], URLS['lac_params'][1])
+            URLS['lac_params'][0], URLS['lac_params'][1], 'lexical_analysis')
         tag_dict_path = download_file(
             self._task_path, "lac_params" + os.path.sep + "tag.dic",
             URLS['lac_params'][0], URLS['lac_params'][1])
