@@ -155,6 +155,111 @@ class RobertaPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0
         },
+        "roberta-base": {
+            "attention_probs_dropout_prob": 0.1,
+            "layer_norm_eps": 1e-05,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 514,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "pad_token_id": 1,
+            "type_vocab_size": 1,
+            "vocab_size": 50265
+        },
+        "roberta-large": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 1024,
+            "initializer_range": 0.02,
+            "intermediate_size": 4096,
+            "max_position_embeddings": 514,
+            "num_attention_heads": 16,
+            "num_hidden_layers": 24,
+            "pad_token_id": 1,
+            "type_vocab_size": 1,
+            "layer_norm_eps": 1e-12,
+            "vocab_size": 50265
+        },
+        "deepset/roberta-base-squad2": {
+            "layer_norm_eps": 1e-12,
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 514,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "pad_token_id": 1,
+            "type_vocab_size": 1,
+            "vocab_size": 50265
+        },
+        "uer/roberta-base-finetuned-chinanews-chinese": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "layer_norm_eps": 1e-12,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "pad_token_id": 0,
+            "type_vocab_size": 2,
+            "vocab_size": 21128
+        },
+        "sshleifer/tiny-distilroberta-base": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 2,
+            "initializer_range": 0.02,
+            "intermediate_size": 2,
+            "layer_norm_eps": 1e-05,
+            "max_position_embeddings": 514,
+            "num_attention_heads": 2,
+            "num_hidden_layers": 2,
+            "pad_token_id": 1,
+            "type_vocab_size": 1,
+            "vocab_size": 50265
+        },
+        "uer/roberta-base-finetuned-cluener2020-chinese": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "layer_norm_eps": 1e-12,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "pad_token_id": 0,
+            "type_vocab_size": 2,
+            "vocab_size": 21128
+        },
+        "uer/roberta-base-chinese-extractive-qa": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "layer_norm_eps": 1e-12,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "pad_token_id": 0,
+            "type_vocab_size": 2,
+            "vocab_size": 21128
+        }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -167,6 +272,20 @@ class RobertaPretrainedModel(PretrainedModel):
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbt3/rbt3_chn_large.pdparams",
             "rbtl3":
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
+            "roberta-base":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_en_base/model_state.pdparams",
+            "roberta-large":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_en_large/model_state.pdparams",
+            "deepset/roberta-base-squad2":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/deepset_roberta_base_squad2/model_state.pdparams",
+            "uer/roberta-base-finetuned-chinanews-chinese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/uer_roberta_base_finetuned_chinanews_chinese/model_state.pdparams",
+            "sshleifer/tiny-distilroberta-base":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/sshleifer_tiny_distilroberta_base/model_state.pdparams",
+            "uer/roberta-base-finetuned-cluener2020-chinese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/uer_roberta_base_finetuned_cluener2020_chinese/model_state.pdparams",
+            "uer/roberta-base-chinese-extractive-qa":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/uer_roberta_base_chinese_extractive_qa/model_state.pdparams",
         }
     }
     base_model_prefix = "roberta"

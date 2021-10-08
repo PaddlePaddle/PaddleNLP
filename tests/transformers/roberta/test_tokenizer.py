@@ -55,7 +55,8 @@ class TestRobertaTokenizer(CpuCommonTest):
         self.set_attr()
         self.create_input_file()
         self.set_test_case()
-        self.tokenizer = RobertaTokenizer(vocab_file=self.vocab_file, do_lower_case=self.do_lower_case)
+        self.tokenizer = RobertaTokenizer(
+            vocab_file=self.vocab_file, do_lower_case=self.do_lower_case)
 
     def test_tokenize(self):
         text_array = self.tokenizer.tokenize(self.text)
@@ -189,7 +190,8 @@ class TestRobertaTokenizerFromPretrained(CpuCommonTest):
         text2 = "小孩子都看得懂"
         # test batch_encode
         expected_input_ids = [
-            101, 6821, 3221, 671, 702, 5042, 1296, 3152, 3315, 102, 2207, 2111, 2094, 6963, 4692, 2533, 2743, 102, 0, 0
+            101, 6821, 3221, 671, 702, 5042, 1296, 3152, 3315, 102, 2207, 2111,
+            2094, 6963, 4692, 2533, 2743, 102, 0, 0
         ]
         expected_token_type_ids = [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0
@@ -229,10 +231,11 @@ class TestRobertaTokenizerFromPretrained(CpuCommonTest):
         text2 = "小孩子都看得懂"
         # test batch_encode
         expected_input_ids = [
-            0, 0, 101, 6821, 3221, 671, 702, 5042, 1296, 3152, 3315, 102, 2207, 2111, 2094, 6963, 4692, 2533, 2743, 102
+            0, 0, 101, 6821, 3221, 671, 702, 5042, 1296, 3152, 3315, 102, 2207,
+            2111, 2094, 6963, 4692, 2533, 2743, 102
         ]
         expected_token_type_ids = [
-           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1
         ]
         expected_attention_mask = [
             0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
@@ -267,12 +270,38 @@ class TestRobertaBPETokenizer(CpuCommonTest):
         pass
 
     def create_input_file(self):
-        vocab = {"<s>":0, "<pad>":1, "</s>":2, 'This':3, 'Ġis':4, 'Ġa':5, 'Ġsimple':6, "ĠP":7, "addle":8,
-        "which":9, "Ġeasy":10, "Ġfor":11, "Ġchildren":12, "<unk>":13, "Ġ":14, "Ġtext":15, "ĠA":16, "ĠIs":17, "this":18, "Which":19, "<mask>":50264}
-        merge_list = ['#version: 0.2', 't h', 'i s', 'I s', 'T h', 'Ġ s', 'Ġ e', 'a s', 'Ġe as', 'i m', 'Ġs im', 'l e', 'p le', 'th is', 'Th is', 'Ġ is', 'Ġ a', 'Ġ Is', 'a d', 'ad d', 'Ġ A', 'Ġ t', 'e x', 'ex t', 'Ġt ext',
-            'Ġ P','Ġsim ple', 'add le', 'W h','w h','c h', 'i ch', 'wh ich', 'Ġ f', 'o r', 'Ġeas y', 'Ġf or', 'Ġ ch', 'l d', 'i ld','Ġch ild','e n','r en', 'Ġchild ren']
+        vocab = {
+            "<s>": 0,
+            "<pad>": 1,
+            "</s>": 2,
+            'This': 3,
+            'Ġis': 4,
+            'Ġa': 5,
+            'Ġsimple': 6,
+            "ĠP": 7,
+            "addle": 8,
+            "which": 9,
+            "Ġeasy": 10,
+            "Ġfor": 11,
+            "Ġchildren": 12,
+            "<unk>": 13,
+            "Ġ": 14,
+            "Ġtext": 15,
+            "ĠA": 16,
+            "ĠIs": 17,
+            "this": 18,
+            "Which": 19,
+            "<mask>": 50264
+        }
+        merge_list = [
+            '#version: 0.2', 't h', 'i s', 'I s', 'T h', 'Ġ s', 'Ġ e', 'a s',
+            'Ġe as', 'i m', 'Ġs im', 'l e', 'p le', 'th is', 'Th is', 'Ġ is',
+            'Ġ a', 'Ġ Is', 'a d', 'ad d', 'Ġ A', 'Ġ t', 'e x', 'ex t', 'Ġt ext',
+            'Ġ P', 'Ġsim ple', 'add le', 'W h', 'w h', 'c h', 'i ch', 'wh ich',
+            'Ġ f', 'o r', 'Ġeas y', 'Ġf or', 'Ġ ch', 'l d', 'i ld', 'Ġch ild',
+            'e n', 'r en', 'Ġchild ren'
+        ]
 
-        
         curr_dir = os.path.dirname(os.path.realpath(__file__))
         vocab_file = os.path.join(curr_dir, "vocab.json")
         merges_file = os.path.join(curr_dir, "merge.txt")
@@ -288,13 +317,16 @@ class TestRobertaBPETokenizer(CpuCommonTest):
 
     def set_test_case(self):
         self.text = "This is a simple Paddle"
-        self.expected_text_array = ['This', 'Ġis', 'Ġa', 'Ġsimple', 'ĠP', 'addle']
+        self.expected_text_array = [
+            'This', 'Ġis', 'Ġa', 'Ġsimple', 'ĠP', 'addle'
+        ]
 
     def setUp(self):
         self.set_attr()
         self.create_input_file()
         self.set_test_case()
-        self.tokenizer = RobertaBPETokenizer(vocab_file=self.vocab_file, merges_file = self.merges_file)
+        self.tokenizer = RobertaBPETokenizer(
+            vocab_file=self.vocab_file, merges_file=self.merges_file)
 
     def test_tokenize(self):
         text_array = self.tokenizer.tokenize(self.text)
@@ -395,7 +427,7 @@ class TestRobertaBPETokenizer(CpuCommonTest):
             model_path, self.tokenizer.resource_files_names['vocab_file'])
         with open(vocab_path, "r", encoding='utf-8') as fr:
             vocabs = json.load(fr)
-        for k,v in self.vocab.items():
+        for k, v in self.vocab.items():
             self.check_output_equal(vocabs[k], v)
 
     @assert_raises(RuntimeError)
@@ -418,7 +450,7 @@ class TestRobertaBPETokenizer(CpuCommonTest):
 
     @assert_raises(FileNotFoundError)
     def test_non_exist_vocab_file(self):
-        RobertaBPETokenizer("non_exist.txt",'non_merge.txt')
+        RobertaBPETokenizer("non_exist.txt", 'non_merge.txt')
 
 
 class TestRobertaBPETokenizerFromPretrained(CpuCommonTest):
@@ -429,7 +461,8 @@ class TestRobertaBPETokenizerFromPretrained(CpuCommonTest):
         text2 = "which is easy for children"
         # test batch_encode
         expected_input_ids = [
-            0, 713, 16, 10, 2007, 221, 33151, 2, 2, 5488, 16, 1365, 13, 408, 2, 1, 1, 1, 1, 1
+            0, 713, 16, 10, 2007, 221, 33151, 2, 2, 5488, 16, 1365, 13, 408, 2,
+            1, 1, 1, 1, 1
         ]
         expected_token_type_ids = [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -469,10 +502,11 @@ class TestRobertaBPETokenizerFromPretrained(CpuCommonTest):
         text2 = "which is easy for children"
         # test batch_encode
         expected_input_ids = [
-            1, 1, 1, 1, 1, 0, 713, 16, 10, 2007, 221, 33151, 2, 2, 5488, 16, 1365, 13, 408, 2
+            1, 1, 1, 1, 1, 0, 713, 16, 10, 2007, 221, 33151, 2, 2, 5488, 16,
+            1365, 13, 408, 2
         ]
         expected_token_type_ids = [
-           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         ]
         expected_attention_mask = [
             0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
@@ -501,6 +535,7 @@ class TestRobertaBPETokenizerFromPretrained(CpuCommonTest):
         self.check_output_equal(results['token_type_ids'],
                                 expected_token_type_ids)
 
+
 if __name__ == "__main__":
     unittest.main()
     # vocab = {"<s>":0, "<pad>":1, "</s>":2, 'This':3, 'Ġis':4, 'Ġa':5, 'Ġsimple':6, "ĠP":7, "addle":8,
@@ -508,7 +543,6 @@ if __name__ == "__main__":
     # merge_list = ['#version: 0.2', 't h', 'i s', 'I s', 'T h', 'Ġ s', 'Ġ e', 'a s', 'Ġe as', 'i m', 'Ġs im', 'l e', 'p le', 'th is', 'Th is', 'Ġ is', 'Ġ a', 'Ġ Is', 'a d', 'ad d', 'Ġ A', 'Ġ t', 'e x', 'ex t', 'Ġt ext',
     #     'Ġ P','Ġsim ple', 'add le', 'W h','w h','c h', 'i ch', 'wh ich', 'Ġ f', 'o r', 'Ġeas y', 'Ġf or', 'Ġ ch', 'l d', 'i ld','Ġch ild','e n','r en', 'Ġchild ren']
 
-    
     # curr_dir = os.path.dirname(os.path.realpath(__file__))
     # vocab_file = os.path.join(curr_dir, "vocab.json")
     # merge_file = os.path.join(curr_dir, "merge.txt")
@@ -542,7 +576,7 @@ if __name__ == "__main__":
     # print(truncate_pair_ids)
     # model_path="E:\deep_learning\代码\git_code\PaddleNLP\\tests\\transformers\\roberta\pretrained_models"
     # tokenizer.save_pretrained(model_path)
-    
+
     # output = tokenizer.convert_tokens_to_ids(["<s>","</s>","<mask>","<pad>", "<unk>"])
     # print(output)
 
