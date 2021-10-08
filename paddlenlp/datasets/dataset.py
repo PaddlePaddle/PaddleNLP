@@ -77,14 +77,14 @@ def load_dataset(path_or_read_func,
         path_or_read_func (str|callable): Name of the dataset processing script 
             in PaddleNLP library or a custom data reading function.
         name (str, optional): Additional name to select a more specific dataset.
-            Default to None.
-        data_files (str|list|tuple|dict, optional): Defineing the path of dataset 
-            files. If None. `splits` must be specified. Default to None. 
+            Defaults to None.
+        data_files (str|list|tuple|dict, optional): Defining the path of dataset
+            files. If None. `splits` must be specified. Defaults to None.
         splits (str|list|tuple, optional): Which split of the data to load. If None.
-            `data_files` must be specified. Default to None. 
-        lazy (bool, optional): Wheather to return `MapDataset` or an `IterDataset`.
+            `data_files` must be specified. Defaults to None.
+        lazy (bool, optional): Weather to return `MapDataset` or an `IterDataset`.
             True for `IterDataset`. False for `MapDataset`. If None, return the 
-            default type of this dataset.
+            default type of this dataset. Defaults to None.
         kwargs (dict): Other keyword arguments to be passed to the `DatasetBuilder`.
 
     Returns:
@@ -195,7 +195,7 @@ class MapDataset(Dataset):
             fn (callable): A filter function that takes a sample as input and
                 returns a boolean. Samples that return False would be discarded.
             num_workers(int, optional): Number of processes for multiprocessing. If 
-                set to 0, it doesn't use multiprocessing. Defalt: 0.
+                set to 0, it doesn't use multiprocessing. Defaults to `0`.
         """
         assert num_workers >= 0, "num_workers should be a non-negative value"
         if num_workers > 0:
@@ -241,14 +241,14 @@ class MapDataset(Dataset):
         Args:
             num_shards (int, optional): An integer representing the number of
                 data shards. If None, `num_shards` would be number of trainers.
-                Default: None
+                Defaults to `None`.
             index (int, optional): An integer representing the index of the
                 current shard. If None, `index` would be the current trainer rank
-                id. Default: None.
+                id. Defaults to `None`.
             contiguous: (bool, optional): If true, contiguous chunks of data 
                 will be select for sharding. And total number of examples will 
                 be the same. Otherwise each shard will contain all examples of 
-                dataset whose index mod `num_shards` = `index`. Default: False.
+                dataset whose index mod `num_shards` = `index`. Defaults to `False`.
         """
         if num_shards is None:
             num_shards = dist.get_world_size()
@@ -280,13 +280,13 @@ class MapDataset(Dataset):
             lazy (bool, optional): If True, transformations would be delayed and
                 performed on demand. Otherwise, transforms all samples at once. Note that 
                 if `fn` is stochastic, `lazy` should be True or you will get the same
-                result on all epochs. Defalt: False.
+                result on all epochs. Defaults to False.
             batched(bool, optional): If True, transformations would take all examples as 
                 input and return a collection of transformed examples. Note that if set 
-                True, `lazy` option would be ignored. Defalt: False.
+                True, `lazy` option would be ignored. Defaults to False.
             num_workers(int, optional): Number of processes for multiprocessing. If 
                 set to 0, it doesn't use multiprocessing. Note that if set to positive
-                value, `lazy` option would be ignored. Defalt: 0.
+                value, `lazy` option would be ignored. Defaults to 0.
         """
 
         assert num_workers >= 0, "num_workers should be a non-negative value"
@@ -416,10 +416,10 @@ class IterDataset(IterableDataset):
         Args:
             num_shards (int, optional): An integer representing the number of
                 data shards. If None, `num_shards` would be number of trainers.
-                Default: None
+                Defaults to None.
             index (int, optional): An integer representing the index of the
                 current shard. If None, `index` would be the current trainer rank
-                id. Default: None.
+                id. Defaults to None.
         """
         if num_shards is None:
             num_shards = dist.get_world_size()
