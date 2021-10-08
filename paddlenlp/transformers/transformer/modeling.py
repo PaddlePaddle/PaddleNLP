@@ -507,10 +507,9 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
                  It is same as the `initial_cell_states` returned by `initialize()`
                  for the first decoding step and `next_states` returned by
                  `step()` for the others.
-             **kwargs: Additional keyword arguments, provided by the caller
-                 `dynamic_decode`.
+             kwargs(dict, optional): Additional keyword arguments, provided by the caller `dynamic_decode`.
 
-         Returns:
+        Returns:
              tuple: Returns tuple (``beam_search_output, beam_search_state, next_inputs, finished``).
              `beam_search_state` and `next_inputs` have the same structure,
              shape and data type as the input arguments states and inputs separately.
