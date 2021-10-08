@@ -34,30 +34,16 @@ from utils import convert_example, compute_metrics
 
 summarization_name_mapping = {"cnn_dailymail": ("article", "highlights"), }
 
-MODEL_CLASSES = {"bart": (BartForConditionalGeneration, BartTokenizer), }
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
     # Required parameters
     parser.add_argument(
-        "--model_type",
-        default="bart",
-        type=str,
-        required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
-    parser.add_argument(
         "--model_name_or_path",
         default="bart-base",
         type=str,
         required=True,
-        help="Path to pre-trained model or shortcut name selected in the list: "
-        + ", ".join(
-            sum([
-                list(classes[-1].pretrained_init_configuration.keys())
-                for classes in MODEL_CLASSES.values()
-            ], [])), )
+        help="Path to pre-trained model. ")
     parser.add_argument(
         "--dataset_name",
         default="cnn_dailymail",
@@ -212,10 +198,9 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
 
     set_seed(args)
-    args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    model = model_class.from_pretrained(args.model_name_or_path)
+    tokenizer = BartTokenizer.from_pretrained(args.model_name_or_path)
+    model = BartForConditionalGeneration.from_pretrained(
+        args.model_name_or_path)
     trans_func = partial(
         convert_example,
         text_column=summarization_name_mapping[args.dataset_name][0],
