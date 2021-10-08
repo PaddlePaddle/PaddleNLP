@@ -14,10 +14,14 @@
 # limitations under the License.
 
 import os
+import json
+from paddle.utils import try_import
 
-from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
+from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer, GPTTokenizer
+from ..gpt.tokenizer import bytes_to_unicode
 
-__all__ = ['RobertaTokenizer', ]
+
+__all__ = ['RobertaTokenizer', 'RobertaBPETokenizer']
 
 
 class RobertaTokenizer(PretrainedTokenizer):
@@ -56,6 +60,12 @@ class RobertaTokenizer(PretrainedTokenizer):
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbt3/vocab.txt",
             "rbtl3":
             "https://paddlenlp.bj.bcebos.com/models/transformers/rbtl3/vocab.txt",
+            "uer/roberta-base-finetuned-chinanews-chinese":
+            "https://huggingface.co/uer/roberta-base-finetuned-chinanews-chinese/resolve/main/vocab.txt",
+            "uer/roberta-base-finetuned-cluener2020-chinese":
+            "https://huggingface.co/uer/roberta-base-finetuned-cluener2020-chinese/resolve/main/vocab.txt",
+            "uer/roberta-base-chinese-extractive-qa":
+            "https://huggingface.co/uer/roberta-base-chinese-extractive-qa/resolve/main/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -69,6 +79,15 @@ class RobertaTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "rbtl3": {
+            "do_lower_case": True
+        },
+        "uer/roberta-base-finetuned-chinanews-chinese": {
+            "do_lower_case": True
+        },
+        "uer/roberta-base-finetuned-cluener2020-chinese": {
+            "do_lower_case": True
+        },
+        "uer/roberta-base-chinese-extractive-qa": {
             "do_lower_case": True
         },
     }
@@ -275,3 +294,167 @@ class RobertaTokenizer(PretrainedTokenizer):
             return [1] + ([0] * len(token_ids_0)) + [1] + (
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
+
+
+class RobertaBPETokenizer(GPTTokenizer):
+    resource_files_names = {
+        "vocab_file": "vocab.json",
+        "merges_file": "merges.txt"
+    }  # for save_pretrained
+    gpt_vocab_link = "https://huggingface.co/roberta-base/resolve/main/vocab.json"
+    gpt_merges_link = "https://huggingface.co/roberta-base/resolve/main/merges.txt"
+    pretrained_resource_files_map = {
+        "vocab_file": {
+            "roberta-base": gpt_vocab_link,
+            "roberta-large": gpt_vocab_link,
+            "sshleifer/tiny-distilroberta-base":
+            "https://huggingface.co/sshleifer/tiny-distilroberta-base/resolve/main/vocab.json"
+        },
+        "merges_file": {
+            "roberta-base": gpt_merges_link,
+            "roberta-large": gpt_merges_link,
+            "sshleifer/tiny-distilroberta-base":
+            "https://huggingface.co/sshleifer/tiny-distilroberta-base/resolve/main/merges.txt"
+        }
+    }
+    pretrained_init_configuration = {
+        "roberta-base": {},
+        "roberta-large": {},
+        "sshleifer/tiny-distilroberta-base": {}
+    }
+    def __init__(
+            self,
+            vocab_file,
+            merges_file,
+            errors='replace',
+            max_len=None,
+            special_tokens=None,
+            bos_token="<s>",
+            eos_token="</s>",
+            cls_token="<s>",
+            sep_token="</s>",
+            unk_token="<unk>",
+            pad_token="<pad>",
+            mask_token="<mask>",
+    ):
+        self._vocab_file = vocab_file
+        self._merges_file = merges_file
+        self.max_len = max_len if max_len is not None else int(1e12)
+        self.num_command_tokens = 2
+        self.num_type_tokens = 2
+
+        with open(vocab_file, encoding="utf-8") as vocab_handle:
+            self.encoder = json.load(vocab_handle)
+        self.decoder = {v: k for k, v in self.encoder.items()}
+
+        self.num_tokens = len(self.encoder)
+        self.num_text_tokens = self.num_tokens - 1
+        self.errors = errors  # how to handle errors in decoding
+        self.byte_encoder = bytes_to_unicode()
+        self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
+        with open(merges_file, encoding="utf-8") as merges_handle:
+            bpe_data = merges_handle.read().split('\n')[1:-1]
+        bpe_merges = [tuple(merge.split()) for merge in bpe_data]
+        self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
+        self.cache = {}
+        re = try_import("regex")
+        self.pat = re.compile(
+            r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+        )
+
+        self.special_tokens = {}
+        self.special_tokens_decoder = {}
+        self.set_special_tokens(special_tokens)
+    
+    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        """
+        Build model inputs from a sequence or a pair of sequence for sequence classification
+        tasks by concatenating and adding special tokens.
+        """
+        _cls = [self.cls_token_id]
+        _sep = [self.sep_token_id]
+        if token_ids_1 is None:
+            return _cls + token_ids_0 + _sep
+        return _cls + token_ids_0 + _sep + _sep + token_ids_1 + _sep
+    
+    def get_offset_mapping(self, text):
+        tokens = self._tokenize(text)
+        offset_mapping = []
+        offset = 0
+        for token in tokens:
+            if token[0]=='Ġ':
+                offset_mapping.append((offset+1, offset+len(token)))
+            else:
+                offset_mapping.append((offset, offset+len(token)))
+            offset+=len(token)
+        
+        return offset_mapping
+
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1):
+        """
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
+        A BERT offset_mapping has the following format:
+
+        - single sequence:      ``(0,0) X (0,0)``
+        - pair of sequences:        ``(0,0) A (0,0) (0,0) B (0,0)``
+
+        Args:
+            offset_mapping_ids_0 (List[tuple]):
+                List of wordpiece offsets to which the special tokens will be added.
+            offset_mapping_ids_1 (List[tuple], optional):
+                Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
+
+        Returns:
+            List[tuple]: A list of wordpiece offsets with the appropriate offsets of special tokens.
+        """
+        if offset_mapping_1 is None:
+            return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)
+                                              ,(0, 0)] + offset_mapping_1 + [(0, 0)]
+
+    def get_special_tokens_mask(self,
+                                token_ids_0,
+                                token_ids_1=None,
+                                already_has_special_tokens=False):
+        """
+        Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
+        special tokens using the tokenizer ``encode`` methods.
+
+        Args:
+            token_ids_0 (List[int]):
+                A list of `inputs_ids` for the first sequence.
+            token_ids_1 (List[int], optinal):
+                Optional second list of IDs for sequence pairs. Defaults to None.
+            already_has_special_tokens (bool, optional): Whether or not the token list is already 
+                formatted with special tokens for the model. Defaults to None.
+
+        Returns:
+            List[int]: The list of integers either be 0 or 1: 1 for a special token, 0 for a sequence token.
+        """
+
+        if already_has_special_tokens:
+            return super().get_special_tokens_mask(
+                token_ids_0=token_ids_0,
+                token_ids_1=token_ids_1,
+                already_has_special_tokens=True)
+
+        if token_ids_1 is None:
+            return [1] + ([0] * len(token_ids_0)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)
+                                                          ) + [1]
+
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1):
+        sep = [self.sep_token_id]
+        cls = [self.cls_token_id]
+
+        if token_ids_1 is None:
+            return len(cls + token_ids_0 + sep) * [0]
+        return len(cls + token_ids_0 + sep + sep + token_ids_1 + sep) * [0]
+    
+    def convert_tokens_to_string(self, tokens):
+        text = ''.join(tokens)
+        text = bytearray([self.byte_decoder[c] for c in text]).decode(
+            'utf-8', errors=self.errors)
+        return text
