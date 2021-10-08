@@ -27,6 +27,7 @@ class JiebaBasicTokenizer(BasicTokenizer):
     Runs basic tokenization with jieba (punctuation splitting, lower casing, jieba pretokenizer etc).
 
     Args:
+        vocab (:class:`paddlenlp.data.Vocab`): An instance of paddlenlp.data.Vocab.
         do_lower_case (bool):
             Whether the text strips accents and converts to lower case.
             If you use the RoFormer Pretrained model, lower is set to
