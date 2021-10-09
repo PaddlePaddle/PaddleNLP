@@ -125,7 +125,7 @@ def parse_args():
     parser.add_argument(
         "--use_amp",
         type=distutils.util.strtobool,
-        default=False,
+        default=True,
         help="Enable mixed precision training.")
     parser.add_argument(
         "--enable_addto",
@@ -160,7 +160,7 @@ def parse_args():
 
 def select_dataset_file_for_each_worker(files, f_start_id, worker_num,
                                         worker_index):
-    """  
+    """
     Spliting the train file according to the worker index.
     """
     num_files = len(files)
@@ -176,7 +176,7 @@ def select_dataset_file_for_each_worker(files, f_start_id, worker_num,
 
 def reset_program_state_dict(model, state_dict):
     """
-    Initialize the parameter from the bert config, and set the parameter by 
+    Initialize the parameter from the bert config, and set the parameter by
     reseting the state dict."
     """
     scale = model.initializer_range if hasattr(model, "initializer_range")\
@@ -184,7 +184,10 @@ def reset_program_state_dict(model, state_dict):
 
     new_state_dict = dict()
     for n, p in state_dict.items():
-        if "layer_norm" not in p.name:
+        #if "fused_multi_head_attention" in p.name:
+        #    print(p.name)
+        #    print(p.dtype)
+        if "layer_norm" not in p.name and "fused_multi_head_attention" not in p.name and "fused_feed_forward" not in p.name:
             dtype_str = "float32"
             if str(p.dtype) == "VarType.FP64":
                 dtype_str = "float64"
@@ -224,7 +227,7 @@ def dist_optimizer(args, optimizer):
         custom_black_list = ['lookup_table',
                              'lookup_table_v2'] if args.use_pure_fp16 else None
         dist_strategy.amp_configs = {
-            'custom_white_list': ['softmax', 'layer_norm', 'gelu'],
+            'custom_white_list': ['softmax', 'layer_norm', 'gelu', 'fused_attention', 'fused_ffn'],
             'init_loss_scaling': args.scale_loss,
             'custom_black_list': custom_black_list,
             'use_pure_fp16': args.use_pure_fp16
@@ -313,7 +316,7 @@ def do_train(args):
     # All bias and LayerNorm parameters are excluded.
     decay_params = [
         p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
+        if not any(nd in n for nd in ["bias", "norm", "ffn", "feed_forward", "atten"])
     ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,

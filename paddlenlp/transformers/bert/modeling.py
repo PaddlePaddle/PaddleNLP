@@ -16,7 +16,7 @@ import paddle
 import paddle.nn as nn
 import paddle.tensor as tensor
 import paddle.nn.functional as F
-from paddle.nn import TransformerEncoder, Linear, Layer, Embedding, LayerNorm, Tanh
+from paddle.nn import FusedTransformerEncoderLayer, TransformerEncoder, Linear, Layer, Embedding, LayerNorm, Tanh
 
 from .. import PretrainedModel, register_base_model
 
