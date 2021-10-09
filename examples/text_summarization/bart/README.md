@@ -1,8 +1,8 @@
-# BART: Bidirectional and Auto-Regressive Transformers
+# BART
 
 ## 模型简介
 
-BART是一种Seq2Seq结构的降噪自编码器，通过增加噪声来破环文本然后重建原文本来训练模型。它使用一个标准的Transformer结构，可以被看作BERT（由于是双向编码器），GPT（由于是从左到右解码器），和一些其他的预训练模型结构。
+BART是一种Seq2Seq结构的降噪自编码器，通过增加噪声来破环文本然后重建原文本来训练模型。它使用一个标准的Transformer结构，可以被看作泛化的BERT（由于是双向编码器），GPT（由于是从左到右解码器），和一些其他的预训练模型结构。
 
 本项目是BART在 PaddlePaddle 2.2上开源实现的文本摘要的例子，包含了在[CNN/DailyMail](https://arxiv.org/pdf/1704.04368.pdf)数据集上微调和生成的代码。
 
@@ -181,14 +181,16 @@ python generate.py \
 
 采用预训练模型及微调模型在验证集上有如下结果：
 
-|   2model_name_or_path    |     Rouge-1     |     Rouge-2     |    Rouge-L    |
+|   model_name_or_path    |     Rouge-1     |     Rouge-2     |    Rouge-L    |
 | :----------------------: | :-------------: | :-------------: |:-------------: |
 |        bart-base         | 43.661 | 20.1563 |41.0312 |
 
 **NOTE:** `./output/bart_model_16000.pdparams`是按本项目中的超参在单卡上finetune得到的结果。
 
-### 模型加速预测
-通过该[教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/README.md#%E7%BC%96%E8%AF%91%E8%87%AA%E5%AE%9A%E4%B9%89op)编译自定义OP，编译完成后，只需在上述模型预测上添加三个参数即可：分别是`faster`，`use_fp16_decoding`，`decoding_lib`。
+### 模型高性能预测
+
+在模型预测阶段，我们提供了基于 FasterTransformer 的高性能预测的选项，可以选择性开启是否需要采用高性能预测。只需在上述模型预测上添加三个参数即可：分别是`faster`，`use_fp16_decoding`，`decoding_lib`。
+
 ```shell
 # GPU启动，预测仅支持单卡
 export CUDA_VISIBLE_DEVICES=0
@@ -212,11 +214,11 @@ python generate.py \
     --device=gpu
 ```
 其中新增参数释义如下：
-- `faster` 表示使用加速版本预测。
-- `use_fp16_decoding` 表示使用FP16精度。
-- `decoding_lib` 表示编译好的自定义OP的路径。
+- `faster` 表示是否开启高性能预测。设置 `--faster` 即表示开启。
+- `use_fp16_decoding` 表示在开启高性能预测的时候，是否使用 fp16 来完成预测过程。设置 `--use_fp16_decoding` 即表示使用 fp16 进行预测，否则使用 fp32。
+- `decoding_lib` 如果为空，将使用 JIT 自动编译所需的动态库。如果需要自行编译，可参考[自定义OP编译使用](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/README.md#%E7%BC%96%E8%AF%91%E8%87%AA%E5%AE%9A%E4%B9%89op) ，然后设定为编译出的高性能自定义 OP的动态库的位置即可。
 
-## Reference
-
-- [BART](https://arxiv.org/pdf/1910.13461.pdf)
-- [CNN/DailyMail](https://arxiv.org/pdf/1704.04368.pdf)
+## 参考文献
+1. Lewis M , Liu Y , Goyal N , et al. [BART: Denoising Sequence-to-Sequence Pre-training for Natural
+Language Generation, Translation, and Comprehension](https://aclanthology.org/2020.acl-main.703.pdf)[C]//Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics. 2020: 7871-7880.
+2. See A , Liu P J , CD  Manning. [Get To The Point: Summarization with Pointer-Generator Networks](https://aclanthology.org/P17-1099.pdf)[C]// Proceedings of the 55th Annual Meeting of the Association for Computational Linguistics. 2017: 1073–1083.

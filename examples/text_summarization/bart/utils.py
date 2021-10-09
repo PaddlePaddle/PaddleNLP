@@ -60,7 +60,7 @@ def compute_metrics(preds, labels, tokenizer, ignore_pad_token_for_loss=True):
                       rouge_types=None,
                       use_stemmer=True):
         if rouge_types is None:
-            rouge_types = ["rouge1", "rouge2", "rougeL", "rougeLsum"]
+            rouge_types = ["rouge1", "rouge2", "rougeLsum"]
 
         scorer = rouge_scorer.RougeScorer(
             rouge_types=rouge_types, use_stemmer=use_stemmer)
