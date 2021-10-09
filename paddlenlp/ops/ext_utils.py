@@ -109,7 +109,7 @@ class FasterTransformerExtension(CMakeExtension):
         self.sources = _get_files(
             os.path.
             join(self.source_dir, "faster_transformer", "src")) + _get_files(
-                os.path.join(self.source_dir, "patches", "faster_transformer"))
+                os.path.join(self.source_dir, "patches", "FasterTransformer"))
         self._std_out_handle = None
         # Env variable may not work as expected, since jit compile by `load`
         # would not re-built if source code is not update.
