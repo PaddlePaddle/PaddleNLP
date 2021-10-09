@@ -39,7 +39,7 @@ usage = r"""
            '''
            [{'text': '中国的国土面积有多大？', 'answer': '960万平方公里。'}]
            '''
-           poetry  = Taskflow("text_generation",  generation_task="poetry")
+           poetry  = Taskflow("text_generation",  generation_task="poetry_generation")
            poetry("林密不见人")
            '''
            [{'text': '林密不见人', 'answer': ',但闻人语响。'}]
@@ -123,16 +123,16 @@ class TextGenerationTask(Task):
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
         generation_task = self.kwargs[
-            'generation_task'] if 'generation_task' in self.kwargs else 'question'
+            'generation_task'] if 'generation_task' in self.kwargs else 'question_answering'
         max_seq_len = 32
 
         def select_few_shot_input(model_name, generation_task):
             pre_input = ""
-            if generation_task not in ['question', 'poetry']:
+            if generation_task not in ['question_answering', 'poetry_generation']:
                 raise ValueError(
-                    "The generation task must be question or poetry")
+                    "The generation task must be question answering or poetry generation")
             if model_name == "gpt-cpm-large-cn":
-                if generation_task == "question":
+                if generation_task == "question_answering":
                     pre_input = '问题：中国的首都是哪里？答案：北京。\n问题：{} 答案：'
                 else:
                     pre_input = '默写古诗: 大漠孤烟直，长河落日圆。\n{}'
