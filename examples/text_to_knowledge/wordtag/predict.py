@@ -38,7 +38,8 @@ def do_predict(args):
         "ner",
         model="wordtag",
         batch_size=args.batch_size,
-        max_seq_length=args.max_seq_len)
+        max_seq_length=args.max_seq_len,
+        linking=True)
     txts = ["《孤女》是2010年九州出版社出版的小说，作者是余兼羽。", "热梅茶是一道以梅子为主要原料制作的茶饮"]
     res = wordtag(txts)
     print(res)
