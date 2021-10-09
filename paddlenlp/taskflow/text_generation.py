@@ -39,7 +39,7 @@ usage = r"""
            '''
            [{'text': '中国的国土面积有多大？', 'answer': '960万平方公里。'}]
            '''
-           poetry  = Taskflow("text_generation",  generation_task="poetry_generation")
+           poetry = Taskflow("text_generation", generation_task="poetry_generation")
            poetry("林密不见人")
            '''
            [{'text': '林密不见人', 'answer': ',但闻人语响。'}]
