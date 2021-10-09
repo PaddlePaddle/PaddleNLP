@@ -1128,6 +1128,11 @@ class InferBartDecoding(nn.Layer):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 decoding_lib)
+        else:
+            logger.warning(
+                "The specified decoding_lib does not exist, and it will be built automatically."
+            )
+            load("FasterTransformer", verbose=True)
 
         super(InferBartDecoding, self).__init__()
         for arg, value in locals().items():
