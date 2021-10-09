@@ -17,7 +17,7 @@ import warnings
 import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .text2knowledge import WordTagTask
+from .named_entity_recognition import WordTagTask
 from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
 from .word_segmentation import WordSegmentationTask
@@ -30,7 +30,7 @@ from .text_correction import CSCTask
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
 TASKS = {
-    "text2knowledge": {
+    "ner": {
         "models": {
             "wordtag": {
                 "task_class": WordTagTask,

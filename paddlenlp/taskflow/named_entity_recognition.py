@@ -113,14 +113,14 @@ URLS = {
 usage = r"""
           from paddlenlp import Taskflow 
 
-          task = Taskflow("text2knowledge")
-          task("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
+          ner = Taskflow("ner")
+          ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
           '''
           [{'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5, 'termid': '时间阶段_cb_2010年'}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5, 'termid': '组织机构_eb_九州出版社'}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_出版'}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '小说_cb_小说'}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2, 'termid': '人物_cb_作者'}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
           '''
 
-          task = Taskflow("text2knowledge", batch_size=2)
-          task(["热梅茶是一道以梅子为主要原料制作的茶饮",
+          ner = Taskflow("ner", batch_size=2)
+          ner(["热梅茶是一道以梅子为主要原料制作的茶饮",
                 "《孤女》是2010年九州出版社出版的小说，作者是余兼羽",
                 "中山中环广场，位于广东省中山市东区，地址是东区兴政路1号",
                 "宫之王是一款打发休闲时光的迷宫游戏"])
