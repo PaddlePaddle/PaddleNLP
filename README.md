@@ -149,9 +149,11 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 #### 文本匹配 (Text Matching)
 | 模型    | 简介       |
 | :--------------- | ---------- |
+| [SimCSE](./examples/text_matching/simcse/):star2:  | 基于论文[SimCSE: Simple Contrastive Learning of Sentence Embeddings](https://arxiv.org/abs/2104.08821)实现无监督语义匹配模型，无需标注数据仅利用无监督数据也能训练效果出众的语义匹配模型。|
 | [SimNet](./examples/text_matching/simnet/)  | 百度自研的语义匹配框架，使用BOW、CNN、GRNN等核心网络作为表示层，在百度内搜索、推荐等多个应用场景得到广泛易用。|
 | [ERNIE](./examples/text_matching/ernie_matching/) | 基于ERNIE使用LCQMC数据完成中文句对匹配任务，提供了Pointwise和Pairwise两种类型学习方式。 |
 | [Sentence-BERT](./examples/text_matching/sentence_transformers/) | 提供基于Siamese双塔结构的文本匹配模型[Sentence-BERT](https://arxiv.org/abs/1908.1008)实现，可用于获取文本的向量化表示。
+| [SimBERT](./examples/text_matching/simbert/) | 提供[SimBERT](https://github.com/ZhuiyiTechnology/simbert)模型实现，用于获取文本的向量化表示。|
 
 #### 文本生成 (Text Generation)
 | 模型        | 简介      |
@@ -233,6 +235,14 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 | [Distill-LSTM](./examples/model_compression/distill_lstm/) | 基于[Distilling Task-Specific Knowledge from BERT into Simple Neural Networks](https://arxiv.org/abs/1903.12136)论文策略的实现，将BERT中英文分类的下游模型知识通过蒸馏的方式迁移至LSTM的小模型结构中，取得比LSTM单独训练更好的效果。 |
 
 
+#### 小样本学习 (Few-Shot Learning)
+
+| 算法   | 简介    |
+| :--------------- | ------- |
+| [PET](./examples/few_shot/pet/) | 基于[Exploiting Cloze Questions for Few Shot Text Classification and Natural Language Inference](https://arxiv.org/abs/2001.07676) 论文策略实现, 基于人工知识设计 Prompt, 将下游目标任务转换为完形填空任务来充分挖掘预训练模型中的知识, 显著提升模型效果。|
+| [P-Tuning](./examples/few_shot/p-tuning/) |基于[GPT Understands, Too](https://arxiv.org/pdf/2103.10385.pdf) 论文策略实现, 首次提出连续可学习的模板参数，在全参数空间对模板进行连续优化，大幅提升模型稳定性和模型效果。|
+| [EFL](./examples/few_shot/efl/) | 基于[Entailment as Few-Shot Learner](https://arxiv.org/abs/2104.14690) 论文策略实现，将下游目标任务转换为蕴含任务降低模型预测空间，显著提升模型效果。|
+
 ## 交互式Notebook教程
 
 - [使用Seq2Vec模块进行句子情感分类](https://aistudio.baidu.com/aistudio/projectdetail/1283423)
@@ -259,7 +269,6 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 <div align="center">
   <img src="./docs/imgs/qq.png" width="200" height="200" />
 </div>  
-
 
 
 ## 版本更新
