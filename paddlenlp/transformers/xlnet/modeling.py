@@ -26,6 +26,9 @@ __all__ = [
     "XLNetModel",
     "XLNetForSequenceClassification",
     "XLNetForTokenClassification",
+    "XLNetLMHeadModel",
+    "XLNetForMultipleChoice",
+    "XLNetForQuestionAnswering"
 ]
 
 dtype_float = paddle.get_default_dtype()
@@ -69,7 +72,7 @@ class XLNetRelativeAttention(Layer):
         self.n_head = n_head
         self.d_head = d_head
         self.d_model = d_model
-        self.scale = 1 / (d_head**0.5)
+        self.scale = 1 / (d_head ** 0.5)
 
         self.q = self.create_parameter(
             [self.d_model, self.n_head * self.d_head])
@@ -344,7 +347,7 @@ class XLNetRelativeAttention(Layer):
         outputs = (output_h, output_g)
 
         if output_attentions:
-            outputs = outputs + (attn_prob, )
+            outputs = outputs + (attn_prob,)
         return outputs
 
 
@@ -408,7 +411,6 @@ class XLNetLayer(Layer):
             target_mapping=None,
             head_mask=None,
             output_attentions=False, ):
-
         outputs = self.rel_attn(
             output_h,
             output_g,
@@ -544,15 +546,15 @@ class XLNetPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "xlnet-base-cased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-base-cased.pdparams",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-base-cased.pdparams",
             "xlnet-large-cased":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-large-cased.pdparams",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/xlnet-large-cased.pdparams",
             "chinese-xlnet-base":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-base.pdparams",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-base.pdparams",
             "chinese-xlnet-mid":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-mid.pdparams",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-mid.pdparams",
             "chinese-xlnet-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-large.pdparams",
+                "https://paddlenlp.bj.bcebos.com/models/transformers/xlnet/chinese-xlnet-large.pdparams",
         }
     }
     base_model_prefix = "transformer"
@@ -579,15 +581,15 @@ class XLNetPretrainedModel(PretrainedModel):
             layer.weight.set_value(paddle.full_like(layer.weight, 1.0))
         elif isinstance(layer, XLNetRelativeAttention):
             for param in [
-                    layer.q,
-                    layer.k,
-                    layer.v,
-                    layer.o,
-                    layer.r,
-                    layer.r_r_bias,
-                    layer.r_s_bias,
-                    layer.r_w_bias,
-                    layer.seg_embed,
+                layer.q,
+                layer.k,
+                layer.v,
+                layer.o,
+                layer.r,
+                layer.r_r_bias,
+                layer.r_s_bias,
+                layer.r_w_bias,
+                layer.seg_embed,
             ]:
                 param.set_value(
                     paddle.tensor.normal(
@@ -789,7 +791,7 @@ class XLNetModel(XLNetPretrainedModel):
     def relative_positional_encoding(self, qlen, klen, bsz=None):
         # Create relative positional encoding.
         freq_seq = paddle.arange(0, self.d_model, 2.0, dtype=dtype_float)
-        inv_freq = 1 / 10000**(freq_seq / self.d_model)
+        inv_freq = 1 / 10000 ** (freq_seq / self.d_model)
 
         if self.attn_type == "bi":
             beg, end = klen, -qlen
@@ -1089,7 +1091,7 @@ class XLNetModel(XLNetPretrainedModel):
             seg_mat = paddle.cast(
                 paddle.unsqueeze(
                     token_type_ids, axis=1) != paddle.unsqueeze(
-                        cat_ids, axis=0),
+                    cat_ids, axis=0),
                 dtype='int64')
             seg_mat = paddle.cast(
                 F.one_hot(
@@ -1125,7 +1127,7 @@ class XLNetModel(XLNetPretrainedModel):
         for i, layer_module in enumerate(self.layer):
             if use_mems:
                 # Cache new mems
-                new_mems = new_mems + (self.cache_mem(output_h, mems[i]), )
+                new_mems = new_mems + (self.cache_mem(output_h, mems[i]),)
             if return_dict:
                 hidden_states.append((output_h, output_g)
                                      if output_g is not None else output_h)
@@ -1369,7 +1371,7 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
             inputs_embeds=None,
             use_mems_train=False,
             use_mems_eval=False,
-            return_dict=False,):
+            return_dict=False, ):
         r"""
         The XLNetForTokenClassification forward method, overrides the `__call__()` special method.
 
@@ -1459,3 +1461,536 @@ class XLNetForTokenClassification(XLNetPretrainedModel):
                 "attentions": transformer_outputs["attentions"],
             }
         return logits
+
+
+class XLNetLMHeadModel(XLNetPretrainedModel):
+    """
+    XLNet Model with a language modeling head on top (linear layer with weights tied to the input embeddings).
+    Args:
+        xlnet (:class:`XLNetModel`):
+            An instance of :class:`XLNetModel`.
+    """
+
+    def __init__(self, xlnet):
+        super(XLNetLMHeadModel, self).__init__()
+        self.transformer = xlnet
+        self.decoder_weight = self.transformer.word_embedding.weight
+        self.decoder_bias = self.create_parameter(
+            shape=[self.transformer.config['vocab_size']], dtype=self.decoder_weight.dtype, is_bias=True)
+        self.init_weights()
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                attention_mask=None,
+                mems=None,
+                perm_mask=None,
+                target_mapping=None,
+                input_mask=None,
+                head_mask=None,
+                inputs_embeds=None,
+                use_mems_train=False,
+                use_mems_eval=False,
+                return_dict=False, ):
+        r"""
+        The XLNetLMHeadModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`XLNetModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`XLNetModel`.
+            attention_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            mems (Tensor, optional):
+                See :class:`XLNetModel`.
+            perm_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            target_mapping (Tensor, optional):
+                See :class:`XLNetModel`.
+            input_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            head_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`XLNetModel`.
+            use_mems_train (bool, optional):
+                See :class:`XLNetModel`.
+            use_mems_eval (bool, optional):
+                See :class:`XLNetModel`.
+            return_dict (bool, optional):
+                See :class:`XLNetModel`.
+
+        Returns:
+            Tensor or dict: Returns tensor `logits` or a dict with key-value pairs:
+             {"logits": `logits`, "mems": `mems`,
+            "hidden_states": `hidden_states`, "attentions": `attentions`}.
+
+            With the corresponding fields:
+
+            - `logits` (Tensor):
+                Classification scores before SoftMax (also called logits). It's data type should be `float32`
+                and has a shape of [batch_size, sequence_length, num_classes].
+            - `mems` (List[Tensor]):
+                See :class:`XLNetModel`.
+            - `hidden_states` (List[Tensor], optional):
+                See :class:`XLNetModel`.
+            - `attentions` (List[Tensor], optional):
+                See :class:`XLNetModel`.
+        """
+        transformer_outputs = self.transformer(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            mems=mems,
+            perm_mask=perm_mask,
+            target_mapping=target_mapping,
+            input_mask=input_mask,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            use_mems_train=use_mems_train,
+            use_mems_eval=use_mems_eval,
+            return_dict=return_dict, )
+        output = transformer_outputs if not return_dict \
+            else transformer_outputs["last_hidden_state"]
+
+        logits = paddle.matmul(output, self.decoder_weight, transpose_y=True) + self.decoder_bias
+
+        if return_dict:
+            return {
+                "logits": logits,
+                "mems": transformer_outputs["mems"],
+                "hidden_states": transformer_outputs["hidden_states"],
+                "attentions": transformer_outputs["attentions"],
+            }
+        return logits
+
+
+class XLNetForMultipleChoice(XLNetPretrainedModel):
+    """
+    XLNet Model with a multiple choice classification head on top (a linear layer on top of the pooled output and a
+    softmax) e.g. for RACE/SWAG tasks.
+    """
+    def __init__(self, xlnet):
+        super(XLNetForMultipleChoice, self).__init__()
+        self.transformer = xlnet
+        self.classifier = XLNetClassificationHead(
+            self.transformer.d_model,
+            self.transformer.config["classifier_dropout"], 1)
+        self.init_weights()
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                attention_mask=None,
+                mems=None,
+                perm_mask=None,
+                target_mapping=None,
+                input_mask=None,
+                head_mask=None,
+                inputs_embeds=None,
+                use_mems_train=False,
+                use_mems_eval=False,
+                return_dict=False, ):
+        r"""
+        The XLNetForMultipleChoice forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`XLNetModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`XLNetModel`.
+            attention_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            mems (Tensor, optional):
+                See :class:`XLNetModel`.
+            perm_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            target_mapping (Tensor, optional):
+                See :class:`XLNetModel`.
+            input_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            head_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`XLNetModel`.
+            use_mems_train (bool, optional):
+                See :class:`XLNetModel`.
+            use_mems_eval (bool, optional):
+                See :class:`XLNetModel`.
+            return_dict (bool, optional):
+                See :class:`XLNetModel`.
+        Returns:
+            tensor or dict: Returns tensor `logtis` or a dict with key-value pairs:
+             {"logits": `logits`, "mems": `mems`,
+            "hidden_states": `hidden_states`, "attentions": `attentions`}
+
+            With the corresponding fields:
+            - `logits` (Tensor):
+                Classification scores before SoftMax (also called logits). It's data type should be `float32`
+                and has a shape of [batch_size, sequence_length, num_classes].
+            - `mems` (List[Tensor]):
+                See :class:`XLNetModel`.
+            - `hidden_states` (List[Tensor], optional):
+                See :class:`XLNetModel`.
+            - `attentions` (List[Tensor], optional):
+                See :class:`XLNetModel`.
+        """
+        num_choices = input_ids.shape[1] if input_ids is not None else inputs_embeds.shape[1]
+        input_ids = input_ids.reshape(shape=(-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+
+        if attention_mask is not None:
+            attention_mask = attention_mask.reshape(shape=(-1, attention_mask.shape[-1]))
+
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids.reshape(shape=(-1, token_type_ids.shape[-1]))
+
+        if inputs_embeds is not None:
+            inputs_embeds = inputs_embeds.reshape(shape=(inputs_embeds.shape[0], -1, inputs_embeds.shape[-1]))
+
+        transformer_outputs = self.transformer(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            return_dict=return_dict, )
+        output = transformer_outputs if not return_dict \
+            else transformer_outputs["last_hidden_state"]
+        logits = self.classifier(output)
+        reshaped_logits = logits.reshape([-1, num_choices])
+        if return_dict:
+            return {
+                "logits": reshaped_logits,
+                "mems": transformer_outputs["mems"],
+                "hidden_states": transformer_outputs["hidden_states"],
+                "attentions": transformer_outputs["attentions"],
+            }
+        return reshaped_logits
+
+
+class XLNetForQuestionAnswering(XLNetPretrainedModel):
+    """
+      XLNet Model with a span classification head on top for extractive question-answering tasks like SQuAD (a linear
+      layers on top of the hidden-states output to compute `span start logits` and `span end logits`).
+    """
+    def __init__(self, xlnet, num_classes=2):
+        super(XLNetForQuestionAnswering, self).__init__()
+        self.num_classes = num_classes
+        self.transformer = xlnet
+        self.qa_outputs = nn.Linear(self.transformer.d_model, num_classes)
+
+        self.init_weights()
+
+    def forward(
+            self,
+            input_ids,
+            token_type_ids=None,
+            attention_mask=None,
+            mems=None,
+            perm_mask=None,
+            target_mapping=None,
+            input_mask=None,
+            head_mask=None,
+            inputs_embeds=None,
+            use_mems_train=False,
+            use_mems_eval=False,
+            return_dict=False, ):
+        r"""
+        The XLNetForQuestionAnswering forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`XLNetModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`XLNetModel`.
+            attention_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            mems (Tensor, optional):
+                See :class:`XLNetModel`.
+            perm_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            target_mapping (Tensor, optional):
+                See :class:`XLNetModel`.
+            input_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            head_mask (Tensor, optional):
+                See :class:`XLNetModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`XLNetModel`.
+            use_mems_train (bool, optional):
+                See :class:`XLNetModel`.
+            use_mems_eval (bool, optional):
+                See :class:`XLNetModel`.
+            return_dict (bool, optional):
+                See :class:`XLNetModel`.
+        Returns:
+            tuple or dict: Returns tensor (`start_logits`, `end_logits`) or a dict with key-value pairs:
+             {"start_logits": `start_logits`, "end_logits": `end_logits`, "mems": `mems`,
+            "hidden_states": `hidden_states`, "attentions": `attentions`}
+
+            With the corresponding fields:
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+            - `mems` (List[Tensor]):
+                See :class:`XLNetModel`.
+            - `hidden_states` (List[Tensor], optional):
+                See :class:`XLNetModel`.
+            - `attentions` (List[Tensor], optional):
+                See :class:`XLNetModel`.
+        """
+        transformer_outputs = self.transformer(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            mems=mems,
+            perm_mask=perm_mask,
+            target_mapping=target_mapping,
+            input_mask=input_mask,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            use_mems_train=use_mems_train,
+            use_mems_eval=use_mems_eval,
+            return_dict=return_dict, )
+        output = transformer_outputs if not return_dict \
+            else transformer_outputs["last_hidden_state"]
+        logits = self.classifier(output)
+        logits = paddle.transpose(logits, perm=[2, 0, 1])
+        start_logits, end_logits = paddle.unstack(x=logits, axis=0)
+        return start_logits, end_logits
+
+# class XLNetForQuestionAnswering(XLNetPretrainedModel):
+#     def __init__(self, xlnet, start_n_top, end_n_top):
+#         super(XLNetForQuestionAnswering, self).__init__()
+#         self.start_n_top = start_n_top
+#         self.end_n_top = end_n_top
+#
+#         self.transformer = xlnet
+#         self.start_logits = PoolerStartLogits(self.transformer.d_model)
+#         self.end_logits = PoolerEndLogits(self.transformer.d_model)
+#         self.answer_class = PoolerAnswerClass(self.transformer.d_model)
+#
+#     def forward(
+#             self,
+#             input_ids=None,
+#             attention_mask=None,
+#             mems=None,
+#             perm_mask=None,
+#             target_mapping=None,
+#             token_type_ids=None,
+#             input_mask=None,
+#             head_mask=None,
+#             inputs_embeds=None,
+#             start_positions=None,
+#             end_positions=None,
+#             is_impossible=None,
+#             cls_index=None,
+#             p_mask=None,
+#             use_mems_train=None,
+#             use_mems_eval=None,
+#             return_dict=None,
+#             **kwargs,  # delete when `use_cache` is removed in XLNetModel
+#     ):
+#         transformer_outputs = self.transformer(
+#             input_ids,
+#             token_type_ids=token_type_ids,
+#             attention_mask=attention_mask,
+#             mems=mems,
+#             perm_mask=perm_mask,
+#             target_mapping=target_mapping,
+#             input_mask=input_mask,
+#             head_mask=head_mask,
+#             inputs_embeds=inputs_embeds,
+#             use_mems_train=use_mems_train,
+#             use_mems_eval=use_mems_eval,
+#             return_dict=return_dict, )
+#         hidden_states = transformer_outputs if not return_dict \
+#             else transformer_outputs["last_hidden_state"]
+#         start_logits = self.start_logits(hidden_states, p_mask=p_mask)
+#
+#         if start_positions is not None and end_positions is not None:
+#             # If we are on multi-GPU, let's remove the dimension added by batch splitting
+#             # for x in (start_positions, end_positions, cls_index, is_impossible):
+#             #     if x is not None and x.dim() > 1:
+#             #         x.squeeze_(-1)
+#             # during training, compute the end logits based on the ground truth of the start position
+#             end_logits = self.end_logits(hidden_states, start_positions=start_positions, p_mask=p_mask)
+#
+#             loss_fct = nn.CrossEntropyLoss()
+#             start_loss = loss_fct(start_logits, start_positions)
+#             end_loss = loss_fct(end_logits, end_positions)
+#             total_loss = (start_loss + end_loss) / 2
+#
+#             if cls_index is not None and is_impossible is not None:
+#                 # Predict answerability from the representation of CLS and START
+#                 cls_logits = self.answer_class(hidden_states, start_positions=start_positions, cls_index=cls_index)
+#                 loss_fct_cls = nn.BCEWithLogitsLoss()
+#                 cls_loss = loss_fct_cls(cls_logits, is_impossible)
+#
+#                 # note(zhiliny): by default multiply the loss by 0.5 so that the scale is comparable to start_loss and end_loss
+#                 total_loss += cls_loss * 0.5
+#
+#             if not return_dict:
+#                 return total_loss
+#             else:
+#                 return {
+#                     "loss": total_loss,
+#                     "mems": transformer_outputs["mems"],
+#                     "hidden_states": transformer_outputs["hidden_states"],
+#                     "attentions": transformer_outputs["attentions"],
+#                 }
+#         else:
+#             # during inference, compute the end logits based on beam search
+#             bsz, slen, hsz = hidden_states.shape
+#             start_log_probs = nn.functional.softmax(start_logits, axis=-1)  # shape (bsz, slen)
+#
+#             start_top_log_probs, start_top_index = paddle.topk(
+#                 start_log_probs, self.start_n_top, axis=-1
+#             )  # shape (bsz, start_n_top)
+#             # start_top_index_exp = start_top_index.unsqueeze(-1).expand(-1, -1, hsz)  # shape (bsz, start_n_top, hsz)
+#             # start_states = torch.gather(hidden_states, -2, start_top_index_exp)  # shape (bsz, start_n_top, hsz)
+#             start_states = gather(hidden_states, start_top_index, 1)
+#             start_states = start_states.unsqueeze(1).expand([-1, slen, -1, -1])  # shape (bsz, slen, start_n_top, hsz)
+#
+#             hidden_states_expanded = hidden_states.unsqueeze(2).expand(
+#                 start_states.shape
+#             )  # shape (bsz, slen, start_n_top, hsz)
+#             p_mask = p_mask.unsqueeze(-1) if p_mask is not None else None
+#             end_logits = self.end_logits(hidden_states_expanded, start_states=start_states, p_mask=p_mask)
+#             end_log_probs = nn.functional.softmax(end_logits, axis=1)  # shape (bsz, slen, start_n_top)
+#
+#             end_top_log_probs, end_top_index = paddle.topk(
+#                 end_log_probs, self.end_n_top, axis=1
+#             )  # shape (bsz, end_n_top, start_n_top)
+#             end_top_log_probs = end_top_log_probs.view(-1, self.start_n_top * self.end_n_top)
+#             end_top_index = end_top_index.view(-1, self.start_n_top * self.end_n_top)
+#
+#             start_states = einsum(
+#                 "blh,bl->bh", hidden_states, start_log_probs
+#             )  # get the representation of START as weighted sum of hidden states
+#             cls_logits = self.answer_class(
+#                 hidden_states, start_states=start_states, cls_index=cls_index
+#             )  # Shape (batch size,): one single `cls_logits` for each sample
+#             if not return_dict:
+#                 outputs = (start_top_log_probs, start_top_index, end_top_log_probs, end_top_index, cls_logits)
+#                 return outputs
+#             else:
+#                 return {
+#                     "start_top_log_probs": start_top_log_probs,
+#                     "start_top_index": start_top_index,
+#                     "end_top_log_probs": end_top_log_probs,
+#                     "end_top_index": end_top_index,
+#                     "cls_logits": cls_logits,
+#                     "mems": transformer_outputs["mems"],
+#                     "hidden_states": transformer_outputs["hidden_states"],
+#                     "attentions": transformer_outputs["attentions"],
+#                 }
+#
+#
+# class PoolerStartLogits(nn.Layer):
+#     """
+#     Compute SQuAD start logits from sequence hidden states.
+#     """
+#
+#     def __init__(self, hidden_size):
+#         super().__init__()
+#         self.dense = nn.Linear(hidden_size, 1)
+#
+#     def forward(self, hidden_states, p_mask=None):
+#         """
+#         Returns:
+#             :obj:`torch.FloatTensor`: The start logits for SQuAD.
+#         """
+#         x = self.dense(hidden_states).squeeze(-1)
+#
+#         if p_mask is not None:
+#             x = x * (1 - p_mask) - 1e30 * p_mask
+#
+#         return x
+#
+#
+# class PoolerEndLogits(nn.Layer):
+#     """
+#     Compute SQuAD end logits from sequence hidden states.
+#     """
+#
+#     def __init__(self, hidden_size):
+#         super().__init__()
+#         self.dense_0 = nn.Linear(hidden_size * 2, hidden_size)
+#         self.activation = nn.Tanh()
+#         self.LayerNorm = nn.LayerNorm(hidden_size)
+#         self.dense_1 = nn.Linear(hidden_size, 1)
+#
+#     def forward(
+#             self,
+#             hidden_states,
+#             start_states=None,
+#             start_positions=None,
+#             p_mask=None,
+#     ):
+#         assert (
+#                 start_states is not None or start_positions is not None
+#         ), "One of start_states, start_positions should be not None"
+#         if start_positions is not None:
+#             slen, hsz = hidden_states.shape[-2:]
+#             # start_positions = start_positions.unsqueeze([1, 2]).expand([-1, -1, hsz])  # shape (bsz, 1, hsz)
+#             # start_states = hidden_states.gather(-2, start_positions)  # shape (bsz, 1, hsz)
+#             start_states = gather(hidden_states, start_positions, 1)
+#             start_states = start_states.expand([-1, slen, -1])  # shape (bsz, slen, hsz)
+#
+#         x = self.dense_0(paddle.concat([hidden_states, start_states]))
+#         x = self.activation(x)
+#         x = self.LayerNorm(x)
+#         x = self.dense_1(x).squeeze(-1)
+#
+#         if p_mask is not None:
+#             x = x * (1 - p_mask) - 1e30 * p_mask
+#         return x
+#
+#
+# class PoolerAnswerClass(nn.Layer):
+#     """
+#     Compute SQuAD 2.0 answer class from classification and start tokens hidden states.
+#     """
+#
+#     def __init__(self, hidden_size):
+#         super().__init__()
+#         self.dense_0 = nn.Linear(hidden_size * 2, hidden_size)
+#         self.activation = nn.Tanh()
+#         self.dense_1 = nn.Linear(hidden_size, 1, bias_attr=False)
+#
+#     def forward(
+#             self,
+#             hidden_states,
+#             start_states=None,
+#             start_positions=None,
+#             cls_index=None,
+#     ):
+#         # No dependency on end_feature so that we can obtain one single `cls_logits` for each sample.
+#         hsz = hidden_states.shape[-1]
+#         assert (
+#                 start_states is not None or start_positions is not None
+#         ), "One of start_states, start_positions should be not None"
+#         if start_positions is not None:
+#             # start_positions = start_positions[:, None, None].expand(-1, -1, hsz)  # shape (bsz, 1, hsz)
+#             # start_states = hidden_states.gather(-2, start_positions).squeeze(-2)  # shape (bsz, hsz)
+#             start_states = gather(hidden_states, start_positions, 1).squeeze(-2)
+#         if cls_index is not None:
+#             # cls_index = cls_index[:, None, None].expand(-1, -1, hsz)  # shape (bsz, 1, hsz)
+#             # cls_token_state = hidden_states.gather(-2, cls_index).squeeze(-2)  # shape (bsz, hsz)
+#             cls_token_state = gather(hidden_states, cls_index, 1).squeeze(-2)
+#         else:
+#             cls_token_state = hidden_states[:, -1, :]  # shape (bsz, hsz)
+#
+#         x = self.dense_0(paddle.concat([start_states, cls_token_state]))
+#         x = self.activation(x)
+#         x = self.dense_1(x).squeeze(-1)
+#
+#         return x
+#
+#
+# def gather(tensor, index, axis):
+#     return paddle.stack([paddle.index_select(x, i, axis - 1) for x, i in zip(tensor, index)], 0)
