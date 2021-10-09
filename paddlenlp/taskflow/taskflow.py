@@ -53,8 +53,7 @@ TASKS = {
             "lac": {
                 "task_class": LacTask,
                 "hidden_size": 128,
-                "emb_dim": 128,
-                "max_seq_len": 64
+                "emb_dim": 128
             }
         },
         "default": {
@@ -66,8 +65,7 @@ TASKS = {
             "lac": {
                 "task_class": WordSegmentationTask,
                 "hidden_size": 128,
-                "emb_dim": 128,
-                "max_seq_len": 64
+                "emb_dim": 128
             }
         },
         "default": {
