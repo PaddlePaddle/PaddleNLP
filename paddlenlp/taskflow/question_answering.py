@@ -27,13 +27,13 @@ from .text_generation import TextGenerationTask
 usage = r"""
            from paddlenlp import Taskflow 
 
-           question_answering = Taskflow("question_answering")
-           question_answering("中国的国土面积有多大？")
+           qa = Taskflow("question_answering")
+           qa("中国的国土面积有多大？")
            '''
            [{'text': '中国的国土面积有多大？', 'answer': '960万平方公里。'}]
            '''
 
-           question_answering(["中国国土面积有多大？", "中国的首都在哪里？"])
+           qa(["中国国土面积有多大？", "中国的首都在哪里？"])
            '''
            [{'text': '中国国土面积有多大？', 'answer': '960万平方公里。'}, {'text': '中国的首都在哪里？', 'answer': '北京。'}]
            '''

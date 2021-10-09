@@ -28,13 +28,13 @@ from .task import Task
 usage = r"""
            from paddlenlp import Taskflow 
 
-           poetry_generation = Taskflow("poetry_generation")
-           poetry_generation("林密不见人")
+           poetry = Taskflow("poetry_generation")
+           poetry("林密不见人")
            '''
            [{'text': '林密不见人', 'answer': ',但闻人语响。'}]
            '''
 
-           poetry_generation(["林密不见人", "举头邀明月"])
+           poetry(["林密不见人", "举头邀明月"])
            '''
            [{'text': '林密不见人', 'answer': ',但闻人语响。'}, {'text': '举头邀明月', 'answer': ',低头思故乡。'}]
            '''
