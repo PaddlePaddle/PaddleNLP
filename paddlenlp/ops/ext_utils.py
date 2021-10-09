@@ -129,7 +129,7 @@ class FasterTransformerExtension(CMakeExtension):
         # `GetCUDAComputeCapability` is not exposed yet, and detect CUDA/GPU
         # version in cmake file.
         # self.cmake_args += [f"-DSM={self.sm}"] if self.sm is not None else []
-        self.cmake_args = [f"-DWITH_GPT=ON"]
+        self.cmake_args += [f"-DWITH_GPT=ON"]
         try:
             super(FasterTransformerExtension,
                   self).build_with_command(ext_builder)
