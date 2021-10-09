@@ -57,4 +57,5 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
     int64_t num_layer_,
     int64_t layer_idx_,
     bool allow_gemm_test,
-    bool use_trt_kernel_);
+    bool use_trt_kernel_,
+    bool normalize_before);

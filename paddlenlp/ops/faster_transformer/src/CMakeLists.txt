@@ -146,7 +146,7 @@ if(ON_INFER)
   endif(NOT WIN32)
 
   cuda_add_library(decoding_infer_op ${decoding_op_files} ${decoder_op_files} SHARED)
-  add_dependencies(decoding_infer_op extern_${THIRD_PARTY_NAME})
+  add_dependencies(decoding_infer_op extern_${THIRD_PARTY_NAME} boost)
 
   string(REPLACE "/" ";" DEMO_PATH ${DEMO})
 
@@ -161,6 +161,7 @@ if(ON_INFER)
 
   if(WITH_GPT AND WITH_SP)
     set(DEPS ${DEPS} sentencepiece)
+    add_dependencies(decoding_infer_op extern_sentencepiece)
   endif()
 
   if(WIN32)

@@ -151,12 +151,12 @@ class AlbertTokenizer(PretrainedTokenizer):
 
         if vocab_file is not None:
             self.tokenizer = AlbertChineseTokenizer(
-                vocab_file,
+                vocab_file=vocab_file,
                 do_lower_case=False,
             )
         elif sentencepiece_model_file is not None:
             self.tokenizer = AlbertEnglishTokenizer(
-                sentencepiece_model_file,
+                sentencepiece_model_file=sentencepiece_model_file,
                 do_lower_case=True,
             )
         else:

@@ -21,9 +21,7 @@ import random
 import time
 import yaml
 import shutil
-
-os.path.expandvars('$HOME')
-os.path.expanduser('~')
+import collections
 
 import numpy as np
 import paddle
@@ -524,12 +522,25 @@ def do_train(args):
             paddle.static.load(main_program,
                                os.path.join(checkpoint_dir, "static_vars"), exe)
 
+    fetch_vars = collections.OrderedDict()
+    fetch_vars["loss"] = loss
+    fetch_vars["lm_loss"] = lm_loss
+    fetch_vars["sop_loss"] = sop_loss
+    fetch_vars["learning_rate"] = main_program.global_block().vars[
+        "learning_rate_0"]
+
+    additional_vars = collections.OrderedDict()
+    if args.use_amp:
+        for key in ["loss_scaling", "num_good_steps", "num_bad_steps"]:
+            additional_vars[key] = main_program.global_block().vars[key + "_0"]
+
     tic_train = time.time()
-    learning_rate = main_program.global_block().vars["learning_rate_0"]
     while True:
         fetchs = []
+        fetchs_keys = []
         if topo.is_last:
-            fetchs = [loss, lm_loss, sop_loss, learning_rate]
+            fetchs = list(fetch_vars.values()) + list(additional_vars.values())
+            fetchs_keys = list(fetch_vars.keys()) + list(additional_vars.keys())
 
         # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
         # many times. and start a new random dataloader.
@@ -550,21 +561,25 @@ def do_train(args):
 
             if global_step % args.logging_freq == 0:
                 if topo.is_last:
-                    loss_return, lm_loss_return, sop_loss_return, lr_return = ret
+                    res = {}
+                    for k, v in zip(fetchs_keys, ret):
+                        res[k] = v[0]
 
                     speed = args.logging_freq / (time.time() - tic_train)
-                    logger.info(
-                        "global step %d, loss: %.9f, lm_loss: %.6f, sop_loss: %.6f, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e"
-                        % (global_step, loss_return[0], lm_loss_return[0],
-                           sop_loss_return[0], speed,
-                           speed * args.global_batch_size, lr_return[0]))
-                    log_writer.add_scalar("loss", loss_return[0], global_step)
-                    log_writer.add_scalar("lm_loss", lm_loss_return[0],
-                                          global_step)
-                    log_writer.add_scalar("sop_loss", sop_loss_return[0],
-                                          global_step)
-                    log_writer.add_scalar("learning_rate", lr_return[0],
-                                          global_step)
+                    common_loginfo = "global step %d, loss: %.9f, lm_loss: %.6f, sop_loss: %.6f, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e" % (
+                        global_step, res["loss"], res["lm_loss"],
+                        res["sop_loss"], speed, speed * args.global_batch_size,
+                        res["learning_rate"])
+                    additional_loginfo = ", ".join([
+                        "{}: {}".format(k, res[k])
+                        for k in additional_vars.keys()
+                    ])
+                    if additional_loginfo:
+                        common_loginfo += ", " + additional_loginfo
+                    logger.info(common_loginfo)
+                    for k, v in res.items():
+                        log_writer.add_scalar(k, v, global_step)
+
                 tic_train = time.time()
 
             #if args.check_accuracy:

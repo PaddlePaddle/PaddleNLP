@@ -61,6 +61,7 @@ std::vector<paddle::Tensor> encoder_kernel(
     int64_t layer_idx_,
     bool allow_gemm_test,
     bool use_trt_kernel_,
+    bool normalize_before,
     cublasHandle_t cublas_handle_,
     cudaStream_t stream) {
   int batch_size_ = input.shape()[0];
@@ -148,7 +149,8 @@ std::vector<paddle::Tensor> encoder_kernel(
   //   }
 
   BertEncoderTransformer<EncoderTraits_>* encoder =
-      new BertEncoderTransformer<EncoderTraits_>(int8_mode, allow_gemm_test);
+      new BertEncoderTransformer<EncoderTraits_>(
+          int8_mode, allow_gemm_test, normalize_before);
 
   encoder->allocateBuffer(allocator_,
                           batch_size_,
@@ -199,7 +201,8 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
     int64_t num_layer,
     int64_t layer_idx,
     bool allow_gemm_test,
-    bool use_trt_kernel) {
+    bool use_trt_kernel,
+    bool normalize_before) {
   auto stream = input.stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
@@ -241,6 +244,7 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
           layer_idx,
           allow_gemm_test,
           use_trt_kernel,
+          normalize_before,
           cublas_handle_,
           stream);
 
@@ -279,6 +283,7 @@ std::vector<paddle::Tensor> EncoderCUDAForward(
           layer_idx,
           allow_gemm_test,
           use_trt_kernel,
+          normalize_before,
           cublas_handle_,
           stream);
       break;

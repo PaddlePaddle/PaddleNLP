@@ -74,6 +74,177 @@ void update_logits_v2(float* logits,
 }
 
 template <typename T>
+__global__ void add_bias_input_pre_layernorm_generalize(T* out,
+                                                        T* bias_and_input,
+                                                        const T* input,
+                                                        const T* bias,
+                                                        const T* gamma,
+                                                        const T* beta,
+                                                        int n) {
+  int tid = threadIdx.x;
+
+  __shared__ float s_mean;
+  __shared__ float s_variance;
+  float mean = 0.0f;
+  float variance = 0.0f;
+
+  float local_sum = 0.0f;
+  for (int i = tid; i < n; i += blockDim.x) {
+    float local_out = (float)(out[blockIdx.x * n + i] +
+                              input[blockIdx.x * n + i] + __ldg(&bias[i]));
+    bias_and_input[blockIdx.x * n + i] = (T)(local_out);
+    local_sum += local_out;
+  }
+
+  mean = blockReduceSum<float>(local_sum);
+
+  if (threadIdx.x == 0) s_mean = mean / n;
+  __syncthreads();
+
+  float local_var_sum = 0.0f;
+  for (int i = tid; i < n; i += blockDim.x) {
+    float diff = (float)(out[blockIdx.x * n + i] + input[blockIdx.x * n + i] +
+                         __ldg(&bias[i])) -
+                 s_mean;
+    local_var_sum += diff * diff;
+  }
+  variance = blockReduceSum<float>(local_var_sum);
+  if (threadIdx.x == 0) s_variance = rsqrtf(variance / n + 1e-6f);
+  __syncthreads();
+
+  for (int i = tid; i < n; i += blockDim.x) {
+    float local_out = (float)(out[blockIdx.x * n + i] +
+                              input[blockIdx.x * n + i] + __ldg(&bias[i]));
+    out[blockIdx.x * n + i] =
+        (T)(((local_out - s_mean) * s_variance) * (float)(__ldg(&gamma[tid])) +
+            (float)(__ldg(&beta[tid])));
+  }
+}
+
+template <typename T>
+__global__ void add_bias_input_generalize(T* out,
+                                          const T* bias_and_input,
+                                          const T* bias,
+                                          int n) {
+  const int tid = threadIdx.x;
+  for (int i = tid; i < n; i += blockDim.x) {
+    float local_out =
+        (float)(out[blockIdx.x * n + i] + bias_and_input[blockIdx.x * n + i]) +
+        bias[i];
+    out[blockIdx.x * n + i] = local_out;
+  }
+}
+
+// Encoder kernels
+template <typename T>
+__global__ void encoder_layernorm_generalize(
+    T* out, const T* input, const T* gamma, const T* beta, int n) {
+  int tid = threadIdx.x;
+
+  __shared__ float s_mean;
+  __shared__ float s_variance;
+
+  float mean = 0.0f;
+  float variance = 0.0f;
+
+  float local_sum = 0.0f;
+  for (int i = tid; i < n; i += blockDim.x) {
+    local_sum += (float)(input[blockIdx.x * n + i]);
+  }
+
+  mean = blockReduceSum<float>(local_sum);
+  if (threadIdx.x == 0) s_mean = mean / n;
+  __syncthreads();
+
+  float local_var_sum = 0.0f;
+  for (int i = tid; i < n; i += blockDim.x) {
+    float diff = (float)(__ldg(&input[blockIdx.x * n + i])) - s_mean;
+    local_var_sum += diff * diff;
+  }
+
+  variance = blockReduceSum<float>(local_var_sum);
+
+  if (threadIdx.x == 0) s_variance = rsqrtf(variance / n + 1e-6f);
+  __syncthreads();
+
+  for (int i = tid; i < n; i += blockDim.x) {
+    out[blockIdx.x * n + i] =
+        (T)((((float)input[blockIdx.x * n + i] - s_mean) * s_variance) *
+                (float)(__ldg(&gamma[i])) +
+            (float)(__ldg(&beta[i])));
+  }
+}
+
+template <typename T>
+void add_bias_input_pre_layernorm_kernelLauncher(T* out,
+                                                 T* bias_and_input,
+                                                 const T* input,
+                                                 const T* bias,
+                                                 const T* gamma,
+                                                 const T* beta,
+                                                 int m,
+                                                 int n,
+                                                 cudaStream_t stream) {
+  dim3 grid(m);
+  dim3 block(n);
+  add_bias_input_pre_layernorm_generalize<T><<<grid, block, 0, stream>>>(
+      out, bias_and_input, input, bias, gamma, beta, n);
+}
+
+template <typename T>
+void add_bias_input_kernelLauncher(T* out,
+                                   const T* bias_and_input,
+                                   const T* bias,
+                                   int m,
+                                   int n,
+                                   cudaStream_t stream) {
+  dim3 grid(m);
+  dim3 block(n);
+  add_bias_input_generalize<T><<<grid, block, 0, stream>>>(
+      out, bias_and_input, bias, n);
+}
+
+template <typename T>
+void layernorm_kernelLauncher(T* out,
+                              const T* input,
+                              const T* gamma,
+                              const T* beta,
+                              int m,
+                              int n,
+                              cudaStream_t stream) {
+  dim3 grid(m);
+  dim3 block(n);
+  encoder_layernorm_generalize<T><<<grid, block, 0, stream>>>(
+      out, input, gamma, beta, n);
+}
+
+template void add_bias_input_pre_layernorm_kernelLauncher(float* out,
+                                                          float* bias_and_input,
+                                                          const float* input,
+                                                          const float* bias,
+                                                          const float* gamma,
+                                                          const float* beta,
+                                                          int m,
+                                                          int n,
+                                                          cudaStream_t stream);
+
+template void add_bias_input_kernelLauncher(float* out,
+                                            const float* bias_and_input,
+                                            const float* bias,
+                                            int m,
+                                            int n,
+                                            cudaStream_t stream);
+
+template void layernorm_kernelLauncher(float* out,
+                                       const float* input,
+                                       const float* gamma,
+                                       const float* beta,
+                                       int m,
+                                       int n,
+                                       cudaStream_t stream);
+// End of encoder kernels
+
+template <typename T>
 __global__ void add_bias_relu_encoder(T* out, const T* bias, int m, int n) {
   for (int id = blockIdx.x * blockDim.x + threadIdx.x; id < m * n;
        id += blockDim.x * gridDim.x) {
