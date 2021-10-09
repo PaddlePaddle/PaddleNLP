@@ -22,6 +22,8 @@ from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
 from .word_segmentation import WordSegmentationTask
 from .text_generation import TextGenerationTask
+from .poetry_generation import PoetryGenerationTask
+from .question_answering import QuestionAnsweringTask
 from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
 
@@ -38,10 +40,20 @@ TASKS = {
             "model": "wordtag"
         }
     },
-    "text_generation": {
+    "poetry_generation": {
         "models": {
             "gpt-cpm-large-cn": {
-                "task_class": TextGenerationTask,
+                "task_class": PoetryGenerationTask,
+            },
+        },
+        "default": {
+            "model": "gpt-cpm-large-cn",
+        }
+    },
+    "question_answering": {
+        "models": {
+            "gpt-cpm-large-cn": {
+                "task_class": QuestionAnsweringTask,
             },
         },
         "default": {

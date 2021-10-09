@@ -21,14 +21,7 @@ import copy
 import itertools
 
 import numpy as np
-import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-from ..datasets import load_dataset, MapDataset
-from ..data import Stack, Pad, Tuple, Vocab, JiebaTokenizer
-from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
-from .task import Task
-from .models import BiGruCrf
+from .utils import download_file
 from .lexical_analysis import load_vocab, LacTask
 
 URLS = {
@@ -56,7 +49,7 @@ usage = r"""
 
 class WordSegmentationTask(LacTask):
     """
-    Lexical analysis of Chinese task to segement the chinese sentence. 
+    Segement the sentences to the words. 
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
