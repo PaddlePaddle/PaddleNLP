@@ -17,6 +17,7 @@ import argparse
 import paddle
 import torch
 import os
+import json
 
 from paddle.utils.download import get_path_from_url
 
@@ -36,16 +37,124 @@ huggingface_to_paddle = {
 }
 
 convert_model_name_list = [
-    "roberta-base",
-    # "roberta-large",
-    "deepset/roberta-base-squad2",
-    "uer/roberta-base-finetuned-chinanews-chinese",
-    "sshleifer/tiny-distilroberta-base",
-    "uer/roberta-base-finetuned-cluener2020-chinese",
-    "uer/roberta-base-chinese-extractive-qa",
+    # "roberta-base",
+    "roberta-large",
+    # "deepset/roberta-base-squad2",
+    # "uer/roberta-base-finetuned-chinanews-chinese",
+    # "sshleifer/tiny-distilroberta-base",
+    # "uer/roberta-base-finetuned-cluener2020-chinese",
+    # "uer/roberta-base-chinese-extractive-qa",
 ]
 
 link_template = "https://huggingface.co/{}/resolve/main/pytorch_model.bin"
+
+pretrained_init_configuration = {
+    "roberta-base": {
+        "attention_probs_dropout_prob": 0.1,
+        "layer_norm_eps": 1e-05,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "hidden_size": 768,
+        "initializer_range": 0.02,
+        "intermediate_size": 3072,
+        "max_position_embeddings": 514,
+        "num_attention_heads": 12,
+        "num_hidden_layers": 12,
+        "pad_token_id": 1,
+        "type_vocab_size": 1,
+        "vocab_size": 50265
+    },
+    "roberta-large": {
+        "attention_probs_dropout_prob": 0.1,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "hidden_size": 1024,
+        "initializer_range": 0.02,
+        "intermediate_size": 4096,
+        "max_position_embeddings": 514,
+        "num_attention_heads": 16,
+        "num_hidden_layers": 24,
+        "pad_token_id": 1,
+        "type_vocab_size": 1,
+        "layer_norm_eps": 1e-12,
+        "vocab_size": 50265
+    },
+    "deepset/roberta-base-squad2": {
+        "layer_norm_eps": 1e-12,
+        "attention_probs_dropout_prob": 0.1,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "hidden_size": 768,
+        "initializer_range": 0.02,
+        "intermediate_size": 3072,
+        "max_position_embeddings": 514,
+        "num_attention_heads": 12,
+        "num_hidden_layers": 12,
+        "pad_token_id": 1,
+        "type_vocab_size": 1,
+        "vocab_size": 50265
+    },
+    "uer/roberta-base-finetuned-chinanews-chinese": {
+        "attention_probs_dropout_prob": 0.1,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "hidden_size": 768,
+        "initializer_range": 0.02,
+        "intermediate_size": 3072,
+        "layer_norm_eps": 1e-12,
+        "max_position_embeddings": 512,
+        "num_attention_heads": 12,
+        "num_hidden_layers": 12,
+        "pad_token_id": 0,
+        "type_vocab_size": 2,
+        "vocab_size": 21128
+    },
+    "sshleifer/tiny-distilroberta-base": {
+        "attention_probs_dropout_prob": 0.1,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "hidden_size": 2,
+        "initializer_range": 0.02,
+        "intermediate_size": 2,
+        "layer_norm_eps": 1e-05,
+        "max_position_embeddings": 514,
+        "num_attention_heads": 2,
+        "num_hidden_layers": 2,
+        "pad_token_id": 1,
+        "type_vocab_size": 1,
+        "vocab_size": 50265
+    },
+    "uer/roberta-base-finetuned-cluener2020-chinese": {
+        "attention_probs_dropout_prob": 0.1,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "hidden_size": 768,
+        "initializer_range": 0.02,
+        "intermediate_size": 3072,
+        "layer_norm_eps": 1e-12,
+        "max_position_embeddings": 512,
+        "num_attention_heads": 12,
+        "num_hidden_layers": 12,
+        "pad_token_id": 0,
+        "type_vocab_size": 2,
+        "vocab_size": 21128
+    },
+    "uer/roberta-base-chinese-extractive-qa": {
+        "attention_probs_dropout_prob": 0.1,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "hidden_size": 768,
+        "initializer_range": 0.02,
+        "intermediate_size": 3072,
+        "layer_norm_eps": 1e-12,
+        "max_position_embeddings": 512,
+        "num_attention_heads": 12,
+        "num_hidden_layers": 12,
+        "pad_token_id": 0,
+        "type_vocab_size": 2,
+        "vocab_size": 21128
+    }
+}
 
 
 def convert_pytorch_checkpoint_to_paddle(pytorch_src_base_path,
@@ -55,10 +164,20 @@ def convert_pytorch_checkpoint_to_paddle(pytorch_src_base_path,
 
         paddle_dump_path = os.path.join(paddle_dump_base_path,
                                         model_name.split('/')[-1])
+
+        if os.path.exists(
+                os.path.join(paddle_dump_path, 'model_state.pdparams')):
+            continue
         if not os.path.exists(paddle_dump_path):
             os.makedirs(paddle_dump_path)
-        pytorch_checkpoint_path = get_path_from_url(model_state_url,
-                                                    paddle_dump_path)
+
+        with open(os.path.join(paddle_dump_path, 'model_config.json'),
+                  'w') as fw:
+            json.dump(pretrained_init_configuration[model_name], fw)
+
+        _ = get_path_from_url(model_state_url, paddle_dump_path)
+        pytorch_checkpoint_path = os.path.join(paddle_dump_path,
+                                               'pytorch_model.bin')
         pytorch_state_dict = torch.load(
             pytorch_checkpoint_path, map_location="cpu")
         paddle_state_dict = OrderedDict()

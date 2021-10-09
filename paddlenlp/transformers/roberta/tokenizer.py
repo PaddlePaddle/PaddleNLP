@@ -459,3 +459,27 @@ class RobertaBPETokenizer(GPTTokenizer):
         text = bytearray([self.byte_decoder[c] for c in text]).decode(
             'utf-8', errors=self.errors)
         return text
+
+    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
+        """
+        Converts an index or a sequence indices to a single
+        token or a sequence of tokens.
+
+        Args:
+            ids (int|List[int]):
+                The token id (or token ids) to be converted to text.
+            skip_special_tokens (bool, optional):
+                Whether or not to skip the special tokens.
+                Defaults to `False`, which means we don't skip the special tokens.
+
+        Returns:
+            str|List[str]: The converted token or the sequence of tokens.
+        """
+
+        tokens = [self.decoder[id] for id in ids]
+        if skip_special_tokens and isinstance(tokens, list):
+            tokens = [
+                token for token in tokens
+                if token not in self.all_special_tokens
+            ]
+        return tokens
