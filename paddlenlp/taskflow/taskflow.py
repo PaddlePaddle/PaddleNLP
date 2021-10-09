@@ -20,6 +20,7 @@ from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
 from .text2knowledge import WordTagTask
 from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
+from .word_segmentation import WordSegmentationTask
 from .text_generation import TextGenerationTask
 from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
@@ -51,6 +52,19 @@ TASKS = {
         "models": {
             "lac": {
                 "task_class": LacTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "max_seq_len": 64
+            }
+        },
+        "default": {
+            "model": "lac"
+        }
+    },
+    "word_segmentation": {
+        "models": {
+            "lac": {
+                "task_class": WordSegmentationTask,
                 "hidden_size": 128,
                 "emb_dim": 128,
                 "max_seq_len": 64
