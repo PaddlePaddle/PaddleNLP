@@ -21,6 +21,7 @@ from .named_entity_recognition import WordTagTask
 from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
 from .word_segmentation import WordSegmentationTask
+from .pos_tagging import POSTaggingTask
 from .text_generation import TextGenerationTask
 from .poetry_generation import PoetryGenerationTask
 from .question_answering import QuestionAnsweringTask
@@ -76,6 +77,18 @@ TASKS = {
         "models": {
             "lac": {
                 "task_class": WordSegmentationTask,
+                "hidden_size": 128,
+                "emb_dim": 128
+            }
+        },
+        "default": {
+            "model": "lac"
+        }
+    },
+    "pos_tagging": {
+        "models": {
+            "lac": {
+                "task_class": POSTaggingTask,
                 "hidden_size": 128,
                 "emb_dim": 128
             }
