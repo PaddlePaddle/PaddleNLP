@@ -101,6 +101,11 @@ class FasterTransformer(TransformerModel):
             The power number in length penalty calculation. Only works in `v2`
             temporarily. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
             Default to 0.6 if not set.
+        diversity_rate(float, optional):
+            Refer to `A Simple, Fast Diverse Decoding Algorithm for Neural Generation <https://arxiv.org/abs/1611.08562>`_
+            for details. Bigger `diversity_rate` would lead to more diversity.
+            if `diversity_rate == 0` is equivalent to naive BeamSearch. Default
+            to 0 if not set.
     """
 
     def __init__(self,
@@ -126,7 +131,8 @@ class FasterTransformer(TransformerModel):
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  rel_len=False,
-                 alpha=0.6):
+                 alpha=0.6,
+                 diversity_rate=0.0):
         # if decoding_lib is None:
         #     raise ValueError(
         #         "The args decoding_lib must be set to use Faster Transformer. ")
@@ -145,6 +151,7 @@ class FasterTransformer(TransformerModel):
         self.use_fp16_decoding = args.pop("use_fp16_decoding")
         self.rel_len = args.pop("rel_len")
         self.alpha = args.pop("alpha")
+        self.diversity_rate = args.pop("diversity_rate")
         self.dropout = dropout
         self.weight_sharing = weight_sharing
         self.trg_vocab_size = trg_vocab_size
@@ -177,6 +184,7 @@ class FasterTransformer(TransformerModel):
             topk=topk,
             topp=topp,
             max_out_len=max_out_len,
+            beam_search_diversity_rate=self.diversity_rate,
             decoding_lib=self.decoding_lib,
             use_fp16_decoding=self.use_fp16_decoding,
             rel_len=self.rel_len,
@@ -453,6 +461,13 @@ class TransformerGenerator(paddle.nn.Layer):
             - `alpha(float, optional)`: The power number in length penalty
             calculation. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
             Only works in `v2` temporarily. Default to 0.6 if not set.
+        
+            - diversity_rate(float, optional): Refer to `A Simple, Fast Diverse
+            Decoding Algorithm for Neural Generation <https://arxiv.org/abs/1611.08562>`_
+            for details. Bigger `diversity_rate` would lead to more diversity.
+            if `diversity_rate == 0` is equivalent to naive BeamSearch. Default
+            to 0 if not set. **NOTE**: Only works when using FasterTransformer
+            temporarily.
     """
 
     def __init__(self,
@@ -485,6 +500,7 @@ class TransformerGenerator(paddle.nn.Layer):
         beam_search_version = kwargs.pop("beam_search_version", "v1")
         rel_len = kwargs.pop("rel_len", False)
         alpha = kwargs.pop("alpha", 0.6)
+        diversity_rate = kwargs.pop("diversity_rate", 0.0)
 
         if use_ft:
             try:
@@ -510,11 +526,16 @@ class TransformerGenerator(paddle.nn.Layer):
                     decoding_strategy=decoding_strategy,
                     use_fp16_decoding=use_fp16_decoding,
                     rel_len=rel_len,
-                    alpha=alpha)
+                    alpha=alpha,
+                    diversity_rate=diversity_rate)
             except Exception:
                 logger.warning(
                     "Exception occurs when using Faster Transformer. " \
                     "The original forward will be involved. ")
+                if diversity_rate != 0:
+                    logger.warning(
+                        "diversity_rate would not work since it is only " \
+                        "supported by FasterTransformer temporarily.")
                 self.transformer = InferTransformerModel(
                     src_vocab_size=src_vocab_size,
                     trg_vocab_size=trg_vocab_size,
@@ -535,6 +556,10 @@ class TransformerGenerator(paddle.nn.Layer):
                     rel_len=rel_len,
                     alpha=alpha)
         else:
+            if diversity_rate != 0:
+                logger.warning(
+                    "diversity_rate would not work since it is only " \
+                    "supported by FasterTransformer temporarily.")
             self.transformer = InferTransformerModel(
                 src_vocab_size=src_vocab_size,
                 trg_vocab_size=trg_vocab_size,
