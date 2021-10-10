@@ -496,7 +496,6 @@ class TransformerGenerator(paddle.nn.Layer):
 
         if use_ft:
             try:
-                load("FasterTransformer", verbose=True)
                 decoding_strategy = ("beam_search_v2"
                                      if beam_search_version == "v2" else
                                      "beam_search")
