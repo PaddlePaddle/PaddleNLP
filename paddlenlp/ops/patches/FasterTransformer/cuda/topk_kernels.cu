@@ -394,6 +394,66 @@ __global__ void topk_stage_2_opt3(const int* __restrict topk_tmp_id_buf,
     ids[batch_id * k + tid] = topk_tmp_id_buf[batch_id * size + s_id[tid]];
 }
 
+template <typename T, int BLOCK_SIZE_, int BLOCKS_PER_BEAM_>
+__global__ void topk_stage_1_opt3(
+    const T* __restrict log_probs,
+    const T* __restrict cum_log_probs,  // If null, log_probs is cum_log_probs.
+                                        // Used in beam_search_v2 which adding
+                                        // cum_log_buf_ to logits_buf_ here.
+    T* tmp_log_probs,
+    int* topk_tmp_id_buf,
+    T* topk_tmp_val_buf,
+    const int k,
+    const int vocab_size,
+    const T diversity_rate) {  // diversity_rate only works when
+                               // BLOCKS_PER_BEAM_ is 1
+  typedef cub::BlockReduce<TopK_2<T>, BLOCK_SIZE_> BlockReduce;
+  __shared__ typename BlockReduce::TempStorage temp_storage;
+
+  const int tid = threadIdx.x;
+  const int bid = blockIdx.x;
+
+  const int row_id = bid / BLOCKS_PER_BEAM_;      // row id for log_probs
+  const int block_lane = bid % BLOCKS_PER_BEAM_;  // block id for a beam
+  const int tmp_log_buf_index = row_id * vocab_size;
+  const int tmp_topk_buf_index = row_id * BLOCKS_PER_BEAM_ * k + block_lane * k;
+  const int beam_id_in_output =
+      row_id / (k >> 1) * k + row_id % (k >> 1) + (k >> 1);
+  TopK_2<T> partial;
+  const bool IS_FP16 = std::is_same<T, half>::value;
+  const T MAX_T_VAL = (IS_FP16) ? HALF_FLT_MAX : FLT_MAX;
+
+  for (int elem_id = tid + block_lane * BLOCK_SIZE_; elem_id < vocab_size;
+       elem_id += BLOCK_SIZE_ * BLOCKS_PER_BEAM_) {
+    int index = elem_id + tmp_log_buf_index;
+    tmp_log_probs[index] = log_probs[index];
+  }
+
+  for (int ite = 0; ite < k; ite++) {
+    partial.init();
+#pragma unroll
+    for (int elem_id = tid + block_lane * BLOCK_SIZE_; elem_id < vocab_size;
+         elem_id += BLOCK_SIZE_ * BLOCKS_PER_BEAM_) {
+      int index = elem_id + tmp_log_buf_index;
+      partial.insert(tmp_log_probs[index], index);
+    }
+
+    TopK_2<T> total =
+        BlockReduce(temp_storage).Reduce(partial, reduce_topk_op_2<T>);
+
+    if (tid == 0) {
+      const int index = tmp_topk_buf_index + ite;
+      topk_tmp_id_buf[index] = total.p;
+      topk_tmp_val_buf[index] =
+          (cum_log_probs ? (total.u + cum_log_probs[beam_id_in_output])
+                         : total.u) +
+          diversity_rate * (T)ite;
+      tmp_log_probs[total.p] = -MAX_T_VAL;
+    }
+    __syncthreads();
+  }
+}
+
 template <typename T, int BLOCK_SIZE, int BLOCKS_PER_BEAM>
 __global__ void topk_stage_1_opt2_general(const T* __restrict log_probs,
                                           T* tmp_log_probs,
@@ -603,9 +663,26 @@ void topK_kernelLauncher(void* workspace,
         CASE_K_DIV(16, 256, 64);
         CASE_K_DIV(64, 256, 64);
         default:
-          printf("[ERROR] Topk kernel does not support beamwidth = %d \n",
-                 beam_width);
-          exit(0);
+          // printf("[ERROR] Topk kernel does not support beamwidth = %d \n",
+          //        beam_width);
+          // exit(0);
+          // diversity_rate only works when BLOCKS_PER_BEAM_ is 1
+          topk_stage_1_opt3<T,
+                            128,
+                            1><<<batch_size * beam_width * 1, 128, 0, stream>>>(
+              log_probs,
+              nullptr,
+              temp_log_probs,
+              topk_tmp_id_buf,
+              topk_tmp_val_buf,
+              beam_width,
+              vocab_size,
+              diversity_rate);
+          topk_stage_2_opt3<
+              T,
+              128,
+              1><<<batch_size, 128, beam_width * sizeof(int), stream>>>(
+              topk_tmp_id_buf, topk_tmp_val_buf, ids, beam_width);
           break;
       }
     }
@@ -624,61 +701,6 @@ template void topK_kernelLauncher<float>(void* workspace,
                                          cudaStream_t stream);
 
 template <typename T, int BLOCK_SIZE_, int BLOCKS_PER_BEAM_>
-__global__ void topk_stage_1_opt3(
-    const T* __restrict log_probs,
-    const T* __restrict cum_log_probs,  // write cum log probs instead of log
-                                        // probs in topk_tmp_val_buf compared
-                                        // with the original topk_stage_1_opt3
-    T* tmp_log_probs,
-    int* topk_tmp_id_buf,
-    T* topk_tmp_val_buf,
-    const int k,
-    const int vocab_size) {
-  typedef cub::BlockReduce<TopK_2<T>, BLOCK_SIZE_> BlockReduce;
-  __shared__ typename BlockReduce::TempStorage temp_storage;
-
-  const int tid = threadIdx.x;
-  const int bid = blockIdx.x;
-
-  const int row_id = bid / BLOCKS_PER_BEAM_;      // row id for log_probs
-  const int block_lane = bid % BLOCKS_PER_BEAM_;  // block id for a beam
-  const int tmp_log_buf_index = row_id * vocab_size;
-  const int tmp_topk_buf_index = row_id * BLOCKS_PER_BEAM_ * k + block_lane * k;
-  const int beam_id_in_output =
-      row_id / (k >> 1) * k + row_id % (k >> 1) + (k >> 1);
-  TopK_2<T> partial;
-  const bool IS_FP16 = std::is_same<T, half>::value;
-  const T MAX_T_VAL = (IS_FP16) ? HALF_FLT_MAX : FLT_MAX;
-
-  for (int elem_id = tid + block_lane * BLOCK_SIZE_; elem_id < vocab_size;
-       elem_id += BLOCK_SIZE_ * BLOCKS_PER_BEAM_) {
-    int index = elem_id + tmp_log_buf_index;
-    tmp_log_probs[index] = log_probs[index];
-  }
-
-  for (int ite = 0; ite < k; ite++) {
-    partial.init();
-#pragma unroll
-    for (int elem_id = tid + block_lane * BLOCK_SIZE_; elem_id < vocab_size;
-         elem_id += BLOCK_SIZE_ * BLOCKS_PER_BEAM_) {
-      int index = elem_id + tmp_log_buf_index;
-      partial.insert(tmp_log_probs[index], index);
-    }
-
-    TopK_2<T> total =
-        BlockReduce(temp_storage).Reduce(partial, reduce_topk_op_2<T>);
-
-    if (tid == 0) {
-      const int index = tmp_topk_buf_index + ite;
-      topk_tmp_id_buf[index] = total.p;
-      topk_tmp_val_buf[index] = total.u + cum_log_probs[beam_id_in_output];
-      tmp_log_probs[total.p] = -MAX_T_VAL;
-    }
-    __syncthreads();
-  }
-}
-
-template <typename T, int BLOCK_SIZE_, int BLOCKS_PER_BEAM_>
 __global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
                                          T* topk_tmp_val_buf,
                                          bool* finished,
@@ -694,7 +716,7 @@ __global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
                                          const int step,
                                          const int max_out_len,
                                          int k,
-                                         T diversity_rate,
+                                         //  T diversity_rate,
                                          float length_penalty,
                                          float max_length_penalty) {
   const int size = beam_width * BLOCKS_PER_BEAM_ * beam_width * 2;
@@ -742,7 +764,8 @@ __global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
       //                                         beam_width] +
       //                    i % k * diversity_rate,
       //                i);
-      partial.insert(topk_tmp_val_buf[i] + i % k * diversity_rate, i);
+      // partial.insert(topk_tmp_val_buf[i] + i % k * diversity_rate, i);
+      partial.insert(topk_tmp_val_buf[i], i);
     }
 
     TopK_2<T> total =
@@ -874,7 +897,8 @@ __global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
                                                     topk_tmp_id_buf,         \
                                                     topk_tmp_val_buf,        \
                                                     beam_width * 2,          \
-                                                    vocab_size);             \
+                                                    vocab_size,              \
+                                                    diversity_rate);         \
     topk_stage_2_opt3_update<                                                \
         float,                                                               \
         BLOCK_SIZE_2_,                                                       \
@@ -894,7 +918,6 @@ __global__ void topk_stage_2_opt3_update(const int* __restrict topk_tmp_id_buf,
         step,                                                                \
         max_out_len,                                                         \
         beam_width * 2,                                                      \
-        diversity_rate,                                                      \
         length_penalty,                                                      \
         max_length_penalty);                                                 \
     break;
@@ -968,7 +991,8 @@ void topK_update_kernelLauncher(
               topk_tmp_id_buf,
               topk_tmp_val_buf,
               beam_width * 2,
-              vocab_size);
+              vocab_size,
+              diversity_rate);
           topk_stage_2_opt3_update<T, 128, 1><<<batch_size, 128, 0, stream>>>(
               topk_tmp_id_buf,
               topk_tmp_val_buf,
@@ -985,7 +1009,7 @@ void topK_update_kernelLauncher(
               step,
               max_out_len,
               beam_width * 2,
-              diversity_rate,
+              // diversity_rate,
               length_penalty,
               max_length_penalty);
           break;
@@ -1002,7 +1026,8 @@ void topK_update_kernelLauncher(
           topk_tmp_id_buf,
           topk_tmp_val_buf,
           beam_width * 2,
-          vocab_size);
+          vocab_size,
+          diversity_rate);
       topk_stage_2_opt3_update<T, 128, 1><<<batch_size, 128, 0, stream>>>(
           topk_tmp_id_buf,
           topk_tmp_val_buf,
@@ -1019,7 +1044,7 @@ void topK_update_kernelLauncher(
           step,
           max_out_len,
           beam_width * 2,
-          diversity_rate,
+          // diversity_rate,
           length_penalty,
           max_length_penalty);
     }
