@@ -37,13 +37,13 @@ huggingface_to_paddle = {
 }
 
 convert_model_name_list = [
-    # "roberta-base",
+    "roberta-base",
     "roberta-large",
-    # "deepset/roberta-base-squad2",
-    # "uer/roberta-base-finetuned-chinanews-chinese",
-    # "sshleifer/tiny-distilroberta-base",
-    # "uer/roberta-base-finetuned-cluener2020-chinese",
-    # "uer/roberta-base-chinese-extractive-qa",
+    "deepset/roberta-base-squad2",
+    "uer/roberta-base-finetuned-chinanews-chinese",
+    "sshleifer/tiny-distilroberta-base",
+    "uer/roberta-base-finetuned-cluener2020-chinese",
+    "uer/roberta-base-chinese-extractive-qa",
 ]
 
 link_template = "https://huggingface.co/{}/resolve/main/pytorch_model.bin"
