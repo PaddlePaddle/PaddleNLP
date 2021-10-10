@@ -178,7 +178,7 @@ git clone https://github.com/moses-smt/mosesdecoder.git
 perl mosesdecoder/scripts/generic/multi-bleu.perl ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data/newstest2014.tok.de < predict.tok.txt
 ```
 
-执行上述操作之后，可以看到类似如下的结果，此处结果是 base model 在 newstest2014 上的 BLEU 结果：
+执行上述操作之后，可以看到类似如下的结果，此处结果是 beam_size 为 5 时 base model 在 newstest2014 上的 BLEU 结果：
 ```
 BLEU = 26.89, 58.4/32.6/20.5/13.4 (BP=1.000, ratio=1.010, hyp_len=65166, ref_len=64506)
 ```
@@ -300,7 +300,7 @@ git clone https://github.com/moses-smt/mosesdecoder.git
 perl mosesdecoder/scripts/generic/multi-bleu.perl ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data/newstest2014.tok.de < predict.tok.txt
 ```
 
-执行上述操作之后，可以看到类似如下的结果，此处结果是 base model 在 newstest2014 上的 BLEU 结果：
+执行上述操作之后，可以看到类似如下的结果，此处结果是 beam_size 为 5 时 base model 在 newstest2014 上的 BLEU 结果：
 ```
 BLEU = 26.89, 58.4/32.6/20.5/13.4 (BP=1.000, ratio=1.010, hyp_len=65166, ref_len=64506)
 ```
