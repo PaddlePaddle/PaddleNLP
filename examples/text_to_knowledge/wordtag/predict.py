@@ -35,7 +35,7 @@ def parse_args():
 def do_predict(args):
     paddle.set_device(args.device)
     wordtag = Taskflow(
-        "ner",
+        "knowledge_mining",
         model="wordtag",
         batch_size=args.batch_size,
         max_seq_length=args.max_seq_len,
