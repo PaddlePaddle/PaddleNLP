@@ -157,8 +157,6 @@ class LacTask(Task):
             'batch_size'] if 'batch_size' in self.kwargs else 1
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
-        max_seq_len = self.kwargs[
-            'max_seq_len'] if 'max_seq_len' in self.kwargs else 64
         infer_data = []
         oov_token_id = self._word_vocab.get("OOV")
 
@@ -170,7 +168,6 @@ class LacTask(Task):
                         len(input_tokens.strip()) > 0):
                     continue
                 filter_inputs.append(input_tokens)
-                input_tokens = input_tokens[:max_seq_len]
                 ids = []
                 for token in input_tokens:
                     token = self._q2b_vocab.get(token, token)

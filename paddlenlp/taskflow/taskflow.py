@@ -17,17 +17,21 @@ import warnings
 import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .text2knowledge import WordTagTask
+from .named_entity_recognition import WordTagTask
 from .sentiment_analysis import SentaTask, SkepTask
 from .lexical_analysis import LacTask
+from .word_segmentation import WordSegmentationTask
+from .pos_tagging import POSTaggingTask
 from .text_generation import TextGenerationTask
+from .poetry_generation import PoetryGenerationTask
+from .question_answering import QuestionAnsweringTask
 from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
 TASKS = {
-    "text2knowledge": {
+    "ner": {
         "models": {
             "wordtag": {
                 "task_class": WordTagTask,
@@ -37,10 +41,20 @@ TASKS = {
             "model": "wordtag"
         }
     },
-    "text_generation": {
+    "poetry_generation": {
         "models": {
             "gpt-cpm-large-cn": {
-                "task_class": TextGenerationTask,
+                "task_class": PoetryGenerationTask,
+            },
+        },
+        "default": {
+            "model": "gpt-cpm-large-cn",
+        }
+    },
+    "question_answering": {
+        "models": {
+            "gpt-cpm-large-cn": {
+                "task_class": QuestionAnsweringTask,
             },
         },
         "default": {
@@ -52,8 +66,31 @@ TASKS = {
             "lac": {
                 "task_class": LacTask,
                 "hidden_size": 128,
-                "emb_dim": 128,
-                "max_seq_len": 64
+                "emb_dim": 128
+            }
+        },
+        "default": {
+            "model": "lac"
+        }
+    },
+    "word_segmentation": {
+        "models": {
+            "lac": {
+                "task_class": WordSegmentationTask,
+                "hidden_size": 128,
+                "emb_dim": 128
+            }
+        },
+        "default": {
+            "model": "lac"
+        }
+    },
+    "pos_tagging": {
+        "models": {
+            "lac": {
+                "task_class": POSTaggingTask,
+                "hidden_size": 128,
+                "emb_dim": 128
             }
         },
         "default": {
