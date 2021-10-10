@@ -14,6 +14,7 @@
 * 推荐使用 Python3
 * `Faster Transformer <https://github.com/NVIDIA/FasterTransformer/tree/v3.1#setup>`_ 使用必要的环境
 * 环境依赖
+
   - attrdict
   - pyyaml
 
@@ -127,7 +128,7 @@ PaddleNLP 准备
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding)
 
-更详细的例子可以参考 `./faster_transformer/sample/decoding_sample.py` 以及 `./sample/encoder_decoding_sample.py`，我们提供了更详细用例。
+更详细的例子可以参考 `Transformer预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/decoding_sample.py>`_，`Transformer预测加速使用示例-机器翻译 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_translation/transformer/faster_transformer>`_，我们提供了更详细用例。
 
 Transformer decoding 示例代码
 """"""""""""
@@ -185,7 +186,7 @@ Transformer decoding 示例代码
 
 目前，GPT-2 的例子仅支持 `batch size` 为 `1` 或是 batch 内输入的序列长度相等的情况。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
 
-更详细的例子可以参考 `./faster_transformer/sample/gpt_sample.py`，我们提供了更详细用例。
+更详细的例子可以参考 `GPT预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_，我们提供了更详细用例。
 
 GPT-2 decoding 示例代码
 """"""""""""
