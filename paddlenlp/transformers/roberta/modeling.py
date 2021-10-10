@@ -65,13 +65,13 @@ class RobertaEmbeddings(nn.Layer):
             position_ids.stop_gradient = True
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = input_embedings + position_embeddings + token_type_embeddings
         embeddings = self.layer_norm(embeddings)
-
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -306,7 +306,9 @@ class RobertaPretrainedModel(PretrainedModel):
                     if hasattr(self, "initializer_range") else
                     self.roberta.config["initializer_range"],
                     shape=layer.weight.shape))
-        elif isinstance(layer, nn.LayerNorm):
+        elif isinstance(
+                layer, nn.LayerNorm
+        ):  # roberta-base,large的eps=1e-5; wwm-ext为1e-12,方便通过config调整对齐
             layer._epsilon = self.layer_norm_eps if hasattr(
                 self,
                 "layer_norm_eps") else self.roberta.config["layer_norm_eps"]
@@ -378,7 +380,8 @@ class RobertaModel(RobertaPretrainedModel):
                  type_vocab_size=16,
                  initializer_range=0.02,
                  pad_token_id=0,
-                 layer_norm_eps=1e-12):
+                 layer_norm_eps=1e-12
+                 ):  # roberta-base,large的eps=1e-5; wwm-ext为1e-12,方便通过config调整对齐
         super(RobertaModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -471,11 +474,9 @@ class RobertaModel(RobertaPretrainedModel):
             position_ids=position_ids,
             token_type_ids=token_type_ids)
 
-        # encoder_outputs, hidden_states = self.encoder(embedding_output, attention_mask)
         encoder_outputs = self.encoder(embedding_output, attention_mask)
         sequence_output = encoder_outputs
         pooled_output = self.pooler(sequence_output)
-        # return sequence_output, pooled_output, hidden_states
         return sequence_output, pooled_output
 
 
@@ -648,7 +649,6 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        # _, pooled_output, hidden_state = self.roberta(
         _, pooled_output = self.roberta(
             input_ids,
             token_type_ids=token_type_ids,
@@ -743,7 +743,7 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output, _, = self.roberta(
+        sequence_output, _ = self.roberta(
             input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
@@ -769,12 +769,7 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
                 token_type_ids=None,
                 attention_mask=None,
                 position_ids=None):
-        r"""
-        labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
-            Labels for computing the multiple choice classification loss. Indices should be in ``[0, ...,
-            num_choices-1]`` where :obj:`num_choices` is the size of the second dimension of the input tensors. (See
-            :obj:`input_ids` above)
-        """
+
         num_choices = input_ids.shape[1]
 
         flat_input_ids = input_ids.reshape(
@@ -826,14 +821,6 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None):
-        r"""
-        labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size, sequence_length)`, `optional`):
-            Labels for computing the masked language modeling loss. Indices should be in ``[-100, 0, ...,
-            config.vocab_size]`` (see ``input_ids`` docstring) Tokens with indices set to ``-100`` are ignored
-            (masked), the loss is only computed for the tokens with labels in ``[0, ..., config.vocab_size]``
-        kwargs (:obj:`Dict[str, any]`, optional, defaults to `{}`):
-            Used to hide legacy arguments that have been deprecated.
-        """
 
         outputs = self.roberta(
             input_ids,
@@ -855,8 +842,6 @@ class RobertaLMHead(nn.Layer):
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
 
         self.decoder = nn.Linear(hidden_size, vocab_size)
-        # self.bias = nn.Parameter(torch.zeros(config.vocab_size))
-        # self.decoder.bias = self.bias
 
     def forward(self, features, **kwargs):
         x = self.dense(features)
@@ -868,28 +853,17 @@ class RobertaLMHead(nn.Layer):
 
         return x
 
-    def _tie_weights(self):
-        # To tie those two weights if they get disconnected (on TPU or when the bias is resized)
-        self.bias = self.decoder.bias
-
 
 class RobertaForCausalLM(RobertaPretrainedModel):
     def __init__(self, roberta):
         super().__init__()
 
-        # if not config.is_decoder:
-        #     logger.warning("If you want to use `RobertaLMHeadModel` as a standalone, add `is_decoder=True.`")
-
-        # self.roberta = RobertaModel(config, add_pooling_layer=False)
         self.roberta = roberta
         hidden_size = self.roberta.config['hidden_size']
         layer_norm_eps = self.roberta.config['layer_norm_eps']
         vocab_size = self.roberta.config['vocab_size']
 
         self.lm_head = RobertaLMHead(hidden_size, layer_norm_eps, vocab_size)
-
-        # The LM head weights require special treatment only when they are tied with the word embeddings
-        # self.update_keys_to_ignore(config, ["lm_head.decoder.weight"])
 
         self.apply(self.init_weights)
 
@@ -905,37 +879,14 @@ class RobertaForCausalLM(RobertaPretrainedModel):
                 token_type_ids=None,
                 position_ids=None):
         r"""
-        encoder_hidden_states  (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, sequence_length, hidden_size)`, `optional`):
-            Sequence of hidden-states at the output of the last layer of the encoder. Used in the cross-attention if
-            the model is configured as a decoder.
-        encoder_attention_mask (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, sequence_length)`, `optional`):
-            Mask to avoid performing attention on the padding token indices of the encoder input. This mask is used in
-            the cross-attention if the model is configured as a decoder. Mask values selected in ``[0, 1]``:
-            - 1 for tokens that are **not masked**,
-            - 0 for tokens that are **masked**.
-        labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size, sequence_length)`, `optional`):
-            Labels for computing the left-to-right language modeling loss (next word prediction). Indices should be in
-            ``[-100, 0, ..., config.vocab_size]`` (see ``input_ids`` docstring) Tokens with indices set to ``-100`` are
-            ignored (masked), the loss is only computed for the tokens with labels in ``[0, ..., config.vocab_size]``
-        past_key_values (:obj:`tuple(tuple(torch.FloatTensor))` of length :obj:`config.n_layers` with each tuple having 4 tensors of shape :obj:`(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`):
-            Contains precomputed key and value hidden states of the attention blocks. Can be used to speed up decoding.
-            If :obj:`past_key_values` are used, the user can optionally input only the last :obj:`decoder_input_ids`
-            (those that don't have their past key value states given to this model) of shape :obj:`(batch_size, 1)`
-            instead of all :obj:`decoder_input_ids` of shape :obj:`(batch_size, sequence_length)`.
-        use_cache (:obj:`bool`, `optional`):
-            If set to :obj:`True`, :obj:`past_key_values` key value states are returned and can be used to speed up
-            decoding (see :obj:`past_key_values`).
-        Returns:
         Example::
-            >>> from transformers import RobertaTokenizer, RobertaForCausalLM, RobertaConfig
-            >>> import torch
-            >>> tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
-            >>> config = RobertaConfig.from_pretrained("roberta-base")
-            >>> config.is_decoder = True
+            >>> from paddlenlp.transformers import RobertaTokenizer, RobertaForCausalLM, RobertaConfig
+            >>> import paddle
+            >>> tokenizer = RobertaBPETokenizer.from_pretrained('roberta-base')
             >>> model = RobertaForCausalLM.from_pretrained('roberta-base', config=config)
-            >>> inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
-            >>> outputs = model(**inputs)
-            >>> prediction_logits = outputs.logits
+            >>> inputs = tokenizer("Hello, my dog is cute")['input_ids']
+            >>> inputs = paddle.to_tensor(inputs)
+            >>> outputs = model(inputs)
         """
 
         outputs = self.roberta(
