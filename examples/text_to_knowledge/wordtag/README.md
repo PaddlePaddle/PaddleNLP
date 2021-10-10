@@ -56,11 +56,11 @@ Term-Linking示例程序可以对无标签数据可以启动模型预测, 例如
 
 ```python
 from paddlenlp import Taskflow
-ner = Taskflow("ner", model="wordtag", linking=True)
-ner(["热梅茶是一道以梅子为主要原料制作的茶饮",
+wordtag = Taskflow("knowledge_mining", model="wordtag", linking=True)
+wordtag(["热梅茶是一道以梅子为主要原料制作的茶饮",
       "《孤女》是2010年九州出版社出版的小说，作者是余兼羽"])
 # Support the input text directly
-ner("热梅茶是一道以梅子为主要原料制作的茶饮")
+wordtag("热梅茶是一道以梅子为主要原料制作的茶饮")
 
 ```
 下面是运行WordTag工具后的知识链接的预测结果
