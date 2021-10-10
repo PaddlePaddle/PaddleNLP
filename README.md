@@ -50,6 +50,35 @@ pip install --upgrade paddlenlp
 
 ## 易用的文本领域API
 
+### Taskflow：开箱即用的工业级NLP能力
+
+Taskflow旨在提供开箱即用的NLP预置任务能力，覆盖自然语言理解与自然语言生成两大场景，在中文场景上提供**工业级的效果**与**极致的预测性能**。
+
+```python
+from paddlenlp import Taskflow
+
+# 中文分词
+seg = Taskflow("word_segmentation")
+seg("第十四届全运会在西安举办")
+>>> ['第十四届', '全运会', '在', '西安', '举办']
+
+# 词性标注
+tag = Taskflow("pos_tagging")
+tag("第十四届全运会在西安举办")
+>>> [('第十四届', 'm'), ('全运会', 'nz'), ('在', 'p'), ('西安', 'LOC'), ('举办', 'v')]
+
+# 命名实体识别
+ner = Taskflow("ner")
+ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
+>>> [{'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
+
+# 句法分析
+ddp = Taskflow("dependency_parsing")
+ddp("百度是一家高科技公司")
+>>> [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+```
+更多使用方法请参考[Taskflow文档](./docs/model_zoo/taskflow.md)
+
 ### Transformer API: 强大的预训练模型生态底座
 
 覆盖**15**个网络结构和**67**个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型。也欢迎开发者贡献更多预训练模型！🤗
@@ -243,47 +272,7 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 | [P-Tuning](./examples/few_shot/p-tuning/) |基于[GPT Understands, Too](https://arxiv.org/pdf/2103.10385.pdf) 论文策略实现, 首次提出连续可学习的模板参数，在全参数空间对模板进行连续优化，大幅提升模型稳定性和模型效果。|
 | [EFL](./examples/few_shot/efl/) | 基于[Entailment as Few-Shot Learner](https://arxiv.org/abs/2104.14690) 论文策略实现，将下游目标任务转换为蕴含任务降低模型预测空间，显著提升模型效果。|
 
-## Taskflow 一键预测
 
-Taskflow是功能强大的自然语言处理库，旨在提供开箱即用的NLP预置任务，覆盖自然语言理解与自然语言生成两大核心应用，在中文场景上提供工业级的效果与极致的预测性能。
-
-### 调用示例
-
-```python
-from paddlenlp import Taskflow
-
-# 中文分词
-seg = Taskflow("word_segmentation")
-seg("第十四届全运会在西安举办")
->>> ['第十四届', '全运会', '在', '西安', '举办']
-
-# 词性标注
-pos_tagging = Taskflow("pos_tagging")
-pos_tagging("第十四届全运会在西安举办")
->>> [('第十四届', 'm'), ('全运会', 'nz'), ('在', 'p'), ('西安', 'LOC'), ('举办', 'v')]
-
-# 命名实体识别
-ner = Taskflow("ner")
-ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
->>> [{'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
-
-# 句法分析
-ddp = Taskflow("dependency_parsing")
-ddp("百度是一家高科技公司")
->>> [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
-```
-更多使用方法请参考[Taskflow文档](./docs/model_zoo/taskflow.md)
-
-### 任务清单
-
-| 自然语言理解任务  | 自然语言生成任务 |
-| :------------  | ---- |
-| 中文分词 | 生成式问答 |
-| 词性标注 | 智能写诗 |
-| 命名实体识别  |  |
-| 文本纠错 |  |
-| 句法分析 |  |
-| 情感分类 |  |
 
 ## 交互式Notebook教程
 
