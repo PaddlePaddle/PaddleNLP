@@ -76,7 +76,7 @@ class TestXLNetLMHeadModel(CommonTest):
         xlnet = XLNetModel(**config)
         model = self.TEST_MODEL_CLASS(xlnet)
         input_ids = paddle.to_tensor(self.input_ids)
-        self.output = model(input_ids)
+        self.output = model(input_ids, return_dict=False)
         self.check_testcase()
 
 
@@ -105,7 +105,7 @@ class TestXLNetForMultipleChoice(TestXLNetLMHeadModel):
         xlnet = XLNetModel(**config)
         model = self.TEST_MODEL_CLASS(xlnet)
         input_ids = paddle.to_tensor(self.input_ids)
-        self.output = model(input_ids)
+        self.output = model(input_ids, return_dict=False)
         self.check_testcase()
 
 
