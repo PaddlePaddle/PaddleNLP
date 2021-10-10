@@ -149,9 +149,11 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 #### 文本匹配 (Text Matching)
 | 模型    | 简介       |
 | :--------------- | ---------- |
+| [SimCSE](./examples/text_matching/simcse/):star2:  | 基于论文[SimCSE: Simple Contrastive Learning of Sentence Embeddings](https://arxiv.org/abs/2104.08821)实现无监督语义匹配模型，无需标注数据仅利用无监督数据也能训练效果出众的语义匹配模型。|
 | [SimNet](./examples/text_matching/simnet/)  | 百度自研的语义匹配框架，使用BOW、CNN、GRNN等核心网络作为表示层，在百度内搜索、推荐等多个应用场景得到广泛易用。|
 | [ERNIE](./examples/text_matching/ernie_matching/) | 基于ERNIE使用LCQMC数据完成中文句对匹配任务，提供了Pointwise和Pairwise两种类型学习方式。 |
 | [Sentence-BERT](./examples/text_matching/sentence_transformers/) | 提供基于Siamese双塔结构的文本匹配模型[Sentence-BERT](https://arxiv.org/abs/1908.1008)实现，可用于获取文本的向量化表示。
+| [SimBERT](./examples/text_matching/simbert/) | 提供[SimBERT](https://github.com/ZhuiyiTechnology/simbert)模型实现，用于获取文本的向量化表示。|
 
 #### 文本生成 (Text Generation)
 | 模型        | 简介      |
@@ -224,10 +226,64 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 
 #### 模型压缩 (Model Compression)
 
-| 模型     | 简介    |
+
+| 模型                                                       | 简介                                                         |
+| :--------------------------------------------------------- | ------------------------------------------------------------ |
+| [MiniLMv2](examples/model_compression/minilmv2) :star2:    | 基于[MiniLMv2: Multi-Head Self-Attention Relation Distillation for Compressing Pretrained Transformers](https://arxiv.org/abs/2012.15828)论文策略的实现，是一种通用蒸馏方法。本实例以`bert-base-chinese`为教师模型，利用中文数据进行了通用蒸馏。 |
+| [TinyBERT](./examples/model_compression/tinybert)          | 基于论文[TinyBERT: Distilling BERT for Natural Language Understanding](https://arxiv.org/abs/1909.10351)的实现，提供了通用蒸馏和下游任务蒸馏的脚本。本实例利用开源模型`tinybert-6l-768d-v2`初始化，在GLUE的7个数据集上进行下游任务的蒸馏，最终模型参数量缩小1/2，预测速度提升2倍，同时保证模型精度几乎无损，其中精度可达教师模型`bert-base-uncased`的 98.90%。 |
+| [OFA-BERT](./examples/model_compression/ofa/) :star2:      | 基于PaddleSlim Once-For-ALL(OFA)策略对BERT在GLUE任务的下游模型进行压缩，在精度无损的情况下可减少33%参数量，达到模型小型化的提速的效果。 |
+| [Distill-LSTM](./examples/model_compression/distill_lstm/) | 基于[Distilling Task-Specific Knowledge from BERT into Simple Neural Networks](https://arxiv.org/abs/1903.12136)论文策略的实现，将BERT中英文分类的下游模型知识通过蒸馏的方式迁移至LSTM的小模型结构中，取得比LSTM单独训练更好的效果。 |
+
+
+#### 小样本学习 (Few-Shot Learning)
+
+| 算法   | 简介    |
 | :--------------- | ------- |
-| [Distill-LSTM](./examples/model_compression/distill_lstm/) | 基于[Distilling Task-Specific Knowledge from BERT into Simple Neural Networks](https://arxiv.org/abs/1903.12136)论文策略的实现，将BERT中英文分类的下游模型知识通过蒸馏的方式迁移至LSTM的小模型结构中，取得比LSTM单独训练更好的效果。|
-| [OFA-BERT](./examples/model_compression/ofa/) :star2:| 基于PaddleSlim Once-For-ALL(OFA)策略对BERT在GLUE任务的下游模型进行压缩，在精度无损的情况下可减少33%参数量，达到模型小型化的提速的效果。 |
+| [PET](./examples/few_shot/pet/) | 基于[Exploiting Cloze Questions for Few Shot Text Classification and Natural Language Inference](https://arxiv.org/abs/2001.07676) 论文策略实现, 基于人工知识设计 Prompt, 将下游目标任务转换为完形填空任务来充分挖掘预训练模型中的知识, 显著提升模型效果。|
+| [P-Tuning](./examples/few_shot/p-tuning/) |基于[GPT Understands, Too](https://arxiv.org/pdf/2103.10385.pdf) 论文策略实现, 首次提出连续可学习的模板参数，在全参数空间对模板进行连续优化，大幅提升模型稳定性和模型效果。|
+| [EFL](./examples/few_shot/efl/) | 基于[Entailment as Few-Shot Learner](https://arxiv.org/abs/2104.14690) 论文策略实现，将下游目标任务转换为蕴含任务降低模型预测空间，显著提升模型效果。|
+
+## Taskflow 一键预测
+
+Taskflow是功能强大的自然语言处理库，旨在提供开箱即用的NLP预置任务，覆盖自然语言理解与自然语言生成两大核心应用，在中文场景上提供工业级的效果与极致的预测性能。
+
+### 调用示例
+
+```python
+from paddlenlp import Taskflow
+
+# 中文分词
+seg = Taskflow("word_segmentation")
+seg("第十四届全运会在西安举办")
+>>> ['第十四届', '全运会', '在', '西安', '举办']
+
+# 词性标注
+pos_tagging = Taskflow("pos_tagging")
+pos_tagging("第十四届全运会在西安举办")
+>>> [('第十四届', 'm'), ('全运会', 'nz'), ('在', 'p'), ('西安', 'LOC'), ('举办', 'v')]
+
+# 命名实体识别
+ner = Taskflow("ner")
+ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
+>>> [{'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
+
+# 句法分析
+ddp = Taskflow("dependency_parsing")
+ddp("百度是一家高科技公司")
+>>> [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+```
+更多使用方法请参考[Taskflow文档](./docs/model_zoo/taskflow.md)
+
+### 任务清单
+
+| 自然语言理解任务  | 自然语言生成任务 |
+| :------------  | ---- |
+| 中文分词 | 生成式问答 |
+| 词性标注 | 智能写诗 |
+| 命名实体识别  |  |
+| 文本纠错 |  |
+| 句法分析 |  |
+| 情感分类 |  |
 
 ## 交互式Notebook教程
 
@@ -255,7 +311,6 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 <div align="center">
   <img src="./docs/imgs/qq.png" width="200" height="200" />
 </div>  
-
 
 
 ## 版本更新
