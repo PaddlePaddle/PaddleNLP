@@ -51,11 +51,11 @@
 
 ### 编译自定义OP
 
-在 Python 动态图下使用自定义 OP 需要将实现的 C++、CUDA 代码编译成动态库，我们已经提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。
+我们已经提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。
 
 #### PaddleNLP 准备
 
-首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 Faster Transformer 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
+首先，如果需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
 
 以下以从 github 上 clone 一个新版 PaddleNLP 为例:
 
@@ -133,6 +133,7 @@ transformer = FasterTransformer(
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
+# 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
 ./build/third-party/build/fastertransformer/bin/decoding_gemm 32 4 8 64 30000 32 512 0
 python ./faster_transformer/sample/decoding_sample.py --config ./faster_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so
 ```
@@ -143,6 +144,7 @@ python ./faster_transformer/sample/decoding_sample.py --config ./faster_transfor
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
+# 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
 ./build/third-party/build/fastertransformer/bin/decoding_gemm 32 4 8 64 30000 32 512 1
 python ./faster_transformer/sample/decoding_sample.py --config ./faster_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so --use_fp16_decoding
 ```
@@ -197,9 +199,9 @@ python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-mediu
 * `--model_name_or_path`: 预训练模型的名称或是路径。
 * `--decoding_lib`: 指向 `libdecoding_op.so` 的路径。需要包含 `libdecoding_op.so`。若不存在则将自动进行 jit 编译产出该 lib。
 * `--batch_size`: 一个 batch 内，样本数目的大小。
-* `--candidate_num`: 执行 topk-sampling 的时候的 `k` 的大小，默认是 4。
-* `--probability_threshold`: 执行 topp-sampling 的时候的阈值的大小，默认是 0.0 表示不执行 topp-sampling。
-* `--max_seq_len`: 最长的生成长度。
+* `--topk`: 执行 topk-sampling 的时候的 `k` 的大小，默认是 4。
+* `--topp`: 执行 topp-sampling 的时候的阈值的大小，默认是 0.0 表示不执行 topp-sampling。
+* `--max_out_len`: 最长的生成长度。
 * `--start_token`: 字符串，表示任意生成的时候的开始 token。
 * `--end_token`: 字符串，生成的结束 token。
 * `--temperature`: temperature 的设定。
@@ -279,6 +281,7 @@ cd bin/
 
 ``` sh
 cd bin/
+# 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
 ../third-party/build/fastertransformer/bin/decoding_gemm 8 5 8 64 38512 256 512 0
 ./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 ```

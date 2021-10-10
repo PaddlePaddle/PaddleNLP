@@ -51,7 +51,7 @@ transformer = FasterTransformer(
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 
-若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自定编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md)。编译好后，使用 `FasterTransformer(decoding_lib="/path/to/lib", ...)` 可以完成导入。
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md)。编译好后，使用 `FasterTransformer(decoding_lib="/path/to/lib", ...)` 可以完成导入。
 
 更详细的例子可以参考 `encoder_decoding_predict.py`，我们提供了更详细用例。
 
@@ -88,6 +88,7 @@ tar -zxf transformer-base-wmt_ende_bpe.tar.gz
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
+# 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
 cp -rf ../../../../paddlenlp/ops/build/third-party/build/fastertransformer/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 0
 python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --decoding_strategy beam_search --beam_size 5
@@ -116,6 +117,7 @@ float16 与 float32 预测的基本流程相同，不过在使用 float16 的 de
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
+# 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
 cp -rf ../../../../paddlenlp/ops/build/third-party/build/fastertransformer/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 1
 python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --use_fp16_decoding --decoding_strategy beam_search --beam_size 5
@@ -126,6 +128,29 @@ python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --d
 翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `./sample/config/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 base model 的配置。
 
 需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
+
+#### 导出基于 FasterTransformer 的预测库使用模型文件
+
+我们提供一个已经基于动态图训练好的 base model 的 checkpoint 以供使用，当前 checkpoint 是基于 WMT 英德翻译的任务训练。可以通过[tranformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/tranformer-base-wmt_ende_bpe.tar.gz)下载。
+
+使用 C++ 预测库，首先，我们需要做的是将动态图的 checkpoint 导出成预测库能使用的模型文件和参数文件。可以执行 `export_model.py` 实现这个过程。
+
+``` sh
+python export_model.py --config ../configs/transformer.base.yaml  --decoding_strategy beam_search --beam_size 5
+```
+
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md)。编译好后，可以在执行 `export_model.py` 时使用 `--decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so` 可以完成导入。
+
+注意：如果是自行编译的话，这里的 `libdecoding_op.so` 的动态库是参照文档 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 中 **`Python 动态图使用自定义 op`** 编译出来的 lib，与相同文档中 **`C++ 预测库使用自定义 op`** 编译产出不同。因此，在使用预测库前，还需要额外导出模型：
+  * 一次用于获取 Python 动态图下的 lib，用到 Python 端进行模型导出。
+  * 一次获取编译的基于预测库的可执行文件
+
+执行 `export_model.py` 之后，可以在当前路径的 `infer_model/` 下面看到导出的模型文件：
+  ```text
+  └── infer_model/
+    ├── transformer.pdiparams
+    └── transformer.pdmodel
+  ```
 
 #### C++ 预测库使用高性能加速
 

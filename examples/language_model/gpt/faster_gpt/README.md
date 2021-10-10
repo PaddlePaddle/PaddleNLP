@@ -72,6 +72,33 @@ python infer.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/l
 * `--temperature`: temperature 的设定。
 * `--use_fp16_decoding`: 是否使用 fp16 进行推理。
 
+#### 导出基于 FasterGPT 的预测库使用模型文件
+
+如果需要使用 Paddle Inference 预测库针对 GPT 进行预测，首先，需要导出预测模型，可以通过 `export_model.py` 脚本获取预测库用模型，执行方式如下所示：
+
+``` sh
+python export_model.py --model_name_or_path gpt2-medium-en --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0 --inference_model_dir ./infer_model/
+```
+
+各个选项的意义与上文的 `infer.py` 的选项相同。额外新增一个 `--inference_model_dir` 选项用于指定保存的模型文件、词表等文件。
+
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md)。编译好后，可以在执行 `export_model.py` 时使用 `--decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so` 可以完成导入。
+
+注意：如果是自行编译的话，这里的 `libdecoding_op.so` 的动态库是参照文档 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 中 **`Python 动态图使用自定义 op`** 编译出来的 lib，与相同文档中 **`C++ 预测库使用自定义 op`** 编译产出不同。因此，在使用预测库前，还需要额外导出模型：
+  * 一次用于获取 Python 动态图下的 lib，用到 Python 端进行模型导出。
+  * 一次获取编译的基于预测库的可执行文件
+
+若是使用的模型是 gpt2-medium-en，保存之后，`./infer_model/` 目录下组织的结构如下：
+
+``` text
+.
+├── gpt.pdiparams       # 保存的参数文件
+├── gpt.pdiparams.info  # 保存的一些变量描述信息，预测不会用到
+├── gpt.pdmodel         # 保存的模型文件
+├── merges.txt          # bpe
+└── vocab.txt           # 词表
+```
+
 #### C++ 预测库使用高性能加速
 
 C++ 预测库使用 FasterGPT 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译。
