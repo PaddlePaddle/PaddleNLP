@@ -70,7 +70,7 @@ tag("第十四届全运会在西安举办")
 # 命名实体识别
 ner = Taskflow("ner")
 ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
->>> [{'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
+>>> [('《', 'w'), ('孤女', '作品类_实体'), ('》', 'w'), ('是', '肯定词'), ('2010年', '时间类'), ('九州出版社', '组织机构类'), ('出版', '场景事件'), ('的', '助词'), ('小说', '作品类_概念'), ('，', 'w'), ('作者', '人物类_概念'), ('是', '肯定词'), ('余兼羽', '人物类_实体')]
 
 # 句法分析
 ddp = Taskflow("dependency_parsing")
