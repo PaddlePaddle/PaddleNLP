@@ -47,7 +47,7 @@ gpt = FasterGPT(
 
 目前，GPT-2 的高性能预测接口 `FasterGPT()` 要求 batch 内输入的样本的长度都是相同的。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
 
-若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md)。编译好后，使用 `FasterGPT(decoding_lib="/path/to/lib", ...)` 可以完成导入。
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md)。编译好后，使用 `FasterGPT(decoding_lib="/path/to/lib", ...)` 可以完成导入。
 
 更详细的例子可以参考 `./infer.py`，我们提供了更详细用例。
 
@@ -74,6 +74,6 @@ python infer.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/l
 
 #### C++ 预测库使用高性能加速
 
-C++ 预测库使用 FasterGPT 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译。
+C++ 预测库使用 FasterGPT 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译。
 
-具体的使用 demo 可以参考 [GPT-2 C++ 预测库使用 demo](../../../paddlenlp/ops/faster_transformer/src/demo/gpt.cc)。
+具体的使用 demo 可以参考 [GPT-2 C++ 预测库使用 demo](../../../../paddlenlp/ops/faster_transformer/src/demo/gpt.cc)。

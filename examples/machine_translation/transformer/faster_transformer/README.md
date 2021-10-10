@@ -51,7 +51,7 @@ transformer = FasterTransformer(
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 
-若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自定编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md)。编译好后，使用 `FasterTransformer(decoding_lib="/path/to/lib", ...)` 可以完成导入。
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自定编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md)。编译好后，使用 `FasterTransformer(decoding_lib="/path/to/lib", ...)` 可以完成导入。
 
 更详细的例子可以参考 `encoder_decoding_predict.py`，我们提供了更详细用例。
 
@@ -129,9 +129,9 @@ python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --d
 
 #### C++ 预测库使用高性能加速
 
-C++ 预测库使用 FasterTransformer 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译。
+C++ 预测库使用 FasterTransformer 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译。
 
-具体的使用 demo 可以参考 [Transformer C++ 预测库使用 demo](../../../paddlenlp/ops/faster_transformer/src/demo/transformer_e2e.cc)。
+具体的使用 demo 可以参考 [Transformer C++ 预测库使用 demo](../../../../paddlenlp/ops/faster_transformer/src/demo/transformer_e2e.cc)。
 
 ## 模型评估
 
