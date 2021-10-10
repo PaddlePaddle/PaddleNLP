@@ -40,9 +40,9 @@ JIT 自动编译
 
 目前支持 JIT 的预测加速 API 有：
 
-* `FasterTransformer()/TransformerGenerator()`: 支持 Transformer 模型的预测加速功能。使用示例可以参考 `Transformer预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/decoding_sample.py>`_，`Transformer预测加速使用示例-机器翻译 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_translation/transformer/faster_transformer>`_。
-* `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 `GPT预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_。
-* `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 `UnifiedTransformer预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dialogue/unified_transformer>`_。
+* `FasterTransformer()/TransformerGenerator()`: 支持 Transformer 模型的预测加速功能。使用示例可以参考 `Transformer 预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/decoding_sample.py>`_，`Transformer 预测加速使用示例-机器翻译 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_translation/transformer/faster_transformer>`_。
+* `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 `GPT 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_。
+* `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 `UnifiedTransformer 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dialogue/unified_transformer>`_。
 * `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。使用示例可以参考 `UNIMOText 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text/faster_unimo>`_。
 * `FasterBart()`: 支持 BART 模型预测加速功能。使用示例可以参考 `BART 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/bart_decoding_sample.py>`_。
 
@@ -128,7 +128,7 @@ PaddleNLP 准备
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding)
 
-更详细的例子可以参考 `Transformer预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/decoding_sample.py>`_，`Transformer预测加速使用示例-机器翻译 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_translation/transformer/faster_transformer>`_，我们提供了更详细用例。
+更详细的例子可以参考 `Transformer 预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/decoding_sample.py>`_，`Transformer 预测加速使用示例-机器翻译 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_translation/transformer/faster_transformer>`_，我们提供了更详细用例。
 
 Transformer decoding 示例代码
 """"""""""""
@@ -152,7 +152,7 @@ Transformer decoding 示例代码
     ./build/third-party/build/fastertransformer/bin/decoding_gemm 32 4 8 64 30000 32 512 1
     python ./faster_transformer/sample/decoding_sample.py --config ./faster_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so --use_fp16_decoding
 
-其中，`decoding_gemm` 不同参数的意义可以参考 `FasterTransformer文档 <https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos>`_。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
+其中，`decoding_gemm` 不同参数的意义可以参考 `FasterTransformer 文档 <https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos>`_。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
 
 使用 GPT-2 decoding 高性能推理
 ^^^^^^^^^^^^
@@ -186,7 +186,7 @@ Transformer decoding 示例代码
 
 目前，GPT-2 的例子仅支持 `batch size` 为 `1` 或是 batch 内输入的序列长度相等的情况。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
 
-更详细的例子可以参考 `GPT预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_，我们提供了更详细用例。
+更详细的例子可以参考 `GPT 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_，我们提供了更详细用例。
 
 GPT-2 decoding 示例代码
 """"""""""""
@@ -297,7 +297,7 @@ PaddleNLP 准备
 
 其中：
 
-* `decoding_gemm` 不同参数的意义可以参考 `FasterTransformer文档 <https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos>`_。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
+* `decoding_gemm` 不同参数的意义可以参考 `FasterTransformer 文档 <https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos>`_。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
 * `DATA_HOME` 则是 `paddlenlp.utils.env.DATA_HOME` 返回的路径。
 
 预测所需要的模型文件，可以通过 `PaddleNLP/examples/machine_translation/transformer/faster_transformer/README.md` 文档中所记述的方式导出。
