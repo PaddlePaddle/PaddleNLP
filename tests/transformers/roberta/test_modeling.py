@@ -18,8 +18,8 @@ import unittest
 import paddle
 import copy
 import sys
-sys.path.append('E:\deep_learning\代码\git_code\PaddleNLP')
-sys.path.append('E:\deep_learning\代码\git_code\PaddleNLP\\tests')
+sys.path.append('/home/aistudio/PaddleNLP')
+sys.path.append('/home/aistudio/PaddleNLP/tests')
 
 from paddlenlp.transformers import RobertaModel
 from paddlenlp.transformers import RobertaForQuestionAnswering, RobertaForSequenceClassification, RobertaForTokenClassification, \
@@ -125,12 +125,14 @@ class TestRobertaForQuestionAnswering(TestRobertaForSequenceClassification):
         self.check_output_equal(self.output[1].numpy().shape,
                                 self.expected_end_logit_shape)
 
+
 class TestRobertaForMaskedLM(TestRobertaForSequenceClassification):
     def set_model_class(self):
         self.TEST_MODEL_CLASS = RobertaForMaskedLM
 
     def set_output(self):
-        self.expected_seq_shape = (self.config['batch_size'], self.config['seq_len'],
+        self.expected_seq_shape = (self.config['batch_size'],
+                                   self.config['seq_len'],
                                    self.config['vocab_size'])
 
     def test_forward(self):
@@ -177,17 +179,16 @@ class TestRobertaFromPretrain(CommonTest):
                                  self.config['hidden_size'])
         self.check_output_equal(output[0].numpy().shape, expected_seq_shape)
         self.check_output_equal(output[1].numpy().shape, expected_pooled_shape)
-        expected_seq_slice = np.array([[1.1114185,0.02256796,0.44618145],
-                                        [1.8308731,0.23186359,0.30875257],
-                                        [1.6826357,-0.19108845,1.1281401]])
+        expected_seq_slice = np.array([[1.1114169, 0.0225839, 0.4461781],
+                                       [1.83088, 0.23190491, 0.30874157],
+                                       [1.6826348, -0.19104452, 1.1281313]])
         # There's output diff about 1e-6 between cpu and gpu
         self.check_output_equal(
             output[0].numpy()[0, 0:3, 0:3], expected_seq_slice, atol=1e-6)
-        
-        expected_pooled_slice = np.array(
-            [[0.9812122,0.12961738,0.8904638],
-            [0.933545,0.5196192,0.79873586],
-            [0.9675642,0.4496641,0.80196345]])
+
+        expected_pooled_slice = np.array([[0.9812122, 0.1296441, 0.8904621],
+                                          [0.933545, 0.5196196, 0.7987352],
+                                          [0.96756446, 0.44966346, 0.801963]])
         self.check_output_equal(
             output[1].numpy()[0:3, 0:3], expected_pooled_slice, atol=1e-6)
 
@@ -195,7 +196,7 @@ class TestRobertaFromPretrain(CommonTest):
 class TestRobertaForMultipleChoice(TestRobertaForSequenceClassification):
     def set_model_class(self):
         self.TEST_MODEL_CLASS = RobertaForMultipleChoice
-    
+
     def set_input(self):
         self.config = copy.deepcopy(RobertaModel.pretrained_init_configuration[
             'roberta-wwm-ext'])
@@ -208,12 +209,13 @@ class TestRobertaForMultipleChoice(TestRobertaForSequenceClassification):
         self.config['batch_size'] = 3
         self.config['max_position_embeddings'] = 512
         self.num_choices = 2
-        input_ids, _ = create_input_data(
-            self.config)
-        self.input_ids = np.array([input_ids for i in range(self.num_choices)]).transpose((1,0,2))
+        input_ids, _ = create_input_data(self.config)
+        self.input_ids = np.array(
+            [input_ids for i in range(self.num_choices)]).transpose((1, 0, 2))
 
     def set_output(self):
-        self.expected_output_shape = (self.config['batch_size'], self.num_choices)
+        self.expected_output_shape = (self.config['batch_size'],
+                                      self.num_choices)
 
     def check_testcase(self):
         self.check_output_equal(self.output.numpy().shape,
@@ -222,5 +224,3 @@ class TestRobertaForMultipleChoice(TestRobertaForSequenceClassification):
 
 if __name__ == "__main__":
     unittest.main()
-    
-

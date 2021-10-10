@@ -18,8 +18,8 @@ import unittest
 import sys
 import json
 
-sys.path.append('E:\deep_learning\代码\git_code\PaddleNLP')
-sys.path.append('E:\deep_learning\代码\git_code\PaddleNLP\\tests')
+sys.path.append('/home/aistudio/PaddleNLP')
+sys.path.append('/home/aistudio/PaddleNLP/tests')
 
 from paddlenlp.transformers import RobertaTokenizer, RobertaBPETokenizer
 from paddlenlp.data import Vocab
