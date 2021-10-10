@@ -114,8 +114,6 @@ python -m paddle.distributed.launch --gpus '0' --log_dir ./log finetune.py \
 
 ### 模型预测
 
-在模型预测阶段，我们提供了基于 FasterTransformer 的高性能预测的选项，可以选择性开启是否需要采用高性能预测。若采用高性能预测，需要基于当前环境编译 FasterTransformer 自定义 op，具体的编译方法可以参考 [自定义OP编译使用](../../../paddlenlp/ops/README.md)。
-
 运行如下命令即可在测试集上进行测试
 
 ```shell
@@ -158,10 +156,12 @@ python infer.py \
 - `top_k` 表示采用"sampling"解码策略时，token的概率按从大到小排序，生成的token只从前`top_k`个中进行采样。
 - `device` 表示使用的设备。
 
-同时，我们提供了开启高性能预测的选项：
+同时，我们提供了基于 FasterTransformer 的高性能预测的选项，可以选择性开启是否需要采用高性能预测：
 - `faster` 表示是否开启高性能预测。设置 `--faster` 即表示开启。
 - `decoding_lib` 表示编译出的高性能自定义 op 的动态库的位置。若为空，将使用 JIT 自动编译所需的动态库。
 - `use_fp16_decoding` 表示在开启高性能预测的时候，是否使用 fp16 来完成预测过程。设置 `--use_fp16_decoding` 即表示使用 fp16 进行预测，否则使用 fp32。
+
+若采用高性能预测，需要基于当前环境编译 FasterTransformer 自定义 op，具体的编译方法可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md)
 
 程序运行结束后会将预测生成的response保存在`output_path`中。同时终端中会输出评估结果。
 

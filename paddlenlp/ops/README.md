@@ -1,8 +1,8 @@
-# 自定义OP编译使用
+# 文本生成高性能加速
 
 ## 子目录结构
 
-以下是 FasterTransformer 的自定义 op 相关文件的目录结构。
+以下是 FasterTransformer 的高性能加速自定义 op 相关文件的目录结构。
 
 ```text
 .
