@@ -194,12 +194,12 @@ gpt = FasterGPT(
 
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
-python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/libdecoding_op.so --batch_size 1 --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0
+python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-medium-en --batch_size 1 --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0
 ```
 
 其中，各个选项的意义如下：
 * `--model_name_or_path`: 预训练模型的名称或是路径。
-* `--decoding_lib`: 指向 `libdecoding_op.so` 的路径。需要包含 `libdecoding_op.so`。若不存在则将自动进行 jit 编译产出该 lib。
+* `--decoding_lib`: 指向 `libdecoding_op.so` 的路径。需要包含 `libdecoding_op.so`。若不指定或是不存在则将自动进行 jit 编译产出该 lib。
 * `--batch_size`: 一个 batch 内，样本数目的大小。
 * `--topk`: 执行 topk-sampling 的时候的 `k` 的大小，默认是 4。
 * `--topp`: 执行 topp-sampling 的时候的阈值的大小，默认是 0.0 表示不执行 topp-sampling。
@@ -209,6 +209,7 @@ python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-mediu
 * `--temperature`: temperature 的设定。
 * `--use_fp16_decoding`: 是否使用 fp16 进行推理。
 
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考前文。编译好后，可以在执行 `gpt_sample.py` 时使用 `--decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so` 可以完成导入。
 
 ## C++ 预测库使用自定义 op
 
@@ -299,10 +300,18 @@ cd bin/
 如果需要使用 Paddle Inference 预测库针对 GPT 进行预测，首先，需要导出预测模型，可以通过 `./faster_transformer/sample/gpt_export_model_sample.py` 脚本获取预测库用模型，执行方式如下所示：
 
 ``` sh
-python ./faster_transformer/sample/gpt_export_model_sample.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/libdecoding_op.so --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0 --inference_model_dir ./infer_model/
+python ./faster_transformer/sample/gpt_export_model_sample.py --model_name_or_path gpt2-medium-en  --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0 --inference_model_dir ./infer_model/
 ```
 
-各个选项的意义与上文的 `gpt_sample.py` 的选项相同。额外新增一个 `--inference_model_dir` 选项用于指定保存的模型文件、词表等文件。若是使用的模型是 gpt2-medium-en，保存之后，`./infer_model/` 目录下组织的结构如下：
+各个选项的意义与上文的 `gpt_sample.py` 的选项相同。额外新增一个 `--inference_model_dir` 选项用于指定保存的模型文件、词表等文件。
+
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考前文。编译好后，可以在执行 `gpt_export_model_sample.py` 时使用 `--decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so` 可以完成导入。
+
+注意：如果是自行编译的话，这里的 `libdecoding_op.so` 的动态库是参照前文中 **`Python 动态图使用自定义 op`** 编译出来的 lib，与 **`C++ 预测库使用自定义 op`** 编译产出不同。因此，在使用预测库前，还需要额外导出模型：
+  * 一次用于获取 Python 动态图下的 lib，用到 Python 端进行模型导出。
+  * 一次获取编译的基于预测库的可执行文件
+
+若是使用的模型是 gpt2-medium-en，保存之后，`./infer_model/` 目录下组织的结构如下：
 
 ``` text
 .
