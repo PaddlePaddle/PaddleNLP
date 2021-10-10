@@ -38,6 +38,7 @@ JIT 自动编译
 以 Transformer 为例，可以直接调用 `TransformerGenerator()` 这个 API，程序会自动编译。
 
 目前支持 JIT 的预测加速 API 有：
+
 * `FasterTransformer()/TransformerGenerator()`: 支持 Transformer 模型的预测加速功能。使用示例可以参考 `Transformer预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/decoding_sample.py>`_，`Transformer预测加速使用示例-机器翻译 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_translation/transformer/faster_transformer>`_。
 * `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 `GPT预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_。
 * `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 `UnifiedTransformer预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dialogue/unified_transformer>`_。
@@ -85,6 +86,7 @@ PaddleNLP 准备
     cd ../
 
 可以使用的编译选项包括：
+
 * `-DSM`: 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
 * `-DPY_CMD`: 指定当前装有 PaddlePaddle 版本的 python 环境，比如 `-DPY_CMD=python3.7`。若未指定 `-DPY_CMD` 将会默认使用系统命令 `python` 对应的 Python。
 * `-DWITH_GPT`: 是否编译带有 GPT 相关的 lib。若使用 GPT-2 高性能推理，需要加上 `-DWITH_GPT=ON`。默认为 OFF。
@@ -196,6 +198,7 @@ GPT-2 decoding 示例代码
     python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/libdecoding_op.so --batch_size 1 --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0
 
 其中，各个选项的意义如下：
+
 * `--model_name_or_path`: 预训练模型的名称或是路径。
 * `--decoding_lib`: 指向 `libdecoding_op.so` 的路径。需要包含 `libdecoding_op.so`。若不存在则将自动进行 jit 编译产出该 lib。
 * `--batch_size`: 一个 batch 内，样本数目的大小。
@@ -249,6 +252,7 @@ PaddleNLP 准备
     cd ../
 
 注意：
+
 * `-DSM`: 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
 * `-DPADDLE_LIB`: 需要指明使用的 PaddlePaddle 预测库的路径 `/path/to/paddle_inference_install_dir/`，并且在该路径下，预测库的组织结构满足：
   .. code-block::
@@ -291,6 +295,7 @@ PaddleNLP 准备
     ./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
 
 其中：
+
 * `decoding_gemm` 不同参数的意义可以参考 `FasterTransformer文档 <https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos>`_。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
 * `DATA_HOME` 则是 `paddlenlp.utils.env.DATA_HOME` 返回的路径。
 
