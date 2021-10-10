@@ -32,22 +32,6 @@ from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mod
 from .task import Task
 
 usage = r"""
-           from paddlenlp import Taskflow 
-
-           question = Taskflow("text_generation")
-           question("中国的国土面积有多大？")
-           '''
-           [{'text': '中国的国土面积有多大？', 'answer': '960万平方公里。'}]
-           '''
-           poetry  = Taskflow("text_generation",  generation_task="poetry")
-           poetry("林密不见人")
-           '''
-           [{'text': '林密不见人', 'answer': ',但闻人语响。'}]
-           '''
-           poetry(["林密不见人", "举头邀明月"])
-           '''
-           [{'text': '林密不见人', 'answer': ',但闻人语响。'}, {'text': '举头邀明月', 'answer': ',低头思故乡。'}]
-           '''
          """
 
 URLS = {
@@ -71,14 +55,6 @@ class TextGenerationTask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = True
         self._usage = usage
-        if self._static_mode:
-            download_file(self._task_path,
-                          "static" + os.path.sep + "inference.pdiparams",
-                          URLS[self.model][0], URLS[self.model][1], model)
-            self._get_inference_model()
-        else:
-            self._construct_model(model)
-        self._construct_tokenizer(model)
 
     def _construct_input_spec(self):
         """
@@ -123,16 +99,18 @@ class TextGenerationTask(Task):
         num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
         generation_task = self.kwargs[
-            'generation_task'] if 'generation_task' in self.kwargs else 'question'
+            'generation_task'] if 'generation_task' in self.kwargs else 'question_answering'
         max_seq_len = 32
 
         def select_few_shot_input(model_name, generation_task):
             pre_input = ""
-            if generation_task not in ['question', 'poetry']:
+            if generation_task not in [
+                    'question_answering', 'poetry_generation'
+            ]:
                 raise ValueError(
                     "The generation task must be question or poetry")
             if model_name == "gpt-cpm-large-cn":
-                if generation_task == "question":
+                if generation_task == "question_answering":
                     pre_input = '问题：中国的首都是哪里？答案：北京。\n问题：{} 答案：'
                 else:
                     pre_input = '默写古诗: 大漠孤烟直，长河落日圆。\n{}'
