@@ -270,13 +270,19 @@ set(FT_PATCH_COMMAND
   && ${MUTE_COMMAND}
 )
 
+# TODO(guosheng): Use UPDATE_COMMAND instead of PATCH_COMMAND to make cmake
+# re-run always use the latest patches when the developer changes FT patch codes,
+# all patches rather than the changes would re-build, any better way to do this.
+# Or maybe hidden this function for simplicity.
+set(FT_UPDATE_COMMAND git checkout v3.1 && git checkout . && ${FT_PATCH_COMMAND})
+
 ExternalProject_Add(
   extern_${THIRD_PARTY_NAME}
   GIT_REPOSITORY    https://github.com/NVIDIA/FasterTransformer.git
   GIT_TAG           v3.1
   PREFIX            ${THIRD_PATH}
   SOURCE_DIR        ${THIRD_PATH}/source/${THIRD_PARTY_NAME}
-  PATCH_COMMAND     ${FT_PATCH_COMMAND}
+  UPDATE_COMMAND    ${FT_UPDATE_COMMAND}  # PATCH_COMMAND     ${FT_PATCH_COMMAND}
   BINARY_DIR        ${THIRD_PATH}/build/${THIRD_PARTY_NAME}
   INSTALL_COMMAND   ""
   CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_STATIC_LIB=${WITH_STATIC_LIB}

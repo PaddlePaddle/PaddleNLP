@@ -645,7 +645,7 @@ __global__ void topk_stage_1_opt3(
   const int tmp_log_buf_index = row_id * vocab_size;
   const int tmp_topk_buf_index = row_id * BLOCKS_PER_BEAM_ * k + block_lane * k;
   const int beam_id_in_output =
-      row_id / (k >> 1) * k + row_id % (k >> 1) + k >> 1;
+      row_id / (k >> 1) * k + row_id % (k >> 1) + (k >> 1);
   TopK_2<T> partial;
   const bool IS_FP16 = std::is_same<T, half>::value;
   const T MAX_T_VAL = (IS_FP16) ? HALF_FLT_MAX : FLT_MAX;
