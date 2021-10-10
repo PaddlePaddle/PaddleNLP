@@ -127,6 +127,12 @@ python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --d
 
 需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
+#### C++ 预测库使用高性能加速
+
+C++ 预测库使用 FasterTransformer 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译。
+
+具体的使用 demo 可以参考 [Transformer C++ 预测库使用 demo](../../../paddlenlp/ops/faster_transformer/src/demo/transformer_e2e.cc)。
+
 ## 模型评估
 
 评估方式与动态图评估方式相同，预测结果中每行输出是对应行输入的得分最高的翻译，对于使用 BPE 的数据，预测出的翻译结果也将是 BPE 表示的数据，要还原成原始的数据（这里指 tokenize 后的数据）才能进行正确的评估。评估过程具体如下（BLEU 是翻译任务常用的自动评估方法指标）：
