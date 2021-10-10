@@ -19,7 +19,7 @@
 
 ### 使用 GPT-2 decoding 高性能推理
 
-编写 python 脚本的时候，调用 `FasterGPT` API 即可实现将 FasterGPT 用于当前的预测。若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。
+编写 python 脚本的时候，调用 `FasterGPT()` API 即可实现将 FasterGPT 用于当前的预测。
 
 ``` python
 from paddlenlp.ops import FasterGPT
@@ -36,22 +36,22 @@ model = model_class.from_pretrained(args.model_name)
 # Define model
 gpt = FasterGPT(
     model=model,
-    candidate_num=args.candidate_num,
-    probability_threshold=args.probability_threshold,
-    max_seq_len=args.max_seq_len,
-    start_id=start_id,
-    end_id=end_id,
+    topk=args.topk,
+    topp=args.topp,
+    max_out_len=args.max_out_len,
+    bos_id=bos_id,
+    eos_id=eos_id,
     temperature=args.temperature,
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 
-目前，GPT-2 的例子仅支持 `batch size` 为 `1` 或是 batch 内输入的样本的长度都是相同的情况。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
+目前，GPT-2 的高性能预测接口 `FasterGPT()` 要求 batch 内输入的样本的长度都是相同的。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
 
-如果需要自定编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md)。编译好后，使用 `FasterGPT(decoding_lib="/path/to/lib", ...)` 可以完成导入。
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md)。编译好后，使用 `FasterGPT(decoding_lib="/path/to/lib", ...)` 可以完成导入。
 
 更详细的例子可以参考 `./infer.py`，我们提供了更详细用例。
 
-#### 执行 GPT-2 decoding on PaddlePaddle
+#### GPT-2 decoding 示例代码
 
 使用 PaddlePaddle 仅执行 decoding 测试（float32）：
 
@@ -71,3 +71,9 @@ python infer.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/l
 * `--end_token`: 字符串，生成的结束 token。
 * `--temperature`: temperature 的设定。
 * `--use_fp16_decoding`: 是否使用 fp16 进行推理。
+
+#### C++ 预测库使用高性能加速
+
+C++ 预测库使用 FasterGPT 的高性能加速需要自定编译，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译。
+
+具体的使用 demo 可以参考 [GPT-2 C++ 预测库使用 demo](../../../paddlenlp/ops/faster_transformer/src/demo/gpt.cc)。

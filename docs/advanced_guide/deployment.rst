@@ -99,7 +99,7 @@ PaddleNLP 准备
 使用 Transformer decoding 高性能推理
 ^^^^^^^^^^^^
 
-编写 python 脚本的时候，调用 `FasterTransformer` API 并传入 `libdecoding_op.so` 的位置即可实现将 Faster Transformer 用于当前的预测。
+编写 python 脚本的时候，调用 `FasterTransformer API <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.ops.faster_transformer.transformer.faster_transformer.html#paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer>` 并传入 `libdecoding_op.so` 的位置即可实现将 Faster Transformer 用于当前的预测。
 
 举例如下：
 
@@ -126,6 +126,8 @@ PaddleNLP 准备
         max_out_len=args.max_out_len,
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding)
+
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以如前文所述进行编译。编译好后，使用 `FasterTransformer(decoding_lib="/path/to/lib", ...)` 可以完成导入。
 
 更详细的例子可以参考 `Transformer 预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/decoding_sample.py>`_，`Transformer 预测加速使用示例-机器翻译 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_translation/transformer/faster_transformer>`_，我们提供了更详细用例。
 
@@ -174,16 +176,18 @@ Transformer decoding 示例代码
     # Define model
     gpt = FasterGPT(
         model=model,
-        candidate_num=args.candidate_num,
-        probability_threshold=args.probability_threshold,
-        max_seq_len=args.max_seq_len,
-        start_id=start_id,
-        end_id=end_id,
+        topk=args.topk,
+        topp=args.topp,
+        max_out_len=args.max_out_len,
+        bos_id=bos_id,
+        eos_id=eos_id,
         temperature=args.temperature,
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding)
 
-目前，GPT-2 的例子仅支持 `batch size` 为 `1` 或是 batch 内输入的序列长度相等的情况。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
+目前，GPT-2 的高性能预测接口 `FasterGPT()` 要求 batch 内输入的样本的长度都是相同的。并且，仅支持 topk-sampling 和 topp-sampling，不支持 beam-search。
+
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以如前文所述进行编译。编译好后，使用 `FasterGPT(decoding_lib="/path/to/lib", ...)` 可以完成导入。
 
 更详细的例子可以参考 `GPT 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_，我们提供了更详细用例。
 
