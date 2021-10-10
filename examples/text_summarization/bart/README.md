@@ -121,13 +121,13 @@ python -m paddle.distributed.launch --gpus 1,2 run_summarization.py \
 
 ### 模型预测
 
-运行如下命令即可在测试集上进行测试
+运行如下命令即可在验证集上进行测试
 
 ```shell
 # GPU启动，预测仅支持单卡
 export CUDA_VISIBLE_DEVICES=0
 python generate.py \
-    --model_name_or_path=./output/bart_model_16000.pdparams \
+    --model_name_or_path=bart-base-cnndm-model \
     --dataset_name=cnn_dailymail \
     --output_path=generate.txt \
     --max_source_length=1024 \
@@ -136,6 +136,7 @@ python generate.py \
     --top_k=2 \
     --top_p=1.0 \
     --num_beams=1 \
+    --length_penalty=0.0 \
     --batch_size=64 \
     --seed=42 \
     --ignore_pad_token_for_loss=True \
@@ -167,6 +168,8 @@ python generate.py \
 
 - `num_beams` 表示besm search的beam size。
 
+- `length_penalty` 表示besm search生成长度的指数惩罚。
+
 - `batch_size` 表示每次迭代**单卡**上的样本数目。
 
 - `seed` 表示随机数生成器的种子。
@@ -183,9 +186,9 @@ python generate.py \
 
 |   model_name_or_path    |     Rouge-1     |     Rouge-2     |    Rouge-L    |
 | :----------------------: | :-------------: | :-------------: |:-------------: |
-|        bart-base         | 43.661 | 20.1563 |41.0312 |
+|        [bart-base-cnndm-model](https://paddlenlp.bj.bcebos.com/models/transformers/bart/bart-base-cnndm-model.tar.gz )      | 43.6364 | 20.1401 |41.0113 |
 
-**NOTE:** `./output/bart_model_16000.pdparams`是按本项目中的超参在单卡上finetune得到的结果。
+**NOTE:** `bart-base-cnndm-model`是按本项目中的超参finetune得到的结果。
 
 ### 模型高性能预测
 
@@ -195,7 +198,7 @@ python generate.py \
 # GPU启动，预测仅支持单卡
 export CUDA_VISIBLE_DEVICES=0
 python generate.py \
-    --model_name_or_path=./output/bart_model_16000.pdparams \
+    --model_name_or_path=bart-base-cnndm-model \
     --dataset_name=cnn_dailymail \
     --output_path=generate.txt \
     --max_source_length=1024 \
@@ -204,6 +207,7 @@ python generate.py \
     --top_k=2 \
     --top_p=1.0 \
     --num_beams=1 \
+    --length_penalty=0.0 \
     --batch_size=64 \
     --seed=42 \
     --ignore_pad_token_for_loss=True \
