@@ -110,6 +110,9 @@ class BartPretrainedModel(PretrainedModel):
                         std=self.init_std if hasattr(self, "init_std") else
                         self.bart.config["init_std"],
                         shape=layer.weight.shape))
+        elif isinstance(layer, (nn.TransformerEncoderLayer,
+                                nn.TransformerDecoderLayer)):
+            layer.activation = nn.GELU(approximate=True)
 
 
 class BartLearnedPositionalEmbedding(Embedding):
