@@ -19,7 +19,7 @@
 
 ## 使用 FasterUNIMOText 完成预测
 
-编写 python 脚本的时候，调用 `FasterUNIMOText` API 即可实现将 FasterUNIMOText 用于当前的预测。
+编写 python 脚本的时候，调用 `FasterUNIMOText` API 即可实现 UNIMOText 的高性能预测。
 
 举例如下：
 

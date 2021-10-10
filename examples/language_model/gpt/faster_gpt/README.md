@@ -19,7 +19,7 @@
 
 ### 使用 GPT-2 decoding 高性能推理
 
-编写 python 脚本的时候，调用 `FasterGPT()` API 即可实现将 FasterGPT 用于当前的预测。
+编写 python 脚本的时候，调用 `FasterGPT()` API 即可实现 GPT-2 模型的高性能预测。
 
 ``` python
 from paddlenlp.ops import FasterGPT

@@ -96,7 +96,7 @@ cd ../
 
 ### 使用 Transformer decoding 高性能推理
 
-编写 python 脚本的时候，调用 `FasterTransformer` API 并传入 `libdecoding_op.so` 的位置即可实现将 Faster Transformer 用于当前的预测。
+编写 python 脚本的时候，调用 `FasterTransformer` API 并传入 `libdecoding_op.so` 的位置即可实现 Transformer 模型的高性能预测。
 
 举例如下：
 
