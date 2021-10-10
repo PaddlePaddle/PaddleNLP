@@ -55,7 +55,7 @@
 
 #### PaddleNLP 准备
 
-首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterUNIMOText 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
+首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 Faster Transformer 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
 
 以下以从 github 上 clone 一个新版 PaddleNLP 为例:
 
@@ -212,7 +212,7 @@ python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-mediu
 
 #### PaddleNLP 准备
 
-首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterUNIMOText 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
+首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 Faster Transformer 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
 
 以下以从 github 上 clone 一个新版 PaddleNLP 为例:
 
