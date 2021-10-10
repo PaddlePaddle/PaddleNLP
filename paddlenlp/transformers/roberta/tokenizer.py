@@ -306,12 +306,14 @@ class RobertaBPETokenizer(GPTTokenizer):
         "vocab_file": {
             "roberta-base": gpt_vocab_link,
             "roberta-large": gpt_vocab_link,
+            "deepset/roberta-base-squad2": gpt_vocab_link,
             "sshleifer/tiny-distilroberta-base":
             "https://huggingface.co/sshleifer/tiny-distilroberta-base/resolve/main/vocab.json"
         },
         "merges_file": {
             "roberta-base": gpt_merges_link,
             "roberta-large": gpt_merges_link,
+            "deepset/roberta-base-squad2": gpt_merges_link,
             "sshleifer/tiny-distilroberta-base":
             "https://huggingface.co/sshleifer/tiny-distilroberta-base/resolve/main/merges.txt"
         }
@@ -319,6 +321,7 @@ class RobertaBPETokenizer(GPTTokenizer):
     pretrained_init_configuration = {
         "roberta-base": {},
         "roberta-large": {},
+        "deepset/roberta-base-squad2": {},
         "sshleifer/tiny-distilroberta-base": {}
     }
 
