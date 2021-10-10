@@ -12,7 +12,7 @@
 * CUDA 10.1 或 10.2（需要 PaddlePaddle 框架一致）
 * gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
 * 推荐使用 Python3
-* [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#setup) 使用必要的环境
+* `Faster Transformer <https://github.com/NVIDIA/FasterTransformer/tree/v3.1#setup>`_ 使用必要的环境
 * 环境依赖
   - attrdict
   - pyyaml
@@ -36,11 +36,11 @@ JIT 自动编译
 以 Transformer 为例，可以直接调用 `TransformerGenerator()` 这个 API，程序会自动编译。
 
 目前支持 JIT 的预测加速 API 有：
-* `FasterTransformer()/TransformerGenerator()`: 支持 Transformer 模型的预测加速功能。使用示例可以参考 [Transformer 预测加速使用示例-sample](./faster_transformer/sample/decoding_sample.py)，[Transformer 预测加速使用示例-机器翻译](../../examples/machine_translation/transformer/faster_transformer/)。
-* `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 [GPT 预测加速使用示例](../../examples/language_model/gpt/faster_gpt/)。
-* `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 [UnifiedTransformer 预测加速使用示例](../../examples/dialogue/unified_transformer/)。
-* `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。使用示例可以参考 [UNIMOText 预测加速使用示例](../../examples/text_generation/unimo-text/faster_unimo/)。
-* `FasterBart()`: 支持 BART 模型预测加速功能。使用示例可以参考 [BART 预测加速使用示例](./faster_transformer/sample/bart_decoding_sample.py)。
+* `FasterTransformer()/TransformerGenerator()`: 支持 Transformer 模型的预测加速功能。使用示例可以参考 `Transformer预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/decoding_sample.py>`_，`Transformer预测加速使用示例-机器翻译 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_translation/transformer/faster_transformer>`_。
+* `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 `GPT预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_。
+* `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 `UnifiedTransformer预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dialogue/unified_transformer>`_。
+* `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。使用示例可以参考 `UNIMOText 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text/faster_unimo>`_。
+* `FasterBart()`: 支持 BART 模型预测加速功能。使用示例可以参考 `BART 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/bart_decoding_sample.py>`_。
 
 具体使用方法可以参考 API 文档或是使用示例。
 
@@ -147,7 +147,7 @@ export FLAGS_fraction_of_gpu_memory_to_use=0.1
 python ./faster_transformer/sample/decoding_sample.py --config ./faster_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so --use_fp16_decoding
 ```
 
-其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
+其中，`decoding_gemm` 不同参数的意义可以参考 `FasterTransformer文档 <https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos>`_。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
 
 使用 GPT-2 decoding 高性能推理
 ^^^^^^^^^^^^
@@ -289,7 +289,7 @@ cd bin/
 ```
 
 其中：
-* `decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
+* `decoding_gemm` 不同参数的意义可以参考 `FasterTransformer文档 <https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos>`_。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
 * `DATA_HOME` 则是 `paddlenlp.utils.env.DATA_HOME` 返回的路径。
 
 预测所需要的模型文件，可以通过 `PaddleNLP/examples/machine_translation/transformer/faster_transformer/README.md` 文档中所记述的方式导出。
