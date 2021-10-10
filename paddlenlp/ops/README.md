@@ -30,7 +30,7 @@
 
 ## 快速开始
 
-我们实现了基于 GPU 的 Faster Transformer 的自定义 op 的接入。接下来，我们将分别介绍基于 Python 动态图和预测库使用 Faster Transformer 自定义 op 的方式，包括 op 的编译与使用。
+我们实现了基于 Faster Transformer 的自定义 op 的接入，用于加速文本生成模型在 GPU 上的预测性能。接下来，我们将分别介绍基于 Python 动态图和预测库使用 Faster Transformer 自定义 op 的方式，包括 op 的编译与使用。
 
 ## Python 动态图使用自定义 op
 

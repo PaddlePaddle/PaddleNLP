@@ -13,7 +13,7 @@
 
 ## 快速开始
 
-我们实现了基于 GPU 的 FasterGPT 的自定义 op 的接入。接下来，我们将介绍基于 Python 动态图使用 FasterGPT 自定义 op 的方式。
+我们实现了基于 Faster Transformer 的 FasterGPT 的自定义 op 的接入，用于 GPT-2 模型在 GPU 上的预测性能。接下来，我们将介绍基于 Python 动态图使用 FasterGPT 自定义 op 的方式。
 
 ## Python 动态图使用自定义 op
 

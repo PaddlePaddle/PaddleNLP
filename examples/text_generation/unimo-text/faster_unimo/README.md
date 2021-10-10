@@ -15,11 +15,11 @@
 
 ## 快速开始
 
-我们实现了基于 GPU 的 FasterUNIMOText 的自定义 op 的接入。接下来，我们将介绍基于 Python 动态图使用 FasterUNIMOText 自定义 op 的方式。
+我们实现了基于 Faster Transformer 的 FasterUNIMOText 的自定义 op 的接入，用于加速 UNIMOText 模型在 GPU 上的预测性能。接下来，我们将介绍基于 Python 动态图使用 FasterUNIMOText 自定义 op 的方式。
 
 ## 使用 FasterUNIMOText 完成预测
 
-编写 python 脚本的时候，调用 `FasterUNIMOText` API 即可实现将 FasterUNIMOText 用于当前的预测。若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。
+编写 python 脚本的时候，调用 `FasterUNIMOText` API 即可实现将 FasterUNIMOText 用于当前的预测。
 
 举例如下：
 
@@ -35,7 +35,7 @@ model = FasterUNIMOText(
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 
-如果需要自定编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md)。编译好后，使用 `FasterUNIMOText(decoding_lib="/path/to/lib", ...)` 可以完成导入。
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自定编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md)。编译好后，使用 `FasterUNIMOText(decoding_lib="/path/to/lib", ...)` 可以完成导入。
 
 更详细的例子可以参考 `infer.py`，我们提供了更详细用例。需要注意的是，当前 FasterUNIMOText 只支持基础的策略，后续我们会进一步丰富像是 length penalty 等策略以提升生成式 API 推理性能。
 

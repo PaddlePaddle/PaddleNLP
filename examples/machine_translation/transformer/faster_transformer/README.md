@@ -19,11 +19,11 @@
 
 ## 快速开始
 
-我们实现了基于 GPU 的 Faster Transformer 的自定义 op 的接入。
+我们实现了基于 Faster Transformer 的自定义 op 的接入，用于加速当前机器翻译 example 在 GPU 上的预测性能。
 
 ## 使用 Faster Transformer 完成预测
 
-编写 python 脚本的时候，调用 [`FasterTransformer` API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.ops.faster_transformer.transformer.faster_transformer.html#paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer) 即可实现将 Faster Transformer 用于当前的预测。若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。
+编写 python 脚本的时候，调用 [`FasterTransformer` API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.ops.faster_transformer.transformer.faster_transformer.html#paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer) 即可实现将 Faster Transformer 用于当前的预测。
 
 举例如下：
 
@@ -51,7 +51,7 @@ transformer = FasterTransformer(
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 
-如果需要自定编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md)。编译好后，使用 `FasterTransformer(decoding_lib="/path/to/lib", ...)` 可以完成导入。
+若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自定编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md)。编译好后，使用 `FasterTransformer(decoding_lib="/path/to/lib", ...)` 可以完成导入。
 
 更详细的例子可以参考 `encoder_decoding_predict.py`，我们提供了更详细用例。
 
