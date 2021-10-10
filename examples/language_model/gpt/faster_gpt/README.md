@@ -101,6 +101,6 @@ python export_model.py --model_name_or_path gpt2-medium-en --topk 4 --topp 0.0 -
 
 #### C++ 预测库使用高性能加速
 
-C++ 预测库使用 FasterGPT 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译。
+C++ 预测库使用 FasterGPT 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译，同时也可以参考相同文档执行对应的 C++ 预测库的 demo 完成预测。
 
-具体的使用 demo 可以参考 [GPT-2 C++ 预测库使用 demo](../../../../paddlenlp/ops/faster_transformer/src/demo/gpt.cc)。
+具体的使用 demo 可以参考 [GPT-2 预测库 C++ demo](../../../../paddlenlp/ops/faster_transformer/src/demo/gpt.cc)。

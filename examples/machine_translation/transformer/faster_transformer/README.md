@@ -154,9 +154,9 @@ python export_model.py --config ../configs/transformer.base.yaml  --decoding_str
 
 #### C++ 预测库使用高性能加速
 
-C++ 预测库使用 FasterTransformer 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译。
+C++ 预测库使用 FasterTransformer 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译，同时也可以参考相同文档执行对应的 C++ 预测库的 demo 完成预测。
 
-具体的使用 demo 可以参考 [Transformer C++ 预测库使用 demo](../../../../paddlenlp/ops/faster_transformer/src/demo/transformer_e2e.cc)。
+具体的使用 demo 可以参考 [Transformer 预测库 C++ demo](../../../../paddlenlp/ops/faster_transformer/src/demo/transformer_e2e.cc)。
 
 ## 模型评估
 
