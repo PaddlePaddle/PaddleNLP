@@ -110,6 +110,7 @@ def do_predict(args):
         beam_search_version=args.beam_search_version,
         rel_len=args.use_rel_len,  # only works when using FT or beam search v2
         alpha=args.alpha,  # only works when using beam search v2
+        diversity_rate=args.diversity_rate,  # only works when using FT
         use_fp16_decoding=False)  # only works when using FT
 
     # Load the trained model
