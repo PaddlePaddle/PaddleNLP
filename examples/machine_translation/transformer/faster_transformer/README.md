@@ -19,58 +19,11 @@
 
 ## 快速开始
 
-我们实现了基于 GPU 的 Faster Transformer 的自定义 op 的接入。接下来，我们将分别介绍基于 Python 动态图和预测库使用 Faster Transformer 自定义 op 的方式，包括 op 的编译与使用。
-
-## Python 动态图使用自定义 op
-
-### 编译自定义OP
-
-在 Python 动态图下使用自定义 OP 需要将实现的 C++、CUDA 代码编译成动态库，我们已经提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。同样的自定义 op 编译的说明也可以在自定义 op 对应的路径 `PaddleNLP/paddlenlp/ops/` 下面找到。
-
-#### PaddleNLP 准备
-
-首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterUNIMOText 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
-
-以下以从 github 上 clone 一个新版 PaddleNLP 为例:
-
-``` sh
-git clone https://github.com/PaddlePaddle/PaddleNLP.git
-```
-
-其次，配置环境变量，让我们可以使用当前 clone 的 paddlenlp，并进入到自定义 OP 的路径，准备后续的编译操作：
-
-``` sh
-export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-cd PaddleNLP/paddlenlp/ops/
-```
-
-#### 编译
-
-编译之前，请确保安装的 PaddlePaddle 的版本高于 2.1.0 或是基于最新的 develop 分支的代码编译，并且正常可用。
-
-编译自定义 OP 可以参照一下步骤：
-
-``` sh
-mkdir build
-cd build/
-cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python3.x
-make -j
-cd ../
-```
-
-可以使用的编译选项包括：
-* `-DSM`: 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
-* `-DPY_CMD`: 指定当前装有 PaddlePaddle 版本的 python 环境，比如 `-DPY_CMD=python3.7`。若未指定 `-DPY_CMD` 将会默认使用系统命令 `python` 对应的 Python。
-* `-DWITH_GPT`: 是否编译带有 GPT 相关的 lib。若使用 GPT-2 高性能推理，需要加上 `-DWITH_GPT=ON`。默认为 OFF。
-* `-DWITH_UNIFIED`: 是否编译带有 Unified Transformer 或是 UNIMOText 相关的 lib。若使用，需要加上 `-DWITH_UNIFIED=ON`。默认为 ON。
-* `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
-* `-DWITH_DECODER`: 是否编译带有 decoder 优化的 lib。默认为 ON。
-
-最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 Faster Transformer decoding 执行的库。
+我们实现了基于 GPU 的 Faster Transformer 的自定义 op 的接入。
 
 ## 使用 Faster Transformer 完成预测
 
-编写 python 脚本的时候，调用 `FasterTransformer` API 并传入 `libdecoding_op.so` 的位置即可实现将 Faster Transformer 用于当前的预测。
+编写 python 脚本的时候，调用 `FasterTransformer` API 即可实现将 Faster Transformer 用于当前的预测。若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。
 
 举例如下：
 
@@ -95,9 +48,10 @@ transformer = FasterTransformer(
     topk=args.topk,
     topp=args.topp,
     max_out_len=args.max_out_len,
-    decoding_lib=args.decoding_lib,
     use_fp16_decoding=args.use_fp16_decoding)
 ```
+
+如果需要自定编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md)。编译好后，使用 `FasterTransformer(decoding_lib="/path/to/lib", ...)` 可以完成导入。
 
 更详细的例子可以参考 `encoder_decoding_predict.py`，我们提供了更详细用例。
 
@@ -174,136 +128,6 @@ python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --d
 需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
 ## 模型评估
-
-评估方式与动态图评估方式相同，预测结果中每行输出是对应行输入的得分最高的翻译，对于使用 BPE 的数据，预测出的翻译结果也将是 BPE 表示的数据，要还原成原始的数据（这里指 tokenize 后的数据）才能进行正确的评估。评估过程具体如下（BLEU 是翻译任务常用的自动评估方法指标）：
-
-``` sh
-# 还原 predict.txt 中的预测结果为 tokenize 后的数据
-sed -r 's/(@@ )|(@@ ?$)//g' predict.txt > predict.tok.txt
-# 若无 BLEU 评估工具，需先进行下载
-git clone https://github.com/moses-smt/mosesdecoder.git
-# 以英德翻译 newstest2014 测试数据为例
-perl mosesdecoder/scripts/generic/multi-bleu.perl ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data/newstest2014.tok.de < predict.tok.txt
-```
-
-执行上述操作之后，可以看到类似如下的结果，此处结果是 base model 在 newstest2014 上的 BLEU 结果：
-```
-BLEU = 26.89, 58.4/32.6/20.5/13.4 (BP=1.000, ratio=1.010, hyp_len=65166, ref_len=64506)
-```
-
-
-## C++ 预测库使用自定义 op
-
-### 编译自定义OP
-
-在 C++ 预测库使用自定义 OP 需要将实现的 C++、CUDA 代码**以及 C++ 预测的 demo**编译成一个可执行文件。因预测库支持自定义 op 方式与 Python 不同，这个过程将不会产生自定义 op 的动态库，将直接得到可执行文件。我们已经提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。并获取执行 demo。
-
-#### PaddleNLP 准备
-
-首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterUNIMOText 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
-
-以下以从 github 上 clone 一个新版 PaddleNLP 为例:
-
-``` sh
-git clone https://github.com/PaddlePaddle/PaddleNLP.git
-```
-
-其次，配置环境变量，让我们可以使用当前 clone 的 paddlenlp，并进入到自定义 OP 的路径，准备后续的编译操作：
-
-``` sh
-export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-cd PaddleNLP/paddlenlp/ops/
-```
-
-#### 编译
-
-编译之前，请确保安装的 PaddlePaddle 预测库的版本是基于最新的 develop 分支的代码编译，并且正常可用。
-
-编译自定义 OP 可以参照以下步骤：
-
-``` sh
-mkdir build
-cd build/
-cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON
-make -j
-cd ../
-```
-
-注意：
-* `-DSM`: 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
-* `-DPADDLE_LIB`: 需要指明使用的 PaddlePaddle 预测库的路径 `/path/to/paddle_inference_install_dir/`，并且在该路径下，预测库的组织结构满足：
-  ```text
-  .
-  ├── CMakeCache.txt
-  ├── paddle/
-    ├── include/
-    └── lib/
-  ├── third_party/
-    ├── cudaerror/
-    ├── install/
-    └── threadpool/
-  └── version.txt
-  ```
-* `-DDEMO`: 说明预测库使用 demo 的位置。比如指定 -DDEMO=./demo/transformer_e2e.cc 或是 -DDEMO=./demo/gpt.cc。最好使用绝对路径，若使用相对路径，需要是相对于 `PaddleNLP/paddlenlp/ops/faster_transformer/src/` 的相对路径。
-* `-DWITH_GPT`: 是否编译带有 GPT 相关的 lib。若使用 GPT-2 高性能推理，需要加上 `-DWITH_GPT=ON`。默认为 OFF。
-* `-DWITH_UNIFIED`: 是否编译带有 Unified Transformer 或是 UNIMOText 相关的 lib。若使用，需要加上 `-DWITH_UNIFIED=ON`。默认为 ON。
-* `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
-* `-DWITH_DECODER`: 是否编译带有 decoder 优化的 lib。默认为 ON。
-* `-DWITH_MKL`: 若当前是使用的 mkl 的 Paddle lib，那么需要打开 MKL 以引入 MKL 相关的依赖。
-* `-DON_INFER`: 是否编译 paddle inference 预测库。
-* **当使用预测库的自定义 op 的时候，请务必开启 `-DON_INFER=ON` 选项，否则，不会得到预测库的可执行文件。**
-
-编译完成后，在 `build/bin/` 路径下将会看到 `transformer_e2e` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
-
-### 导出基于 Faster Transformer 自定义 op 的预测库可使用模型文件
-
-我们提供一个已经基于动态图训练好的 base model 的 checkpoint 以供使用，当前 checkpoint 是基于 WMT 英德翻译的任务训练。可以通过[transformer-base-wmt_ende_bpe](https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz)下载。
-
-使用 C++ 预测库，首先，我们需要做的是将动态图的 checkpoint 导出成预测库能使用的模型文件和参数文件。可以执行 `export_model.py` 实现这个过程。
-
-``` sh
-python export_model.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so  --decoding_strategy beam_search --beam_size 5
-```
-
-注意：这里的 `libdecoding_op.so` 的动态库是参照前文 **`Python 动态图使用自定义 op`** 编译出来的 lib，当前 **`C++ 预测库使用自定义 op`** 不包含编译的动态库。因此，如果在使用预测库前，还需要额外导出模型，需要编译两次：
-  * 一次用于获取 Python 动态图下的 lib，用到 Python 端进行模型导出。
-  * 一次获取编译的基于预测库的可执行文件
-
-执行 `export_model.py` 之后，可以在当前路径的 `infer_model/` 下面看到导出的模型文件：
-  ```text
-  └── infer_model/
-    ├── transformer.pdiparams
-    ├── transformer.pdiparams.info
-    └── transformer.pdmodel
-  ```
-
-
-### 使用 PaddlePaddle 预测库预测
-
-自定义 op 编译完成后，在 `paddlenlp/ops/build/bin/` 路径下将会看到 `transformer_e2e` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
-
-``` sh
-cd bin/
-./transformer_e2e -batch_size <batch_size> -gpu_id <gpu_id> -model_dir <model_directory> -vocab_dir <dict_directory> -data_dir <input_data>
-```
-
-这里的 `<model_directory>` 即是上文说到导出的 paddle inference 模型。
-
-举例说明：
-
-``` sh
-cd bin/
-../third-party/build/fastertransformer/bin/decoding_gemm 8 5 8 64 38512 256 512 0
-./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 -data_dir DATA_HOME/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en
-```
-
-其中：
-* `decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
-* `DATA_HOME` 则是 `paddlenlp.utils.env.DATA_HOME` 返回的路径。
-
-## 模型评估
-
-预测完成之后，会生成一份 `predict.txt` 的文件，记录了本次英德翻译的预测结果，可以使用下面的方式进行 BLEU 计算。
 
 评估方式与动态图评估方式相同，预测结果中每行输出是对应行输入的得分最高的翻译，对于使用 BPE 的数据，预测出的翻译结果也将是 BPE 表示的数据，要还原成原始的数据（这里指 tokenize 后的数据）才能进行正确的评估。评估过程具体如下（BLEU 是翻译任务常用的自动评估方法指标）：
 

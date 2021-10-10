@@ -4,6 +4,22 @@
 
 文本生成高性能加速
 
+使用环境说明
+------------
+
+* 本项目依赖于 PaddlePaddle 2.1.0 及以上版本或适当的 develop 版本
+* CMake >= 3.10
+* CUDA 10.1 或 10.2（需要 PaddlePaddle 框架一致）
+* gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
+* 推荐使用 Python3
+* [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#setup) 使用必要的环境
+* 环境依赖
+  - attrdict
+  - pyyaml
+  ```shell
+  pip install attrdict pyyaml
+  ```
+
 快速开始
 ------------
 
