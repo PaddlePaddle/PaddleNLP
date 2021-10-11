@@ -424,6 +424,8 @@ class ViterbiDecoder(nn.Layer):
 
         # last_ids: batch_size
         scores, last_ids = alpha.max(1), alpha.argmax(1)
+        if max_seq_len == 1:
+            return scores, last_ids.unsqueeze(1)
         # Trace back the best path
         # historys: seq_len, batch_size, n_labels
         historys = paddle.stack(historys)
@@ -438,10 +440,14 @@ class ViterbiDecoder(nn.Layer):
             # hist: batch_size, n_labels
             left_length = left_length + 1
             gather_idx = batch_offset + last_ids
-            tag_mask = paddle.cast((left_length >= 0), 'int64')
+            tag_mask = paddle.cast((left_length > 0), 'int64')
             last_ids_update = paddle.gather(hist.flatten(),
                                             gather_idx) * tag_mask
+            zero_len_mask = paddle.cast((left_length == 0), 'int64')
+            last_ids_update = last_ids_update * (1 - zero_len_mask
+                                                 ) + last_ids * zero_len_mask
             batch_path.append(last_ids_update)
+            tag_mask = paddle.cast((left_length >= 0), 'int64')
             last_ids = last_ids_update + last_ids * (1 - tag_mask)
         batch_path = paddle.reverse(paddle.stack(batch_path, 1), [1])
         return scores, batch_path

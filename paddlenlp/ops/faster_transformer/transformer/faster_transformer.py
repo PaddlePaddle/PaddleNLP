@@ -92,7 +92,10 @@ class FasterTransformer(TransformerModel):
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
         diversity_rate (float, optional):
-            The diversity rate for beam search. Defaults to 0.0.
+            Refer to `A Simple, Fast Diverse Decoding Algorithm for Neural Generation <https://arxiv.org/abs/1611.08562>`_
+            for details. Bigger `diversity_rate` would lead to more diversity.
+            if `diversity_rate == 0` is equivalent to naive BeamSearch. Default
+            to 0 if not set.
         use_fp16_decoding(bool, optional): Whether to use fp16 for decoding. 
         rel_len(bool, optional):
             Indicating whether `max_out_len` in is the length relative to that
@@ -458,6 +461,13 @@ class TransformerGenerator(paddle.nn.Layer):
             - `alpha(float, optional)`: The power number in length penalty
             calculation. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
             Only works in `v2` temporarily. Default to 0.6 if not set.
+        
+            - diversity_rate(float, optional): Refer to `A Simple, Fast Diverse
+            Decoding Algorithm for Neural Generation <https://arxiv.org/abs/1611.08562>`_
+            for details. Bigger `diversity_rate` would lead to more diversity.
+            if `diversity_rate == 0` is equivalent to naive BeamSearch. Default
+            to 0 if not set. **NOTE**: Only works when using FasterTransformer
+            temporarily.
     """
 
     def __init__(self,
@@ -524,6 +534,10 @@ class TransformerGenerator(paddle.nn.Layer):
                 logger.warning(
                     "Exception occurs when using Faster Transformer. " \
                     "The original forward will be involved. ")
+                if diversity_rate != 0:
+                    logger.warning(
+                        "diversity_rate would not work since it is only " \
+                        "supported by FasterTransformer temporarily.")
                 self.transformer = InferTransformerModel(
                     src_vocab_size=src_vocab_size,
                     trg_vocab_size=trg_vocab_size,
@@ -544,6 +558,10 @@ class TransformerGenerator(paddle.nn.Layer):
                     rel_len=rel_len,
                     alpha=alpha)
         else:
+            if diversity_rate != 0:
+                logger.warning(
+                    "diversity_rate would not work since it is only " \
+                    "supported by FasterTransformer temporarily.")
             self.transformer = InferTransformerModel(
                 src_vocab_size=src_vocab_size,
                 trg_vocab_size=trg_vocab_size,
