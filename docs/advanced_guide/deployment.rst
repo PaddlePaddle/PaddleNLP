@@ -291,6 +291,7 @@ PaddleNLP 准备
 编译完成后，在 `build/bin/` 路径下将会看到 `transformer_e2e` 的一个可执行文件。通过设置对应的设置参数完成执行的过程。
 
 .. code-block::
+
     cd bin/
     ./transformer_e2e -batch_size <batch_size> -gpu_id <gpu_id> -model_dir <model_directory> -vocab_dir <dict_directory> -data_dir <input_data>
 
@@ -308,12 +309,12 @@ PaddleNLP 准备
 * `decoding_gemm` 不同参数的意义可以参考 `FasterTransformer 文档 <https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos>`_。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
 * `DATA_HOME` 则是 `paddlenlp.utils.env.DATA_HOME` 返回的路径。
 
-预测所需要的模型文件，可以通过 `PaddleNLP/examples/machine_translation/transformer/faster_transformer/README.md` 文档中所记述的方式导出。
+预测所需要的模型文件，可以通过 `faster_transformer/README.md <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/machine_translation/transformer/faster_transformer/README.md>`_ 文档中所记述的方式导出。
 
 执行 GPT decoding on PaddlePaddle
 """"""""""""
 
-如果需要使用 Paddle Inference 预测库针对 GPT 进行预测，首先，需要导出预测模型，可以通过 `./faster_transformer/sample/gpt_export_model_sample.py` 脚本获取预测库用模型，执行方式如下所示：
+如果需要使用 Paddle Inference 预测库针对 GPT 进行预测，首先，需要导出预测模型，可以通过 `gpt_export_model_sample.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/gpt_export_model_sample.py>`_ 脚本获取预测库用模型，执行方式如下所示：
 
 .. code-block::
 
@@ -328,7 +329,7 @@ PaddleNLP 准备
   * 一次用于获取 Python 动态图下的 lib，用到 Python 端进行模型导出。
   * 一次获取编译的基于预测库的可执行文件
 
-若是使用的模型是 gpt2-medium-en，保存之后，`./infer_model/` 目录下组织的结构如下：
+若是使用的模型是 gpt2-medium-en，保存之后，`infer_model/` 目录下组织的结构如下：
 
 .. code-block::
 
