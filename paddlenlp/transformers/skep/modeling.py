@@ -554,7 +554,7 @@ class SkepCrfForTokenClassification(nn.Layer):
                 See :class:`SkepModel`.
             token_type_ids (Tensor, optional):
                 See :class:`SkepModel`.
-            position_ids (Tensor, `optional`):
+            position_ids (Tensor, optional):
                 See :class:`SkepModel`.
             attention_mask (Tensor, optional):
                 See :class:`SkepModel`.
@@ -574,7 +574,7 @@ class SkepCrfForTokenClassification(nn.Layer):
 
             - `prediction` (Tensor):
                 The prediction tensor containing the highest scoring tag indices.
-                Its datqa type is int64 and its shape is `[batch_size, sequence_length]`.
+                Its data type is int64 and its shape is `[batch_size, sequence_length]`.
 
         """
         sequence_output, _ = self.skep(
