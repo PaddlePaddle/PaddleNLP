@@ -112,7 +112,8 @@ class BartPretrainedModel(PretrainedModel):
                         shape=layer.weight.shape))
         elif isinstance(layer, (nn.TransformerEncoderLayer,
                                 nn.TransformerDecoderLayer)):
-            layer.activation = nn.GELU(approximate=True)
+            if layer.activation == F.gelu:
+                layer.activation = nn.GELU(approximate=True)
 
 
 class BartLearnedPositionalEmbedding(Embedding):
