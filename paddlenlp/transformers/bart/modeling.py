@@ -183,7 +183,7 @@ class BartEncoder(BartPretrainedModel):
         self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids=None, attention_mask=None):
+    def forward(self, input_ids=None, attention_mask=None, **kwargs):
         """
         The BartEncoder forward method, overrides the `__call__()` special method.
 
@@ -260,7 +260,7 @@ class BartDecoder(BartPretrainedModel):
 
     def forward(self,
                 decoder_input_ids=None,
-                decoder_input_ids=None,
+                decoder_attention_mask=None,
                 encoder_output=None,
                 memory_mask=None,
                 cache=None):
@@ -270,7 +270,7 @@ class BartDecoder(BartPretrainedModel):
         Args:
             decoder_input_ids (Tensor, optional):
                 See :class:`BartModel`.
-            decoder_input_ids (Tensor, optional):
+            decoder_attention_mask (Tensor, optional):
                 See :class:`BartModel`.
             encoder_output (Tensor, optional):
                 See :class:`BartModel`.
