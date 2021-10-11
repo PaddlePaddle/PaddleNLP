@@ -285,8 +285,9 @@ def do_train(args):
                 logits = model(input_ids, attention_mask, decoder_input_ids)
                 loss = loss_fct(logits, labels)
             if args.use_amp:
-                scaler.scale(loss).backward()
-                scaler.minimize(optimizer, loss)
+                scaled_loss = scaler.scale(loss)
+                scaled_loss.backward()
+                scaler.minimize(optimizer, scaled_loss)
             else:
                 loss.backward()
                 optimizer.step()
