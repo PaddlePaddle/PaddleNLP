@@ -208,7 +208,7 @@ class Clue(DatasetBuilder):
                     '27614454cc26be6fcab5bbd9a45967ff',
                 ],
                 'test1.0': [
-                    os.path.join('cluewsc2020_public', 'test.json'),
+                    os.path.join('cluewsc2020_public', 'test1.0.json'),
                     '0e9e8ffd8ee90ddf1f58d6dc2e02de7b',
                 ]
             },

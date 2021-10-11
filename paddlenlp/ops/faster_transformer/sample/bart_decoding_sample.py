@@ -81,7 +81,7 @@ def parse_args():
     parser.add_argument(
         "--max_out_len", default=50, type=int, help="Maximum output length. ")
     parser.add_argument(
-        "--beam_search_diversity_rate",
+        "--diversity_rate",
         default=0.0,
         type=float,
         help="The diversity of beam search. ")
@@ -144,7 +144,7 @@ def do_predict(args):
         topk=args.topk,
         topp=args.topp,
         max_out_len=args.max_out_len,
-        beam_search_diversity_rate=args.beam_search_diversity_rate,
+        diversity_rate=args.diversity_rate,
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding,
         rel_len=args.rel_len,

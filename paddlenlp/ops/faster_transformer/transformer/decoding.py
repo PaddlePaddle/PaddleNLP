@@ -36,8 +36,8 @@ def infer_transformer_decoding(
         ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
         decoder_ln_bias, linear_weight, linear_bias, pos_emb,
         _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
-        _n_layer, _bos_id, _eos_id, _max_out_len, _beam_search_diversity_rate,
-        _rel_len, _alpha):
+        _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
+        _alpha):
     helper = LayerHelper('fusion_decoding', **locals())
 
     inputs = {
@@ -88,7 +88,7 @@ def infer_transformer_decoding(
         'bos_id': _bos_id,
         'eos_id': _eos_id,
         'max_len': _max_out_len,
-        'beam_search_diversity_rate': _beam_search_diversity_rate,
+        'beam_search_diversity_rate': _diversity_rate,
         "rel_len": _rel_len,
         "alpha": _alpha
     }
@@ -175,8 +175,8 @@ def infer_unified_decoding(
         trans_weight, trans_bias, lm_ln_weight, lm_ln_bias, linear_weight,
         linear_bias, pos_emb, type_emb, _decoding_strategy, _beam_size, _topk,
         _topp, _n_head, _size_per_head, _n_layer, _bos_id, _eos_id,
-        _max_out_len, _beam_search_diversity_rate, _unk_id, _mask_id,
-        _temperature, _len_penalty, _normalize_before, _pos_bias, _hidden_act):
+        _max_out_len, _diversity_rate, _unk_id, _mask_id, _temperature,
+        _len_penalty, _normalize_before, _pos_bias, _hidden_act):
     helper = LayerHelper('fusion_unified_decoding', **locals())
 
     inputs = {
@@ -225,7 +225,7 @@ def infer_unified_decoding(
         "bos_id": _bos_id,
         "eos_id": _eos_id,
         "max_len": _max_out_len,
-        "beam_search_diversity_rate": _beam_search_diversity_rate,
+        "beam_search_diversity_rate": _diversity_rate,
         "unk_id": _unk_id,
         "mask_id": _mask_id,
         "temperature": _temperature,
@@ -264,8 +264,8 @@ def infer_bart_decoding(
         ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
         decoder_ln_bias, linear_weight, linear_bias, pos_emb,
         _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
-        _n_layer, _bos_id, _eos_id, _max_out_len, _beam_search_diversity_rate,
-        _rel_len, _alpha):
+        _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
+        _alpha):
 
     helper = LayerHelper('fusion_bart_decoding', **locals())
 
@@ -317,7 +317,7 @@ def infer_bart_decoding(
         'bos_id': _bos_id,
         'eos_id': _eos_id,
         'max_len': _max_out_len,
-        'beam_search_diversity_rate': _beam_search_diversity_rate,
+        'beam_search_diversity_rate': _diversity_rate,
         "rel_len": _rel_len,
         "alpha": _alpha
     }
@@ -391,20 +391,25 @@ class InferTransformerDecoding(nn.Layer):
                  topk=1,
                  topp=0.0,
                  max_out_len=256,
-                 beam_search_diversity_rate=0.0,
+                 diversity_rate=0.0,
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  rel_len=False,
                  alpha=0.6):
         # if decoding_lib is None:
         #     raise ValueError(
-        #         "The args decoding_lib must be set to use Faster Transformer. ")
+        #         "The args decoding_lib must be set to use FasterTransformer. ")
         # elif not os.path.exists(decoding_lib):
         #     raise ValueError("The path to decoding lib is not exist.")
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 decoding_lib)
+        else:
+            logger.warning(
+                "The specified decoding_lib does not exist, and it will be built automatically."
+            )
+            load("FasterTransformer", verbose=True)
 
         super(InferTransformerDecoding, self).__init__()
         for arg, value in locals().items():
@@ -564,8 +569,8 @@ class InferTransformerDecoding(nn.Layer):
             self._decoding_strategy, self._beam_size, self._topk, self._topp,
             self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
-            self._bos_id, self._eos_id, self._max_out_len,
-            self._beam_search_diversity_rate, self._rel_len, self._alpha)
+            self._bos_id, self._eos_id, self._max_out_len, self._diversity_rate,
+            self._rel_len, self._alpha)
 
         ids = finalize(
             self._beam_size,
@@ -760,16 +765,15 @@ class InferUnifiedDecoding(nn.Layer):
                  mask_id=30000,
                  normalize_before=True,
                  hidden_act="gelu"):
-        if decoding_lib is None:
-            raise ValueError(
-                "The args decoding_lib must be set to use Faster Transformer. ")
-        elif not os.path.exists(decoding_lib):
-            raise ValueError("The path to decoding lib is not exist.")
-        # TODO(): Using jit.
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 decoding_lib)
+        else:
+            logger.warning(
+                "The specified decoding_lib does not exist, and it will be built automatically."
+            )
+            load("FasterTransformer", verbose=True)
 
         super(InferUnifiedDecoding, self).__init__()
         for arg, value in locals().items():
@@ -1048,7 +1052,7 @@ class InferUnifiedDecoding(nn.Layer):
                 eos_id=1,
                 temperature=1.0,
                 length_penalty=1.0,
-                beam_search_diversity_rate=0.0,
+                diversity_rate=0.0,
                 pos_bias=True):
         output_ids, parent_ids, sequence_length = infer_unified_decoding(
             cache_k=cache_k,
@@ -1093,7 +1097,7 @@ class InferUnifiedDecoding(nn.Layer):
             _bos_id=bos_id,
             _eos_id=eos_id,
             _max_out_len=max_out_len,
-            _beam_search_diversity_rate=beam_search_diversity_rate,
+            _diversity_rate=diversity_rate,
             _unk_id=self._unk_id,
             _mask_id=self._mask_id,
             _temperature=temperature,
@@ -1120,20 +1124,25 @@ class InferBartDecoding(nn.Layer):
                  topk=1,
                  topp=0.0,
                  max_out_len=256,
-                 beam_search_diversity_rate=0.0,
+                 diversity_rate=0.0,
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  rel_len=False,
                  alpha=0.6):
         # if decoding_lib is None:
         #     raise ValueError(
-        #         "The args decoding_lib must be set to use Faster Transformer. ")
+        #         "The args decoding_lib must be set to use FasterTransformer. ")
         # elif not os.path.exists(decoding_lib):
         #     raise ValueError("The path to decoding lib is not exist.")
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 decoding_lib)
+        else:
+            logger.warning(
+                "The specified decoding_lib does not exist, and it will be built automatically."
+            )
+            load("FasterTransformer", verbose=True)
 
         super(InferBartDecoding, self).__init__()
         for arg, value in locals().items():
@@ -1321,8 +1330,8 @@ class InferBartDecoding(nn.Layer):
             self._decoding_strategy, self._beam_size, self._topk, self._topp,
             self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
-            self._bos_id, self._eos_id, self._max_out_len,
-            self._beam_search_diversity_rate, self._rel_len, self._alpha)
+            self._bos_id, self._eos_id, self._max_out_len, self._diversity_rate,
+            self._rel_len, self._alpha)
 
         ids = finalize(
             self._beam_size,
