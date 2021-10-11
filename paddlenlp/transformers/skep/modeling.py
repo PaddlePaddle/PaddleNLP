@@ -562,7 +562,7 @@ class SkepCrfForTokenClassification(nn.Layer):
                 The input length tensor storing real length of each sequence for correctness.
                 Its data type should be int64 and its shape is `[batch_size]`.
                 Defaults to `None`.
-            labels（Tensor, optional):
+            labels (Tensor, optional):
                 The input label tensor.
                 Its data type should be int64 and its shape is `[batch_size, sequence_length]`.
 
