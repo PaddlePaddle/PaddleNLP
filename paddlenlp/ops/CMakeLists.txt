@@ -278,7 +278,7 @@ set(FT_UPDATE_COMMAND git checkout v3.1 && git checkout . && ${FT_PATCH_COMMAND}
 
 ExternalProject_Add(
   extern_${THIRD_PARTY_NAME}
-  GIT_REPOSITORY    https://github.com/NVIDIA/FasterTransformer.git
+  GIT_REPOSITORY    https://gitee.com/paddlepaddle/FasterTransformer.git  # https://github.com/NVIDIA/FasterTransformer.git
   GIT_TAG           v3.1
   PREFIX            ${THIRD_PATH}
   SOURCE_DIR        ${THIRD_PATH}/source/${THIRD_PARTY_NAME}
