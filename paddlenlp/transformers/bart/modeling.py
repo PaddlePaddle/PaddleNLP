@@ -203,7 +203,6 @@ class BartEncoder(BartPretrainedModel):
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
 
         """
-    def forward(self, input_ids=None, attention_mask=None, **kwargs):
         if input_ids is None:
             raise ValueError("Input_ids cannot be None.")
         inputs_embeds = self.embed_tokens(input_ids)
