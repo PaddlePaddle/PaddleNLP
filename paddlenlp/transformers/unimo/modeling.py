@@ -186,7 +186,7 @@ class UNIMOModel(UNIMOPretrainedModel):
 
         unk_token_id (int, optional):
             A special token representing the *unknown (out-of-vocabulary)* token.
-            An unknown token is set to be `unk_token` inorder to be converted to an ID.
+            An unknown token is set to be `unk_token` in order to be converted to an ID.
             Defaults to `17963`.
         pad_token_id (int, optional):
             A special token used to make arrays of tokens the same size for batching purposes.
@@ -201,9 +201,6 @@ class UNIMOModel(UNIMOPretrainedModel):
             A special token representing a masked token. This is the token used
             in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to `3`.
-        bos_token (str, optional):
-            A special token representing the beginning of a sequence that was used during pretraining.
-            Defaults to `"<s>"`.
     """
 
     def __init__(

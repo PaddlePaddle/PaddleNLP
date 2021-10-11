@@ -234,8 +234,8 @@ class RobertaModel(RobertaPretrainedModel):
                 See :meth:`RobertaPretrainedModel._init_weights()` for how weights are initialized in `RobertaModel`.
 
         pad_token_id(int, optional):
-            The non-linear activation function in the pooling layer.
-            Defaults to `"tanh"`.
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
     """
 
     def __init__(self,
@@ -357,6 +357,10 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
     Args:
         roberta (:class:`RobertaModel`):
             An instance of RobertaModel.
+        dropout (float, optional):
+            The dropout probability for output of Roberta.
+            If None, use the same value as `hidden_dropout_prob` of `RobertaModel`
+            instance `roberta`. Defaults to `None`.
     """
 
     def __init__(self, roberta, dropout=None):
