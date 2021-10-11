@@ -18,12 +18,25 @@ import paddle.nn.functional as F
 
 __all__ = ['RDropLoss']
 
+
 class RDropLoss(nn.Layer):
     """
     R-Drop Loss implementation
     For more information about R-drop please refer to this paper: https://arxiv.org/abs/2106.14448
     Original implementation please refer to this code: https://github.com/dropreg/R-Drop
+
+    Args:
+        reduction(str, optional):
+            Indicate how to average the loss,
+        the candicates are ``'none'`` | ``'batchmean'`` | ``'mean'`` | ``'sum'``.
+        If `reduction` is ``'mean'``, the reduced mean loss is returned;
+        If `reduction` is ``'batchmean'``, the sum loss divided by batch size is returned;
+        if `reduction` is ``'sum'``, the reduced sum loss is returned;
+        if `reduction` is ``'none'``, no reduction will be apllied.
+        Default is ``'none'``.
+
     """
+
     def __init__(self, reduction='none'):
         """
         reduction(obj:`str`, optional): Indicate how to average the loss,
@@ -51,8 +64,18 @@ class RDropLoss(nn.Layer):
         Returns:
             loss(obj:`Tensor`): the rdrop loss of p and q
         """
-        p_loss = F.kl_div(F.log_softmax(p, axis=-1), F.softmax(q, axis=-1), reduction=self.reduction)
-        q_loss = F.kl_div(F.log_softmax(q, axis=-1), F.softmax(p, axis=-1), reduction=self.reduction)
+        p_loss = F.kl_div(
+            F.log_softmax(
+                p, axis=-1),
+            F.softmax(
+                q, axis=-1),
+            reduction=self.reduction)
+        q_loss = F.kl_div(
+            F.log_softmax(
+                q, axis=-1),
+            F.softmax(
+                p, axis=-1),
+            reduction=self.reduction)
 
         # pad_mask is for seq-level tasks
         if pad_mask is not None:
