@@ -99,7 +99,7 @@ PaddleNLP 准备
 使用 Transformer decoding 高性能推理
 ^^^^^^^^^^^^
 
-编写 python 脚本的时候，调用 `FasterTransformer API <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.ops.faster_transformer.transformer.faster_transformer.html#paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer>` 即可实现 Transformer 模型的高性能预测。
+编写 python 脚本的时候，调用 `FasterTransformer API <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.ops.faster_transformer.transformer.faster_transformer.html#paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer>`_ 即可实现 Transformer 模型的高性能预测。
 
 举例如下：
 
