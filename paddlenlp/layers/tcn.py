@@ -23,7 +23,7 @@ class Chomp1d(nn.Layer):
     Remove the elements on the right.
 
     Args:
-        chomp_size (`int`): 
+        chomp_size (int):
             The number of elements removed.
     """
 
@@ -41,19 +41,19 @@ class TemporalBlock(nn.Layer):
     See the Figure 1(b) in https://arxiv.org/pdf/1803.01271.pdf for more details.
 
     Args:
-        n_inputs (`int`): 
+        n_inputs (int):
             The number of channels in the input tensor.
-        n_outputs (`int`): 
+        n_outputs (int):
             The number of filters.
-        kernel_size (`int`): 
+        kernel_size (int):
             The filter size.
-        stride (`int`): 
+        stride (int):
             The stride size.
-        dilation (`int`): 
+        dilation (int):
             The dilation size.
-        padding (`int`): 
+        padding (int):
             The size of zeros to be padded.
-        dropout (`float`, optional): 
+        dropout (float, optional):
             Probability of dropout the units. Defaults to 0.2.
     """
 
@@ -112,6 +112,12 @@ class TemporalBlock(nn.Layer):
                 paddle.tensor.normal(0.0, 0.01, self.downsample.weight.shape))
 
     def forward(self, x):
+        """
+        Args:
+            x (Tensor):
+                The input tensor with a shape  of [batch_size, input_channel, sequence_length].
+
+        """
         out = self.net(x)
         res = x if self.downsample is None else self.downsample(x)
         return self.relu(out + res)
@@ -124,10 +130,14 @@ class TCN(nn.Layer):
         such as LSTMs in many tasks. See https://arxiv.org/pdf/1803.01271.pdf for more details.
 
         Args:
-            input_channel ([int]): The number of channels in the input tensor. 
-            num_channels ([list | tuple]): The number of channels in different layer. 
-            kernel_size (int, optional): [description]. Defaults to 2.
-            dropout (float, optional): [description]. Defaults to 0.2.
+            input_channel (int):
+                The number of channels in the input tensor.
+            num_channels (list | tuple):
+                The number of channels in different layer.
+            kernel_size (int, optional):
+                The filter size.. Defaults to 2.
+            dropout (float, optional):
+                Probability of dropout the units.. Defaults to 0.2.
         """
         super(TCN, self).__init__()
         layers = nn.LayerList()
@@ -153,12 +163,11 @@ class TCN(nn.Layer):
         Apply temporal convolutional networks to the input tensor.
 
         Args:
-            x (`Tensor`): 
-                The input tensor with a shape  of [batch_size, input_channel, sequence_length].
+            x (Tensor):
+                The input tensor with a shape of [batch_size, input_channel, sequence_length].
 
         Returns:
-            output (`Tensor`): 
-                The output tensor with a shape of [batch_size, num_channels[-1], sequence_length].
+            Tensor: The `output` tensor with a shape of [batch_size, num_channels[-1], sequence_length].
         """
         output = self.network(x)
         return output

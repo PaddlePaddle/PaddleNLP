@@ -1117,18 +1117,12 @@ class InferUnifiedDecoding(nn.Layer):
 
 
 class InferBartDecoding(nn.Layer):
-    def __init__(self,
-                 model,
-                 decoding_strategy="beam_search_v2",
-                 beam_size=4,
-                 topk=1,
-                 topp=0.0,
-                 max_out_len=256,
-                 diversity_rate=0.0,
-                 decoding_lib=None,
-                 use_fp16_decoding=False,
-                 rel_len=False,
-                 alpha=0.6):
+    def __init__(
+            self,
+            model,
+            decoding_strategy="beam_search_v2",
+            decoding_lib=None,
+            use_fp16_decoding=False, ):
         # if decoding_lib is None:
         #     raise ValueError(
         #         "The args decoding_lib must be set to use FasterTransformer. ")
@@ -1308,12 +1302,30 @@ class InferBartDecoding(nn.Layer):
         self.linear_weight = [model.lm_head_weight.t()]
         self.linear_bias = [model.final_logits_bias]
 
-    def forward(self, enc_output, memory_seq_lens):
+    def forward(self,
+                enc_output,
+                memory_seq_lens,
+                beam_size=4,
+                top_k=1,
+                top_p=0.0,
+                max_out_len=256,
+                diversity_rate=0.0,
+                rel_len=False,
+                alpha=0.6):
+        # Beam_search/beam_search_v2 should be corrected to beam_search_v2.
         if self._decoding_strategy.startswith("beam_search"):
-            enc_output = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
-                enc_output, self._beam_size)
             memory_seq_lens = nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
-                memory_seq_lens, self._beam_size)
+                memory_seq_lens, beam_size)
+            self._decoding_strategy = "beam_search_v2"
+        elif self._decoding_strategy == "greedy_search":
+            top_k = 1
+            top_p = 0.0
+            self._decoding_strategy = "topk_sampling"
+        elif self._decoding_strategy == "sampling":
+            if abs(top_p - 0.0) < 1e-6 and top_k > 0:
+                self._decoding_strategy = "topk_sampling"
+            elif top_p != 1.0 and top_k == 0:
+                self._decoding_strategy = "topp_sampling"
 
         output_ids, parent_ids, sequence_length = infer_bart_decoding(
             [enc_output], [memory_seq_lens], self.word_emb, self.slf_ln_weight,
@@ -1327,17 +1339,15 @@ class InferBartDecoding(nn.Layer):
             self.ffn_inter_weight, self.ffn_inter_bias, self.ffn_out_weight,
             self.ffn_out_bias, self.decoder_ln_weight, self.decoder_ln_bias,
             self.linear_weight, self.linear_bias, self.pos_emb,
-            self._decoding_strategy, self._beam_size, self._topk, self._topp,
-            self._n_head,
+            self._decoding_strategy, beam_size, top_k, top_p, self._n_head,
             int(self._d_model / self._n_head), self._num_decoder_layers,
-            self._bos_id, self._eos_id, self._max_out_len, self._diversity_rate,
-            self._rel_len, self._alpha)
+            self._bos_id, self._eos_id, max_out_len, diversity_rate, rel_len,
+            alpha)
 
         ids = finalize(
-            self._beam_size,
+            beam_size,
             output_ids,
             parent_ids,
             sequence_length,
             decoding_strategy=self._decoding_strategy)
-
         return ids

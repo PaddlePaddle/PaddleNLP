@@ -1,0 +1,2 @@
+nltk==3.6.2
+rouge_score==0.0.4
