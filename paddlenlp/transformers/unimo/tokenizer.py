@@ -36,37 +36,40 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
     Args:
         vocab_file (str): 
-            file path of the vocabulary.
-        do_lower_case (str, optional): 
-            Whether the text strips accents and convert to lower case. 
-            Defaults to `True`.
-        unk_token (str, optional): 
-            The special token for unknown words. 
+            The vocabulary file path (ends with '.txt') required to instantiate
+            a `WordpieceTokenizer`.
+        do_lower_case (str, optional):
+            Whether or not to lowercase the input when tokenizing.
+            Defaults to`True`.
+        unk_token (str):
+            A special token representing the *unknown (out-of-vocabulary)* token.
+            An unknown token is set to be `unk_token` inorder to be converted to an ID.
             Defaults to "[UNK]".
-        sep_token (str, optional): 
-            The special token for separator token. 
+        sep_token (str):
+            A special token separating two different sentences in the same input.
             Defaults to "[SEP]".
-        pad_token (str, optional): 
-            The special token for padding. 
+        pad_token (str):
+            A special token used to make arrays of tokens the same size for batching purposes.
             Defaults to "[PAD]".
-        cls_token (str, optional): 
-            The special token for cls. 
-            Defaults to "[CLS]".
-        mask_token (str, optional): 
-            The special token for mask.
+        cls_token (str):
+            A special token used for sequence classification. It is the last token
+            of the sequence when built with special tokens. Defaults to "[CLS]".
+        mask_token (str):
+            A special token representing a masked token. This is the token used
+            in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to "[MASK]".
-    
+
     Examples:
-        .. code-block:: python
+        .. code-block::
+
             from paddlenlp.transformers import UNIMOTokenizer
             tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
-            encoded_inputs = tokenizer('这是一个测试样例')
-            # encoded_inputs: 
-            # { 
-            #   'input_ids': [1, 47, 10, 7, 27, 558, 525, 314, 656, 2], 
+            encoded_inputs = tokenizer('He was a puppeteer')
+            # encoded_inputs
+            #{
+            #   'input_ids': [1, 4444, 4385, 1545, 6712, 10062, 9568, 9756, 9500, 2],
             #   'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            # }
-
+            #}
 
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
@@ -109,11 +112,11 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
     @property
     def vocab_size(self):
-        r"""
-        return the size of vocabulary.
+        """
+        Return the size of vocabulary.
 
         Returns:
-            int: the size of vocabulary.
+            int: The size of vocabulary.
         """
         return len(self.vocab)
 
@@ -144,7 +147,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
         Args:
             text (str): The text to be tokenized.
-        
+
         Returns:
             List[str]: A list of string representing converted tokens.
         """
@@ -155,14 +158,24 @@ class UNIMOTokenizer(PretrainedTokenizer):
         return split_tokens
 
     def tokenize(self, text):
-        r"""
-        End-to-end tokenization for UNIMO models.
+        """
+        Converts a string to a list of tokens.
 
         Args:
             text (str): The text to be tokenized.
-        
+
         Returns:
-            List[str]: A list of string representing converted tokens.
+            List(str): A list of string representing converted tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import UNIMOTokenizer
+
+                tokenizer = UNIMOtokenizer.from_pretrained('unimo-text-1.0')
+                tokens = tokenizer.tokenize('He was a puppeteer')
+                # ['he', 'was', 'a', 'pu', '##pp', '##et', '##ee', '##r']
+
         """
         return self._tokenize(text)
 
@@ -173,10 +186,24 @@ class UNIMOTokenizer(PretrainedTokenizer):
         `##` when converting.
 
         Args:
-            tokens (List[str]): A list of string representing tokens to be converted.
+            tokens (list): A list of string representing tokens to be converted.
 
         Returns:
             str: Converted string from tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import UNIMOTokenizer
+
+                tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
+                tokens = tokenizer.tokenize('He was a puppeteer')
+
+                strings = tokenizer.convert_tokens_to_string(tokens)
+                '''
+                he was a puppeteer
+                '''
+
         """
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
@@ -185,18 +212,13 @@ class UNIMOTokenizer(PretrainedTokenizer):
         r"""
         Returns the number of added tokens when encoding a sequence with special tokens.
 
-        Note:
-            This encodes inputs and checks the number of added tokens, and is 
-            therefore not efficient. Do not put this inside your training loop.
-
         Args:
-            pair (str, optional): Returns the number of added tokens in the 
-                case of a sequence pair if set to True, returns the number 
-                of added tokens in the case of a single sequence if set to 
-                False. Defaults to False.
+            pair(bool):
+                Whether the input is a sequence pair or a single sequence.
+                Defaults to `False` and the input is a single sequence.
 
         Returns:
-            `int`: Number of tokens added to sequences
+            int: Number of tokens added to sequences.
         """
         token_ids_0 = []
         token_ids_1 = []
@@ -206,13 +228,13 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
-        Build model inputs from a sequence or a pair of sequence for sequence 
-        classification tasks by concatenating and adding special tokens. 
-        
+        Build model inputs from a sequence or a pair of sequence for sequence
+        classification tasks by concatenating and adding special tokens.
+
         A UNIMO sequence has the following format:
-        ::
-            - single sequence: ``[CLS] X [SEP]``
-            - pair of sequences: ``[CLS] A [SEP] B [SEP]``
+
+        - single sequence:      ``[CLS] X [SEP]``
+        - pair of sequences:        ``[CLS] A [SEP] B [SEP]``
 
         Args:
             token_ids_0 (List[int]):
@@ -232,7 +254,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
     def merge_subword(self, tokens):
         r"""
-        Converts the subwords in a sequence of tokens (list of string) to whole 
+        Converts the subwords in a sequence of tokens (list of string) to whole
         words, also remove `##` when converting.
 
         Args:
@@ -258,14 +280,14 @@ class UNIMOTokenizer(PretrainedTokenizer):
                                                  offset_mapping_0,
                                                  offset_mapping_1=None):
         r"""
-        Build offset map from a pair of offset map by concatenating and adding 
-        offsets of special tokens. 
-        
+        Build offset map from a pair of offset map by concatenating and adding
+        offsets of special tokens.
+
         A UNIMO offset_mapping has the following format:
         ::
             - single sequence: ``(0,0) X (0,0)``
             - pair of sequences: `(0,0) A (0,0) B (0,0)``
-        
+
         Args:
             offset_mapping_ids_0 (List[tuple]):
                 List of char offsets to which the special tokens will be added.
@@ -274,7 +296,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
                 Defaults to `None`.
 
         Returns:
-            List[tuple]: List of char offsets with the appropriate offsets 
+            List[tuple]: List of char offsets with the appropriate offsets
                 of special tokens.
         """
         if offset_mapping_1 is None:
@@ -287,8 +309,8 @@ class UNIMOTokenizer(PretrainedTokenizer):
                                              token_ids_0,
                                              token_ids_1=None):
         r"""
-        Create a mask from the two sequences passed to be used in a sequence-pair 
-        classification task. 
+        Create a mask from the two sequences passed to be used in a sequence-pair
+        classification task.
 
         A UNIMO sequence pair mask has the following format:
         ::
@@ -296,14 +318,14 @@ class UNIMOTokenizer(PretrainedTokenizer):
             0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
             | first sequence    | second sequence |
 
-        If `token_ids_1` is `None`, this method only returns the first portion 
+        If `token_ids_1` is `None`, this method only returns the first portion
         of the mask (0s).
 
         Args:
             token_ids_0 (List[int]):
                 List of IDs.
             token_ids_1 (List[int], optional):
-                Optional second list of IDs for sequence pairs. 
+                Optional second list of IDs for sequence pairs.
                 Defaults to `None`.
 
         Returns:
@@ -333,97 +355,96 @@ class UNIMOTokenizer(PretrainedTokenizer):
                    is_split_into_words=False,
                    continuous_position=False):
         """
-        Main method for encoding the source for generation. It will return a 
-        dictionary containing the encoded sequence and other relative informations 
-        which meets the input format requirements of the UNIMO-text model. 
+        Main method for encoding the source for generation. It will return a
+        dictionary containing the encoded sequence and other relative informations
+        which meets the input format requirements of the UNIMO-text model.
 
         Args:
-            source (str): The source text of generation. It should be a string. 
-            target (str, optional): The target text of generation. It should be 
-                set when training the model and should be None when running 
+            source (str): The source text of generation. It should be a string.
+            target (str, optional): The target text of generation. It should be
+                set when training the model and should be None when running
                 inference. Defaults to None.
-            title (str, optional): The additional information of some of the 
+            title (str, optional): The additional information of some of the
                 generation tasks such as summary. Defaults to None.
             max_seq_len (int, optional): The maximum encoded sequence length.
                 Defaults to 512.
-            max_target_len (int, optional): The maximum encoded sequence 
+            max_target_len (int, optional): The maximum encoded sequence
                 length of the input `target`. Defaults to 128.
-            max_title_len (int, optional): The maximum encoded sequence 
+            max_title_len (int, optional): The maximum encoded sequence
                 length of the input `title`. Defaults to 128.
-            return_position_ids (bool, optional): Whether to return the 
+            return_position_ids (bool, optional): Whether to return the
                 position_ids. Defaults to True.
-            return_token_type_ids (bool, optional): Whether to return the 
+            return_token_type_ids (bool, optional): Whether to return the
                 token_type_ids. Defaults to True.
-            return_attention_mask (bool, optional): Whether to return the 
+            return_attention_mask (bool, optional): Whether to return the
                 attention_mask. Defaults to True.
             return_length (bool, optional): Whether to return the length of the
                 encoded sequence. Defaults to False.
-            add_start_token_for_decoding (bool, optional): Whether to add the 
-                special token "[CLS]" at the end of sequence as the begining of 
-                the target when running inference to force the model to start 
+            add_start_token_for_decoding (bool, optional): Whether to add the
+                special token "[CLS]" at the end of sequence as the begining of
+                the target when running inference to force the model to start
                 generating target sequence. Defaults to False.
-            pad_to_max_seq_len (bool, optional): Whether to pad the returned 
-                sequences to the `max_seq_len`. Note that, in this method, 
+            pad_to_max_seq_len (bool, optional): Whether to pad the returned
+                sequences to the `max_seq_len`. Note that, in this method,
                 returned sequences will be padded on the left. Defaults to False.
-            return_tensors (bool, optional): Whether to convert the returned 
+            return_tensors (bool, optional): Whether to convert the returned
                 sequences to Tensor. Defaults to False.
-            is_split_into_words(bool, optinal): Whether or not the input text 
-                (`source`, `target` and `title`) has been pretokenized. 
+            is_split_into_words(bool, optinal): Whether or not the input text
+                (`source`, `target` and `title`) has been pretokenized.
                 Defaults to False.
-            continuous_position(bool, optinal): Whether the position ids is  
+            continuous_position(bool, optinal): Whether the position ids is
                 continuous between source ids and target ids. Defaults to False.
 
-        Returns: 
-            dict: A dictionary containing the encoded sequence and other 
+        Returns:
+            dict: A dictionary containing the encoded sequence and other
             relative informations.
 
             With the corresponding fields:
 
             - input_ids (list[int]|Tensor):
-                A list of indices of input tokens to be feed to UNIMO-text 
-                model. If `return_tensors` is True, it is a Tensor with shape 
+                A list of indices of input tokens to be feed to UNIMO-text
+                model. If `return_tensors` is True, it is a Tensor with shape
                 [1, sequence_length] and data type 'int64'.
             - token_type_ids (list[int]|Tensor, optional):
-                A list of segment token indices to indicate whether the token 
-                belongs to the dialogue target. If `return_tensors` is True, 
-                it is a Tensor with shape [1, sequence_length] and data type 
-                'int64'. 
+                A list of segment token indices to indicate whether the token
+                belongs to the dialogue target. If `return_tensors` is True,
+                it is a Tensor with shape [1, sequence_length] and data type
+                'int64'.
                 Being returned when `return_token_type_ids` is set to True.
             - position_ids (list[int]|Tensor, optional):
-                A list of The position indices. If `return_tensors` is True, 
-                it is a Tensor with shape [1, sequence_length] and data type 
+                A list of The position indices. If `return_tensors` is True,
+                it is a Tensor with shape [1, sequence_length] and data type
                 'int64'.
                 Being returned when `return_position_ids` is set to True.
             - attention_mask (numpy.ndarray|Tensor, optional):
-                A numpy.ndarray to prevents attention to some unwanted positions, 
-                with shape [sequence_length, sequence_length] and data type 
-                'float32'. If `return_tensors` is True, it is a Tensor with shape 
+                A numpy.ndarray to prevents attention to some unwanted positions,
+                with shape [sequence_length, sequence_length] and data type
+                'float32'. If `return_tensors` is True, it is a Tensor with shape
                 [1, 1, sequence_length, sequence_length] and data type 'float32'.
                 Being returned when `return_attention_mask` is set to True.
             - seq_len (int, optional):
-                The actual length of the `input_ids`, excluding the pad token. 
+                The actual length of the `input_ids`, excluding the pad token.
                 Being returned when `return_length` is set to True.
 
         Example:
             .. code-block::
 
                 from paddlenlp.transformers import UNIMOTokenizer
-
                 tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
-
-                inputs = tokenizer.gen_encode('我爱祖国')
-                for key in inputs:
-                    print(key + ':')
-                    print(inputs[key])
-                # input_ids: [1, 75, 329, 997, 20, 2]
-                # token_type_ids: [0, 0, 0, 0, 0, 0]
-                # position_ids: [0, 1, 2, 3, 4, 5]
-                # attention_mask: [[0. 0. 0. 0. 0. 0.]
-                # [0. 0. 0. 0. 0. 0.]
-                # [0. 0. 0. 0. 0. 0.]
-                # [0. 0. 0. 0. 0. 0.]
-                # [0. 0. 0. 0. 0. 0.]
-                # [0. 0. 0. 0. 0. 0.]]
+                inputs = tokenizer.gen_encode('He was a puppeteer')
+                #{'input_ids': [1, 4444, 4385, 1545, 6712, 10062, 9568, 9756, 9500, 2],
+                #'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                #'position_ids': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+                #'attention_mask': array([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]], dtype=float32)}
         """
 
         # Input type checking for clearer error

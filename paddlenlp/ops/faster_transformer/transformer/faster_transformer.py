@@ -28,7 +28,7 @@ from paddlenlp.ops.ext_utils import load
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
                                     UnifiedTransformerPretrainedModel,
-                                    UNIMOPretrainedModel)
+                                    UNIMOPretrainedModel, BartPretrainedModel)
 
 
 class FasterTransformer(TransformerModel):
@@ -135,7 +135,7 @@ class FasterTransformer(TransformerModel):
                  alpha=0.6):
         # if decoding_lib is None:
         #     raise ValueError(
-        #         "The args decoding_lib must be set to use Faster Transformer. ")
+        #         "The args decoding_lib must be set to use FasterTransformer. ")
         # elif not os.path.exists(decoding_lib):
         #     raise ValueError("The path to decoding lib is not exist.")
 
@@ -238,7 +238,7 @@ class FasterTransformer(TransformerModel):
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
         # NOTE: the data type of the embedding bias for logits is different
         # between decoding with beam search and top-k/top-p sampling in
-        # Faster Transformer when using float16.
+        # FasterTransformer when using float16.
         # NOTE: This changes since FasterTransformer V4.0 and update accordingly
         # after update to FT-4.0.
         bias_dtype = "float32"
@@ -352,7 +352,7 @@ class FasterTransformer(TransformerModel):
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
         # NOTE: the data type of the embedding bias for logits is different
         # between decoding with beam search and top-k/top-p sampling in
-        # Faster Transformer when using float16.
+        # FasterTransformer when using float16.
         # NOTE: This changes since FasterTransformer V4.0 and update accordingly
         # after update to FT-4.0.
         bias_dtype = "float32"
@@ -437,11 +437,11 @@ class TransformerGenerator(paddle.nn.Layer):
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
             to `False`. 
 
-            - `use_ft(bool, optional)`: Whether to use Faster Transformer
+            - `use_ft(bool, optional)`: Whether to use FasterTransformer
             for decoding. Default to True if not set.
 
             - `use_fp16_decoding(bool, optional)`: Whether to use fp16
-            for decoding.  Only works when using Faster Transformer.
+            for decoding.  Only works when using FasterTransformer.
 
             - `beam_search_version(str, optional)`: Indicating the strategy of
             beam search. It can be 'v1' or 'v2'. 'v2' would select the top
@@ -495,7 +495,7 @@ class TransformerGenerator(paddle.nn.Layer):
         self.d_model = d_model
         self.max_length = max_length
         self.output_time_major = kwargs.pop("output_time_major", True)
-        # Only works for Faster Transformer.
+        # Only works for FasterTransformer.
         # TODO: original version supports diversity rate.
         diversity_rate = kwargs.pop("diversity_rate", 0.0)
         use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
@@ -506,7 +506,6 @@ class TransformerGenerator(paddle.nn.Layer):
 
         if use_ft:
             try:
-                load("FasterTransformer", verbose=True)
                 decoding_strategy = ("beam_search_v2"
                                      if beam_search_version == "v2" else
                                      "beam_search")
@@ -532,7 +531,7 @@ class TransformerGenerator(paddle.nn.Layer):
                     alpha=alpha)
             except Exception:
                 logger.warning(
-                    "Exception occurs when using Faster Transformer. " \
+                    "Exception occurs when using FasterTransformer. " \
                     "The original forward will be involved. ")
                 if diversity_rate != 0:
                     logger.warning(
@@ -1026,19 +1025,12 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             pos_bias=False)
 
 
-class FasterBART(nn.Layer):
+class FasterBART(BartPretrainedModel):
     def __init__(self,
                  model,
                  decoding_strategy="beam_search_v2",
-                 beam_size=4,
-                 topk=1,
-                 topp=0.0,
-                 max_out_len=256,
-                 diversity_rate=0.0,
                  decoding_lib=None,
-                 use_fp16_decoding=False,
-                 rel_len=False,
-                 alpha=0.6):
+                 use_fp16_decoding=False):
         super(FasterBART, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
         if use_fp16_decoding:
@@ -1047,26 +1039,115 @@ class FasterBART(nn.Layer):
             model.bart.encoder.embed_tokens = nn.Embedding(
                 *model.bart.encoder.embed_tokens.weight.shape,
                 weight_attr=weight_attr)
-        self.bart_encoder = model.bart.get_encoder()
-        self.pad_id = model.bart.config['pad_token_id']
+        self.encoder = model.bart.get_encoder()
+        self.decoder = model.bart.get_decoder()
+        self.bos_token_id = model.bart.config['bos_token_id']
+        self.eos_token_id = model.bart.config['eos_token_id']
+        self.pad_token_id = model.bart.config['pad_token_id']
+        if decoding_strategy.startswith("beam_search"):
+            decoding_strategy = "beam_search_v2"
+        self._decoding_strategy = decoding_strategy
         self.decoding = InferBartDecoding(
             model=model,
             decoding_strategy=decoding_strategy,
-            beam_size=beam_size,
-            topk=topk,
-            topp=topp,
-            max_out_len=max_out_len,
-            diversity_rate=diversity_rate,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding)
 
-    def forward(self, input_ids):
-        encoder_output = self.bart_encoder(input_ids)
-        mem_seq_lens = paddle.sum(paddle.cast(
-            input_ids != self.pad_id, dtype="int32"),
-                                  axis=-1,
-                                  keepdim=True,
-                                  dtype="int32")
+    def get_encoder(self):
+        return self.encoder
+
+    def get_decoder(self):
+        return self.decoder
+
+    def greedy_search(self, input_ids, logits_processors, max_length,
+                      pad_token_id, eos_token_id, **model_kwargs):
+        return self.sample(
+            input_ids=input_ids,
+            logits_processors=logits_processors,
+            max_length=max_length,
+            pad_token_id=pad_token_id,
+            eos_token_id=eos_token_id,
+            top_k=1,
+            top_p=1.0,
+            **model_kwargs)
+
+    def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
+                    diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
+        max_length -= input_ids.shape[-1]
+        rel_len = model_kwargs.pop("rel_len", False)
+        alpha = model_kwargs.pop("alpha", 0.6)
+        encoder_output = model_kwargs.pop("encoder_output")
+        mem_seq_lens = model_kwargs.pop("mem_seq_lens")
+        return self.forward(
+            encoder_output=encoder_output,
+            mem_seq_lens=mem_seq_lens,
+            beam_size=beam_scorer.num_beams,
+            max_out_len=max_length,
+            diversity_rate=diversity_rate,
+            rel_len=rel_len,
+            alpha=alpha)
+
+    def sample(self,
+               input_ids,
+               logits_processors,
+               max_length,
+               pad_token_id,
+               eos_token_id,
+               top_k=4,
+               top_p=0.0,
+               temperature=1.0,
+               min_tokens_to_keep=1,
+               **model_kwargs):
+        max_length -= input_ids.shape[-1]
+        if self._decoding_strategy in ["sampling", "greedy_search"] and (
+                abs(top_p - 1.0) < 1e-6 and top_k > 0):
+            top_p = 0.0
+        elif self._decoding_strategy == "sampling" and (top_p != 1.0 and
+                                                        top_k == 0):
+            top_k = 0
+        else:
+            raise ValueError(
+                "Only top_k sampling or top_p sampling are supported. " \
+                "Top_k sampling and top_p sampling cannot be both applied. ")
+        encoder_output = model_kwargs.pop("encoder_output")
+        mem_seq_lens = model_kwargs.pop("mem_seq_lens")
+        return self.forward(
+            encoder_output=encoder_output,
+            mem_seq_lens=mem_seq_lens,
+            top_k=top_k,
+            top_p=top_p,
+            max_out_len=max_length)
+
+    def forward(self,
+                input_ids=None,
+                encoder_output=None,
+                mem_seq_lens=None,
+                beam_size=4,
+                top_k=1,
+                top_p=0.0,
+                max_out_len=256,
+                diversity_rate=0.0,
+                rel_len=False,
+                alpha=0.6):
+        if encoder_output is None:
+            assert input_ids is not None, "You have to specify either input_ids or encoder_output."
+            encoder_output = self.encoder(input_ids)
+        if mem_seq_lens is None:
+            assert input_ids is not None, "You have to specify either input_ids when generating mem_seq_lens."
+            mem_seq_lens = paddle.sum(paddle.cast(
+                input_ids != self.pad_token_id, dtype="int32"),
+                                      axis=-1,
+                                      keepdim=True,
+                                      dtype="int32")
         if self.use_fp16_decoding:
             encoder_output = paddle.cast(encoder_output, "float16")
-        return self.decoding(encoder_output, mem_seq_lens)
+        return self.decoding(
+            enc_output=encoder_output,
+            memory_seq_lens=mem_seq_lens,
+            beam_size=beam_size,
+            top_k=top_k,
+            top_p=top_p,
+            max_out_len=max_out_len,
+            diversity_rate=diversity_rate,
+            rel_len=rel_len,
+            alpha=alpha)
