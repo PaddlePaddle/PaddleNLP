@@ -24,14 +24,14 @@
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: 快速开始
 
    安装 <get_started/installation>
    10分钟完成高精度中文情感分析 <get_started/quick_start>
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: 数据准备
 
    整体介绍 <data_prepare/overview>
@@ -41,26 +41,26 @@
    数据处理 <data_prepare/data_preprocess>
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: 模型库
 
    Transformer预训练模型 <model_zoo/transformers>
    预训练词向量 <model_zoo/embeddings>
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: 评价指标
 
    评价指标 <metrics/metrics.md>
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: 实践教程
 
    AI Studio Notebook <tutorials/overview>
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: 进阶指南
 
    模型压缩 <advanced_guide/model_compression/index>
@@ -68,7 +68,7 @@
    大规模分布式训练 <advanced_guide/distributed_training>
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: 社区交流共建
 
    如何贡献模型 <community/contribute_models/index>
@@ -77,13 +77,13 @@
    如何加入兴趣小组 <community/join_in_PaddleNLP-SIG>
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: FAQ
 
    FAQ <FAQ.md>
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: API Reference
 
    paddlenlp.data <source/paddlenlp.data>
