@@ -124,6 +124,16 @@ Transformer预训练模型汇总
 |                    |                                         |              | and Traditional text using              |
 |                    |                                         |              | Whole-Word-Masking with extented data.  |
 |                    +-----------------------------------------+--------------+-----------------------------------------+
+|                    |``macbert-base-chinese``                 | Chinese      | 12-layer, 768-hidden,                   |
+|                    |                                         |              | 12-heads, 102M parameters.              |
+|                    |                                         |              | Trained with novel MLM as correction    |
+|                    |                                         |              | pre-training task.                      |
+|                    +-----------------------------------------+--------------+-----------------------------------------+
+|                    |``macbert-large-chinese``                | Chinese      | 24-layer, 1024-hidden,                  |
+|                    |                                         |              | 16-heads, 326M parameters.              |
+|                    |                                         |              | Trained with novel MLM as correction    |
+|                    |                                         |              | pre-training task.                      |
+|                    +-----------------------------------------+--------------+-----------------------------------------+
 |                    |``simbert-base-chinese``                 | Chinese      | 12-layer, 768-hidden,                   |
 |                    |                                         |              | 12-heads, 108M parameters.              |
 |                    |                                         |              | Trained on 22 million pairs of similar  |
