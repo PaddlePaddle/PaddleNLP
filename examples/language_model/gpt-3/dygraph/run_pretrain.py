@@ -46,8 +46,8 @@ def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank):
     paddle.seed(basic_seed + data_world_rank)
 
     # local_seed/ global_seed is used to control dropout in ModelParallel
-    local_seed = args.seed + 123 + mp_rank * 10 + pp_rank * 1000
-    global_seed = args.seed + data_world_rank
+    local_seed = basic_seed + 123 + mp_rank * 10 + pp_rank * 1000
+    global_seed = basic_seed + data_world_rank
     tracker = get_rng_state_tracker()
     tracker.add('global_seed', global_seed)
     tracker.add('local_seed', local_seed)
@@ -102,8 +102,8 @@ def do_train(args):
         "micro_batch_size": args.micro_batch_size
     }
 
-    # used for loss alignment when args.mp_degree > 1
-    # strategy.tensor_parallel_configs = {"tensor_init_seed": 123}
+    # set control in tensor parallel
+    strategy.tensor_parallel_configs = {"tensor_init_seed": args.seed}
 
     fleet.init(is_collective=True, strategy=strategy)
 
