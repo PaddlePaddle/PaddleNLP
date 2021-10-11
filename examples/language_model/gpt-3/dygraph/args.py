@@ -26,9 +26,10 @@ def process_batch_size(args):
             "global_batch_size[{}] should be divided by local_batch_size[{}] when dp_degree is [{}]"\
                 .format(args.global_batch_size, args.local_batch_size, args.dp_degree)
     elif args.global_batch_size is not None and args.local_batch_size is None:
-        args.local_batch_size = args.global_batch_size // args.dp_degree
+        args.local_batch_size = args.global_batch_size // (args.dp_degree *
+                                                           args.sharding_degree)
     else:
-        args.global_batch_size = args.local_batch_size * args.dp_degree
+        args.global_batch_size = args.local_batch_size * args.dp_degree * args.sharding_degree
     assert args.local_batch_size % args.micro_batch_size == 0
 
 
