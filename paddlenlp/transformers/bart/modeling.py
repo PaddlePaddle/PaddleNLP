@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from functools import partial
 import numpy as np
 
 import paddle
@@ -28,7 +29,7 @@ __all__ = [
 ]
 
 
-def shift_tokens_right(input_ids: tensor, decoder_start_token_id: int):
+def shift_tokens_right(input_ids, decoder_start_token_id):
     """
     Shift input ids one token to the right.
     """
@@ -110,6 +111,10 @@ class BartPretrainedModel(PretrainedModel):
                         std=self.init_std if hasattr(self, "init_std") else
                         self.bart.config["init_std"],
                         shape=layer.weight.shape))
+        elif isinstance(layer, (nn.TransformerEncoderLayer,
+                                nn.TransformerDecoderLayer)):
+            if layer.activation == F.gelu:
+                layer.activation = partial(F.gelu, approximate=True)
 
 
 class BartLearnedPositionalEmbedding(Embedding):
@@ -176,7 +181,7 @@ class BartEncoder(BartPretrainedModel):
         self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids=None, attention_mask=None):
+    def forward(self, input_ids=None, attention_mask=None, **kwargs):
         if input_ids is None:
             raise ValueError("Input_ids cannot be None.")
         inputs_embeds = self.embed_tokens(input_ids)
@@ -331,17 +336,20 @@ class BartModel(BartPretrainedModel):
                                           "specified when generating decoder_input_ids"
             decoder_input_ids = shift_tokens_right(input_ids,
                                                    self.decoder_start_token_id)
-        if encoder_output is None:
-            encoder_output = self.encoder(input_ids, attention_mask)
-
         if attention_mask is None:
             assert input_ids is not None, "input_ids should be " \
                                           "specified when generating attention_mask"
             attention_mask = paddle.cast(
                 input_ids == self.pad_token_id,
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(
+                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = (1.0 - attention_mask) * -1e9
             attention_mask.stop_gradient = True
-
+        if encoder_output is None:
+            encoder_output = self.encoder(input_ids, attention_mask)
         if use_cache:
             if cache is None:
                 cache = self.decoder.decoder.gen_cache(encoder_output)
