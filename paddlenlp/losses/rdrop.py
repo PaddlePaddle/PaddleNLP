@@ -27,13 +27,12 @@ class RDropLoss(nn.Layer):
 
     Args:
         reduction(str, optional):
-            Indicate how to average the loss,
-        the candicates are ``'none'`` | ``'batchmean'`` | ``'mean'`` | ``'sum'``.
-        If `reduction` is ``'mean'``, the reduced mean loss is returned;
-        If `reduction` is ``'batchmean'``, the sum loss divided by batch size is returned;
-        if `reduction` is ``'sum'``, the reduced sum loss is returned;
-        if `reduction` is ``'none'``, no reduction will be apllied.
-        Default is ``'none'``.
+            Indicate how to average the loss, the candicates are ``'none'``,``'batchmean'``,``'mean'``,``'sum'``.
+            If `reduction` is ``'mean'``, the reduced mean loss is returned;
+            If `reduction` is ``'batchmean'``, the sum loss divided by batch size is returned;
+            If `reduction` is ``'sum'``, the reduced sum loss is returned;
+            If `reduction` is ``'none'``, no reduction will be applied.
+            Defaults to ``'none'``.
     """
 
     def __init__(self, reduction='none'):
