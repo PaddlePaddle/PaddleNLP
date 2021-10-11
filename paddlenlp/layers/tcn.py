@@ -171,6 +171,3 @@ class TCN(nn.Layer):
         """
         output = self.network(x)
         return output
-
-
-2
