@@ -14,10 +14,12 @@ python -m paddle.distributed.launch --log_dir $log_dir --gpus "0,1,2,3,4,5,6,7" 
     --device gpu\
     --eval_freq 1000\
     --warmup_rate 0.01\
+    --scale_loss 32768\
     --global_batch_size 16\
     --micro_batch_size 2\
     --dp_degree 2\
-    --mp_degree 4\
-    --pp_degree 1\
+    --mp_degree 2\
+    --pp_degree 2\
     --use_amp True\
-    --scale_loss 32768
+    --use_recompute False
+

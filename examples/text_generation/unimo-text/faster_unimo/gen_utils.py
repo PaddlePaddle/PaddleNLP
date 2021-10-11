@@ -118,6 +118,8 @@ def post_process_sum(token_ids, tokenizer):
 def select_sum(ids, scores, tokenizer, max_dec_len=None,
                num_return_sequences=1):
     results = []
+    group = []
+    tmp = []
     if scores is not None:
         ids = ids.numpy()
         scores = scores.numpy()
@@ -127,8 +129,6 @@ def select_sum(ids, scores, tokenizer, max_dec_len=None,
                 "the length of `ids` is {}, but the `num_return_sequences` is {}".
                 format(len(ids), num_return_sequences))
 
-        group = []
-        tmp = []
         for pred, score in zip(ids, scores):
             pred_token_ids, pred_tokens = post_process_sum(pred, tokenizer)
             num_token = len(pred_token_ids)
@@ -157,6 +157,13 @@ def select_sum(ids, scores, tokenizer, max_dec_len=None,
             num_token = len(pred_token_ids)
             response = "".join(pred_tokens)
 
-            results.append(response)
+            # TODO: Support return scores in FT.
+            tmp.append([response])
+            if len(tmp) == num_return_sequences:
+                group.append(tmp)
+                tmp = []
+
+        for preds in group:
+            results.append(preds[0][0])
 
     return results

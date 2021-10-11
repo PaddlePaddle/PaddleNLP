@@ -46,7 +46,8 @@ std::vector<paddle::Tensor> EncoderForward(
     const int64_t& num_layer,
     const int64_t& layer_idx,
     const bool& allow_gemm_test,
-    const bool& use_trt_kernel) {
+    const bool& use_trt_kernel,
+    const bool& normalize_before) {
   if (input.place() == paddle::PlaceType::kGPU) {
     auto shape = input.shape();
     auto encoder_out = paddle::Tensor(paddle::PlaceType::kGPU, shape);
@@ -80,7 +81,8 @@ std::vector<paddle::Tensor> EncoderForward(
                               num_layer,
                               layer_idx,
                               allow_gemm_test,
-                              use_trt_kernel);
+                              use_trt_kernel,
+                              normalize_before);
   } else {
     PD_THROW("Not implemented place. Only GPU is supported. ");
   }
@@ -116,7 +118,8 @@ std::vector<std::vector<int64_t>> EncoderInferShape(
     const int64_t& num_layer,
     const int64_t& layer_idx,
     const bool& allow_gemm_test,
-    const bool& use_trt_kernel) {
+    const bool& use_trt_kernel,
+    const bool& normalize_before) {
   return {input_shape};
 }
 
@@ -143,20 +146,7 @@ std::vector<paddle::DataType> EncoderInferDtype(
   // const paddle::DataType& sequence_id_offset,
   // const paddle::DataType& trt_seqlen_offset,
   // const paddle::DataType& amax_list) {
-  switch (input) {
-    case paddle::DataType::FLOAT16: {
-      return {input};
-    }
-    case paddle::DataType::FLOAT32: {
-      return {input};
-    }
-    default: {
-      PD_THROW(
-          "NOT supported data type. "
-          "Only float16 and float32 are supported. ");
-      break;
-    }
-  }
+  return {input};
 }
 
 PD_BUILD_OP(fusion_encoder)
@@ -192,7 +182,8 @@ PD_BUILD_OP(fusion_encoder)
             "num_layer: int64_t",
             "layer_idx: int64_t",
             "allow_gemm_test: bool",
-            "use_trt_kernel: bool"})
+            "use_trt_kernel: bool",
+            "normalize_before: bool"})
     .SetKernelFn(PD_KERNEL(EncoderForward))
     .SetInferShapeFn(PD_INFER_SHAPE(EncoderInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(EncoderInferDtype));

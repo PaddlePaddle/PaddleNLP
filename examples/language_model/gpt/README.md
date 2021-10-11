@@ -233,22 +233,29 @@ python deploy/python/inference.py --model_type gpt \
 from paddlenlp import Taskflow
 
 # 默认是知识问答任务
-question = Taskflow("text_generation")
-question("中国的国土面积有多大？")
+qa = Taskflow("question_answering")
+qa("中国的国土面积有多大？")
 '''
 [{'text': '中国的国土面积有多大？', 'answer': '960万平方公里。'}]
 '''
 
+qa(["中国国土面积有多大？", "中国的首都在哪里？"])
+'''
+[{'text': '中国国土面积有多大？', 'answer': '960万平方公里。'}, {'text': '中国的首都在哪里？', 'answer': '北京。'}]
+'''
+
 # 使用写诗任务进行写诗
-poetry  = Taskflow("text_generation", generation_task="poetry")
-poetry("林密不见人")
-'''
-[{'text': '林密不见人', 'answer': ',但闻人语响。'}]
-'''
-poetry(["林密不见人", "举头邀明月"])
-'''
-[{'text': '林密不见人', 'answer': ',但闻人语响。'}, {'text': '举头邀明月', 'answer': ',低头思故乡。'}]
-'''
+
+ poetry = Taskflow("poetry_generation")
+ poetry("林密不见人")
+ '''
+ [{'text': '林密不见人', 'answer': ',但闻人语响。'}]
+ '''
+
+ poetry(["林密不见人", "举头邀明月"])
+ '''
+ [{'text': '林密不见人', 'answer': ',但闻人语响。'}, {'text': '举头邀明月', 'answer': ',低头思故乡。'}]
+ '''
 ```
 
 ## 其他
