@@ -348,44 +348,25 @@ def do_train(args):
                     logger.info("Save model to %s" % output_dir)
 
                     if args.pp_degree > 1:
-                        model_to_save.save_state_dict(output_dir)
-                        if mp_rank * pp_rank == 1:
+                        if mp_rank == 0 and sharding_rank == 0 and pp_rank == 0:
                             tokenizer.save_pretrained(output_dir)
+                        model_to_save.save_state_dict(output_dir)
                         paddle.save(
                             optimizer.state_dict(),
                             os.path.join(
                                 output_dir,
                                 "model_state_mp_{:0>2d}_sharding_{:0>2d}_pp_{:0>2d}.pdopt".
                                 format(mp_rank, sharding_rank, pp_rank)))
-                    elif args.sharding_degree > 1:
-                        if args.mp_degree > 1:
-                            if mp_rank == 1:
-                                tokenizer.save_pretrained(output_dir)
-                            model_to_save.save_pretrained(output_dir)
-                            paddle.save(
-                                optimizer.state_dict(),
-                                os.path.join(
-                                    output_dir,
-                                    "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".
-                                    format(mp_rank, sharding_rank)))
-                        else:
-                            tokenizer.save_pretrained(output_dir)
-                            model_to_save.save_pretrained(output_dir)
-                            paddle.save(
-                                optimizer.state_dict(),
-                                os.path.join(
-                                    output_dir,
-                                    "model_state_sharding_{:0>2d}.pdopt".format(
-                                        sharding_rank)))
                     else:
-                        path = os.path.join(output_dir,
-                                            'model_{:0>2d}'.format(mp_rank))
-                        os.makedirs(path, exist_ok=True)
-                        model_to_save.save_pretrained(path)
-
-                        paddle.save(optimizer.state_dict(),
-                                    os.path.join(path, "model_state.pdopt"))
-                        tokenizer.save_pretrained(path)
+                        if mp_rank == 0 and sharding_rank == 0:
+                            tokenizer.save_pretrained(output_dir)
+                        model_to_save.save_pretrained(output_dir)
+                        paddle.save(
+                            optimizer.state_dict(),
+                            os.path.join(
+                                output_dir,
+                                "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".
+                                format(mp_rank, sharding_rank)))
 
                 if global_step >= args.max_steps:
                     run_evaluate(args, test_data_loader, model, criterion,
