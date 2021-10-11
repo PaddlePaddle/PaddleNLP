@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import argparse
 import time
 from pprint import pprint
@@ -41,10 +40,12 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 
 def prepare_input(tokenizer, sentences, pad_id):
     word_pad = Pad(pad_id, dtype="int64")
-    tokenized = tokenizer(sentences)
+    tokenized = tokenizer(sentences, return_length=True)
     inputs = word_pad([i["input_ids"] for i in tokenized])
+    mem_seq_lens = [i["seq_len"] for i in tokenized]
     input_ids = paddle.to_tensor(inputs)
-    return input_ids
+    mem_seq_lens = paddle.to_tensor(mem_seq_lens, dtype="int32")
+    return input_ids, mem_seq_lens
 
 
 def parse_args():
@@ -59,9 +60,9 @@ def parse_args():
         "--batch_size", default=1, type=int, help="Batch size. ")
     parser.add_argument(
         "--decoding_strategy",
-        default='beam_search',
+        default='greedy_search',
         type=str,
-        help="The decoding strategy. Can be one of [beam_search, beam_search_v2, topk_sampling, topp_sampling]"
+        help="The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
     )
     parser.add_argument(
         "--beam_size",
@@ -69,13 +70,13 @@ def parse_args():
         type=int,
         help="The parameters for beam search. ")
     parser.add_argument(
-        "--topk",
-        default=1,
+        "--top_k",
+        default=2,
         type=int,
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
-        "--topp",
-        default=0.0,
+        "--top_p",
+        default=1.0,
         type=float,
         help="The probability threshold to procedure topp sampling. ")
     parser.add_argument(
@@ -116,7 +117,7 @@ def parse_args():
 
 def do_predict(args):
     place = "gpu"
-    place = paddle.set_device(place)
+    paddle.set_device(place)
 
     tokenizer = BartTokenizer.from_pretrained(args.model_name_or_path)
     logger.info('Loading the model parameters, please wait...')
@@ -134,21 +135,14 @@ def do_predict(args):
     bos_id = model.bart.config['bos_token_id']
     eos_id = model.bart.config['eos_token_id']
     pad_id = model.bart.config['pad_token_id']
-    input_ids = prepare_input(tokenizer, sentences, pad_id)
+    input_ids, mem_seq_lens = prepare_input(tokenizer, sentences, pad_id)
 
     # Define model
     faster_bart = FasterBART(
         model=model,
         decoding_strategy=args.decoding_strategy,
-        beam_size=args.beam_size,
-        topk=args.topk,
-        topp=args.topp,
-        max_out_len=args.max_out_len,
-        diversity_rate=args.diversity_rate,
         decoding_lib=args.decoding_lib,
-        use_fp16_decoding=args.use_fp16_decoding,
-        rel_len=args.rel_len,
-        alpha=args.alpha)
+        use_fp16_decoding=args.use_fp16_decoding)
 
     # Set evaluate mode
     faster_bart.eval()
@@ -157,10 +151,21 @@ def do_predict(args):
         for i in range(100):
             # For warmup.
             if 50 == i:
-                paddle.fluid.core._cuda_synchronize(place)
+                # PaddlePaddle >= 2.2
+                paddle.device.cuda.synchronize()
                 start = time.perf_counter()
-            finished_seq = faster_bart(input_ids)
-        paddle.fluid.core._cuda_synchronize(place)
+            finished_seq = faster_bart.generate(
+                input_ids=input_ids,
+                mem_seq_lens=mem_seq_lens,
+                max_length=args.max_out_len,
+                decode_strategy=args.decoding_strategy,
+                top_k=args.top_k,
+                top_p=args.top_p,
+                num_beams=args.beam_size,
+                diversity_rate=args.diversity_rate,
+                rel_len=args.rel_len,
+                alpha=args.alpha)
+        paddle.device.cuda.synchronize()
         logger.info("Average test time for decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))
 
@@ -173,7 +178,8 @@ def do_predict(args):
                         break
                     generated_ids = post_process_seq(beam, bos_id, eos_id)
                     print(tokenizer.convert_ids_to_string(generated_ids))
-        elif args.decoding_strategy in ['topk_sampling', 'topp_sampling']:
+        elif args.decoding_strategy.endswith(
+                'sampling') or args.decoding_strategy == "greedy_search":
             finished_seq = finished_seq.numpy().transpose([1, 0])
             for ins in finished_seq:
                 generated_ids = post_process_seq(ins, bos_id, eos_id)
