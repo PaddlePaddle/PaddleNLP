@@ -135,7 +135,7 @@ class FasterTransformer(TransformerModel):
                  alpha=0.6):
         # if decoding_lib is None:
         #     raise ValueError(
-        #         "The args decoding_lib must be set to use Faster Transformer. ")
+        #         "The args decoding_lib must be set to use FasterTransformer. ")
         # elif not os.path.exists(decoding_lib):
         #     raise ValueError("The path to decoding lib is not exist.")
 
@@ -238,7 +238,7 @@ class FasterTransformer(TransformerModel):
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
         # NOTE: the data type of the embedding bias for logits is different
         # between decoding with beam search and top-k/top-p sampling in
-        # Faster Transformer when using float16.
+        # FasterTransformer when using float16.
         # NOTE: This changes since FasterTransformer V4.0 and update accordingly
         # after update to FT-4.0.
         bias_dtype = "float32"
@@ -352,7 +352,7 @@ class FasterTransformer(TransformerModel):
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
         # NOTE: the data type of the embedding bias for logits is different
         # between decoding with beam search and top-k/top-p sampling in
-        # Faster Transformer when using float16.
+        # FasterTransformer when using float16.
         # NOTE: This changes since FasterTransformer V4.0 and update accordingly
         # after update to FT-4.0.
         bias_dtype = "float32"
@@ -437,11 +437,11 @@ class TransformerGenerator(paddle.nn.Layer):
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
             to `False`. 
 
-            - `use_ft(bool, optional)`: Whether to use Faster Transformer
+            - `use_ft(bool, optional)`: Whether to use FasterTransformer
             for decoding. Default to True if not set.
 
             - `use_fp16_decoding(bool, optional)`: Whether to use fp16
-            for decoding.  Only works when using Faster Transformer.
+            for decoding.  Only works when using FasterTransformer.
 
             - `beam_search_version(str, optional)`: Indicating the strategy of
             beam search. It can be 'v1' or 'v2'. 'v2' would select the top
@@ -495,7 +495,7 @@ class TransformerGenerator(paddle.nn.Layer):
         self.d_model = d_model
         self.max_length = max_length
         self.output_time_major = kwargs.pop("output_time_major", True)
-        # Only works for Faster Transformer.
+        # Only works for FasterTransformer.
         # TODO: original version supports diversity rate.
         diversity_rate = kwargs.pop("diversity_rate", 0.0)
         use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
@@ -506,7 +506,6 @@ class TransformerGenerator(paddle.nn.Layer):
 
         if use_ft:
             try:
-                load("FasterTransformer", verbose=True)
                 decoding_strategy = ("beam_search_v2"
                                      if beam_search_version == "v2" else
                                      "beam_search")
@@ -532,7 +531,7 @@ class TransformerGenerator(paddle.nn.Layer):
                     alpha=alpha)
             except Exception:
                 logger.warning(
-                    "Exception occurs when using Faster Transformer. " \
+                    "Exception occurs when using FasterTransformer. " \
                     "The original forward will be involved. ")
                 if diversity_rate != 0:
                     logger.warning(
