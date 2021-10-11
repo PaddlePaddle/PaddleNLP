@@ -398,13 +398,18 @@ class InferTransformerDecoding(nn.Layer):
                  alpha=0.6):
         # if decoding_lib is None:
         #     raise ValueError(
-        #         "The args decoding_lib must be set to use Faster Transformer. ")
+        #         "The args decoding_lib must be set to use FasterTransformer. ")
         # elif not os.path.exists(decoding_lib):
         #     raise ValueError("The path to decoding lib is not exist.")
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 decoding_lib)
+        else:
+            logger.warning(
+                "The specified decoding_lib does not exist, and it will be built automatically."
+            )
+            load("FasterTransformer", verbose=True)
 
         super(InferTransformerDecoding, self).__init__()
         for arg, value in locals().items():
@@ -760,16 +765,15 @@ class InferUnifiedDecoding(nn.Layer):
                  mask_id=30000,
                  normalize_before=True,
                  hidden_act="gelu"):
-        if decoding_lib is None:
-            raise ValueError(
-                "The args decoding_lib must be set to use Faster Transformer. ")
-        elif not os.path.exists(decoding_lib):
-            raise ValueError("The path to decoding lib is not exist.")
-        # TODO(): Using jit.
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 decoding_lib)
+        else:
+            logger.warning(
+                "The specified decoding_lib does not exist, and it will be built automatically."
+            )
+            load("FasterTransformer", verbose=True)
 
         super(InferUnifiedDecoding, self).__init__()
         for arg, value in locals().items():
@@ -1127,13 +1131,18 @@ class InferBartDecoding(nn.Layer):
                  alpha=0.6):
         # if decoding_lib is None:
         #     raise ValueError(
-        #         "The args decoding_lib must be set to use Faster Transformer. ")
+        #         "The args decoding_lib must be set to use FasterTransformer. ")
         # elif not os.path.exists(decoding_lib):
         #     raise ValueError("The path to decoding lib is not exist.")
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 decoding_lib)
+        else:
+            logger.warning(
+                "The specified decoding_lib does not exist, and it will be built automatically."
+            )
+            load("FasterTransformer", verbose=True)
 
         super(InferBartDecoding, self).__init__()
         for arg, value in locals().items():
