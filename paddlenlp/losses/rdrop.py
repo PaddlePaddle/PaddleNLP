@@ -34,19 +34,9 @@ class RDropLoss(nn.Layer):
         if `reduction` is ``'sum'``, the reduced sum loss is returned;
         if `reduction` is ``'none'``, no reduction will be apllied.
         Default is ``'none'``.
-
     """
 
     def __init__(self, reduction='none'):
-        """
-        reduction(obj:`str`, optional): Indicate how to average the loss,
-        the candicates are ``'none'`` | ``'batchmean'`` | ``'mean'`` | ``'sum'``.
-        If `reduction` is ``'mean'``, the reduced mean loss is returned;
-        If `reduction` is ``'batchmean'``, the sum loss divided by batch size is returned;
-        if `reduction` is ``'sum'``, the reduced sum loss is returned;
-        if `reduction` is ``'none'``, no reduction will be apllied.
-        Default is ``'none'``.
-        """
         super(RDropLoss, self).__init__()
         if reduction not in ['sum', 'mean', 'none', 'batchmean']:
             raise ValueError(
@@ -57,12 +47,12 @@ class RDropLoss(nn.Layer):
     def forward(self, p, q, pad_mask=None):
         """
         Args:
-            p(obj:`Tensor`): the first forward logits of training examples.
-            q(obj:`Tensor`): the second forward logits of training examples.
-            pad_mask(obj:`Tensor`, optional): The Tensor containing the binary mask to index with, it's data type is bool.
+            p(Tensor): the first forward logits of training examples.
+            q(Tensor): the second forward logits of training examples.
+            pad_mask(Tensor, optional): The Tensor containing the binary mask to index with, it's data type is bool.
 
         Returns:
-            loss(obj:`Tensor`): the rdrop loss of p and q
+            Tensor: Returns tensor `loss`, the rdrop loss of p and q.
         """
         p_loss = F.kl_div(
             F.log_softmax(
