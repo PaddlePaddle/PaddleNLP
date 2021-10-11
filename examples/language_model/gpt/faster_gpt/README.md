@@ -15,9 +15,7 @@
 
 我们实现了基于 FasterTransformer 的 FasterGPT 的自定义 op 的接入，用于 GPT-2 模型在 GPU 上的预测性能。接下来，我们将介绍基于 Python 动态图使用 FasterGPT 自定义 op 的方式。
 
-## Python 动态图使用自定义 op
-
-### 使用 GPT-2 decoding 高性能推理
+## 使用 GPT-2 decoding 高性能推理
 
 编写 python 脚本的时候，调用 `FasterGPT()` API 即可实现 GPT-2 模型的高性能预测。
 
@@ -51,7 +49,7 @@ gpt = FasterGPT(
 
 更详细的例子可以参考 `./infer.py`，我们提供了更详细用例。
 
-#### GPT-2 decoding 示例代码
+### GPT-2 decoding 示例代码
 
 使用 PaddlePaddle 仅执行 decoding 测试（float32）：
 
@@ -72,7 +70,7 @@ python infer.py --model_name_or_path gpt2-medium-en --decoding_lib ./build/lib/l
 * `--temperature`: temperature 的设定。
 * `--use_fp16_decoding`: 是否使用 fp16 进行推理。
 
-#### 导出基于 FasterGPT 的预测库使用模型文件
+### 导出基于 FasterGPT 的预测库使用模型文件
 
 如果需要使用 Paddle Inference 预测库针对 GPT 进行预测，首先，需要导出预测模型，可以通过 `export_model.py` 脚本获取预测库用模型，执行方式如下所示：
 
@@ -99,7 +97,7 @@ python export_model.py --model_name_or_path gpt2-medium-en --topk 4 --topp 0.0 -
 └── vocab.txt           # 词表
 ```
 
-#### C++ 预测库使用高性能加速
+### C++ 预测库使用高性能加速
 
 C++ 预测库使用 FasterGPT 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译，同时也可以参考相同文档执行对应的 C++ 预测库的 demo 完成预测。
 
