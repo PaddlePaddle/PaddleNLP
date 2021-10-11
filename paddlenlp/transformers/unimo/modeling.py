@@ -29,13 +29,11 @@ __all__ = [
 
 class UNIMOPretrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained UNIMO models. It provides 
-    UNIMO related `model_config_file`, `resource_files_names`, 
-    `pretrained_resource_files_map`, `pretrained_init_configuration`, 
-    `base_model_prefix` for downloading and loading pretrained models. 
-    
-    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for 
-    more details.
+    An abstract class for pretrained UNIMO models. It provides UNIMO related
+    `model_config_file`, `pretrained_init_configuration`,
+    `resource_files_names`, `pretrained_resource_files_map`,
+    `base_model_prefix` for downloading and loading pretrained models.
+    Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
     model_config_file = "model_config.json"
@@ -132,73 +130,77 @@ class UNIMOEmbeddings(nn.Layer):
 @register_base_model
 class UNIMOModel(UNIMOPretrainedModel):
     """
-    The bare UNIMO Model outputting raw hidden-states without any 
-    specific head on top.
+    The bare UNIMO Model outputting raw hidden-states.
 
-    This model inherits from 
-    :class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Refer to the 
-    superclass documentation for the generic methods.
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the  superclass documentation for the generic methods.
 
-    This model is also a `paddle.nn.Layer <https://www.paddlepaddle.org.cn
-    /documentation/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ 
-    subclass. Use it as a regular Paddle Layer and refer to the Paddle 
+    This model is also a `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass.
+    Use it as a regular Paddle Layer and refer to the Paddle
     documentation for all matter related to general usage and behavior.
 
     Args:
         vocab_size (int):
-            Vocabulary size of `inputs_ids` in :class:`UNIMOModel`. 
-            Also is the vocab size of token embedding matrix.
+            Vocabulary size of `inputs_ids` in `UNIMOModel`. Also is the vocab size of token embedding matrix.
+            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `UNIMOModel`.
         hidden_size (int, optional):
-            Dimensionality of the embedding layers, encoder layers and pooler 
-            layer. Defaults to 768.
+            Dimensionality of the embedding layers and encoder layers. Defaults to `768`.
         num_hidden_layers (int, optional):
-            The number of hidden layers in the encoder. Defaults to 12.
+            The number of hidden layers in the Transformer encoder. Defaults to `12`.
         num_attention_heads (int, optional):
-            The number of heads in multi-head attention(MHA). Defaults to 12.
+            Number of attention heads for each attention layer in the Transformer encoder.
+            Defaults to `12`.
         intermediate_size (int, optional):
-            Dimensionality of the feed-forward layer in the encoder. Input 
-            tensors to feed-forward layers are firstly projected from 
-            `hidden_size` to `intermediate_size`, and then projected back to 
-            `hidden_size`. Typically `intermediate_size` is larger than 
-            `hidden_size`. Defaults to 3072.
+            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
+            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
+            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
+            Defaults to `3072`.
         hidden_act (str, optional):
-            The activation function in the feedforward network. Defaults to 
-            "gelu".
-        hidden_dropout_prob(float, optional): 
-            The dropout probability used in pre-process and post-precess of MHA 
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported. Defaults to ``"gelu"``.
+        hidden_dropout_prob(float, optional):
+            The dropout probability used in pre-process and post-precess of MHA
             and FFN sub-layer. Defaults to 0.1.
-        attention_probs_dropout_prob (float, optional): 
-            The dropout probability used in MHA to drop some attention target. 
-            Defaults to 0.1.
-        normalize_before (bool, optional): 
-            Indicate whether to put layer normalization into preprocessing of 
-            MHA and FFN sub-layers. If True, pre-process is layer ormalization 
-            and post-precess includes dropout, residual connection. Otherwise, 
-            no pre-process and post-precess includes dropout, residual 
-            connection, layer normalization. Defaults to True.
+        attention_probs_dropout_prob (float, optional):
+            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
+            Defaults to `0.1`.
+        normalize_before (bool, optional):
+            Indicate whether to put layer normalization into preprocessing of
+            MHA and FFN sub-layers. If True, pre-process is layer normalization
+            and post-precess includes dropout, residual connection. Otherwise,
+            no pre-process and post-precess includes dropout, residual
+            connection, layer normalization. Defaults to `True`.
         max_position_embeddings (int, optional):
-            The maximum length of input `position_ids`. Defaults to 512.
+            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
+            sequence. Defaults to `512`.
         type_vocab_size (int, optional):
-            The size of the input `token_type_ids`. Defaults to 2.
+            The vocabulary size of the `token_type_ids` passed when calling `~transformers.UNIMOModel`.
+            Defaults to `2`.
         initializer_range (float, optional):
-            The standard deviation of the normal initializer. Defaults to 0.02.
+            The standard deviation of the normal initializer. Defaults to `0.02`.
 
             .. note::
-                A normal_initializer initializes weight matrices as normal 
-                distributions. See 
-                :meth:`UNIMOPretrainedModel.init_weights` method 
-                for how weights are initialized in 
-                :class:`UNIMOModel`.
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`UNIMOPretrainedModel._init_weights()` for how weights are initialized in `UNIMOModel`.
+
         unk_token_id (int, optional):
-            The id of special token `unk_token`. Defaults to 0.
+            A special token representing the *unknown (out-of-vocabulary)* token.
+            An unknown token is set to be `unk_token` in order to be converted to an ID.
+            Defaults to `17963`.
         pad_token_id (int, optional):
-            The id of special token `pad_token`. Defaults to 0.
+            A special token used to make arrays of tokens the same size for batching purposes.
+            Defaults to `0`.
         bos_token_id (int, optional):
-            The id of special token `bos_token`. Defaults to 1.
+            A special token representing the beginning of a sequence that was used during pretraining.
+            Defaults to `1`.
         eos_token_id (int, optional):
-            The id of special token `eos_token`. Defaults to 2.
+            A special token representing the end of a sequence that was used during pretraining.
+            Defaults to `3`.
         mask_token_id (int, optional):
-            The id of special token `mask_token`. Defaults to 30000.
+            A special token representing a masked token. This is the token used
+            in the masked language modeling task which the model tries to predict the original unmasked ones.
+            Defaults to `3`.
     """
 
     def __init__(
@@ -257,59 +259,54 @@ class UNIMOModel(UNIMOPretrainedModel):
                 use_cache=False,
                 cache=None):
         r"""
-        The UNIMOModel forward method, overrides the special 
-        :meth:`__call__` method.
+        The UNIMOModel forward method, overrides the special :meth:`__call__` method.
 
         Args:
             input_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input 
-                sequence. It's data type should be `int64` and has a shape of 
-                [batch_size, sequence_length].
+                numerical representations of tokens that build the input sequence.
+                It's data type should be `int64` and has a shape of  [batch_size, sequence_length].
             token_type_ids (Tensor):
-                Segment token indices to indicate first and second portions of 
+                Segment token indices to indicate first and second portions of
                 the inputs. Indices can be either 0 or 1:
 
                 - 0 corresponds to a **sentence A** token,
                 - 1 corresponds to a **sentence B** token.
 
-                It's data type should be `int64` and has a shape of 
-                [batch_size, sequence_length].
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                Defaults to None, which means no segment embeddings is added to token embeddings.
             position_ids (Tensor):
-                The position indices of input sequence tokens. It's data type 
-                should be `int64` and has a shape of [batch_size, sequence_length].
-            attention_mask (Tensor): 
-                A tensor used in multi-head attention to prevents attention to 
-                some unwanted positions, usually the paddings or the subsequent 
-                positions. It is a tensor with shape broadcasted to 
-                [batch_size, n_head, sequence_length, sequence_length]. 
-                
-                - When the data type is bool, the unwanted positions have 
-                  `False` values and the others have `True` values. 
-                - When the data type is int, the unwanted positions have 0 
-                  values and the others have 1 values. 
-                - When the data type is float, the unwanted positions have 
-                  `-INF` values and the others have 0 values.
-
-            use_cache: (bool, optional): 
-                Whether or not use the model cache to speed up decoding. Defaults 
-                to False.
-            cache (list, optional): 
-                It is a list, and each element in the list is `incremental_cache` 
-                produced by :meth:`paddle.nn.TransformerEncoderLayer.gen_cache` 
-                method. See :meth:`paddle.nn.TransformerEncoder.gen_cache` 
-                method for more details. It is only used for inference and 
-                should be None for training. Defaults to None.
+                Indices of positions of each input sequence tokens in the position embeddings.
+                Selected in the range ``[0, max_position_embeddings - 1]``.
+                It's data type should be `int64` and has a shape of [batch_size, sequence_length].
+                Defaults to `None`.
+            attention_mask (Tensor):
+                Mask used in multi-head attention to avoid performing attention to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
+                [batch_size, num_attention_heads, sequence_length, sequence_length].
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+            use_cache: (bool, optional):
+                Whether or not use the model cache to speed up decoding.
+                Defaults to `False`.
+            cache (list, optional):
+                It is a list, and each element in the list is `incremental_cache`
+                produced by :meth:`paddle.nn.TransformerEncoderLayer.gen_cache`
+                method. See :meth:`paddle.nn.TransformerEncoder.gen_cache`
+                method for more details. It is only used for inference and
+                should be None for training. Defaults to `None`.
 
         Returns:
-            Tensor|tuple: If `use_cache` is False, it is a tensor 
-            representing the output of :class:`UNIMOModel`, with 
-            shape [batch_size, sequence_length, hidden_size]. The data type is 
-            float32 or float64. Otherwise, it is a tuple, besides the output of 
-            :class:`UNIMOModel`, the tuple also includes the new 
-            cache which is same as input `cache` but `incremental_cache` in it 
-            has an incremental length. 
-            See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and 
+            Tensor or tuple: If `use_cache` is False, it is a tensor representing the output of :class:`UNIMOModel`, with
+            shape [batch_size, sequence_length, hidden_size]. The data type is float64.
+            Otherwise, it is a tuple, besides the output of :class:`UNIMOModel`, the tuple also includes the new
+            cache which is same as input `cache` but `incremental_cache` in it has an incremental length.
+            See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and
             :meth:`paddle.nn.MultiHeadAttention.forward` method for more details.
 
         Example:
@@ -321,10 +318,7 @@ class UNIMOModel(UNIMOPretrainedModel):
                 model = UNIMOModel.from_pretrained('unimo-text-1.0')
                 tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
 
-                source = '我爱祖国'
-                inputs = tokenizer.gen_encode(
-                    source,
-                    return_tensors=True)
+                inputs = tokenizer.gen_encode("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors=True)
                 outputs = model(**inputs)
         """
 
@@ -379,8 +373,8 @@ class UNIMOLMHead(nn.Layer):
 
 class UNIMOLMHeadModel(UNIMOPretrainedModel):
     """
-    The UNIMO Model with a language modeling head on top (linear 
-    layer with weights tied to the input embeddings) for generation tasks.
+    The UNIMO Model with a language modeling head on top (linear
+    layer with weights tied to the input embeddings), designed for generation tasks.
 
     Args:
         unimo (:class:`UNIMOModel`):
@@ -405,7 +399,7 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
                 use_cache=False,
                 cache=None):
         r"""
-        The UNIMOLMHeadModel forward method, overrides the special 
+        The UNIMOLMHeadModel forward method, overrides the special
         :meth:`__call__` method.
 
         Args:
@@ -415,22 +409,19 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
                 See :class:`UNIMOModel`.
             position_ids (Tensor):
                 See :class:`UNIMOModel`.
-            attention_mask (Tensor): 
+            attention_mask (Tensor):
                 See :class:`UNIMOModel`.
-            use_cache: (bool, optional): 
+            use_cache: (bool, optional):
                 See :class:`UNIMOModel`.
-            cache (list, optional): 
+            cache (list, optional):
                 See :class:`UNIMOModel`.
 
         Returns:
-            Tensor|tuple: If `use_cache` is False, it is a tensor 
-            representing the output of :class:`UNIMOLMHeadModel`, 
-            with shape [batch_size, sequence_length, vocab_size]. The data type 
-            is float32 or float64. Otherwise, it is a tuple, besides the output 
-            of :class:`UNIMOLMHeadModel`, the tuple also includes 
-            the new cache which is same as input `cache` but `incremental_cache` 
-            in it has an incremental length. 
-            See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and 
+            Tensor or tuple: If `use_cache` is False, it is a tensor representing the output of :class:`UNIMOModel`, with
+            shape [batch_size, sequence_length, hidden_size]. The data type is float64.
+            Otherwise, it is a tuple, besides the output of :class:`UNIMOLMHeadModel`, the tuple also includes the new
+            cache which is same as input `cache` but `incremental_cache` in it has an incremental length.
+            See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and
             :meth:`paddle.nn.MultiHeadAttention.forward` method for more details.
 
         Example:
@@ -442,9 +433,8 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
                 model = UNIMOLMHeadModel.from_pretrained('unimo-text-1.0')
                 tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
 
-                source = '我爱祖国'
                 inputs = tokenizer.gen_encode(
-                    source,
+                    "Welcome to use PaddlePaddle and PaddleNLP!",
                     return_tensors=True,
                     is_split_into_words=False)
                 logits = model(**inputs)
