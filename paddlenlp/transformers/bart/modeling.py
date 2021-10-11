@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from functools import partial
 import numpy as np
 
 import paddle
@@ -113,7 +114,7 @@ class BartPretrainedModel(PretrainedModel):
         elif isinstance(layer, (nn.TransformerEncoderLayer,
                                 nn.TransformerDecoderLayer)):
             if layer.activation == F.gelu:
-                layer.activation = nn.GELU(approximate=True)
+                layer.activation = partial(F.gelu, approximate=True)
 
 
 class BartLearnedPositionalEmbedding(Embedding):
