@@ -289,7 +289,6 @@ class BartModel(BartPretrainedModel):
             Defaults to `0`.
         d_model (int, optional):
             Dimensionality of the embedding layer, encoder layer and decoder layer. Defaults to `768`.
-
         num_encoder_layers (int, optional):
             Number of hidden layers in the Transformer encoder. Defaults to `6`.
         num_decoder_layers (int, optional):
