@@ -1,6 +1,6 @@
-# Faster Transformer 预测
+# FasterTransformer 预测
 
-在这里我们集成了 NVIDIA [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。同时集成了 Faster Transformer float32 以及 float16 预测。以下是使用 Faster Transformer 的说明。
+在这里我们集成了 NVIDIA [FasterTransformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。同时集成了 FasterTransformer float32 以及 float16 预测。以下是使用 FasterTransformer 的说明。
 
 ## 使用环境说明
 
@@ -9,7 +9,7 @@
 * CUDA 10.1 或 10.2（需要 PaddlePaddle 框架一致）
 * gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
 * 推荐使用 Python3
-* [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#setup) 使用必要的环境
+* [FasterTransformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#setup) 使用必要的环境
 * 环境依赖
   - attrdict
   - pyyaml
@@ -19,9 +19,9 @@
 
 ## 快速开始
 
-我们实现了基于 Faster Transformer 的自定义 op 的接入，用于加速当前机器翻译 example 在 GPU 上的预测性能。
+我们实现了基于 FasterTransformer 的自定义 op 的接入，用于加速当前机器翻译 example 在 GPU 上的预测性能。
 
-## 使用 Faster Transformer 完成预测
+## 使用 FasterTransformer 完成预测
 
 编写 python 脚本的时候，调用 [`FasterTransformer` API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.ops.faster_transformer.transformer.faster_transformer.html#paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer) 即可实现 Transformer 模型的高性能预测。
 
@@ -96,7 +96,7 @@ python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --d
 
 其中:
 * `--config`: 选项用于指明配置文件的位置
-* `--decoding_lib`: 选项用于指明编译好的 Faster Transformer decoding lib 的位置
+* `--decoding_lib`: 选项用于指明编译好的 FasterTransformer decoding lib 的位置
 * `--decoding_strategy`: 选项用于指定解码使用的策略，可以选择是 `beam_search`，`topk_sampling`，`topp_sampling`。
   * 当使用 `beam_search` 的时候，需要指定 `--beam_size` 的值
   * 当使用 `topk_sampling` 的时候，需要指定 `--topk` 的值
@@ -123,7 +123,7 @@ cp -rf ../../../../paddlenlp/ops/build/third-party/build/fastertransformer/bin/d
 python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --use_fp16_decoding --decoding_strategy beam_search --beam_size 5
 ```
 
-其中，`--config` 选项用于指明配置文件的位置，而 `--decoding_lib` 选项用于指明编译好的 Faster Transformer decoding lib 的位置。
+其中，`--config` 选项用于指明配置文件的位置，而 `--decoding_lib` 选项用于指明编译好的 FasterTransformer decoding lib 的位置。
 
 翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `./sample/config/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 base model 的配置。
 

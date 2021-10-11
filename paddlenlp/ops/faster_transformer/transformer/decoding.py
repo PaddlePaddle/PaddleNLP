@@ -398,7 +398,7 @@ class InferTransformerDecoding(nn.Layer):
                  alpha=0.6):
         # if decoding_lib is None:
         #     raise ValueError(
-        #         "The args decoding_lib must be set to use Faster Transformer. ")
+        #         "The args decoding_lib must be set to use FasterTransformer. ")
         # elif not os.path.exists(decoding_lib):
         #     raise ValueError("The path to decoding lib is not exist.")
         if decoding_lib is not None and os.path.isfile(decoding_lib):
@@ -1131,7 +1131,7 @@ class InferBartDecoding(nn.Layer):
                  alpha=0.6):
         # if decoding_lib is None:
         #     raise ValueError(
-        #         "The args decoding_lib must be set to use Faster Transformer. ")
+        #         "The args decoding_lib must be set to use FasterTransformer. ")
         # elif not os.path.exists(decoding_lib):
         #     raise ValueError("The path to decoding lib is not exist.")
         if decoding_lib is not None and os.path.isfile(decoding_lib):

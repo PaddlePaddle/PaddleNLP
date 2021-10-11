@@ -1,6 +1,6 @@
 # FasterUNIMOText 预测
 
-在这里我们集成并升级了 NVIDIA [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。以下是使用 FasterUNIMOText 的说明。
+在这里我们集成并升级了 NVIDIA [FasterTransformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。以下是使用 FasterUNIMOText 的说明。
 
 **需要注意的是：**这里的说明仅涉及使用 FasterUNIMOText 进行预测，而预测所需的模型，需要经过上一级目录 `../run_gen.py` finetuning 获取。
 
@@ -11,11 +11,11 @@
 * CUDA 10.1 或 10.2（需要 PaddlePaddle 框架一致）
 * gcc 版本需要与编译 PaddlePaddle 版本一致，比如使用 gcc8.2
 * 推荐使用 Python3
-* [Faster Transformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#setup) 使用必要的环境
+* [FasterTransformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#setup) 使用必要的环境
 
 ## 快速开始
 
-我们实现了基于 Faster Transformer 的 FasterUNIMOText 的自定义 op 的接入，用于加速 UNIMOText 模型在 GPU 上的预测性能。接下来，我们将介绍基于 Python 动态图使用 FasterUNIMOText 自定义 op 的方式。
+我们实现了基于 FasterTransformer 的 FasterUNIMOText 的自定义 op 的接入，用于加速 UNIMOText 模型在 GPU 上的预测性能。接下来，我们将介绍基于 Python 动态图使用 FasterUNIMOText 自定义 op 的方式。
 
 ## 使用 FasterUNIMOText 完成预测
 
