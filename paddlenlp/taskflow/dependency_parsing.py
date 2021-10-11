@@ -63,6 +63,7 @@ usage = r"""
            '''
            [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': ['2', '0', '5', '5', '2'], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
            '''
+
            ddp = Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")
            ddp("百度是一家高科技公司")
            '''
@@ -112,7 +113,7 @@ class DDParserTask(Task):
                 ddparser, ddparser-ernie-1.0 and ddoarser-ernie-gram-zh")
         word_vocab_path = download_file(
             self._task_path, self.model + os.path.sep + "word_vocab.json",
-            URLS[self.model][0], URLS[self.model][1])
+            URLS[self.model][0], URLS[self.model][1], self.model)
         rel_vocab_path = download_file(
             self._task_path, self.model + os.path.sep + "rel_vocab.json",
             URLS[self.model][0], URLS[self.model][1])
