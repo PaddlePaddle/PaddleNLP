@@ -65,6 +65,11 @@ class UNIMOTokenizer(PretrainedTokenizer):
             from paddlenlp.transformers import UNIMOTokenizer
             tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
             encoded_inputs = tokenizer('He was a puppeteer')
+            # encoded_inputs
+            #{
+            #   'input_ids': [1, 4444, 4385, 1545, 6712, 10062, 9568, 9756, 9500, 2],
+            #   'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            #}
 
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
@@ -169,6 +174,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
                 tokenizer = UNIMOtokenizer.from_pretrained('unimo-text-1.0')
                 tokens = tokenizer.tokenize('He was a puppeteer')
+                # ['he', 'was', 'a', 'pu', '##pp', '##et', '##ee', '##r']
 
         """
         return self._tokenize(text)
@@ -426,7 +432,19 @@ class UNIMOTokenizer(PretrainedTokenizer):
                 from paddlenlp.transformers import UNIMOTokenizer
                 tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
                 inputs = tokenizer.gen_encode('He was a puppeteer')
-
+                #{'input_ids': [1, 4444, 4385, 1545, 6712, 10062, 9568, 9756, 9500, 2],
+                #'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                #'position_ids': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+                #'attention_mask': array([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]], dtype=float32)}
         """
 
         # Input type checking for clearer error

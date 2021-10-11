@@ -422,7 +422,7 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
         Returns:
             Tensor or tuple: If `use_cache` is False, it is a tensor representing the output of :class:`UNIMOModel`, with
             shape [batch_size, sequence_length, hidden_size]. The data type is float64.
-            Otherwise, it is a tuple, besides the output of :class:`UNIMOModel`, the tuple also includes the new
+            Otherwise, it is a tuple, besides the output of :class:`UNIMOLMHeadModel`, the tuple also includes the new
             cache which is same as input `cache` but `incremental_cache` in it has an incremental length.
             See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and
             :meth:`paddle.nn.MultiHeadAttention.forward` method for more details.
