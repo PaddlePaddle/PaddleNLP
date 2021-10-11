@@ -38,12 +38,19 @@ MODEL_CLASSES = {
 }
 
 
-def set_hyrbid_parallel_seed(basic_seed, data_world_rank):
+def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank):
     assert args.device != "cpu"
 
     random.seed(basic_seed + data_world_rank)
     np.random.seed(basic_seed + data_world_rank)
     paddle.seed(basic_seed + data_world_rank)
+
+    # local_seed/ global_seed is used to control dropout in ModelParallel
+    local_seed = args.seed + 123 + mp_rank * 10 + pp_rank * 1000
+    global_seed = args.seed + data_world_rank
+    tracker = get_rng_state_tracker()
+    tracker.add('global_seed', global_seed)
+    tracker.add('local_seed', local_seed)
 
 
 @paddle.no_grad()
@@ -95,7 +102,8 @@ def do_train(args):
         "micro_batch_size": args.micro_batch_size
     }
 
-    strategy.tensor_parallel_configs = {"tensor_init_seed": 123, }
+    # used for loss alignment when args.mp_degree > 1
+    # strategy.tensor_parallel_configs = {"tensor_init_seed": 123}
 
     fleet.init(is_collective=True, strategy=strategy)
 
@@ -113,15 +121,7 @@ def do_train(args):
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
     # seed control in hybrid parallel
-    set_hyrbid_parallel_seed(args.seed, data_world_rank)
-
-    # local_seed/ global_seed is used to control dropout in ModelParallel
-    local_seed = args.seed + 123 + mp_rank * 10 + pp_rank * 1000
-    global_seed = args.seed + data_world_rank
-
-    tracker = get_rng_state_tracker()
-    tracker.add('global_seed', global_seed)
-    tracker.add('local_seed', local_seed)
+    set_hyrbid_parallel_seed(args.seed, data_world_rank, mp_rank, pp_rank)
 
     default_global_tokens_num = args.global_batch_size * args.max_seq_len
 
@@ -335,6 +335,7 @@ def do_train(args):
                                  args.eval_iters, log_writer, global_step,
                                  epoch, "valid")
 
+                # TODO: 1. merge paramters while saving model. 2. ensure that the model is saved and loaded correctly
                 # only dp_rank = 0 save model
                 if (global_step % args.save_steps == 0 or
                         global_step >= args.max_steps) and dp_rank == 0:
