@@ -91,6 +91,11 @@ class FasterTransformer(TransformerModel):
             `topp` are kept for top-p sampling. Defaults to 4. 
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
+        diversity_rate (float, optional):
+            Refer to `A Simple, Fast Diverse Decoding Algorithm for Neural Generation <https://arxiv.org/abs/1611.08562>`_
+            for details. Bigger `diversity_rate` would lead to more diversity.
+            if `diversity_rate == 0` is equivalent to naive BeamSearch. Default
+            to 0 if not set.
         use_fp16_decoding(bool, optional): Whether to use fp16 for decoding. 
         rel_len(bool, optional):
             Indicating whether `max_out_len` in is the length relative to that
@@ -123,6 +128,7 @@ class FasterTransformer(TransformerModel):
                  topk=1,
                  topp=0.0,
                  max_out_len=256,
+                 diversity_rate=0.0,
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  rel_len=False,
@@ -141,6 +147,7 @@ class FasterTransformer(TransformerModel):
         self.topk = args.pop("topk")
         self.topp = args.pop("topp")
         self.max_out_len = args.pop("max_out_len")
+        self.diversity_rate = args.pop("diversity_rate")
         self.decoding_lib = args.pop("decoding_lib")
         self.use_fp16_decoding = args.pop("use_fp16_decoding")
         self.rel_len = args.pop("rel_len")
@@ -177,6 +184,7 @@ class FasterTransformer(TransformerModel):
             topk=topk,
             topp=topp,
             max_out_len=max_out_len,
+            diversity_rate=self.diversity_rate,
             decoding_lib=self.decoding_lib,
             use_fp16_decoding=self.use_fp16_decoding,
             rel_len=self.rel_len,
@@ -453,6 +461,13 @@ class TransformerGenerator(paddle.nn.Layer):
             - `alpha(float, optional)`: The power number in length penalty
             calculation. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
             Only works in `v2` temporarily. Default to 0.6 if not set.
+        
+            - diversity_rate(float, optional): Refer to `A Simple, Fast Diverse
+            Decoding Algorithm for Neural Generation <https://arxiv.org/abs/1611.08562>`_
+            for details. Bigger `diversity_rate` would lead to more diversity.
+            if `diversity_rate == 0` is equivalent to naive BeamSearch. Default
+            to 0 if not set. **NOTE**: Only works when using FasterTransformer
+            temporarily.
     """
 
     def __init__(self,
@@ -480,6 +495,9 @@ class TransformerGenerator(paddle.nn.Layer):
         self.d_model = d_model
         self.max_length = max_length
         self.output_time_major = kwargs.pop("output_time_major", True)
+        # Only works for Faster Transformer.
+        # TODO: original version supports diversity rate.
+        diversity_rate = kwargs.pop("diversity_rate", 0.0)
         use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
         use_ft = kwargs.pop("use_ft", True)
         beam_search_version = kwargs.pop("beam_search_version", "v1")
@@ -507,6 +525,7 @@ class TransformerGenerator(paddle.nn.Layer):
                     eos_id=eos_id,
                     beam_size=beam_size,
                     max_out_len=max_out_len,
+                    diversity_rate=diversity_rate,
                     decoding_strategy=decoding_strategy,
                     use_fp16_decoding=use_fp16_decoding,
                     rel_len=rel_len,
@@ -515,6 +534,10 @@ class TransformerGenerator(paddle.nn.Layer):
                 logger.warning(
                     "Exception occurs when using Faster Transformer. " \
                     "The original forward will be involved. ")
+                if diversity_rate != 0:
+                    logger.warning(
+                        "diversity_rate would not work since it is only " \
+                        "supported by FasterTransformer temporarily.")
                 self.transformer = InferTransformerModel(
                     src_vocab_size=src_vocab_size,
                     trg_vocab_size=trg_vocab_size,
@@ -535,6 +558,10 @@ class TransformerGenerator(paddle.nn.Layer):
                     rel_len=rel_len,
                     alpha=alpha)
         else:
+            if diversity_rate != 0:
+                logger.warning(
+                    "diversity_rate would not work since it is only " \
+                    "supported by FasterTransformer temporarily.")
             self.transformer = InferTransformerModel(
                 src_vocab_size=src_vocab_size,
                 trg_vocab_size=trg_vocab_size,
@@ -786,7 +813,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             temperature=temperature)
 
     def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
-                    pad_token_id, eos_token_id, **model_kwargs):
+                    diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
         max_length -= input_ids.shape[-1]
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
@@ -796,6 +823,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             model_inputs=model_inputs,
             max_length=max_length,
             num_beams=beam_scorer.num_beams,
+            diversity_rate=diversity_rate,
             temperature=temperature)
 
     def forward(self,
@@ -804,6 +832,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
                 top_k=4,
                 top_p=0.0,
                 num_beams=4,
+                diversity_rate=0.0,
                 temperature=1.0,
                 model_inputs=None,
                 **model_kwargs):
@@ -823,6 +852,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             cache_v=cache_v,
             memory_seq_lens=seq_len,
             beam_size=num_beams,
+            diversity_rate=diversity_rate,
             topk=top_k,
             topp=top_p,
             max_out_len=max_length,
@@ -946,7 +976,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             temperature=temperature)
 
     def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
-                    pad_token_id, eos_token_id, **model_kwargs):
+                    diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
         max_length -= input_ids.shape[-1]
         model_inputs = self.prepare_inputs_for_generation(input_ids,
                                                           **model_kwargs)
@@ -956,6 +986,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             model_inputs=model_inputs,
             max_length=max_length,
             num_beams=beam_scorer.num_beams,
+            diversity_rate=diversity_rate,
             temperature=temperature)
 
     def forward(self,
@@ -964,6 +995,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
                 top_k=4,
                 top_p=0.0,
                 num_beams=4,
+                diversity_rate=0.0,
                 temperature=1.0,
                 model_inputs=None,
                 **model_kwargs):
@@ -983,6 +1015,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             cache_v=cache_v,
             memory_seq_lens=seq_len,
             beam_size=num_beams,
+            diversity_rate=diversity_rate,
             topk=top_k,
             topp=top_p,
             max_out_len=max_length,
@@ -1001,7 +1034,7 @@ class FasterBART(nn.Layer):
                  topk=1,
                  topp=0.0,
                  max_out_len=256,
-                 beam_search_diversity_rate=0.0,
+                 diversity_rate=0.0,
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  rel_len=False,
@@ -1023,7 +1056,7 @@ class FasterBART(nn.Layer):
             topk=topk,
             topp=topp,
             max_out_len=max_out_len,
-            beam_search_diversity_rate=beam_search_diversity_rate,
+            diversity_rate=diversity_rate,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding)
 
@@ -1032,7 +1065,8 @@ class FasterBART(nn.Layer):
         mem_seq_lens = paddle.sum(paddle.cast(
             input_ids != self.pad_id, dtype="int32"),
                                   axis=-1,
-                                  keepdim=True)
+                                  keepdim=True,
+                                  dtype="int32")
         if self.use_fp16_decoding:
             encoder_output = paddle.cast(encoder_output, "float16")
         return self.decoding(encoder_output, mem_seq_lens)

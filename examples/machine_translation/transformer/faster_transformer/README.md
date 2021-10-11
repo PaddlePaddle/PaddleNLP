@@ -139,6 +139,7 @@ python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --d
   * 当使用 `topk_sampling` 的时候，需要指定 `--topk` 的值
   * 当使用 `topp_sampling` 的时候，需要指定 `topp` 的值，并且需要保证 `--topk` 的值为 0
 * `--beam_size`: 解码策略是 `beam_search` 的时候，beam size 的大小，数据类型是 `int`
+* `--diversity_rate`: 解码策略是 `beam_search` 的时候，设置 diversity rate 的大小，数据类型是 `float`。当设置的 `diversity_rate` 大于 0 的时候，FasterTransformer 仅支持 beam size 为 1，4，16，64
 * `--topk`: 解码策略是 `topk_sampling` 的时候，topk 计算的 k 值的大小，数据类型是 `int`
 * `--topp`: 解码策略是 `topp_sampling` 的时候，p 的大小，数据类型是 `float`
 
@@ -177,7 +178,7 @@ git clone https://github.com/moses-smt/mosesdecoder.git
 perl mosesdecoder/scripts/generic/multi-bleu.perl ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data/newstest2014.tok.de < predict.tok.txt
 ```
 
-执行上述操作之后，可以看到类似如下的结果，此处结果是 base model 在 newstest2014 上的 BLEU 结果：
+执行上述操作之后，可以看到类似如下的结果，此处结果是 beam_size 为 5 时 base model 在 newstest2014 上的 BLEU 结果：
 ```
 BLEU = 26.89, 58.4/32.6/20.5/13.4 (BP=1.000, ratio=1.010, hyp_len=65166, ref_len=64506)
 ```
@@ -299,7 +300,7 @@ git clone https://github.com/moses-smt/mosesdecoder.git
 perl mosesdecoder/scripts/generic/multi-bleu.perl ~/.paddlenlp/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data/newstest2014.tok.de < predict.tok.txt
 ```
 
-执行上述操作之后，可以看到类似如下的结果，此处结果是 base model 在 newstest2014 上的 BLEU 结果：
+执行上述操作之后，可以看到类似如下的结果，此处结果是 beam_size 为 5 时 base model 在 newstest2014 上的 BLEU 结果：
 ```
 BLEU = 26.89, 58.4/32.6/20.5/13.4 (BP=1.000, ratio=1.010, hyp_len=65166, ref_len=64506)
 ```

@@ -195,12 +195,14 @@ class AlbertTokenizer(PretrainedTokenizer):
 
         if vocab_file is not None:
             self.tokenizer = AlbertChineseTokenizer(
-                vocab_file,
-                do_lower_case=False, )
+                vocab_file=vocab_file,
+                do_lower_case=False,
+            )
         elif sentencepiece_model_file is not None:
             self.tokenizer = AlbertEnglishTokenizer(
-                sentencepiece_model_file,
-                do_lower_case=True, )
+                sentencepiece_model_file=sentencepiece_model_file,
+                do_lower_case=True,
+            )
         else:
             raise ValueError(
                 "You should only specify either one(not both) of 'vocal_file'"
