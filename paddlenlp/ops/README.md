@@ -51,7 +51,7 @@
 
 ### 编译自定义OP
 
-我们已经提供对应的 CMakeLists.txt ，可以参考使用如下的方式完成编译。
+除了自动编译外，如果需要自行编译，我们已经提供对应的 CMakeLists.txt，可以参考使用如下的方式完成编译。
 
 #### PaddleNLP 准备
 
@@ -249,7 +249,7 @@ cd ../
 
 注意：
 * `-DSM`: 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
-* `-DPADDLE_LIB`: 需要指明使用的 PaddlePaddle 预测库的路径 `/path/to/paddle_inference_install_dir/`，并且在该路径下，预测库的组织结构满足：
+* `-DPADDLE_LIB`: 需要指明使用的 PaddlePaddle 预测库的路径 `/path/to/paddle_inference_install_dir/`，需要使用的 PaddlePaddle 的 lib 可以选择自行编译或者直接从官网下载 [paddle_inference_linux_lib](https://paddleinference.paddlepaddle.org.cn/user_guides/download_lib.html#linux)。需要注意的是，在该路径下，预测库的组织结构满足：
   ```text
   .
   ├── CMakeCache.txt
