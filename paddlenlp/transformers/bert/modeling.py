@@ -484,7 +484,7 @@ class BertModel(BertPretrainedModel):
                 tokenizer = BertTokenizer.from_pretrained('bert-wwm-chinese')
                 model = BertModel.from_pretrained('bert-wwm-chinese')
 
-                inputs = tokenizer("欢迎使用百度飞浆!")
+                inputs = tokenizer("欢迎使用百度飞桨!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''

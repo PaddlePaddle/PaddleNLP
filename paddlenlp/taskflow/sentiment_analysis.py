@@ -115,7 +115,7 @@ class SentaTask(Task):
             padding_idx=pad_token_id,
             pooling_type='max')
         model_path = download_file(self._task_path, model + ".pdparams",
-                                   URLS[model][0], URLS[model][1])
+                                   URLS[model][0], URLS[model][1], model)
 
         # Load the model parameter for the predict
         state_dict = paddle.load(model_path)
@@ -234,7 +234,7 @@ class SkepTask(Task):
         model_instance = SkepSequenceModel.from_pretrained(
             model, num_classes=len(self._label_map))
         model_path = download_file(self._task_path, model + ".pdparams",
-                                   URLS[model][0], URLS[model][1])
+                                   URLS[model][0], URLS[model][1], model)
         state_dict = paddle.load(model_path)
         model_instance.set_state_dict(state_dict)
         self._model = model_instance
