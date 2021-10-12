@@ -116,6 +116,7 @@ class RougeL(paddle.metric.Metric):
     in sequence n-grams automatically.
 
     .. math::
+
         R_{LCS} & = \frac{LCS(C,S)}{len(S)}
 
         P_{LCS} & = \frac{LCS(C,S)}{len(C)}
