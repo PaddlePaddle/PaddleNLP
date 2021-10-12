@@ -43,8 +43,7 @@ JIT 自动编译
 * `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 `GPT 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_。
 * `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 `UnifiedTransformer 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dialogue/unified_transformer>`_。
 * `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。使用示例可以参考 `UNIMOText 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text/faster_unimo>`_。
-* `FasterBart()`: 支持 BART 模型预测加速功能。使用示例可以参考 `BART 预测加速使用示例 <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/bart_decoding_sample.py>`_。
-
+* `FasterBART()`: 支持 BART 模型预测加速功能。使用示例可以参考 `BART 预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/faster_transformer/sample/bart_decoding_sample.py>`_，`BART 预测加速使用示例-文本摘要 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_summarization/bart>`_。
 具体使用方法可以参考 API 文档或是使用示例。
 
 编译自定义OP
@@ -99,7 +98,7 @@ PaddleNLP 准备
 使用 Transformer decoding 高性能推理
 ^^^^^^^^^^^^
 
-编写 python 脚本的时候，调用 `FasterTransformer API <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.ops.faster_transformer.transformer.faster_transformer.html#paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer>` 即可实现 Transformer 模型的高性能预测。
+编写 python 脚本的时候，调用 `FasterTransformer API <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.ops.faster_transformer.transformer.faster_transformer.html#paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer>`_ 即可实现 Transformer 模型的高性能预测。
 
 举例如下：
 
