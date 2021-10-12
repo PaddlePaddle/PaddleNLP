@@ -176,10 +176,7 @@ class BartEncoder(BartPretrainedModel):
         self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers)
         self.apply(self.init_weights)
 
-    def forward(
-            self,
-            input_ids=None,
-            attention_mask=None):
+    def forward(self, input_ids=None, attention_mask=None):
         if input_ids is None:
             raise ValueError("Input_ids cannot be None.")
         inputs_embeds = self.embed_tokens(input_ids)

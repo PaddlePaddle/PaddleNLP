@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument(
         "--without_ft",
         action="store_true",
-        help="Whether to use Faster Transformer to do predict. ")
+        help="Whether to use FasterTransformer to do predict. ")
     parser.add_argument(
         "--vocab_file",
         default=None,
