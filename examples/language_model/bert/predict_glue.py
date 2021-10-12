@@ -121,6 +121,8 @@ class Predictor(object):
                     'Please run the script with --collect_shape first to generate shape range info file, \
                     and then run without --collect_shape again.'
 
+                # `True` means trt engine would be rebuilded when shape is out of range.
+                # `False` means it would raise error.
                 config.enable_tuned_tensorrt_dynamic_shape(
                     args.shape_range_info, True)
 

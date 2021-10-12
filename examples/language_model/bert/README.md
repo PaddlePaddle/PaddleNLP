@@ -224,10 +224,11 @@ python -u ./predict_glue.py \
 
 
 下面是在NVIDIA Tesla V100 16GB的GPU卡，cuda10.1，cudnn7.6版本的环境下，使用TensorRT的动态shape模式预测与不使用TensorRT时预测时间的对比(batch_size: 32，单位: s)：
+
 |                       | SST-2(s) | RTE(s) | QNLI(s) |
 | --------------------- | -------- | ------ | ------- |
-| 未使用TensorRT        | 0.2760   | 0.0818 | 0.6246  |
-| 使用TensorRT(Float32) | 0.1368   | 0.1218 | 0.4424  |
+| 未使用TensorRT        |          |        |         |
+| 使用TensorRT(Float32) |          |        |         |
 
 
 同时支持使用输入样例数据的方式进行预测任务，这里仅以文本情感分类数据[SST-2](https://nlp.stanford.edu/sentiment/index.html)为例，输出样例数据的分类预测结果：
