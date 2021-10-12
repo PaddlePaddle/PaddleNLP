@@ -31,7 +31,7 @@ option(WITH_SP          "Compiled with sentencepiece. Only works when WITH_GPT a
 option(WITH_DECODER     "Compile with Transformer Decoder"                          ON)
 option(WITH_ENCODER     "Compile with Transformer Encoder"                          ON)
 option(WITH_STATIC_LIB  "Compile static lib"                                        OFF)
-option(WITH_BART        "Compile with BART"                                       ON)
+option(WITH_BART        "Compile with BART"                                         ON)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
@@ -278,7 +278,7 @@ set(FT_UPDATE_COMMAND git checkout v3.1 && git checkout . && ${FT_PATCH_COMMAND}
 
 ExternalProject_Add(
   extern_${THIRD_PARTY_NAME}
-  GIT_REPOSITORY    https://github.com/NVIDIA/FasterTransformer.git
+  GIT_REPOSITORY    https://gitee.com/paddlepaddle/FasterTransformer.git  # https://github.com/NVIDIA/FasterTransformer.git
   GIT_TAG           v3.1
   PREFIX            ${THIRD_PATH}
   SOURCE_DIR        ${THIRD_PATH}/source/${THIRD_PARTY_NAME}
