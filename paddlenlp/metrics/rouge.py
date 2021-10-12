@@ -116,21 +116,39 @@ class RougeL(paddle.metric.Metric):
     in sequence n-grams automatically.
 
     .. math::
-
         R_{LCS} & = \frac{LCS(C,S)}{len(S)}
 
         P_{LCS} & = \frac{LCS(C,S)}{len(C)}
 
         F_{LCS} & = \frac{(1 + \gamma^2)R_{LCS}P_{LCS}}}{R_{LCS} + \gamma^2{R_{LCS}}
 
-    where `C` is the candidate sentence, and 'S' is the refrence sentence.
+    where `C` is the candidate sentence, and 'S' is the reference sentence.
 
     Args:
-        gamma (float): A hyperparameter to decide the weight of recall. Default: 1.2.
-    
-    Examples:(TODO: liujiaqi)
+        trans_func (callable, optional): `trans_func` transforms the network
+            output to string to calculate.
+        vocab (dict|paddlenlp.data.vocab, optional): Vocab for target language.
+            If `trans_func` is None and RougeL is used as `paddle.metric.Metric`
+            instance, `default_trans_func` will be performed and `vocab` must
+            be provided.
+        gamma (float): A hyperparameter to decide the weight of recall. Defaults to 1.2.
+        name (str, optional): Name of `paddle.metric.Metric` instance. Defaults to "rouge-l".
+
+    Examples:
         1. Using as a general evaluation object.
+
+        .. code-block:: python
+
+            from paddlenlp.metrics import RougeL
+            rougel = RougeL()
+            cand = ["The","cat","The","cat","on","the","mat"]
+            ref_list = [["The","cat","is","on","the","mat"], ["There","is","a","cat","on","the","mat"]]
+            rougel.add_inst(cand, ref_list)
+            print(rougel.score()) # 0.7800511508951408
+
         2. Using as an instance of `paddle.metric.Metric`.
+
+        .. code-block:: python
 
     '''
 
