@@ -46,6 +46,11 @@ def parse_args():
     )
     parser.add_argument("--beam_size", default=5, type=int, help="Beam size. ")
     parser.add_argument(
+        "--diversity_rate",
+        default=0.0,
+        type=float,
+        help="The diversity rate for beam search. ")
+    parser.add_argument(
         "--topk",
         default=4,
         type=int,
@@ -144,6 +149,7 @@ def do_predict(args):
         decoding_strategy=args.decoding_strategy,
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
+        diversity_rate=args.diversity_rate,
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding)
 
@@ -206,6 +212,7 @@ if __name__ == "__main__":
     args.use_fp16_decoding = ARGS.use_fp16_decoding
     args.decoding_strategy = ARGS.decoding_strategy
     args.beam_size = ARGS.beam_size
+    args.diversity_rate = ARGS.diversity_rate
     args.topk = ARGS.topk
     args.topp = ARGS.topp
     args.profile = ARGS.profile
