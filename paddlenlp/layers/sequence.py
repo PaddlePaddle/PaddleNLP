@@ -18,14 +18,14 @@ def sequence_mask(seq_ids, valid_lengths):
     To boost the performance, this sequence_mask is different with paddle.fluid.layers.sequence_mask
 
     Args:
-        seq_ids (`Tensor`): 
+        seq_ids (Tensor):
             The whole sequence index, a tensor with a shape of [batch_size, sequence_length].
-        valid_lengths (`Tensor`): 
+        valid_lengths (Tensor):
             The valid length of every sequence, a tensor with a shape of [batch_size].
 
     Returns:
-        mask (`Tensor`): 
-            The output sequence mask. Its dtype is ``bool`` and has a shpe of [batch_size, sequence_length].
+        Tensor: Returns the output sequence mask `mask`.
+        Its dtype is `bool` and has a shape of [batch_size, sequence_length].
     """
     lengths_exp = valid_lengths.unsqueeze(1)
     mask = seq_ids < lengths_exp

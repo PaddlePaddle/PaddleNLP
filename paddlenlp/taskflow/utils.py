@@ -420,18 +420,19 @@ class TermTree(object):
                 else:
                     return False, None
 
-    def build_from_dir(self, term_schema_path, term_data_path):
+    def build_from_dir(self, term_schema_path, term_data_path, linking=True):
         """Build TermTree from a directory which should contain type schema and term data.
 
         Args:
             dir ([type]): [description]
         """
         self.__load_type(term_schema_path)
-        self.__load_file(term_data_path)
-        self.__build_sons()
+        if linking:
+            self.__load_file(term_data_path)
+            self.__build_sons()
 
     @classmethod
-    def from_dir(cls, term_schema_path, term_data_path) -> "TermTree":
+    def from_dir(cls, term_schema_path, term_data_path, linking) -> "TermTree":
         """Build TermTree from a directory which should contain type schema and term data.
 
         Args:
@@ -441,7 +442,7 @@ class TermTree(object):
             TermTree: [description]
         """
         term_tree = cls()
-        term_tree.build_from_dir(term_schema_path, term_data_path)
+        term_tree.build_from_dir(term_schema_path, term_data_path, linking)
         return term_tree
 
     def __dfs(self,
