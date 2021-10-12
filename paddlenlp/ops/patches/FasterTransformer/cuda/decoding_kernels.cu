@@ -64,6 +64,46 @@ void init_kernelLauncher_v2(bool* finished,
                                                    batch_size);
 }
 
+template <typename T>
+__global__ void embedding_position_lookups_bart_kernel(
+    T* from_tensor,
+    const T* embedding_table,
+    const T* position_encoding,
+    const int* word_ids,
+    const int batch_size,
+    const int hidden_units) {
+  // 1. lookup from embedding table
+  // 2. add the position encoding
+  for (int index = blockIdx.x * blockDim.x + threadIdx.x;
+       index < batch_size * hidden_units;
+       index += blockDim.x * gridDim.x) {
+    const int row_index = index / hidden_units;
+    const int col_index = index % hidden_units;
+    from_tensor[index] =
+        embedding_table[word_ids[row_index] * hidden_units + col_index] +
+        position_encoding[col_index];
+  }
+}
+
+template <typename T>
+void embedding_position_lookups_bart_kernel_launcher(T* from_tensor,
+                                                     const T* embedding_table,
+                                                     const T* position_encoding,
+                                                     const int* word_ids,
+                                                     const int batch_size,
+                                                     const int hidden_units,
+                                                     cudaStream_t stream) {
+  dim3 grid(min(batch_size, 65536));
+  dim3 block(min(hidden_units, 1024));
+  embedding_position_lookups_bart_kernel<T><<<grid, block, 0, stream>>>(
+      from_tensor,
+      embedding_table,
+      position_encoding,
+      word_ids,
+      batch_size,
+      hidden_units);
+}
+
 template void init_kernelLauncher_v2(bool* finished,
                                      int* sequence_length,
                                      int* word_ids,
@@ -81,5 +121,23 @@ template void init_kernelLauncher_v2(bool* finished,
                                      const int batch_size,
                                      const int beam_width,
                                      cudaStream_t stream);
+
+template void embedding_position_lookups_bart_kernel_launcher(
+    float* from_tensor,
+    const float* embedding_table,
+    const float* position_encoding,
+    const int* word_ids,
+    const int batch_size,
+    const int hidden_units,
+    cudaStream_t stream);
+
+template void embedding_position_lookups_bart_kernel_launcher(
+    half* from_tensor,
+    const half* embedding_table,
+    const half* position_encoding,
+    const int* word_ids,
+    const int batch_size,
+    const int hidden_units,
+    cudaStream_t stream);
 
 }  // end of name space fastertransformer

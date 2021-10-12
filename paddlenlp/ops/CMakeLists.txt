@@ -31,6 +31,7 @@ option(WITH_SP          "Compiled with sentencepiece. Only works when WITH_GPT a
 option(WITH_DECODER     "Compile with Transformer Decoder"                          ON)
 option(WITH_ENCODER     "Compile with Transformer Encoder"                          ON)
 option(WITH_STATIC_LIB  "Compile static lib"                                        OFF)
+option(WITH_BART        "Compile with BART"                                         ON)
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
@@ -57,8 +58,12 @@ if(WITH_DECODER)
   list(APPEND decoder_op_files fusion_decoder_op.cc fusion_decoder_op.cu)
 endif()
 
-if(NOT WITH_TRANSFORMER AND NOT WITH_GPT AND NOT WITH_DECODER AND NOT WITH_ENCODER)
-  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON or/and -DWITH_DECODER=ON or/and -DWITH_ENCODER=ON must be set to use FasterTransformer. ")
+if(WITH_BART)
+  list(APPEND decoding_op_files fusion_bart_decoding_op.cc fusion_bart_decoding_op.cu)
+endif()
+
+if(NOT WITH_TRANSFORMER AND NOT WITH_GPT AND NOT WITH_DECODER AND NOT WITH_ENCODER AND NOT WITH_BART)
+  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON or/and -DWITH_DECODER=ON or/and -DWITH_ENCODER=ON or/and -DWITH_BART=ON must be set to use FasterTransformer. ")
 endif()
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
@@ -69,6 +74,59 @@ list(APPEND CMAKE_MODULE_PATH ${CUDA_PATH}/lib64)
 set(CMAKE_C_FLAGS    "${CMAKE_C_FLAGS}")    
 set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}  -Xcompiler -Wall")
+
+######################################################################################
+# A function for automatic detection of GPUs installed  (if autodetection is enabled)
+# Usage:
+#   detect_installed_gpus(out_variable)
+function(detect_installed_gpus out_variable)
+  if(NOT CUDA_gpu_detect_output)
+    set(cufile ${PROJECT_BINARY_DIR}/detect_cuda_archs.cu)
+
+    file(WRITE ${cufile} ""
+      "#include \"stdio.h\"\n"
+      "#include \"cuda.h\"\n"
+      "#include \"cuda_runtime.h\"\n"
+      "int main() {\n"
+      "  int count = 0;\n"
+      "  if (cudaSuccess != cudaGetDeviceCount(&count)) return -1;\n"
+      "  if (count == 0) return -1;\n"
+      "  for (int device = 0; device < count; ++device) {\n"
+      "    cudaDeviceProp prop;\n"
+      "    if (cudaSuccess == cudaGetDeviceProperties(&prop, device))\n"
+      "      printf(\"%d.%d \", prop.major, prop.minor);\n"
+      "  }\n"
+      "  return 0;\n"
+      "}\n")
+
+    execute_process(COMMAND "${CUDA_NVCC_EXECUTABLE}"
+                    "--run" "${cufile}"
+                    WORKING_DIRECTORY "${PROJECT_BINARY_DIR}/CMakeFiles/"
+                    RESULT_VARIABLE nvcc_res OUTPUT_VARIABLE nvcc_out
+                    ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+    if(nvcc_res EQUAL 0)
+      # Only use last item of nvcc_out (the last device's compute capability).
+      string(REGEX REPLACE "\\." "" nvcc_out "${nvcc_out}")
+      string(REGEX MATCHALL "[0-9()]+" nvcc_out "${nvcc_out}")
+      list(GET nvcc_out -1 nvcc_out)
+      set(CUDA_gpu_detect_output ${nvcc_out} CACHE INTERNAL "Returned GPU architetures from detect_installed_gpus tool" FORCE)
+    endif()
+  endif()
+
+  if(NOT CUDA_gpu_detect_output)
+    message(STATUS "Automatic GPU detection failed. Building for all known architectures.")
+    set(${out_variable} ${paddle_known_gpu_archs} PARENT_SCOPE)
+  else()
+    set(${out_variable} ${CUDA_gpu_detect_output} PARENT_SCOPE)
+  endif()
+endfunction()
+
+if (NOT SM)
+# TODO(guosheng): Remove it if `GetCUDAComputeCapability` is exposed by paddle.
+# Currently, if `CUDA_gpu_detect_output` is not defined, use the detected arch.
+detect_installed_gpus(SM)
+endif()
 
 if (SM STREQUAL 80 OR
     SM STREQUAL 86 OR
@@ -177,6 +235,11 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/bert_encoder_transformer.h bert_encoder_transformer_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_dst)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/open_decoder.h open_decoder_h_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/open_decoder.h open_decoder_h_dst)
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/decoding_sampling.h decoding_sampling_h_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/decoding_sampling.h decoding_sampling_h_dst)
+
 set(OPT_OPEN_ATTN_COMMAND sed -i -e "370,392d" -e "410,454d" -e "229d" ${open_attention_h_dst})
 
 # TODO(guosheng): `find` seems meeting errors missing argument to `-exec', fix it
@@ -192,6 +255,8 @@ set(FT_PATCH_COMMAND
   && cp ${sampling_h_src} ${trans_dst}
   && cp ${arguments_h_src} ${trans_dst}
   && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
+  && cp ${open_decoder_h_src} ${open_decoder_h_dst}
+  && cp ${decoding_sampling_h_src} ${decoding_sampling_h_dst}
   && cat ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
   && cat ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
@@ -205,64 +270,19 @@ set(FT_PATCH_COMMAND
   && ${MUTE_COMMAND}
 )
 
-######################################################################################
-# A function for automatic detection of GPUs installed  (if autodetection is enabled)
-# Usage:
-#   detect_installed_gpus(out_variable)
-function(detect_installed_gpus out_variable)
-  if(NOT CUDA_gpu_detect_output)
-    set(cufile ${PROJECT_BINARY_DIR}/detect_cuda_archs.cu)
-
-    file(WRITE ${cufile} ""
-      "#include \"stdio.h\"\n"
-      "#include \"cuda.h\"\n"
-      "#include \"cuda_runtime.h\"\n"
-      "int main() {\n"
-      "  int count = 0;\n"
-      "  if (cudaSuccess != cudaGetDeviceCount(&count)) return -1;\n"
-      "  if (count == 0) return -1;\n"
-      "  for (int device = 0; device < count; ++device) {\n"
-      "    cudaDeviceProp prop;\n"
-      "    if (cudaSuccess == cudaGetDeviceProperties(&prop, device))\n"
-      "      printf(\"%d.%d \", prop.major, prop.minor);\n"
-      "  }\n"
-      "  return 0;\n"
-      "}\n")
-
-    execute_process(COMMAND "${CUDA_NVCC_EXECUTABLE}"
-                    "--run" "${cufile}"
-                    WORKING_DIRECTORY "${PROJECT_BINARY_DIR}/CMakeFiles/"
-                    RESULT_VARIABLE nvcc_res OUTPUT_VARIABLE nvcc_out
-                    ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-    if(nvcc_res EQUAL 0)
-      # Only use last item of nvcc_out (the last device's compute capability).
-      string(REGEX REPLACE "\\." "" nvcc_out "${nvcc_out}")
-      string(REGEX MATCHALL "[0-9()]+" nvcc_out "${nvcc_out}")
-      list(GET nvcc_out -1 nvcc_out)
-      set(CUDA_gpu_detect_output ${nvcc_out} CACHE INTERNAL "Returned GPU architetures from detect_installed_gpus tool" FORCE)
-    endif()
-  endif()
-
-  if(NOT CUDA_gpu_detect_output)
-    message(STATUS "Automatic GPU detection failed. Building for all known architectures.")
-    set(${out_variable} ${paddle_known_gpu_archs} PARENT_SCOPE)
-  else()
-    set(${out_variable} ${CUDA_gpu_detect_output} PARENT_SCOPE)
-  endif()
-endfunction()
-
-# TODO(guosheng): Remove it if `GetCUDAComputeCapability` is exposed by paddle.
-# Currently, if `CUDA_gpu_detect_output` is not defined, use the detected arch.
-detect_installed_gpus(SM)
+# TODO(guosheng): Use UPDATE_COMMAND instead of PATCH_COMMAND to make cmake
+# re-run always use the latest patches when the developer changes FT patch codes,
+# all patches rather than the changes would re-build, any better way to do this.
+# Or maybe hidden this function for simplicity.
+set(FT_UPDATE_COMMAND git checkout v3.1 && git checkout . && ${FT_PATCH_COMMAND})
 
 ExternalProject_Add(
   extern_${THIRD_PARTY_NAME}
-  GIT_REPOSITORY    https://github.com/NVIDIA/FasterTransformer.git
+  GIT_REPOSITORY    https://gitee.com/paddlepaddle/FasterTransformer.git  # https://github.com/NVIDIA/FasterTransformer.git
   GIT_TAG           v3.1
   PREFIX            ${THIRD_PATH}
   SOURCE_DIR        ${THIRD_PATH}/source/${THIRD_PARTY_NAME}
-  PATCH_COMMAND     ${FT_PATCH_COMMAND}
+  UPDATE_COMMAND    ${FT_UPDATE_COMMAND}  # PATCH_COMMAND     ${FT_PATCH_COMMAND}
   BINARY_DIR        ${THIRD_PATH}/build/${THIRD_PARTY_NAME}
   INSTALL_COMMAND   ""
   CMAKE_ARGS        -DCMAKE_BUILD_TYPE=Release -DSM=${SM} -DBUILD_PD=ON -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_STATIC_LIB=${WITH_STATIC_LIB}
@@ -293,11 +313,11 @@ if(ON_INFER AND WITH_GPT AND WITH_SP)
   )
   
   include_directories(
-    ${THIRD_PATH}/source/sentencepiece/src/
+    ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/sentencepiece/src/
   )
 
   link_directories(
-    ${THIRD_PATH}/build/sentencepiece/src/
+    ${CMAKE_BINARY_DIR}/${THIRD_PATH}/build/sentencepiece/src/
   )
 
   add_definitions(-DGPT_ON_SENTENCEPIECE)

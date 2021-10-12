@@ -497,8 +497,8 @@ class GPTEmbeddings(nn.Layer):
         position_embeddings = self.position_embeddings(position_ids)
         embeddings = input_embedings + position_embeddings
 
-        with get_rng_state_tracker().rng_state('global_seed'):
-            embeddings = self.dropout(embeddings)
+        #with get_rng_state_tracker().rng_state('global_seed'):
+        embeddings = self.dropout(embeddings)
 
         return embeddings
 
@@ -754,23 +754,24 @@ class GPTModel(GPTPretrainedModel):
             input_ids=input_ids, position_ids=position_ids)
 
         # TODO, use registered buffer
-        causal_mask = paddle.tensor.triu(
-            paddle.ones((paddle.shape(input_ids)[-1],
-                         paddle.shape(input_ids)[-1])) * -1e9,
-            diagonal=1)
+        # causal_mask = paddle.tensor.triu(
+        #     paddle.ones((paddle.shape(input_ids)[-1],
+        #                  paddle.shape(input_ids)[-1])) * -1e9,
+        #     diagonal=1)
 
-        if attention_mask is not None:
-            attention_mask = attention_mask + causal_mask
-        else:
-            attention_mask = causal_mask
+        # if attention_mask is not None:
+        #     attention_mask = attention_mask + causal_mask
+        # else:
+        #     attention_mask = causal_mask
 
         # The tensor returned by triu not in static graph.
-        attention_mask.stop_gradient = True
+        # attention_mask.stop_gradient = True
 
         encoder_outputs = self.decoder(
             embedding_output,
             memory=None,
-            tgt_mask=attention_mask,
+            # tgt_mask=attention_mask,
+            tgt_mask=None,
             use_cache=use_cache,
             cache=cache)
         self.checkpoints.extend(self.decoder.checkpoints)
