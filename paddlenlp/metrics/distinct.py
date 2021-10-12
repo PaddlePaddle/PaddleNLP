@@ -83,7 +83,7 @@ class Distinct(paddle.metric.Metric):
             distinct = Distinct(trans_func=partial(trans_func, tokenizer=tokenizer))
             batch_size, seq_len, vocab_size = 4, 16, tokenizer.vocab_size
             logits = paddle.rand([batch_size, seq_len, vocab_size])
-            
+
             distinct.update(logits.numpy())
             print(distinct.accumulate()) # 1.0
     """

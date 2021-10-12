@@ -81,7 +81,7 @@ class BLEU(paddle.metric.Metric):
 
         BLEU & = BP\exp(\sum_{n=1}^N w_{n} \log{p_{n}})
 
-    where `c` is the length of candidate sentence, and 'r' is the length of refrence sentence.
+    where `c` is the length of candidate sentence, and `r` is the length of reference sentence.
 
     Args:
         trans_func (callable, optional): `trans_func` transforms the network
@@ -90,11 +90,11 @@ class BLEU(paddle.metric.Metric):
             If `trans_func` is None and BLEU is used as `paddle.metric.Metric`
             instance, `default_trans_func` will be performed and `vocab` must
             be provided.
-        n_size (int, optional): Number of gram for BLEU metric. Default: 4.
+        n_size (int, optional): Number of gram for BLEU metric. Defaults to 4.
         weights (list, optional): The weights of precision of each gram.
-            Default: None.
+            Defaults to None.
         name (str, optional): Name of `paddle.metric.Metric` instance.
-            Default: "bleu".
+            Defaults to "bleu".
 
     Examples:
         1. Using as a general evaluation object.
