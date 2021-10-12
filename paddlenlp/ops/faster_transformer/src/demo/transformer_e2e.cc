@@ -38,7 +38,7 @@ DEFINE_int32(gpu_id, 0, "The gpu id to do inference. ");
 DEFINE_string(model_dir,
               "./infer_model/",
               "The directory to the inference model. ");
-DEFINE_string(vocab_dir,
+DEFINE_string(vocab_file,
               "./vocab_all.bpe.33708",
               "The directory to the vocabulary file. ");
 DEFINE_string(data_dir,
@@ -46,7 +46,7 @@ DEFINE_string(data_dir,
               "The directory to the input data. ");
 
 std::string model_dir = "";
-std::string vocab_dir = "";
+std::string vocab_file = "";
 std::string data_dir = "";
 
 const int EOS_IDX = 1;
@@ -145,7 +145,7 @@ public:
   }
 
   bool GetWordDict() {
-    std::ifstream fin(vocab_dir);
+    std::ifstream fin(vocab_file);
     std::string line;
     int k = 0;
     while (std::getline(fin, line)) {
@@ -263,7 +263,7 @@ int main(int argc, char** argv) {
   gpu_id = FLAGS_gpu_id;
 
   model_dir = FLAGS_model_dir;
-  vocab_dir = FLAGS_vocab_dir;
+  vocab_file = FLAGS_vocab_file;
   data_dir = FLAGS_data_dir;
 
   paddle::inference::Main(batch_size, gpu_id);
