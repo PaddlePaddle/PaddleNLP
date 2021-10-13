@@ -114,9 +114,10 @@ class RougeL(paddle.metric.Metric):
     Longest common subsequence problem takes into account sentence level structure
     similarity naturally and identifies longest co-occurring
     in sequence n-grams automatically.
+
         $$R_{LCS}  = \\frac{LCS(C,S)}{len(S)}$$
         $$P_{LCS}  = \\frac{LCS(C,S)}{len(C)}$$
-        $$F_{LCS} & = \\frac{(1 + \gamma^2)R_{LCS}P_{LCS}}}{R_{LCS} + \gamma^2{R_{LCS}}$$
+        $$F_{LCS} & = \\frac{(1 + \\gamma^2)R_{LCS}P_{LCS}}}{R_{LCS} + \\gamma^2{R_{LCS}}$$
 
     .. math::
 
@@ -139,8 +140,6 @@ class RougeL(paddle.metric.Metric):
         name (str, optional): Name of `paddle.metric.Metric` instance. Defaults to "rouge-l".
 
     Examples:
-        1. Using as a general evaluation object.
-
         .. code-block:: python
 
             from paddlenlp.metrics import RougeL
@@ -149,10 +148,6 @@ class RougeL(paddle.metric.Metric):
             ref_list = [["The","cat","is","on","the","mat"], ["There","is","a","cat","on","the","mat"]]
             rougel.add_inst(cand, ref_list)
             print(rougel.score()) # 0.7800511508951408
-
-        2. Using as an instance of `paddle.metric.Metric`.
-
-        .. code-block:: python
 
     '''
 
@@ -173,6 +168,15 @@ class RougeL(paddle.metric.Metric):
     def lcs(self, string, sub):
         """
         Calculate the length of longest common subsequence of string and sub.
+
+        Args:
+            string (str):
+                The string to be calculated, usually longer the sub string.
+            sub (str):
+                The sub string to be calculated.
+
+        Returns:
+            float: Returns the length of the longest common subsequence of string and sub.
         """
         if len(string) < len(sub):
             sub, string = string, sub
