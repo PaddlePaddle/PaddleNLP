@@ -302,11 +302,16 @@ class GenerationMixin(object):
         return paddle.unsqueeze(attention_mask, axis=[1, 2])
 
     @staticmethod
-    def get_logits_processor(min_length=None, eos_token_id=None):
+    def get_logits_processor(min_length=None,
+                             eos_token_id=None,
+                             repetition_penalty=None):
         processors = LogitsProcessorList()
         if min_length is not None and eos_token_id is not None and min_length > -1:
             processors.append(
                 MinLengthLogitsProcessor(min_length, eos_token_id))
+        if repetition_penalty is not None and repetition_penalty != 1.0:
+            processors.append(
+                RepetitionPenaltyLogitsProcessor(penalty=repetition_penalty))
         # TODO
         # Add more pre_processing for distribution
 
@@ -442,6 +447,7 @@ class GenerationMixin(object):
                  temperature=1.0,
                  top_k=0,
                  top_p=1.0,
+                 repetition_penalty=1.0,
                  num_beams=1,
                  length_penalty=0.0,
                  early_stopping=False,
@@ -481,6 +487,9 @@ class GenerationMixin(object):
                 top-p-filtering in the "sampling" strategy. The value should 
                 satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no 
                 effect.
+            repetition_penalty (float, optional):
+                The parameter for repetition penalty. 1.0 means no penalty. See `this paper
+                <https://arxiv.org/pdf/1909.05858.pdf>`__ for more details. Defaults to 1.0.
             num_beams (int, optional): The number of beams in the "beam_search"
                 strategy. Default to 1.
             length_penalty (float, optional): The exponential penalty to the 
@@ -640,7 +649,8 @@ class GenerationMixin(object):
         model_kwargs["use_cache"] = use_cache
         max_length += input_ids.shape[-1]
         min_length += input_ids.shape[-1]
-        logits_processors = self.get_logits_processor(min_length, eos_token_id)
+        logits_processors = self.get_logits_processor(min_length, eos_token_id,
+                                                      repetition_penalty)
 
         if decode_strategy == 'greedy_search':
             if num_return_sequences > 1:
@@ -1020,3 +1030,33 @@ class MinLengthLogitsProcessor(LogitsProcessor):
         if cur_len < self.min_length:
             logits[:, self.eos_token_id] = -1e9
         return logits
+
+
+class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
+    r"""
+    Enforcing an exponential penalty on repeated sequences.
+
+    Args:
+        repetition_penalty (float):
+            The parameter for repetition penalty. 1.0 means no penalty. See `this paper
+            <https://arxiv.org/pdf/1909.05858.pdf>`__ for more details.
+    """
+
+    def __init__(self, penalty: float):
+        if not isinstance(penalty, float) or not (penalty > 0):
+            raise ValueError(
+                f"`penalty` has to be a strictly positive float, but is {penalty}"
+            )
+
+        self.penalty = penalty
+
+    def __call__(self, input_ids, logits):
+        score = paddle.index_sample(logits, input_ids)
+        score = paddle.where(score < 0, score * self.penalty,
+                             score / self.penalty)
+        input_ids = input_ids + paddle.arange(logits.shape[0]).unsqueeze(
+            -1) * logits.shape[-1]
+        outputs = paddle.scatter(logits.flatten(),
+                                 input_ids.flatten(),
+                                 score.flatten()).reshape(logits.shape)
+        return outputs
