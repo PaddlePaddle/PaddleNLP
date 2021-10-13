@@ -145,6 +145,8 @@ class WordTagTask(Task):
         self._static_mode = False
         self._log_name = self.kwargs[
             'log_name'] if 'log_name' in self.kwargs else 'wordtag'
+        self._linking = self.kwargs[
+            'linking'] if 'linking' in self.kwargs else False
         term_schema_path = download_file(
             self._task_path, "termtree_type.csv", URLS['termtree_type'][0],
             URLS['termtree_type'][1], self._log_name)
@@ -156,9 +158,8 @@ class WordTagTask(Task):
                                  URLS['termtree_tags_pos'][1])
         self._tags_to_index, self._index_to_tags = self._load_labels(tag_path)
 
-        self._termtree = TermTree.from_dir(term_schema_path, term_data_path)
-        self._linking = self.kwargs[
-            'linking'] if 'linking' in self.kwargs else False
+        self._termtree = TermTree.from_dir(term_schema_path, term_data_path,
+                                           self._linking)
         self._construct_tokenizer(model)
         self._usage = usage
         self._summary_num = 2

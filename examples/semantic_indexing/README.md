@@ -232,8 +232,8 @@ python -u -m paddle.distributed.launch --gpus "0" \
 0.9800204038619995
 ```
 
-## 使用Faster Transformer进行快速预测
-不同于上述原生预测的是，使用FasterTransformer的预测是使用了集成了Faster Transformer库的Paddle自定算子，在一定的配置下，可以对TransformerEncoder的预测进行加速。
+## 使用FasterTransformer进行快速预测
+不同于上述原生预测的是，使用FasterTransformer的预测是使用了集成了FasterTransformer库的Paddle自定算子，在一定的配置下，可以对TransformerEncoder的预测进行加速。
 
 ```shell
 python -u -m paddle.distributed.launch --gpus "0" faster_predict.py \
