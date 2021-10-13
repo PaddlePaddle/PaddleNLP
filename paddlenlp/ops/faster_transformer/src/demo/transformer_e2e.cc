@@ -40,14 +40,14 @@ DEFINE_string(model_dir,
               "The directory to the inference model. ");
 DEFINE_string(vocab_file,
               "./vocab_all.bpe.33708",
-              "The directory to the vocabulary file. ");
-DEFINE_string(data_dir,
+              "The path to the vocabulary file. ");
+DEFINE_string(data_file,
               "./newstest2014.tok.bpe.33708.en",
-              "The directory to the input data. ");
+              "The path to the input data file. ");
 
 std::string model_dir = "";
 std::string vocab_file = "";
-std::string data_dir = "";
+std::string data_file = "";
 
 const int EOS_IDX = 1;
 const int PAD_IDX = 0;
@@ -219,7 +219,7 @@ void Main(int batch_size, int gpu_id) {
   // can turn off the IR optimization for same results as following:
   // config.SwitchIrOptim(false);
   auto predictor = CreatePredictor(config);
-  DataReader reader(data_dir);
+  DataReader reader(data_file);
   reader.GetWordDict();
 
   double whole_time = 0;
@@ -264,7 +264,7 @@ int main(int argc, char** argv) {
 
   model_dir = FLAGS_model_dir;
   vocab_file = FLAGS_vocab_file;
-  data_dir = FLAGS_data_dir;
+  data_file = FLAGS_data_file;
 
   paddle::inference::Main(batch_size, gpu_id);
 
