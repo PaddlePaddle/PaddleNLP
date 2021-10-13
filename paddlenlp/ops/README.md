@@ -45,7 +45,7 @@
 * `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 [GPT 预测加速使用示例](../../examples/language_model/gpt/faster_gpt/)。
 * `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 [UnifiedTransformer 预测加速使用示例](../../examples/dialogue/unified_transformer/)。
 * `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。使用示例可以参考 [UNIMOText 预测加速使用示例](../../examples/text_generation/unimo-text/faster_unimo/)。
-* `FasterBart()`: 支持 BART 模型预测加速功能。使用示例可以参考 [BART 预测加速使用示例](./faster_transformer/sample/bart_decoding_sample.py)。
+* `FasterBART()`: 支持 BART 模型预测加速功能。使用示例可以参考 [BART 预测加速使用示例-sample](./faster_transformer/sample/bart_decoding_sample.py)，[BART 预测加速使用示例-文本摘要](../../examples/text_summarization/bart)。
 
 具体使用方法可以参考 API 文档或是使用示例。
 
