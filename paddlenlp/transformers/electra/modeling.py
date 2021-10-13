@@ -351,8 +351,10 @@ class ElectraModel(ElectraPretrainedModel):
         vocab_size (int):
             Vocabulary size of `inputs_ids` in `ElectraModel`. Also is the vocab size of token embedding matrix.
             Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `ElectraModel`.
+        embedding_size (int, optional):
+            Dimensionality of the embedding layer.
         hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layer and pooler layer.
+            Dimensionality of the encoder layer and pooler layer.
         num_hidden_layers (int, optional):
             Number of hidden layers in the Transformer encoder.
         num_attention_heads (int, optional):
@@ -380,7 +382,7 @@ class ElectraModel(ElectraPretrainedModel):
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `ElectraModel`.
+                See :meth:`ElectraPretrainedModel.init_weights()` for how weights are initialized in `ElectraModel`.
 
         pad_token_id (int, optional):
             The index of padding token in the token vocabulary.
@@ -699,10 +701,13 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
             An instance of ElectraModel.
         num_classes (int, optional):
             The number of classes. Defaults to `2`.
-
+        dropout (float, optional):
+            The dropout probability for output of Electra.
+            If None, use the same value as `hidden_dropout_prob` of `ElectraModel`
+            instance `electra`. Defaults to None.
     """
 
-    def __init__(self, electra, num_classes):
+    def __init__(self, electra, num_classes=2, dropout=None):
         super(ElectraForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.electra = electra
@@ -769,10 +774,13 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
             An instance of ElectraModel.
         num_classes (int, optional):
             The number of classes. Defaults to `2`.
-
+        dropout (float, optional):
+            The dropout probability for output of Electra.
+            If None, use the same value as `hidden_dropout_prob` of `ElectraModel`
+            instance `electra`. Defaults to None.
     """
 
-    def __init__(self, electra, num_classes):
+    def __init__(self, electra, num_classes=2, dropout=None):
         super(ElectraForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.electra = electra
