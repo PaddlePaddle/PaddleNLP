@@ -167,44 +167,51 @@ class BpeEncoder(object):
 
 class SkepTokenizer(PretrainedTokenizer):
     r"""
-    Constructs an ERNIE tokenizer. It uses a basic tokenizer to do punctuation
+    Constructs a Skep tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
     tokenize as subwords.
 
     Args:
-        vocab_file (`str`): 
-            file path of the vocabulary.
-        do_lower_case (`bool`, optional): 
-            Whether the text strips accents and convert to lower case. 
-            Defaults to `True`.
-        unk_token (`str`, optional): 
-            The special token for unknown words. 
+        vocab_file (str):
+            The vocabulary file path (ends with '.txt') required to instantiate
+            a `WordpieceTokenizer`.
+        bpe_vocab_file (str, optional):
+            The vocabulary file path of a `BpeTokenizer`. Defaults to `None`.
+        bpe_json_file (str, optional):
+            The json file path of a `BpeTokenizer`. Defaults to `None`.
+        use_bpe_encoder (bool, optional):
+            Whether or not to use BPE Encoder. Defaults to `False`.
+        need_token_type_id (bool, optional):
+            Whether or not to use token type id. Defaults to `True`.
+        add_two_sep_token_inter (bool, optional):
+            Whether or not to add two different `sep_token`. Defaults to `False`.
+        unk_token (str, optional):
+            The special token for unknown words.
             Defaults to "[UNK]".
-        sep_token (`str`, optional): 
-            The special token for separator token. 
+        sep_token (str, optional):
+            The special token for separator token.
             Defaults to "[SEP]".
-        pad_token (`str`, optional): 
-            The special token for padding. 
+        pad_token (str, optional):
+            The special token for padding.
             Defaults to "[PAD]".
-        cls_token (`str`, optional): 
-            The special token for cls. 
+        cls_token (str, optional):
+            The special token for cls.
             Defaults to "[CLS]".
-        mask_token (`str`, optional): 
+        mask_token (str, optional):
             The special token for mask.
             Defaults to "[MASK]".
-    
+
     Examples:
-        .. code-block:: python
+        .. code-block::
+
             from paddlenlp.transformers import SkepTokenizer
-            tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
-            encoded_inputs = tokenizer('这是一个测试样例')
-            # encoded_inputs: 
+            tokenizer = SkepTokenizer.from_pretrained('skep_ernie_2.0_large_en')
+            encoded_inputs = tokenizer('He was a puppeteer')
+            # encoded_inputs:
             # {
-            #   'input_ids': [1, 47, 10, 7, 27, 558, 525, 314, 656, 2], 
-            #   'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            #    'input_ids': [101, 2002, 2001, 1037, 13997, 11510, 102],
+            #    'token_type_ids': [0, 0, 0, 0, 0, 0, 0]
             # }
-
-
     """
     resource_files_names = {
         "vocab_file": "vocab.txt",
@@ -297,21 +304,22 @@ class SkepTokenizer(PretrainedTokenizer):
     @property
     def vocab_size(self):
         r"""
-        return the size of vocabulary.
+        Return the size of vocabulary.
+
         Returns:
-            `int`: the size of vocabulary.
+            int: the size of vocabulary.
         """
         return len(self.vocab)
 
     def _tokenize(self, text):
         r"""
-        End-to-end tokenization for ERNIE models.
+        End-to-end tokenization for Skep models.
 
         Args:
-            text (`str`): The text to be tokenized.
-        
+            text (str): The text to be tokenized.
+
         Returns:
-            List[`str`]: A list of string representing converted tokens.
+            list: A list of string representing converted tokens.
         """
         split_tokens = []
         if not self.use_bpe_encoder:
@@ -325,14 +333,26 @@ class SkepTokenizer(PretrainedTokenizer):
         return split_tokens
 
     def tokenize(self, text):
-        r"""
-        End-to-end tokenization for ERNIE models.
+        """
+        Converts a string to a list of tokens.
 
         Args:
-            text (`str`): The text to be tokenized.
-        
+            text (str): The text to be tokenized.
+
         Returns:
-            List[`str`]: A list of string representing converted tokens.
+            List(str): A list of string representing converted tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import SkepTokenizer
+
+                tokenizer = SkepTokenizer.from_pretrained('skep_ernie_2.0_large_en')
+                tokens = tokenizer.tokenize('He was a puppeteer')
+                '''
+                ['he', 'was', 'a', 'puppet', '##eer']
+                '''
+
         """
         return self._tokenize(text)
 
@@ -340,17 +360,14 @@ class SkepTokenizer(PretrainedTokenizer):
         r"""
         Returns the number of added tokens when encoding a sequence with special tokens.
 
-        Note:
-            This encodes inputs and checks the number of added tokens, and is therefore not efficient. 
-            Do not put this inside your training loop.
-
         Args:
-            pair (`bool`, optional): Returns the number of added tokens in the case of a sequence 
-                pair if set to True, returns the number of added tokens in the case of a single sequence 
-                if set to False. Defaults to False.
+            pair (bool, optional):
+                Returns the number of added tokens in the case of a sequence
+                pair if set to True, returns the number of added tokens in the case of a single sequence if set to False.
+                Defaults to False.
 
         Returns:
-            `int`: Number of tokens added to sequences
+            int: Number of tokens added to sequences
         """
         token_ids_0 = []
         token_ids_1 = []
@@ -361,28 +378,27 @@ class SkepTokenizer(PretrainedTokenizer):
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
-        adding special tokens. 
-        
+        adding special tokens.
+
         A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence has the following format:
-        ::
-            - single sequence: ``[CLS] X [SEP]``
-            - pair of sequences: ``[CLS] A [SEP] B [SEP]``
+
+        - single sequence:      ``[CLS] X [SEP]``
+        - pair of sequences:        ``[CLS] A [SEP] B [SEP]``
 
         A skep_roberta_large_en sequence has the following format:
-        ::
-            - single sequence: ``[CLS] X [SEP]``
-            - pair of sequences: ``[CLS] A [SEP] [SEP] B [SEP]``
 
+        - single sequence:      ``[CLS] X [SEP]``
+        - pair of sequences:        ``[CLS] A [SEP] [SEP] B [SEP]``
 
         Args:
-            token_ids_0 (`List[int]`):
+            token_ids_0 (List[int]):
                 List of IDs to which the special tokens will be added.
-            token_ids_1 (`List[int]`, optional):
+            token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs.
                 Defaults to `None`.
 
         Returns:
-            `List[int]`: List of input_id with the appropriate special tokens.
+            list[int]: List of input_id with the appropriate special tokens.
         """
         if not self.add_two_sep_token_inter:
             if token_ids_1 is None:
@@ -401,7 +417,7 @@ class SkepTokenizer(PretrainedTokenizer):
                                              token_ids_0,
                                              token_ids_1=None):
         r"""
-        Create a mask from the two sequences passed to be used in a sequence-pair classification task. 
+        Create a mask from the two sequences passed to be used in a sequence-pair classification task.
 
         A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence pair mask has the following format:
         ::
@@ -410,18 +426,18 @@ class SkepTokenizer(PretrainedTokenizer):
             | first sequence    | second sequence |
 
         If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
-        
+
         note: There is no need token type ids for skep_roberta_large_ch model.
 
         Args:
-            token_ids_0 (`List[int]`):
+            token_ids_0 (List[int]):
                 List of IDs.
-            token_ids_1 (`List[int]`, optional):
+            token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs. 
                 Defaults to `None`.
 
         Returns:
-            `List[int]`: List of token_type_id according to the given sequence(s).
+            List[int]: List of token_type_id according to the given sequence(s).
         """
         if self.need_token_type_id:
             _sep = [self.sep_token_id]
