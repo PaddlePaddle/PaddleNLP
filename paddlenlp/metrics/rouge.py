@@ -114,9 +114,9 @@ class RougeL(paddle.metric.Metric):
     Longest common subsequence problem takes into account sentence level structure
     similarity naturally and identifies longest co-occurring
     in sequence n-grams automatically.
-        $$R_{LCS}  = \frac{LCS(C,S)}{len(S)}$$
-        $$P_{LCS}  = \frac{LCS(C,S)}{len(C)}$$
-        $$F_{LCS} & = \frac{(1 + \gamma^2)R_{LCS}P_{LCS}}}{R_{LCS} + \gamma^2{R_{LCS}}$$
+        $$R_{LCS}  = \\frac{LCS(C,S)}{len(S)}$$
+        $$P_{LCS}  = \\frac{LCS(C,S)}{len(C)}$$
+        $$F_{LCS} & = \\frac{(1 + \gamma^2)R_{LCS}P_{LCS}}}{R_{LCS} + \gamma^2{R_{LCS}}$$
 
     .. math::
 

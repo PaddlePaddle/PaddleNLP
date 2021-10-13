@@ -43,22 +43,9 @@ class Perplexity(paddle.metric.Metric):
     Example:
         .. code-block::
 
-            import numpy as np
-            from functools import partial
             import paddle
             from paddlenlp.transformers import BertTokenizer
             from paddlenlp.metrics import Perplexity
-
-            def trans_func(logits, tokenizer):
-                '''Transform the network output `logits` to string list.'''
-                # [batch_size, seq_len]
-                token_ids = np.argmax(logits, axis=-1).tolist()
-                cand_list = []
-                for ids in token_ids:
-                    tokens = tokenizer.convert_ids_to_tokens(ids)
-                    strings = tokenizer.convert_tokens_to_string(tokens)
-                    cand_list.append(strings.split())
-                return cand_list
 
             paddle.seed(2021)
             tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
