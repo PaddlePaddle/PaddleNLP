@@ -1322,8 +1322,6 @@ class InferBartDecoding(nn.Layer):
                 memory_seq_lens, beam_size)
             self._decoding_strategy = "beam_search_v2"
         elif self._decoding_strategy == "greedy_search":
-            top_k = 1
-            top_p = 0.0
             self._decoding_strategy = "topk_sampling"
         elif self._decoding_strategy == "sampling":
             if abs(top_p - 0.0) < 1e-6 and top_k > 0:

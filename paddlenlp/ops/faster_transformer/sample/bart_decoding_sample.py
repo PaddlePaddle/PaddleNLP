@@ -92,12 +92,7 @@ def parse_args():
         type=int,
         help="The number of decoded sentences to output. ")
     parser.add_argument(
-        "--rel_len",
-        action="store_true",
-        help=" Indicating whether max_out_len in configurations is the length relative to \
-            that of source text. Only works in `v2` temporarily.")
-    parser.add_argument(
-        "--alpha",
+        "--length_penalty",
         default=0.6,
         type=float,
         help="The power number in length penalty calculation. Only works in `v2` temporarily."
@@ -138,11 +133,7 @@ def do_predict(args):
     input_ids, mem_seq_lens = prepare_input(tokenizer, sentences, pad_id)
 
     # Define model
-    faster_bart = FasterBART(
-        model=model,
-        decoding_strategy=args.decoding_strategy,
-        decoding_lib=args.decoding_lib,
-        use_fp16_decoding=args.use_fp16_decoding)
+    faster_bart = model
 
     # Set evaluate mode
     faster_bart.eval()
@@ -154,17 +145,15 @@ def do_predict(args):
                 # PaddlePaddle >= 2.2
                 paddle.device.cuda.synchronize()
                 start = time.perf_counter()
-            finished_seq = faster_bart.generate(
+            finished_seq, _ = faster_bart.generate(
                 input_ids=input_ids,
-                mem_seq_lens=mem_seq_lens,
                 max_length=args.max_out_len,
                 decode_strategy=args.decoding_strategy,
                 top_k=args.top_k,
                 top_p=args.top_p,
                 num_beams=args.beam_size,
                 diversity_rate=args.diversity_rate,
-                rel_len=args.rel_len,
-                alpha=args.alpha)
+                length_penalty=args.length_penalty)
         paddle.device.cuda.synchronize()
         logger.info("Average test time for decoding is %f ms" % (
             (time.perf_counter() - start) / 50 * 1000))

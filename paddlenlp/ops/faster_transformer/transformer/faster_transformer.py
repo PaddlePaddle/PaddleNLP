@@ -1044,8 +1044,6 @@ class FasterBART(BartPretrainedModel):
         self.bos_token_id = model.bart.config['bos_token_id']
         self.eos_token_id = model.bart.config['eos_token_id']
         self.pad_token_id = model.bart.config['pad_token_id']
-        if decoding_strategy.startswith("beam_search"):
-            decoding_strategy = "beam_search_v2"
         self._decoding_strategy = decoding_strategy
         self.decoding = InferBartDecoding(
             model=model,
@@ -1059,76 +1057,17 @@ class FasterBART(BartPretrainedModel):
     def get_decoder(self):
         return self.decoder
 
-    def greedy_search(self, input_ids, logits_processors, max_length,
-                      pad_token_id, eos_token_id, **model_kwargs):
-        return self.sample(
-            input_ids=input_ids,
-            logits_processors=logits_processors,
-            max_length=max_length,
-            pad_token_id=pad_token_id,
-            eos_token_id=eos_token_id,
-            top_k=1,
-            top_p=1.0,
-            **model_kwargs)
-
-    def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
-                    diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
-        max_length -= input_ids.shape[-1]
-        rel_len = model_kwargs.pop("rel_len", False)
-        alpha = model_kwargs.pop("alpha", 0.6)
-        encoder_output = model_kwargs.pop("encoder_output")
-        mem_seq_lens = model_kwargs.pop("mem_seq_lens")
-        return self.forward(
-            encoder_output=encoder_output,
-            mem_seq_lens=mem_seq_lens,
-            beam_size=beam_scorer.num_beams,
-            max_out_len=max_length,
-            diversity_rate=diversity_rate,
-            rel_len=rel_len,
-            alpha=alpha)
-
-    def sample(self,
-               input_ids,
-               logits_processors,
-               max_length,
-               pad_token_id,
-               eos_token_id,
-               top_k=4,
-               top_p=0.0,
-               temperature=1.0,
-               min_tokens_to_keep=1,
-               **model_kwargs):
-        max_length -= input_ids.shape[-1]
-        if self._decoding_strategy in ["sampling", "greedy_search"] and (
-                abs(top_p - 1.0) < 1e-6 and top_k > 0):
-            top_p = 0.0
-        elif self._decoding_strategy == "sampling" and (top_p != 1.0 and
-                                                        top_k == 0):
-            top_k = 0
-        else:
-            raise ValueError(
-                "Only top_k sampling or top_p sampling are supported. " \
-                "Top_k sampling and top_p sampling cannot be both applied. ")
-        encoder_output = model_kwargs.pop("encoder_output")
-        mem_seq_lens = model_kwargs.pop("mem_seq_lens")
-        return self.forward(
-            encoder_output=encoder_output,
-            mem_seq_lens=mem_seq_lens,
-            top_k=top_k,
-            top_p=top_p,
-            max_out_len=max_length)
-
     def forward(self,
                 input_ids=None,
                 encoder_output=None,
                 mem_seq_lens=None,
-                beam_size=4,
+                num_beams=4,
                 top_k=1,
                 top_p=0.0,
-                max_out_len=256,
+                max_length=256,
                 diversity_rate=0.0,
-                rel_len=False,
-                alpha=0.6):
+                length_penalty=0.6,
+                **model_kwargs):
         if encoder_output is None:
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.encoder(input_ids)
@@ -1141,13 +1080,16 @@ class FasterBART(BartPretrainedModel):
                                       dtype="int32")
         if self.use_fp16_decoding:
             encoder_output = paddle.cast(encoder_output, "float16")
+
+        # change top_p to zero if not using top_p sampling for FT
+        if top_p == 1.0:
+            top_p = 0.0
         return self.decoding(
             enc_output=encoder_output,
             memory_seq_lens=mem_seq_lens,
-            beam_size=beam_size,
+            beam_size=num_beams,
             top_k=top_k,
             top_p=top_p,
-            max_out_len=max_out_len,
+            max_out_len=max_length,
             diversity_rate=diversity_rate,
-            rel_len=rel_len,
-            alpha=alpha)
+            alpha=length_penalty)

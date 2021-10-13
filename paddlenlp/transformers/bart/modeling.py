@@ -759,6 +759,16 @@ class BartForConditionalGeneration(BartPretrainedModel):
     def get_decoder(self):
         return self.bart.get_decoder()
 
+    def get_faster_entry(self, kwargs):
+        from paddlenlp.ops import FasterBART
+        decoding_strategy = kwargs.get('decode_strategy')
+        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
+        self._faster_entry = FasterBART(
+            self,
+            decoding_strategy=decoding_strategy,
+            use_fp16_decoding=use_fp16_decoding).forward
+        return self._faster_entry
+
     def forward(self,
                 input_ids,
                 attention_mask=None,

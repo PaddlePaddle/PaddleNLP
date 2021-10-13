@@ -303,6 +303,20 @@ class GenerationMixin(object):
         return paddle.unsqueeze(attention_mask, axis=[1, 2])
 
     @staticmethod
+    def prepare_seq_len_for_generation(input_ids, pad_token_id, eos_token_id):
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
+            input_ids == pad_token_id).numpy().item()
+        is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
+            (eos_token_id is not None) and (pad_token_id != eos_token_id))
+        if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
+            seq_len = paddle.sum(input_ids != pad_token_id,
+                                 axis=1).unsqueeze(-1)
+        else:
+            seq_len = paddle.full(
+                (input_ids.shape[0], 1), input_ids.shape[1], dtype="int64")
+        return seq_len
+
+    @staticmethod
     def get_logits_processor(min_length=None,
                              eos_token_id=None,
                              num_beams=1,
@@ -447,6 +461,20 @@ class GenerationMixin(object):
         # the generate method.
 
         return logits
+
+    def get_faster_entry(self, kwargs):
+        return False
+
+    def _convert_to_faster(self, kwargs):
+        # try general convert
+        pass
+
+    def _build_faster(self, kwargs):
+        self._faster_entry = False
+        # 1. custom convert
+        if not self.get_faster_entry(kwargs):
+            # 2. try general convert
+            self._convert_to_faster(kwargs)
 
     @paddle.no_grad()
     def generate(self,
@@ -625,6 +653,18 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
+        if getattr(self, '_faster_entry', None) is not False:
+            args = locals()
+            args.pop('self')
+            args.pop("__class__", None)
+            if not hasattr(self, '_faster_entry'):
+                self._build_faster(args)
+            if self._faster_entry:
+                model_kwargs = args.pop('model_kwargs')
+                output_ids = self._faster_entry(**args, **model_kwargs)
+                # make result and faster result oneconsistent
+                dummy_srore = None
+                return output_ids, dummy_srore
 
         # params check
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
