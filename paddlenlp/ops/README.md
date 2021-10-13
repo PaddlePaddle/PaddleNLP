@@ -79,14 +79,14 @@ cd PaddleNLP/paddlenlp/ops/
 ``` sh
 mkdir build
 cd build/
-cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python3.x
+cmake .. -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python3.x
 make -j
 cd ../
 ```
 
 可以使用的编译选项包括：
-* `-DSM`: 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
 * `-DPY_CMD`: 指定当前装有 PaddlePaddle 版本的 python 环境，比如 `-DPY_CMD=python3.7`。若未指定 `-DPY_CMD` 将会默认使用系统命令 `python` 对应的 Python。
+* `-DSM`: 是指的所用 GPU 的 compute capability，建议不使用该选项设置，未设置时将自动检测。如要设置，需根据 [compute capability](https://developer.nvidia.com/zh-cn/cuda-gpus#compute) 进行设置，如 V100 时设置 `-DSM=70` 或 T4 时设置 `-DSM=75`。
 * `-DWITH_GPT`: 是否编译带有 GPT 相关的 lib。若使用 GPT-2 高性能推理，需要加上 `-DWITH_GPT=ON`。默认为 OFF。
 * `-DWITH_UNIFIED`: 是否编译带有 Unified Transformer 或是 UNIMOText 相关的 lib。若使用，需要加上 `-DWITH_UNIFIED=ON`。默认为 ON。
 * `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
@@ -242,13 +242,12 @@ cd PaddleNLP/paddlenlp/ops/
 ``` sh
 mkdir build
 cd build/
-cmake .. -DSM=xx -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON
+cmake .. -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON
 make -j
 cd ../
 ```
 
-注意：
-* `-DSM`: 是指的所用 GPU 的 compute capability。举例来说，可以将之指定为 70(V100) 或是 75(T4)
+可以使用的编译选项包括：
 * `-DPADDLE_LIB`: 需要指明使用的 PaddlePaddle 预测库的路径 `/path/to/paddle_inference_install_dir/`，需要使用的 PaddlePaddle 的 lib 可以选择自行编译或者直接从官网下载 [paddle_inference_linux_lib](https://paddleinference.paddlepaddle.org.cn/user_guides/download_lib.html#linux)。需要注意的是，在该路径下，预测库的组织结构满足：
   ```text
   .
@@ -263,6 +262,7 @@ cd ../
   └── version.txt
   ```
 * `-DDEMO`: 说明预测库使用 demo 的位置。比如指定 -DDEMO=./demo/transformer_e2e.cc 或是 -DDEMO=./demo/gpt.cc。最好使用绝对路径，若使用相对路径，需要是相对于 `PaddleNLP/paddlenlp/ops/faster_transformer/src/` 的相对路径。
+* `-DSM`: 是指的所用 GPU 的 compute capability，建议不使用该选项设置，未设置时将自动检测。如要设置，需根据 [compute capability](https://developer.nvidia.com/zh-cn/cuda-gpus#compute) 进行设置，如 V100 时设置 `-DSM=70` 或 T4 时设置 `-DSM=75`。
 * `-DWITH_GPT`: 是否编译带有 GPT 相关的 lib。若使用 GPT-2 高性能推理，需要加上 `-DWITH_GPT=ON`。默认为 OFF。
 * `-DWITH_UNIFIED`: 是否编译带有 Unified Transformer 或是 UNIMOText 相关的 lib。若使用，需要加上 `-DWITH_UNIFIED=ON`。默认为 ON。
 * `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
