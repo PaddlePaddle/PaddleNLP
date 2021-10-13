@@ -258,7 +258,7 @@ PaddleNLP 准备
     make -j
     cd ../
 
-注意：
+可以使用的编译选项包括：
 
 * `-DPADDLE_LIB`: 需要指明使用的 PaddlePaddle 预测库的路径 `/path/to/paddle_inference_install_dir/`，需要使用的 PaddlePaddle 的 lib 可以选择自行编译或者直接从官网下载 `paddle_inference_linux_lib <https://paddleinference.paddlepaddle.org.cn/user_guides/download_lib.html#linux>`_。需要注意的是，在该路径下，预测库的组织结构满足：
   .. code-block::
