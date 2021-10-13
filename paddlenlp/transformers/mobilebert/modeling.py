@@ -789,13 +789,17 @@ class MobileBertPreTrainedModel(PretrainedModel):
 
 
 class MobileBertForPreTraining(MobileBertPreTrainedModel):
-    def __init__(self, config):
+    def __init__(self, mobilebert):
         super(MobileBertForPreTraining, self).__init__()
-        self.mobilebert = MobileBertModel(config)
-        self.cls = MobileBertPreTrainingHeads(config)
-        self.mob_bert_config = config
+        self.mobilebert = mobilebert
+        self.cls = MobileBertPreTrainingHeads(
+            self.mobilebert.config["vocab_size"],
+            self.mobilebert.config["hidden_size"],
+            self.mobilebert.config["embedding_size"],
+            self.mobilebert.config["hidden_act"],
+            self.mobilebert.config["layer_norm_eps"])
 
-        self.apply(self.init_weights)
+        self.init_weights()
 
     def get_output_embeddings(self):
         return self.cls.predictions.decoder
@@ -814,8 +818,7 @@ class MobileBertForPreTraining(MobileBertPreTrainedModel):
             labels=None,
             next_sentence_label=None,
             output_attentions=None,
-            output_hidden_states=None,
-            return_dict=None, ):
+            output_hidden_states=None, ):
         r"""
         labels (``paddle.Tensor`` of shape ``(batch_size, sequence_length)``, `optional`):
             Labels for computing the masked language modeling loss. Indices should be in ``[-100, 0, ...,
@@ -837,7 +840,6 @@ class MobileBertForPreTraining(MobileBertPreTrainedModel):
             >>> prediction_logits = outputs[0]
             >>> seq_relationship_logits = outputs[1]
         """
-        return_dict = return_dict if return_dict is not None else self.mob_bert_config.use_return_dict
 
         outputs = self.mobilebert(
             input_ids,
@@ -847,13 +849,12 @@ class MobileBertForPreTraining(MobileBertPreTrainedModel):
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict, )
+            output_hidden_states=output_hidden_states)
         sequence_output, pooled_output = outputs[:2]
         prediction_scores, seq_relationship_score = self.cls(sequence_output,
                                                              pooled_output)
 
-        output = (prediction_scores, seq_relationship_score) + (outputs[0], )
+        output = (prediction_scores, seq_relationship_score) + outputs[2:]
         return output
 
 

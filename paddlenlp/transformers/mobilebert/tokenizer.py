@@ -6,7 +6,7 @@ __all__ = ['MobileBertTokenizer']
 class MobileBertTokenizer(BertTokenizer):
     r"""
     Construct a MobileBERT tokenizer.
-    :class:`~transformers.MobileBertTokenizer is identical to :class:`~transformers.BertTokenizer` and runs end-to-end
+    :class:`~paddlenlp.transformers.MobileBertTokenizer is identical to :class:`~paddlenlp.transformers.BertTokenizer` and runs end-to-end
     tokenization: punctuation splitting and wordpiece.
     Refer to superclass :class:`~transformers.BertTokenizer` for usage examples and documentation concerning
     parameters.
