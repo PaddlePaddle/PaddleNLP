@@ -406,9 +406,10 @@ class InferTransformerDecoding(nn.Layer):
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 decoding_lib)
         else:
-            logger.warning(
-                "The specified decoding_lib does not exist, and it will be built automatically."
-            )
+            if decoding_lib is not None:
+                logger.warning(
+                    "The specified decoding_lib does not exist, and it will be built automatically."
+                )
             load("FasterTransformer", verbose=True)
 
         super(InferTransformerDecoding, self).__init__()
@@ -597,9 +598,10 @@ class InferGptDecoding(nn.Layer):
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 decoding_lib)
         else:
-            logger.warning(
-                "The specified decoding_lib does not exist, and it will be built automatically."
-            )
+            if decoding_lib is not None:
+                logger.warning(
+                    "The specified decoding_lib does not exist, and it will be built automatically."
+                )
             load("FasterTransformer", verbose=True)
 
         super(InferGptDecoding, self).__init__()
@@ -770,9 +772,10 @@ class InferUnifiedDecoding(nn.Layer):
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 decoding_lib)
         else:
-            logger.warning(
-                "The specified decoding_lib does not exist, and it will be built automatically."
-            )
+            if decoding_lib is not None:
+                logger.warning(
+                    "The specified decoding_lib does not exist, and it will be built automatically."
+                )
             load("FasterTransformer", verbose=True)
 
         super(InferUnifiedDecoding, self).__init__()
@@ -1133,9 +1136,10 @@ class InferBartDecoding(nn.Layer):
             paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
                 decoding_lib)
         else:
-            logger.warning(
-                "The specified decoding_lib does not exist, and it will be built automatically."
-            )
+            if decoding_lib is not None:
+                logger.warning(
+                    "The specified decoding_lib does not exist, and it will be built automatically."
+                )
             load("FasterTransformer", verbose=True)
 
         super(InferBartDecoding, self).__init__()
