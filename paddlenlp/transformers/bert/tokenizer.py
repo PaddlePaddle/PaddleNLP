@@ -328,15 +328,15 @@ class BertTokenizer(PretrainedTokenizer):
             "simbert-base-chinese":
             "https://paddlenlp.bj.bcebos.com/models/transformers/simbert/vocab.txt",
             "tbs17-MathBERT":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/tbs17/MathBERT-vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/tbs17-MathBERT/vocab.txt",
             "nlptown-bert-base-multilingual-uncased-sentiment":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/nlptown/bert-base-multilingual-uncased-sentiment-vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/nlptown-bert-base-multilingual-uncased-sentiment/vocab.txt",
             "ckiplab-bert-base-chinese-ws":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ckiplab/bert-base-chinese-ws-vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/ckiplab-bert-base-chinese-ws/vocab.txt",
             "ckiplab-bert-base-chinese-pos":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ckiplab/bert-base-chinese-pos-vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/ckiplab-bert-base-chinese-pos/vocab.txt",
             "ckiplab-bert-base-chinese-ner":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ckiplab/bert-base-chinese-ner-vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/community/junnyu/ckiplab-bert-base-chinese-ner/vocab.txt",
         }
     }
     pretrained_init_configuration = {
