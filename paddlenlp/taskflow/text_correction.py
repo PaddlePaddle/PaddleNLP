@@ -139,7 +139,7 @@ class CSCTask(Task):
             pad_pinyin_id=self._pinyin_vocab[self._pinyin_vocab.pad_token])
         # Load the model parameter for the predict
         model_path = download_file(self._task_path, model + ".pdparams",
-                                   URLS[model][0], URLS[model][1])
+                                   URLS[model][0], URLS[model][1], model)
         state_dict = paddle.load(model_path)
         model_instance.set_state_dict(state_dict)
         model_instance.eval()

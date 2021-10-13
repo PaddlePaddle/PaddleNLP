@@ -232,12 +232,12 @@ class CrossEntropyCriterion(nn.Layer):
                     The average loss of current batch whose data type can be float32, float64.
                     The relation between `sum_cost` and `avg_cost` can be described as:
 
-                    .. math:
+                    .. math::
 
-                        avg_cost = sum_cost / token_num
+                        avg\_cost = sum\_cost / token\_num
 
                 - `token_num` (Tensor):
-                    The number of tokens of current batch. 
+                    The number of tokens of current batch. Its data type can be float32, float64.
 
         Example:
             .. code-block::
@@ -493,6 +493,31 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
             t)
 
     def step(self, time, inputs, states, **kwargs):
+        """
+        Perform a beam search decoding step, which uses cell to get probabilities,
+        and follows a beam search step to calculate scores and select candidate token ids.
+
+        Args:
+             time(Tensor): An `int64` tensor with shape `[1]` provided by the caller,
+                 representing the current time step number of decoding.
+             inputs(Tensor): A tensor variable. It is same as `initial_inputs`
+                 returned by `initialize()` for the first decoding step and
+                 `next_inputs` returned by `step()` for the others.
+             states(Tensor): A structure of tensor variables.
+                 It is same as the `initial_cell_states` returned by `initialize()`
+                 for the first decoding step and `next_states` returned by
+                 `step()` for the others.
+             kwargs(dict, optional): Additional keyword arguments, provided by the caller `dynamic_decode`.
+
+        Returns:
+             tuple: Returns tuple (``beam_search_output, beam_search_state, next_inputs, finished``).
+             `beam_search_state` and `next_inputs` have the same structure,
+             shape and data type as the input arguments states and inputs separately.
+             `beam_search_output` is a namedtuple(including scores, predicted_ids, parent_ids as fields) of tensor variables,
+             where `scores, predicted_ids, parent_ids` all has a tensor value shaped [batch_size, beam_size] with data type
+             float32, int64, int64. `finished` is a bool tensor with shape [batch_size, beam_size].
+
+         """
         # Steps for decoding.
         # Compared to RNN, Transformer has 3D data at every decoding step
         inputs = paddle.reshape(inputs, [-1, 1])  # token
@@ -628,7 +653,7 @@ class TransformerModel(nn.Layer):
             The dropout probability used in MHA to drop some attention target.
             If None, use the value of dropout. Defaults to None.
         act_dropout (float):
-            The dropout probability used after FFN activition. If None, use
+            The dropout probability used after FFN activation. If None, use
             the value of dropout. Defaults to None.
         bos_id (int, optional):
             The start token id and also be used as padding id. Defaults to 0.
