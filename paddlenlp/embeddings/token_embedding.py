@@ -242,6 +242,14 @@ class TokenEmbedding(nn.Embedding):
         Returns:
             `numpy.array`: The vectors of specifying words.
 
+        Examples:
+            .. code-block::
+
+                from paddlenlp.embeddings import TokenEmbedding
+
+                embed = TokenEmbedding()
+                vector =  embed.search('Welcome to use PaddlePaddle and PaddleNLP!')
+
         """
         idx_list = self.get_idx_list_from_words(words)
         idx_tensor = paddle.to_tensor(idx_list)
@@ -270,6 +278,15 @@ class TokenEmbedding(nn.Embedding):
 
         Returns:
             `list`: The indexes list of specifying words.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.embeddings import TokenEmbedding
+
+                embed = TokenEmbedding()
+                index =  embed.get_idx_from_word('Welcome to use PaddlePaddle and PaddleNLP!')
+                #635963
 
         """
         if isinstance(words, str):
@@ -305,7 +322,16 @@ class TokenEmbedding(nn.Embedding):
             word_b (`str`): The second word string.
 
         Returns:
-            `Float`: The dot product of 2 words.
+            float: The dot product of 2 words.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.embeddings import TokenEmbedding
+
+                embed = TokenEmbedding()
+                dot_product =  embed.dot('PaddlePaddle', 'PaddleNLP!')
+                #0.11827179
 
         """
         dot = self._dot_np
@@ -321,7 +347,16 @@ class TokenEmbedding(nn.Embedding):
             word_b (`str`): The second word string.
 
         Returns:
-            `Float`: The cosine similarity of 2 words.
+            float: The cosine similarity of 2 words.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.embeddings import TokenEmbedding
+
+                embed = TokenEmbedding()
+                cosine_simi =  embed.cosine_sim('PaddlePaddle', 'PaddleNLP!')
+                #0.99999994
 
         """
         dot = self._dot_np
